@@ -9,19 +9,26 @@ pub struct SortedVec<T> {
 }
 
 impl<T: Ord + Clone> SortedVec<T> {
-    /// Creates a new, empty `SortedVec`.
+    /// Creates a new, empty [`SortedVec`].
     pub fn new() -> Self {
         Self { inner: Vec::new() }
     }
 
-    /// Inserts an element into the `SortedVec`, maintaining sorted order. This runs in O(n) because
-    /// of shifting of elements.
+    /// Creates a new, empty [`SortedVec`] with given capacity
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// Inserts an element into the [`SortedVec`], maintaining sorted order. This runs in O(n)
+    /// because of shifting of elements.
     pub fn insert(&mut self, value: T) {
         let pos = self.inner.binary_search(&value).unwrap_or_else(|e| e);
         self.inner.insert(pos, value);
     }
 
-    /// Removes an element from the `SortedVec`. Returns `true` if the element was found and
+    /// Removes an element from the [`SortedVec`]. Returns `true` if the element was found and
     /// removed. This runs in O(n) due to shifting of elements.
     pub fn remove(&mut self, value: &T) -> bool {
         if let Ok(pos) = self.inner.binary_search(value) {
@@ -32,7 +39,7 @@ impl<T: Ord + Clone> SortedVec<T> {
         }
     }
 
-    /// Checks if the `SortedVec` contains the given value.
+    /// Checks if the [`SortedVec`] contains the given value.
     pub fn contains(&self, value: &T) -> bool {
         self.binary_search(value).is_ok()
     }
@@ -42,12 +49,12 @@ impl<T: Ord + Clone> SortedVec<T> {
         self.inner.binary_search(value)
     }
 
-    /// Returns the number of elements in the `SortedVec`.
+    /// Returns the number of elements in the [`SortedVec`].
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    /// Returns `true` if the `SortedVec` is empty.
+    /// Returns `true` if the [`SortedVec`] is empty.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
@@ -62,7 +69,7 @@ impl<T: Ord + Clone> SortedVec<T> {
         self.inner.iter()
     }
 
-    /// Consumes the `SortedVec` and returns the inner `Vec`.
+    /// Consumes the [`SortedVec`] and returns the inner [`Vec`].
     pub fn into_inner(self) -> Vec<T> {
         self.inner
     }
@@ -72,7 +79,7 @@ impl<T: Ord + Clone> SortedVec<T> {
         &self.inner
     }
 
-    /// Merge another `SortedVec`
+    /// Merge another [`SortedVec`]
     pub fn merge(&mut self, other: &Self) {
         let mut merged: Vec<T> = Vec::with_capacity(self.len() + other.len());
         let mut i = 0;
@@ -112,7 +119,7 @@ impl<T: Ord + Clone> Default for SortedVec<T> {
 }
 
 impl<T: Ord + Clone> From<Vec<T>> for SortedVec<T> {
-    /// Creates a `SortedVec` from a `Vec`, sorting the elements.
+    /// Creates a [`SortedVec`] from a [`Vec`], sorting the elements.
     fn from(mut vec: Vec<T>) -> Self {
         vec.sort();
         Self { inner: vec }

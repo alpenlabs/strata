@@ -26,6 +26,7 @@ use crate::{
     status::{apply_status_updates, L1StatusUpdate},
 };
 
+/// Context that encapsulates common items needed for L1 reader.
 struct ReaderContext<R: Reader> {
     /// Bitcoin reader client
     client: Arc<R>,
@@ -37,6 +38,7 @@ struct ReaderContext<R: Reader> {
     status_tx: Arc<StatusTx>,
 }
 
+/// The main task that initializes the reader state and starts reading from bitcoin.
 pub async fn bitcoin_data_reader_task(
     client: Arc<impl Reader>,
     event_tx: mpsc::Sender<L1Event>,
@@ -53,6 +55,7 @@ pub async fn bitcoin_data_reader_task(
     do_reader_task(ctx, target_next_block).await
 }
 
+/// Inner function that actually does the reading task.
 async fn do_reader_task<R: Reader>(
     ctx: ReaderContext<R>,
     target_next_block: u64,
@@ -218,6 +221,7 @@ async fn find_pivot_block(
     Ok(None)
 }
 
+/// Fetches a block at given height, extracts relevant transactions and emits an `L1Event`.
 async fn fetch_and_process_block<R: Reader>(
     ctx: &ReaderContext<R>,
     height: u64,

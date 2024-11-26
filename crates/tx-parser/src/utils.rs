@@ -87,7 +87,7 @@ pub fn generate_taproot_address(
 
 /// Reads the operator wallet public keys from Rollup params. Returns None if
 /// not yet bootstrapped
-/// FIXME: This is only for devnet as these pks have to be read from the chain state
+// FIXME: This is only for devnet as these pks have to be read from the chain state
 pub fn get_operator_wallet_pks(params: &RollupParams) -> Vec<Buf32> {
     let OperatorConfig::Static(operator_table) = &params.operator_config;
 

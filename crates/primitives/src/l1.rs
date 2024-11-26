@@ -237,7 +237,7 @@ pub struct L1Status {
 /// some useful traits on it such as [`serde::Deserialize`], [`borsh::BorshSerialize`] and
 /// [`borsh::BorshDeserialize`].
 // TODO: implement [`arbitrary::Arbitrary`]?
-#[derive(Debug, Clone, Serialize, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BitcoinAddress {
     /// The [`bitcoin::Network`] that this address is valid in.
     network: Network,
@@ -352,26 +352,11 @@ impl BorshDeserialize for BitcoinAddress {
     }
 }
 
-impl PartialEq for BitcoinAddress {
-    fn eq(&self, other: &Self) -> bool {
-        self.address
-            .script_pubkey()
-            .eq(&other.address.script_pubkey())
-    }
-}
-
-impl PartialOrd for BitcoinAddress {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for BitcoinAddress {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.address
-            .script_pubkey()
-            .cmp(&other.address.script_pubkey())
-    }
+/// Outpoint of a bitcoin tx
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, BorshSerialize, BorshDeserialize)]
+pub struct Outpoint {
+    pub txid: Buf32,
+    pub vout: u32,
 }
 
 /// A wrapper for bitcoin amount in sats similar to the implementation in [`bitcoin::Amount`].

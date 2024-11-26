@@ -1,7 +1,7 @@
 [package]
+edition = "2021"
 name = "strata-zkvm-tests"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
@@ -43,10 +43,10 @@ strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
 
 [features]
 default = ["sp1"]
-sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder"]
-risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder"]
 mock = [
   "strata-sp1-guest-builder/mock",
   "strata-sp1-adapter/mock",
   "strata-risc0-adapter/mock",
 ]
+risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder"]
+sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder"]

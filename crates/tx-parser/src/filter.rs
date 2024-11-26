@@ -21,73 +21,57 @@ pub fn filter_protocol_op_tx_refs(
         .txdata
         .iter()
         .enumerate()
-        .filter_map(|(i, tx)| {
-            extract_protocol_op(tx, &filter_config)
-                .map(|relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
+        .flat_map(|(i, tx)| {
+            extract_protocol_ops(tx, &filter_config)
+                .into_iter()
+                .map(move |relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
         })
         .collect()
 }
 
-///  if a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
-///  info.
-///  TODO: make this function return multiple ops as a single tx can have multiple outpoints that's
-///  relevant
-fn extract_protocol_op(
-    tx: &Transaction,
-    filter_conf: &TxFilterConfig,
-) -> Option<ProtocolOperation> {
+/// If a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
+/// info.
+//  TODO: make this function return multiple ops as a single tx can have multiple outpoints that's
+//  relevant
+fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
     // Currently all we have are inscription txs, deposits and deposit requests
-    parse_inscription_checkpoint(tx, filter_conf)
+    parse_inscription_checkpoints(tx, filter_conf)
         .map(ProtocolOperation::Checkpoint)
-        .or_else(|| parse_deposit(tx, filter_conf).map(ProtocolOperation::Deposit))
-        .or_else(|| parse_deposit_request(tx, filter_conf).map(ProtocolOperation::DepositRequest))
+        .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
+        .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
+        .collect()
 }
 
-/// Identifies the tx utxos that are spent to certain addresses/script_pubkeys and parse any
-/// information accordingly.
-fn _parse_spent_to(tx: &Transaction, filter_conf: &TxFilterConfig) -> Option<ProtocolOperation> {
-    // Check for spent to addrs
-    let _matched_op = tx
-        .output
-        .iter()
-        .filter_map(|op| {
-            filter_conf
-                .expected_addrs
-                .as_slice()
-                .binary_search_by_key(&op.script_pubkey, |e| e.address().script_pubkey())
-                .ok()
-                .and_then(|idx| filter_conf.expected_addrs.get(idx))
-        })
-        .next();
-    // TODO: complete this when we figure out what kind of protocol ops can be generated from
-    // matching spends
-
-    None
-}
-
-fn parse_deposit_request(
+fn parse_deposit_requests(
     tx: &Transaction,
     filter_conf: &TxFilterConfig,
-) -> Option<DepositRequestInfo> {
-    extract_deposit_request_info(tx, &filter_conf.deposit_config)
+) -> impl Iterator<Item = DepositRequestInfo> {
+    // TODO: Currently only one item is parsed, need to check thoroughly and parse multiple
+    extract_deposit_request_info(tx, &filter_conf.deposit_config).into_iter()
 }
 
-fn parse_deposit(tx: &Transaction, filter_conf: &TxFilterConfig) -> Option<DepositInfo> {
-    extract_deposit_info(tx, &filter_conf.deposit_config)
+fn parse_deposits(
+    tx: &Transaction,
+    filter_conf: &TxFilterConfig,
+) -> impl Iterator<Item = DepositInfo> {
+    // TODO: Currently only one item is parsed, need to check thoroughly and parse multiple
+    extract_deposit_info(tx, &filter_conf.deposit_config).into_iter()
 }
 
-/// Parses inscription from the given transaction. The inscription currently recognized is the
-/// checkpoint inscription.
+/// Parses inscription from the given transaction. Currently, the only inscription recognizable is
+/// the checkpoint inscription.
 // TODO: we need to change inscription structure and possibly have inscriptions for checkpoints and
 // DA separately
-fn parse_inscription_checkpoint(
-    tx: &Transaction,
-    filter_conf: &TxFilterConfig,
-) -> Option<SignedBatchCheckpoint> {
-    tx.input.first().and_then(|inp| {
+fn parse_inscription_checkpoints<'a>(
+    tx: &'a Transaction,
+    filter_conf: &'a TxFilterConfig,
+) -> impl Iterator<Item = SignedBatchCheckpoint> + 'a {
+    tx.input.iter().filter_map(|inp| {
         inp.witness
             .tapscript()
-            .and_then(|scr| parse_inscription_data(&scr.into(), &filter_conf.rollup_name).ok())
+            .and_then(|scr| {
+                parse_inscription_data(&scr.into(), &filter_conf.rollup_name.clone()).ok()
+            })
             .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.batch_data()).ok())
     })
 }

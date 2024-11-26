@@ -1,32 +1,34 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     buf::Buf32,
-    l1::BitcoinAddress,
+    l1::{BitcoinAddress, Outpoint},
     params::{DepositTxParams, RollupParams},
     sorted_vec::SortedVec,
 };
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 
+/// A configuration that determines how relevant transactions in a bitcoin block are filtered.
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub struct TxFilterConfig {
     /// For checkpoint update inscriptions.
     pub rollup_name: String,
 
-    /// For addresses that we expect spends to.
+    /// For addresses that are expected to be spent to.
     pub expected_addrs: SortedVec<BitcoinAddress>,
 
-    /// For blobs we expect to be written.
+    /// For blobs that are expected to be written to bitcoin.
     pub expected_blobs: SortedVec<Buf32>,
 
     /// For deposits that might be spent from.
     pub expected_outpoints: SortedVec<Outpoint>,
 
-    /// Deposit config that defines the structure we expect in the utxo
+    /// Deposit config that determines how a deposit transaction can be parsed.
     pub deposit_config: DepositTxParams,
 }
 
 impl TxFilterConfig {
+    /// Derive a `TxFilterConfig` from `RollupParams`.
     // TODO: this will need chainstate too in the future
     pub fn derive_from(rollup_params: &RollupParams) -> anyhow::Result<Self> {
         let operator_wallet_pks = get_operator_wallet_pks(rollup_params);
@@ -51,11 +53,4 @@ impl TxFilterConfig {
             deposit_config,
         })
     }
-}
-
-/// Outpoint of a bitcoin tx
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, BorshSerialize, BorshDeserialize)]
-pub struct Outpoint {
-    pub txid: Buf32,
-    pub vout: u32,
 }
