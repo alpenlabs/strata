@@ -148,7 +148,7 @@ pub mod internal {
     macro_rules! impl_buf_serde {
         // Historically, the Buf* types were wrapping FixedBytes.
         // Delegate serde to FixedBytes for now to not break anything.
-        // In the future, this will be reworked.
+        // TODO (STR-453): rework serde.
         ($name:ident, $len:expr) => {
             impl serde::Serialize for $name {
                 #[inline]
