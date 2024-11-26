@@ -78,29 +78,10 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         gas_price = web3.to_wei(1, "gwei")
         self.logger.debug(f"Gas price: {gas_price}")
 
+        # Burn any existing balance in the EL address
         # FIXME: Somehow web3 default account has some balance.
         # Hence we need to set it to burn it.
-        balance_to_burn = int(rethrpc.eth_getBalance(el_address), 16)
-        self.logger.debug(f"Strata balance to burn: {balance_to_burn}")
-        estimated_gas = web3.eth.estimate_gas(
-            {
-                "from": el_address,
-                "to": BURNER_ADDRESS,
-                "value": balance_to_burn,
-            }
-        )
-        web3.eth.send_transaction(
-            {
-                "from": el_address,
-                "to": BURNER_ADDRESS,
-                "value": balance_to_burn - (estimated_gas * gas_price),
-                "gas": estimated_gas,
-                "gasPrice": gas_price,
-            }
-        )
-        wait_until(lambda: int(rethrpc.eth_getBalance(el_address), 16) == 0)
-        # Ok now we have a clean state
-        self.logger.debug("Strata balance is zero")
+        self.burn_balance(web3, rethrpc, el_address, gas_price)
 
         # Get operators pubkey and musig2 aggregates it
         bridge_pk = get_bridge_pubkey(seqrpc)
@@ -148,9 +129,8 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         self.logger.debug(f"Strata Balance difference: {difference}")
         assert difference == balance_post_withdraw, "balance difference is not expected"
 
-        # Mine blocks
-        btcrpc.proxy.generatetoaddress(12, UNSPENDABLE_ADDRESS)
-        wait_until(lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > 0)
+        # Wait for the withdraw address to have a positive balance
+        self.mine_blocks_until_maturity(btcrpc, withdraw_address, btc_url, btc_user, btc_password)
 
         # Make sure that the balance in the BTC wallet is D BTC - operator's fees
         btc_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
@@ -238,3 +218,39 @@ class BridgeWithdrawHappyTest(flexitest.Test):
             "data": data_bytes,
         }
         return web3.eth.estimate_gas(transaction)
+
+    def burn_balance(self, web3: Web3, rethrpc, el_address: str, gas_price: int):
+        """Burns any existing balance in the given address."""
+        balance_to_burn = int(rethrpc.eth_getBalance(el_address), 16)
+        self.logger.debug(f"Strata balance to burn: {balance_to_burn}")
+        estimated_gas = web3.eth.estimate_gas(
+            {
+                "from": el_address,
+                "to": BURNER_ADDRESS,
+                "value": balance_to_burn,
+            }
+        )
+        web3.eth.send_transaction(
+            {
+                "from": el_address,
+                "to": BURNER_ADDRESS,
+                "value": balance_to_burn - (estimated_gas * gas_price),
+                "gas": estimated_gas,
+                "gasPrice": gas_price,
+            }
+        )
+        wait_until(lambda: int(rethrpc.eth_getBalance(el_address), 16) == 0)
+        # Ok now we have a clean state
+        self.logger.debug("Strata balance is zero")
+
+    def mine_blocks_until_maturity(
+        self, btcrpc, withdraw_address, btc_url, btc_user, btc_password, number_of_blocks=12
+    ):
+        """
+        Mine blocks until the withdraw address has a positive balance
+        By default, the number of blocks to mine is 12:
+        - 6 blocks to mature the DRT
+        - 6 blocks to mature the DT
+        """
+        btcrpc.proxy.generatetoaddress(number_of_blocks, UNSPENDABLE_ADDRESS)
+        wait_until(lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > 0)
