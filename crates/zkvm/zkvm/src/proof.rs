@@ -38,7 +38,7 @@ impl From<&Proof> for Vec<u8> {
 #[derive(
     Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary,
 )]
-pub struct VerificationKey(pub Vec<u8>);
+pub struct VerificationKey(Vec<u8>);
 
 impl VerificationKey {
     pub fn new(data: Vec<u8>) -> Self {
@@ -73,7 +73,7 @@ impl AggregationInput {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProofType {
     Groth16,
     Core,
