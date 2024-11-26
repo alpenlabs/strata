@@ -28,7 +28,7 @@ use strata_rocksdb::{
     broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
-use strata_status::{StatusRx, StatusTx};
+use strata_status::StatusChannel;
 use strata_storage::{
     managers::checkpoint::CheckpointDbManager, ops::bridge_relay::BridgeMsgOps, L2BlockManager,
 };
@@ -244,8 +244,7 @@ pub struct CoreContext {
     pub params: Arc<Params>,
     pub sync_manager: Arc<SyncManager>,
     pub l2_block_manager: Arc<L2BlockManager>,
-    pub status_tx: Arc<StatusTx>,
-    pub status_rx: Arc<StatusRx>,
+    pub status_channel: StatusChannel,
     pub engine: Arc<RpcExecEngineCtl<EngineRpcClient>>,
     pub relayer_handle: Arc<RelayerHandle>,
     pub bitcoin_client: Arc<BitcoinClient>,
@@ -324,7 +323,7 @@ fn start_core_tasks(
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
     // init status tasks
-    let (status_tx, status_rx) = init_status_channel(database.as_ref(), params.network())?;
+    let status_channel = init_status_channel(database.as_ref())?;
 
     let engine = init_engine_controller(
         config,
@@ -351,7 +350,7 @@ fn start_core_tasks(
         engine.clone(),
         pool.clone(),
         params.clone(),
-        (status_tx.clone(), status_rx.clone()),
+        status_channel.clone(),
         checkpoint_manager,
     )?
     .into();
@@ -364,13 +363,13 @@ fn start_core_tasks(
         bitcoin_client.clone(),
         database.clone(),
         sync_manager.get_csm_ctl(),
-        status_tx.clone(),
+        status_channel.clone(),
     )?;
 
     // Start relayer task.
     let relayer_handle = strata_bridge_relay::relayer::start_bridge_relayer_task(
         bridge_msg_ops,
-        status_rx.clone(),
+        status_channel.clone(),
         config.relayer,
         executor,
     );
@@ -381,8 +380,7 @@ fn start_core_tasks(
         params,
         sync_manager,
         l2_block_manager,
-        status_tx,
-        status_rx,
+        status_channel,
         engine,
         relayer_handle,
         bitcoin_client,
@@ -407,7 +405,7 @@ fn start_sequencer_tasks(
         params,
         sync_manager,
         l2_block_manager,
-        status_tx,
+        status_channel,
         engine,
         bitcoin_client,
         ..
@@ -443,7 +441,7 @@ fn start_sequencer_tasks(
         bitcoin_client,
         writer_config,
         seq_db,
-        status_tx.clone(),
+        status_channel.clone(),
         pool.clone(),
         broadcast_handle.clone(),
     )?;
@@ -521,7 +519,7 @@ async fn start_rpc(
         database,
         sync_manager,
         l2_block_manager,
-        status_rx,
+        status_channel,
         relayer_handle,
         ..
     } = ctx;
@@ -530,7 +528,7 @@ async fn start_rpc(
 
     // Init RPC impls.
     let strata_rpc = rpc_server::StrataRpcImpl::new(
-        status_rx,
+        status_channel.clone(),
         database,
         sync_manager,
         l2_block_manager,

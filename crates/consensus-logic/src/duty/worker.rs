@@ -379,9 +379,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let target_slot = data.target_slot();
             let parent = data.parent();
 
-            let client_state = sync_manager.status_rx().cl().borrow().clone();
-
-            let l1_view = client_state.l1_view();
+            let l1_view = sync_manager.status_channel().l1_view();
 
             // TODO get the cur client state from the sync manager, the one used
             // to initiate this duty and pass it into `sign_and_store_block`
@@ -392,7 +390,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let Some((blkid, _block)) = block_assembly::sign_and_store_block(
                 target_slot,
                 parent,
-                l1_view,
+                &l1_view,
                 identity_key,
                 database,
                 engine,

@@ -18,7 +18,10 @@ use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
 use strata_db::traits::L1Database;
 use strata_primitives::l1::BitcoinAddress;
 use strata_rpc_types::RpcServerError;
-use strata_state::{bridge_state::DepositState, chain_state::Chainstate, tx::ProtocolOperation};
+use strata_state::{
+    bridge_state::{DepositState, DepositsTable},
+    tx::ProtocolOperation,
+};
 use tracing::{debug, error};
 
 /// The `vout` corresponding to the deposit related Taproot address on the Deposit Request
@@ -142,9 +145,8 @@ pub(super) async fn extract_deposit_requests<L1DB: L1Database>(
 /// [`OperatorIdx`](strata_primitives::bridge::OperatorIdx) to be passed in as a withdrawal
 /// duty is relevant for all operators for now.
 pub(super) fn extract_withdrawal_infos(
-    chain_state: &Arc<Chainstate>,
+    deposits_table: &DepositsTable,
 ) -> impl Iterator<Item = CooperativeWithdrawalInfo> + '_ {
-    let deposits_table = chain_state.deposits_table();
     let deposits = deposits_table.deposits();
 
     let withdrawal_infos = deposits.filter_map(|deposit| {
@@ -205,6 +207,7 @@ mod tests {
             DepositEntry, DepositsTable, DispatchCommand, DispatchedState, OperatorTable,
             WithdrawOutput,
         },
+        chain_state::Chainstate,
         exec_env::ExecEnvState,
         exec_update::UpdateInput,
         genesis::GenesisStateData,
@@ -288,8 +291,8 @@ mod tests {
             generate_empty_chain_state_with_deposits(num_deposits);
         let chain_state = Arc::new(chain_state);
 
-        let withdrawal_infos =
-            extract_withdrawal_infos(&chain_state).collect::<Vec<CooperativeWithdrawalInfo>>();
+        let withdrawal_infos = extract_withdrawal_infos(chain_state.deposits_table())
+            .collect::<Vec<CooperativeWithdrawalInfo>>();
 
         assert_eq!(
             withdrawal_infos.len(),

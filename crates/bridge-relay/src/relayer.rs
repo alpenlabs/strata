@@ -5,7 +5,7 @@ use std::{
 };
 
 use strata_primitives::relay::types::{BridgeMessage, RelayerConfig, Scope};
-use strata_status::StatusRx;
+use strata_status::StatusChannel;
 use strata_storage::ops::bridge_relay::BridgeMsgOps;
 use strata_tasks::TaskExecutor;
 use tokio::{select, sync::mpsc, time::interval};
@@ -22,7 +22,7 @@ pub struct RelayerState {
     brmsg_ops: Arc<BridgeMsgOps>,
 
     /// To fetch the chainstate to inspect the operator set.
-    status_rx: Arc<StatusRx>,
+    status_channel: StatusChannel,
 
     /// Tracker to avoid duplicating messages.
     processed_msgs: RecentMessageTracker,
@@ -33,12 +33,12 @@ impl RelayerState {
     pub fn new(
         config: RelayerConfig,
         brmsg_ops: Arc<BridgeMsgOps>,
-        status_rx: Arc<StatusRx>,
+        status_channel: StatusChannel,
     ) -> Self {
         Self {
             config,
             brmsg_ops,
-            status_rx,
+            status_channel,
             processed_msgs: RecentMessageTracker::new(),
         }
     }
@@ -83,12 +83,9 @@ impl RelayerState {
             // Otherwise it's better for network health to relay them
             // unconditionally.
             // TODO make it configurable if we relay or not without chainstate?
-            let chs_state = self.status_rx.chs().borrow().clone();
-            if let Some(chs_state) = chs_state {
-                let sig_res = strata_primitives::relay::util::verify_bridge_msg_sig(
-                    &message,
-                    chs_state.operator_table(),
-                );
+            if let Some(op_table) = self.status_channel.operator_table() {
+                let sig_res =
+                    strata_primitives::relay::util::verify_bridge_msg_sig(&message, &op_table);
 
                 if let Err(e) = sig_res {
                     trace!(err = %e, "dropping invalid message");
@@ -164,7 +161,7 @@ impl RelayerHandle {
 // TODO make this a builder
 pub fn start_bridge_relayer_task(
     ops: Arc<BridgeMsgOps>,
-    status_rx: Arc<StatusRx>,
+    status_channel: StatusChannel,
     config: RelayerConfig,
     task_exec: &TaskExecutor,
 ) -> Arc<RelayerHandle> {
@@ -172,7 +169,7 @@ pub fn start_bridge_relayer_task(
     // the peer that sent them to us
     let (brmsg_tx, brmsg_rx) = mpsc::channel::<BridgeMessage>(100);
 
-    let state = RelayerState::new(config, ops.clone(), status_rx);
+    let state = RelayerState::new(config, ops.clone(), status_channel);
     task_exec.spawn_critical_async("bridge-msg-relayer", relayer_task(state, brmsg_rx));
 
     let h = RelayerHandle { brmsg_tx, ops };
