@@ -11,7 +11,10 @@ use strata_zkvm::VerificationKey;
 use uuid::Uuid;
 
 use super::{btc_ops::BtcBlockspaceProofGenerator, ProofGenerator};
-use crate::{errors::ProvingTaskError, state::ProvingTask2, task2::TaskTracker2};
+use crate::{
+    errors::ProvingTaskError,
+    task2::{ProvingTask2, TaskTracker2},
+};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]

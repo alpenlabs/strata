@@ -19,8 +19,7 @@ use crate::{
         btc_ops::BtcBlockspaceProofGenerator, l1_batch_ops::L1BatchProofGenerator, ProofGenerator,
         ProofHandler,
     },
-    state::ProvingTaskStatus2,
-    task2::TaskTracker2,
+    task2::{ProvingTaskStatus2, TaskTracker2},
     utils::block_on,
 };
 
@@ -29,7 +28,6 @@ pub struct ProverManager {
     task_tracker: Arc<TaskTracker2>,
     db: ProverDB,
     pool: rayon::ThreadPool,
-    pending_tasks_count: usize,
     handlers: HashMap<StrataProvingOp, ProofHandler>,
 }
 
@@ -60,14 +58,13 @@ impl ProverManager {
                 .build()
                 .expect("Failed to initialize prover threadpool worker"),
 
-            pending_tasks_count: Default::default(),
             db: ProverDB::new(Arc::new(db)),
             task_tracker,
             handlers,
         }
     }
 
-    /// Main event loop that continuously processes pending tasks and tracks proving progress.
+    /// Main event loop that continuously processes pending tasks
     pub async fn run(&self) {
         loop {
             self.process_pending_tasks().await;
@@ -97,14 +94,14 @@ impl ProverManager {
 
             self.pool.spawn(move || {
                 tracing::info_span!("prover_worker").in_scope(|| {
-                    make_proof2(handler, db, proof_id, task_tracker);
+                    make_proof(handler, db, proof_id, task_tracker);
                 })
             });
         }
     }
 }
 
-pub fn make_proof2(
+pub fn make_proof(
     handler: ProofHandler,
     db: ProverDB,
     proof_id: StrataProofId,
@@ -112,6 +109,8 @@ pub fn make_proof2(
 ) {
     let op = proof_id.into();
     let host = sp1::get_host(&op);
+
+    block_on(task_tracker.update_status(Uuid::new_v4(), ProvingTaskStatus2::ProvingInProgress));
 
     let proof_res = match handler {
         ProofHandler::BtcBlockspace(btc_blockspace_handler) => {
@@ -124,11 +123,11 @@ pub fn make_proof2(
 
     match proof_res {
         Ok(proof) => {
-            db.prover_store().insert_proof(proof_id, proof);
-            task_tracker.update_status(Uuid::new_v4(), ProvingTaskStatus2::Completed); // TODO
+            let _ = db.prover_store().insert_proof(proof_id, proof);
+            block_on(task_tracker.update_status(Uuid::new_v4(), ProvingTaskStatus2::Completed)); // TODO
         }
         Err(_) => {
-            task_tracker.update_status(Uuid::new_v4(), ProvingTaskStatus2::Failed);
+            block_on(task_tracker.update_status(Uuid::new_v4(), ProvingTaskStatus2::Failed));
         }
     }
 }

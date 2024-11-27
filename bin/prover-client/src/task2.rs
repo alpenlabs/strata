@@ -1,10 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
+use strata_primitives::vk::StrataProofId;
 use tokio::sync::Mutex;
 use tracing::info;
 use uuid::Uuid;
-
-use crate::state::{ProvingTask2, ProvingTaskStatus2};
 
 /// The `TaskTracker` manages the lifecycle of proving tasks. It provides functionality
 /// to create tasks, update their status, and retrieve tasks based on their current state.
@@ -78,4 +77,30 @@ impl TaskTracker2 {
         let tasks = self.tasks.lock().await;
         tasks.get(&task_id).cloned()
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct ProvingTask2 {
+    pub proof_id: StrataProofId,
+    pub status: ProvingTaskStatus2,
+}
+
+impl ProvingTask2 {
+    pub fn new(proof_id: StrataProofId, dependencies: Vec<Uuid>) -> Self {
+        let status = if dependencies.is_empty() {
+            ProvingTaskStatus2::Pending
+        } else {
+            ProvingTaskStatus2::WaitingForDependencies(HashSet::from_iter(dependencies))
+        };
+        Self { proof_id, status }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ProvingTaskStatus2 {
+    WaitingForDependencies(HashSet<Uuid>),
+    Pending,
+    ProvingInProgress,
+    Completed,
+    Failed,
 }

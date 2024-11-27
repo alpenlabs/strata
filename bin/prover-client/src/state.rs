@@ -8,14 +8,7 @@ use strata_primitives::vk::StrataProofId;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::{
-    primitives::prover_input::{ProofWithVkey, ZkVmInput},
-    proof_generators::{
-        btc_ops::BtcBlockspaceProofGenerator,
-        ProofGenerator,
-        // l1_batch_ops::{L1BatchIntermediateInput, L1BatchProofGenerator},
-    },
-};
+use crate::primitives::prover_input::{ProofWithVkey, ZkVmInput};
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -131,32 +124,4 @@ pub struct ProvingTask {
     pub status: ProvingTaskStatus,
     pub dependencies: Vec<Uuid>,
     pub proof: Option<ProofWithVkey>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ProvingTask2 {
-    pub proof_id: StrataProofId,
-    pub status: ProvingTaskStatus2,
-}
-
-impl ProvingTask2 {
-    pub fn new(proof_id: StrataProofId, dependencies: Vec<Uuid>) -> Self {
-        let status = if dependencies.len() > 0 {
-            ProvingTaskStatus2::WaitingForDependencies(HashSet::from_iter(dependencies.into_iter()))
-        } else {
-            ProvingTaskStatus2::Pending
-        };
-        Self { proof_id, status }
-    }
-}
-
-type ProofId = String;
-
-#[derive(Debug, Clone)]
-pub enum ProvingTaskStatus2 {
-    WaitingForDependencies(HashSet<Uuid>),
-    Pending,
-    ProvingInProgress,
-    Completed,
-    Failed,
 }
