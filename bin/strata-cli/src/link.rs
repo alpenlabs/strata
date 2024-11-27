@@ -3,10 +3,11 @@ use std::fmt::Display;
 use alloy::primitives::{Address as StrataAddress, TxHash};
 use bdk_wallet::bitcoin;
 
-/// A thing that exists or is represented onchain.
-/// Currently, this is either a transaction or an address.
+/// Represents anything that can be represented on-chain.
 pub enum OnchainObject<'a> {
+    /// On-chain Transaction ID.
     Transaction(Txid<'a>),
+    /// On-chain Address.
     Address(Address<'a>),
 }
 
@@ -35,8 +36,12 @@ impl<'a> From<&'a TxHash> for OnchainObject<'a> {
 }
 
 impl<'a> OnchainObject<'a> {
-    /// Create a link to the object on the given explorer.
+    /// Creates a link to the object on the given explorer.
     /// Should be of the form `http{s}://{domain}`.
+    ///
+    /// # Examples
+    ///
+    /// PLEASE ADD AN EXAMPLE.
     pub fn with_explorer<'b>(self, explorer: &'b str) -> Link<'a, 'b> {
         Link {
             object: self,
@@ -44,12 +49,12 @@ impl<'a> OnchainObject<'a> {
         }
     }
 
-    /// Create a link to the object on the given explorer, if it exists.
+    /// Creates a link to the object on the given explorer, if it exists.
     /// Should be of the form `http{s}://{domain}`.
     ///
     /// If `explorer` is `None`, the object will be represented as-is.
     ///
-    /// This is primarily a helper for displaying an OnChainObject in a user-facing context.
+    /// This is primarily a helper for displaying an [`OnChainObject`] in a user-facing context.
     pub fn with_maybe_explorer<'b>(self, explorer: Option<&'b str>) -> MaybeLink<'a, 'b> {
         match explorer {
             Some(dmn) => MaybeLink::Link(self.with_explorer(dmn)),
@@ -59,7 +64,7 @@ impl<'a> OnchainObject<'a> {
 }
 
 /// A helper trait for pretty printing something into a human-readable string.
-/// Differs from `Display` in that it might add other wording outside of purely
+/// Differs from [`Display`] in that it might add other wording outside of purely
 /// the string representation of `self`.
 ///
 /// E.g. a transaction might be prefixed with "Transaction: " or "Tx: ".
@@ -100,7 +105,7 @@ impl Display for OnchainObject<'_> {
     }
 }
 
-/// A wrapper around a bitcoin transaction id or a strata transaction id.
+/// A wrapper around a bitcoin transaction ID or a Strata transaction ID.
 #[derive(Clone, Copy)]
 pub enum Txid<'a> {
     Bitcoin(&'a bitcoin::Txid),
@@ -146,7 +151,7 @@ impl Display for Address<'_> {
 
 /// A link to an object on an explorer.
 ///
-/// This is primarily a helper for displaying an OnChainObject in a user-facing
+/// This is primarily a helper for displaying an [`OnChainObject`] in a user-facing
 /// context when a explorer URL is known.
 pub struct Link<'a, 'b> {
     /// Object of the link (Transaction or Address)
