@@ -42,7 +42,14 @@ class BridgeWithdrawHappyTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(pre_generate_blocks=101))
+        # TODO Temporary hotfix, the test was unfortunately broken. 
+        # The fix aims to cure the issue asap.
+
+        # Likely, we have to:
+        # - switch it to named env config ("basic"),
+        # - use pre-funding,
+        # - get rid of direct generatetoaddress inside the test.
+        ctx.set_env(BasicEnvConfig(pre_generate_blocks=101, pre_fund_addrs=False))
         self.logger = get_logger("BridgeWithdrawHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
