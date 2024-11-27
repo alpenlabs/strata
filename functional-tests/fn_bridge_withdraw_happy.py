@@ -42,7 +42,7 @@ class BridgeWithdrawHappyTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        # TODO Temporary hotfix, the test was unfortunately broken. 
+        # TODO Temporary hotfix, the test was unfortunately broken.
         # The fix aims to cure the issue asap.
 
         # Likely, we have to:
