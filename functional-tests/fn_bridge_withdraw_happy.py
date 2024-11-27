@@ -5,10 +5,10 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import (
     deposit_request_transaction,
     extract_p2tr_pubkey,
-    get_address,
     get_balance,
 )
 from web3 import Web3
+from web3.middleware import SignAndSendRawMiddlewareBuilder
 
 from constants import (
     DEFAULT_ROLLUP_PARAMS,
@@ -16,7 +16,6 @@ from constants import (
     SATS_TO_WEI,
     UNSPENDABLE_ADDRESS,
 )
-from entry import BasicEnvConfig
 from utils import get_bridge_pubkey, get_logger, wait_until
 
 # Local constants
@@ -24,8 +23,9 @@ from utils import get_bridge_pubkey, get_logger, wait_until
 DEPOSIT_AMOUNT = DEFAULT_ROLLUP_PARAMS["deposit_amount"]
 # Gas for the withdrawal transaction
 WITHDRAWAL_GAS_FEE = 22_000  # technically is 21_000
-# Burner address in Strata
-BURNER_ADDRESS = Web3.to_checksum_address("0xdeadf001900dca3ebeefdeadf001900dca3ebeef")
+# Ethereum Private Key
+# NOTE: don't use this private key in production
+ETH_PRIVATE_KEY = "0x0000000000000000000000000000000000000000000000000000000000000001"
 # BTC Operator's fee for withdrawal
 OPERATOR_FEE = DEFAULT_ROLLUP_PARAMS["operator_fee"]
 # BTC extra fee for withdrawal
@@ -42,19 +42,12 @@ class BridgeWithdrawHappyTest(flexitest.Test):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        # TODO Temporary hotfix, the test was unfortunately broken.
-        # The fix aims to cure the issue asap.
-
-        # Likely, we have to:
-        # - switch it to named env config ("basic"),
-        # - use pre-funding,
-        # - get rid of direct generatetoaddress inside the test.
-        ctx.set_env(BasicEnvConfig(pre_generate_blocks=101, pre_fund_addrs=False))
+        ctx.set_env("basic")
         self.logger = get_logger("BridgeWithdrawHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
-        address = get_address(0)
-        withdraw_address = get_address(1)
+        address = ctx.env.gen_ext_btc_address()
+        withdraw_address = ctx.env.gen_ext_btc_address()
         self.logger.debug(f"Address: {address}")
         self.logger.debug(f"Change Address: {withdraw_address}")
         self.logger.debug(f"Gas: {WITHDRAWAL_GAS_FEE}")
@@ -67,6 +60,9 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         btcrpc: BitcoindClient = btc.create_rpc()
         rethrpc = reth.create_rpc()
 
+        seq_addr = seq.get_prop("address")
+        self.logger.debug(f"Sequencer Address: {seq_addr}")
+
         btc_url = btcrpc.base_url
         btc_user = btc.props["rpc_user"]
         btc_password = btc.props["rpc_password"]
@@ -75,35 +71,39 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         self.logger.debug(f"BTC user: {btc_user}")
         self.logger.debug(f"BTC password: {btc_password}")
 
+        # Get the original balance of the withdraw address
+        original_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
+        self.logger.debug(f"BTC balance before withdraw: {original_balance}")
+
         web3: Web3 = reth.create_web3()
-        web3.eth.default_account = web3.address
-        el_address = web3.address
+        # Create an Ethereum account from the private key
+        eth_account = web3.eth.account.from_key(ETH_PRIVATE_KEY)
+        el_address = eth_account.address
         self.logger.debug(f"EL address: {el_address}")
+
+        # Add the Ethereum account as auto-signer
+        # Transactions from `el_address` will then be signed, under the hood, in the middleware
+        web3.middleware_onion.inject(SignAndSendRawMiddlewareBuilder.build(eth_account), layer=0)
+
+        # Get the balance of the EL address before the deposits
+        balance = int(rethrpc.eth_getBalance(el_address), 16)
+        self.logger.debug(f"Strata Balance before deposits: {balance}")
+        assert balance == 0, "Strata balance is not expected"
 
         # Gas price
         gas_price = web3.to_wei(1, "gwei")
         self.logger.debug(f"Gas price: {gas_price}")
 
-        # Burn any existing balance in the EL address
-        # FIXME: Somehow web3 default account has some balance.
-        # Hence we need to set it to burn it.
-        self.burn_balance(web3, rethrpc, el_address, gas_price)
-
         # Get operators pubkey and musig2 aggregates it
         bridge_pk = get_bridge_pubkey(seqrpc)
         self.logger.debug(f"Bridge pubkey: {bridge_pk}")
-
-        seq_addr = seq.get_prop("address")
-        self.logger.debug(f"Sequencer Address: {seq_addr}")
-        bridge_pk = get_bridge_pubkey(seqrpc)
-
-        # Generate plenty of BTC to address
-        btcrpc.proxy.generatetoaddress(102, address)
 
         # Deposit to the EL address
         # NOTE: we need 2 deposits to make sure we have funds for gas
         self.make_drt(ctx, el_address, bridge_pk)
         self.make_drt(ctx, el_address, bridge_pk)
+        balance_after_deposits = int(rethrpc.eth_getBalance(el_address), 16)
+        self.logger.debug(f"Strata Balance after deposits: {balance_after_deposits}")
         wait_until(
             lambda: int(rethrpc.eth_getBalance(el_address), 16) == 2 * DEPOSIT_AMOUNT * SATS_TO_WEI
         )
@@ -116,9 +116,13 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         # Send funds to the bridge precompile address for a withdrawal
         change_address_pk = extract_p2tr_pubkey(withdraw_address)
         self.logger.debug(f"Change Address PK: {change_address_pk}")
-        estimated_withdraw_gas = self.estimate_withdraw_gas(ctx, change_address_pk)
+        estimated_withdraw_gas = self.estimate_withdraw_gas(
+            ctx, web3, el_address, change_address_pk
+        )
         self.logger.debug(f"Estimated withdraw gas: {estimated_withdraw_gas}")
-        l2_tx_hash = self.make_withdraw(ctx, change_address_pk, estimated_withdraw_gas).hex()
+        l2_tx_hash = self.make_withdraw(
+            ctx, web3, el_address, change_address_pk, estimated_withdraw_gas
+        ).hex()
         self.logger.debug(f"Sent withdrawal transaction with hash: {l2_tx_hash}")
 
         # Wait for the withdrawal to be processed
@@ -136,14 +140,16 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         assert difference == balance_post_withdraw, "balance difference is not expected"
 
         # Wait for the withdraw address to have a positive balance
-        self.mine_blocks_until_maturity(btcrpc, withdraw_address, btc_url, btc_user, btc_password)
+        self.mine_blocks_until_maturity(
+            btcrpc, withdraw_address, btc_url, btc_user, btc_password, original_balance
+        )
 
         # Make sure that the balance in the BTC wallet is D BTC - operator's fees
         btc_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
         self.logger.debug(f"BTC balance: {btc_balance}")
-        expected_balance = DEPOSIT_AMOUNT - OPERATOR_FEE - WITHDRAWAL_EXTRA_FEE
-        self.logger.debug(f"BTC expected balance: {expected_balance}")
-        assert btc_balance == expected_balance, "BTC balance is not expected"
+        difference = DEPOSIT_AMOUNT - OPERATOR_FEE - WITHDRAWAL_EXTRA_FEE
+        self.logger.debug(f"BTC expected balance: {original_balance + difference}")
+        assert btc_balance == original_balance + difference, "BTC balance is not expected"
 
         return True
 
@@ -181,14 +187,17 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         btcrpc.proxy.generatetoaddress(6, seq_addr)
         time.sleep(3)
 
-    def make_withdraw(self, ctx: flexitest.RunContext, change_address_pk, gas=WITHDRAWAL_GAS_FEE):
+    def make_withdraw(
+        self,
+        ctx: flexitest.RunContext,
+        web3: Web3,
+        el_address,
+        change_address_pk,
+        gas=WITHDRAWAL_GAS_FEE,
+    ):
         """
         Withdrawal Request Transaction in Strata's EVM.
         """
-        reth = ctx.get_service("reth")
-        web3: Web3 = reth.create_web3()
-        web3.eth.default_account = web3.address
-        el_address = web3.address
         self.logger.debug(f"EL address: {el_address}")
         self.logger.debug(f"Bridge address: {PRECOMPILE_BRIDGEOUT_ADDRESS}")
 
@@ -204,14 +213,12 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         l2_tx_hash = web3.eth.send_transaction(transaction)
         return l2_tx_hash
 
-    def estimate_withdraw_gas(self, ctx: flexitest.RunContext, change_address_pk):
+    def estimate_withdraw_gas(
+        self, ctx: flexitest.RunContext, web3: Web3, el_address, change_address_pk
+    ):
         """
         Estimate the gas for the withdrawal transaction.
         """
-        reth = ctx.get_service("reth")
-        web3: Web3 = reth.create_web3()
-        web3.eth.default_account = web3.address
-        el_address = web3.address
         self.logger.debug(f"EL address: {el_address}")
         self.logger.debug(f"Bridge address: {PRECOMPILE_BRIDGEOUT_ADDRESS}")
 
@@ -225,32 +232,15 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         }
         return web3.eth.estimate_gas(transaction)
 
-    def burn_balance(self, web3: Web3, rethrpc, el_address: str, gas_price: int):
-        """Burns any existing balance in the given address."""
-        balance_to_burn = int(rethrpc.eth_getBalance(el_address), 16)
-        self.logger.debug(f"Strata balance to burn: {balance_to_burn}")
-        estimated_gas = web3.eth.estimate_gas(
-            {
-                "from": el_address,
-                "to": BURNER_ADDRESS,
-                "value": balance_to_burn,
-            }
-        )
-        web3.eth.send_transaction(
-            {
-                "from": el_address,
-                "to": BURNER_ADDRESS,
-                "value": balance_to_burn - (estimated_gas * gas_price),
-                "gas": estimated_gas,
-                "gasPrice": gas_price,
-            }
-        )
-        wait_until(lambda: int(rethrpc.eth_getBalance(el_address), 16) == 0)
-        # Ok now we have a clean state
-        self.logger.debug("Strata balance is zero")
-
     def mine_blocks_until_maturity(
-        self, btcrpc, withdraw_address, btc_url, btc_user, btc_password, number_of_blocks=12
+        self,
+        btcrpc,
+        withdraw_address,
+        btc_url,
+        btc_user,
+        btc_password,
+        original_balance,
+        number_of_blocks=12,
     ):
         """
         Mine blocks until the withdraw address has a positive balance
@@ -259,4 +249,7 @@ class BridgeWithdrawHappyTest(flexitest.Test):
         - 6 blocks to mature the DT
         """
         btcrpc.proxy.generatetoaddress(number_of_blocks, UNSPENDABLE_ADDRESS)
-        wait_until(lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > 0)
+        wait_until(
+            lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password)
+            > original_balance
+        )
