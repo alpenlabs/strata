@@ -3,11 +3,9 @@ use std::fmt::Display;
 use alloy::primitives::{Address as StrataAddress, TxHash};
 use bdk_wallet::bitcoin;
 
-/// Represents anything that can be represented on-chain.
+/// Represents something that can be represented on-chain.
 pub enum OnchainObject<'a> {
-    /// On-chain Transaction ID.
     Transaction(Txid<'a>),
-    /// On-chain Address.
     Address(Address<'a>),
 }
 
@@ -39,9 +37,7 @@ impl<'a> OnchainObject<'a> {
     /// Creates a link to the object on the given explorer.
     /// Should be of the form `http{s}://{domain}`.
     ///
-    /// # Examples
-    ///
-    /// PLEASE ADD AN EXAMPLE.
+    /// Example: `https://mempool.space`
     pub fn with_explorer<'b>(self, explorer: &'b str) -> Link<'a, 'b> {
         Link {
             object: self,
@@ -54,7 +50,7 @@ impl<'a> OnchainObject<'a> {
     ///
     /// If `explorer` is `None`, the object will be represented as-is.
     ///
-    /// This is primarily a helper for displaying an [`OnChainObject`] in a user-facing context.
+    /// This is primarily a helper for displaying an [`OnchainObject`] in a user-facing context.
     pub fn with_maybe_explorer<'b>(self, explorer: Option<&'b str>) -> MaybeLink<'a, 'b> {
         match explorer {
             Some(dmn) => MaybeLink::Link(self.with_explorer(dmn)),
@@ -151,8 +147,8 @@ impl Display for Address<'_> {
 
 /// A link to an object on an explorer.
 ///
-/// This is primarily a helper for displaying an [`OnChainObject`] in a user-facing
-/// context when a explorer URL is known.
+/// This is primarily a helper for displaying an [`OnchainObject`] in a
+/// user-facing context when a explorer URL is known.
 pub struct Link<'a, 'b> {
     /// Object of the link (Transaction or Address)
     object: OnchainObject<'a>,
