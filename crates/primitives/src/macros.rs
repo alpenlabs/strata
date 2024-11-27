@@ -74,18 +74,18 @@ pub mod internal {
             }
 
             impl From<$name>
-                for reth_primitives::revm_primitives::alloy_primitives::FixedBytes<$len>
+                for ::reth_primitives::revm_primitives::alloy_primitives::FixedBytes<$len>
             {
                 fn from(value: $name) -> Self {
                     value.0.into()
                 }
             }
 
-            impl From<reth_primitives::revm_primitives::alloy_primitives::FixedBytes<$len>>
+            impl From<::reth_primitives::revm_primitives::alloy_primitives::FixedBytes<$len>>
                 for $name
             {
                 fn from(
-                    value: reth_primitives::revm_primitives::alloy_primitives::FixedBytes<$len>,
+                    value: ::reth_primitives::revm_primitives::alloy_primitives::FixedBytes<$len>,
                 ) -> Self {
                     value.0.into()
                 }
@@ -156,7 +156,7 @@ pub mod internal {
                     &self,
                     serializer: S,
                 ) -> Result<S::Ok, S::Error> {
-                    serde::Serialize::serialize(&reth_primitives::revm_primitives::alloy_primitives::FixedBytes::<$len>::from(&self.0), serializer)
+                    serde::Serialize::serialize(&::reth_primitives::revm_primitives::alloy_primitives::FixedBytes::<$len>::from(&self.0), serializer)
                 }
             }
 
@@ -166,7 +166,7 @@ pub mod internal {
                     deserializer: D,
                 ) -> Result<Self, D::Error> {
                     serde::Deserialize::deserialize(deserializer)
-                        .map(|v: reth_primitives::revm_primitives::alloy_primitives::FixedBytes<$len>| Self::from(v))
+                        .map(|v: ::reth_primitives::revm_primitives::alloy_primitives::FixedBytes<$len>| Self::from(v))
                 }
             }
         };

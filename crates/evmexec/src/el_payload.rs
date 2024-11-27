@@ -1,7 +1,7 @@
 use alloy_rpc_types::engine::ExecutionPayloadV1;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use reth_primitives::revm_primitives::B256;
+use reth_primitives::revm_primitives::{FixedBytes, B256};
 use reth_rpc_types_compat::engine::try_payload_v1_to_block;
 use strata_primitives::{
     buf::{Buf20, Buf32},
@@ -104,8 +104,7 @@ impl From<ElPayload> for ExecutionPayloadV1 {
             gas_used: val.gas_used,
             timestamp: val.timestamp,
             extra_data: val.extra_data.into(),
-            base_fee_per_gas: reth_primitives::revm_primitives::FixedBytes(val.base_fee_per_gas.0)
-                .into(),
+            base_fee_per_gas: FixedBytes(val.base_fee_per_gas.0).into(),
             block_hash: val.block_hash.0.into(),
             transactions: val
                 .transactions
