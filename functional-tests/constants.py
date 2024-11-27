@@ -43,7 +43,8 @@ SEQ_PUBKEY = Key(SEQ_KEY.hex()).x_hex
 # TODO initialize this with the new genesis tool instead of having it hardcoded
 DEFAULT_ROLLUP_PARAMS: dict = {
     "rollup_name": "alpenstrata",
-    "block_time": DEFAULT_BLOCK_TIME_SEC * 1000,
+    "block_time": int(DEFAULT_BLOCK_TIME_SEC * 1_000),
+    "message_interval": int((DEFAULT_BLOCK_TIME_SEC * 1_000) / 2),
     "cred_rule": {
         "schnorr_key": SEQ_PUBKEY,
     },

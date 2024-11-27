@@ -312,6 +312,7 @@ class BridgeClientFactory(flexitest.Factory):
         node_url: str,
         bitcoind_config: dict,
         ctx: flexitest.EnvContext,
+        message_interval: int = DEFAULT_ROLLUP_PARAMS["message_interval"],
     ):
         idx = self.next_idx()
         name = f"bridge.{idx}"
@@ -332,6 +333,7 @@ class BridgeClientFactory(flexitest.Factory):
             "--btc-user", bitcoind_config["bitcoind_user"],
             "--btc-pass", bitcoind_config["bitcoind_pass"],
             "--rollup-url", node_url,
+            "--message-interval", str(message_interval),
         ]
         # fmt: on
 

@@ -10,7 +10,7 @@ from utils import generate_n_blocks, wait_until
 @flexitest.register
 class L1WriterTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("premined_blocks")
+        ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

@@ -7,7 +7,11 @@ from strata_utils import (
     take_back_transaction,
 )
 
-from constants import DEFAULT_ROLLUP_PARAMS, DEFAULT_TAKEBACK_TIMEOUT, UNSPENDABLE_ADDRESS
+from constants import (
+    DEFAULT_ROLLUP_PARAMS,
+    DEFAULT_TAKEBACK_TIMEOUT,
+    UNSPENDABLE_ADDRESS,
+)
 from utils import get_bridge_pubkey, get_logger, wait_until
 
 # Local constants
@@ -18,38 +22,31 @@ TAKE_BACK_FEE = 17_243
 
 
 @flexitest.register
-class BridgeDepositReclaimTest(flexitest.Test):
+class BridgeDepositReclaimDrtSeenTest(flexitest.Test):
     """
-    A test class for reclaim path scenarios of bridge deposits.
-
-    It tests the functionality of broadcasting a deposit request transaction (DRT) for the bridge
+    Tests the functionality of broadcasting a deposit request transaction (DRT) for the bridge
     and verifying that the reclaim path works as expected.
 
     In the test we stop one of the bridge operators to prevent the DRT from being processed.
+    However, we let the operator be aware of the DRT before stopping it
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
-        self.logger = get_logger("BridgeDepositReclaimTest")
+        ctx.set_env("operator_lag")
+        self.logger = get_logger("BridgeDepositReclaimDrtSeenTest")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
-        reth = ctx.get_service("reth")
         seq = ctx.get_service("sequencer")
-        # We just need to stop one bridge operator
-        bridge_operator = ctx.get_service("bridge.0")
-        # Kill the operator so the bridge does not process the DRT transaction
-        bridge_operator.stop()
-        self.logger.debug("Bridge operators stopped")
+        reth = ctx.get_service("reth")
 
+        seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
+        rethrpc = reth.create_rpc()
+
         btc_url = btcrpc.base_url
         btc_user = btc.props["rpc_user"]
         btc_password = btc.props["rpc_password"]
-
-        rethrpc = reth.create_rpc()
-
-        seqrpc = seq.create_rpc()
 
         self.logger.debug(f"BTC URL: {btc_url}")
         self.logger.debug(f"BTC user: {btc_user}")
@@ -106,7 +103,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btc_user,
             btc_password,
         )
-        self.logger.debug(f"User BTC balance (before takeback): {refund_btc_balance}")
+        self.logger.debug(f"Refund BTC balance (before takeback): {refund_btc_balance}")
         assert refund_btc_balance == initial_refund_btc_balance, "BTC balance has changed"
 
         # Spend the take back path
@@ -153,14 +150,10 @@ class BridgeDepositReclaimTest(flexitest.Test):
         expected_balance = 5 * DEPOSIT_AMOUNT - TAKE_BACK_FEE
         assert refund_btc_balance >= expected_balance, "BTC balance is not as expected"
 
-        # Now let's see if the EVM side has no funds
-        # Make sure that the el_address has zero balance
-        balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
-        self.logger.debug(f"EVM balance (after takeback): {balance}")
-        assert balance == 0, "EVM balance is not zero"
-
-        # Restart the bridge operator
-        bridge_operator.start()
+        # Get the balance of the EL address after the deposits
+        balance_post = int(rethrpc.eth_getBalance(el_address), 16)
+        self.logger.debug(f"Strata Balance after deposits: {balance_post}")
+        assert balance_post == 0, "Strata balance is not zero"
 
         return True
 

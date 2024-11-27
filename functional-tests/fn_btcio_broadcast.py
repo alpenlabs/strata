@@ -7,7 +7,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 @flexitest.register
 class BroadcastTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("premined_blocks")  # premined because we want to create a tx
+        ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
