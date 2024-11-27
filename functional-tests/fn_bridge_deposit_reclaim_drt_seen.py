@@ -1,5 +1,3 @@
-import time
-
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import (
@@ -14,7 +12,7 @@ from constants import (
     DEFAULT_TAKEBACK_TIMEOUT,
     UNSPENDABLE_ADDRESS,
 )
-from utils import get_bridge_pubkey, get_logger
+from utils import get_bridge_pubkey, get_logger, wait_until
 
 # Local constants
 # D BTC
@@ -56,8 +54,13 @@ class BridgeDepositReclaimDrtSeenTest(flexitest.Test):
 
         bridge_pk = get_bridge_pubkey(seqrpc)
         el_address = ctx.env.gen_el_address()
+        user_addr = ctx.env.gen_ext_btc_address()
         refund_addr = ctx.env.gen_ext_btc_address()
         recovery_addr = ctx.env.gen_rec_btc_address()
+        self.logger.debug(f"El address: {el_address}")
+        self.logger.debug(f"User address: {user_addr}")
+        self.logger.debug(f"Refund address: {refund_addr}")
+        self.logger.debug(f"Recovery address: {recovery_addr}")
 
         # First let's see if the EVM side has no funds
         # Make sure that the el_address has zero balance
@@ -76,7 +79,6 @@ class BridgeDepositReclaimDrtSeenTest(flexitest.Test):
         # DRT same block
         txid_drt = self.make_drt(ctx, el_address, bridge_pk)
         self.logger.debug(f"Deposit Request Transaction: {txid_drt}")
-        time.sleep(1)
 
         # Now we need to generate a bunch of blocks
         # since they will be able to spend the DRT output.
@@ -90,10 +92,11 @@ class BridgeDepositReclaimDrtSeenTest(flexitest.Test):
             self.logger.debug(f"Generating {blocks_to_generate} blocks in chunk {i+1}/{chunks}")
             btcrpc.proxy.generatetoaddress(blocks_to_generate, UNSPENDABLE_ADDRESS)
 
-        # wait up a little bit
-        time.sleep(0.25)
-
         # Make sure that the BTC refund address has the expected balance
+        wait_until(
+            lambda: get_balance(refund_addr, btc_url, btc_user, btc_password)
+            == initial_refund_btc_balance
+        )
         refund_btc_balance = get_balance(
             refund_addr,
             btc_url,
@@ -110,10 +113,20 @@ class BridgeDepositReclaimDrtSeenTest(flexitest.Test):
         self.logger.debug("Take back tx generated")
 
         # Send the transaction to the Bitcoin network
+        original_recovery_balance = get_balance_recovery(
+            recovery_addr,
+            bridge_pk,
+            btc_url,
+            btc_user,
+            btc_password,
+        )
         txid = btcrpc.proxy.sendrawtransaction(take_back_tx)
         self.logger.debug(f"sent take back tx with txid = {txid} for address {el_address}")
         btcrpc.proxy.generatetoaddress(2, UNSPENDABLE_ADDRESS)
-        time.sleep(1)
+        wait_until(
+            lambda: get_balance_recovery(recovery_addr, bridge_pk, btc_url, btc_user, btc_password)
+            < original_recovery_balance
+        )
 
         # Make sure that the BTC recovery address has 0 BTC
         btc_balance = get_balance_recovery(
@@ -166,6 +179,5 @@ class BridgeDepositReclaimDrtSeenTest(flexitest.Test):
         # Send the transaction to the Bitcoin network
         txid = btcrpc.proxy.sendrawtransaction(tx)
         self.logger.debug(f"sent deposit request with txid = {txid} for address {el_address}")
-        time.sleep(1)  # I don't know how to get rid of this sleep
 
         return txid
