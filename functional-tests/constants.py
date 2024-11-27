@@ -20,6 +20,10 @@ PRECOMPILE_BRIDGEOUT_ADDRESS = "0x5400000000000000000000000000000000000001"
 # Taken from python-strata-utils:
 UNSPENDABLE_ADDRESS = "bcrt1plh4vmrc7ejjt66d8rj5nx8hsvslw9ps9rp3a0v7kzq37ekt5lggskf39fp"
 
+# SATS to WEI
+SATS_TO_WEI = 10_000_000_000
+GWEI_TO_WEI = 1_000_000_000
+
 # Network times and stuff
 DEFAULT_BLOCK_TIME_SEC = 1
 DEFAULT_EPOCH_SLOTS = 64
@@ -51,6 +55,12 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     "target_l2_batch_size": DEFAULT_EPOCH_SLOTS,
     "address_length": 20,
     "deposit_amount": 1_000_000_000,
+    # 5% according to `OPERATOR_FEE` in `bridge-tx-builder/src/constants.rs
+    "operator_fee": 50_000_000,
+    # ANYONE_CAN_SPEND_OUTPUT_VALUE (330) in `bridge-tx-builder/src/constants.rs`
+    # + 5.5 sats/vB (200 vbytes) according to `MIN_RELAY_FEE`
+    # in `bridge-tx-builder/src/constants.rs`
+    "withdraw_extra_fee": int(330 + 5.5 * 200),
     "rollup_vk": {
         "risc0_verifying_key": ROLLUP_VK,
     },
