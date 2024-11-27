@@ -156,8 +156,7 @@ type ProofId = String;
 pub enum ProvingTaskStatus2 {
     WaitingForDependencies(HashSet<Uuid>),
     Pending,
-    WitnessSubmitted(ProofId),
-    ProvingInProgress(ProofId),
+    ProvingInProgress,
     Completed,
     Failed,
 }

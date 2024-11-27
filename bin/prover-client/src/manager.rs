@@ -46,12 +46,12 @@ impl ProverManager {
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager = ZkVMManager::new();
-        zkvm_manager.add_vm(ProofVm::BtcProving, sp1::btc_blockspace());
-        zkvm_manager.add_vm(ProofVm::L1Batch, sp1::l1_batch());
-        zkvm_manager.add_vm(ProofVm::ELProving, sp1::evm_ee_stf());
-        zkvm_manager.add_vm(ProofVm::CLProving, sp1::cl_stf());
-        zkvm_manager.add_vm(ProofVm::CLAggregation, sp1::cl_agg());
-        zkvm_manager.add_vm(ProofVm::Checkpoint, sp1::checkpoint());
+        zkvm_manager.add_vm(ProofVm::BtcProving, sp1::BTC_BLOCKSPACE_SP1_HOST.clone());
+        zkvm_manager.add_vm(ProofVm::L1Batch, sp1::L1_BATCH_SP1_HOST.clone());
+        zkvm_manager.add_vm(ProofVm::ELProving, sp1::EVM_EE_STF_SP1_HOST.clone());
+        zkvm_manager.add_vm(ProofVm::CLProving, sp1::CL_STF_SP1_HOST.clone());
+        zkvm_manager.add_vm(ProofVm::CLAggregation, sp1::CL_AGG_SP1_HOST.clone());
+        zkvm_manager.add_vm(ProofVm::Checkpoint, sp1::CHECKPOINT_SP1_HOST.clone());
 
         Self {
             pool: rayon::ThreadPoolBuilder::new()

@@ -25,6 +25,7 @@ mod dispatcher;
 mod errors;
 mod hosts;
 mod manager;
+mod manager2;
 mod primitives;
 mod proof_generators;
 mod prove;
@@ -33,6 +34,7 @@ mod rpc_server;
 mod state;
 mod task;
 mod task2;
+mod utils;
 
 #[tokio::main]
 async fn main() {

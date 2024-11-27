@@ -1,10 +1,10 @@
-use std::{borrow::Borrow, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use bitcoin::secp256k1::{SecretKey, SECP256K1};
 use rand::{rngs::StdRng, SeedableRng};
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
-use strata_db::traits::{ProverDataProvider, ProverDataStore, ProverDatabase};
+use strata_db::traits::{ProverDataStore, ProverDatabase};
 use strata_primitives::{
     block_credential,
     buf::Buf32,
@@ -37,26 +37,26 @@ impl ProofGenerator for BtcBlockspaceProofGenerator {
 
     async fn create_task(
         &self,
-        id: StrataProofId,
+        id: &StrataProofId,
         db: &ProverDB,
         task_tracker: Arc<TaskTracker2>,
     ) -> Result<Uuid, ProvingTaskError> {
-        let task = ProvingTask2::new(id.clone(), vec![]);
+        let task = ProvingTask2::new(*id, vec![]);
         let task_id = task_tracker.insert_task(task).await;
-        db.prover_store().insert_task(task_id, id);
+        db.prover_store().insert_task(task_id, *id);
         Ok(task_id)
     }
 
     async fn fetch_input(
         &self,
-        id: StrataProofId,
-        db: &ProverDB,
+        id: &StrataProofId,
+        _db: &ProverDB,
     ) -> Result<<Self::Prover as strata_zkvm::ZkVmProver>::Input, anyhow::Error> {
         let height = match id {
             StrataProofId::BtcBlockspace(height) => height,
             _ => return Err(anyhow!("invalid input")),
         };
-        let block = self.btc_client.get_block_at(height).await?;
+        let block = self.btc_client.get_block_at(*height).await?;
         let rollup_params = get_pm_rollup_params();
         Ok(BlockspaceProofInput {
             block,

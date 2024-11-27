@@ -126,6 +126,7 @@ impl ProverDataProvider for ProofDb {
     }
 }
 
+#[derive(Clone)]
 pub struct ProverDB {
     db: Arc<ProofDb>,
 }

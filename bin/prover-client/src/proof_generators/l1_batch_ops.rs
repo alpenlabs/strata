@@ -39,14 +39,14 @@ impl ProofGenerator for L1BatchProofGenerator {
 
     async fn create_task(
         &self,
-        id: StrataProofId,
+        id: &StrataProofId,
         db: &ProverDB,
         task_tracker: Arc<TaskTracker2>,
     ) -> Result<Uuid, ProvingTaskError> {
         let mut dependencies = vec![];
 
         // Create btc tasks for each block in the range
-        let (start, end) = match id {
+        let (start, end) = match *id {
             StrataProofId::L1Batch(start, end) => (start, end),
             _ => {
                 return Err(ProvingTaskError::InvalidInput(
@@ -59,26 +59,26 @@ impl ProofGenerator for L1BatchProofGenerator {
             let btc_proof_id = StrataProofId::BtcBlockspace(btc_block_idx);
             let btc_task_id = self
                 .btc_dispatcher
-                .create_task(btc_proof_id, db, task_tracker.clone())
+                .create_task(&btc_proof_id, db, task_tracker.clone())
                 .await
                 .map_err(|e| ProvingTaskError::DependencyTaskCreation(e.to_string()))?;
             dependencies.push(btc_task_id);
         }
 
-        let task = ProvingTask2::new(id.clone(), dependencies.clone());
+        let task = ProvingTask2::new(*id, dependencies.clone());
         let task_id = task_tracker.insert_task(task).await;
-        db.prover_store().insert_task(task_id, id);
+        db.prover_store().insert_task(task_id, *id);
         db.prover_store().insert_dependencies(task_id, dependencies);
         Ok(task_id)
     }
 
     async fn fetch_input(
         &self,
-        id: StrataProofId,
+        id: &StrataProofId,
         db: &ProverDB,
     ) -> Result<<Self::Prover as strata_zkvm::ZkVmProver>::Input, anyhow::Error> {
         // Create btc tasks for each block in the range
-        let (start_height, end_height) = match id {
+        let (start_height, end_height) = match *id {
             StrataProofId::L1Batch(start, end) => (start, end),
             _ => return Err(anyhow!("invalid input")),
         };

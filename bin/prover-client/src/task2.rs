@@ -10,7 +10,7 @@ use crate::state::{ProvingTask2, ProvingTaskStatus2};
 /// to create tasks, update their status, and retrieve tasks based on their current state.
 #[derive(Debug)]
 pub struct TaskTracker2 {
-    tasks: Mutex<HashMap<Uuid, ProvingTask2>>,
+    pub tasks: Mutex<HashMap<Uuid, ProvingTask2>>,
 }
 
 impl TaskTracker2 {
@@ -33,27 +33,16 @@ impl TaskTracker2 {
         task_id
     }
 
-    /// Updates the status of a task.
-    pub async fn update_status(&self, task_id: Uuid, status: ProvingTaskStatus2) {
-        let mut tasks = self.tasks.lock().await;
-        if let Some(task) = tasks.get_mut(&task_id) {
-            task.status = status;
-        }
-    }
-
-    /// Marks a task as completed and updates dependent tasks accordingly.
+    /// Updates the status of task as well as other tasks that depens on it.
     ///
     /// This function updates the status of the completed task and checks if any tasks that depend
     /// on it can now be marked as pending. If all dependencies of a dependent task are
     /// completed, it updates the dependent task's status to `Pending` and prepares it for
     /// proving.
-    pub async fn mark_task_completed(&self, task_id: Uuid) {
-        info!("Task {:?} marked as completed", task_id);
+    pub async fn update_status(&self, task_id: Uuid, status: ProvingTaskStatus2) {
         let mut tasks = self.tasks.lock().await;
-
-        // Update the completed task's status and proof
         if let Some(task) = tasks.get_mut(&task_id) {
-            task.status = ProvingTaskStatus2::Completed;
+            task.status = status;
         }
 
         // Handle tasks waiting for dependencies
@@ -69,6 +58,19 @@ impl TaskTracker2 {
                     }
                 }
             });
+    }
+
+    pub async fn get_tasks_by_status<F>(&self, filter_fn: F) -> Vec<ProvingTask2>
+    where
+        F: Fn(&ProvingTaskStatus2) -> bool,
+    {
+        let tasks = self.tasks.lock().await;
+
+        tasks
+            .values()
+            .filter(|task| filter_fn(&task.status))
+            .cloned()
+            .collect()
     }
 
     /// Retrieves a task by its ID.
