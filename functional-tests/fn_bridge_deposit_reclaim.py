@@ -12,6 +12,12 @@ from strata_utils import (
 from constants import DEFAULT_ROLLUP_PARAMS, DEFAULT_TAKEBACK_TIMEOUT, UNSPENDABLE_ADDRESS
 from utils import get_bridge_pubkey, get_logger
 
+# Local constants
+# D BTC
+DEPOSIT_AMOUNT = DEFAULT_ROLLUP_PARAMS["deposit_amount"]
+# Fee for the take back path at 2 sat/vbyte
+TAKE_BACK_FEE = 17_243
+
 
 @flexitest.register
 class BridgeDepositReclaimTest(flexitest.Test):
@@ -68,6 +74,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btc_user,
             btc_password,
         )
+        self.logger.debug(f"Initial refund BTC balance: {initial_refund_btc_balance}")
 
         # DRT same block
         txid_drt = self.make_drt(ctx, el_address, bridge_pk, maturity=0)
@@ -130,8 +137,8 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btc_password,
         )
         self.logger.debug(f"User BTC balance (after takeback): {refund_btc_balance}")
-        expected_balance_lower_bound = DEFAULT_ROLLUP_PARAMS["deposit_amount"] - 100_000_000
-        assert refund_btc_balance >= expected_balance_lower_bound, "BTC balance is not as expected"
+        expected_balance = 5 * DEPOSIT_AMOUNT - TAKE_BACK_FEE
+        assert refund_btc_balance >= expected_balance, "BTC balance is not as expected"
 
         # Now let's see if the EVM side has no funds
         # Make sure that the el_address has zero balance
