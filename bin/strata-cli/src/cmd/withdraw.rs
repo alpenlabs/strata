@@ -11,6 +11,7 @@ use indicatif::ProgressBar;
 
 use crate::{
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
+    link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
@@ -70,5 +71,9 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
     pb.enable_steady_tick(Duration::from_millis(100));
     let res = l2w.send_transaction(tx).await.unwrap();
     pb.finish_with_message("Broadcast successful");
-    let _ = print_strata_explorer_url(res.tx_hash(), &term, &settings);
+    let _ = term.write_line(
+        &OnchainObject::from(res.tx_hash())
+            .with_maybe_explorer(settings.blockscout_endpoint.as_deref())
+            .pretty(),
+    );
 }

@@ -18,7 +18,7 @@ use crate::{
     constants::{
         BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, SIGNET_BLOCK_TIME, UNSPENDABLE,
     },
-    link::{pretty_txid, Link},
+    link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
@@ -148,10 +148,11 @@ pub async fn deposit(
         .await
         .expect("successful broadcast");
     let txid = tx.compute_txid();
-    pb.finish_with_message(pretty_txid(
-        (&txid).into(),
-        &settings.mempool_space_endpoint,
-    ));
+    pb.finish_with_message(
+        OnchainObject::from(&txid)
+            .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
+            .pretty(),
+    );
     let _ = term.write_line(&format!(
         "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on Strata.",
         SIGNET_BLOCK_TIME

@@ -12,6 +12,7 @@ use console::Term;
 
 use crate::{
     constants::SATS_TO_WEI,
+    link::{OnchainObject, PrettyPrint},
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
@@ -72,7 +73,12 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                 .broadcast_tx(&tx)
                 .await
                 .expect("successful broadcast");
-            let _ = print_bitcoin_explorer_url(&tx.compute_txid(), &term, &settings);
+            let txid = tx.compute_txid();
+            let _ = term.write_line(
+                &OnchainObject::from(&txid)
+                    .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
+                    .pretty(),
+            );
         }
         NetworkType::Strata => {
             let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).expect("valid wallet");
@@ -84,7 +90,11 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                 .send_transaction(tx)
                 .await
                 .expect("successful broadcast");
-            let _ = print_strata_explorer_url(res.tx_hash(), &term, &settings);
+            let _ = term.write_line(
+                &OnchainObject::from(res.tx_hash())
+                    .with_maybe_explorer(settings.blockscout_endpoint.as_deref())
+                    .pretty(),
+            );
         }
     };
 

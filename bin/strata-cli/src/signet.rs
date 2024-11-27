@@ -12,7 +12,7 @@ use std::{
 use backend::{ScanError, SignetBackend, SyncError, WalletUpdate};
 use bdk_esplora::esplora_client::{self, AsyncClient};
 use bdk_wallet::{
-    bitcoin::{FeeRate, Network, Txid},
+    bitcoin::{FeeRate, Network},
     rusqlite::{self, Connection},
     PersistedWallet, Wallet,
 };
