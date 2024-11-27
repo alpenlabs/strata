@@ -35,23 +35,23 @@ impl<'a> From<&'a TxHash> for OnchainObject<'a> {
 }
 
 impl<'a> OnchainObject<'a> {
-    /// Create a link to the object on the given explorer domain.
+    /// Create a link to the object on the given explorer.
     /// Should be of the form `http{s}://{domain}`.
-    pub fn with_explorer<'b>(self, explorer_domain: &'b str) -> Link<'a, 'b> {
+    pub fn with_explorer<'b>(self, explorer: &'b str) -> Link<'a, 'b> {
         Link {
             object: self,
-            explorer_domain,
+            explorer_ep: explorer,
         }
     }
 
-    /// Create a link to the object on the given explorer domain, if it exists.
+    /// Create a link to the object on the given explorer, if it exists.
     /// Should be of the form `http{s}://{domain}`.
     ///
-    /// If `explorer_domain` is `None`, the object will be represented as-is.
+    /// If `explorer` is `None`, the object will be represented as-is.
     ///
     /// This is primarily a helper for displaying an OnChainObject in a user-facing context.
-    pub fn with_maybe_explorer<'b>(self, explorer_domain: Option<&'b str>) -> MaybeLink<'a, 'b> {
-        match explorer_domain {
+    pub fn with_maybe_explorer<'b>(self, explorer: Option<&'b str>) -> MaybeLink<'a, 'b> {
+        match explorer {
             Some(dmn) => MaybeLink::Link(self.with_explorer(dmn)),
             None => MaybeLink::Object(self),
         }
@@ -144,30 +144,30 @@ impl Display for Address<'_> {
     }
 }
 
-/// A link to an object on an explorer domain.
+/// A link to an object on an explorer.
 ///
 /// This is primarily a helper for displaying an OnChainObject in a user-facing
-/// context when an explorer domain is known.
+/// context when a explorer URL is known.
 pub struct Link<'a, 'b> {
     /// Object of the link (Transaction or Address)
     object: OnchainObject<'a>,
-    /// Domain of the explorer (will be used to build the URL)
-    explorer_domain: &'b str,
+    /// Endpoint of the explorer (will be used to build the URL)
+    explorer_ep: &'b str,
 }
 
 impl<'b, 'a> Display for Link<'a, 'b> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.object {
             OnchainObject::Transaction(ref txid) => match txid {
-                Txid::Bitcoin(txid) => write!(f, "https://{}/tx/{}", self.explorer_domain, txid),
-                Txid::Strata(txid) => write!(f, "https://{}/tx/{}", self.explorer_domain, txid),
+                Txid::Bitcoin(txid) => write!(f, "{}/tx/{}", self.explorer_ep, txid),
+                Txid::Strata(txid) => write!(f, "{}/tx/{}", self.explorer_ep, txid),
             },
             OnchainObject::Address(ref address) => match address {
                 Address::Bitcoin(address) => {
-                    write!(f, "https://{}/address/{}", self.explorer_domain, address)
+                    write!(f, "{}/address/{}", self.explorer_ep, address)
                 }
                 Address::Strata(address) => {
-                    write!(f, "https://{}/address/{}", self.explorer_domain, address)
+                    write!(f, "{}/address/{}", self.explorer_ep, address)
                 }
             },
         }
