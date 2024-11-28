@@ -10,13 +10,7 @@ use strata_rocksdb::{
     DbOpsConfig,
 };
 use strata_sp1_adapter::SP1Host;
-use strata_sp1_guest_builder::{
-    GUEST_BTC_BLOCKSPACE_ELF, GUEST_BTC_BLOCKSPACE_PK, GUEST_BTC_BLOCKSPACE_VK,
-    GUEST_CHECKPOINT_ELF, GUEST_CHECKPOINT_PK, GUEST_CHECKPOINT_VK, GUEST_CL_AGG_ELF,
-    GUEST_CL_AGG_PK, GUEST_CL_AGG_VK, GUEST_CL_STF_ELF, GUEST_CL_STF_PK, GUEST_CL_STF_VK,
-    GUEST_EVM_EE_STF_ELF, GUEST_EVM_EE_STF_PK, GUEST_EVM_EE_STF_VK, GUEST_L1_BATCH_ELF,
-    GUEST_L1_BATCH_PK, GUEST_L1_BATCH_VK,
-};
+use strata_sp1_guest_builder::*;
 use strata_zkvm::{Proof, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
