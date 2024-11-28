@@ -140,7 +140,7 @@ pub mod internal {
                 fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                     // twice as large, required by the hex::encode_to_slice.
                     let mut buf = [0; $len * 2];
-                    hex::encode_to_slice(self.0, &mut buf).expect("buf: enc hex");
+                    ::hex::encode_to_slice(self.0, &mut buf).expect("buf: enc hex");
                     f.write_str(unsafe { ::core::str::from_utf8_unchecked(&buf) })
                 }
             }
@@ -149,10 +149,10 @@ pub mod internal {
                 fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                     // fmt only first and last bits of data.
                     let mut buf = [0; 6];
-                    hex::encode_to_slice(&self.0[..3], &mut buf).expect("buf: enc hex");
+                    ::hex::encode_to_slice(&self.0[..3], &mut buf).expect("buf: enc hex");
                     f.write_str(unsafe { ::core::str::from_utf8_unchecked(&buf) })?;
                     f.write_str("..")?;
-                    hex::encode_to_slice(&self.0[$len - 3..], &mut buf).expect("buf: enc hex");
+                    ::hex::encode_to_slice(&self.0[$len - 3..], &mut buf).expect("buf: enc hex");
                     f.write_str(unsafe { ::core::str::from_utf8_unchecked(&buf) })?;
                     Ok(())
                 }
