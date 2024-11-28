@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+strata-zkvm.workspace = true
+
 bincode.workspace = true
 borsh.workspace = true
 serde.workspace = true
-strata-zkvm.workspace = true
 tracing.workspace = true

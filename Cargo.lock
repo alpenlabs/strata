@@ -13515,7 +13515,6 @@ dependencies = [
  "hex",
  "risc0-zkvm",
  "serde",
- "serde_json",
  "sha2 0.10.8",
  "strata-zkvm",
  "tracing-subscriber 0.3.18",
@@ -13614,7 +13613,6 @@ dependencies = [
  "borsh",
  "hex",
  "serde",
- "serde_json",
  "sha2 0.10.8",
  "sp1-primitives",
  "sp1-sdk",
@@ -13788,10 +13786,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "hex",
- "num-bigint 0.4.6",
- "num-traits",
  "serde_json",
- "sp1-sdk",
  "strata-native-zkvm-adapter",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
@@ -13807,7 +13802,6 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "strata-zkvm",
- "tempfile",
 ]
 
 [[package]]
