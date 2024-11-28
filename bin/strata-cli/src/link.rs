@@ -70,7 +70,9 @@ pub trait PrettyPrint {
 
 /// A helper enum for pretty printing something that might be a link or an object.
 pub enum MaybeLink<'a, 'b> {
+    /// A link to some explorer web page representing the object.
     Link(Link<'a, 'b>),
+    /// Only an onchain object.
     Object(OnchainObject<'a>),
 }
 
@@ -104,7 +106,9 @@ impl Display for OnchainObject<'_> {
 /// A wrapper around a bitcoin transaction ID or a Strata transaction ID.
 #[derive(Clone, Copy)]
 pub enum Txid<'a> {
+    /// A transaction ID for a Bitcoin transaction.
     Bitcoin(&'a bitcoin::Txid),
+    /// A transaction ID for a Strata transaction.
     Strata(&'a TxHash),
 }
 
