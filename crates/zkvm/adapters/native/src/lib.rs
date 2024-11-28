@@ -1,6 +1,6 @@
 mod host;
 mod input;
-mod zkvm;
+mod env;
 
 pub use host::NativeHost;
-pub use zkvm::NativeMachine;
+pub use env::NativeMachine;

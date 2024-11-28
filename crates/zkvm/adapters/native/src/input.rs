@@ -1,6 +1,6 @@
 use strata_zkvm::{ZkVmInputBuilder, ZkVmResult};
 
-use crate::zkvm::NativeMachine;
+use crate::env::NativeMachine;
 
 pub struct NativeMachineInputBuilder(pub NativeMachine);
 

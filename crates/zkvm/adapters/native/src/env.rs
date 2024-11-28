@@ -2,11 +2,11 @@ use std::cell::{Cell, RefCell};
 
 use strata_zkvm::{Proof, ZkVmEnv};
 
-#[derive(Debug, Clone)]
 /// A native implementation of the [`ZkVmEnv`]
 ///
 /// This uses interior mutability patterns ([`Cell`] and [`RefCell`]) to conform
 /// to the [`ZkVmEnv`] trait, which requires methods to take an immutable reference to `self`.
+#[derive(Debug, Clone)]
 pub struct NativeMachine {
     /// A vector containing chunks of serialized input data.
     ///

@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc};
 
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmResult};
 
-use crate::{input::NativeMachineInputBuilder, zkvm::NativeMachine};
+use crate::{input::NativeMachineInputBuilder, env::NativeMachine};
 
 type ProcessProofFn = dyn Fn(&NativeMachine) -> ZkVmResult<()> + Send + Sync;
 
