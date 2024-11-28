@@ -1,6 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{de::DeserializeOwned, Serialize};
 
+use crate::Proof;
+
 /// A trait representing a Zero-Knowledge Virtual Machine (ZkVM) interface.
 /// Provides methods for reading inputs, committing outputs, and verifying proofs
 /// within the ZkVM environment.
@@ -22,7 +24,7 @@ pub trait ZkVmEnv {
     /// [`write_borsh`](`crate::ZkVmInputBuilder::write_borsh).
     fn read_borsh<T: BorshDeserialize>(&self) -> T {
         let buf = self.read_buf();
-        borsh::from_slice(&buf).expect("borsh serialization failed")
+        borsh::from_slice(&buf).expect("borsh deserialization failed")
     }
 
     /// Commits a pre-serialized buffer to the public values stream.
@@ -41,7 +43,7 @@ pub trait ZkVmEnv {
     ///
     /// Values that are committed can be proven as public parameters.
     fn commit_borsh<T: BorshSerialize>(&self, output: &T) {
-        self.commit_buf(&borsh::to_vec(output).expect("failed borsh serialization"));
+        self.commit_buf(&borsh::to_vec(output).expect("borsh serialization failed"));
     }
 
     /// Verifies a proof generated with the ZkVM.
@@ -54,21 +56,17 @@ pub trait ZkVmEnv {
     ///
     /// # Parameters
     ///
-    /// * `proof`: A byte slice containing the serialized proof. (TODO: Change `proof: &[u8]` to a
-    ///   `Proof` type.)
+    /// * `proof`: [Proof](crate::Proof)
     /// * `verification_key`: A byte slice containing the serialized verification key.
     /// * `public_params_raw`: A byte slice containing the serialized public parameters.
     ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the proof verifies successfully, or an `anyhow::Error` if verification
-    /// fails.
+    /// It will panic if the proof fails to verify.
     fn verify_groth16_proof(
         &self,
-        proof: &[u8],
+        proof: &Proof,
         verification_key: &[u8],
         public_params_raw: &[u8],
-    ) -> anyhow::Result<()>;
+    );
 
     /// Reads and verifies a committed output from another guest function.
     ///

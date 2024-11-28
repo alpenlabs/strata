@@ -1,50 +1,36 @@
-use std::fmt;
+use crate::{host::ZkVmHost, input::ZkVmInputBuilder, proof::Proof, ProofType, ZkVmError};
 
-/// Prover config of the ZkVm Host
-#[derive(Debug, Clone, Copy)]
-pub struct ProverOptions {
-    pub enable_compression: bool,
-    pub use_mock_prover: bool,
-    pub stark_to_snark_conversion: bool,
-    pub use_cached_keys: bool,
-}
+pub trait ZkVmProver {
+    type Input;
+    type Output;
 
-// Compact representation of the prover options
-// Can be used to identify the saved proofs
-impl fmt::Display for ProverOptions {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut has_flags = false;
+    fn proof_type() -> ProofType;
 
-        if self.enable_compression {
-            write!(f, "c")?;
-            has_flags = true;
-        }
+    /// Prepares the input for the zkVM.
+    fn prepare_input<'a, B>(input: &'a Self::Input) -> Result<B::Input, ZkVmError>
+    where
+        B: ZkVmInputBuilder<'a>;
 
-        if self.use_mock_prover {
-            write!(f, "m")?;
-            has_flags = true;
-        }
+    /// Processes the proof to produce the final output.
+    fn process_output<H>(proof: &Proof, host: &H) -> Result<Self::Output, ZkVmError>
+    where
+        H: ZkVmHost;
 
-        if self.stark_to_snark_conversion {
-            write!(f, "s")?;
-            has_flags = true;
-        }
+    /// Proves the computation using any zkVM host.
+    fn prove<'a, H>(input: &'a Self::Input, host: &H) -> Result<(Proof, Self::Output), ZkVmError>
+    where
+        H: ZkVmHost,
+        H::Input<'a>: ZkVmInputBuilder<'a>,
+    {
+        // Prepare the input using the host's input builder.
+        let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)?;
 
-        if has_flags {
-            write!(f, "_")?;
-        }
+        // Use the host to prove.
+        let (proof, _) = host.prove(zkvm_input, Self::proof_type())?;
 
-        Ok(())
-    }
-}
+        // Process and return the output using the verifier.
+        let output = Self::process_output(&proof, host)?;
 
-impl Default for ProverOptions {
-    fn default() -> Self {
-        Self {
-            enable_compression: false,
-            use_mock_prover: true,
-            stark_to_snark_conversion: false,
-            use_cached_keys: true,
-        }
+        Ok((proof, output))
     }
 }

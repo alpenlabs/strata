@@ -1,8 +1,9 @@
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
-use sp1_verifier::{Groth16Verifier, GROTH16_VK_BYTES};
 use sp1_zkvm::{io, lib::verify::verify_sp1_proof};
-use strata_zkvm::ZkVmEnv;
+use strata_zkvm::{Proof, ZkVmEnv};
+
+use crate::verify_groth16;
 
 pub struct Sp1ZkVmEnv;
 
@@ -25,24 +26,16 @@ impl ZkVmEnv for Sp1ZkVmEnv {
 
     fn verify_native_proof(&self, vk_digest: &[u32; 8], public_values: &[u8]) {
         let pv_digest = Sha256::digest(public_values);
-        verify_sp1_proof(vk_digest, &pv_digest.into())
+        verify_sp1_proof(vk_digest, &pv_digest.into());
     }
 
     fn verify_groth16_proof(
         &self,
-        proof: &[u8],
+        proof: &Proof,
         verification_key: &[u8],
         public_params_raw: &[u8],
-    ) -> anyhow::Result<()> {
-        let vk_hash_str = hex::encode(verification_key);
-        let vk_hash_str = format!("0x{}", vk_hash_str);
-
-        // TODO: optimization
-        // Groth16Verifier internally again decodes the hex encoded vkey_hash, which can be avoided
-        // Skipped for now because `load_groth16_proof_from_bytes` is not available outside of the
-        // crate
-        Groth16Verifier::verify(proof, public_params_raw, &vk_hash_str, &GROTH16_VK_BYTES)
-            .map_err(anyhow::Error::from)
+    ) {
+        verify_groth16(proof, verification_key, public_params_raw).unwrap();
     }
 
     fn read_verified_serde<T: DeserializeOwned>(&self, vk_digest: &[u32; 8]) -> T {

@@ -44,6 +44,7 @@ members = [
   "crates/vtxjmt",
   "provers/risc0",
   "provers/sp1",
+  "provers/tests",
 
   # binaries listed separately
   "bin/bridge-client",
@@ -86,6 +87,7 @@ strata-mmr = { path = "crates/util/mmr" }
 strata-primitives = { path = "crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
 strata-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }
+strata-proofimpl-cl-agg = { path = "crates/proof-impl/cl-agg" }
 strata-proofimpl-cl-stf = { path = "crates/proof-impl/cl-stf" }
 strata-proofimpl-evm-ee-stf = { path = "crates/proof-impl/evm-ee-stf" }
 strata-proofimpl-l1-batch = { path = "crates/proof-impl/l1-batch" }
@@ -128,11 +130,7 @@ alloy-rpc-types-eth = { version = "0.4.2", default-features = false, features = 
 ] }
 alloy-serde = { version = "0.4.2", default-features = false }
 alloy-sol-types = "0.8.0"
-revm = { version = "14.0.3", features = [
-  "std",
-  "secp256k1",
-  "blst",
-], default-features = false }
+revm = { version = "14.0.3", features = ["std"], default-features = false }
 revm-primitives = { version = "10.0.0", features = [
   "std",
 ], default-features = false }

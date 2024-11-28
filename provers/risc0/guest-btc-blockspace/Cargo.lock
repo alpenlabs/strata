@@ -117,9 +117,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-primitives"
-version = "0.8.13"
+version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aeeb5825c2fc8c2662167058347cd0cafc3cb15bcb5cdb1758a63c2dca0409e"
+checksum = "9fce5dbd6a4f118eecc4719eaa9c7ffc31c315e6c5ccde3642db927802312425"
 dependencies = [
  "alloy-rlp",
  "bytes",
@@ -1089,6 +1089,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ecdsa"
+version = "0.16.9"
+source = "git+https://github.com/sp1-patches/signatures?branch=patch-ecdsa-v0.16.9#475daa8834035cc170a567e7656329ab8de8cc44"
+dependencies = [
+ "anyhow",
+ "cfg-if",
+ "digest 0.10.7",
+ "elliptic-curve",
+ "hex-literal",
+ "signature",
+ "sp1-lib",
+ "spki",
+]
+
+[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1356,6 +1371,7 @@ dependencies = [
 name = "guest-risc0-btc-blockspace"
 version = "0.1.0"
 dependencies = [
+ "risc0-zkvm",
  "strata-proofimpl-btc-blockspace",
  "strata-risc0-adapter",
 ]
@@ -1754,10 +1770,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "956ff9b67e26e1a6a866cb758f12c6f8746208489e3e4a4b5580802f2f0a587b"
 dependencies = [
  "cfg-if",
- "ecdsa",
+ "ecdsa 0.16.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "elliptic-curve",
  "once_cell",
  "sha2",
+ "signature",
 ]
 
 [[package]]
@@ -3020,10 +3037,13 @@ dependencies = [
 [[package]]
 name = "secp256k1"
 version = "0.29.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9465315bc9d4566e1724f0fffcbcc446268cb522e60f9a27bcded6b19c108113"
+source = "git+https://github.com/sp1-patches/rust-secp256k1?branch=patch-secp256k1-v0.29.1#56af92843a8f15038f5dff12acef3afdb5a1b716"
 dependencies = [
  "bitcoin_hashes",
+ "cfg-if",
+ "ecdsa 0.16.9 (git+https://github.com/sp1-patches/signatures?branch=patch-ecdsa-v0.16.9)",
+ "elliptic-curve",
+ "k256",
  "rand",
  "secp256k1-sys",
  "serde",
@@ -3032,8 +3052,7 @@ dependencies = [
 [[package]]
 name = "secp256k1-sys"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1433bd67156263443f14d603720b082dd3121779323fce20cba2aa07b874bc1b"
+source = "git+https://github.com/sp1-patches/rust-secp256k1?branch=patch-secp256k1-v0.29.1#56af92843a8f15038f5dff12acef3afdb5a1b716"
 dependencies = [
  "cc",
 ]
@@ -3203,6 +3222,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp1-lib"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c8744af050832df5ca44fcd63979a83b93ca3010b2d5a5ce2a2b91f7438065c"
+dependencies = [
+ "bincode",
+ "serde",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3303,7 +3332,6 @@ dependencies = [
 name = "strata-risc0-adapter"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bincode",
  "borsh",
  "risc0-zkvm",
@@ -3355,11 +3383,11 @@ dependencies = [
 name = "strata-zkvm"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "arbitrary",
  "bincode",
  "borsh",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

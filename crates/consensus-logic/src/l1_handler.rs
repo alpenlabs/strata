@@ -1,6 +1,5 @@
 use std::{panic, sync::Arc};
 
-use anyhow::anyhow;
 use bitcoin::{
     consensus::serialize,
     hashes::{sha256d, Hash},
@@ -15,13 +14,13 @@ use strata_primitives::{
     params::{Params, RollupParams},
     vk::RollupVerifyingKey,
 };
-use strata_risc0_adapter::Risc0Verifier;
-use strata_sp1_adapter::SP1Verifier;
+use strata_risc0_adapter;
+use strata_sp1_adapter;
 use strata_state::{
     batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
 };
 use strata_tx_parser::messages::{BlockData, L1Event};
-use strata_zkvm::ZkVmVerifier;
+use strata_zkvm::ZkVmResult;
 use tokio::sync::mpsc;
 use tracing::*;
 
@@ -165,10 +164,7 @@ fn check_for_da_batch(
 /// # Caution
 ///
 /// If the checkpoint proof is empty, this function returns an `Ok(())`.
-pub fn verify_proof(
-    checkpoint: &BatchCheckpoint,
-    rollup_params: &RollupParams,
-) -> anyhow::Result<()> {
+pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) -> ZkVmResult<()> {
     let rollup_vk = rollup_params.rollup_vk;
     let checkpoint_idx = checkpoint.batch_info().idx();
     let proof = checkpoint.proof();
@@ -184,18 +180,13 @@ pub fn verify_proof(
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint
-    let res = panic::catch_unwind(|| match rollup_vk {
+    match rollup_vk {
         RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-            Risc0Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+            strata_risc0_adapter::verify_groth16(proof, vk.as_ref(), &public_params_raw)
         }
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
-            SP1Verifier::verify_groth16(proof, vk.as_ref(), &public_params_raw)
+            strata_sp1_adapter::verify_groth16(proof, vk.as_ref(), &public_params_raw)
         }
-    });
-    match res {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(e),
-        Err(_) => Err(anyhow!("Unexpected error occurred while verifying proof")),
     }
 }
 

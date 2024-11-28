@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 mod btc;
+mod checkpoint;
 mod cl;
 mod el;
 mod l1_batch;

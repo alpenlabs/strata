@@ -117,9 +117,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-primitives"
-version = "0.8.13"
+version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aeeb5825c2fc8c2662167058347cd0cafc3cb15bcb5cdb1758a63c2dca0409e"
+checksum = "9fce5dbd6a4f118eecc4719eaa9c7ffc31c315e6c5ccde3642db927802312425"
 dependencies = [
  "alloy-rlp",
  "bytes",
@@ -3303,12 +3303,10 @@ dependencies = [
 name = "strata-proofimpl-l1-batch"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bitcoin",
  "borsh",
  "ethnum",
  "serde",
- "serde_json",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-state",
@@ -3319,7 +3317,6 @@ dependencies = [
 name = "strata-risc0-adapter"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bincode",
  "borsh",
  "risc0-zkvm",
@@ -3371,11 +3368,11 @@ dependencies = [
 name = "strata-zkvm"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "arbitrary",
  "bincode",
  "borsh",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

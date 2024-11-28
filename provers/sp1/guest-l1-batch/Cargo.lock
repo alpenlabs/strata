@@ -2179,12 +2179,10 @@ dependencies = [
 name = "strata-proofimpl-l1-batch"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bitcoin",
  "borsh",
  "ethnum",
  "serde",
- "serde_json",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-state",
@@ -2195,7 +2193,6 @@ dependencies = [
 name = "strata-sp1-adapter"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bincode",
  "borsh",
  "hex",
@@ -2251,11 +2248,11 @@ dependencies = [
 name = "strata-zkvm"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "arbitrary",
  "bincode",
  "borsh",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

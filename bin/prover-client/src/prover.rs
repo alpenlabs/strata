@@ -13,7 +13,7 @@ use strata_sp1_guest_builder::{
     GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
     GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
 };
-use strata_zkvm::{Proof, ProverOptions, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{Proof, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -104,16 +104,22 @@ where
     Vm: ZkVmHost + 'static,
     for<'a> Vm::Input<'a>: ZkVmInputBuilder<'a>,
 {
-    let zkvm_input = match zkvm_input {
+    let (zkvm_input, proof_type) = match zkvm_input {
         ZkVmInput::ElBlock(el_input) => {
             let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            Vm::Input::new().write_serde(&el_input)?.build()?
+            (
+                Vm::Input::new().write_serde(&el_input)?.build()?,
+                ProofType::Compressed,
+            )
         }
 
-        ZkVmInput::BtcBlock(block, rollup_params) => Vm::Input::new()
-            .write_serde(&rollup_params)?
-            .write_buf(&bitcoin::consensus::serialize(&block))?
-            .build()?,
+        ZkVmInput::BtcBlock(block, rollup_params) => (
+            Vm::Input::new()
+                .write_serde(&rollup_params)?
+                .write_buf(&bitcoin::consensus::serialize(&block))?
+                .build()?,
+            ProofType::Compressed,
+        ),
 
         ZkVmInput::L1Batch(l1_batch_input) => {
             let mut input_builder = Vm::Input::new();
@@ -124,18 +130,21 @@ where
                 input_builder.write_proof(proof_input)?;
             }
 
-            input_builder.build()?
+            (input_builder.build()?, ProofType::Compressed)
         }
 
-        ZkVmInput::ClBlock(cl_proof_input) => Vm::Input::new()
-            .write_serde(&get_pm_rollup_params())?
-            .write_buf(&cl_proof_input.cl_raw_witness)?
-            .write_proof(
-                cl_proof_input
-                    .el_proof
-                    .expect("CL Proving was sent without EL proof"),
-            )?
-            .build()?,
+        ZkVmInput::ClBlock(cl_proof_input) => (
+            Vm::Input::new()
+                .write_serde(&get_pm_rollup_params())?
+                .write_buf(&cl_proof_input.cl_raw_witness)?
+                .write_proof(
+                    cl_proof_input
+                        .el_proof
+                        .expect("CL Proving was sent without EL proof"),
+                )?
+                .build()?,
+            ProofType::Compressed,
+        ),
 
         ZkVmInput::L2Batch(l2_batch_input) => {
             let mut input_builder = Vm::Input::new();
@@ -149,7 +158,7 @@ where
                 input_builder.write_proof(proof_input)?;
             }
 
-            input_builder.build()?
+            (input_builder.build()?, ProofType::Compressed)
         }
 
         ZkVmInput::Checkpoint(checkpoint_input) => {
@@ -166,11 +175,11 @@ where
             input_builder.write_proof(l1_batch_proof)?;
             input_builder.write_proof(l2_batch_proof)?;
 
-            input_builder.build()?
+            (input_builder.build()?, ProofType::Groth16)
         }
     };
 
-    let (proof, vk) = vm.prove(zkvm_input)?;
+    let (proof, vk) = vm.prove(zkvm_input, proof_type)?;
     let agg_input = ProofWithVkey::new(proof, vk);
     Ok(agg_input)
 }
@@ -179,12 +188,12 @@ impl<Vm: ZkVmHost> Prover<Vm>
 where
     Vm: ZkVmHost,
 {
-    pub(crate) fn new(prover_config: ProverOptions) -> Self {
+    pub(crate) fn new() -> Self {
         let rbdb = open_rocksdb_database().unwrap();
         let db_ops = DbOpsConfig { retry_count: 3 };
         let db = ProofDb::new(rbdb, db_ops);
 
-        let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new(prover_config);
+        let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new();
         zkvm_manager.add_vm(ProofVm::BtcProving, GUEST_BTC_BLOCKSPACE_ELF.clone());
         zkvm_manager.add_vm(ProofVm::L1Batch, GUEST_L1_BATCH_ELF.clone());
         zkvm_manager.add_vm(ProofVm::ELProving, GUEST_EVM_EE_STF_ELF.clone());

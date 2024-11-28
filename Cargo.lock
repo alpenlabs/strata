@@ -13171,7 +13171,6 @@ dependencies = [
 name = "strata-proofimpl-checkpoint"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bitcoin",
  "borsh",
  "ethnum",
@@ -13200,9 +13199,7 @@ dependencies = [
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "borsh",
- "serde",
  "strata-chaintsn",
  "strata-crypto",
  "strata-primitives",
@@ -13210,7 +13207,6 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "strata-zkvm",
- "thiserror",
 ]
 
 [[package]]
@@ -13245,13 +13241,11 @@ dependencies = [
 name = "strata-proofimpl-l1-batch"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bitcoin",
  "borsh",
  "ethnum",
  "rand",
  "serde",
- "serde_json",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-state",
@@ -13505,7 +13499,6 @@ dependencies = [
 name = "strata-risc0-adapter"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bincode",
  "borsh",
  "risc0-zkvm",
@@ -13605,7 +13598,6 @@ dependencies = [
 name = "strata-sp1-adapter"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bincode",
  "borsh",
  "hex",
@@ -13625,29 +13617,12 @@ dependencies = [
 name = "strata-sp1-guest-builder"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bincode",
- "bitcoin",
- "borsh",
- "hex",
- "num-bigint 0.4.6",
- "num-traits",
  "once_cell",
- "serde_json",
  "sha2 0.10.8",
  "sp1-helper",
  "sp1-sdk",
- "strata-primitives",
- "strata-proofimpl-btc-blockspace",
- "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-stf",
- "strata-proofimpl-evm-ee-stf",
- "strata-proofimpl-l1-batch",
  "strata-sp1-adapter",
- "strata-state",
- "strata-test-utils",
- "strata-zkvm",
- "tempfile",
 ]
 
 [[package]]
@@ -13785,11 +13760,41 @@ dependencies = [
 name = "strata-zkvm"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "arbitrary",
  "bincode",
  "borsh",
  "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-zkvm-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "serde_json",
+ "sp1-sdk",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-checkpoint",
+ "strata-proofimpl-cl-agg",
+ "strata-proofimpl-cl-stf",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-proofimpl-l1-batch",
+ "strata-risc0-adapter",
+ "strata-risc0-guest-builder",
+ "strata-sp1-adapter",
+ "strata-sp1-guest-builder",
+ "strata-state",
+ "strata-test-utils",
+ "strata-zkvm",
+ "tempfile",
 ]
 
 [[package]]
