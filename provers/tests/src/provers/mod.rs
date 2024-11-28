@@ -1,7 +1,13 @@
 use std::{fs, path::PathBuf};
 
-use anyhow::Result;
 use strata_zkvm::{Proof, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult};
+
+pub mod btc;
+mod checkpoint;
+pub mod cl;
+pub mod el;
+pub mod l1_batch;
+pub mod l2_batch;
 
 pub trait ProofGenerator<T, P: ZkVmProver> {
     /// Generates a proof based on the input.
@@ -58,7 +64,7 @@ fn get_cache_dir() -> std::path::PathBuf {
 }
 
 /// Reads a proof from a file.
-fn read_proof_from_file(proof_file: &std::path::Path) -> Result<Proof> {
+fn read_proof_from_file(proof_file: &std::path::Path) -> anyhow::Result<Proof> {
     use std::{fs::File, io::Read};
 
     use anyhow::Context;
@@ -74,7 +80,7 @@ fn read_proof_from_file(proof_file: &std::path::Path) -> Result<Proof> {
 }
 
 /// Writes a proof to a file.
-fn write_proof_to_file(proof: &Proof, proof_file: &std::path::Path) -> Result<()> {
+fn write_proof_to_file(proof: &Proof, proof_file: &std::path::Path) -> anyhow::Result<()> {
     use std::{fs::File, io::Write};
 
     use anyhow::Context;
