@@ -9,12 +9,7 @@ use crate::{input::ZkVmInputBuilder, proof::Proof, ProofType, VerificationKey, Z
 pub trait ZkVmHost: Send + Sync + Clone + Display + 'static {
     type Input<'a>: ZkVmInputBuilder<'a>;
 
-    /// Initializes the ZkVm with the provided ELF program and prover configuration.
-    // fn init(guest_code: &[u8]) -> Self;
-
     /// Executes the guest code within the VM, generating and returning the validity proof.
-    // TODO: Consider using custom error types instead of a generic error to capture the different
-    // reasons proving can fail.
     fn prove<'a>(
         &self,
         input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,

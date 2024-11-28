@@ -92,7 +92,8 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointBatchInfo, CheckpointProver>
     }
 }
 
-pub fn test_proof<H: ZkVmHost>(
+#[allow(dead_code)]
+fn test_proof<H: ZkVmHost>(
     checkpoint_host: H,
     btc_host: H,
     l1_batch_host: H,

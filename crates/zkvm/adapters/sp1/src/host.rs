@@ -14,6 +14,7 @@ use crate::input::SP1ProofInputBuilder;
 /// The `SP1Host` is responsible for program execution and proving
 #[derive(Clone)]
 pub struct SP1Host {
+    #[allow(dead_code)]
     elf: Vec<u8>,
     proving_key: SP1ProvingKey,
     verifying_key: SP1VerifyingKey,
