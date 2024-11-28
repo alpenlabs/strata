@@ -45,4 +45,8 @@ strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
 default = ["sp1"]
 sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder"]
 risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder"]
-mock = ["strata-sp1-guest-builder/mock", "strata-sp1-adapter/mock"]
+mock = [
+  "strata-sp1-guest-builder/mock",
+  "strata-sp1-adapter/mock",
+  "strata-risc0-adapter/mock",
+]
