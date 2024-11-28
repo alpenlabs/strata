@@ -23,6 +23,12 @@ impl NativeMachine {
     }
 }
 
+impl Default for NativeMachine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ZkVmEnv for NativeMachine {
     fn read_buf(&self) -> Vec<u8> {
         // Get the current value of input_ptr
