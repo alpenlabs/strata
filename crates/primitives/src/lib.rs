@@ -11,6 +11,8 @@ pub mod errors;
 pub mod evm_exec;
 pub mod hash;
 pub mod l1;
+#[macro_use]
+mod macros;
 pub mod operator;
 pub mod params;
 pub mod prelude;

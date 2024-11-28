@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn test_groth16_verification() {
         let sp1_vkey_hash = "0x00efb1120491119751e75bc55bc95b64d33f973ecf68fcf5cbff08506c5788f9";
-        let vk_buf32 = Buf32(sp1_vkey_hash.parse().unwrap());
+        let vk_buf32: Buf32 = sp1_vkey_hash.parse().unwrap();
         let vk_hash_str = hex::encode(vk_buf32.as_bytes());
         let vk_hash_str = format!("0x{}", vk_hash_str);
         assert_eq!(sp1_vkey_hash, vk_hash_str);

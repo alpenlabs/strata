@@ -78,11 +78,11 @@ pub fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegmen
     let update_input = UpdateInput::new(
         el_proof_pp.block_idx,
         Vec::new(),
-        Buf32(el_proof_pp.txn_root),
-        create_evm_extra_payload(Buf32(el_proof_pp.new_blockhash)),
+        Buf32(*el_proof_pp.txn_root),
+        create_evm_extra_payload(Buf32(*el_proof_pp.new_blockhash)),
     );
 
-    let update_output = UpdateOutput::new_from_state(Buf32(el_proof_pp.new_state_root));
+    let update_output = UpdateOutput::new_from_state(Buf32(*el_proof_pp.new_state_root));
     let exec_update = ExecUpdate::new(update_input, update_output);
 
     ExecSegment::new(exec_update)

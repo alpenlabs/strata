@@ -252,7 +252,7 @@ mod tests {
         // Correct merkle proof
         let deposit_info = DepositInfo::new(
             deposit_request_outpoint,
-            Buf20::default().0 .0.to_vec(),
+            Buf20::default().0.to_vec(),
             BRIDGE_DENOMINATION.into(),
             take_back_leaf_hash,
             drt_output_address.clone(),
@@ -271,7 +271,7 @@ mod tests {
             .to_hex_string(Case::Lower);
         let deposit_info = DepositInfo::new(
             deposit_request_outpoint,
-            Buf20::default().0 .0.to_vec(),
+            Buf20::default().0.to_vec(),
             BRIDGE_DENOMINATION.into(),
             TapNodeHash::from_str(&random_hash).unwrap(),
             drt_output_address.clone(),
@@ -297,7 +297,7 @@ mod tests {
 
         // in actual DRT, this will be the take-back leaf.
         // for testing, this could be any script as we only care about its hash.
-        let op_return_script = metadata_script(&Buf20::default().0 .0);
+        let op_return_script = metadata_script(&Buf20::default().0);
         let op_return_script_hash =
             TapNodeHash::from_script(&op_return_script, taproot::LeafVersion::TapScript);
 

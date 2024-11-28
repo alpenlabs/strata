@@ -46,25 +46,23 @@ fn get_deprecated_fallback() -> RollupParams {
         horizon_l1_height: 3,
         genesis_l1_height: 5,
         operator_config: OperatorConfig::Static(vec![opkeys]),
-        evm_genesis_block_hash: Buf32(
+        evm_genesis_block_hash:
             "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
                 .parse()
                 .unwrap(),
-        ),
-        evm_genesis_block_state_root: Buf32(
+        evm_genesis_block_state_root:
             "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
                 .parse()
                 .unwrap(),
-        ),
         l1_reorg_safe_depth: 4,
         target_l2_batch_size: 64,
         address_length: 20,
         deposit_amount: 1_000_000_000,
-        rollup_vk: RollupVerifyingKey::SP1VerifyingKey(Buf32(
+        rollup_vk: RollupVerifyingKey::SP1VerifyingKey(
             "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
                 .parse()
                 .unwrap(),
-        )), // TODO: update this with vk for checkpoint proof
+        ), // TODO: update this with vk for checkpoint proof
         dispatch_assignment_dur: 64,
         proof_publish_mode: ProofPublishMode::Timeout(5),
         max_deposits_in_block: 16,

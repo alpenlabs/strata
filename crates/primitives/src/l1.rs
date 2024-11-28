@@ -130,7 +130,7 @@ impl L1BlockManifest {
 
 impl From<Block> for L1BlockManifest {
     fn from(block: Block) -> Self {
-        let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array().into());
+        let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array());
         let root = block
             .witness_root()
             .map(|x| x.to_byte_array())
@@ -138,7 +138,7 @@ impl From<Block> for L1BlockManifest {
         let header = serialize(&block.header);
         Self {
             blockid,
-            txs_root: Buf32(root.into()),
+            txs_root: Buf32(root),
             header,
         }
     }
@@ -475,7 +475,7 @@ impl XOnlyPk {
 
             let serialized_key: FixedBytes<32> = output_key.serialize().into();
 
-            Ok(Self(Buf32(serialized_key)))
+            Ok(Self(Buf32(serialized_key.into())))
         } else {
             Err(ParseError::UnsupportedAddress(checked_addr.address_type()))
         }
@@ -483,7 +483,7 @@ impl XOnlyPk {
 
     /// Convert the [`XOnlyPk`] to an [`Address`].
     pub fn to_p2tr_address(&self, network: Network) -> Result<Address, ParseError> {
-        let buf: [u8; 32] = self.0 .0 .0;
+        let buf: [u8; 32] = self.0 .0;
         let pubkey = XOnlyPublicKey::from_slice(&buf)?;
 
         Ok(Address::p2tr_tweaked(
