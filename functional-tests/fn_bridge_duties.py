@@ -63,13 +63,16 @@ class BridgeDutiesTest(flexitest.Test):
         )
         duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
         duties: list = duties_resp["duties"]
-        # Filter out the duties unrelated to the el_address.
-        duties = []
-        for duty in duties_resp["duties"]:
+        # Filter out the duties unrelated to other than the el_address.
+        for duty in duties:
             self.logger.debug(f"duty: {duty}")
             if "el_address" in duty["payload"]:
                 self.logger.debug(f"duty['payload']['el_address']: {duty['payload']['el_address']}")
-                duties.append(duty)
+        duties = [
+            d
+            for d in duties
+            if "el_address" in d["payload"] and d["payload"]["el_address"] == el_address_bytes
+        ]
 
         expected_duties = []
         for txid in txids:
