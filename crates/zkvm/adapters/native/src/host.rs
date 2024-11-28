@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc};
 
 use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmResult};
 
-use crate::{input::NativeMachineInputBuilder, env::NativeMachine};
+use crate::{env::NativeMachine, input::NativeMachineInputBuilder};
 
 type ProcessProofFn = dyn Fn(&NativeMachine) -> ZkVmResult<()> + Send + Sync;
 
@@ -20,7 +20,7 @@ impl ZkVmHost for NativeHost {
         _proof_type: ProofType,
     ) -> ZkVmResult<(Proof, VerificationKey)> {
         (self.process_proof)(&native_machine)?;
-        let output = native_machine.output.borrow().clone();
+        let output = native_machine.state.borrow().output.clone();
         Ok((Proof::new(output), self.get_verification_key()))
     }
 

@@ -1,11 +1,20 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 
 use strata_zkvm::{Proof, ZkVmEnv};
 
+/// Encapsulates the mutable state of the NativeMachine.
+#[derive(Debug, Clone)]
+pub struct NativeMachineState {
+    /// Pointer to the current position in the input.
+    pub input_ptr: usize,
+    /// Buffer to store the output.
+    pub output: Vec<u8>,
+}
+
 /// A native implementation of the [`ZkVmEnv`]
 ///
-/// This uses interior mutability patterns ([`Cell`] and [`RefCell`]) to conform
-/// to the [`ZkVmEnv`] trait, which requires methods to take an immutable reference to `self`.
+/// This uses interior mutability with [`RefCell`] to conform to the [`ZkVmEnv`] trait, which
+/// requires methods to take an immutable reference to `self`.
 #[derive(Debug, Clone)]
 pub struct NativeMachine {
     /// A vector containing chunks of serialized input data.
@@ -14,26 +23,18 @@ pub struct NativeMachine {
     /// processed.
     pub inputs: Vec<Vec<u8>>,
 
-    /// A pointer to the current position in the `input` vector.
-    ///
-    /// Uses `Cell` for interior mutability, allowing `input_ptr` to be incremented within methods
-    /// that have an immutable reference to `self`. This keeps track of the next input to read.
-    pub input_ptr: Cell<usize>,
-
-    /// A vector for collecting serialized output data chunks.
-    ///
-    /// Wrapped in a `RefCell` to allow mutable access even when `self` is immutable. This stores
-    /// the outputs produced.
-    pub output: RefCell<Vec<u8>>,
+    /// Encapsulated mutable state for the machine.
+    pub state: RefCell<NativeMachineState>,
 }
 
 impl NativeMachine {
     pub fn new() -> Self {
-        Self {
-            inputs: vec![],
-            input_ptr: Cell::new(0),
-            output: RefCell::new(vec![]),
-        }
+        let state = RefCell::new(NativeMachineState {
+            input_ptr: 0,
+            output: Vec::new(),
+        });
+        let inputs = Vec::new();
+        Self { inputs, state }
     }
 
     pub fn write_slice(&mut self, input: Vec<u8>) {
@@ -49,15 +50,10 @@ impl Default for NativeMachine {
 
 impl ZkVmEnv for NativeMachine {
     fn read_buf(&self) -> Vec<u8> {
-        // Get the current value of input_ptr
-        let idx = self.input_ptr.get();
-
-        let bytes = self.inputs[idx].clone();
-
-        // Increment input_ptr
-        self.input_ptr.set(idx + 1);
-
-        bytes
+        let mut state = self.state.borrow_mut();
+        let buf = self.inputs[state.input_ptr].clone();
+        state.input_ptr += 1;
+        buf
     }
 
     fn read_serde<T: serde::de::DeserializeOwned>(&self) -> T {
@@ -66,7 +62,7 @@ impl ZkVmEnv for NativeMachine {
     }
 
     fn commit_buf(&self, raw_output: &[u8]) {
-        self.output.borrow_mut().extend_from_slice(raw_output);
+        self.state.borrow_mut().output.extend_from_slice(raw_output);
     }
 
     fn commit_serde<T: serde::Serialize>(&self, output: &T) {
