@@ -120,13 +120,13 @@ impl TaskTracker {
 
     /// Retrieves a task status by its ID.
     /// Used in places where only status is needed, to avoid (potentially expensive) cloning
-    /// of the whole `ProvingTask`.
+    /// of the whole [`ProvingTask`].
     pub async fn get_task_status(&self, task_id: Uuid) -> Option<ProvingTaskStatus> {
         let tasks = self.tasks.lock().await;
         tasks.get(&task_id).map(|task| task.status)
     }
 
-    /// Retrieves all the task for the given status.
+    /// Retrieves all the task for the given [`ProvingTaskStatus`].
     pub async fn get_tasks_by_status(&self, status: ProvingTaskStatus) -> Vec<ProvingTask> {
         let tasks = self.tasks.lock().await;
         tasks
@@ -138,7 +138,7 @@ impl TaskTracker {
 
     /// Retrieves all the task ids for the given status.
     /// Used in places where only the id is needed, to avoid (potentially expensive) cloning
-    /// of the whole `ProvingTask`.
+    /// of the whole [`ProvingTask`].
     pub async fn get_task_ids_by_status(&self, status: ProvingTaskStatus) -> Vec<Uuid> {
         let tasks = self.tasks.lock().await;
         tasks
