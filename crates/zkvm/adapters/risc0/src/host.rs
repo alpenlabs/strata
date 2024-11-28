@@ -11,7 +11,6 @@ use crate::input::Risc0ProofInputBuilder;
 
 /// A host for the `Risc0` zkVM that stores the guest program in ELF format
 /// The `Risc0Host` is responsible for program execution and proving
-
 #[derive(Clone)]
 pub struct Risc0Host {
     elf: Vec<u8>,
