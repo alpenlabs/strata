@@ -38,7 +38,6 @@ impl<H: ZkVmHost> ProofGenerator<u64, EvmEeProver> for ElProofGenerator<H> {
     }
 }
 
-// Run test if any of sp1 or risc0 feature is enabled and the test is being run in release mode
 #[cfg(test)]
 mod tests {
     use super::*;

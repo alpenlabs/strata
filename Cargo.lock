@@ -13130,14 +13130,9 @@ dependencies = [
 name = "strata-native-zkvm-adapter"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bincode",
  "borsh",
- "hex",
  "serde",
- "serde_json",
- "sha2 0.10.8",
- "sp1-sdk",
  "strata-zkvm",
  "tracing",
 ]

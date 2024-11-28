@@ -48,7 +48,6 @@ impl<H: ZkVmHost> ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenera
     }
 }
 
-// Run test if any of sp1 or risc0 feature is enabled and the test is being run in release mode
 #[cfg(test)]
 mod test {
     use strata_zkvm::ZkVmHost;
