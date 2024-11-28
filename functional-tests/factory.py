@@ -201,6 +201,7 @@ class RethFactory(flexitest.Factory):
         reth_secret_path: str,
         sequencer_reth_rpc: Optional[str],
         ctx: flexitest.EnvContext,
+        custom_chain: str = "dev",
     ) -> flexitest.Service:
         name = f"reth.{id}"
         datadir = ctx.make_service_dir(name)
@@ -225,8 +226,7 @@ class RethFactory(flexitest.Factory):
             "--http.port", str(ethrpc_http_port),
             "--color", "never",
             "--enable-witness-gen",
-            # TODO: update tests to use new chain config
-            "--custom-chain", "dev",
+            "--custom-chain", custom_chain,
             "-vvvv"
         ]
         # fmt: on

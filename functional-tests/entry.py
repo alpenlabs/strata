@@ -65,6 +65,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         pre_fund_addrs: bool = True,
         n_operators: int = 2,
         message_interval: int = DEFAULT_ROLLUP_PARAMS["message_interval"],
+        custom_chain: str = "dev",
     ):
         super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
@@ -74,6 +75,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         self.pre_fund_addrs = pre_fund_addrs
         self.n_operators = n_operators
         self.message_interval = message_interval
+        self.custom_chain = custom_chain
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
@@ -104,7 +106,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
         with open(reth_secret_path, "w") as f:
             f.write(generate_jwt_secret())
 
-        reth = reth_fac.create_exec_client(0, reth_secret_path, None)
+        reth = reth_fac.create_exec_client(
+            0, reth_secret_path, None, custom_chain=self.custom_chain
+        )
         reth_port = reth.get_prop("rpc_port")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
@@ -373,6 +377,8 @@ def main(argv):
         # Operator lag is a test that checks if the bridge can handle operator lag.
         # It is also useful for testing the reclaim path.
         "operator_lag": BasicEnvConfig(101, message_interval=10 * 60 * 1_000),
+        # Devnet production env
+        "devnet": BasicEnvConfig(101, custom_chain="devnet"),
         "fast_batches": BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()),
         "hub1": HubNetworkEnvConfig(),
         "prover": BasicEnvConfig(101, enable_prover_client=True),
