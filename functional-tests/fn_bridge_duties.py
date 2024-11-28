@@ -1,10 +1,8 @@
-import time
-
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from utils import broadcast_tx, get_logger
+from utils import broadcast_tx, get_logger, wait_until
 
 
 @flexitest.register
@@ -52,7 +50,11 @@ class BridgeDutiesTest(flexitest.Test):
                 # add robustness by spreading out requests across blocks
                 self.logger.debug(f"sent deposit request #{j} with txid = {txid} to block #{i}")
 
-        time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
+        # wait for the transactions to have at least 2 confirmations
+        wait_until(
+            lambda: all(btcrpc.proxy.gettransaction(txid)["confirmations"] >= 2 for txid in txids),
+            timeout=SEQ_PUBLISH_BATCH_INTERVAL_SECS * 2,
+        )
 
         operator_idx = 0
         start_index = 0
@@ -61,8 +63,13 @@ class BridgeDutiesTest(flexitest.Test):
         )
         duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
         duties: list = duties_resp["duties"]
-        # Filter out the duties unrelated to other than the el_address.
-        duties = [d for d in duties if d["payload"]["el_address"] == el_address_bytes]
+        # Filter out the duties unrelated to the el_address.
+        duties = []
+        for duty in duties_resp["duties"]:
+            self.logger.debug(f"duty: {duty}")
+            if "el_address" in duty["payload"]:
+                self.logger.debug(f"duty['payload']['el_address']: {duty['payload']['el_address']}")
+                duties.append(duty)
 
         expected_duties = []
         for txid in txids:
