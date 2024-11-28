@@ -31,17 +31,17 @@ impl ZkVmHost for NativeHost {
     }
 
     fn get_verification_key(&self) -> VerificationKey {
-        VerificationKey::new(vec![])
+        VerificationKey::default()
     }
 
     fn extract_borsh_public_output<T: borsh::BorshDeserialize>(proof: &Proof) -> ZkVmResult<T> {
-        Ok(borsh::from_slice(proof.as_bytes()).expect("ser"))
+        borsh::from_slice(proof.as_bytes()).map_err(|e| e.into())
     }
 
     fn extract_serde_public_output<T: serde::Serialize + serde::de::DeserializeOwned>(
         proof: &Proof,
     ) -> ZkVmResult<T> {
-        Ok(bincode::deserialize(proof.as_bytes()).expect("ser"))
+        bincode::deserialize(proof.as_bytes()).map_err(|e| e.into())
     }
 
     fn extract_raw_public_output(proof: &Proof) -> ZkVmResult<Vec<u8>> {

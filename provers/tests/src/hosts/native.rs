@@ -8,6 +8,12 @@ use strata_proofimpl_cl_stf::process_cl_stf;
 use strata_proofimpl_evm_ee_stf::process_block_transaction_outer;
 use strata_proofimpl_l1_batch::process_l1_batch_proof;
 
+/// A mock verification key used in native mode when proof verification is not performed.
+///
+/// This constant provides a placeholder value for scenarios where a verification key is
+/// required by a function signature, but actual verification is skipped.
+const MOCK_VK: [u32; 8] = [0u32; 8];
+
 pub fn btc_blockspace() -> NativeHost {
     NativeHost {
         process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
@@ -19,7 +25,7 @@ pub fn btc_blockspace() -> NativeHost {
 pub fn l1_batch() -> NativeHost {
     NativeHost {
         process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-            process_l1_batch_proof(zkvm, &[0u32; 8]);
+            process_l1_batch_proof(zkvm, &MOCK_VK);
             Ok(())
         })),
     }
@@ -37,7 +43,7 @@ pub fn evm_ee_stf() -> NativeHost {
 pub fn cl_stf() -> NativeHost {
     NativeHost {
         process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-            process_cl_stf(zkvm, &[0u32; 8]);
+            process_cl_stf(zkvm, &MOCK_VK);
             Ok(())
         })),
     }
@@ -46,7 +52,7 @@ pub fn cl_stf() -> NativeHost {
 pub fn cl_agg() -> NativeHost {
     NativeHost {
         process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-            process_cl_agg(zkvm, &[0u32; 8]);
+            process_cl_agg(zkvm, &MOCK_VK);
             Ok(())
         })),
     }
@@ -55,7 +61,7 @@ pub fn cl_agg() -> NativeHost {
 pub fn checkpoint() -> NativeHost {
     NativeHost {
         process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-            process_checkpoint_proof_outer(zkvm, &[0u32; 8], &[0u32; 8]);
+            process_checkpoint_proof_outer(zkvm, &MOCK_VK, &MOCK_VK);
             Ok(())
         })),
     }
