@@ -10,10 +10,11 @@ use console::{style, Term};
 
 use crate::{
     constants::SATS_TO_WEI,
+    link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
-    signet::{get_fee_rate, log_fee_rate, print_bitcoin_explorer_url, SignetWallet},
-    strata::{print_strata_explorer_url, StrataWallet},
+    signet::{get_fee_rate, log_fee_rate, SignetWallet},
+    strata::StrataWallet,
 };
 
 /// Drains the internal wallet to the provided
@@ -83,7 +84,12 @@ pub async fn drain(
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().expect("fully signed tx");
         settings.signet_backend.broadcast_tx(&tx).await.unwrap();
-        let _ = print_bitcoin_explorer_url(&tx.compute_txid(), &term, &settings);
+        let txid = tx.compute_txid();
+        let _ = term.write_line(
+            &OnchainObject::from(&txid)
+                .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
+                .pretty(),
+        );
         let _ = term.write_line(&format!("Drained signet wallet to {}", address,));
     }
 
@@ -110,7 +116,11 @@ pub async fn drain(
 
         let res = l2w.send_transaction(tx).await.unwrap();
 
-        let _ = print_strata_explorer_url(res.tx_hash(), &term, &settings);
+        let _ = term.write_line(
+            &OnchainObject::from(res.tx_hash())
+                .with_maybe_explorer(settings.blockscout_endpoint.as_deref())
+                .pretty(),
+        );
 
         let _ = term.write_line(&format!(
             "Drained {} from Strata wallet to {}",

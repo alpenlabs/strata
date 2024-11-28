@@ -1,5 +1,6 @@
 pub mod cmd;
 pub mod constants;
+mod link;
 pub mod net_type;
 pub mod recovery;
 pub mod seed;

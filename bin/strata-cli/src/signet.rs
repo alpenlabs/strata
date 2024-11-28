@@ -12,7 +12,7 @@ use std::{
 use backend::{ScanError, SignetBackend, SyncError, WalletUpdate};
 use bdk_esplora::esplora_client::{self, AsyncClient};
 use bdk_wallet::{
-    bitcoin::{FeeRate, Network, Txid},
+    bitcoin::{FeeRate, Network},
     rusqlite::{self, Connection},
     PersistedWallet, Wallet,
 };
@@ -21,7 +21,7 @@ use persist::Persister;
 use terrors::OneOf;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
-use crate::{seed::Seed, settings::Settings};
+use crate::seed::Seed;
 
 pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
     let _ = term.write_line(&format!(
@@ -42,20 +42,6 @@ pub async fn get_fee_rate(
             .expect("valid fee rate")
             .unwrap_or(FeeRate::BROADCAST_MIN),
     }
-}
-
-pub fn print_bitcoin_explorer_url(
-    txid: &Txid,
-    term: &Term,
-    settings: &Settings,
-) -> Result<(), io::Error> {
-    term.write_line(&match settings.mempool_space_endpoint {
-        Some(ref url) => format!(
-            "View transaction at {}",
-            style(format!("{url}/tx/{txid}")).blue()
-        ),
-        None => format!("Transaction ID: {txid}"),
-    })
 }
 
 #[derive(Clone, Debug)]
