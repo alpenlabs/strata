@@ -195,9 +195,8 @@ impl StrataProverClientApiServer for ProverClientRpc {
     async fn get_task_status(&self, task_id: Uuid) -> RpcResult<Option<String>> {
         let task_tracker = self.context.el_proving_task_dispatcher.task_tracker();
 
-        if let Some(proving_task) = task_tracker.get_task(task_id).await {
-            let task_status = proving_task.status.to_string();
-            return RpcResult::Ok(Some(task_status));
+        if let Some(task_status) = task_tracker.get_task_status(task_id).await {
+            return RpcResult::Ok(Some(task_status.to_string()));
         }
 
         RpcResult::Ok(None)
