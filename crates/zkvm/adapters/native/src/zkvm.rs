@@ -3,10 +3,28 @@ use std::cell::{Cell, RefCell};
 use strata_zkvm::{Proof, ZkVmEnv};
 
 #[derive(Debug, Clone)]
+/// A native implementation of the [`ZkVmEnv`]
+///
+/// This uses interior mutability patterns ([`Cell`] and [`RefCell`]) to conform
+/// to the [`ZkVmEnv`] trait, which requires methods to take an immutable reference to `self`.
 pub struct NativeMachine {
+    /// A vector containing chunks of serialized input data.
+    ///
+    /// Each element in the vector represents a separate input that can be deserialized and
+    /// processed.
     pub inputs: Vec<Vec<u8>>,
+
+    /// A pointer to the current position in the `input` vector.
+    ///
+    /// Uses `Cell` for interior mutability, allowing `input_ptr` to be incremented within methods
+    /// that have an immutable reference to `self`. This keeps track of the next input to read.
     pub input_ptr: Cell<usize>,
-    pub output: RefCell<Vec<Vec<u8>>>,
+
+    /// A vector for collecting serialized output data chunks.
+    ///
+    /// Wrapped in a `RefCell` to allow mutable access even when `self` is immutable. This stores
+    /// the outputs produced.
+    pub output: RefCell<Vec<u8>>,
 }
 
 impl NativeMachine {
@@ -48,7 +66,7 @@ impl ZkVmEnv for NativeMachine {
     }
 
     fn commit_buf(&self, raw_output: &[u8]) {
-        self.output.borrow_mut().push(raw_output.to_vec());
+        self.output.borrow_mut().extend_from_slice(raw_output);
     }
 
     fn commit_serde<T: serde::Serialize>(&self, output: &T) {

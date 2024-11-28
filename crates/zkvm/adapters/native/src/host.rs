@@ -1,6 +1,6 @@
 use std::{fmt, sync::Arc};
 
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmInputBuilder, ZkVmResult};
+use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmResult};
 
 use crate::{input::NativeMachineInputBuilder, zkvm::NativeMachine};
 
@@ -16,18 +16,12 @@ impl ZkVmHost for NativeHost {
 
     fn prove<'a>(
         &self,
-        prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
+        native_machine: NativeMachine,
         _proof_type: ProofType,
     ) -> ZkVmResult<(Proof, VerificationKey)> {
-        (self.process_proof)(&prover_input)?;
-        let output_ref = prover_input.output.borrow();
-
-        let output = if output_ref.is_empty() {
-            vec![]
-        } else {
-            output_ref[0].clone()
-        };
-        Ok((Proof::new(output), VerificationKey::new(vec![])))
+        (self.process_proof)(&native_machine)?;
+        let output = native_machine.output.borrow().clone();
+        Ok((Proof::new(output), self.get_verification_key()))
     }
 
     fn get_verification_key(&self) -> VerificationKey {
