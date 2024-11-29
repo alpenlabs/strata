@@ -49,10 +49,15 @@ impl ChainstateDatabase for ChainstateDb {
     }
 
     // TODO: define what toplevel means more clearly
+    // TODO: Why is it called toplevel when it is returning any record based on index?
     fn get_toplevel_state(
         &self,
         idx: u64,
     ) -> DbResult<Option<strata_state::chain_state::Chainstate>> {
+        Ok(self.db.get::<ChainstateSchema>(&idx)?)
+    }
+
+    fn get_state_at(&self, idx: u64) -> DbResult<Option<strata_state::chain_state::Chainstate>> {
         Ok(self.db.get::<ChainstateSchema>(&idx)?)
     }
 

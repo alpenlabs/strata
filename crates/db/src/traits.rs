@@ -150,6 +150,10 @@ pub trait ClientStateDatabase {
 
     /// Gets a state checkpoint at a previously written index, if it exists.
     fn get_state_checkpoint(&self, idx: u64) -> DbResult<Option<ClientState>>;
+
+    fn get_last_client_state_idx(&self) -> DbResult<u64>;
+
+    fn get_state_at(&self, idx: u64) -> DbResult<Option<ClientState>>;
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think
@@ -226,6 +230,8 @@ pub trait ChainstateDatabase {
 
     /// Gets the toplevel chain state at a particular block index (height).
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<Chainstate>>;
+
+    fn get_state_at(&self, idx: u64) -> DbResult<Option<Chainstate>>;
 }
 
 /// Db trait for Checkpoint data
