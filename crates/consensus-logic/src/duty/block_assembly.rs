@@ -4,6 +4,7 @@
 use std::{sync::Arc, thread, time};
 
 use bitcoin::Transaction;
+use strata_chaintsn::clock;
 use strata_crypto::sign_schnorr_sig;
 use strata_db::traits::{
     ChainstateDatabase, ClientStateDatabase, Database, L1Database, L2BlockDatabase,
@@ -54,6 +55,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     params: &Arc<Params>,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!("preparing block");
+    let rollup_params = params.rollup();
     let l1_db = database.l1_db();
     let l2_db = database.l2_db();
     let cs_db = database.client_state_db();
@@ -68,6 +70,9 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         warn!(%slot, "was turn to propose block, but found block in database already");
         return Ok(None);
     }
+
+    let epoch = clock::get_slot_expected_epoch(slot, rollup_params);
+    let is_epoch_final_slot = clock::is_epoch_final_slot(slot, rollup_params);
 
     // Figure out some general data about the slot and the previous state.
     let ts = now_millis();
@@ -100,15 +105,18 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         .get_toplevel_state(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_block_id))?;
 
-    // TODO Pull data from CSM state that we've observed from L1, including new
-    // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = prepare_l1_segment(
-        l1_state,
-        &prev_chstate,
-        l1_db.as_ref(),
-        MAX_L1_ENTRIES_PER_BLOCK,
-        params.rollup(),
-    )?;
+    // Pull data from CSM state that we've observed from L1, like new headers.
+    let l1_seg = if is_epoch_final_slot {
+        Some(prepare_l1_segment(
+            l1_state,
+            &prev_chstate,
+            l1_db.as_ref(),
+            MAX_L1_ENTRIES_PER_BLOCK,
+            rollup_params,
+        )?)
+    } else {
+        None
+    };
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
