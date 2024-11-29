@@ -34,6 +34,45 @@ impl From<&Proof> for Vec<u8> {
     }
 }
 
+#[derive(
+    Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary,
+)]
+pub struct PublicValues(Vec<u8>);
+
+impl PublicValues {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self(data)
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl From<PublicValues> for Vec<u8> {
+    fn from(value: PublicValues) -> Self {
+        value.0
+    }
+}
+
+impl From<&PublicValues> for Vec<u8> {
+    fn from(value: &PublicValues) -> Self {
+        value.0.clone()
+    }
+}
+
+#[derive(
+    Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary,
+)]
+pub struct ProofReceipt {
+    pub proof: Proof,
+    pub public_values: PublicValues,
+}
+
 /// Verification Key required to verify proof generated from `ZKVMHost`
 #[derive(
     Debug,
