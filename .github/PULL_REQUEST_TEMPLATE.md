@@ -18,7 +18,7 @@ Select the type of change your PR introduces (put an `x` in all that apply):
 - [ ] New or updated tests
 - [ ] Dependency Update
 
-## Notes to Reviewer's
+## Notes to Reviewers
 
 <!--
 Anything in particular you want to note that will help reviewer's fulfill their role
