@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
-    l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
+    l1::{BitcoinAmount, OutputRef, XOnlyPk},
     operator::{OperatorKeyProvider, OperatorPubkeys},
 };
 
