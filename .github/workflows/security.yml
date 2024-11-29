@@ -22,9 +22,10 @@ jobs:
           cache-on-failure: true
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --force
+        run: cargo install --locked cargo-audit --force
 
-        #  HACK: not denying warnings as we depend on `yaml-rust` via `format-serde-error` which is unmaintained
+        #  HACK: not denying warnings as we depend on `yaml-rust` via `format-serde-error`
+        #        which is unmaintained
       - name: Check for audit warnings
         run: cargo audit -D warnings
         continue-on-error: true
