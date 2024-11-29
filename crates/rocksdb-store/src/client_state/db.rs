@@ -119,6 +119,17 @@ impl ClientStateDatabase for ClientStateDb {
     ) -> DbResult<Option<strata_state::client_state::ClientState>> {
         Ok(self.db.get::<ClientStateSchema>(&idx)?)
     }
+
+    fn get_last_client_state_idx(&self) -> DbResult<u64> {
+        match self.get_last_idx::<ClientStateSchema>()? {
+            Some(idx) => Ok(idx),
+            None => Err(DbError::NotBootstrapped),
+        }
+    }
+
+    fn get_state_at(&self, idx: u64) -> DbResult<Option<strata_state::client_state::ClientState>> {
+        Ok(self.db.get::<ClientStateSchema>(&idx)?)
+    }
 }
 
 #[cfg(test)]
