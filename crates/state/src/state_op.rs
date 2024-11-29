@@ -3,6 +3,8 @@
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 
+#![allow(unused)]
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
@@ -23,38 +25,10 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
-enum StateOp {
-    /// Replace the chain state with something completely different.
-    Replace(Box<Chainstate>),
-
-    /// Sets the current slot.
-    SetSlotAndTipBlock(u64, L2BlockId),
-
-    /// Reverts L1 accepted height back to a previous height, rolling back any
-    /// blocks that were there.
-    RevertL1Height(u64),
-
-    /// Accepts a new L1 block into the maturation queue.
-    AcceptL1Block(l1::L1MaturationEntry),
-
-    /// Matures the next L1 block, whose idx must match the one specified here
-    /// as a sanity check.
-    MatureL1Block(u64),
-
-    /// An intention to do a withdrawal.
-    SubmitWithdrawal(WithdrawalIntent),
-
-    /// Remove deposit Intent
-    ConsumeDepositIntent(u64),
-
-    /// Creates an operator
-    CreateOperator(Buf32, Buf32),
-
-    /// Assigns an assignee a deposit and withdrawal dispatch command to play out.
-    DispatchWithdrawal(u32, OperatorIdx, DispatchCommand, BitcoinBlockHeight),
-
-    /// Resets the assignee and block height for a deposit.
-    ResetDepositAssignee(u32, OperatorIdx, BitcoinBlockHeight),
+pub enum StateOp {
+    /// Do nothing.  This arm is needed for some reason I don't understand.
+    Noop,
+    // nothing now, maybe later
 }
 
 /// Collection of writes we're making to the state.
@@ -102,87 +76,7 @@ pub fn apply_write_batch_to_chainstate(
 
 fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
     match op {
-        StateOp::Replace(new_state) => *state = new_state.as_ref().clone(),
-
-        StateOp::SetSlotAndTipBlock(slot, last_block) => {
-            // TODO remove
-        }
-
-        StateOp::RevertL1Height(to_height) => {
-            debug!(%to_height, "Obtained RevertL1Height Operation");
-            /*let mqueue = &mut state.l1_state.maturation_queue;
-            let back_idx = mqueue.back_idx().expect("stateop: maturation queue empty");
-
-            // Do some bookkeeping to make sure it's safe to do this.
-            if *to_height > back_idx {
-                panic!("stateop: revert to above tip block");
-            }
-
-            let n_drop = back_idx - to_height;
-            if n_drop > mqueue.len() as u64 {
-                panic!("stateop: revert matured block");
-            }
-
-            // Now that it's safe to do the revert, we can just do it.
-            for _ in 0..n_drop {
-                // This expect should never trigger.
-                mqueue.pop_back().expect("stateop: unable to revert more");
-            }*/
-        }
-
-        StateOp::AcceptL1Block(entry) => {
-            /*let mqueue = &mut state.l1_state.maturation_queue;
-            mqueue.push_back(entry.clone());*/
-        }
-
-        StateOp::MatureL1Block(maturing_idx) => {
-            /*let operators: Vec<_> = state.operator_table().indices().collect();
-            let mqueue = &mut state.l1_state.maturation_queue;
-            let deposits = state.exec_env_state.pending_deposits_mut();
-
-            // Checks.
-            assert!(mqueue.len() > 1); // make sure we'll still have blocks in the queue
-            let front_idx = mqueue.front_idx().unwrap();
-            assert_eq!(front_idx, *maturing_idx);
-
-            // Actually take the block out so we can do something with it.
-            let matured_block = mqueue.pop_front().unwrap();
-
-            // TODO add it to the MMR so we can reference it in the future
-            let (header_record, deposit_txs, _) = matured_block.into_parts();
-            for tx in deposit_txs {
-                if let Deposit(deposit_info) = tx.tx().protocol_operation() {
-                    trace!("we got some deposit_txs");
-                    let amt = deposit_info.amt;
-                    let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
-                    deposits.push_back(deposit_intent);
-                    state
-                        .deposits_table
-                        .add_deposits(&deposit_info.outpoint, &operators, amt)
-                }
-            }
-            state.l1_state.safe_block = header_record;*/
-        }
-
-        StateOp::SubmitWithdrawal(withdrawal) => {
-            // TODO remove
-        }
-
-        StateOp::ConsumeDepositIntent(to_drop_idx) => {
-            // TODO remove
-        }
-
-        StateOp::CreateOperator(spk, wpk) => {
-            // TODO remove
-        }
-
-        StateOp::DispatchWithdrawal(deposit_idx, op_idx, cmd, exec_height) => {
-            // TODO remove
-        }
-
-        StateOp::ResetDepositAssignee(deposit_idx, op_idx, exec_height) => {
-            // TODO remove
-        }
+        StateOp::Noop => {}
     }
 }
 
@@ -265,20 +159,6 @@ impl StateCache {
         self.write_ops.is_empty()
     }
 
-    /// Applies some operations to the state, including them in the write ops
-    /// list.
-    fn merge_ops(&mut self, ops: impl Iterator<Item = StateOp>) {
-        for op in ops {
-            apply_op_to_chainstate(&op, &mut self.new_ch_state);
-            self.write_ops.push(op);
-        }
-    }
-
-    /// Like `merge_ops`, but only for a single op, for convenience.
-    fn merge_op(&mut self, op: StateOp) {
-        self.merge_ops([op].into_iter());
-    }
-
     /// Sets the current slot in the state.
     pub fn set_cur_header(&mut self, header: &impl L2Header) {
         self.new_ch_state.slot = header.blockidx();
@@ -309,21 +189,6 @@ impl StateCache {
         self.epoch_state_mut()
             .operator_table
             .insert(signing_pk, wallet_pk);
-    }
-
-    /// L1 revert
-    pub fn revert_l1_view_to(&mut self, height: u64) {
-        self.merge_op(StateOp::RevertL1Height(height));
-    }
-
-    /// add l1 block to maturation entry
-    pub fn apply_l1_block_entry(&mut self, ent: L1MaturationEntry) {
-        self.merge_op(StateOp::AcceptL1Block(ent));
-    }
-
-    /// remove matured block from maturation entry
-    fn mature_l1_block(&mut self, idx: u64) {
-        self.merge_op(StateOp::MatureL1Block(idx));
     }
 
     pub fn set_safe_l1_tip(&mut self, blkid: L1BlockId, idx: u64) {
