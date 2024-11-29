@@ -42,7 +42,6 @@ impl From<HexBytes> for Vec<u8> {
         value.0
     }
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
 
@@ -140,6 +139,16 @@ pub struct BlockHeader {
     pub state_root: [u8; 32],
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct BlockBody {
+    pub todo: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct L2Block {
+    pub header: BlockHeader,
+    pub body: BlockBody,
+}
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DaBlob {
     /// The destination or identifier for the blob.
@@ -249,4 +258,35 @@ pub enum L2BlockStatus {
     Verified(u64),
     /// Block is now finalized, certain depth has been reached in L1
     Finalized(u64),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainState {
+    /// Most recent seen block.
+    pub(crate) last_block: L2BlockId,
+
+    /// The slot of the last produced block.
+    pub(crate) slot: u64,
+
+    pub(crate) epoch: u64,
+    // / Rollup's view of L1 state.
+    // / Too many things in child to be Serialized
+    // pub(crate) l1_state: l1::L1ViewState,
+
+    // /// Pending withdrawals that have been initiated but haven't been sent out.
+    // /// StateQueue needs to be serialized. <WithdrawalIntent> is already Serialize
+    // pub(crate) pending_withdraws: StateQueue<bridge_ops::WithdrawalIntent>,
+
+    // /// Execution environment state.  This is just for the single EE we support
+    // /// right now.
+    // /// Too many things in child to be Serialized
+    // pub(crate) exec_env_state: exec_env::ExecEnvState,
+
+    // /// Operator table we store registered operators for.
+    // /// Serialize to be added to OperatorTable only
+    // pub(crate) operator_table: bridge_state::OperatorTable,
+
+    // /// Deposits table tracking each deposit's state.
+    // /// Serialize to be added to DepositsTable only
+    // pub(crate) deposits_table: bridge_state::DepositsTable,
 }

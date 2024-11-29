@@ -4,17 +4,44 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use strata_db::types::L1TxStatus;
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
-    types::{BlockHeader, ClientStatus, L1Status},
-    BridgeDuties, ExecUpdate, HexBytes, HexBytes32, L2BlockStatus, NodeSyncStatus,
-    RpcCheckpointInfo,
+    BlockHeader, BridgeDuties, ClientStatus, ExecUpdate, HexBytes, HexBytes32, L1Status, L2Block,
+    L2BlockStatus, NodeSyncStatus, RpcCheckpointInfo,
 };
 use strata_state::{
-    bridge_state::DepositEntry, id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent,
+    bridge_state::DepositEntry, client_state::ClientState, id::L2BlockId,
+    operation::ClientUpdateOutput, sync_event::SyncEvent,
 };
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
 pub trait StrataApi {
+    #[method(name = "getBlockById")]
+    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>>;
+
+    #[method(name = "getBlocksAtIdx")]
+    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>>;
+
+    #[method(name = "blockNumber")]
+    async fn block_number(&self) -> RpcResult<u64>;
+
+    #[method(name = "getLastChainstateIdx")]
+    async fn get_last_chainstate_idx(&self) -> RpcResult<u64>;
+
+    // #[method(name = "strata_getChainstateAtIdx")]
+    // async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<Chainstate>>;
+
+    #[method(name = "getLastClientStateIdx")]
+    async fn get_last_clientstate_idx(&self) -> RpcResult<u64>;
+
+    #[method(name = "getClientStateAtIdx")]
+    async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>>;
+
+    // #[method(name = "strata_getLastBroadcastEntry")]
+    // async fn get_last_broadcast_entry(&self) -> RpcResult<Option<L1TxEntry>>;
+
+    // #[method(name = "strata_getBroadcastEntryByIdx")]
+    // async fn get_broadcast_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>>;
+
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
