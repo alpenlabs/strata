@@ -23,6 +23,7 @@ use strata_state::{
 };
 
 use crate::{
+    clock,
     errors::TsnError,
     macros::*,
     slot_rng::{self, SlotRng},
@@ -50,6 +51,18 @@ pub fn process_block(
     }
 
     let mut rng = compute_init_slot_rng(state);
+
+    // Check that the L1 segment is missing/present as we expect.
+    let is_epoch_final = clock::is_epoch_final_slot(header.blockidx(), params);
+    if body.l1_segment().is_some() {
+        if !is_epoch_final {
+            return Err(TsnError::ExpectedNoL1Segment);
+        }
+    } else {
+        if is_epoch_final {
+            return Err(TsnError::ExpectedL1Segment);
+        }
+    }
 
     // Update basic bookkeeping.
     state.set_cur_header(header);

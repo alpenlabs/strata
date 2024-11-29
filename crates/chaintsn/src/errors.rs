@@ -22,6 +22,12 @@ pub enum TsnError {
     #[error("ran out of deposits to assign withdrawals to")]
     InsufficientDepositsForIntents,
 
+    #[error("block missing L1 segment when expected")]
+    ExpectedL1Segment,
+
+    #[error("block had L1 segment when not expected")]
+    ExpectedNoL1Segment,
+
     #[error("there are no operators in the chainstate")]
     NoOperators,
 
