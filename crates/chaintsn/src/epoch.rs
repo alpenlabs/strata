@@ -252,7 +252,7 @@ mod tests {
     use strata_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
         bridge_state::OperatorTable,
-        chain_state::ChainState,
+        chain_state::Chainstate,
         exec_env::ExecEnvState,
         exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
         genesis::GenesisStateData,
