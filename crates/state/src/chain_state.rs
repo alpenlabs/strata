@@ -102,7 +102,7 @@ impl Chainstate {
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
-        let hashed_state = HashedChainState {
+        let hashed_state = HashedChainstate {
             last_block: self.last_block.into(),
             slot: self.slot,
             epoch: self.epoch,
@@ -133,12 +133,12 @@ impl<'a> Arbitrary<'a> for Chainstate {
 
 /// Toplevel hash commitment structure for chain state.
 ///
-/// Used transiently to compute the state root of the [`ChainState`].
+/// Used transiently to compute the state root of the [`Chainstate`].
 // TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
-// It should be replaced once we swap out ChainState's type definitions with SSZ type definitions
+// It should be replaced once we swap out Chainstate's type definitions with SSZ type definitions
 // which defines all of this more rigorously
 #[derive(BorshSerialize)]
-struct HashedChainState {
+struct HashedChainstate {
     last_block: Buf32,
     slot: u64,
     epoch: u64,
