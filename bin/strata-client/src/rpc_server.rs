@@ -106,6 +106,75 @@ fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> RpcBlockHeader {
 
 #[async_trait]
 impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
+    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>> {
+        let db = self.database.clone();
+        let blk_ids = wait_blocking("l2_blockid", move || {
+            db.l2_db()
+                .get_blocks_at_height(idx)
+                .map_err(Error::Db)
+                .map(|ids| {
+                    ids.into_iter()
+                        .map(|id| HexBytes32(*id.as_ref()))
+                        .collect::<Vec<HexBytes32>>()
+                })
+        })
+        .await?;
+        Ok(blk_ids)
+    }
+
+    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>> {
+        let db = self.database.clone();
+        let l2blk = fetch_l2blk::<D>(db.l2_db(), block_id)?;
+        Ok(Some(L2Block {
+            header: conv_blk_header_to_rpc(l2blk.header()),
+            body: BlockBody { todo: 0 },
+        }))
+    }
+    async fn block_number(&self) -> RpcResult<u64> {
+        let sync = {
+            let cl = self.status_rx.cl().borrow();
+            cl.sync().ok_or(Error::ClientNotStarted)?.clone()
+        };
+        Ok(sync.chain_tip_height())
+    }
+
+    async fn get_last_chainstate_idx(&self) -> RpcResult<u64> {
+        let db = self.database.clone();
+        let last_idx = wait_blocking("last_chain_state_idx", move || {
+            db.chain_state_db().get_last_state_idx().map_err(Error::Db)
+        })
+        .await?;
+        Ok(last_idx)
+    }
+
+    // async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<ChainState>> {
+    //     let db = self.database.clone();
+    //     let chain_state = wait_blocking("chain_state_at_idx", move || {
+    //         db.chain_state_db().get_state_at(idx).map_err(Error::Db)
+    //     })
+    //     .await?;
+    //     Ok(chain_state)
+    // }
+
+    async fn get_last_clientstate_idx(&self) -> RpcResult<u64> {
+        let db = self.database.clone();
+        let last_idx = wait_blocking("last_client_state_idx", move || {
+            db.client_state_db()
+                .get_last_client_state_idx()
+                .map_err(Error::Db)
+        })
+        .await?;
+        Ok(last_idx)
+    }
+
+    async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
+        let db = self.database.clone();
+        let client_state = wait_blocking("client_state_at_idx", move || {
+            db.client_state_db().get_state_at(idx).map_err(Error::Db)
+        })
+        .await?;
+        Ok(client_state)
+    }
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
     }

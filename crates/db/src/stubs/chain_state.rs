@@ -160,4 +160,19 @@ impl ChainstateDatabase for StubChainstateDb {
         let st = self.state.lock();
         Ok(st.toplevels.get(&idx).cloned())
     }
+    fn get_state_at(&self, idx: u64) -> DbResult<Option<strata_state::chain_state::Chainstate>> {
+        let st = self.state.lock();
+        let last_idx = st.find_last_write_batch();
+        if idx > last_idx {
+            return Err(DbError::UnknownIdx(idx));
+        }
+
+        let mut state = st.toplevels.get(&0).cloned().unwrap();
+        for i in 1..=idx {
+            let batch = st.write_batches.get(&i).cloned().unwrap();
+            state = state_op::apply_write_batch_to_chainstate(state, &batch);
+        }
+
+        Ok(Some(state))
+    }
 }
