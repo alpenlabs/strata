@@ -1,4 +1,6 @@
-use crate::{host::ZkVmHost, input::ZkVmInputBuilder, proof::Proof, ProofType, ZkVmError};
+use crate::{
+    host::ZkVmHost, input::ZkVmInputBuilder, proof::Proof, ProofType, PublicValues, ZkVmError,
+};
 
 pub trait ZkVmProver {
     type Input;
@@ -12,9 +14,7 @@ pub trait ZkVmProver {
         B: ZkVmInputBuilder<'a>;
 
     /// Processes the proof to produce the final output.
-    fn process_output<H>(proof: &Proof, host: &H) -> Result<Self::Output, ZkVmError>
-    where
-        H: ZkVmHost;
+    fn process_output(proof: &PublicValues) -> Result<Self::Output, ZkVmError>;
 
     /// Proves the computation using any zkVM host.
     fn prove<'a, H>(input: &'a Self::Input, host: &H) -> Result<(Proof, Self::Output), ZkVmError>
@@ -26,11 +26,11 @@ pub trait ZkVmProver {
         let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)?;
 
         // Use the host to prove.
-        let (proof, _) = host.prove(zkvm_input, Self::proof_type())?;
+        let proof = host.prove(zkvm_input, Self::proof_type())?;
 
         // Process and return the output using the verifier.
-        let output = Self::process_output(&proof, host)?;
+        let output = Self::process_output(&proof.public_values)?;
 
-        Ok((proof, output))
+        Ok((proof.proof, output))
     }
 }
