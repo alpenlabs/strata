@@ -10,8 +10,11 @@ use crate::batch::SignedBatchCheckpoint;
 pub enum ProtocolOperation {
     /// Deposit Transaction
     Deposit(DepositInfo),
+    /// Deposit Request info
     DepositRequest(DepositRequestInfo),
-    RollupInscription(SignedBatchCheckpoint),
+    /// Checkpoint data
+    Checkpoint(SignedBatchCheckpoint),
+    // TODO: add other kinds like Proofs and statediffs
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]

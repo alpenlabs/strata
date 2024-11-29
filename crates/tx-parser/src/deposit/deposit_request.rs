@@ -112,7 +112,7 @@ mod tests {
         error::DepositParseError,
         test_utils::{
             build_no_op_deposit_request_script, build_test_deposit_request_script,
-            create_transaction_two_outpoints, get_deposit_tx_config, test_taproot_addr,
+            create_test_deposit_tx, get_deposit_tx_config, test_taproot_addr,
         },
     };
 
@@ -133,7 +133,7 @@ mod tests {
             evm_addr.to_vec(),
         );
 
-        let test_transaction = create_transaction_two_outpoints(
+        let test_transaction = create_test_deposit_tx(
             Amount::from_sat(config.deposit_amount),
             &test_taproot_addr.address().script_pubkey(),
             &deposit_request_script,
