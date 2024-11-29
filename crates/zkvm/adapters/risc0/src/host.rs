@@ -195,7 +195,7 @@ outputs",
 
         let filename = "proof-groth16.bin";
         let mut file = File::create(filename).unwrap();
-        file.write_all(&bincode::serialize(&proof).expect("bincode serialization"))
+        file.write_all(&bincode::serialize(&proof).expect("bincode serialization failed"))
             .unwrap();
 
         assert_eq!(zkvm.get_verification_key().as_bytes(), expected_vk);
