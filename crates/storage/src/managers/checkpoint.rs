@@ -22,19 +22,19 @@ impl CheckpointDbManager {
 
     pub async fn put_checkpoint(&self, idx: u64, entry: CheckpointEntry) -> DbResult<()> {
         self.ops.put_batch_checkpoint_async(idx, entry).await?;
-        self.checkpoint_cache.purge_async(&idx).await;
+        self.checkpoint_cache.purge(&idx);
         Ok(())
     }
 
     pub fn put_checkpoint_blocking(&self, idx: u64, entry: CheckpointEntry) -> DbResult<()> {
         self.ops.put_batch_checkpoint_blocking(idx, entry)?;
-        self.checkpoint_cache.purge_blocking(&idx);
+        self.checkpoint_cache.purge(&idx);
         Ok(())
     }
 
     pub async fn get_checkpoint(&self, idx: u64) -> DbResult<Option<CheckpointEntry>> {
         self.checkpoint_cache
-            .get_or_fetch_async(&idx, || self.ops.get_batch_checkpoint_chan(idx))
+            .get_or_fetch(&idx, || self.ops.get_batch_checkpoint_chan(idx))
             .await
     }
 

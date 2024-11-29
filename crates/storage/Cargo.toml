@@ -8,9 +8,13 @@ strata-db.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
 
+ahash.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 bitcoin.workspace = true
+cache-advisor.workspace = true
+concurrent-map.workspace = true
+kanal.workspace = true
 lru.workspace = true
 paste.workspace = true
 threadpool.workspace = true

@@ -1,32 +1,50 @@
 //! Generic cache utility for what we're inserting into the database.
 
-use std::{hash::Hash, num::NonZeroUsize, sync::Arc};
+use std::{cell::RefCell, cmp::PartialEq, hash::Hash, marker::PhantomData, num::NonZeroUsize};
 
+use ahash::RandomState;
+use cache_advisor::CacheAdvisor;
+use concurrent_map::{CasFailure, ConcurrentMap};
+use kanal::{bounded_async, AsyncReceiver};
 use strata_db::{DbError, DbResult};
-use tokio::sync::{broadcast, Mutex, RwLock};
 use tracing::*;
 
 use crate::exec::DbRecv;
 
-/// Entry for something we can put into the cache without actually knowing what it is, and so we can
-/// keep the reservation to it.
-type CacheSlot<T> = Arc<RwLock<SlotState<T>>>;
-
 /// Describes a cache entry that may be occupied, reserved for pending database read, or returned an
 /// error from a database read.
-#[derive(Debug)]
-pub enum SlotState<T> {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Entry<T: Clone> {
     /// Authentic database entry.
     Ready(T),
 
     /// A database fetch is happening in the background and it will be updated.
-    Pending(broadcast::Receiver<T>),
-
-    /// An unspecified error happened fetching from the database.
-    Error,
+    Pending(Receiver<DbResult<T>>),
 }
 
-impl<T: Clone> SlotState<T> {
+// Do not use outside this module.
+//
+// A wrapper around a async kanal receiver that implements PartialEq so we can
+// do cas ops. We don't actually CAS between SlotState::Pending and
+// SlotState::Pending, so this is fine.
+#[derive(Debug, Clone)]
+pub struct Receiver<T>(AsyncReceiver<T>);
+
+impl<T> AsRef<AsyncReceiver<T>> for Receiver<T> {
+    fn as_ref(&self) -> &AsyncReceiver<T> {
+        &self.0
+    }
+}
+
+impl<T> PartialEq for Receiver<T> {
+    fn eq(&self, _other: &Self) -> bool {
+        // this is only so we can
+        false
+    }
+}
+impl<T> Eq for Receiver<T> {}
+
+impl<T: Clone> Entry<T> {
     /// Tries to read a value from the slot, asynchronously.
     pub async fn get_async(&self) -> DbResult<T> {
         match self {
@@ -37,12 +55,11 @@ impl<T: Clone> SlotState<T> {
                 // correctly.
                 // TODO figure out how to test this
                 trace!("waiting for database fetch to complete");
-                match ch.resubscribe().recv().await {
-                    Ok(v) => Ok(v),
+                match ch.0.recv().await {
+                    Ok(v) => v,
                     Err(_e) => Err(DbError::WorkerFailedStrangely),
                 }
             }
-            Self::Error => Err(DbError::CacheLoadFail),
         }
     }
 
@@ -56,71 +73,71 @@ impl<T: Clone> SlotState<T> {
                 // correctly.
                 // TODO figure out how to test this
                 trace!("waiting for database fetch to complete");
-                match ch.resubscribe().blocking_recv() {
-                    Ok(v) => Ok(v),
+                match ch.0.as_sync().recv() {
+                    Ok(v) => v,
                     Err(_e) => Err(DbError::WorkerFailedStrangely),
                 }
             }
-            Self::Error => Err(DbError::CacheLoadFail),
         }
     }
 }
 
 /// Wrapper around a LRU cache that handles cache reservations and asynchronously waiting for
 /// database operations in the background without keeping a global lock on the cache.
-pub struct CacheTable<K, V> {
-    cache: Mutex<lru::LruCache<K, CacheSlot<V>>>,
+#[derive(Debug, Clone)]
+pub struct CacheTable<K, V>
+where
+    K: Hash,
+    V: 'static + CacheTableValue + PartialEq,
+{
+    table: ConcurrentMap<u64, Entry<V>>,
+    advisor: RefCell<CacheAdvisor>,
+    hasher: RandomState,
+    _k: PhantomData<K>,
 }
 
-impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
+pub trait CacheTableValue: Clone + Send + Sync {}
+impl<V> CacheTableValue for V where V: Clone + Send + Sync {}
+
+impl<K, V> CacheTable<K, V>
+where
+    K: Hash,
+    V: 'static + CacheTableValue + PartialEq,
+{
     /// Creates a new cache with some maximum capacity.
     ///
     /// This measures entries by *count* not their (serialized?) size, so ideally entries should
     /// consume similar amounts of memory to helps us best reason about real cache capacity.
     pub fn new(size: NonZeroUsize) -> Self {
         Self {
-            cache: Mutex::new(lru::LruCache::new(size)),
+            table: ConcurrentMap::new(),
+            advisor: CacheAdvisor::new(size.get(), 20).into(),
+            hasher: RandomState::new(),
+            _k: PhantomData,
         }
     }
 
     /// Gets the number of elements in the cache.
-    // TODO replace this with an atomic we update after every op
-    pub async fn get_len_async(&self) -> usize {
-        let cache = self.cache.lock().await;
-        cache.len()
-    }
-
-    /// Gets the number of elements in the cache.
-    // TODO replace this with an atomic we update after every op
-    pub fn get_len_blocking(&self) -> usize {
-        let cache = self.cache.blocking_lock();
-        cache.len()
+    pub fn len(&self) -> usize {
+        self.table.len()
     }
 
     /// Removes the entry for a particular cache entry.
-    pub async fn purge_async(&self, k: &K) {
-        let mut cache = self.cache.lock().await;
-        cache.pop(k);
-    }
-
-    /// Removes the entry for a particular cache entry.
-    pub fn purge_blocking(&self, k: &K) {
-        let mut cache = self.cache.blocking_lock();
-        cache.pop(k);
+    pub fn purge(&self, k: &K) {
+        self.table.remove(&self.hasher.hash_one(k));
     }
 
     /// Inserts an entry into the table, dropping the previous value.
-    pub async fn insert_async(&self, k: K, v: V) {
-        let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
-        let mut cache = self.cache.lock().await;
-        cache.put(k, slot);
+    pub fn insert(&self, k: K, v: V) {
+        let hash = self.hasher.hash_one(&k);
+        self.table.insert(hash, Entry::Ready(v));
+        self.record_access_and_evict(hash);
     }
 
-    /// Inserts an entry into the table, dropping the previous value.
-    pub fn insert_blocking(&self, k: K, v: V) {
-        let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
-        let mut cache = self.cache.blocking_lock();
-        cache.put(k, slot);
+    fn record_access_and_evict(&self, hash: u64) {
+        for (hash, _cost) in self.advisor.borrow_mut().accessed_reuse_buffer(hash, 1) {
+            self.table.remove(hash);
+        }
     }
 
     /// Returns a clone of an entry from the cache or possibly invoking some function returning a
@@ -128,96 +145,80 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
     ///
     /// This is meant to be used with the `_chan` functions generated by the db ops macro in the
     /// `exec` module.
-    pub async fn get_or_fetch_async(&self, k: &K, fetch_fn: impl Fn() -> DbRecv<V>) -> DbResult<V> {
-        // See below comment about control flow.
-        let (mut slot_lock, complete_tx) = {
-            let mut cache = self.cache.lock().await;
-            if let Some(entry_lock) = cache.get(k) {
-                let entry = entry_lock.read().await;
-                return entry.get_async().await;
-            }
+    pub async fn get_or_fetch(&self, k: &K, fetch_fn: impl Fn() -> DbRecv<V>) -> DbResult<V> {
+        let hash = self.hasher.hash_one(k);
+        self.record_access_and_evict(hash);
 
-            // Create a new cache slot and insert and lock it.
-            let (complete_tx, complete_rx) = broadcast::channel(1);
-            let slot = Arc::new(RwLock::new(SlotState::Pending(complete_rx)));
-            cache.push(k.clone(), slot.clone());
-            let lock = slot
-                .try_write_owned()
-                .expect("cache: lock fresh cache entry");
-
-            (lock, complete_tx)
-        };
+        let (tx, rx) = bounded_async(1);
+        // mmmmmm atomic cas ops
+        if let Err(CasFailure { actual, .. }) =
+            self.table
+                .cas(hash, None, Some(Entry::Pending(Receiver(rx))))
+        {
+            return actual.expect("should be Some").get_async().await;
+        }
 
         // Start the task and get the recv handle.
         let res_fut = fetch_fn();
 
         let res = match res_fut.await {
-            Ok(Ok(v)) => v,
-            Ok(Err(e)) => {
-                error!(?e, "failed to make database fetch");
-                *slot_lock = SlotState::Error;
-                self.purge_async(k).await;
-                return Err(e);
+            Ok(res) => {
+                if let Err(ref e) = res {
+                    error!(?e, "failed to make database fetch");
+                }
+                res
             }
             Err(_) => {
                 error!("database fetch aborted");
-                self.purge_async(k).await;
                 return Err(DbError::WorkerFailedStrangely);
             }
         };
 
-        // Fill in the lock state and send down the complete tx.
-        *slot_lock = SlotState::Ready(res.clone());
-        if complete_tx.send(res.clone()).is_err() {
+        // Update the cache entry if we got a value.
+        if let Ok(v) = res.clone() {
+            self.table.insert(hash, Entry::Ready(v));
+        }
+
+        // Update any waiting readers.
+        if tx.send(res.clone()).await.is_err() {
             warn!("failed to notify waiting cache readers");
         }
 
-        Ok(res)
+        res
     }
 
     /// Returns a clone of an entry from the cache or invokes some function to load it from
     /// the underlying database.
     pub fn get_or_fetch_blocking(&self, k: &K, fetch_fn: impl Fn() -> DbResult<V>) -> DbResult<V> {
-        // The flow control here is kinda weird, I don't like it.  The key here is that we want to
-        // ensure the lock on the whole cache is as short-lived as possible while we check to see if
-        // the entry we're looking for is there.  If it's not, then we want to insert a reservation
-        // that we hold a lock to and then release the cache-level lock.
-        let (mut slot_lock, complete_tx) = {
-            let mut cache = self.cache.blocking_lock();
-            if let Some(entry_lock) = cache.get(k) {
-                let entry = entry_lock.blocking_read();
-                return entry.get_blocking();
-            }
+        let hash = self.hasher.hash_one(k);
+        self.record_access_and_evict(hash);
 
-            // Create a new cache slot and insert and lock it.
-            let (complete_tx, complete_rx) = broadcast::channel(1);
-            let slot = Arc::new(RwLock::new(SlotState::Pending(complete_rx)));
-            cache.push(k.clone(), slot.clone());
-            let lock = slot
-                .try_write_owned()
-                .expect("cache: lock fresh cache entry");
+        let (tx, rx) = bounded_async(1);
+        // mmmmmm atomic cas ops
+        if let Err(CasFailure { actual, .. }) =
+            self.table
+                .cas(hash, None, Some(Entry::Pending(Receiver(rx))))
+        {
+            return actual.expect("should be Some").get_blocking();
+        }
 
-            (lock, complete_tx)
+        let res = fetch_fn();
+
+        if let Err(ref e) = res {
+            error!(?e, "failed to make database fetch");
         };
 
-        // Load the entry and insert it into the slot we've already reserved.
-        let res = match fetch_fn() {
-            Ok(v) => v,
-            Err(e) => {
-                warn!(?e, "failed to make database fetch");
-                *slot_lock = SlotState::Error;
-                self.purge_blocking(k);
-                return Err(e);
-            }
-        };
+        // Update the cache entry if we got a value.
+        if let Ok(v) = res.clone() {
+            self.table.insert(hash, Entry::Ready(v));
+        }
 
-        // Fill in the lock state and send down the complete tx.
-        *slot_lock = SlotState::Ready(res.clone());
-        if complete_tx.send(res.clone()).is_err() {
+        // Update any waiting readers.
+        if tx.as_sync().send(res.clone()).is_err() {
             warn!("failed to notify waiting cache readers");
         }
 
-        Ok(res)
+        res
     }
 }
 
@@ -232,7 +233,7 @@ mod tests {
         let cache = CacheTable::<u64, u64>::new(3.try_into().unwrap());
 
         let res = cache
-            .get_or_fetch_async(&42, || {
+            .get_or_fetch(&42, || {
                 let (tx, rx) = tokio::sync::oneshot::channel();
                 tx.send(Ok(10)).expect("test: send init value");
                 rx
@@ -242,7 +243,7 @@ mod tests {
         assert_eq!(res, 10);
 
         let res = cache
-            .get_or_fetch_async(&42, || {
+            .get_or_fetch(&42, || {
                 let (tx, rx) = tokio::sync::oneshot::channel();
                 tx.send(Err(DbError::Busy)).expect("test: send init value");
                 rx
@@ -251,9 +252,9 @@ mod tests {
             .expect("test: load gof");
         assert_eq!(res, 10);
 
-        cache.insert_async(42, 12).await;
+        cache.insert(42, 12);
         let res = cache
-            .get_or_fetch_async(&42, || {
+            .get_or_fetch(&42, || {
                 let (tx, rx) = tokio::sync::oneshot::channel();
                 tx.send(Err(DbError::Busy)).expect("test: send init value");
                 rx
@@ -262,10 +263,10 @@ mod tests {
             .expect("test: load gof");
         assert_eq!(res, 12);
 
-        let len = cache.get_len_async().await;
+        let len = cache.len();
         assert_eq!(len, 1);
-        cache.purge_async(&42).await;
-        let len = cache.get_len_async().await;
+        cache.purge(&42);
+        let len = cache.len();
         assert_eq!(len, 0);
     }
 
@@ -283,16 +284,16 @@ mod tests {
             .expect("test: load gof");
         assert_eq!(res, 10);
 
-        cache.insert_blocking(42, 12);
+        cache.insert(42, 12);
         let res = cache
             .get_or_fetch_blocking(&42, || Err(DbError::Busy))
             .expect("test: load gof");
         assert_eq!(res, 12);
 
-        let len = cache.get_len_blocking();
+        let len = cache.len();
         assert_eq!(len, 1);
-        cache.purge_blocking(&42);
-        let len = cache.get_len_blocking();
+        cache.purge(&42);
+        let len = cache.len();
         assert_eq!(len, 0);
     }
 }

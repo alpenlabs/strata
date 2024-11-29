@@ -174,6 +174,7 @@ reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth.git", rev =
 reth-trie = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
 reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
 
+ahash = "0.8.11"
 anyhow = "1.0.86"
 arbitrary = { version = "1.3.2", features = ["derive"] }
 argh = "0.1"
@@ -184,8 +185,10 @@ bitcoin = { version = "=0.32.3", features = ["serde"] }
 bitcoind = { version = "0.36.0", features = ["26_0"] }
 borsh = { version = "1.5.0", features = ["derive"] }
 bytes = "1.6.0"
+cache-advisor = "1.0.16"
 chrono = "0.4.38"
 clap = "4"
+concurrent-map = "5.0.37"
 digest = "0.10"
 ethnum = "1.5.0"
 eyre = "0.6"
@@ -199,6 +202,7 @@ jmt = "0.10.0"
 jsonrpsee = "0.24"
 jsonrpsee-http-client = "0.24"
 jsonrpsee-types = "0.24"
+kanal = "0.1.0-pre8"
 lazy_static = "1.5.0"
 lru = "0.12"
 miniscript = "12.2.0"
