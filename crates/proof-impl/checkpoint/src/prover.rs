@@ -1,16 +1,12 @@
 use strata_primitives::params::RollupParams;
-use strata_proofimpl_cl_stf::L2BatchProofOutput;
-use strata_proofimpl_l1_batch::L1BatchProofOutput;
-use strata_zkvm::{AggregationInput, Proof, PublicValues, VerificationKey, ZkVmProver, ZkVmResult};
+use strata_zkvm::{AggregationInput, PublicValues, ZkVmProver, ZkVmResult};
 
 use crate::CheckpointProofOutput;
 
 pub struct CheckpointProverInput {
     pub rollup_params: RollupParams,
-    pub l1_batch: (Proof, L1BatchProofOutput),
-    pub l2_batch: (Proof, L2BatchProofOutput),
-    pub l1_batch_vk: VerificationKey,
-    pub l2_batch_vk: VerificationKey,
+    pub l1_batch: AggregationInput,
+    pub l2_batch: AggregationInput,
 }
 
 pub struct CheckpointProver;
@@ -29,14 +25,8 @@ impl ZkVmProver for CheckpointProver {
     {
         B::new()
             .write_serde(&input.rollup_params)?
-            .write_proof(AggregationInput::new(
-                input.l1_batch.0.clone(),
-                input.l1_batch_vk.clone(),
-            ))?
-            .write_proof(AggregationInput::new(
-                input.l2_batch.0.clone(),
-                input.l2_batch_vk.clone(),
-            ))?
+            .write_proof(&input.l1_batch)?
+            .write_proof(&input.l2_batch)?
             .build()
     }
 

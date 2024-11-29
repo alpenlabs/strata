@@ -100,20 +100,20 @@ impl VerificationKey {
 
 /// An input to the aggregation program.
 ///
-/// Consists of a proof and a verification key.
+/// Consists of a [`ProofReceipt`] and a [`VerificationKey`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AggregationInput {
-    proof: ProofReceipt,
+    receipt: ProofReceipt,
     vk: VerificationKey,
 }
 
 impl AggregationInput {
-    pub fn new(proof: ProofReceipt, vk: VerificationKey) -> Self {
-        Self { proof, vk }
+    pub fn new(receipt: ProofReceipt, vk: VerificationKey) -> Self {
+        Self { receipt, vk }
     }
 
-    pub fn proof(&self) -> &ProofReceipt {
-        &self.proof
+    pub fn receipt(&self) -> &ProofReceipt {
+        &self.receipt
     }
 
     pub fn vk(&self) -> &VerificationKey {

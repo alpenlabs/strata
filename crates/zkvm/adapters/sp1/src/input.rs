@@ -25,9 +25,9 @@ impl<'a> ZkVmInputBuilder<'a> for SP1ProofInputBuilder {
         Ok(self)
     }
 
-    fn write_proof(&mut self, item: AggregationInput) -> ZkVmResult<&mut Self> {
-        let public_values = SP1PublicValues::from(item.proof().public_values.as_bytes());
-        let proof: SP1Proof = bincode::deserialize(item.proof().proof.as_bytes())?;
+    fn write_proof(&mut self, item: &AggregationInput) -> ZkVmResult<&mut Self> {
+        let public_values = SP1PublicValues::from(item.receipt().public_values.as_bytes());
+        let proof: SP1Proof = bincode::deserialize(item.receipt().proof.as_bytes())?;
         let vkey: SP1VerifyingKey = bincode::deserialize(item.vk().as_bytes())?;
 
         // Write the public values of the program that'll be proven inside zkVM.

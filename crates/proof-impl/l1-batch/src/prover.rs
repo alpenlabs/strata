@@ -1,13 +1,14 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
 use strata_state::l1::HeaderVerificationState;
-use strata_zkvm::{AggregationInput, Proof, PublicValues, VerificationKey, ZkVmProver, ZkVmResult};
+use strata_zkvm::{
+    AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmProver, ZkVmResult,
+};
 
 use crate::logic::L1BatchProofOutput;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofInput {
-    pub batch: Vec<(Proof, BlockspaceProofOutput)>,
+    pub batch: Vec<ProofReceipt>,
     pub state: HeaderVerificationState,
     pub blockspace_vk: VerificationKey,
 }
@@ -32,8 +33,8 @@ impl ZkVmProver for L1BatchProver {
         let len = input.batch.len() as u32;
         input_builder.write_serde(&len)?;
 
-        for (proof, _) in &input.batch {
-            input_builder.write_proof(AggregationInput::new(
+        for proof in &input.batch {
+            input_builder.write_proof(&AggregationInput::new(
                 proof.clone(),
                 input.blockspace_vk.clone(),
             ))?;

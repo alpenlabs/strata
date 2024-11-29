@@ -1,5 +1,7 @@
 use risc0_zkvm::{sha::Digest, ExecutorEnv, ExecutorEnvBuilder, InnerReceipt, Receipt};
-use strata_zkvm::{SerializationErrorSource, ZkVmError, ZkVmInputBuilder, ZkVmResult};
+use strata_zkvm::{
+    AggregationInput, SerializationErrorSource, ZkVmError, ZkVmInputBuilder, ZkVmResult,
+};
 
 pub struct Risc0ProofInputBuilder<'a>(ExecutorEnvBuilder<'a>);
 
@@ -36,10 +38,10 @@ impl<'a> ZkVmInputBuilder<'a> for Risc0ProofInputBuilder<'a> {
         Ok(self)
     }
 
-    fn write_proof(&mut self, item: strata_zkvm::AggregationInput) -> ZkVmResult<&mut Self> {
+    fn write_proof(&mut self, item: &AggregationInput) -> ZkVmResult<&mut Self> {
         // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
-        let journal = item.proof().public_values.as_bytes().to_vec();
-        let inner: InnerReceipt = bincode::deserialize(item.proof().public_values.as_bytes())?;
+        let journal = item.receipt().public_values.as_bytes().to_vec();
+        let inner: InnerReceipt = bincode::deserialize(item.receipt().public_values.as_bytes())?;
         let vk: Digest = item
             .vk()
             .as_bytes()
