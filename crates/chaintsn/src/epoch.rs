@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_with_deposit_update_tx() {
-        let mut chs: ChainState = ArbitraryGenerator::new().generate();
+        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
         // get the l1 view state of the chain state
         let params = gen_params();
         // TODO refactor
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_with_empty_payload() {
-        let chs: ChainState = ArbitraryGenerator::new().generate();
+        let chs: Chainstate = ArbitraryGenerator::new().generate();
         let params = gen_params();
 
         let epoch_state = chs.epoch_state().clone();
@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update() {
-        let mut chs: ChainState = ArbitraryGenerator::new().generate();
+        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
         let params = gen_params();
         //let header_record = chs.l1_view();
         let old_safe_height = chs.epoch_state().safe_block_idx();
