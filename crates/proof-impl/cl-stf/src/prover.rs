@@ -1,6 +1,6 @@
 use strata_primitives::params::RollupParams;
 use strata_state::{block::L2Block, chain_state::Chainstate};
-use strata_zkvm::{AggregationInput, Proof, VerificationKey, ZkVmProver, ZkVmResult};
+use strata_zkvm::{AggregationInput, Proof, PublicValues, VerificationKey, ZkVmProver, ZkVmResult};
 
 use crate::L2BatchProofOutput;
 
@@ -36,10 +36,10 @@ impl ZkVmProver for ClStfProver {
             .build()
     }
 
-    fn process_output<H>(proof: &Proof, _host: &H) -> ZkVmResult<Self::Output>
+    fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>
     where
         H: strata_zkvm::ZkVmHost,
     {
-        H::extract_borsh_public_output(proof)
+        H::extract_borsh_public_output(public_values)
     }
 }
