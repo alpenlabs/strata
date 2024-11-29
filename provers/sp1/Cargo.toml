@@ -17,4 +17,5 @@ sp1-sdk = "3.0.0"
 
 [features]
 default = ["prover"]
-prover = ["dep:strata-sp1-adapter"]
+prover = ["strata-sp1-adapter"]
+mock = []
