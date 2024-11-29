@@ -103,16 +103,16 @@ impl VerificationKey {
 /// Consists of a proof and a verification key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AggregationInput {
-    proof: Proof,
+    proof: ProofReceipt,
     vk: VerificationKey,
 }
 
 impl AggregationInput {
-    pub fn new(proof: Proof, vk: VerificationKey) -> Self {
+    pub fn new(proof: ProofReceipt, vk: VerificationKey) -> Self {
         Self { proof, vk }
     }
 
-    pub fn proof(&self) -> &Proof {
+    pub fn proof(&self) -> &ProofReceipt {
         &self.proof
     }
 
