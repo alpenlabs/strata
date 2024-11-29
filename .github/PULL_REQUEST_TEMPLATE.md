@@ -7,15 +7,23 @@ Provide a brief summary of the changes and the motivation behind them.
 ### Type of Change
 
 <!--
-Select the type of change your PR introduces (put an `x` in all that apply):-
+Select the type of change your PR introduces (put an `x` in all that apply):
 -->
 
--   [ ] Bug fix (non-breaking change which fixes an issue)
--   [ ] New feature/Enhancement (non-breaking change which adds functionality or enhances an existing one)
--   [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
--   [ ] Documentation update
--   [ ] Refactor
--   [ ] New or updated tests
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature/Enhancement (non-breaking change which adds functionality or enhances an existing one)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+- [ ] Refactor
+- [ ] New or updated tests
+- [ ] Dependency Update
+
+## Notes to Reviewer's
+
+<!--
+Anything in particular you want to note that will help reviewer's fulfill their role
+in reviewing this PR?
+-->
 
 ## Checklist
 
@@ -23,12 +31,12 @@ Select the type of change your PR introduces (put an `x` in all that apply):-
 Ensure all the following are checked:
 -->
 
--   [ ] I have performed a self-review of my code.
--   [ ] I have commented my code where necessary.
--   [ ] I have updated the documentation if needed.
--   [ ] My changes do not introduce new warnings.
--   [ ] I have added tests that prove my changes are effective or that my feature works.
--   [ ] New and existing tests pass with my changes.
+- [ ] I have performed a self-review of my code.
+- [ ] I have commented my code where necessary.
+- [ ] I have updated the documentation if needed.
+- [ ] My changes do not introduce new warnings.
+- [ ] I have added tests that prove my changes are effective or that my feature works.
+- [ ] New and existing tests pass with my changes.
 
 ## Related Issues
 
