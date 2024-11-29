@@ -118,7 +118,7 @@ pub(crate) async fn check_or_load_descriptor_into_wallet(
 
 #[cfg(test)]
 mod tests {
-    use bitcoind::BitcoinD;
+    use corepc_node::BitcoinD;
     use strata_btcio::rpc::{
         traits::Signer,
         types::{ImportDescriptor, ImportDescriptorResult},

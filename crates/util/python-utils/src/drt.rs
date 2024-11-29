@@ -462,7 +462,7 @@ pub(crate) fn get_balance_recovery_inner(
 #[cfg(test)]
 mod tests {
     use bdk_wallet::{bitcoin::Amount, KeychainKind, LocalOutput};
-    use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
+    use corepc_node::BitcoinD;
     use strata_btcio::rpc::{traits::Broadcaster, BitcoinClient};
     use strata_common::logging;
     use tokio::time::{sleep, Duration};
@@ -491,10 +491,7 @@ mod tests {
     ) -> anyhow::Result<()> {
         let coinbase_address = match address {
             Some(address) => address,
-            None => bitcoind
-                .client
-                .get_new_address(None, None)?
-                .assume_checked(),
+            None => bitcoind.client.new_address()?,
         };
         let _ = bitcoind
             .client

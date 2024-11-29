@@ -33,12 +33,13 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-arbitrary.workspace = true
-bitcoind.workspace = true
-mockall.workspace = true
 strata-common.workspace = true
 strata-rocksdb = { workspace = true, features = ["test_utils"] }
 strata-test-utils.workspace = true
+
+arbitrary.workspace = true
+mockall.workspace = true
+corepc-node = { version = "0.4.0", features = ["28_0"] }
 
 [features]
 test_utils = []
