@@ -3,10 +3,11 @@ use std::sync::Arc;
 use strata_zkvm::ZkVmHost;
 use tokio::time::{sleep, Duration};
 use tracing::info;
+use uuid::Uuid;
 
 use crate::{
     config::PROVER_MANAGER_INTERVAL,
-    primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTask, ProvingTaskStatus},
+    primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
     prover::Prover,
     task::TaskTracker,
 };
@@ -69,21 +70,21 @@ where
     /// upon success, updates the task status to `Completed`.
     /// Additionally, post-processing hooks may need to be added to handle specific logic,
     pub async fn track_proving_progress(&self) {
-        let in_progress_tasks = self
+        let in_progress_task_ids = self
             .task_tracker
-            .get_tasks_by_status(ProvingTaskStatus::Processing)
+            .get_task_ids_by_status(ProvingTaskStatus::Processing)
             .await;
 
-        for task in in_progress_tasks {
+        for task_id in in_progress_task_ids {
             match self
                 .prover
-                .get_proof_submission_status_and_remove_on_success(task.id)
+                .get_proof_submission_status_and_remove_on_success(task_id)
             {
-                Ok(status) => self.apply_proof_status_update(task, status).await,
+                Ok(status) => self.apply_proof_status_update(task_id, status).await,
                 Err(e) => {
                     tracing::error!(
                         "Failed to get proof submission status for task {}: {}",
-                        task.id,
+                        task_id,
                         e
                     );
                 }
@@ -91,13 +92,13 @@ where
         }
     }
 
-    async fn apply_proof_status_update(&self, task: ProvingTask, status: ProofSubmissionStatus) {
+    async fn apply_proof_status_update(&self, task_id: Uuid, status: ProofSubmissionStatus) {
         match status {
             ProofSubmissionStatus::Success(proof) => {
-                self.task_tracker.mark_task_completed(task.id, proof).await;
+                self.task_tracker.mark_task_completed(task_id, proof).await;
             }
             ProofSubmissionStatus::ProofGenerationInProgress => {
-                info!("Task {} proof generation in progress", task.id);
+                info!("Task {} proof generation in progress", task_id);
             }
         }
     }
