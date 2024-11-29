@@ -21,7 +21,7 @@ Select the type of change your PR introduces (put an `x` in all that apply):
 ## Notes to Reviewers
 
 <!--
-Anything in particular you want to note that will help reviewer's fulfill their role
+Anything in particular you want to note that will help reviewers fulfill their role
 in reviewing this PR?
 -->
 
