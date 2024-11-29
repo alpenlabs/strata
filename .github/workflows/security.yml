@@ -21,10 +21,8 @@ jobs:
         with:
           cache-on-failure: true
 
-       # HACK: v0.21.0 fails during dependency resolution. Remove when this is resolved
-       # https://github.com/rustsec/rustsec/issues/1249#issuecomment-2423257490 
-      - name: Install cargo-audit v0.20.0
-        run: cargo install cargo-audit --version 0.20.0 --force
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --force
 
         #  HACK: not denying warnings as we depend on `yaml-rust` via `format-serde-error` which is unmaintained
       - name: Check for audit warnings
