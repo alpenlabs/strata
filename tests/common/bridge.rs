@@ -3,19 +3,17 @@
 use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
 
 use anyhow::Context;
-use bitcoin::{
-    key::Keypair,
-    secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
-    taproot::{LeafVersion, TaprootBuilder},
-    Address, Amount, Network, OutPoint, TapNodeHash, Transaction, Txid,
-};
-use bitcoind::{
-    bitcoincore_rpc::{
-        json::{AddressType, ListUnspentResultEntry, SignRawTransactionResult},
-        RpcApi,
+use bitcoincore_rpc::{
+    bitcoin::{
+        key::Keypair,
+        secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
+        taproot::{LeafVersion, TaprootBuilder},
+        Address, Amount, Network, OutPoint, TapNodeHash, Transaction, Txid,
     },
-    BitcoinD, Conf,
+    json::{AddressType, ListUnspentResultEntry, SignRawTransactionResult},
+    Auth, Client, RpcApi,
 };
+use corepc_node::{BitcoinD, Conf};
 use strata_bridge_sig_manager::prelude::SignatureManager;
 use strata_bridge_tx_builder::{
     prelude::{
@@ -40,6 +38,8 @@ use tokio::{
     time::{error::Elapsed, timeout},
 };
 use tracing::{debug, event, span, trace, warn, Level};
+
+use crate::common::bitcoind::get_auth;
 
 /// Transaction fee to confirm Deposit Transaction
 ///
@@ -504,27 +504,39 @@ pub(crate) struct Agent {
 
     /// The bitcoin instance for the agent.
     bitcoind: Arc<Mutex<BitcoinD>>,
+
+    /// The [`Client`] instance for the agent.
+    client: Arc<Client>,
 }
 
 impl Agent {
     pub(crate) async fn new(id: &str, bitcoind: Arc<Mutex<BitcoinD>>) -> Self {
-        let address = {
+        let (address, client) = {
             let bitcoind = bitcoind.lock().await;
 
-            bitcoind
-                .client
+            let (user, password) = get_auth(&bitcoind);
+
+            let auth = Auth::UserPass(user, password);
+            let client = Client::new(&bitcoind.rpc_url(), auth).expect("client should start");
+
+            client
                 .create_wallet(id, None, None, None, None)
                 .expect("should create a wallet");
 
-            bitcoind
-                .client
+            let address = client
                 .get_new_address(Some(id), Some(AddressType::Bech32m))
                 .expect("address should be generated")
                 .require_network(Network::Regtest)
-                .expect("address should be valid")
+                .expect("address should be valid for Regtest");
+
+            (address, client)
         };
 
-        Self { address, bitcoind }
+        Self {
+            address,
+            bitcoind,
+            client: Arc::new(client),
+        }
     }
 
     #[allow(unused)] // This is used in `cooperative-bridge-out-flow` but not in `bridge-in-flow`
@@ -542,26 +554,20 @@ impl Agent {
 
     /// Mines [`Self::MIN_BLOCKS_TILL_SPENDABLE`] + `num_blocks` to this user's address.
     pub(crate) async fn mine_blocks(&self, num_blocks: u64) -> Amount {
-        let bitcoind = self.bitcoind.lock().await;
-
-        let _ = bitcoind
+        let _ = self
             .client
             .generate_to_address(num_blocks, &self.address)
             .context("could not mine blocks")
             .map(|hashes| hashes.len());
 
         // confirm balance
-        bitcoind
-            .client
+        self.client
             .get_balance(None, None)
             .expect("should be able to extract balance")
     }
 
     pub(crate) async fn get_unspent_utxos(&self) -> Vec<ListUnspentResultEntry> {
-        let bitcoind = self.bitcoind.lock().await;
-
-        bitcoind
-            .client
+        self.client
             .list_unspent(None, None, Some(&[&self.address]), Some(false), None)
             .expect("should get unspent transactions")
     }
@@ -572,9 +578,7 @@ impl Agent {
     ) -> Option<(Address, OutPoint, Amount)> {
         let unspent_utxos = self.get_unspent_utxos().await;
 
-        let bitcoind = self.bitcoind.lock().await;
-
-        let change_address = bitcoind
+        let change_address = self
             .client
             .get_raw_change_address(Some(AddressType::Bech32m))
             .expect("should get change address")
@@ -599,10 +603,7 @@ impl Agent {
     }
 
     pub(crate) async fn sign_raw_tx(&self, tx: &Transaction) -> SignRawTransactionResult {
-        let bitcoind = self.bitcoind.lock().await;
-        let result = bitcoind
-            .client
-            .sign_raw_transaction_with_wallet(tx, None, None);
+        let result = self.client.sign_raw_transaction_with_wallet(tx, None, None);
 
         assert!(
             result.is_ok(),
@@ -615,9 +616,8 @@ impl Agent {
 
     pub(crate) async fn broadcast_signed_tx(&self, tx: &Transaction) -> Txid {
         debug!(?tx, "broadcasting transaction");
-        let bitcoind = self.bitcoind.lock().await;
 
-        let result = bitcoind.client.test_mempool_accept(&[tx]);
+        let result = self.client.test_mempool_accept(&[tx]);
         assert!(
             result.is_ok(),
             "should pass mempool test but got err: {:?}",
@@ -632,7 +632,7 @@ impl Agent {
                 .fold(Amount::from_int_btc(0), |total_in_value, txin| {
                     let prev_vout = txin.previous_output.vout;
                     let prev_txid = txin.previous_output.txid;
-                    let prev_tx = bitcoind
+                    let prev_tx = self
                         .client
                         .get_raw_transaction(&prev_txid, None)
                         .expect("previous transaction should exist");
@@ -654,7 +654,7 @@ impl Agent {
             "Fee calculation for the transaction"
         );
 
-        let result = bitcoind.client.send_raw_transaction(tx);
+        let result = self.client.send_raw_transaction(tx);
 
         assert!(
             result.is_ok(),
@@ -667,7 +667,9 @@ impl Agent {
     }
 }
 
-pub(crate) async fn setup(num_operators: usize) -> (Arc<Mutex<BitcoinD>>, BridgeFederation) {
+pub(crate) async fn setup(
+    num_operators: usize,
+) -> (Arc<Mutex<BitcoinD>>, Arc<Client>, BridgeFederation) {
     logging::init(logging::LoggerConfig::with_base_name("bridge-tests"));
 
     let span = span!(Level::INFO, "setup federation");
@@ -686,12 +688,16 @@ pub(crate) async fn setup(num_operators: usize) -> (Arc<Mutex<BitcoinD>>, Bridge
 
     event!(Level::INFO, action = "starting bitcoind", conf = ?conf);
     let bitcoind = BitcoinD::from_downloaded_with_conf(&conf).expect("bitcoind client must start");
+    let (user, password) = get_auth(&bitcoind);
+    let auth = Auth::UserPass(user, password);
+    event!(Level::INFO, action = "creating bitcoind client");
+    let client = Arc::new(Client::new(&bitcoind.rpc_url(), auth).expect("client should start"));
     let bitcoind = Arc::new(Mutex::new(bitcoind));
 
     event!(Level::INFO, action = "setting up a bridge federation", num_operator = %num_operators);
     let federation = BridgeFederation::new(num_operators, bitcoind.clone()).await;
 
-    (bitcoind, federation)
+    (bitcoind, client, federation)
 }
 
 pub(crate) fn setup_sig_manager(index: OperatorIdx, keypair: Keypair) -> SignatureManager {

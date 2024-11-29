@@ -5,17 +5,16 @@
 
 use std::sync::Arc;
 
-use bitcoin::{Amount, Network};
-use bitcoind::{
-    bitcoincore_rpc::{json::ScanTxOutRequest, RpcApi},
-    BitcoinD,
+use bitcoincore_rpc::{
+    bitcoin::{Amount, Network},
+    json::ScanTxOutRequest,
+    Client, RpcApi,
 };
 use common::bridge::{perform_rollup_actions, perform_user_actions, setup, BridgeDuty, User};
 use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, get_aggregated_pubkey, SpendPath, BRIDGE_DENOMINATION,
 };
 use strata_primitives::bridge::PublickeyTable;
-use tokio::sync::Mutex;
 use tracing::{debug, event, info, Level};
 
 mod common;
@@ -24,7 +23,7 @@ mod common;
 async fn deposit_flow() {
     let num_operators = 5;
 
-    let (bitcoind, federation) = setup(num_operators).await;
+    let (bitcoind, client, federation) = setup(num_operators).await;
 
     let pubkey_table = federation.pubkey_table.clone();
 
@@ -58,16 +57,12 @@ async fn deposit_flow() {
         handle.await.unwrap();
     }
 
-    confirm_deposit(bitcoind.clone(), &user, pubkey_table).await;
+    confirm_deposit(client.clone(), &user, pubkey_table).await;
 
     info!("Deposit flow complete");
 }
 
-async fn confirm_deposit(
-    bitcoind: Arc<Mutex<BitcoinD>>,
-    user: &User,
-    pubkey_table: PublickeyTable,
-) {
+async fn confirm_deposit(client: Arc<Client>, user: &User, pubkey_table: PublickeyTable) {
     let num_blocks = 1;
     event!(Level::DEBUG, action = "mining some blocks to confirm deposit transaction", num_blocks = %num_blocks);
 
@@ -83,11 +78,8 @@ async fn confirm_deposit(
 
     let bridge_script_pubkey = bridge_addr.script_pubkey();
 
-    let bitcoind = bitcoind.lock().await;
-
     event!(Level::DEBUG, action = "scanning tx outs in the bridge address", bridge_addr=?bridge_addr);
-    let utxos = bitcoind
-        .client
+    let utxos = client
         .scan_tx_out_set_blocking(&[ScanTxOutRequest::Single(format!(
             "raw({})",
             bridge_script_pubkey.to_hex_string()

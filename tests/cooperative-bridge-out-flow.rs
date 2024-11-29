@@ -5,12 +5,12 @@
 
 use std::sync::Arc;
 
-use bitcoin::{
+use bitcoincore_rpc::bitcoin::{
     key::rand::{self, Rng},
     Address, Amount, Network, OutPoint, ScriptBuf, Transaction,
 };
-use bitcoind::BitcoinD;
 use common::bridge::{setup, BridgeDuty, User, MIN_MINER_REWARD_CONFS};
+use corepc_node::BitcoinD;
 use rand::rngs::OsRng;
 use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey,
@@ -25,7 +25,7 @@ mod common;
 #[tokio::test]
 async fn withdrawal_flow() {
     let num_operators = 5;
-    let (bitcoind, federation) = setup(num_operators).await;
+    let (bitcoind, _client, federation) = setup(num_operators).await;
 
     let span = span!(Level::WARN, "starting cooperative withdrawal flow");
     let _guard = span.enter();

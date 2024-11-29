@@ -12,4 +12,5 @@
 //! is `dead code` even though it is actually being used by another test "crate".
 //! Apparently, `clippy` isn't smart enough for that kind of analysis.
 
+pub(crate) mod bitcoind;
 pub(crate) mod bridge;
