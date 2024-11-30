@@ -105,6 +105,10 @@ impl ZkVmHost for SP1Host {
     }
 
     fn verify(&self, proof: &ProofReceipt) -> ZkVmResult<()> {
+        #[cfg(feature = "mock")]
+        {
+            std::env::set_var("SP1_PROVER", "mock");
+        }
         let public_values = SP1PublicValues::from(proof.public_values.as_bytes());
         let proof: SP1Proof = bincode::deserialize(proof.proof.as_bytes())?;
         let sp1_version = sp1_sdk::SP1_CIRCUIT_VERSION.to_string();
