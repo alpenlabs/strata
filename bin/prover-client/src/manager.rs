@@ -44,7 +44,7 @@ where
     /// Process all tasks that have the `Pending` status.
     /// This function fetches the pending tasks, submits their witness data to the prover,
     /// and starts the proving process for each task.
-    /// If starting the proving process fails, the task status is reverted back to `Pending`.
+    /// If starting the proving process fails, the task status stays as `Pending`.
     async fn process_pending_tasks(&self) {
         let pending_tasks = self
             .task_tracker
@@ -53,11 +53,7 @@ where
 
         for task in pending_tasks {
             self.prover.submit_witness(task.id, task.prover_input);
-            if self.prover.start_proving(task.id).is_err() {
-                self.task_tracker
-                    .update_status(task.id, ProvingTaskStatus::Pending)
-                    .await;
-            } else {
+            if self.prover.start_proving(task.id).is_ok() {
                 self.task_tracker
                     .update_status(task.id, ProvingTaskStatus::Processing)
                     .await;

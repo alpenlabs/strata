@@ -73,8 +73,8 @@ impl ProverState {
         }
     }
 
-    fn get_prover_status(&self, task_id: Uuid) -> Option<&ProvingTaskState> {
-        self.tasks_status.get(&task_id)
+    fn get_prover_status(&mut self, task_id: &Uuid) -> Entry<Uuid, ProvingTaskState> {
+        self.tasks_status.entry(*task_id)
     }
 
     fn inc_task_count(&mut self) {
@@ -291,24 +291,28 @@ where
             .write()
             .map_err(|_| anyhow::anyhow!("Failed to acquire write lock"))?;
 
-        let status = prover_state.get_prover_status(task_id).cloned();
+        let status = prover_state.get_prover_status(&task_id);
 
         match status {
-            Some(ProvingTaskState::ProvingInProgress) => {
-                Ok(ProofSubmissionStatus::ProofGenerationInProgress)
-            }
-            Some(ProvingTaskState::Proved(proof)) => {
-                self.save_proof_to_db(task_id, proof.proof())?;
+            Entry::Occupied(status_entry) => match status_entry.get() {
+                ProvingTaskState::ProvingInProgress => {
+                    Ok(ProofSubmissionStatus::ProofGenerationInProgress)
+                }
+                ProvingTaskState::Proved(proof) => {
+                    self.save_proof_to_db(task_id, proof.proof())?;
 
-                prover_state.remove(&task_id);
-                Ok(ProofSubmissionStatus::Success(proof.clone()))
-            }
-            Some(ProvingTaskState::WitnessSubmitted(_)) => Err(anyhow::anyhow!(
-                "Witness for {:?} was submitted, but the proof generation is not triggered.",
-                task_id
-            )),
-            Some(ProvingTaskState::Err(e)) => Err(anyhow::anyhow!(e.to_string())),
-            None => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
+                    let aggr_proof = proof.clone();
+                    status_entry.remove();
+
+                    Ok(ProofSubmissionStatus::Success(aggr_proof))
+                }
+                ProvingTaskState::WitnessSubmitted(_) => Err(anyhow::anyhow!(
+                    "Witness for {:?} was submitted, but the proof generation is not triggered.",
+                    task_id
+                )),
+                ProvingTaskState::Err(e) => Err(anyhow::anyhow!(e.to_string())),
+            },
+            Entry::Vacant(_) => Err(anyhow::anyhow!("Missing witness for: {:?}", task_id)),
         }
     }
 
