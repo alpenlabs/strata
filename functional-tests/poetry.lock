@@ -1973,13 +1973,13 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "web3"
-version = "7.4.0"
+version = "7.5.0"
 description = "web3: A Python library for interacting with Ethereum"
 optional = false
 python-versions = "<4,>=3.8"
 files = [
-    {file = "web3-7.4.0-py3-none-any.whl", hash = "sha256:09864c549e0ab97a9915f0c02a98f9e87bc1bfb23fedc3e4e6a95e5ab11787b6"},
-    {file = "web3-7.4.0.tar.gz", hash = "sha256:473e85ee9ff61f20acb114756bbf222f2f75b42daedc1c3e9183ce6431c6039e"},
+    {file = "web3-7.5.0-py3-none-any.whl", hash = "sha256:16fea8ee9c042a60edfdc2388c4d2c0177a9be383c76a4913cf9acb156df1954"},
+    {file = "web3-7.5.0.tar.gz", hash = "sha256:42477d076c745da05e595e8aec91a3a168d87b09b85b0424181cac69edb9b4a2"},
 ]
 
 [package.dependencies]
@@ -2191,4 +2191,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "79c1497fe8ef68d45bed9dab98bc6a479494961d294d3cd0b951facaa80af8f2"
+content-hash = "96d86acb2c50f2d62dcb3b4948bbd829ffc29c7bd1c4f4b6c91940097eae9249"
