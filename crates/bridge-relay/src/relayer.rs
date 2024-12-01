@@ -245,7 +245,7 @@ mod tests {
         let processed_msgs = RecentMessageTracker::new();
 
         // Create valid BridgeMsgId instances for testing
-        let ag = ArbitraryGenerator::new();
+        let mut ag = ArbitraryGenerator::new();
         let cur_message_id: BridgeMsgId = ag.generate();
         let old_message_id: BridgeMsgId = ag.generate();
         assert_ne!(cur_message_id, old_message_id);
