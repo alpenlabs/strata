@@ -15,6 +15,7 @@ members = [
   "crates/primitives",
   "crates/zkvm/adapters/risc0",
   "crates/zkvm/adapters/sp1",
+  "crates/zkvm/adapters/native",
   "crates/proof-impl/btc-blockspace",
   "crates/proof-impl/checkpoint",
   "crates/proof-impl/cl-agg",
@@ -84,6 +85,7 @@ strata-db = { path = "crates/db" }
 strata-eectl = { path = "crates/eectl" }
 strata-evmexec = { path = "crates/evmexec" }
 strata-mmr = { path = "crates/util/mmr" }
+strata-native-zkvm-adapter = { path = "crates/zkvm/adapters/native" }
 strata-primitives = { path = "crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
 strata-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }

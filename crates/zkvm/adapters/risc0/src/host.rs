@@ -1,3 +1,6 @@
+use std::fmt;
+
+use hex::encode;
 use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, ProverOpts, Receipt};
 use serde::{de::DeserializeOwned, Serialize};
 use strata_zkvm::{
@@ -8,24 +11,24 @@ use crate::input::Risc0ProofInputBuilder;
 
 /// A host for the `Risc0` zkVM that stores the guest program in ELF format
 /// The `Risc0Host` is responsible for program execution and proving
-
 #[derive(Clone)]
 pub struct Risc0Host {
     elf: Vec<u8>,
     id: Digest,
 }
 
-impl ZkVmHost for Risc0Host {
-    type Input<'a> = Risc0ProofInputBuilder<'a>;
-
-    fn init(guest_code: &[u8]) -> Self {
+impl Risc0Host {
+    pub fn init(guest_code: &[u8]) -> Self {
         let id = compute_image_id(guest_code).expect("invalid elf");
-
         Risc0Host {
-            id,
             elf: guest_code.to_vec(),
+            id,
         }
     }
+}
+
+impl ZkVmHost for Risc0Host {
+    type Input<'a> = Risc0ProofInputBuilder<'a>;
 
     fn prove<'a>(
         &self,
@@ -98,6 +101,12 @@ impl ZkVmHost for Risc0Host {
             .verify(self.id)
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
         Ok(())
+    }
+}
+
+impl fmt::Display for Risc0Host {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "risc0_{}", encode(self.id.as_bytes()))
     }
 }
 

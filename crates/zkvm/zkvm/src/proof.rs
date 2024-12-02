@@ -36,7 +36,16 @@ impl From<&Proof> for Vec<u8> {
 
 /// Verification Key required to verify proof generated from `ZKVMHost`
 #[derive(
-    Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    BorshSerialize,
+    BorshDeserialize,
+    Arbitrary,
 )]
 pub struct VerificationKey(Vec<u8>);
 
