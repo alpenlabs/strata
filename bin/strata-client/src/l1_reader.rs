@@ -27,23 +27,20 @@ where
 
     // TODO switch to checking the L1 tip in the consensus/client state
     let l1_db = db.l1_db().clone();
-    let target_next_block = l1_db
-        .get_chain_tip()?
-        .map(|i| i + 1)
-        .unwrap_or(params.rollup().horizon_l1_height);
+    let horz_height = params.rollup().horizon_l1_height;
+    let target_next_block = l1_db.get_chain_tip()?.map(|i| i + 1).unwrap_or(horz_height);
+    assert!(target_next_block >= horz_height);
 
     let reader_config = Arc::new(config.get_reader_config(params.clone()));
-    let chs_db = db.chain_state_db().clone();
 
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",
-        bitcoin_data_reader_task::<D>(
+        bitcoin_data_reader_task(
             rpc_client,
             ev_tx,
             target_next_block,
             reader_config,
             status_rx.clone(),
-            chs_db,
         ),
     );
 

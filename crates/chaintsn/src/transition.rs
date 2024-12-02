@@ -191,9 +191,7 @@ fn process_execution_update<'u>(
     state: &mut StateCache,
     update: &'u exec_update::ExecUpdate,
 ) -> Result<&'u [WithdrawalIntent], TsnError> {
-    // for all the ops, corresponding to DepositIntent , remove those DepositIntent the ExecEnvState
-    let deposits = state.state().exec_env_state().pending_deposits();
-
+    // for all the ops, corresponding to DepositIntent, remove those DepositIntent the ExecEnvState
     let applied_ops = update.input().applied_ops();
 
     let applied_deposit_intent_idx = applied_ops

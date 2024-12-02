@@ -31,13 +31,11 @@ pub fn get_deposit_tx_config() -> DepositTxParams {
     }
 }
 
-pub fn create_transaction_two_outpoints(
+pub fn create_test_deposit_tx(
     amt: Amount,
-    scr1: &ScriptBuf,
-    scr2: &ScriptBuf,
+    addr_script: &ScriptBuf,
+    opreturn_script: &ScriptBuf,
 ) -> Transaction {
-    // construct the inputs
-
     let previous_output: OutputRef = ArbitraryGenerator::new().generate();
 
     let inputs = vec![TxIn {
@@ -51,12 +49,11 @@ pub fn create_transaction_two_outpoints(
     let outputs = vec![
         TxOut {
             value: amt, // 10 BTC in satoshis
-            // script_pubkey: taproot_addr().script_pubkey(),
-            script_pubkey: scr1.clone(),
+            script_pubkey: addr_script.clone(),
         },
         TxOut {
             value: Amount::ZERO, // Amount is zero for OP_RETURN
-            script_pubkey: scr2.clone(),
+            script_pubkey: opreturn_script.clone(),
         },
     ];
 

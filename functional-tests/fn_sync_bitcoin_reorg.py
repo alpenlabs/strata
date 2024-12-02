@@ -23,7 +23,9 @@ class BitcoinReorgChecksTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(
             BasicEnvConfig(
-                0,
+                # TODO: Need to generate at least horizon height blocks, can't
+                # get rollup params from here
+                2,
                 rollup_settings=net_settings.get_fast_batch_settings(),
                 auto_generate_blocks=False,
             )

@@ -20,6 +20,6 @@ tracing.workspace = true
 
 [features]
 default = []
+mock = []
 prover = ["sp1-sdk"]
 zkvm = ["sp1-zkvm"]
-mock = []

@@ -135,7 +135,7 @@ fn check_for_da_batch(
     let signed_checkpts = protocol_ops_txs
         .iter()
         .filter_map(|ops_txs| match ops_txs.proto_op() {
-            strata_state::tx::ProtocolOperation::RollupInscription(inscription) => Some((
+            strata_state::tx::ProtocolOperation::Checkpoint(inscription) => Some((
                 inscription,
                 &blockdata.block().txdata[ops_txs.index() as usize],
             )),
