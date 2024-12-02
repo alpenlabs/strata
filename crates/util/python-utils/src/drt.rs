@@ -461,6 +461,8 @@ pub(crate) fn get_balance_recovery_inner(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Once;
+
     use bdk_wallet::{bitcoin::Amount, KeychainKind, LocalOutput};
     use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
     use strata_btcio::rpc::{traits::Broadcaster, BitcoinClient};
@@ -471,9 +473,20 @@ mod tests {
     use super::*;
     use crate::taproot::taproot_wallet;
 
+    static INIT: Once = Once::new();
+
     const EL_ADDRESS: &str = "deedf001900dca3ebeefdeadf001900dca3ebeef";
     const MUSIG_BRIDGE_PK: &str =
         "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
+
+    /// Initializes logging for a given test.
+    ///
+    /// This avoids multiple threads calling `logging::init` at the same time.
+    fn init_logging(name: &str) {
+        INIT.call_once(|| {
+            logging::init(logging::LoggerConfig::with_base_name(name));
+        });
+    }
 
     /// Get the authentication credentials for a given `bitcoind` instance.
     fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
@@ -504,7 +517,7 @@ mod tests {
 
     #[tokio::test]
     async fn drt_mempool_accept() {
-        logging::init(logging::LoggerConfig::with_base_name("drt-tests"));
+        init_logging("drt-tests");
 
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
@@ -532,7 +545,7 @@ mod tests {
 
     #[tokio::test]
     async fn recovery_path_mempool_accept() {
-        logging::init(logging::LoggerConfig::with_base_name("recovery-path-tests"));
+        init_logging("recovery-path-tests");
 
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
@@ -619,7 +632,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_balance() {
-        logging::init(logging::LoggerConfig::with_base_name("balance-tests"));
+        init_logging("balance-tests");
 
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
@@ -693,9 +706,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_balance_recovery() {
-        logging::init(logging::LoggerConfig::with_base_name(
-            "recovery-balance-tests",
-        ));
+        init_logging("recovery-balance-tests");
 
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
