@@ -514,14 +514,13 @@ impl Agent {
         let (address, client) = {
             let bitcoind = bitcoind.lock().await;
 
+            let _client = bitcoind.client.create_wallet(id);
+
             let (user, password) = get_auth(&bitcoind);
 
             let auth = Auth::UserPass(user, password);
-            let client = Client::new(&bitcoind.rpc_url(), auth).expect("client should start");
-
-            client
-                .create_wallet(id, None, None, None, None)
-                .expect("should create a wallet");
+            let client =
+                Client::new(&bitcoind.rpc_url_with_wallet(id), auth).expect("client should start");
 
             let address = client
                 .get_new_address(Some(id), Some(AddressType::Bech32m))
@@ -690,8 +689,16 @@ pub(crate) async fn setup(
     let bitcoind = BitcoinD::from_downloaded_with_conf(&conf).expect("bitcoind client must start");
     let (user, password) = get_auth(&bitcoind);
     let auth = Auth::UserPass(user, password);
+
+    let wallet_name = "common";
+    bitcoind
+        .create_wallet(wallet_name)
+        .expect("should be able to create a wallet");
+
     event!(Level::INFO, action = "creating bitcoind client");
-    let client = Arc::new(Client::new(&bitcoind.rpc_url(), auth).expect("client should start"));
+    let client = Arc::new(
+        Client::new(&bitcoind.rpc_url_with_wallet(wallet_name), auth).expect("client should start"),
+    );
     let bitcoind = Arc::new(Mutex::new(bitcoind));
 
     event!(Level::INFO, action = "setting up a bridge federation", num_operator = %num_operators);
