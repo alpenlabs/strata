@@ -36,7 +36,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
         """
         return next(self._el_address_gen)
 
-    def gen_ext_btc_address(self) -> str | List[str]:
+    def gen_ext_btc_address(self) -> str | list[str]:
         """
         Generates a unique bitcoin (external) taproot addresses that is funded with some BTC.
         """
@@ -45,7 +45,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
         self._ext_btc_addr_idx += 1
         return tr_addr
 
-    def gen_rec_btc_address(self) -> str | List[str]:
+    def gen_rec_btc_address(self) -> str | list[str]:
         """
         Generates a unique bitcoin (recovery) taproot addresses that is funded with some BTC.
         """
