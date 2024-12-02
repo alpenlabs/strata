@@ -35,8 +35,8 @@ impl L2Block {
         &self.body
     }
 
-    pub fn l1_segment(&self) -> &L1Segment {
-        &self.body.l1_segment
+    pub fn l1_segment(&self) -> &Option<L1Segment> {
+        self.body.l1_segment()
     }
 
     pub fn exec_segment(&self) -> &ExecSegment {
@@ -62,19 +62,19 @@ impl<'a> Arbitrary<'a> for L2Block {
 /// Contains the additional payloads within the L2 block.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L2BlockBody {
-    l1_segment: L1Segment,
+    l1_segment: Option<L1Segment>,
     exec_segment: ExecSegment,
 }
 
 impl L2BlockBody {
-    pub fn new(l1_segment: L1Segment, exec_segment: ExecSegment) -> Self {
+    pub fn new(l1_segment: Option<L1Segment>, exec_segment: ExecSegment) -> Self {
         Self {
             l1_segment,
             exec_segment,
         }
     }
 
-    pub fn l1_segment(&self) -> &L1Segment {
+    pub fn l1_segment(&self) -> &Option<L1Segment> {
         &self.l1_segment
     }
 
