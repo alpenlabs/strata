@@ -111,7 +111,7 @@ services:
   bitcoind:
     build:
       context: ./bitcoind/
-    image: "strata_bitcoind:v0.1.1"
+    image: "strata_bitcoind:v0.1.2"
     environment:
       RPC_ALLOW_IP: "0.0.0.0/0"
       BITCOIND_RPC_USER: rpcuser
