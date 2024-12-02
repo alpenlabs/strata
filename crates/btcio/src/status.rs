@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use bitcoin::Txid;
-use strata_status::StatusTx;
-use tracing::error;
+use strata_status::StatusChannel;
 
 #[derive(Debug, Clone)]
 pub enum L1StatusUpdate {
@@ -15,9 +12,9 @@ pub enum L1StatusUpdate {
     IncrementInscriptionCount,
 }
 
-pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_tx: Arc<StatusTx>) {
-    let mut l1_status = status_tx.l1.borrow().clone();
-    for event in status_updates {
+pub async fn apply_status_updates(st_updates: &[L1StatusUpdate], st_chan: &StatusChannel) {
+    let mut l1_status = st_chan.l1_status();
+    for event in st_updates {
         match event {
             L1StatusUpdate::CurHeight(height) => l1_status.cur_height = *height,
             L1StatusUpdate::LastUpdate(epoch_time) => l1_status.last_update = *epoch_time,
@@ -31,7 +28,5 @@ pub async fn apply_status_updates(status_updates: &[L1StatusUpdate], status_tx: 
         }
     }
 
-    if let Err(err) = status_tx.l1.send(l1_status.clone()) {
-        error!(%err, "error updating l1status");
-    }
+    st_chan.update_l1_status(l1_status);
 }

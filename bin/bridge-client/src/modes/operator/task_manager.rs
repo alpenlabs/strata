@@ -12,7 +12,7 @@ use strata_bridge_exec::{
 use strata_bridge_tx_builder::{prelude::BuildContext, TxKind};
 use strata_btcio::rpc::traits::Broadcaster;
 use strata_rpc_api::StrataApiClient;
-use strata_rpc_types::BridgeDuties;
+use strata_rpc_types::RpcBridgeDuties;
 use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
 use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeDutyIndexOps};
 use tokio::{task::JoinSet, time::sleep};
@@ -38,7 +38,7 @@ where
 {
     pub(super) async fn start(&self, duty_polling_interval: Duration) -> anyhow::Result<()> {
         loop {
-            let BridgeDuties {
+            let RpcBridgeDuties {
                 duties,
                 start_index,
                 stop_index,
@@ -77,7 +77,7 @@ where
     }
 
     /// Polls for [`BridgeDuty`]s.
-    pub(crate) async fn poll_duties(&self) -> anyhow::Result<BridgeDuties> {
+    pub(crate) async fn poll_duties(&self) -> anyhow::Result<RpcBridgeDuties> {
         let start_index = self
             .bridge_duty_idx_db_ops
             .get_index_async()
@@ -85,7 +85,7 @@ where
             .unwrap_or(Some(0))
             .unwrap_or(0);
 
-        let BridgeDuties {
+        let RpcBridgeDuties {
             duties,
             start_index,
             stop_index,
@@ -137,7 +137,7 @@ where
             }
         }
 
-        Ok(BridgeDuties {
+        Ok(RpcBridgeDuties {
             duties: todo_duties,
             start_index,
             stop_index,

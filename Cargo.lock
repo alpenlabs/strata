@@ -13594,6 +13594,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "strata-db",
+ "strata-primitives",
  "strata-state",
  "thiserror",
 ]

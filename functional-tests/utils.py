@@ -406,10 +406,10 @@ def get_bridge_pubkey(seqrpc) -> str:
     """
     Get the bridge pubkey from the sequencer.
     """
-    # Wait for seq
+    # Wait until genesis
     wait_until(
-        lambda: seqrpc.strata_protocolVersion() is not None,
-        error_with="Sequencer did not start on time",
+        lambda: seqrpc.strata_syncStatus() is not None,
+        error_with="Genesis did not happen in time",
     )
     op_pks = seqrpc.strata_getActiveOperatorChainPubkeySet()
     print(f"Operator pubkeys: {op_pks}")

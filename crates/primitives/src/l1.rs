@@ -227,10 +227,13 @@ pub struct L1Status {
     pub cur_tip_blkid: String,
 
     /// Last published txid where L2 blob was present
-    pub last_published_txid: Option<String>,
+    pub last_published_txid: Option<Txid>,
 
     /// UNIX millis time of the last time we got a new update from the L1 connector.
     pub last_update: u64,
+
+    /// number of published transactions in current run (commit + reveal pair count as 1)
+    pub published_inscription_count: u64,
 }
 
 /// A wrapper around the [`bitcoin::Address<NetworkChecked>`] type created in order to implement

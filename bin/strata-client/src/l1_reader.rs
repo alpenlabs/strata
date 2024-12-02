@@ -4,7 +4,7 @@ use strata_btcio::{reader::query::bitcoin_data_reader_task, rpc::traits::Reader}
 use strata_consensus_logic::{csm::ctl::CsmController, l1_handler::bitcoin_data_handler_task};
 use strata_db::traits::{Database, L1Database};
 use strata_primitives::params::Params;
-use strata_status::StatusTx;
+use strata_status::StatusChannel;
 use strata_tasks::TaskExecutor;
 use strata_tx_parser::messages::L1Event;
 use tokio::sync::mpsc;
@@ -18,7 +18,7 @@ pub fn start_reader_tasks<D>(
     rpc_client: Arc<impl Reader + Send + Sync + 'static>,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
-    status_rx: Arc<StatusTx>,
+    status_channel: StatusChannel,
 ) -> anyhow::Result<()>
 where
     D: Database + Send + Sync + 'static,
@@ -40,7 +40,7 @@ where
             ev_tx,
             target_next_block,
             reader_config,
-            status_rx.clone(),
+            status_channel,
         ),
     );
 
