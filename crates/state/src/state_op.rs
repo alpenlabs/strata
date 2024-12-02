@@ -25,10 +25,11 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
+#[repr(u8)] // otherwise rustc makes the size 0 with only 1 variant
 pub enum StateOp {
     /// Do nothing.  This arm is needed for some reason I don't understand.
     Noop,
-    // nothing now, maybe later
+    // nothing else now, maybe later
 }
 
 /// Collection of writes we're making to the state.
