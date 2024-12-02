@@ -1,0 +1,37 @@
+name: Run prover guest code checks
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2024-07-27
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install SP1 Toolchain
+        run: |
+          curl -L https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up
+          export PATH=~/.sp1/bin:$PATH
+          cargo prove --version
+      - name: Set up Clang
+        uses: egor-tensin/setup-clang@v1
+        with:
+          version: latest
+          platform: x64
+  
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build guest code
+        run: cd provers/sp1/ && cargo build --release -F "prover"
