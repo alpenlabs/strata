@@ -311,25 +311,25 @@ files = [
 
 [[package]]
 name = "bitcoinlib"
-version = "0.6.15"
+version = "0.7.0"
 description = "Bitcoin cryptocurrency Library"
 optional = false
 python-versions = "*"
 files = [
-    {file = "bitcoinlib-0.6.15-py3-none-any.whl", hash = "sha256:6176e9ba8116f84aa28bdba2155dbf6e63188d449c9f5f0bfa16ce18f0dbac1d"},
-    {file = "bitcoinlib-0.6.15.tar.gz", hash = "sha256:a7f281a0f2c950455a7edcaabce93de405748e8f1cfa490e827cd14d75e081c4"},
+    {file = "bitcoinlib-0.7.0-py3-none-any.whl", hash = "sha256:ec826633018bd080f526b98d80494da1beeb42cc87faf64c0041d86a054afc94"},
+    {file = "bitcoinlib-0.7.0.tar.gz", hash = "sha256:a2b0092223a31e54b46efe6fab5128484921632d7d24aea0f00d1653485ff68e"},
 ]
 
 [package.dependencies]
-ecdsa = ">=0.17"
-fastecdsa = {version = ">=2.2.1", markers = "platform_system != \"Windows\""}
+ecdsa = {version = ">=0.18", markers = "platform_system == \"Windows\""}
+fastecdsa = {version = ">=2.3.0", markers = "platform_system != \"Windows\""}
 numpy = {version = ">=1.22.0", markers = "python_version >= \"3.9\""}
-pycryptodome = ">=3.14.1"
+pycryptodome = ">=3.19.0"
 requests = ">=2.25.0"
-SQLAlchemy = ">=2.0.0"
+SQLAlchemy = ">=2.0.20"
 
 [package.extras]
-dev = ["Cython (>=3.0.0)", "coveralls (>=3.0.1)", "mysql-connector-python (>=8.0.27)", "mysqlclient (>=2.1.0)", "parameterized (>=0.8.1)", "psycopg2 (>=2.9.2)", "scrypt (>=0.8.18)", "sphinx (>=6.0.0)", "sphinx-rtd-theme (>=1.0.0)", "win-unicode-console"]
+dev = ["Cython (>=3.0.8)", "coveralls (>=4.0.1)", "mysql-connector-python (>=8.4.0)", "mysqlclient (>=2.2.0)", "psycopg (>=3.1.16)", "scrypt (>=0.8.20)", "sphinx (>=7.1.0)", "sphinx-rtd-theme (>=2.0.0)", "win-unicode-console"]
 
 [[package]]
 name = "certifi"
@@ -2191,4 +2191,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "a098380c21df588550816f0aec279db9d0c69a05ef54aaac57001d89a166727f"
+content-hash = "14d281871b7bab116a6daa84682b84dc4bcb13c2eceacf612b70061670153d5d"
