@@ -15,6 +15,7 @@ pub enum RpcServerError {
     #[error("not yet implemented")]
     Unimplemented,
 
+    // FIXME: this should probably be merged with BeforeGenesis below?
     #[error("client not started")]
     ClientNotStarted,
 

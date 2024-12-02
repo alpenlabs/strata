@@ -72,7 +72,7 @@ impl ClientState {
         self.sync_state.as_ref()
     }
 
-    pub fn has_genesis_occured(&self) -> bool {
+    pub fn has_genesis_occurred(&self) -> bool {
         self.chain_active && self.sync().is_some()
     }
 

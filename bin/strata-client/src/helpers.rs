@@ -19,15 +19,15 @@ use strata_db::{database::CommonDatabase, traits::Database};
 use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
 use strata_primitives::{
     buf::Buf32,
+    l1::L1Status,
     params::{Params, RollupParams},
 };
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainstateDb,
     ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
 };
-use strata_rpc_types::L1Status;
 use strata_state::csm_status::CsmStatus;
-use strata_status::{create_status_channel, StatusRx, StatusTx};
+use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
 use tokio::runtime::Runtime;
 use tracing::*;
@@ -203,10 +203,7 @@ pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
 }
 
 // initializes the status bundle that we can pass around cheaply for status/metrics
-pub fn init_status_channel<D>(
-    database: &D,
-    network: Network,
-) -> anyhow::Result<(Arc<StatusTx>, Arc<StatusRx>)>
+pub fn init_status_channel<D>(database: &D) -> anyhow::Result<StatusChannel>
 where
     D: Database + Send + Sync + 'static,
 {
@@ -220,11 +217,10 @@ where
     status.update_from_client_state(&cur_state);
 
     let l1_status = L1Status {
-        network,
         ..Default::default()
     };
 
-    Ok(create_status_channel(status, cur_state, l1_status))
+    Ok(StatusChannel::new(cur_state, l1_status, None))
 }
 
 pub fn init_engine_controller(

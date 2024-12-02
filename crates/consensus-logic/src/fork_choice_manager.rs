@@ -10,16 +10,13 @@ use strata_db::{
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
 use strata_state::{
-    block::L2BlockBundle, block_validation::validate_block_segments, client_state::ClientState,
-    prelude::*, state_op::StateCache, sync_event::SyncEvent,
+    block::L2BlockBundle, block_validation::validate_block_segments, chain_state::Chainstate,
+    client_state::ClientState, prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
-use strata_status::StatusTx;
+use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
 use strata_tasks::ShutdownGuard;
-use tokio::{
-    runtime::Handle,
-    sync::{mpsc, watch},
-};
+use tokio::{runtime::Handle, sync::mpsc};
 use tracing::*;
 
 use crate::{
@@ -200,23 +197,10 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
-    status_tx: Arc<StatusTx>,
+    status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
-    let mut cl_rx = status_tx.cl.subscribe();
-
     info!("waiting for genesis");
-    let init_state = handle.block_on(async {
-        loop {
-            let c = cl_rx.changed().await;
-            if c.is_err() {
-                return Err(anyhow::anyhow!("ClientState update sender dropped"));
-            }
-            let st = cl_rx.borrow();
-            if st.has_genesis_occured() {
-                return Ok(st.clone());
-            }
-        }
-    })?;
+    let init_state = handle.block_on(status_channel.wait_until_genesis())?;
     let init_state = Arc::new(init_state);
 
     // we should have the finalized tips in state at this point
@@ -250,7 +234,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         engine.as_ref(),
         fcm_rx,
         &csm_ctl,
-        status_tx,
+        status_channel,
     ) {
         error!(err = ?e, "tracker aborted");
         return Err(e);
@@ -273,19 +257,20 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: &CsmController,
-    status_tx: Arc<StatusTx>,
+    status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
-    let mut cl_rx = status_tx.cl.subscribe();
     loop {
         if shutdown.should_shutdown() {
             warn!("fcm task received shutdown signal");
             break;
         }
 
-        let fcm_ev = wait_for_fcm_event(&handle, &mut fcm_rx, &mut cl_rx);
+        let fcm_ev = wait_for_fcm_event(&handle, &mut fcm_rx, &status_channel);
 
         match fcm_ev {
-            FcmEvent::NewFcmMsg(m) => process_fc_message(m, &mut fcm_state, engine, csm_ctl),
+            FcmEvent::NewFcmMsg(m) => {
+                process_fc_message(m, &mut fcm_state, engine, csm_ctl, &status_channel)
+            }
             FcmEvent::NewStateUpdate(st) => handle_new_state(&mut fcm_state, st),
             FcmEvent::Abort => break,
         }?;
@@ -297,26 +282,21 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
 fn wait_for_fcm_event(
     handle: &Handle,
     fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
-    cl_rx: &mut watch::Receiver<ClientState>,
+    status_channel: &StatusChannel,
 ) -> FcmEvent {
     handle.block_on(async {
         tokio::select! {
             m = fcm_rx.recv() => {
-                match m {
-                    Some(msg) => FcmEvent::NewFcmMsg(msg),
-                    None => {
-                        warn!("Fcm channel closed");
-                        FcmEvent::Abort
-                    }
-                }
+                m.map(FcmEvent::NewFcmMsg).unwrap_or_else(|| {
+                    warn!("Fcm channel closed");
+                    FcmEvent::Abort
+                })
             }
-            c = cl_rx.changed() => {
-                if c.is_err() {
+            c = status_channel.wait_for_client_change() => {
+                c.map(FcmEvent::NewStateUpdate).unwrap_or_else(|_| {
                     warn!("ClientState update sender closed");
                     FcmEvent::Abort
-                } else {
-                    FcmEvent::NewStateUpdate(cl_rx.borrow().clone())
-                }
+                })
             }
         }
     })
@@ -327,6 +307,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
     fcm_state: &mut ForkChoiceManager<D>,
     engine: &E,
     csm_ctl: &CsmController,
+    status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match msg {
         ForkChoiceMessage::NewBlock(blkid) => {
@@ -390,9 +371,12 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
 
             // Only if the update actually does something should we try to
             // change the fork choice tip.
-            if !reorg.is_identity() {
-                // Apply the reorg.
-                if let Err(e) = apply_tip_update(&reorg, fcm_state) {
+            if reorg.is_identity() {
+                return Ok(());
+            }
+            // Apply the reorg.
+            match apply_tip_update(&reorg, fcm_state) {
+                Err(e) => {
                     warn!(err = ?e, "failed to compute CL STF");
 
                     // Specifically state transition errors we want to handle
@@ -411,20 +395,22 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
                     // Everything else we should fail on.
                     return Err(e);
                 }
+                Ok(post_state) => {
+                    // Block is valid, update the status
+                    fcm_state.set_block_status(&blkid, BlockStatus::Valid)?;
 
-                // Block is valid, update the status
-                fcm_state.set_block_status(&blkid, BlockStatus::Valid)?;
+                    // TODO also update engine tip block
 
-                // TODO also update engine tip block
+                    // Insert the sync event and submit it to the executor.
+                    let tip_blkid = *reorg.new_tip();
+                    info!(?tip_blkid, "new chain tip block");
+                    let ev = SyncEvent::NewTipBlock(tip_blkid);
+                    csm_ctl.submit_event(ev)?;
 
-                // Insert the sync event and submit it to the executor.
-                let tip_blkid = *reorg.new_tip();
-                info!(?tip_blkid, "new chain tip block");
-                let ev = SyncEvent::NewTipBlock(tip_blkid);
-                csm_ctl.submit_event(ev)?;
+                    // Update status
+                    status_channel.update_chainstate(post_state);
+                }
             }
-
-            // TODO is there anything else we have to do here?
         }
     }
 
@@ -531,7 +517,7 @@ fn pick_best_block<'t>(
 fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
     fc_manager: &mut ForkChoiceManager<D>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Chainstate> {
     let chs_db = fc_manager.database.chain_state_db();
 
     // See if we need to roll back recent changes.
@@ -594,5 +580,5 @@ fn apply_tip_update<D: Database>(
         fc_manager.cur_index = idx;
     }
 
-    Ok(())
+    Ok(pre_state)
 }

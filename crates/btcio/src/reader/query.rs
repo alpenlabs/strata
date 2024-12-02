@@ -11,7 +11,7 @@ use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
 };
-use strata_status::StatusTx;
+use strata_status::StatusChannel;
 use strata_tx_parser::{
     filter::filter_protocol_op_tx_refs,
     filter_types::TxFilterConfig,
@@ -35,7 +35,7 @@ struct ReaderContext<R: Reader> {
     /// Config
     config: Arc<ReaderConfig>,
     /// Status transmitter
-    status_tx: Arc<StatusTx>,
+    status_channel: StatusChannel,
 }
 
 /// The main task that initializes the reader state and starts reading from bitcoin.
@@ -44,13 +44,13 @@ pub async fn bitcoin_data_reader_task(
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
-    status_tx: Arc<StatusTx>,
+    status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
     let ctx = ReaderContext {
         client,
         event_tx,
         config,
-        status_tx,
+        status_channel,
     };
     do_reader_task(ctx, target_next_block).await
 }
@@ -101,7 +101,7 @@ async fn do_reader_task<R: Reader>(
                 .as_millis() as u64,
         ));
 
-        apply_status_updates(&status_updates, ctx.status_tx.clone()).await;
+        apply_status_updates(&status_updates, &ctx.status_channel).await;
     }
 }
 

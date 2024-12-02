@@ -48,7 +48,7 @@ pub fn init_client_state(params: &Params, database: &impl Database) -> anyhow::R
 pub fn init_genesis_chainstate(
     params: &Params,
     database: &impl Database,
-) -> anyhow::Result<L2BlockId> {
+) -> anyhow::Result<Chainstate> {
     debug!("preparing database genesis chainstate!");
 
     let horizon_blk_height = params.rollup.horizon_l1_height;
@@ -63,8 +63,6 @@ pub fn init_genesis_chainstate(
     let gblock = make_genesis_block(params);
     let gchstate = make_genesis_chainstate(&gblock, pregenesis_mfs, params);
 
-    let genesis_blkid = gblock.header().get_blockid();
-
     // Now insert things into the database.
     let chs_db = database.chain_state_db();
     let l2_db = database.l2_db();
@@ -76,7 +74,7 @@ pub fn init_genesis_chainstate(
     // states or something
 
     info!("finished genesis insertions");
-    Ok(genesis_blkid)
+    Ok(gchstate)
 }
 
 pub fn construct_operator_table(opconfig: &OperatorConfig) -> OperatorTable {

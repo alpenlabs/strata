@@ -4,13 +4,11 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use strata_db::types::L1TxStatus;
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
-    types::{BlockHeader, ClientStatus, L1Status},
-    BridgeDuties, ExecUpdate, HexBytes, HexBytes32, L2BlockStatus, NodeSyncStatus,
-    RpcCheckpointInfo,
+    types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
+    HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcCheckpointInfo, RpcDepositEntry,
+    RpcExecUpdate, RpcSyncStatus,
 };
-use strata_state::{
-    bridge_state::DepositEntry, id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent,
-};
+use strata_state::{id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent};
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
@@ -25,25 +23,25 @@ pub trait StrataApi {
     async fn get_l1_connection_status(&self) -> RpcResult<bool>;
 
     #[method(name = "l1status")]
-    async fn get_l1_status(&self) -> RpcResult<L1Status>;
+    async fn get_l1_status(&self) -> RpcResult<RpcL1Status>;
 
     #[method(name = "getL1blockHash")]
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>>;
 
     #[method(name = "clientStatus")]
-    async fn get_client_status(&self) -> RpcResult<ClientStatus>;
+    async fn get_client_status(&self) -> RpcResult<RpcClientStatus>;
 
     #[method(name = "getRecentBlockHeaders")]
-    async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<BlockHeader>>;
+    async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<RpcBlockHeader>>;
 
     #[method(name = "getHeadersAtIdx")]
-    async fn get_headers_at_idx(&self, index: u64) -> RpcResult<Option<Vec<BlockHeader>>>;
+    async fn get_headers_at_idx(&self, index: u64) -> RpcResult<Option<Vec<RpcBlockHeader>>>;
 
     #[method(name = "getHeaderById")]
-    async fn get_header_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<BlockHeader>>;
+    async fn get_header_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcBlockHeader>>;
 
     #[method(name = "getExecUpdateById")]
-    async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<ExecUpdate>>;
+    async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcExecUpdate>>;
 
     #[method(name = "getCLBlockWitness")]
     async fn get_cl_block_witness_raw(&self, index: u64) -> RpcResult<Option<Vec<u8>>>;
@@ -52,11 +50,11 @@ pub trait StrataApi {
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;
 
     #[method(name = "getCurrentDepositById")]
-    async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<DepositEntry>;
+    async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<RpcDepositEntry>;
 
     // block sync methods
     #[method(name = "syncStatus")]
-    async fn sync_status(&self) -> RpcResult<NodeSyncStatus>;
+    async fn sync_status(&self) -> RpcResult<RpcSyncStatus>;
 
     #[method(name = "getRawBundles")]
     async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes>;
@@ -72,7 +70,7 @@ pub trait StrataApi {
     #[method(name = "submitBridgeMsg")]
     async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 
-    /// Get the [`BridgeDuties`] from a certain `start_index` for a given [`OperatorIdx`].
+    /// Get the [`RpcBridgeDuties`] from a certain `start_index` for a given [`OperatorIdx`].
     ///
     /// The `start_index` is a monotonically increasing number with no gaps. So, it is safe to call
     /// this method with any `u64` value. If an entry corresponding to the `start_index` is not
@@ -82,7 +80,7 @@ pub trait StrataApi {
         &self,
         operator_idx: OperatorIdx,
         start_index: u64,
-    ) -> RpcResult<BridgeDuties>;
+    ) -> RpcResult<RpcBridgeDuties>;
 
     /// Get the operators' public key table that is used to sign transactions and messages.
     ///

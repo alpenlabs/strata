@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 strata-db.workspace = true
+strata-primitives.workspace = true
 strata-state.workspace = true
 
 bitcoin.workspace = true

@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use futures::stream::{self, Stream, StreamExt};
 use strata_rpc_api::StrataApiClient;
-use strata_rpc_types::NodeSyncStatus;
+use strata_rpc_types::RpcSyncStatus;
 use strata_state::{block::L2BlockBundle, id::L2BlockId};
 use tracing::error;
 
@@ -18,7 +18,7 @@ pub enum ClientError {
 
 #[async_trait::async_trait]
 pub trait SyncClient {
-    async fn get_sync_status(&self) -> Result<NodeSyncStatus, ClientError>;
+    async fn get_sync_status(&self) -> Result<RpcSyncStatus, ClientError>;
 
     fn get_blocks_range(
         &self,
@@ -62,7 +62,7 @@ impl<RPC: StrataApiClient + Send + Sync> RpcSyncPeer<RPC> {
 
 #[async_trait::async_trait]
 impl<RPC: StrataApiClient + Send + Sync> SyncClient for RpcSyncPeer<RPC> {
-    async fn get_sync_status(&self) -> Result<NodeSyncStatus, ClientError> {
+    async fn get_sync_status(&self) -> Result<RpcSyncStatus, ClientError> {
         let status = self
             .rpc_client
             .sync_status()

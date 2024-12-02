@@ -11,7 +11,7 @@ use strata_db::{
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::SyncAction};
-use strata_status::StatusTx;
+use strata_status::StatusChannel;
 use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use strata_tasks::ShutdownGuard;
 use tokio::{
@@ -117,10 +117,16 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
-    status_tx: Arc<StatusTx>,
+    status_channel: StatusChannel,
 ) -> Result<(), Error> {
     while let Some(msg) = msg_rx.blocking_recv() {
-        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg, &status_tx, &shutdown) {
+        if let Err(e) = process_msg(
+            &mut state,
+            engine.as_ref(),
+            &msg,
+            &status_channel,
+            &shutdown,
+        ) {
             error!(err = %e, ?msg, "failed to process sync message, aborting!");
             break;
         }
@@ -140,7 +146,7 @@ fn process_msg<D: Database>(
     state: &mut WorkerState<D>,
     engine: &impl ExecEngineCtl,
     msg: &CsmMessage,
-    status_rx: &Arc<StatusTx>,
+    status_channel: &StatusChannel,
     shutdown: &ShutdownGuard,
 ) -> anyhow::Result<()> {
     match msg {
@@ -153,7 +159,7 @@ fn process_msg<D: Database>(
                 if ev_idx < *idx {
                     warn!(%ev_idx, "Applying missed sync event.");
                 }
-                handle_sync_event_with_retry(state, engine, ev_idx, status_rx, shutdown)?;
+                handle_sync_event_with_retry(state, engine, ev_idx, status_channel, shutdown)?;
             }
 
             Ok(())
@@ -167,7 +173,7 @@ fn handle_sync_event_with_retry<D: Database>(
     state: &mut WorkerState<D>,
     engine: &impl ExecEngineCtl,
     ev_idx: u64,
-    status_tx: &Arc<StatusTx>,
+    status_channel: &StatusChannel,
     shutdown: &ShutdownGuard,
 ) -> anyhow::Result<()> {
     // Fetch the sync event so that we can debug print it.
@@ -190,7 +196,7 @@ fn handle_sync_event_with_retry<D: Database>(
         // TODO demote to trace after we figure out the current issues
         debug!("trying sync event");
 
-        let Err(e) = handle_sync_event(state, engine, ev_idx, status_tx) else {
+        let Err(e) = handle_sync_event(state, engine, ev_idx, status_channel) else {
             // Happy case, we want this to happen.
             trace!("completed sync event");
             break;
@@ -220,7 +226,7 @@ fn handle_sync_event<D: Database>(
     state: &mut WorkerState<D>,
     engine: &impl ExecEngineCtl,
     ev_idx: u64,
-    status_tx: &Arc<StatusTx>,
+    status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
@@ -228,7 +234,7 @@ fn handle_sync_event<D: Database>(
 
     // Apply the actions produced from the state transition.
     for action in outp.actions() {
-        apply_action(action.clone(), state, engine)?;
+        apply_action(action.clone(), state, engine, status_channel)?;
     }
 
     // Make sure that the new state index is set as expected.
@@ -244,10 +250,8 @@ fn handle_sync_event<D: Database>(
     let mut status = CsmStatus::default();
     status.set_last_sync_ev_idx(ev_idx);
     status.update_from_client_state(new_state.as_ref());
-    let client_state = new_state.as_ref().clone();
 
-    let _ = status_tx.csm.send(status);
-    let _ = status_tx.cl.send(client_state);
+    status_channel.update_client_state(new_state.as_ref().clone());
 
     trace!(?new_state, "sending client update notif");
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
@@ -262,6 +266,7 @@ fn apply_action<D: Database>(
     action: SyncAction,
     state: &mut WorkerState<D>,
     engine: &impl ExecEngineCtl,
+    status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match action {
         SyncAction::UpdateTip(blkid) => {
@@ -294,12 +299,12 @@ fn apply_action<D: Database>(
 
             // TODO: use l1blkid during chain state genesis ?
 
-            genesis::init_genesis_chainstate(&state.params, state.database.as_ref()).map_err(
-                |err| {
+            let chstate = genesis::init_genesis_chainstate(&state.params, state.database.as_ref())
+                .map_err(|err| {
                     error!(err = %err, "failed to compute chain genesis");
                     Error::GenesisFailed(err.to_string())
-                },
-            )?;
+                })?;
+            status_channel.update_chainstate(chstate);
         }
 
         SyncAction::WriteCheckpoints(_height, checkpoints) => {

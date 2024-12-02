@@ -5,7 +5,7 @@ use strata_db::{
     types::{BlobEntry, BlobL1Status, L1TxStatus},
 };
 use strata_state::da_blob::{BlobDest, BlobIntent};
-use strata_status::StatusTx;
+use strata_status::StatusChannel;
 use strata_storage::ops::inscription::{Context, InscriptionDataOps};
 use strata_tasks::TaskExecutor;
 use tracing::*;
@@ -88,7 +88,7 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     bitcoin_client: Arc<impl Reader + Wallet + Signer + Send + Sync + 'static>,
     config: WriterConfig,
     db: Arc<D>,
-    status_tx: Arc<StatusTx>,
+    status_channel: StatusChannel,
     pool: threadpool::ThreadPool,
     broadcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<Arc<InscriptionHandle>> {
@@ -104,7 +104,7 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
             config,
             inscription_data_ops,
             broadcast_handle,
-            status_tx,
+            status_channel,
         )
         .await
     });
@@ -143,7 +143,7 @@ pub async fn watcher_task(
     config: WriterConfig,
     insc_ops: Arc<InscriptionDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
-    status_tx: Arc<StatusTx>,
+    status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's watcher task");
     let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
@@ -206,7 +206,7 @@ pub async fn watcher_task(
                             let new_status = determine_blob_next_status(&ctx.status, &rtx.status);
                             debug!(?new_status, "The next status for blob");
 
-                            update_l1_status(&blobentry, &new_status, status_tx.clone()).await;
+                            update_l1_status(&blobentry, &new_status, &status_channel).await;
 
                             // Update blobentry with new status
                             let mut updated_entry = blobentry.clone();
@@ -236,7 +236,7 @@ pub async fn watcher_task(
 async fn update_l1_status(
     blobentry: &BlobEntry,
     new_status: &BlobL1Status,
-    status_tx: Arc<StatusTx>,
+    status_channel: &StatusChannel,
 ) {
     // Update L1 status. Since we are processing one blobentry at a time, if the entry is
     // finalized/confirmed, then it means it is published as well
@@ -248,7 +248,7 @@ async fn update_l1_status(
             L1StatusUpdate::LastPublishedTxid(blobentry.reveal_txid.into()),
             L1StatusUpdate::IncrementInscriptionCount,
         ];
-        apply_status_updates(&status_updates, status_tx).await;
+        apply_status_updates(&status_updates, status_channel).await;
     }
 }
 

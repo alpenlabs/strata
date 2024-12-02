@@ -343,6 +343,10 @@ impl DepositEntry {
         &self.state
     }
 
+    pub fn notary_operators(&self) -> &[OperatorIdx] {
+        &self.notary_operators
+    }
+
     pub fn deposit_state_mut(&mut self) -> &mut DepositState {
         &mut self.state
     }

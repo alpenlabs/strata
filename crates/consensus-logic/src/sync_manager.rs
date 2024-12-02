@@ -7,7 +7,7 @@ use std::sync::Arc;
 use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
-use strata_status::{StatusRx, StatusTx};
+use strata_status::StatusChannel;
 use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use strata_tasks::TaskExecutor;
 use tokio::{
@@ -30,8 +30,7 @@ pub struct SyncManager {
     fc_manager_tx: mpsc::Sender<ForkChoiceMessage>,
     csm_controller: Arc<CsmController>,
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
-    status_tx: Arc<StatusTx>,
-    status_rx: Arc<StatusRx>,
+    status_channel: StatusChannel,
 }
 
 impl SyncManager {
@@ -60,12 +59,8 @@ impl SyncManager {
         self.cupdate_rx.resubscribe()
     }
 
-    pub fn status_rx(&self) -> Arc<StatusRx> {
-        self.status_rx.clone()
-    }
-
-    pub fn status_tx(&self) -> Arc<StatusTx> {
-        self.status_tx.clone()
+    pub fn status_channel(&self) -> &StatusChannel {
+        &self.status_channel
     }
 
     /// Submits a fork choice message if possible. (synchronously)
@@ -92,7 +87,7 @@ pub fn start_sync_tasks<
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
-    status_bundle: (Arc<StatusTx>, Arc<StatusRx>),
+    status_channel: StatusChannel,
     checkpoint_manager: Arc<CheckpointDbManager>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
@@ -111,9 +106,9 @@ pub fn start_sync_tasks<
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
     let fcm_params = params.clone();
-    let st_tx = status_bundle.0.clone();
     let handle = runtime.handle().clone();
-    executor.spawn_critical("fork_choice_manager::tracker_task", |shutdown| {
+    let st_ch = status_channel.clone();
+    executor.spawn_critical("fork_choice_manager::tracker_task", move |shutdown| {
         // TODO this should be simplified into a builder or something
         fork_choice_manager::tracker_task(
             shutdown,
@@ -124,7 +119,7 @@ pub fn start_sync_tasks<
             fcm_rx,
             fcm_csm_controller,
             fcm_params,
-            st_tx,
+            st_ch,
         )
     });
 
@@ -138,10 +133,10 @@ pub fn start_sync_tasks<
     )?;
 
     let csm_engine = engine.clone();
+    let st_ch = status_channel.clone();
 
-    let status_tx = status_bundle.0.clone();
-    executor.spawn_critical("client_worker_task", |shutdown| {
-        worker::client_worker_task(shutdown, client_worker_state, csm_engine, csm_rx, status_tx)
+    executor.spawn_critical("client_worker_task", move |shutdown| {
+        worker::client_worker_task(shutdown, client_worker_state, csm_engine, csm_rx, st_ch)
             .map_err(Into::into)
     });
 
@@ -150,7 +145,6 @@ pub fn start_sync_tasks<
         fc_manager_tx: fcm_tx,
         csm_controller,
         cupdate_rx,
-        status_tx: status_bundle.0,
-        status_rx: status_bundle.1,
+        status_channel,
     })
 }
