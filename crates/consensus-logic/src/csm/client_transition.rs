@@ -585,4 +585,194 @@ mod tests {
         assert_eq!(res.actions(), expected_actions);
         assert_eq!(res.writes(), expected_writes);
     }
+    struct TestEvent {
+        event: SyncEvent,
+        expected_writes: Vec<ClientStateWrite>,
+        expected_actions: Vec<SyncAction>,
+    }
+
+    struct TestCase {
+        description: &'static str,
+        events: Vec<TestEvent>, // List of events to process
+        state_assertions: Box<dyn Fn(&ClientState)>, // Closure to verify state after all events
+    }
+
+    fn run_test_cases<D: Database>(
+        test_cases: Vec<TestCase>,
+        state: &mut ClientState,
+        database: &D,
+        params: &Params,
+    ) {
+        for case in test_cases {
+            println!("Running test case: {}", case.description);
+
+            for (i, test_event) in case.events.iter().enumerate() {
+                let output = process_event(state, &test_event.event, database, params).unwrap();
+
+                assert_eq!(
+                    output.writes(),
+                    test_event.expected_writes,
+                    "Failed on writes for event {} in test case: {}",
+                    i + 1,
+                    case.description
+                );
+                assert_eq!(
+                    output.actions(),
+                    test_event.expected_actions,
+                    "Failed on actions for event {} in test case: {}",
+                    i + 1,
+                    case.description
+                );
+
+                operation::apply_writes_to_state(state, output.writes().iter().cloned());
+            }
+
+            // Run the state assertions after all events
+            (case.state_assertions)(state);
+        }
+    }
+
+    #[test]
+    fn test_genesis_temp() {
+        let database = get_common_db();
+        let params = gen_params();
+        let mut state = gen_client_state(Some(&params));
+
+        let horizon = params.rollup().horizon_l1_height;
+        let genesis = params.rollup().genesis_l1_height;
+
+        let chain = get_btc_chain();
+        let l1_chain = chain.get_block_manifests(horizon as u32, 10);
+        let l1_verification_state =
+            chain.get_verification_state(genesis as u32 + 1, &MAINNET.clone().into());
+
+        let genesis_block = genesis::make_genesis_block(&params);
+        let genesis_blockid = genesis_block.header().get_blockid();
+
+        let l1_db = database.l1_db();
+        for (i, b) in l1_chain.iter().enumerate() {
+            l1_db
+                .put_block_data(i as u64 + horizon, b.clone(), Vec::new())
+                .expect("test: insert blocks");
+        }
+        let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash().into()).collect();
+
+        let test_cases = vec![
+            TestCase {
+                description: "At horizon block",
+                events: vec![TestEvent {
+                    event: SyncEvent::L1Block(horizon, l1_chain[0].block_hash().into()),
+                    expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                        l1_chain[0].block_hash().into(),
+                    )],
+                    expected_actions: vec![],
+                }],
+                state_assertions: Box::new({
+                    let l1_chain = l1_chain.clone();
+                    move |state| {
+                        assert!(!state.is_chain_active());
+                        assert_eq!(
+                            state.most_recent_l1_block(),
+                            Some(&l1_chain[0].block_hash().into())
+                        );
+                        assert_eq!(state.next_exp_l1_block(), horizon + 1);
+                    }
+                }),
+            },
+            TestCase {
+                description: "At horizon block + 1",
+                events: vec![TestEvent {
+                    event: SyncEvent::L1Block(horizon + 1, l1_chain[1].block_hash().into()),
+                    expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                        l1_chain[1].block_hash().into(),
+                    )],
+                    expected_actions: vec![],
+                }],
+                state_assertions: Box::new({
+                    let l1_chain = l1_chain.clone();
+                    move |state| {
+                        assert!(!state.is_chain_active());
+                        assert_eq!(
+                            state.most_recent_l1_block(),
+                            Some(&l1_chain[1].block_hash().into())
+                        );
+                        assert_eq!(state.next_exp_l1_block(), genesis);
+                    }
+                }),
+            },
+            TestCase {
+                description: "As the genesis of L2 is reached but not locked in yet",
+                events: vec![TestEvent {
+                    event: SyncEvent::L1Block(
+                        genesis,
+                        l1_chain[(genesis - horizon) as usize].block_hash().into(),
+                    ),
+                    expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                        l1_chain[(genesis - horizon) as usize].block_hash().into(),
+                    )],
+                    expected_actions: vec![],
+                }],
+                state_assertions: Box::new(move |state| {
+                    assert!(!state.is_chain_active());
+                    assert_eq!(state.next_exp_l1_block(), genesis + 1);
+                }),
+            },
+            /*
+            TestCase {
+                description: "At genesis + 3, lock in genesis",
+                events: vec![
+                    TestEvent {
+                        event: SyncEvent::L1BlockGenesis(
+                            genesis + 3,
+                            l1_verification_state.clone(),
+                        ),
+                        expected_writes: vec![
+                            ClientStateWrite::ActivateChain,
+                            ClientStateWrite::UpdateVerificationState(
+                                l1_verification_state.clone(),
+                            ),
+                            ClientStateWrite::ReplaceSync(Box::new(SyncState::from_genesis_blkid(
+                                genesis_blockid,
+                            ))),
+                        ],
+                        expected_actions: vec![SyncAction::L2Genesis(
+                            l1_chain[(genesis - horizon) as usize].block_hash().into(),
+                        )],
+                    },
+                    TestEvent {
+                        event: SyncEvent::L1Block(
+                            genesis + 3,
+                            l1_chain[(genesis + 3 - horizon) as usize]
+                                .block_hash()
+                                .into(),
+                        ),
+                        expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                            l1_chain[(genesis + 3 - horizon) as usize]
+                                .block_hash()
+                                .into(),
+                        )],
+                        expected_actions: vec![],
+                    },
+                ],
+                state_assertions: Box::new(move |state| {
+                    assert!(state.is_chain_active());
+                    assert_eq!(state.next_exp_l1_block(), genesis + 4);
+                }),
+            },
+            */
+            // TestCase {
+            //     description: "L1 reorg",
+            //     events: vec![TestEvent {
+            //         event: SyncEvent::L1Revert(genesis),
+            //         expected_writes: vec![ClientStateWrite::RollbackL1BlocksTo(genesis)],
+            //         expected_actions: vec![],
+            //     }],
+            //     state_assertions: Box::new(move |state| {
+            //         assert_eq!(state.most_recent_l1_block(), None); // Example assertion
+            //     }),
+            // },
+        ];
+
+        run_test_cases(test_cases, &mut state, database.as_ref(), &params);
+    }
 }
