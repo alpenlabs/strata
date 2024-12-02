@@ -1,5 +1,9 @@
+use std::fmt;
+
 use serde::{de::DeserializeOwned, Serialize};
-use sp1_sdk::{ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey};
+use sp1_sdk::{
+    HashableKey, ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey,
+};
 use strata_zkvm::{
     Proof, ProofType, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
 };
@@ -10,38 +14,46 @@ use crate::input::SP1ProofInputBuilder;
 /// The `SP1Host` is responsible for program execution and proving
 #[derive(Clone)]
 pub struct SP1Host {
+    #[allow(dead_code)]
+    elf: Vec<u8>,
     proving_key: SP1ProvingKey,
     verifying_key: SP1VerifyingKey,
 }
 
 impl SP1Host {
-    pub fn new(proving_key: SP1ProvingKey, verifying_key: SP1VerifyingKey) -> Self {
+    pub fn new(elf: &[u8], proving_key: SP1ProvingKey, verifying_key: SP1VerifyingKey) -> Self {
         Self {
+            elf: elf.to_vec(),
             proving_key,
             verifying_key,
         }
     }
 
-    pub fn new_from_bytes(proving_key_bytes: &[u8], verifying_key_bytes: &[u8]) -> Self {
+    pub fn new_from_bytes(
+        elf: &[u8],
+        proving_key_bytes: &[u8],
+        verifying_key_bytes: &[u8],
+    ) -> Self {
         let proving_key: SP1ProvingKey =
             bincode::deserialize(proving_key_bytes).expect("invalid sp1 pk bytes");
         let verifying_key: SP1VerifyingKey =
             bincode::deserialize(verifying_key_bytes).expect("invalid sp1 vk bytes");
-        SP1Host::new(proving_key, verifying_key)
+        SP1Host::new(elf, proving_key, verifying_key)
+    }
+
+    pub fn init(guest_code: &[u8]) -> Self {
+        let client = ProverClient::new();
+        let (proving_key, verifying_key) = client.setup(guest_code);
+        Self {
+            elf: guest_code.to_vec(),
+            proving_key,
+            verifying_key,
+        }
     }
 }
 
 impl ZkVmHost for SP1Host {
     type Input<'a> = SP1ProofInputBuilder;
-    fn init(guest_code: &[u8]) -> Self {
-        let client = ProverClient::new();
-        let (proving_key, verifying_key) = client.setup(guest_code);
-        Self {
-            proving_key,
-            verifying_key,
-        }
-    }
-
     fn prove<'a>(
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
@@ -100,6 +112,12 @@ impl ZkVmHost for SP1Host {
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
 
         Ok(())
+    }
+}
+
+impl fmt::Display for SP1Host {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "sp1_{}", self.verifying_key.bytes32())
     }
 }
 

@@ -9,10 +9,8 @@ use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
-use strata_sp1_guest_builder::{
-    GUEST_BTC_BLOCKSPACE_ELF, GUEST_CHECKPOINT_ELF, GUEST_CL_AGG_ELF, GUEST_CL_STF_ELF,
-    GUEST_EVM_EE_STF_ELF, GUEST_L1_BATCH_ELF,
-};
+use strata_sp1_adapter::SP1Host;
+use strata_sp1_guest_builder::*;
 use strata_zkvm::{Proof, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
@@ -89,14 +87,11 @@ impl ProverState {
 
 // A prover that generates proofs in parallel using a thread pool. If the pool is saturated,
 // the prover will reject new jobs.
-pub(crate) struct Prover<Vm>
-where
-    Vm: ZkVmHost + 'static,
-{
+pub(crate) struct Prover {
     prover_state: Arc<RwLock<ProverState>>,
     db: ProverDB,
     pool: rayon::ThreadPool,
-    vm_manager: ZkVMManager<Vm>,
+    vm_manager: ZkVMManager<SP1Host>, // TODO: make this generic
 }
 
 fn make_proof<Vm>(zkvm_input: ZkVmInput, vm: &'static Vm) -> Result<ProofWithVkey, anyhow::Error>
@@ -184,22 +179,49 @@ where
     Ok(agg_input)
 }
 
-impl<Vm: ZkVmHost> Prover<Vm>
-where
-    Vm: ZkVmHost,
-{
+impl Prover {
     pub(crate) fn new() -> Self {
         let rbdb = open_rocksdb_database().unwrap();
         let db_ops = DbOpsConfig { retry_count: 3 };
         let db = ProofDb::new(rbdb, db_ops);
 
-        let mut zkvm_manager: ZkVMManager<Vm> = ZkVMManager::new();
-        zkvm_manager.add_vm(ProofVm::BtcProving, GUEST_BTC_BLOCKSPACE_ELF.clone());
-        zkvm_manager.add_vm(ProofVm::L1Batch, GUEST_L1_BATCH_ELF.clone());
-        zkvm_manager.add_vm(ProofVm::ELProving, GUEST_EVM_EE_STF_ELF.clone());
-        zkvm_manager.add_vm(ProofVm::CLProving, GUEST_CL_STF_ELF.clone());
-        zkvm_manager.add_vm(ProofVm::CLAggregation, GUEST_CL_AGG_ELF.clone());
-        zkvm_manager.add_vm(ProofVm::Checkpoint, GUEST_CHECKPOINT_ELF.clone());
+        let mut zkvm_manager = ZkVMManager::new();
+        zkvm_manager.add_vm(
+            ProofVm::BtcProving,
+            SP1Host::new_from_bytes(
+                &GUEST_BTC_BLOCKSPACE_ELF,
+                &GUEST_BTC_BLOCKSPACE_PK,
+                &GUEST_BTC_BLOCKSPACE_VK,
+            ),
+        );
+        zkvm_manager.add_vm(
+            ProofVm::L1Batch,
+            SP1Host::new_from_bytes(&GUEST_L1_BATCH_ELF, &GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK),
+        );
+        zkvm_manager.add_vm(
+            ProofVm::ELProving,
+            SP1Host::new_from_bytes(
+                &GUEST_EVM_EE_STF_ELF,
+                &GUEST_EVM_EE_STF_PK,
+                &GUEST_EVM_EE_STF_VK,
+            ),
+        );
+        zkvm_manager.add_vm(
+            ProofVm::CLProving,
+            SP1Host::new_from_bytes(&GUEST_CL_STF_ELF, &GUEST_CL_STF_PK, &GUEST_CL_STF_VK),
+        );
+        zkvm_manager.add_vm(
+            ProofVm::CLAggregation,
+            SP1Host::new_from_bytes(&GUEST_CL_AGG_ELF, &GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK),
+        );
+        zkvm_manager.add_vm(
+            ProofVm::Checkpoint,
+            SP1Host::new_from_bytes(
+                &GUEST_CHECKPOINT_ELF,
+                &GUEST_CHECKPOINT_PK,
+                &GUEST_CHECKPOINT_VK,
+            ),
+        );
 
         Self {
             pool: rayon::ThreadPoolBuilder::new()
