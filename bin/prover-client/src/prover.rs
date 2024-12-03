@@ -3,7 +3,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use strata_db::traits::{ProverDatabase, ProverTaskDatabase};
+use strata_db::traits::{ProofDatabase, ProverDatabase};
+use strata_primitives::proof::ProofId;
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
@@ -307,22 +308,23 @@ impl Prover {
         }
     }
 
-    fn save_proof_to_db(&self, task_id: Uuid, proof: &ProofReceipt) -> Result<(), anyhow::Error> {
-        self.db
-            .prover_task_db()
-            .insert_new_task_entry(*task_id.as_bytes(), bincode::serialize(&proof)?)?;
+    // TODO: replace `task_id` with ProofKey
+    fn save_proof_to_db(&self, _task_id: Uuid, _proof: &ProofReceipt) -> Result<(), anyhow::Error> {
+        // Note: This works fine for now because proof is never read from DB right now
+        // let proof_id = ProofId::BtcBlockspace(1);
+        // self.db.proof_db().insert_proof(proof_id, proof.clone())?;
         Ok(())
     }
 
-    // This might be used later?
+    // TODO: fix this
     #[allow(dead_code)]
     fn read_proof_from_db(&self, task_id: Uuid) -> Result<Proof, anyhow::Error> {
-        let proof_entry = self
-            .db
-            .prover_task_db()
-            .get_task_entry_by_id(*task_id.as_bytes())?;
+        // used an arbitrary proof id for now
+        // TODO: to be replaced once we move from Uuid to ProofId based status
+        let proof_id = ProofId::BtcBlockspace(1);
+        let proof_entry = self.db.proof_db().get_proof(proof_id)?;
         match proof_entry {
-            Some(raw_proof) => Ok(Proof::new(raw_proof)),
+            Some(proof) => Ok(proof),
             None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),
         }
     }

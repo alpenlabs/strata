@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt, TransactionRetry};
-use strata_db::{errors::DbError, traits::ProverTaskDatabase, DbResult};
+use strata_db::{
+    errors::DbError,
+    traits::{ProofDatabase, ProverDatabase},
+    DbResult,
+};
 use strata_primitives::proof::ProofId;
 use strata_zkvm::Proof;
 
@@ -19,7 +23,7 @@ impl ProofDb {
     }
 }
 
-impl ProverTaskDatabase for ProofDb {
+impl ProofDatabase for ProofDb {
     fn insert_proof(&self, proof_id: ProofId, proof: Proof) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
@@ -36,6 +40,24 @@ impl ProverTaskDatabase for ProofDb {
 
     fn get_proof(&self, proof_id: ProofId) -> DbResult<Option<Proof>> {
         Ok(self.db.get::<ProofSchema>(&proof_id)?)
+    }
+}
+
+pub struct ProverDB {
+    db: Arc<ProofDb>,
+}
+
+impl ProverDB {
+    pub fn new(db: Arc<ProofDb>) -> Self {
+        Self { db }
+    }
+}
+
+impl ProverDatabase for ProverDB {
+    type ProofDB = ProofDb;
+
+    fn proof_db(&self) -> &Arc<Self::ProofDB> {
+        &self.db
     }
 }
 
