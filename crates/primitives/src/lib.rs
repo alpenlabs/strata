@@ -20,4 +20,4 @@ pub mod prelude;
 pub mod relay;
 pub mod sorted_vec;
 pub mod utils;
-pub mod vk;
+pub mod proof;

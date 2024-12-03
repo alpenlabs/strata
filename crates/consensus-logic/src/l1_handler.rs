@@ -12,7 +12,7 @@ use strata_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1TxProof},
     params::{Params, RollupParams},
-    vk::RollupVerifyingKey,
+    proof::RollupVerifyingKey,
 };
 use strata_risc0_adapter;
 use strata_sp1_adapter;
