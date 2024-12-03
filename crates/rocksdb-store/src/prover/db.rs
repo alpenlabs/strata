@@ -24,7 +24,7 @@ impl ProofDb {
 }
 
 impl ProofDatabase for ProofDb {
-    fn insert_proof(&self, proof_id: ProofId, proof: Proof) -> DbResult<()> {
+    fn put_proof(&self, proof_id: ProofId, proof: Proof) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if tx.get::<ProofSchema>(&proof_id)?.is_some() {
@@ -40,6 +40,19 @@ impl ProofDatabase for ProofDb {
 
     fn get_proof(&self, proof_id: ProofId) -> DbResult<Option<Proof>> {
         Ok(self.db.get::<ProofSchema>(&proof_id)?)
+    }
+
+    fn del_proof(&self, proof_id: ProofId) -> DbResult<bool> {
+        self.db
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
+                if tx.get::<ProofSchema>(&proof_id)?.is_none() {
+                    return Ok(false);
+                }
+                tx.delete::<ProofSchema>(&proof_id)?;
+
+                Ok::<_, anyhow::Error>(true)
+            })
+            .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 }
 
@@ -83,7 +96,7 @@ mod tests {
 
         let (proof_id, proof) = generate_proof();
 
-        let result = db.insert_proof(proof_id, proof.clone());
+        let result = db.put_proof(proof_id, proof.clone());
         assert!(result.is_ok(), "Proof should be inserted successfully");
 
         let stored_proof = db.get_proof(proof_id).unwrap();
@@ -96,9 +109,9 @@ mod tests {
 
         let (proof_id, proof) = generate_proof();
 
-        db.insert_proof(proof_id, proof.clone()).unwrap();
+        db.put_proof(proof_id, proof.clone()).unwrap();
 
-        let result = db.insert_proof(proof_id, proof);
+        let result = db.put_proof(proof_id, proof);
         assert!(result.is_err(), "Duplicate proof insertion should fail");
     }
 
@@ -106,7 +119,14 @@ mod tests {
     fn test_get_nonexistent_proof() {
         let db = setup_db();
 
-        let proof_id = ProofId::BtcBlockspace(999);
+        let (proof_id, proof) = generate_proof();
+        db.put_proof(proof_id, proof.clone()).unwrap();
+
+        let res = db.del_proof(proof_id);
+        assert!(matches!(res, Ok(true)));
+
+        let res = db.del_proof(proof_id);
+        assert!(matches!(res, Ok(false)));
 
         let stored_proof = db.get_proof(proof_id).unwrap();
         assert_eq!(stored_proof, None, "Nonexistent proof should return None");
