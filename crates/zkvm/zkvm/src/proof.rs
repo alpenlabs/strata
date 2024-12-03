@@ -6,7 +6,16 @@ use serde::{Deserialize, Serialize};
 ///
 /// Provides common utilities such as byte access and emptiness checks.
 #[derive(
-    Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    BorshSerialize,
+    BorshDeserialize,
+    PartialEq,
+    Eq,
+    Arbitrary,
+    Default,
 )]
 pub struct ByteWrapper(Vec<u8>);
 
