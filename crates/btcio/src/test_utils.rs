@@ -214,9 +214,8 @@ impl Signer for TestBitcoinClient {
 pub fn generate_inscription_script_test(
     inscription_data: Vec<InscriptionBlob>,
     rollup_name: &str,
-    version: u8,
 ) -> anyhow::Result<ScriptBuf> {
-    generate_inscription_script(&inscription_data, rollup_name, version)
+    generate_inscription_script(&inscription_data, rollup_name)
 }
 
 pub fn build_reveal_transaction_test(

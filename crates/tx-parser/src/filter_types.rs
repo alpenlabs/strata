@@ -5,6 +5,7 @@ use strata_primitives::{
     params::{DepositTxParams, RollupParams},
     sorted_vec::SortedVec,
 };
+use strata_state::batch::SignedBatchCheckpoint;
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 
@@ -53,4 +54,9 @@ impl TxFilterConfig {
             deposit_config,
         })
     }
+}
+
+pub(crate) enum FilteredInscriptionType {
+    Checkpoint(SignedBatchCheckpoint),
+    DA(Vec<u8>)
 }
