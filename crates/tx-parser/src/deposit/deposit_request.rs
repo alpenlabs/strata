@@ -71,10 +71,7 @@ pub fn parse_deposit_request_script(
     // data has expected magic bytes
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
-    let actual_magic_bytes = &data[..magic_len];
-    if data.len() < magic_len || actual_magic_bytes != magic_bytes {
-        //debug!(expected_magic_bytes = ?magic_bytes, ?actual_magic_bytes, "mismatched magic
-        // bytes");
+    if data.len() < magic_len || &data[..magic_len] != magic_bytes {
         return Err(DepositParseError::MagicBytesMismatch);
     }
 
