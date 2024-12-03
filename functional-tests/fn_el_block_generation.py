@@ -1,4 +1,6 @@
+import logging
 from functools import partial
+from pathlib import Path
 
 import flexitest
 
@@ -10,6 +12,7 @@ from utils import wait_until_with_value
 class ElBlockGenerationTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(1000))
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")

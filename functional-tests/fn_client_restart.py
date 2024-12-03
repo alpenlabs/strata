@@ -1,3 +1,6 @@
+import logging
+from pathlib import Path
+
 import flexitest
 
 import net_settings
@@ -18,10 +21,10 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()))
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
-
         seqrpc = seq.create_rpc()
 
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
@@ -29,7 +32,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         # Check for first 2 checkpoints
         for n in range(2):
             check_nth_checkpoint_finalized(n, seqrpc)
-            print(f"Pass checkpoint finalization for checkpoint {n}")
+            self.logger.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         # Stop sequencer
         seq.stop()
@@ -43,7 +46,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         # Check for next 2 checkpoints
         for n in range(2, 4):
             check_nth_checkpoint_finalized(n, seqrpc)
-            print(f"Pass checkpoint finalization for checkpoint {n}")
+            self.logger.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)
 

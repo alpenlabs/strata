@@ -1,8 +1,11 @@
+import logging
+from pathlib import Path
+
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from utils import broadcast_tx, get_logger, wait_until
+from utils import broadcast_tx, wait_until
 
 
 @flexitest.register
@@ -13,7 +16,7 @@ class BridgeDutiesTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = get_logger("getBridgeDuties")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

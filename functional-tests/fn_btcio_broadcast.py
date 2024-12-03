@@ -1,13 +1,17 @@
-import time
+import logging
+from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
+
+from utils import wait_until_with_value
 
 
 @flexitest.register
 class BroadcastTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
@@ -28,27 +32,23 @@ class BroadcastTest(flexitest.Test):
         raw_tx = btcrpc.proxy.createrawtransaction(inputs, dest)
 
         signed_tx = btcrpc.proxy.signrawtransactionwithwallet(raw_tx)["hex"]
-        print("Signed Tx", signed_tx)
+        self.logger.debug(f"Signed Tx {signed_tx}")
 
         txid = seqrpc.strataadmin_broadcastRawTx(signed_tx)
-        print("Rpc returned txid", txid)
+        self.logger.debug(f"Rpc returned txid {txid}")
 
-        # Now poll for the tx in chain
-        tx_published = False
-        for _ in range(10):
-            time.sleep(1)
-            try:
-                _ = btcrpc.gettransaction(txid)
-                print("Found expected tx in mempool")
-                tx_published = True
-                break
-            except Exception as e:
-                print(e)
-        assert tx_published, "Tx was not published"
+        wait_until_with_value(
+            lambda: btcrpc.gettransaction(txid),
+            predicate=lambda v: v is not None,
+            error_with="Tx was not published",
+            timeout=10,
+        )
 
-        # Also check from rpc, wait for a while
-        time.sleep(1)
-        st = seqrpc.strata_getTxStatus(txid)
-        assert st["status"] in ("Confirmed", "Finalized")
-
+        # Also check from strata rpc
+        wait_until_with_value(
+            lambda: seqrpc.strata_getTxStatus(txid),
+            predicate=lambda v: v["status"] in ("Confirmed", "Finalized"),
+            error_with="Tx was not identified by strata",
+            timeout=3,
+        )
         return True

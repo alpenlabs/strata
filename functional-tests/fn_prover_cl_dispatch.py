@@ -1,4 +1,6 @@
+import logging
 import time
+from pathlib import Path
 
 import flexitest
 
@@ -9,6 +11,7 @@ from utils import wait_for_proof_with_time_out
 class ProverClientTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         prover_client = ctx.get_service("prover_client")
@@ -19,7 +22,7 @@ class ProverClientTest(flexitest.Test):
 
         # Dispatch the prover task
         task_id = prover_client_rpc.dev_strata_proveCLBlock(1)
-        print("got the task id: {}", task_id)
+        self.logger.debug(f"got the task id: {task_id}")
         assert task_id is not None
 
         time_out = 10 * 60
