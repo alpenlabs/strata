@@ -31,7 +31,7 @@ pub trait ZkVmProver {
         let receipt = host.prove(zkvm_input, Self::proof_type())?;
 
         // Process output to see if we are getting the expected output.
-        let _ = Self::process_output::<H>(&receipt.public_values)?;
+        let _ = Self::process_output::<H>(receipt.public_values())?;
 
         Ok(receipt)
     }

@@ -61,10 +61,7 @@ impl ZkVmHost for Risc0Host {
         let proof = Proof::new(bincode::serialize(&proof_info.receipt.inner)?);
         let public_values = PublicValues::new(proof_info.receipt.journal.bytes);
 
-        Ok(ProofReceipt {
-            proof,
-            public_values,
-        })
+        Ok(ProofReceipt::new(proof, public_values))
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
@@ -83,8 +80,8 @@ impl ZkVmHost for Risc0Host {
     }
 
     fn verify(&self, proof: &ProofReceipt) -> ZkVmResult<()> {
-        let journal = proof.public_values.as_bytes().to_vec();
-        let inner: InnerReceipt = bincode::deserialize(proof.proof.as_bytes())?;
+        let journal = proof.public_values().as_bytes().to_vec();
+        let inner: InnerReceipt = bincode::deserialize(proof.proof().as_bytes())?;
         let receipt = Receipt::new(inner, journal);
         receipt
             .verify(self.id)
@@ -133,7 +130,7 @@ mod tests {
         host.verify(&proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = Risc0Host::extract_serde_public_output(&proof.public_values)
+        let out: u32 = Risc0Host::extract_serde_public_output(proof.public_values())
             .expect("Failed to extract public outputs");
         assert_eq!(input, out)
     }
@@ -157,7 +154,7 @@ mod tests {
         zkvm.verify(&proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = Risc0Host::extract_serde_public_output(&proof.public_values).expect(
+        let out: u32 = Risc0Host::extract_serde_public_output(proof.public_values()).expect(
             "Failed to extract public
 outputs",
         );

@@ -85,10 +85,7 @@ impl ZkVmHost for SP1Host {
         let proof = Proof::new(bincode::serialize(&proof_info.proof)?);
         let public_values = PublicValues::new(proof_info.public_values.to_vec());
 
-        Ok(ProofReceipt {
-            proof,
-            public_values,
-        })
+        Ok(ProofReceipt::new(proof, public_values))
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
@@ -109,8 +106,8 @@ impl ZkVmHost for SP1Host {
         {
             std::env::set_var("SP1_PROVER", "mock");
         }
-        let public_values = SP1PublicValues::from(proof.public_values.as_bytes());
-        let proof: SP1Proof = bincode::deserialize(proof.proof.as_bytes())?;
+        let public_values = SP1PublicValues::from(proof.public_values().as_bytes());
+        let proof: SP1Proof = bincode::deserialize(proof.proof().as_bytes())?;
         let sp1_version = sp1_sdk::SP1_CIRCUIT_VERSION.to_string();
         let proof_with_public_values = SP1ProofWithPublicValues {
             proof,

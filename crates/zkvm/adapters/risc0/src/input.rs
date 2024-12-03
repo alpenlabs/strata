@@ -40,8 +40,8 @@ impl<'a> ZkVmInputBuilder<'a> for Risc0ProofInputBuilder<'a> {
 
     fn write_proof(&mut self, item: &AggregationInput) -> ZkVmResult<&mut Self> {
         // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
-        let journal = item.receipt().public_values.as_bytes().to_vec();
-        let inner: InnerReceipt = bincode::deserialize(item.receipt().public_values.as_bytes())?;
+        let journal = item.receipt().public_values().as_bytes().to_vec();
+        let inner: InnerReceipt = bincode::deserialize(item.receipt().public_values().as_bytes())?;
         let vk: Digest = item
             .vk()
             .as_bytes()

@@ -119,7 +119,7 @@ async fn check_and_submit_proof(
         if proving_task.status == ProvingTaskStatus::Completed {
             match &proving_task.proof {
                 Some(proof) => {
-                    let proof_bytes = HexBytes::from(proof.receipt().proof.as_bytes());
+                    let proof_bytes = HexBytes::from(proof.receipt().proof().as_bytes());
                     info!(
                         "Sending checkpoint proof: {:?} ckp id: {:?} to the sequencer",
                         current_task_id, current_idx
