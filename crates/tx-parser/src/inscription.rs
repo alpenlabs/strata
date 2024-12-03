@@ -3,7 +3,7 @@ use bitcoin::{
     script::{Instruction, Instructions},
     ScriptBuf,
 };
-use strata_state::tx::InscriptionData;
+use strata_state::tx::InscriptionBlob;
 use thiserror::Error;
 use tracing::debug;
 
@@ -49,7 +49,7 @@ pub enum InscriptionParseError {
 pub fn parse_inscription_data(
     script: &ScriptBuf,
     rollup_name: &str,
-) -> Result<InscriptionData, InscriptionParseError> {
+) -> Result<InscriptionBlob, InscriptionParseError> {
     let mut instructions = script.instructions();
 
     enter_envelope(&mut instructions)?;
@@ -80,7 +80,8 @@ pub fn parse_inscription_data(
     match (tag, size) {
         (BATCH_DATA_TAG, Some(size)) => {
             let batch_data = extract_n_bytes(size, &mut instructions)?;
-            Ok(InscriptionData::new(batch_data))
+            // DA for now but this should be based on the TAG on the script itself
+            Ok(InscriptionBlob::new(strata_state::tx::BlobType::DA,batch_data))
         }
         (BATCH_DATA_TAG, None) => Err(InscriptionParseError::InvalidBlob),
         _ => Err(InscriptionParseError::InvalidBlobTag),
@@ -148,13 +149,14 @@ fn extract_n_bytes(
 mod tests {
 
     use strata_btcio::test_utils::generate_inscription_script_test;
+    use strata_state::tx::BlobType;
 
     use super::*;
 
     #[test]
     fn test_parse_inscription_data() {
         let bytes = vec![0, 1, 2, 3];
-        let inscription_data = InscriptionData::new(bytes.clone());
+        let inscription_data = vec![InscriptionBlob::new(BlobType::DA,bytes.clone())];
         let script =
             generate_inscription_script_test(inscription_data.clone(), "TestRollup", 1).unwrap();
 
@@ -162,11 +164,12 @@ mod tests {
         let result = parse_inscription_data(&script, "TestRollup").unwrap();
 
         // Assert the rollup name was parsed correctly
-        assert_eq!(result, inscription_data);
+        // ASH
+        assert_eq!(result, inscription_data[0]);
 
         // Try with larger size
         let bytes = vec![1; 2000];
-        let inscription_data = InscriptionData::new(bytes.clone());
+        let inscription_data = vec![InscriptionBlob::new(BlobType::DA,bytes.clone())];
         let script =
             generate_inscription_script_test(inscription_data.clone(), "TestRollup", 1).unwrap();
 
@@ -174,6 +177,7 @@ mod tests {
         let result = parse_inscription_data(&script, "TestRollup").unwrap();
 
         // Assert the rollup name was parsed correctly
-        assert_eq!(result, inscription_data);
+        // ASH
+        assert_eq!(result, inscription_data[0]);
     }
 }

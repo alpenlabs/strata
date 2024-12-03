@@ -72,7 +72,7 @@ fn parse_inscription_checkpoints<'a>(
             .and_then(|scr| {
                 parse_inscription_data(&scr.into(), &filter_conf.rollup_name.clone()).ok()
             })
-            .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.batch_data()).ok())
+            .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.data()).ok())
     })
 }
 
@@ -98,7 +98,7 @@ mod test {
     use strata_primitives::l1::BitcoinAmount;
     use strata_state::{
         batch::SignedBatchCheckpoint,
-        tx::{InscriptionData, ProtocolOperation},
+        tx::{BlobType, InscriptionBlob, ProtocolOperation},
     };
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
@@ -166,7 +166,7 @@ mod test {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
         let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
-        let inscription_data = InscriptionData::new(borsh::to_vec(&signed_checkpoint).unwrap());
+        let inscription_data = vec![InscriptionBlob::new(BlobType::DA, borsh::to_vec(&signed_checkpoint).unwrap())];
 
         let script = generate_inscription_script_test(inscription_data, &rollup_name, 1).unwrap();
 

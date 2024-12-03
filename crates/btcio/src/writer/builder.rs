@@ -25,7 +25,7 @@ use bitcoin::{
     Witness,
 };
 use rand::{rngs::OsRng, RngCore};
-use strata_state::tx::InscriptionData;
+use strata_state::tx::InscriptionBlob;
 use strata_tx_parser::inscription::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
 use thiserror::Error;
 use tracing::trace;
@@ -59,7 +59,7 @@ pub enum InscriptionError {
 // dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
 // dependency doesn't happen
 pub async fn build_inscription_txs(
-    payload: &[u8],
+    inscription_data: &[InscriptionBlob],
     rpc_client: &Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
@@ -72,7 +72,7 @@ pub async fn build_inscription_txs(
     };
     create_inscription_transactions(
         &config.rollup_name,
-        payload,
+        inscription_data,
         utxos,
         config.sequencer_address.clone(),
         config.amount_for_reveal_txn,
@@ -85,7 +85,7 @@ pub async fn build_inscription_txs(
 #[allow(clippy::too_many_arguments)]
 pub fn create_inscription_transactions(
     rollup_name: &str,
-    write_intent: &[u8],
+    inscription_data: &[InscriptionBlob],
     utxos: Vec<ListUnspent>,
     recipient: Address,
     reveal_value: u64,
@@ -96,11 +96,9 @@ pub fn create_inscription_transactions(
     let key_pair = generate_key_pair()?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
-    let insc_data = InscriptionData::new(write_intent.to_vec());
-
     // Start creating inscription content
     let reveal_script =
-        build_reveal_script(rollup_name, &public_key, insc_data, INSCRIPTION_VERSION)?;
+        build_reveal_script(rollup_name, &public_key, inscription_data, INSCRIPTION_VERSION)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -401,7 +399,7 @@ pub fn generate_key_pair() -> Result<UntweakedKeypair, anyhow::Error> {
 fn build_reveal_script(
     rollup_name: &str,
     taproot_public_key: &XOnlyPublicKey,
-    insc_data: InscriptionData,
+    insc_data: &[InscriptionBlob],
     version: u8,
 ) -> Result<ScriptBuf, anyhow::Error> {
     let mut script_bytes = script::Builder::new()
@@ -494,10 +492,11 @@ fn assert_correct_address(
 
 // Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
 pub fn generate_inscription_script(
-    inscription_data: InscriptionData,
+    inscription_data: &[InscriptionBlob],
     rollup_name: &str,
     version: u8,
 ) -> anyhow::Result<ScriptBuf> {
+    let inscription_data = inscription_data[0].clone();
     let mut builder = script::Builder::new()
         .push_opcode(OP_FALSE)
         .push_opcode(OP_IF)
@@ -506,10 +505,10 @@ pub fn generate_inscription_script(
         .push_slice(PushBytesBuf::try_from(VERSION_TAG.to_vec())?)
         .push_slice(PushBytesBuf::from([version]))
         .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
-        .push_int(inscription_data.batch_data().len() as i64);
+        .push_int(inscription_data.data().len() as i64);
 
-    trace!(batchdata_size = %inscription_data.batch_data().len(), "Inserting batch data");
-    for chunk in inscription_data.batch_data().chunks(520) {
+    trace!(batchdata_size = %inscription_data.data().len(), "Inserting batch data");
+    for chunk in inscription_data.data().chunks(520) {
         trace!(size=%chunk.len(), "inserting chunk");
         builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
     }
@@ -527,6 +526,7 @@ mod tests {
         taproot::ControlBlock, Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn,
         TxOut, Witness,
     };
+    use strata_state::tx::BlobType;
 
     use super::*;
     use crate::{rpc::types::ListUnspent, writer::builder::InscriptionError};
@@ -723,7 +723,7 @@ mod tests {
     fn test_create_inscription_transactions() {
         let (rollup_name, _, _, _, address, utxos) = get_mock_data();
 
-        let write_intent = vec![0u8; 100];
+        let write_intent = [InscriptionBlob::new(BlobType::DA, vec![0u8;100])];
         let (commit, reveal) = super::create_inscription_transactions(
             rollup_name,
             &write_intent,

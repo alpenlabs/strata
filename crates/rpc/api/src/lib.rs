@@ -135,7 +135,7 @@ pub trait StrataAdminApi {
 pub trait StrataSequencerApi {
     /// Adds L1Write sequencer duty which will be executed by sequencer
     #[method(name = "strataadmin_submitDABlob")]
-    async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
+    async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()>;
 
     /// Verifies and adds the submitted proof to the checkpoint database
     #[method(name = "strataadmin_submitCheckpointProof")]

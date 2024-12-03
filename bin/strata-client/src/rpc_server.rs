@@ -22,7 +22,6 @@ use strata_db::{
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
-    hash,
     params::Params,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
@@ -31,6 +30,7 @@ use strata_rpc_types::{
     RpcBridgeDuties, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcExecUpdate,
     RpcL1Status, RpcSyncStatus,
 };
+use strata_state::{da_blob::BlobCommitment, tx::BlobType};
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
     batch::BatchCheckpoint,
@@ -42,7 +42,7 @@ use strata_state::{
     id::L2BlockId,
     l1::L1BlockId,
     operation::ClientUpdateOutput,
-    sync_event::SyncEvent,
+    sync_event::SyncEvent, tx::InscriptionBlob,
 };
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
@@ -281,7 +281,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
                     .iter()
                     .map(|blob| DaBlob {
                         dest: blob.dest().into(),
-                        blob_commitment: *blob.commitment().as_ref(),
+                        blob_commitment: *blob.commitment().into_inner().as_ref(),
                     })
                     .collect();
 
@@ -660,9 +660,13 @@ impl SequencerServerImpl {
 
 #[async_trait]
 impl StrataSequencerApiServer for SequencerServerImpl {
-    async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
-        let commitment = hash::raw(&blob.0);
-        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
+    async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()> {
+        let blob_vec: Vec<InscriptionBlob> = blobs
+            .into_iter()
+            .map(|blob| InscriptionBlob::new(BlobType::DA, blob.into_inner()))
+            .collect();
+        let blob_commitment = BlobCommitment::from_payload(&blob_vec);
+        let blobintent = BlobIntent::new(BlobDest::L1, blob_commitment, blob_vec);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
         if let Err(e) = self

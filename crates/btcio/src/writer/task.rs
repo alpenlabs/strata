@@ -30,47 +30,47 @@ impl InscriptionHandle {
 
     pub fn submit_intent(&self, intent: BlobIntent) -> anyhow::Result<()> {
         if intent.dest() != BlobDest::L1 {
-            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
+            warn!(commitment = ?intent.commitment(), "Received intent not meant for L1");
             return Ok(());
         }
 
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
-        debug!(commitment = %intent.commitment(), "Received intent");
+        debug!(commitment = ?intent.commitment(), "Received intent");
         if self
             .ops
-            .get_blob_entry_blocking(*intent.commitment())?
+            .get_blob_entry_blocking(intent.commitment().into_inner())?
             .is_some()
         {
-            warn!(commitment = %intent.commitment(), "Received duplicate intent");
+            warn!(commitment = ?intent.commitment(), "Received duplicate intent");
             return Ok(());
         }
 
         Ok(self
             .ops
-            .put_blob_entry_blocking(*intent.commitment(), entry)?)
+            .put_blob_entry_blocking(intent.commitment().into_inner(), entry)?)
     }
 
     pub async fn submit_intent_async(&self, intent: BlobIntent) -> anyhow::Result<()> {
         if intent.dest() != BlobDest::L1 {
-            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
+            warn!(commitment = ?intent.commitment(), "Received intent not meant for L1");
             return Ok(());
         }
 
         let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
-        debug!(commitment = %intent.commitment(), "Received intent");
+        debug!(commitment = ?intent.commitment(), "Received intent");
 
         if self
             .ops
-            .get_blob_entry_async(*intent.commitment())
+            .get_blob_entry_async(intent.commitment().into_inner())
             .await?
             .is_some()
         {
-            warn!(commitment = %intent.commitment(), "Received duplicate intent");
+            warn!(commitment = ?intent.commitment(), "Received duplicate intent");
             return Ok(());
         }
         Ok(self
             .ops
-            .put_blob_entry_async(*intent.commitment(), entry)
+            .put_blob_entry_async(intent.commitment().into_inner(), entry)
             .await?)
     }
 }

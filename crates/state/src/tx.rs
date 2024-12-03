@@ -42,17 +42,30 @@ pub struct DepositRequestInfo {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct InscriptionData {
+pub struct InscriptionBlob {
+    /// what kind of inscription it is for tagging purpose
+    data_type: BlobType,
     /// payload present in inscription transaction (either batchTx or checkpointTx)
-    batch_data: Vec<u8>,
+    data: Vec<u8>,
 }
 
-impl InscriptionData {
-    pub fn new(batch_data: Vec<u8>) -> Self {
-        Self { batch_data }
+#[derive(Copy, Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum BlobType {
+    Checkpoint,
+    DA,
+    Batch
+}
+
+impl InscriptionBlob {
+    pub fn new(data_type: BlobType, data: Vec<u8>) -> Self {
+        Self { data_type, data }
     }
 
-    pub fn batch_data(&self) -> &[u8] {
-        &self.batch_data
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub fn data_type(&self) -> BlobType {
+        self.data_type
     }
 }
