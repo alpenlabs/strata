@@ -14,7 +14,9 @@ pub enum ProtocolOperation {
     DepositRequest(DepositRequestInfo),
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
-    // TODO: add other kinds like Proofs and statediffs
+    /// DA data
+    DA(Vec<u8>)
+    // TODO: add other kinds like statediffs
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -50,10 +52,20 @@ pub struct InscriptionBlob {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[borsh(use_discriminant=true)]
 pub enum BlobType {
-    Checkpoint,
-    DA,
-    Batch
+    Checkpoint = 0,
+    DA = 1,
+}
+
+impl BlobType {
+    pub fn from_u32(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::Checkpoint),
+            1 => Some(Self::DA),
+            _ => None
+        }
+    }
 }
 
 impl InscriptionBlob {
