@@ -4,9 +4,10 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
+from constants import DEFAULT_ROLLUP_PARAMS
 from envs import testenv
 from envs.testenv import BasicEnvConfig
-from utils import get_bridge_pubkey
+from utils import *
 
 
 @flexitest.register
@@ -56,8 +57,8 @@ class BridgeDepositHappyTest(testenv.StrataTester):
         seq = ctx.get_service("sequencer")
         btcrpc: BitcoindClient = btc.create_rpc()
         btc_url = btcrpc.base_url
-        btc_user = btc.props["rpc_user"]
-        btc_password = btc.props["rpc_password"]
+        btc_user = btc.get_prop("rpc_user")
+        btc_password = btc.get_prop("rpc_password")
         seq_addr = seq.get_prop("address")
 
         # Create the deposit request transaction
@@ -80,7 +81,10 @@ class BridgeDepositHappyTest(testenv.StrataTester):
 
         # time to mature DT
         btcrpc.proxy.generatetoaddress(6, seq_addr)
-        time.sleep(3)
+
+        # time for the deposit inclusion
+        timeout = 70 # TODO needs to be until the end of the epoch
+        wait_until_checkpoint(seq.create_rpc(), timeout)
 
     def drain_wallet(self, ctx: flexitest.RunContext):
         """
@@ -90,8 +94,8 @@ class BridgeDepositHappyTest(testenv.StrataTester):
         seq = ctx.get_service("sequencer")
         btcrpc: BitcoindClient = btc.create_rpc()
         btc_url = btcrpc.base_url
-        btc_user = btc.props["rpc_user"]
-        btc_password = btc.props["rpc_password"]
+        btc_user = btc.get_prop("rpc_user")
+        btc_password = btc.get_prop("rpc_password")
         seq_addr = seq.get_prop("address")
 
         tx = bytes(drain_wallet(seq_addr, btc_url, btc_user, btc_password)).hex()
@@ -123,8 +127,8 @@ class BridgeDepositHappyTest(testenv.StrataTester):
         rethrpc = reth.create_rpc()
 
         btc_url = btcrpc.base_url
-        btc_user = btc.props["rpc_user"]
-        btc_password = btc.props["rpc_password"]
+        btc_user = btc.get_prop("rpc_user")
+        btc_password = btc.get_prop("rpc_password")
 
         self.debug(f"BTC URL: {btc_url}")
         self.debug(f"BTC user: {btc_user}")
