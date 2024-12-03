@@ -11,7 +11,7 @@ use strata_primitives::{
     block_credential,
     operator::OperatorPubkeys,
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
-    vk::RollupVerifyingKey,
+    proof::RollupVerifyingKey,
 };
 use tracing::debug;
 use uuid::Uuid;
