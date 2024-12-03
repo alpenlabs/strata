@@ -2156,24 +2156,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitcoind"
-version = "0.36.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ee5cf6a9903ff9cc808494c1232b0e9f6eef6600913d0d69fe1cb5c428f25b9"
-dependencies = [
- "anyhow",
- "bitcoin_hashes 0.14.0",
- "bitcoincore-rpc",
- "flate2",
- "log",
- "minreq",
- "tar",
- "tempfile",
- "which",
- "zip",
-]
-
-[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3013,6 +2995,51 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b49ba7ef1ad6107f8824dbe97de947cbaac53c44e7f9756a1fba0d37c1eec505"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "corepc-client"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b926446a90cd329b8ce85ea40d74e1961d0ad42ea0bc0708a82e5ca843fe631d"
+dependencies = [
+ "bitcoin",
+ "corepc-types",
+ "jsonrpc",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "corepc-node"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d73264e3fa9857a43c8c51dba528646c355773617924f0b9e821d078f11a6fb"
+dependencies = [
+ "anyhow",
+ "bitcoin_hashes 0.14.0",
+ "corepc-client",
+ "flate2",
+ "log",
+ "minreq",
+ "serde_json",
+ "tar",
+ "tempfile",
+ "which",
+ "zip",
+]
+
+[[package]]
+name = "corepc-types"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7efadd36b3035cb5dda5c8346d6314a16507b4d26269a553733d12b5bbf9b31"
+dependencies = [
+ "bitcoin",
+ "bitcoin-internals",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -5587,8 +5614,8 @@ name = "integration-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bitcoin",
- "bitcoind",
+ "bitcoincore-rpc",
+ "corepc-node",
  "strata-bridge-sig-manager",
  "strata-bridge-tx-builder",
  "strata-common",
@@ -12725,8 +12752,8 @@ dependencies = [
  "argh",
  "async-trait",
  "bitcoin",
- "bitcoind",
  "chrono",
+ "corepc-node",
  "directories",
  "jsonrpsee",
  "miniscript",
@@ -12835,9 +12862,9 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "bitcoin",
- "bitcoind",
  "borsh",
  "bytes",
+ "corepc-node",
  "hex",
  "mockall",
  "musig2",
@@ -13324,7 +13351,7 @@ dependencies = [
  "anyhow",
  "bdk_bitcoind_rpc",
  "bdk_wallet",
- "bitcoind",
+ "corepc-node",
  "musig2",
  "pyo3",
  "pyo3-build-config",
