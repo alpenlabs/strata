@@ -5,12 +5,13 @@ use std::sync::Arc;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
-use strata_primitives::{l1::*, prelude::*};
+use strata_primitives::{l1::*, prelude::*, proof::ProofId};
 use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
     sync_event::SyncEvent,
 };
+use strata_zkvm::Proof;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
@@ -271,26 +272,15 @@ pub trait ProverDatabase {
 }
 
 pub trait ProverTaskDatabase {
-    /// Adds a new txentry to database
-    fn insert_new_task_entry(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<u64>;
+    /// Inserts a proof into the database.
+    ///
+    /// Returns `Ok(())` on success, or an error on failure.
+    fn insert_proof(&self, proof_id: ProofId, proof: Proof) -> DbResult<()>;
 
-    /// Updates an existing txentry
-    fn update_task_entry_by_id(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<()>;
-
-    /// Updates an existing txentry
-    fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
-
-    /// Fetch [`Vec<u8>`] from db
-    fn get_task_entry_by_id(&self, txid: [u8; 16]) -> DbResult<Option<Vec<u8>>>;
-
-    /// Get next index to be inserted to
-    fn get_next_task_idx(&self) -> DbResult<u64>;
-
-    /// Get transaction id for index
-    fn get_taskid(&self, idx: u64) -> DbResult<Option<[u8; 16]>>;
-
-    /// get txentry by idx
-    fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>>;
+    /// Retrieves a proof by its ID.
+    ///
+    /// Returns `Some(proof)` if found, or `None` if not.
+    fn get_proof(&self, proof_id: ProofId) -> DbResult<Option<Proof>>;
 }
 
 pub trait BroadcastDatabase {
