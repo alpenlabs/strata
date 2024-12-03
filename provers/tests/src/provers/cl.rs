@@ -1,9 +1,6 @@
-use strata_proofimpl_cl_stf::{
-    prover::{ClStfInput, ClStfProver},
-    L2BatchProofOutput,
-};
+use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
 
 use super::{el::ElProofGenerator, ProofGenerator};
 
@@ -24,7 +21,7 @@ impl<H: ZkVmHost> ClProofGenerator<H> {
 impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
     fn get_input(&self, block_num: &u64) -> ZkVmResult<ClStfInput> {
         // Generate EL proof required for aggregation
-        let (el_proof, _) = self.el_proof_generator.get_proof(block_num)?;
+        let el_proof = self.el_proof_generator.get_proof(block_num)?;
 
         // Read CL witness data
         let params = gen_params();
@@ -43,7 +40,7 @@ impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
         })
     }
 
-    fn gen_proof(&self, block_num: &u64) -> ZkVmResult<(Proof, L2BatchProofOutput)> {
+    fn gen_proof(&self, block_num: &u64) -> ZkVmResult<ProofReceipt> {
         let host = self.get_host();
         let input = self.get_input(block_num)?;
         ClStfProver::prove(&input, &host)

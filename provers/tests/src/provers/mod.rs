@@ -1,9 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use strata_zkvm::{
-    Proof, ProofReceipt, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult,
-};
+use strata_zkvm::{ProofReceipt, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult};
 
 pub mod btc;
 mod checkpoint;
