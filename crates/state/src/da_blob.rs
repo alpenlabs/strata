@@ -1,11 +1,14 @@
-//! Types relating to blobs.
+//! Types relating to payloads. These payloads get on a certain settlement layer.
 //!
-//! These types don't care about the *purpose* of the blobs, we only care about what's in them.
+//! These types don't care about the *purpose* of the payloads, but tracks the type and the data
+//! inside it.
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, hash};
+
+use crate::tx::EnvelopePayload;
 
 /// DA destination identifier.   This will eventually be used to enable
 /// storing blobs on alternative availability schemes.
@@ -25,7 +28,7 @@ use strata_primitives::buf::Buf32;
 )]
 #[borsh(use_discriminant = true)]
 #[repr(u8)]
-pub enum BlobDest {
+pub enum DataBundleDest {
     /// If we expect the DA to be on the L1 chain that we settle to.  This is
     /// always the strongest DA layer we have access to.
     L1 = 0,
@@ -33,33 +36,39 @@ pub enum BlobDest {
 
 /// Manual `Arbitrary` impl so that we always generate L1 DA if we add future
 /// ones that would work in totally different ways.
-impl<'a> Arbitrary<'a> for BlobDest {
+impl<'a> Arbitrary<'a> for DataBundleDest {
     fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::L1)
     }
 }
 
-/// Summary of a DA blob to be included on a DA layer.  Specifies the target and
-/// a commitment to the blob.
+/// Summary of a payload to be included on some settlement layer. Specifies the target and
+/// a commitment to the payload.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct BlobSpec {
+pub struct PayloadSpec {
     /// Target settlement layer we're expecting the DA on.
-    dest: BlobDest,
+    dest: DataBundleDest,
 
-    /// Commitment to the blob (probably just a hash or a
+    /// Commitment to the payload (probably just a hash or a
     /// merkle root) that we expect to see committed to DA.
-    blob_commitment: Buf32,
+    payload_commitment: PayloadCommitment,
 }
 
-impl BlobSpec {
-    /// The target we expect the DA blob to be stored on.
-    pub fn dest(&self) -> BlobDest {
+impl PayloadSpec {
+    pub fn new(dest: DataBundleDest, payload_commitment: PayloadCommitment) -> Self {
+        Self {
+            dest,
+            payload_commitment,
+        }
+    }
+    /// The settlement layer, we expect the payload to be stored on.
+    pub fn dest(&self) -> DataBundleDest {
         self.dest
     }
 
-    /// Commitment to the blob payload.
-    pub fn commitment(&self) -> &Buf32 {
-        &self.blob_commitment
+    /// Hash Commitment of the Payload
+    pub fn commitment(&self) -> &PayloadCommitment {
+        &self.payload_commitment
     }
 }
 
@@ -69,49 +78,61 @@ impl BlobSpec {
 ///
 /// These are never stored on-chain.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct BlobIntent {
-    /// The destination for this blob.
-    dest: BlobDest,
-
-    /// Commitment to the blob payload.
-    commitment: Buf32,
-
-    /// Blob payload.
-    payload: Vec<u8>,
+pub struct PayloadIntent {
+    /// Summary of the payload to be included in DA layer. contains destination and commitment
+    spec: PayloadSpec,
+    /// Envelope payload.
+    payload: EnvelopePayload,
 }
 
-impl BlobIntent {
-    pub fn new(dest: BlobDest, commitment: Buf32, payload: Vec<u8>) -> Self {
+impl PayloadIntent {
+    pub fn new(
+        dest: DataBundleDest,
+        commitment: PayloadCommitment,
+        payload: EnvelopePayload,
+    ) -> Self {
         Self {
-            dest,
-            commitment,
+            spec: PayloadSpec::new(dest, commitment),
             payload,
         }
     }
 
-    /// The target we expect the DA blob to be stored on.
-    pub fn dest(&self) -> BlobDest {
-        self.dest
+    /// The target we expect the payload to be stored on.
+    pub fn dest(&self) -> DataBundleDest {
+        self.spec.dest()
     }
 
-    /// Commitment to the blob payload, which might be context-specific.  This
+    /// Commitment to the payload, which might be context-specific. This
     /// is conceptually unrelated to the blob ID that we use for tracking which
     /// blobs we've written in the L1 writer bookkeeping.
-    pub fn commitment(&self) -> &Buf32 {
-        &self.commitment
+    pub fn commitment(&self) -> &PayloadCommitment {
+        self.spec.commitment()
     }
 
-    /// The blob payload that matches the commitment.
-    pub fn payload(&self) -> &[u8] {
+    /// Payload relating to the intent. The commitment for this is stored in PayloadSpec
+    pub fn payload(&self) -> &EnvelopePayload {
         &self.payload
     }
 
-    /// Generates the spec from the relevant parts of the blob intent that
-    /// uniquely refers to the blob data.
-    pub fn to_spec(&self) -> BlobSpec {
-        BlobSpec {
-            dest: self.dest,
-            blob_commitment: self.commitment,
-        }
+    /// spec of the payload data. Contains settlement layer and its commitment hash
+    pub fn spec(&self) -> PayloadSpec {
+        self.spec
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct PayloadCommitment(Buf32);
+
+impl PayloadCommitment {
+    pub fn new(commitment: &Buf32) -> Self {
+        Self(*commitment)
+    }
+
+    pub fn from_slice(payload: &[u8]) -> Self {
+        Self::new(&hash::raw(payload))
+    }
+
+    pub fn into_inner(&self) -> Buf32 {
+        self.0
     }
 }

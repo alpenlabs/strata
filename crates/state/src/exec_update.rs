@@ -121,7 +121,7 @@ pub struct UpdateOutput {
     /// DA blobs that we expect to see on L1.  This may be empty, probably is
     /// only set near the end of the range of blocks in a batch since we only
     /// assert these in a per-batch frequency.
-    da_blobs: Vec<da_blob::BlobSpec>,
+    da_blobs: Vec<da_blob::PayloadSpec>,
 }
 
 impl UpdateOutput {
@@ -146,7 +146,7 @@ impl UpdateOutput {
         &self.withdrawals
     }
 
-    pub fn da_blobs(&self) -> &[da_blob::BlobSpec] {
+    pub fn da_blobs(&self) -> &[da_blob::PayloadSpec] {
         &self.da_blobs
     }
 }

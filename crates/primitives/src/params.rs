@@ -1,5 +1,6 @@
 //! Global consensus parameters for the rollup.
 
+use bitcoin::Address;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -15,6 +16,12 @@ use crate::{
 pub struct RollupParams {
     /// Rollup name
     pub rollup_name: String,
+
+    /// DA Envelope tag
+    pub da_tag: String,
+
+    /// checkpoint Envelope tag
+    pub ckpt_tag: String,
 
     /// Block time in milliseconds.
     pub block_time: u64,
@@ -64,6 +71,15 @@ pub struct RollupParams {
 
     /// network the l1 is set on
     pub network: bitcoin::Network,
+
+    /// Fee policy
+    pub fee_policy: FeePolicy,
+
+    /// btcio writer poll duration
+    pub writer_poll_dur: u64,
+
+    /// amount for reveal txn
+    pub amt_for_reveal_tx: u64,
 }
 
 impl RollupParams {
@@ -243,4 +259,33 @@ impl OperatorConfig {
             OperatorConfig::Static(op_keys) => op_keys.as_ref(),
         }
     }
+}
+
+/// Specifies the method used to calculate transaction fees.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum FeePolicy {
+    /// Use estimatesmartfee.
+    Smart,
+
+    /// Fixed fee in sat/vB.
+    Fixed(u64),
+}
+
+/// Configuration related to passing envelope through commit reveal transaction
+#[derive(Debug, Clone)]
+pub struct EnvelopeTxConfig {
+    /// The sequencer change_address. This is where the reveal txn spends it's utxo to
+    pub sequencer_address: Address,
+
+    /// da envelope tag
+    pub da_tag: String,
+
+    /// checkpoint envelope tag
+    pub ckpt_tag: String,
+
+    /// How should the transaction fee be determined
+    pub fee_policy: FeePolicy,
+
+    /// How much amount(in sats) to send to reveal address
+    pub amount_for_reveal_txn: u64,
 }

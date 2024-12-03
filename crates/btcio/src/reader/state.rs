@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use bitcoin::BlockHash;
-use strata_tx_parser::filter::TxFilterConfig;
+use strata_btcio_tx::TxFilterConfig;
 
 /// State we use in various parts of the reader.
 #[derive(Debug)]

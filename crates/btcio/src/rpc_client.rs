@@ -20,21 +20,17 @@ use serde_json::{
     json,
     value::{RawValue, Value},
 };
-use tokio::time::sleep;
-use tracing::*;
-
-use crate::rpc::{
+use strata_btcio_rpc_types::{
     error::{BitcoinRpcError, ClientError},
-    traits::{Broadcaster, Reader, Signer, Wallet},
+    traits::{Broadcaster, ClientResult, Reader, Signer, Wallet},
     types::{
         CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
         ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
         SignRawTransactionWithWallet,
     },
 };
-
-/// This is an alias for the result type returned by the [`BitcoinClient`].
-pub type ClientResult<T> = Result<T, ClientError>;
+use tokio::time::sleep;
+use tracing::*;
 
 /// The maximum number of retries for a request.
 const MAX_RETRIES: u8 = 3;

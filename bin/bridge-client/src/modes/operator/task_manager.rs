@@ -10,7 +10,7 @@ use strata_bridge_exec::{
     handler::ExecHandler,
 };
 use strata_bridge_tx_builder::{prelude::BuildContext, TxKind};
-use strata_btcio::rpc::traits::Broadcaster;
+use strata_btcio_rpc_types::traits::Broadcaster;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcBridgeDuties;
 use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};

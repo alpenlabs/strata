@@ -32,6 +32,7 @@ pyo3-build-config = "0.22.6"
 
 [dev-dependencies]
 strata-btcio.workspace = true
+strata-btcio-rpc-types.workspace = true
 strata-common.workspace = true
 
 anyhow.workspace = true

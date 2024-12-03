@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+
 use anyhow::anyhow;
 use bitcoin::{
     opcodes::all::OP_PUSHNUM_1,
@@ -14,7 +16,7 @@ use strata_primitives::{
 };
 
 /// Extract next instruction and try to parse it as an opcode
-pub fn next_op(instructions: &mut Instructions<'_>) -> Option<Opcode> {
+pub fn next_op(instructions: &mut Peekable<Instructions<'_>>) -> Option<Opcode> {
     let nxt = instructions.next();
     match nxt {
         Some(Ok(Instruction::Op(op))) => Some(op),
@@ -22,8 +24,26 @@ pub fn next_op(instructions: &mut Instructions<'_>) -> Option<Opcode> {
     }
 }
 
+/// peek next instruction
+pub fn peek_op<'a>(instructions: &'a mut Peekable<Instructions<'a>>) -> Option<&'a Opcode> {
+    let nxt = instructions.peek();
+    match nxt {
+        Some(Ok(Instruction::Op(op))) => Some(op),
+        _ => None,
+    }
+}
+
+/// peek next instruction to check if it op false or not
+pub fn peek_op_false(instructions: &mut Peekable<Instructions<'_>>) -> bool {
+    let nxt = instructions.peek();
+    match nxt {
+        Some(Ok(Instruction::PushBytes(bytes))) => bytes.as_bytes().is_empty(),
+        _ => false,
+    }
+}
+
 /// Extract next instruction and try to parse it as a byte slice
-pub fn next_bytes<'a>(instructions: &mut Instructions<'a>) -> Option<&'a [u8]> {
+pub fn next_bytes<'a>(instructions: &mut Peekable<Instructions<'a>>) -> Option<&'a [u8]> {
     match instructions.next() {
         Some(Ok(Instruction::PushBytes(bytes))) => Some(bytes.as_bytes()),
         _ => None,
@@ -31,7 +51,7 @@ pub fn next_bytes<'a>(instructions: &mut Instructions<'a>) -> Option<&'a [u8]> {
 }
 
 /// Extract next integer value(unsigned)
-pub fn next_int(instructions: &mut Instructions<'_>) -> Option<u32> {
+pub fn next_int(instructions: &mut Peekable<Instructions<'_>>) -> Option<u32> {
     let n = instructions.next();
     match n {
         Some(Ok(Instruction::PushBytes(bytes))) => {

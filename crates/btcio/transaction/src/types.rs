@@ -11,8 +11,14 @@ use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct TxFilterConfig {
-    /// For checkpoint update inscriptions.
+    /// For deposit and deposit request
     pub rollup_name: String,
+
+    /// For da envelopes
+    pub da_tag: String,
+
+    /// For checkpoint envelopes
+    pub ckpt_tag: String,
 
     /// For addresses that are expected to be spent to.
     pub expected_addrs: SortedVec<BitcoinAddress>,
@@ -35,6 +41,8 @@ impl TxFilterConfig {
         let address = generate_taproot_address(&operator_wallet_pks, rollup_params.network)?;
 
         let rollup_name = rollup_params.rollup_name.clone();
+        let da_tag = rollup_params.da_tag.clone();
+        let ckpt_tag = rollup_params.ckpt_tag.clone();
         let expected_blobs = SortedVec::new(); // TODO: this should come from chainstate
         let expected_addrs = SortedVec::from(vec![address.clone()]);
         let expected_outpoints = SortedVec::new();
@@ -47,6 +55,8 @@ impl TxFilterConfig {
         };
         Ok(Self {
             rollup_name,
+            da_tag,
+            ckpt_tag,
             expected_blobs,
             expected_addrs,
             expected_outpoints,

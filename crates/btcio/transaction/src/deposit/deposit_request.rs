@@ -46,7 +46,7 @@ pub fn parse_deposit_request_script(
     script: &ScriptBuf,
     config: &DepositTxParams,
 ) -> Result<DepositRequestScriptInfo, DepositParseError> {
-    let mut instructions = script.instructions();
+    let mut instructions = script.instructions().peekable();
 
     // check if OP_RETURN is present and if not just discard it
     if next_op(&mut instructions) != Some(OP_RETURN) {

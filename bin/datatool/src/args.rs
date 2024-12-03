@@ -23,6 +23,7 @@ pub(crate) struct Args {
     pub(crate) subc: Subcommand,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub(crate) enum Subcommand {
@@ -128,6 +129,18 @@ pub(crate) struct SubcParams {
 
     #[argh(
         option,
+        description = "DA tag, used in envelopes (default 'strata-da')"
+    )]
+    pub(crate) da_tag: Option<String>,
+
+    #[argh(
+        option,
+        description = "checkpoint tag, used in envelopes (default 'strata-ckpt')"
+    )]
+    pub(crate) checkpoint_tag: Option<String>,
+
+    #[argh(
+        option,
         description = "sequencer pubkey (default unchecked)",
         short = 's'
     )]
@@ -172,6 +185,18 @@ pub(crate) struct SubcParams {
         description = "permit blank proofs after timeout in millis (default strict)"
     )]
     pub(crate) proof_timeout: Option<u32>,
+
+    #[argh(
+        option,
+        description = "fee in sats for reveal transactions. Will be determined dynamically if None"
+    )]
+    pub(crate) fixed_fee: Option<u64>,
+
+    #[argh(option, description = "transaction writer poll duration")]
+    pub(crate) writer_poll_duration: Option<u64>,
+
+    #[argh(option, description = "amount to pay for reveal transaction")]
+    pub(crate) amount_for_reveal_tx: Option<u64>,
 }
 
 pub(crate) struct CmdContext {

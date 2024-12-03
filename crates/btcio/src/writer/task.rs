@@ -1,89 +1,94 @@
 use std::{sync::Arc, time::Duration};
 
+use strata_btcio_rpc_types::traits::{Reader, Signer, Wallet};
+use strata_btcio_tx::reveal::builder::CommitRevealTxError;
 use strata_db::{
-    traits::SequencerDatabase,
-    types::{BlobEntry, BlobL1Status, L1TxStatus},
+    traits::WriterDatabase,
+    types::{BundleL1Status, DataBundleIntentEntry, L1TxStatus},
 };
-use strata_state::da_blob::{BlobDest, BlobIntent};
+use strata_primitives::buf::Buf32;
+use strata_state::da_blob::{DataBundleDest, PayloadIntent};
 use strata_status::StatusChannel;
-use strata_storage::ops::inscription::{Context, InscriptionDataOps};
+use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;
 use tracing::*;
 
 use super::config::WriterConfig;
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::traits::{Reader, Signer, Wallet},
     status::{apply_status_updates, L1StatusUpdate},
-    writer::{builder::InscriptionError, signer::create_and_sign_blob_inscriptions},
+    writer::signer::create_and_sign_commit_reveal_txs,
 };
 
-/// A handle to the Inscription task.
-pub struct InscriptionHandle {
-    ops: Arc<InscriptionDataOps>,
+/// A handle to the envelope task which gets published as commit reveal txs.
+pub struct EnvelopeHandle {
+    ops: Arc<EnvelopeDataOps>,
 }
 
-impl InscriptionHandle {
-    pub fn new(ops: Arc<InscriptionDataOps>) -> Self {
+impl EnvelopeHandle {
+    pub fn new(ops: Arc<EnvelopeDataOps>) -> Self {
         Self { ops }
     }
 
-    pub fn submit_intent(&self, intent: BlobIntent) -> anyhow::Result<()> {
-        if intent.dest() != BlobDest::L1 {
-            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
+    pub fn submit_intent(&self, intent: PayloadIntent) -> anyhow::Result<()> {
+        if intent.dest() != DataBundleDest::L1 {
+            warn!(commitment = ?intent.commitment(), "Received intent not meant for L1");
             return Ok(());
         }
 
-        let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
-        debug!(commitment = %intent.commitment(), "Received intent");
-        if self
-            .ops
-            .get_blob_entry_blocking(*intent.commitment())?
-            .is_some()
-        {
-            warn!(commitment = %intent.commitment(), "Received duplicate intent");
-            return Ok(());
-        }
-
-        Ok(self
-            .ops
-            .put_blob_entry_blocking(*intent.commitment(), entry)?)
+        let entry = DataBundleIntentEntry::new_unsigned(vec![intent.payload().clone()]);
+        self.submit_entry_sync(intent.commitment().into_inner(), entry)
     }
 
-    pub async fn submit_intent_async(&self, intent: BlobIntent) -> anyhow::Result<()> {
-        if intent.dest() != BlobDest::L1 {
-            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
+    pub async fn submit_intent_async(&self, intent: PayloadIntent) -> anyhow::Result<()> {
+        if intent.dest() != DataBundleDest::L1 {
+            warn!(commitment = ?intent.commitment(), "Received intent not meant for L1");
             return Ok(());
         }
 
-        let entry = BlobEntry::new_unsigned(intent.payload().to_vec());
-        debug!(commitment = %intent.commitment(), "Received intent");
+        let entry = DataBundleIntentEntry::new_unsigned(vec![intent.payload().clone()]);
+        self.submit_entry_async(intent.commitment().into_inner(), entry)
+            .await
+    }
 
-        if self
-            .ops
-            .get_blob_entry_async(*intent.commitment())
-            .await?
-            .is_some()
-        {
-            warn!(commitment = %intent.commitment(), "Received duplicate intent");
+    fn submit_entry_sync(
+        &self,
+        commitment: Buf32,
+        entry: DataBundleIntentEntry,
+    ) -> anyhow::Result<()> {
+        debug!(?commitment, "Received intent");
+        if self.ops.get_entry_blocking(commitment)?.is_some() {
+            warn!(?commitment, "Received duplicate intent");
             return Ok(());
         }
-        Ok(self
-            .ops
-            .put_blob_entry_async(*intent.commitment(), entry)
-            .await?)
+        self.ops.put_entry_blocking(commitment, entry)?;
+        Ok(())
+    }
+
+    async fn submit_entry_async(
+        &self,
+        commitment: Buf32,
+        entry: DataBundleIntentEntry,
+    ) -> anyhow::Result<()> {
+        debug!(?commitment, "Received intent");
+        if self.ops.get_entry_async(commitment).await?.is_some() {
+            warn!(?commitment, "Received duplicate intent");
+            return Ok(());
+        }
+        self.ops.put_entry_async(commitment, entry).await?;
+        Ok(())
     }
 }
 
-/// Starts the inscription task.
+/// Starts the Envelope task, which ultimately will be placed as a commit reveal transaction
 ///
-/// This creates an [`InscriptionHandle`] and spawns a watcher task that watches the status of
-/// incriptions in bitcoin.
+/// This creates an [`EnvelopeHandle`] and spawns a watcher task that watches the status of
+/// envelopes in bitcoin.
 ///
 /// # Returns
 ///
-/// [`Result<InscriptionHandle>`](anyhow::Result)
-pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
+/// [`Result<EnvelopeHandle>`](anyhow::Result)
+pub fn start_envelope_task<D: WriterDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<impl Reader + Wallet + Signer + Send + Sync + 'static>,
     config: WriterConfig,
@@ -91,37 +96,38 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     status_channel: StatusChannel,
     pool: threadpool::ThreadPool,
     broadcast_handle: Arc<L1BroadcastHandle>,
-) -> anyhow::Result<Arc<InscriptionHandle>> {
-    let inscription_data_ops = Arc::new(Context::new(db).into_ops(pool));
-    let next_watch_blob_idx = get_next_blobidx_to_watch(inscription_data_ops.as_ref())?;
+) -> anyhow::Result<Arc<EnvelopeHandle>> {
+    let envelope_data_ops = Arc::new(Context::new(db).into_ops(pool));
+    let next_watch_entry_idx = get_next_entry_idx_to_watch(envelope_data_ops.as_ref())?;
 
-    let inscription_handle = Arc::new(InscriptionHandle::new(inscription_data_ops.clone()));
+    let envelope_handle = Arc::new(EnvelopeHandle::new(envelope_data_ops.clone()));
 
     executor.spawn_critical_async("btcio::watcher_task", async move {
         watcher_task(
-            next_watch_blob_idx,
+            next_watch_entry_idx,
             bitcoin_client,
             config,
-            inscription_data_ops,
+            envelope_data_ops,
             broadcast_handle,
             status_channel,
         )
         .await
     });
 
-    Ok(inscription_handle)
+    Ok(envelope_handle)
 }
 
 /// Looks into the database from descending index order till it reaches 0 or `Finalized`
-/// [`BlobEntry`] from which the rest of the [`BlobEntry`]s should be watched.
-fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u64> {
-    let mut next_idx = insc_ops.get_next_blob_idx_blocking()?;
+/// [`DataBundleIntentEntry`] from which the rest of the [`DataBundleIntentEntry`]s should be
+/// watched.
+fn get_next_entry_idx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u64> {
+    let mut next_idx = insc_ops.get_next_entry_idx_blocking()?;
 
     while next_idx > 0 {
-        let Some(blob) = insc_ops.get_blob_entry_by_idx_blocking(next_idx - 1)? else {
+        let Some(entry) = insc_ops.get_entry_by_idx_blocking(next_idx - 1)? else {
             break;
         };
-        if blob.status == BlobL1Status::Finalized {
+        if entry.status == BundleL1Status::Finalized {
             break;
         };
         next_idx -= 1;
@@ -129,19 +135,13 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
     Ok(next_idx)
 }
 
-/// Watches for inscription transactions status in bitcoin. Note that this watches for each
-/// inscription until it is confirmed
-/// Watches for inscription transactions status in the Bitcoin blockchain.
-///
-/// # Note
-///
-/// The inscription will be monitored until it acquires the status of
-/// [`BlobL1Status::Finalized`]
+/// Watches for commit reveal transactions status in bitcoin. The transaction will
+/// be monitored until it acquires the status of [`PayloadL1Status::Finalized`]
 pub async fn watcher_task(
-    next_blbidx_to_watch: u64,
+    next_entry_to_watch: u64,
     bitcoin_client: Arc<impl Reader + Wallet + Signer>,
     config: WriterConfig,
-    insc_ops: Arc<InscriptionDataOps>,
+    envelope_ops: Arc<EnvelopeDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
@@ -149,18 +149,18 @@ pub async fn watcher_task(
     let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
     tokio::pin!(interval);
 
-    let mut curr_blobidx = next_blbidx_to_watch;
+    let mut curr_entry_idx = next_entry_to_watch;
     loop {
         interval.as_mut().tick().await;
 
-        if let Some(blobentry) = insc_ops.get_blob_entry_by_idx_async(curr_blobidx).await? {
-            match blobentry.status {
+        if let Some(entry) = envelope_ops.get_entry_by_idx_async(curr_entry_idx).await? {
+            match entry.status {
                 // If unsigned or needs resign, create new signed commit/reveal txs and update the
                 // entry
-                BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
-                    debug!(?blobentry.status, %curr_blobidx, "Processing unsigned blobentry");
-                    match create_and_sign_blob_inscriptions(
-                        &blobentry,
+                BundleL1Status::Unsigned | BundleL1Status::NeedsResign => {
+                    debug!(?entry.status, %curr_entry_idx, "Processing unsigned entry");
+                    match create_and_sign_commit_reveal_txs(
+                        &entry,
                         &broadcast_handle,
                         bitcoin_client.clone(),
                         &config,
@@ -168,15 +168,16 @@ pub async fn watcher_task(
                     .await
                     {
                         Ok((cid, rid)) => {
-                            let mut updated_entry = blobentry.clone();
-                            updated_entry.status = BlobL1Status::Unpublished;
+                            let mut updated_entry = entry.clone();
+                            updated_entry.status = BundleL1Status::Unpublished;
                             updated_entry.commit_txid = cid;
                             updated_entry.reveal_txid = rid;
-                            update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
+                            update_existing_entry(curr_entry_idx, updated_entry, &envelope_ops)
+                                .await?;
 
-                            debug!(%curr_blobidx, "Signed blob");
+                            debug!(%curr_entry_idx, "Signed entry");
                         }
-                        Err(InscriptionError::NotEnoughUtxos(required, available)) => {
+                        Err(CommitRevealTxError::NotEnoughUtxos(required, available)) => {
                             // Just wait till we have enough utxos and let the status be `Unsigned`
                             // or `NeedsResign`
                             // Maybe send an alert
@@ -188,65 +189,70 @@ pub async fn watcher_task(
                     }
                 }
                 // If finalized, nothing to do, move on to process next entry
-                BlobL1Status::Finalized => {
-                    curr_blobidx += 1;
+                BundleL1Status::Finalized => {
+                    curr_entry_idx += 1;
                 }
                 // If entry is signed but not finalized or excluded yet, check broadcast txs status
-                BlobL1Status::Published | BlobL1Status::Confirmed | BlobL1Status::Unpublished => {
-                    debug!(%curr_blobidx, "Checking blobentry's broadcast status");
+                BundleL1Status::Published
+                | BundleL1Status::Confirmed
+                | BundleL1Status::Unpublished => {
+                    debug!(%curr_entry_idx, "Checking entry's broadcast status");
                     let commit_tx = broadcast_handle
-                        .get_tx_entry_by_id_async(blobentry.commit_txid)
+                        .get_tx_entry_by_id_async(entry.commit_txid)
                         .await?;
                     let reveal_tx = broadcast_handle
-                        .get_tx_entry_by_id_async(blobentry.reveal_txid)
+                        .get_tx_entry_by_id_async(entry.reveal_txid)
                         .await?;
 
                     match (commit_tx, reveal_tx) {
                         (Some(ctx), Some(rtx)) => {
-                            let new_status = determine_blob_next_status(&ctx.status, &rtx.status);
-                            debug!(?new_status, "The next status for blob");
+                            let new_status =
+                                determine_envelope_entry_next_status(&ctx.status, &rtx.status);
+                            debug!(?new_status, "The next status for entry");
 
-                            update_l1_status(&blobentry, &new_status, &status_channel).await;
+                            update_l1_status(&entry, &new_status, &status_channel).await;
 
-                            // Update blobentry with new status
-                            let mut updated_entry = blobentry.clone();
+                            // Update entry with new status
+                            let mut updated_entry = entry.clone();
                             updated_entry.status = new_status.clone();
-                            update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
+                            update_existing_entry(curr_entry_idx, updated_entry, &envelope_ops)
+                                .await?;
 
-                            if new_status == BlobL1Status::Finalized {
-                                curr_blobidx += 1;
+                            if new_status == BundleL1Status::Finalized {
+                                curr_entry_idx += 1;
                             }
                         }
                         _ => {
-                            warn!(%curr_blobidx, "Corresponding commit/reveal entry for blobentry not found in broadcast db. Sign and create transactions again.");
-                            let mut updated_entry = blobentry.clone();
-                            updated_entry.status = BlobL1Status::Unsigned;
-                            update_existing_entry(curr_blobidx, updated_entry, &insc_ops).await?;
+                            warn!(%curr_entry_idx, "Corresponding commit/reveal entry for entry not found in broadcast db. Sign and create transactions again.");
+                            let mut updated_entry = entry.clone();
+                            updated_entry.status = BundleL1Status::Unsigned;
+                            update_existing_entry(curr_entry_idx, updated_entry, &envelope_ops)
+                                .await?;
                         }
                     }
                 }
             }
         } else {
-            // No blob exists, just continue the loop to wait for blob's presence in db
-            info!(%curr_blobidx, "Waiting for blobentry to be present in db");
+            // No entry exists, just continue the loop to wait for entry presence in db
+            info!(%curr_entry_idx, "Waiting for entry to be present in db");
         }
     }
 }
 
 async fn update_l1_status(
-    blobentry: &BlobEntry,
-    new_status: &BlobL1Status,
+    entry: &DataBundleIntentEntry,
+    new_status: &BundleL1Status,
     status_channel: &StatusChannel,
 ) {
-    // Update L1 status. Since we are processing one blobentry at a time, if the entry is
+    // Update L1 status. Since we are processing one entry at a time, if the entry is
     // finalized/confirmed, then it means it is published as well
-    if *new_status == BlobL1Status::Published
-        || *new_status == BlobL1Status::Confirmed
-        || *new_status == BlobL1Status::Finalized
+    if *new_status == BundleL1Status::Published
+        || *new_status == BundleL1Status::Confirmed
+        || *new_status == BundleL1Status::Finalized
     {
         let status_updates = [
-            L1StatusUpdate::LastPublishedTxid(blobentry.reveal_txid.into()),
-            L1StatusUpdate::IncrementInscriptionCount,
+            L1StatusUpdate::LastPublishedTxid(entry.reveal_txid.into()),
+            L1StatusUpdate::IncrementCommitRevealTxCount,
         ];
         apply_status_updates(&status_updates, status_channel).await;
     }
@@ -254,36 +260,36 @@ async fn update_l1_status(
 
 async fn update_existing_entry(
     idx: u64,
-    updated_entry: BlobEntry,
-    insc_ops: &InscriptionDataOps,
+    updated_entry: DataBundleIntentEntry,
+    envelope_ops: &EnvelopeDataOps,
 ) -> anyhow::Result<()> {
-    let msg = format!("Expect to find blobentry {idx} in db");
-    let id = insc_ops.get_blob_entry_id_async(idx).await?.expect(&msg);
-    Ok(insc_ops.put_blob_entry_async(id, updated_entry).await?)
+    let msg = format!("Expect to find entry {idx} in db");
+    let id = envelope_ops.get_entry_id_async(idx).await?.expect(&msg);
+    Ok(envelope_ops.put_entry_async(id, updated_entry).await?)
 }
 
-/// Determine the status of the `BlobEntry` based on the status of its commit and reveal
-/// transactions in bitcoin.
-fn determine_blob_next_status(
+/// Determine the status of the [`DataBundleIntentEntry`] based on the status of its commit and
+/// reveal transactions in bitcoin.
+fn determine_envelope_entry_next_status(
     commit_status: &L1TxStatus,
     reveal_status: &L1TxStatus,
-) -> BlobL1Status {
+) -> BundleL1Status {
     match (&commit_status, &reveal_status) {
         // If reveal is finalized, both are finalized
-        (_, L1TxStatus::Finalized { .. }) => BlobL1Status::Finalized,
+        (_, L1TxStatus::Finalized { .. }) => BundleL1Status::Finalized,
         // If reveal is confirmed, both are confirmed
-        (_, L1TxStatus::Confirmed { .. }) => BlobL1Status::Confirmed,
-        // If reveal is published regardless of commit, the blob is published
-        (_, L1TxStatus::Published) => BlobL1Status::Published,
+        (_, L1TxStatus::Confirmed { .. }) => BundleL1Status::Confirmed,
+        // If reveal is published regardless of commit, the envelope is published
+        (_, L1TxStatus::Published) => BundleL1Status::Published,
         // if commit has invalid inputs, needs resign
-        (L1TxStatus::InvalidInputs, _) => BlobL1Status::NeedsResign,
+        (L1TxStatus::InvalidInputs, _) => BundleL1Status::NeedsResign,
         // If commit is unpublished, both are upublished
-        (L1TxStatus::Unpublished, _) => BlobL1Status::Unpublished,
-        // If commit is published but not reveal, the blob is unpublished
-        (_, L1TxStatus::Unpublished) => BlobL1Status::Unpublished,
+        (L1TxStatus::Unpublished, _) => BundleL1Status::Unpublished,
+        // If commit is published but not reveal, the entry is unpublished
+        (_, L1TxStatus::Unpublished) => BundleL1Status::Unpublished,
         // If reveal has invalid inputs, these need resign because we can do nothing with just
         // commit tx confirmed. This should not occur in practice
-        (_, L1TxStatus::InvalidInputs) => BlobL1Status::NeedsResign,
+        (_, L1TxStatus::InvalidInputs) => BundleL1Status::NeedsResign,
     }
 }
 
@@ -293,86 +299,86 @@ mod test {
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
-    use crate::writer::test_utils::get_inscription_ops;
+    use crate::writer::test_utils::get_envelope_ops;
 
     #[test]
-    fn test_initialize_writer_state_no_last_blob_idx() {
-        let iops = get_inscription_ops();
+    fn test_initialize_writer_state_no_last_entry_idx() {
+        let iops = get_envelope_ops();
 
-        let nextidx = iops.get_next_blob_idx_blocking().unwrap();
+        let nextidx = iops.get_next_entry_idx_blocking().unwrap();
         assert_eq!(nextidx, 0);
 
-        let idx = get_next_blobidx_to_watch(&iops).unwrap();
+        let idx = get_next_entry_idx_to_watch(&iops).unwrap();
 
         assert_eq!(idx, 0);
     }
 
     #[test]
-    fn test_initialize_writer_state_with_existing_blobs() {
-        let iops = get_inscription_ops();
+    fn test_initialize_writer_state_with_existing_envelopes() {
+        let iops = get_envelope_ops();
 
-        let mut e1: BlobEntry = ArbitraryGenerator::new().generate();
-        e1.status = BlobL1Status::Finalized;
-        let blob_hash: Buf32 = [1; 32].into();
-        iops.put_blob_entry_blocking(blob_hash, e1).unwrap();
-        let expected_idx = iops.get_next_blob_idx_blocking().unwrap();
+        let mut e1: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        e1.status = BundleL1Status::Finalized;
+        let hash: Buf32 = [1; 32].into();
+        iops.put_entry_blocking(hash, e1).unwrap();
+        let expected_idx = iops.get_next_entry_idx_blocking().unwrap();
 
-        let mut e2: BlobEntry = ArbitraryGenerator::new().generate();
-        e2.status = BlobL1Status::Published;
-        let blob_hash: Buf32 = [2; 32].into();
-        iops.put_blob_entry_blocking(blob_hash, e2).unwrap();
+        let mut e2: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        e2.status = BundleL1Status::Published;
+        let hash: Buf32 = [2; 32].into();
+        iops.put_entry_blocking(hash, e2).unwrap();
 
-        let mut e3: BlobEntry = ArbitraryGenerator::new().generate();
-        e3.status = BlobL1Status::Unsigned;
-        let blob_hash: Buf32 = [3; 32].into();
-        iops.put_blob_entry_blocking(blob_hash, e3).unwrap();
+        let mut e3: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        e3.status = BundleL1Status::Unsigned;
+        let hash: Buf32 = [3; 32].into();
+        iops.put_entry_blocking(hash, e3).unwrap();
 
-        let mut e4: BlobEntry = ArbitraryGenerator::new().generate();
-        e4.status = BlobL1Status::Unsigned;
-        let blob_hash: Buf32 = [4; 32].into();
-        iops.put_blob_entry_blocking(blob_hash, e4).unwrap();
+        let mut e4: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        e4.status = BundleL1Status::Unsigned;
+        let hash: Buf32 = [4; 32].into();
+        iops.put_entry_blocking(hash, e4).unwrap();
 
-        let idx = get_next_blobidx_to_watch(&iops).unwrap();
+        let idx = get_next_entry_idx_to_watch(&iops).unwrap();
 
         assert_eq!(idx, expected_idx);
     }
 
     #[test]
-    fn test_determine_blob_next_status() {
+    fn test_determine_entry_next_status() {
         // When both are unpublished
         let (commit_status, reveal_status) = (L1TxStatus::Unpublished, L1TxStatus::Unpublished);
-        let next = determine_blob_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, BlobL1Status::Unpublished);
+        let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BundleL1Status::Unpublished);
 
         // When both are Finalized
         let fin = L1TxStatus::Finalized { confirmations: 5 };
         let (commit_status, reveal_status) = (fin.clone(), fin);
-        let next = determine_blob_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, BlobL1Status::Finalized);
+        let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BundleL1Status::Finalized);
 
         // When both are Confirmed
         let conf = L1TxStatus::Confirmed { confirmations: 5 };
         let (commit_status, reveal_status) = (conf.clone(), conf.clone());
-        let next = determine_blob_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, BlobL1Status::Confirmed);
+        let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BundleL1Status::Confirmed);
 
         // When both are Published
         let publ = L1TxStatus::Published;
         let (commit_status, reveal_status) = (publ.clone(), publ.clone());
-        let next = determine_blob_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, BlobL1Status::Published);
+        let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BundleL1Status::Published);
 
         // When both have invalid
         let (commit_status, reveal_status) = (L1TxStatus::InvalidInputs, L1TxStatus::InvalidInputs);
-        let next = determine_blob_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, BlobL1Status::NeedsResign);
+        let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BundleL1Status::NeedsResign);
 
         // When reveal has invalid inputs but commit is confirmed. I doubt this would happen in
         // practice for our case.
-        // Then the blob status should be NeedsResign i.e. the blob should be signed again and
-        // published.
+        // Then the envelope status should be NeedsResign i.e. the envelope should be signed again
+        // and published.
         let (commit_status, reveal_status) = (conf.clone(), L1TxStatus::InvalidInputs);
-        let next = determine_blob_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, BlobL1Status::NeedsResign);
+        let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
+        assert_eq!(next, BundleL1Status::NeedsResign);
     }
 }

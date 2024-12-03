@@ -1,35 +1,30 @@
 use std::sync::Arc;
 
 use bitcoin::{consensus, Transaction};
-use strata_db::types::{BlobEntry, L1TxEntry};
+use strata_btcio_rpc_types::traits::{Reader, Signer, Wallet};
+use strata_btcio_tx::reveal::builder::{build_commit_reveal_txs, CommitRevealTxError};
+use strata_db::types::{DataBundleIntentEntry, L1TxEntry};
 use strata_primitives::buf::Buf32;
 use tracing::*;
 
-use super::{
-    builder::{build_inscription_txs, InscriptionError},
-    config::WriterConfig,
-};
-use crate::{
-    broadcaster::L1BroadcastHandle,
-    rpc::traits::{Reader, Signer, Wallet},
-};
+use super::config::WriterConfig;
+use crate::broadcaster::L1BroadcastHandle;
 
-type BlobIdx = u64;
-
-/// Create inscription transactions corresponding to a [`BlobEntry`].
+/// Create commit reveal transactions corresponding to a [`EnvelopeEntry`].
 ///
 /// This is used during one of the cases:
 /// 1. A new blob intent needs to be signed
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
-pub async fn create_and_sign_blob_inscriptions(
-    blobentry: &BlobEntry,
+pub async fn create_and_sign_commit_reveal_txs(
+    blobentry: &DataBundleIntentEntry,
     broadcast_handle: &L1BroadcastHandle,
     client: Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
-) -> Result<(Buf32, Buf32), InscriptionError> {
-    trace!("Creating and signing blob inscriptions");
-    let (commit, reveal) = build_inscription_txs(&blobentry.blob, &client, config).await?;
+) -> Result<(Buf32, Buf32), CommitRevealTxError> {
+    trace!("Creating and signing commit reveal transactions");
+    let (commit, reveal) =
+        build_commit_reveal_txs(&blobentry.envelopes, &client, &config.envelope_tx_config).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");
@@ -52,11 +47,11 @@ pub async fn create_and_sign_blob_inscriptions(
     let _ = broadcast_handle
         .put_tx_entry(cid, centry)
         .await
-        .map_err(|e| InscriptionError::Other(e.into()))?;
+        .map_err(|e| CommitRevealTxError::Other(e.into()))?;
     let _ = broadcast_handle
         .put_tx_entry(rid, rentry)
         .await
-        .map_err(|e| InscriptionError::Other(e.into()))?;
+        .map_err(|e| CommitRevealTxError::Other(e.into()))?;
     Ok((cid, rid))
 }
 
@@ -64,36 +59,42 @@ pub async fn create_and_sign_blob_inscriptions(
 mod test {
     use std::sync::Arc;
 
-    use strata_db::types::{BlobEntry, BlobL1Status};
+    use strata_db::types::{BundleL1Status, DataBundleIntentEntry};
     use strata_primitives::hash;
+    use strata_state::{
+        da_blob::PayloadCommitment,
+        tx::{EnvelopePayload, PayloadTypeTag},
+    };
 
     use super::*;
     use crate::{
         test_utils::TestBitcoinClient,
-        writer::test_utils::{get_broadcast_handle, get_config, get_inscription_ops},
+        writer::test_utils::{get_broadcast_handle, get_config, get_envelope_ops},
     };
 
     #[tokio::test]
-    async fn test_create_and_sign_blob_inscriptions() {
-        let iops = get_inscription_ops();
+    async fn test_create_and_sign_commit_reveal_txs() {
+        let iops = get_envelope_ops();
         let bcast_handle = get_broadcast_handle();
         let client = Arc::new(TestBitcoinClient::new(1));
         let config = get_config();
 
         // First insert an unsigned blob
-        let entry = BlobEntry::new_unsigned([1; 100].to_vec());
+        let envelope = EnvelopePayload::new(PayloadTypeTag::DA, vec![1; 100]);
+        let entry = DataBundleIntentEntry::new_unsigned(vec![envelope.clone()]);
 
-        assert_eq!(entry.status, BlobL1Status::Unsigned);
+        assert_eq!(entry.status, BundleL1Status::Unsigned);
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
-        let intent_hash = hash::raw(&entry.blob);
-        iops.put_blob_entry_async(intent_hash, entry.clone())
+        let intent_hash = PayloadCommitment::new(&hash::raw(envelope.data()));
+        // let intent_hash =
+        iops.put_entry_async(intent_hash.into_inner(), entry.clone())
             .await
             .unwrap();
 
         let (cid, rid) =
-            create_and_sign_blob_inscriptions(&entry, bcast_handle.as_ref(), client, &config)
+            create_and_sign_commit_reveal_txs(&entry, bcast_handle.as_ref(), client, &config)
                 .await
                 .unwrap();
 

@@ -308,7 +308,7 @@ pub struct L1Status {
     pub last_update: u64,
 
     /// number of published transactions in current run (commit + reveal pair count as 1)
-    pub published_inscription_count: u64,
+    pub published_reveal_tx_count: u64,
 }
 
 /// A wrapper around the [`bitcoin::Address<NetworkChecked>`] type created in order to implement

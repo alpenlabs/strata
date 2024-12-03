@@ -10,7 +10,8 @@ use jsonrpsee::{core::client::async_client::Client as L2RpcClient, ws_client::Ws
 use strata_bridge_exec::handler::ExecHandler;
 use strata_bridge_sig_manager::prelude::SignatureManager;
 use strata_bridge_tx_builder::prelude::TxBuildContext;
-use strata_btcio::rpc::{traits::Reader, BitcoinClient};
+use strata_btcio::rpc_client::BitcoinClient;
+use strata_btcio_rpc_types::traits::Reader;
 use strata_primitives::bridge::OperatorIdx;
 use strata_rocksdb::{
     bridge::db::{BridgeDutyIndexRocksDb, BridgeDutyRocksDb, BridgeTxRocksDb},

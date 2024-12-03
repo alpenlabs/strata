@@ -11,6 +11,8 @@ path = "src/main.rs"
 strata-bridge-relay.workspace = true
 strata-bridge-tx-builder.workspace = true
 strata-btcio.workspace = true
+strata-btcio-rpc-types.workspace = true
+strata-btcio-tx.workspace = true
 strata-common.workspace = true
 strata-consensus-logic.workspace = true
 strata-db.workspace = true
@@ -27,7 +29,6 @@ strata-status.workspace = true
 strata-storage.workspace = true
 strata-sync.workspace = true
 strata-tasks.workspace = true
-strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
 alloy-rpc-types.workspace = true

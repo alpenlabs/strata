@@ -12773,6 +12773,7 @@ dependencies = [
  "strata-bridge-sig-manager",
  "strata-bridge-tx-builder",
  "strata-btcio",
+ "strata-btcio-rpc-types",
  "strata-common",
  "strata-key-derivation",
  "strata-primitives",
@@ -12799,7 +12800,7 @@ dependencies = [
  "serde",
  "strata-bridge-sig-manager",
  "strata-bridge-tx-builder",
- "strata-btcio",
+ "strata-btcio-rpc-types",
  "strata-primitives",
  "strata-rpc-api",
  "strata-rpc-types",
@@ -12884,6 +12885,8 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "strata-bridge-tx-builder",
+ "strata-btcio-rpc-types",
+ "strata-btcio-tx",
  "strata-common",
  "strata-db",
  "strata-primitives",
@@ -12894,7 +12897,42 @@ dependencies = [
  "strata-storage",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
+ "thiserror",
+ "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-btcio-rpc-types"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bitcoin",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-btcio-tx"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "musig2",
+ "rand",
+ "strata-bridge-tx-builder",
+ "strata-btcio",
+ "strata-btcio-rpc-types",
+ "strata-primitives",
+ "strata-state",
+ "strata-test-utils",
  "thiserror",
  "threadpool",
  "tokio",
@@ -12976,6 +13014,8 @@ dependencies = [
  "strata-bridge-relay",
  "strata-bridge-tx-builder",
  "strata-btcio",
+ "strata-btcio-rpc-types",
+ "strata-btcio-tx",
  "strata-common",
  "strata-consensus-logic",
  "strata-db",
@@ -12994,7 +13034,6 @@ dependencies = [
  "strata-sync",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
  "strata-zkvm",
  "thiserror",
  "threadpool",
@@ -13027,6 +13066,7 @@ dependencies = [
  "rand",
  "secp256k1",
  "strata-btcio",
+ "strata-btcio-tx",
  "strata-chaintsn",
  "strata-crypto",
  "strata-db",
@@ -13041,7 +13081,6 @@ dependencies = [
  "strata-storage",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
  "strata-zkvm",
  "thiserror",
  "threadpool",
@@ -13225,10 +13264,10 @@ dependencies = [
  "serde",
  "sha2 0.10.8",
  "strata-bridge-tx-builder",
+ "strata-btcio-tx",
  "strata-primitives",
  "strata-state",
  "strata-test-utils",
- "strata-tx-parser",
  "strata-zkvm",
 ]
 
@@ -13340,6 +13379,8 @@ dependencies = [
  "serde",
  "serde_json",
  "strata-btcio",
+ "strata-btcio-rpc-types",
+ "strata-btcio-tx",
  "strata-common",
  "strata-db",
  "strata-native-zkvm-adapter",
@@ -13360,7 +13401,6 @@ dependencies = [
  "strata-sp1-guest-builder",
  "strata-state",
  "strata-test-utils",
- "strata-tx-parser",
  "strata-zkvm",
  "thiserror",
  "tokio",
@@ -13413,6 +13453,7 @@ dependencies = [
  "secp256k1",
  "shrex",
  "strata-btcio",
+ "strata-btcio-rpc-types",
  "strata-common",
  "strata-primitives",
  "tokio",
@@ -13821,6 +13862,7 @@ dependencies = [
  "rockbound",
  "serde_json",
  "strata-btcio",
+ "strata-btcio-tx",
  "strata-chaintsn",
  "strata-consensus-logic",
  "strata-db",
@@ -13829,28 +13871,7 @@ dependencies = [
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "strata-storage",
- "strata-tx-parser",
  "threadpool",
-]
-
-[[package]]
-name = "strata-tx-parser"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "bitcoin",
- "borsh",
- "hex",
- "musig2",
- "rand",
- "strata-bridge-tx-builder",
- "strata-btcio",
- "strata-primitives",
- "strata-state",
- "strata-test-utils",
- "thiserror",
- "tracing",
 ]
 
 [[package]]

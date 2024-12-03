@@ -7,9 +7,10 @@ use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
-    rpc::{traits::Reader, BitcoinClient},
-    writer::{config::WriterConfig, start_inscription_task},
+    rpc_client::BitcoinClient,
+    writer::{config::WriterConfig, start_envelope_task},
 };
+use strata_btcio_rpc_types::traits::Reader;
 use strata_common::logging;
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
@@ -24,9 +25,7 @@ use strata_db::{
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, SyncParams};
-use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
-};
+use strata_rocksdb::{broadcaster::db::BroadcastDb, DbOpsConfig, WriterDb};
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
@@ -157,7 +156,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 ctx.bitcoin_client.clone(),
                 params.clone(),
             );
-            let seq_db = init_sequencer_database(rbdb.clone(), ops_config);
+            let writer_db = init_writer_database(rbdb.clone(), ops_config);
 
             start_sequencer_tasks(
                 ctx.clone(),
@@ -165,7 +164,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 sequencer_config,
                 &executor,
                 &runtime,
-                seq_db,
+                writer_db,
                 checkpoint_handle.clone(),
                 broadcast_handle,
                 &mut methods,
@@ -393,7 +392,7 @@ fn start_sequencer_tasks(
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
     runtime: &Runtime,
-    seq_db: Arc<SequencerDB<RBSeqBlobDb>>,
+    writer_db: Arc<WriterDb>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     methods: &mut Methods,
@@ -431,22 +430,26 @@ fn start_sequencer_tasks(
     // Spawn up writer
     let writer_config = WriterConfig::new(
         sequencer_bitcoin_address,
-        params.rollup().rollup_name.clone(),
+        params.rollup().da_tag.clone(),
+        params.rollup().ckpt_tag.clone(),
+        params.rollup().writer_poll_dur,
+        params.rollup().fee_policy,
+        params.rollup().amt_for_reveal_tx,
     )?;
 
-    // Start inscription tasks
-    let inscription_handle = start_inscription_task(
+    // Start envelope inscribing related tasks
+    let envelope_handle = start_envelope_task(
         executor,
         bitcoin_client,
         writer_config,
-        seq_db,
+        writer_db,
         status_channel.clone(),
         pool.clone(),
         broadcast_handle.clone(),
     )?;
 
     let admin_rpc = rpc_server::SequencerServerImpl::new(
-        inscription_handle.clone(),
+        envelope_handle.clone(),
         broadcast_handle,
         params.clone(),
         checkpoint_handle.clone(),
@@ -481,7 +484,7 @@ fn start_sequencer_tasks(
             sync_manager,
             database,
             engine,
-            inscription_handle,
+            envelope_handle,
             pool,
             params,
             checkpoint_handle,

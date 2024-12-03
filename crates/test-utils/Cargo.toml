@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 strata-btcio.workspace = true
+strata-btcio-tx.workspace = true
 strata-chaintsn.workspace = true
 strata-consensus-logic.workspace = true
 strata-db = { workspace = true, features = ["stubs"] }
@@ -13,7 +14,6 @@ strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-state.workspace = true
 strata-storage.workspace = true
-strata-tx-parser.workspace = true
 
 anyhow.workspace = true
 arbitrary.workspace = true

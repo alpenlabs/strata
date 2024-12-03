@@ -1,13 +1,8 @@
 use std::sync::Arc;
 
 use bitcoin::params::MAINNET;
-use strata_btcio::{
-    reader::query::get_verification_state,
-    rpc::{
-        traits::{Reader, Wallet},
-        BitcoinClient,
-    },
-};
+use strata_btcio::{reader::query::get_verification_state, rpc_client::BitcoinClient};
+use strata_btcio_rpc_types::traits::{Reader, Wallet};
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};

@@ -6,6 +6,7 @@
 
 use bitcoin::{Network, Txid};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use strata_primitives::{
     bridge::OperatorIdx,
     l1::{BitcoinAmount, L1TxRef, OutputRef},
@@ -17,6 +18,7 @@ use strata_state::{
     bridge_ops::WithdrawalIntent,
     bridge_state::{DepositEntry, DepositState},
     id::L2BlockId,
+    tx::{EnvelopePayload, PayloadTypeTag},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +77,7 @@ pub struct RpcL1Status {
     pub last_published_txid: Option<Txid>,
 
     /// number of published transactions in current run (commit + reveal pair count as 1)
-    pub published_inscription_count: u64,
+    pub published_bundle_intents_count: u64,
 
     /// UNIX millis time of the last time we got a new update from the L1 connector.
     pub last_update: u64,
@@ -92,7 +94,7 @@ impl RpcL1Status {
             cur_height: l1s.cur_height,
             cur_tip_blkid: l1s.cur_tip_blkid,
             last_published_txid: l1s.last_published_txid.map(Into::into),
-            published_inscription_count: l1s.published_inscription_count,
+            published_bundle_intents_count: l1s.published_reveal_tx_count,
             last_update: l1s.last_update,
             network,
         }
@@ -107,7 +109,7 @@ impl Default for RpcL1Status {
             cur_height: Default::default(),
             cur_tip_blkid: Default::default(),
             last_published_txid: Default::default(),
-            published_inscription_count: Default::default(),
+            published_bundle_intents_count: Default::default(),
             last_update: Default::default(),
             network: Network::Regtest,
         }
@@ -313,4 +315,44 @@ pub enum L2BlockStatus {
     Verified(u64),
     /// Block is now finalized, certain depth has been reached in L1
     Finalized(u64),
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RpcEnvelopePayload {
+    /// type of payload
+    tag: RpcPayloadTypeTag,
+    /// payload present in envelope
+    #[serde_as(as = "serde_with::hex::Hex")]
+    data: Vec<u8>,
+}
+impl RpcEnvelopePayload {
+    pub fn tag(&self) -> RpcPayloadTypeTag {
+        self.tag
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl From<RpcEnvelopePayload> for EnvelopePayload {
+    fn from(value: RpcEnvelopePayload) -> Self {
+        EnvelopePayload::new(value.tag.into(), value.data)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum RpcPayloadTypeTag {
+    Checkpoint,
+    DA,
+}
+
+impl From<RpcPayloadTypeTag> for PayloadTypeTag {
+    fn from(value: RpcPayloadTypeTag) -> Self {
+        match value {
+            RpcPayloadTypeTag::Checkpoint => PayloadTypeTag::Checkpoint,
+            RpcPayloadTypeTag::DA => PayloadTypeTag::DA,
+        }
+    }
 }

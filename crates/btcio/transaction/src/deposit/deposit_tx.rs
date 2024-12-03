@@ -50,7 +50,7 @@ fn parse_deposit_script<'a>(
     script: &'a ScriptBuf,
     config: &DepositTxParams,
 ) -> Result<&'a [u8], DepositParseError> {
-    let mut instructions = script.instructions();
+    let mut instructions = script.instructions().peekable();
 
     // check if OP_RETURN is present and if not just discard it
     if next_op(&mut instructions) != Some(OP_RETURN) {

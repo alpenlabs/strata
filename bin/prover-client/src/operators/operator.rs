@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use jsonrpsee::http_client::HttpClient;
-use strata_btcio::rpc::BitcoinClient;
+use strata_btcio::rpc_client::BitcoinClient;
 use strata_primitives::{params::RollupParams, proof::ProofContext};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;

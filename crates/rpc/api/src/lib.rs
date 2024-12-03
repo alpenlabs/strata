@@ -6,7 +6,7 @@ use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
     HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcCheckpointInfo, RpcDepositEntry,
-    RpcExecUpdate, RpcSyncStatus,
+    RpcEnvelopePayload, RpcExecUpdate, RpcSyncStatus,
 };
 use strata_state::{id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent};
 use strata_zkvm::ProofReceipt;
@@ -134,9 +134,9 @@ pub trait StrataAdminApi {
 #[cfg_attr(not(feature = "client"), rpc(server))]
 #[cfg_attr(feature = "client", rpc(server, client))]
 pub trait StrataSequencerApi {
-    /// Adds L1Write sequencer duty which will be executed by sequencer
-    #[method(name = "strataadmin_submitDABlob")]
-    async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
+    /// Adds L1Write sequencer duties which will be executed by sequencer
+    #[method(name = "strataadmin_submitEnvelopePayloads")]
+    async fn submit_envelope_payloads(&self, payload: Vec<RpcEnvelopePayload>) -> RpcResult<()>;
 
     /// Verifies and adds the submitted proof to the checkpoint database
     #[method(name = "strataadmin_submitCheckpointProof")]

@@ -2,12 +2,12 @@
 //! deposits, forced inclusion transactions as well as state updates
 
 use bitcoin::Block;
+use strata_btcio_tx::{filter_protocol_op_tx_refs, TxFilterConfig};
 use strata_primitives::{block_credential::CredRule, params::RollupParams};
 use strata_state::{
     batch::BatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
-use strata_tx_parser::filter::{filter_protocol_op_tx_refs, TxFilterConfig};
 
 pub fn extract_relevant_info(
     block: &Block,
@@ -19,7 +19,7 @@ pub fn extract_relevant_info(
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    let relevant_txs = filter_protocol_op_tx_refs(block, &filter_config);
+    let relevant_txs = filter_protocol_op_tx_refs(block, filter_config);
 
     for tx in relevant_txs {
         match tx.proto_op() {

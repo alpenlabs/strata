@@ -2,7 +2,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import testenv
-from utils import generate_n_blocks, submit_da_blob, wait_until
+from utils import generate_n_blocks, submit_envelope_payload, wait_until
 
 
 @flexitest.register
@@ -28,10 +28,12 @@ class L1WriterTest(testenv.StrataTester):
             error_with="Sequencer did not start on time",
         )
 
-        # Submit blob
-        blobdata = "2c4253d512da5bb4223f10e8e6017ede69cc63d6e6126916f4b68a1830b7f805"
-        tx = submit_da_blob(btcrpc, seqrpc, blobdata)
-        # Calculate scriptbpubkey for sequencer address
+        # Submit envelope payload
+        tag = "DA"
+        data = "2c4253d512da5bb4223f10e8e6017ede69cc63d6e6126916f4b68a1830b7f805"
+        tx = submit_envelope_payload(btcrpc, seqrpc, tag, data)
+
+        # Calculate scriptpubkey for sequencer address
         addrdata = btcrpc.proxy.validateaddress(seqaddr)
         scriptpubkey = addrdata["scriptPubKey"]
 

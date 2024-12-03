@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 strata-btcio.workspace = true
+strata-btcio-rpc-types.workspace = true
 strata-common.workspace = true
 strata-db.workspace = true
 strata-native-zkvm-adapter.workspace = true
@@ -24,7 +25,6 @@ strata-rocksdb.workspace = true
 strata-rpc-api = { workspace = true, features = ["client"] }
 strata-rpc-types.workspace = true
 strata-state.workspace = true
-strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
 alloy-rpc-types.workspace = true
@@ -42,6 +42,7 @@ rayon = "1.8.0"
 rockbound.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+strata-btcio-tx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true

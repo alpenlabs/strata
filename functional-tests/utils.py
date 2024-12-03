@@ -219,7 +219,7 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
         wait_until(
             lambda: manual_gen.btcrpc.proxy.gettransaction(published_txid)["confirmations"] > 0,
             timeout=5,
-            error_with="Published inscription not confirmed",
+            error_with="Published checkpoint transaction not confirmed",
         )
 
 
@@ -497,8 +497,12 @@ def get_envelope_pushdata(inp: str):
     return op_if_block[pushdata_position + 2 + 4 :]
 
 
-def submit_da_blob(btcrpc: BitcoindClient, seqrpc: JsonrpcClient, blobdata: str):
-    _ = seqrpc.strataadmin_submitDABlob(blobdata)
+def submit_envelope_payload(btcrpc: BitcoindClient, seqrpc: JsonrpcClient, tag: str, blobdata: str):
+    payload_data = {
+        "tag": tag,
+        "data": blobdata,
+    }
+    _ = seqrpc.strataadmin_submitEnvelopePayloads([payload_data])
 
     # if blob data is present in tx witness then return the transaction
     tx = wait_until_with_value(

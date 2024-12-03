@@ -9,7 +9,7 @@ use jsonrpsee::http_client::HttpClientBuilder;
 use operators::ProofOperator;
 use prover_manager::ProverManager;
 use rpc_server::ProverClientRpc;
-use strata_btcio::rpc::BitcoinClient;
+use strata_btcio::rpc_client::BitcoinClient;
 use strata_common::logging;
 use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use task_tracker::TaskTracker;

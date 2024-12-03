@@ -5,7 +5,7 @@ import testenv
 from utils import (
     generate_n_blocks,
     get_envelope_pushdata,
-    submit_da_blob,
+    submit_envelope_payload,
     wait_until,
     wait_until_with_value,
 )
@@ -50,7 +50,8 @@ class ResubmitCheckpointTest(testenv.StrataTester):
                 print("Not an envelope transaction")
                 continue
 
-        tx = submit_da_blob(btcrpc, seqrpc, envelope_data)
+        tag = "Checkpoint"
+        tx = submit_envelope_payload(btcrpc, seqrpc, tag, envelope_data)
         # Calculate scriptbpubkey for sequencer address
         addrdata = btcrpc.proxy.validateaddress(seqaddr)
         scriptpubkey = addrdata["scriptPubKey"]

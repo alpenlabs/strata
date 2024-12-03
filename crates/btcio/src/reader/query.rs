@@ -6,23 +6,23 @@ use std::{
 
 use anyhow::bail;
 use bitcoin::{hashes::Hash, Block, BlockHash};
+use strata_btcio_rpc_types::traits::Reader;
+use strata_btcio_tx::{
+    filter_protocol_op_tx_refs,
+    messages::{BlockData, L1Event},
+    types::TxFilterConfig,
+};
 use strata_primitives::buf::Buf32;
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
 };
 use strata_status::StatusChannel;
-use strata_tx_parser::{
-    filter::filter_protocol_op_tx_refs,
-    filter_types::TxFilterConfig,
-    messages::{BlockData, L1Event},
-};
 use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
     reader::{config::ReaderConfig, state::ReaderState},
-    rpc::traits::Reader,
     status::{apply_status_updates, L1StatusUpdate},
 };
 
@@ -319,7 +319,8 @@ async fn process_block<R: Reader>(
     let txs = block.txdata.len();
 
     let params = ctx.config.params.clone();
-    let filtered_txs = filter_protocol_op_tx_refs(&block, state.filter_config());
+    let filter_config = TxFilterConfig::derive_from(params.rollup())?;
+    let filtered_txs = filter_protocol_op_tx_refs(&block, filter_config);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");
@@ -452,6 +453,8 @@ mod test {
                 )
                 .unwrap(),
             },
+            da_tag: "strata-da".to_string(),
+            ckpt_tag: "strata-ckpt".to_string(),
         }
     }
 

@@ -6,6 +6,7 @@ use bitcoin::{
     Block, Wtxid,
 };
 use secp256k1::XOnlyPublicKey;
+use strata_btcio_tx::messages::{BlockData, L1Event};
 use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
@@ -19,7 +20,6 @@ use strata_sp1_adapter;
 use strata_state::{
     batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
 };
-use strata_tx_parser::messages::{BlockData, L1Event};
 use strata_zkvm::ZkVmResult;
 use tokio::sync::mpsc;
 use tracing::*;
@@ -125,7 +125,7 @@ where
     }
 }
 
-/// Parses inscriptions and checks for batch data in the transactions
+/// Parses reveal transactions and checks for batch data in the transactions
 fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
@@ -135,10 +135,9 @@ fn check_for_da_batch(
     let signed_checkpts = protocol_ops_txs
         .iter()
         .filter_map(|ops_txs| match ops_txs.proto_op() {
-            strata_state::tx::ProtocolOperation::Checkpoint(inscription) => Some((
-                inscription,
-                &blockdata.block().txdata[ops_txs.index() as usize],
-            )),
+            strata_state::tx::ProtocolOperation::Checkpoint(batch) => {
+                Some((batch, &blockdata.block().txdata[ops_txs.index() as usize]))
+            }
             _ => None,
         });
 

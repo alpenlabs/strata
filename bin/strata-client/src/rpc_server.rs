@@ -11,7 +11,7 @@ use bitcoin::{
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
-use strata_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
+use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle, l1_handler::verify_proof, sync_manager::SyncManager,
 };
@@ -28,8 +28,8 @@ use strata_primitives::{
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_rpc_types::{
     errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockHeader,
-    RpcBridgeDuties, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcExecUpdate,
-    RpcL1Status, RpcSyncStatus,
+    RpcBridgeDuties, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcEnvelopePayload,
+    RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
@@ -37,12 +37,13 @@ use strata_state::{
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
-    da_blob::{BlobDest, BlobIntent},
+    da_blob::{DataBundleDest, PayloadCommitment, PayloadIntent},
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
     operation::ClientUpdateOutput,
     sync_event::SyncEvent,
+    tx::EnvelopePayload,
 };
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
@@ -282,7 +283,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
                     .iter()
                     .map(|blob| DaBlob {
                         dest: blob.dest().into(),
-                        blob_commitment: *blob.commitment().as_ref(),
+                        blob_commitment: *blob.commitment().into_inner().as_ref(),
                     })
                     .collect();
 
@@ -637,7 +638,7 @@ impl StrataAdminApiServer for AdminServerImpl {
 }
 
 pub struct SequencerServerImpl {
-    inscription_handle: Arc<InscriptionHandle>,
+    envelope_handle: Arc<EnvelopeHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     checkpoint_handle: Arc<CheckpointHandle>,
     params: Arc<Params>,
@@ -645,13 +646,13 @@ pub struct SequencerServerImpl {
 
 impl SequencerServerImpl {
     pub fn new(
-        inscription_handle: Arc<InscriptionHandle>,
+        envelope_handle: Arc<EnvelopeHandle>,
         broadcast_handle: Arc<L1BroadcastHandle>,
         params: Arc<Params>,
         checkpoint_handle: Arc<CheckpointHandle>,
     ) -> Self {
         Self {
-            inscription_handle,
+            envelope_handle,
             broadcast_handle,
             params,
             checkpoint_handle,
@@ -661,17 +662,23 @@ impl SequencerServerImpl {
 
 #[async_trait]
 impl StrataSequencerApiServer for SequencerServerImpl {
-    async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
-        let commitment = hash::raw(&blob.0);
-        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
-        // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
-        // is deferred to signer in the writer module
-        if let Err(e) = self
-            .inscription_handle
-            .submit_intent_async(blobintent)
-            .await
-        {
-            return Err(Error::Other(e.to_string()).into());
+    async fn submit_envelope_payloads(&self, bundle: Vec<RpcEnvelopePayload>) -> RpcResult<()> {
+        let payload_intents = bundle
+            .into_iter()
+            .map(|payload| {
+                let envelope_payload: EnvelopePayload = payload.into();
+                let commitment = PayloadCommitment::new(&hash::raw(envelope_payload.data()));
+                PayloadIntent::new(DataBundleDest::L1, commitment, envelope_payload)
+            })
+            .collect::<Vec<_>>();
+
+        for intent in payload_intents {
+            // NOTE: It would be nice to return reveal txid from the submit method. But creation of
+            // txs is deferred to signer in the writer module
+            self.envelope_handle
+                .submit_intent_async(intent)
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?;
         }
         Ok(())
     }

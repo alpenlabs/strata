@@ -1,79 +1,69 @@
-use bitcoin::{Block, Transaction};
-use strata_state::{
-    batch::SignedBatchCheckpoint,
-    tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
-};
+//! Structure for filtering relevant transactions
 
-use super::messages::ProtocolOpTxRef;
-pub use crate::filter_types::TxFilterConfig;
-use crate::{
-    deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
-    inscription::parse_inscription_data,
-};
+pub mod deposit;
+pub mod messages;
+pub mod reveal;
+pub mod types;
+pub mod utils;
+pub mod visitor;
+
+use bitcoin::{Block, Transaction};
+use strata_state::tx::ProtocolOperation;
+use visitor::{BridgeVisitor, OpTxVisitor, ScanProofOpVisitor, TxVisitor};
+
+use crate::messages::ProtocolOpTxRef;
+pub use crate::types::TxFilterConfig;
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
 /// [`TxFilterConfig`]s
 pub fn filter_protocol_op_tx_refs(
     block: &Block,
-    filter_config: &TxFilterConfig,
+    filter_config: TxFilterConfig,
 ) -> Vec<ProtocolOpTxRef> {
     block
         .txdata
         .iter()
         .enumerate()
         .flat_map(|(i, tx)| {
-            extract_protocol_ops(tx, filter_config)
+            extract_protocol_ops(tx, &filter_config)
                 .into_iter()
                 .map(move |relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
         })
         .collect()
 }
 
-/// If a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
-/// info.
-//  TODO: make this function return multiple ops as a single tx can have multiple outpoints that's
-//  relevant
-fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
-    // Currently all we have are inscription txs, deposits and deposit requests
-    parse_inscription_checkpoints(tx, filter_conf)
-        .map(ProtocolOperation::Checkpoint)
-        .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
-        .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
+/// Extracts protocol operations from a transaction based on the provided filter configuration.
+pub fn extract_protocol_ops(
+    tx: &Transaction,
+    filter_conf: &TxFilterConfig,
+) -> Vec<ProtocolOperation> {
+    let scan_proof_op_visitor = ScanProofOpVisitor::new();
+    let mut proof_tx_visitor = OpTxVisitor::new(scan_proof_op_visitor);
+
+    // TODO: We shouldn't be including bridge visitor here. As we would want different
+    // functions(path) for proof side and client side.
+    // we need to concretize what the requirements of client and rework ProtocolOperation
+    // (i.e : whole DA chunk to be stored for reconstruction(short and long version),
+    // stuff like not having DepositRequest Tx in testnet etc) which
+    // needs lifting in separate ticket STR-402
+    let mut bridge_visitor = BridgeVisitor::new();
+
+    proof_tx_visitor.visit_tx(filter_conf, tx);
+    bridge_visitor.visit_tx(filter_conf, tx);
+
+    proof_tx_visitor
+        .op_visitor()
+        .protocol_ops()
+        .iter()
+        .cloned()
+        .chain(
+            bridge_visitor
+                .deposit_requests()
+                .iter()
+                .cloned()
+                .map(ProtocolOperation::DepositRequest),
+        )
         .collect()
-}
-
-fn parse_deposit_requests(
-    tx: &Transaction,
-    filter_conf: &TxFilterConfig,
-) -> impl Iterator<Item = DepositRequestInfo> {
-    // TODO: Currently only one item is parsed, need to check thoroughly and parse multiple
-    extract_deposit_request_info(tx, &filter_conf.deposit_config).into_iter()
-}
-
-fn parse_deposits(
-    tx: &Transaction,
-    filter_conf: &TxFilterConfig,
-) -> impl Iterator<Item = DepositInfo> {
-    // TODO: Currently only one item is parsed, need to check thoroughly and parse multiple
-    extract_deposit_info(tx, &filter_conf.deposit_config).into_iter()
-}
-
-/// Parses inscription from the given transaction. Currently, the only inscription recognizable is
-/// the checkpoint inscription.
-// TODO: we need to change inscription structure and possibly have inscriptions for checkpoints and
-// DA separately
-fn parse_inscription_checkpoints<'a>(
-    tx: &'a Transaction,
-    filter_conf: &'a TxFilterConfig,
-) -> impl Iterator<Item = SignedBatchCheckpoint> + 'a {
-    tx.input.iter().filter_map(|inp| {
-        inp.witness
-            .tapscript()
-            .and_then(|scr| {
-                parse_inscription_data(&scr.into(), &filter_conf.rollup_name.clone()).ok()
-            })
-            .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.batch_data()).ok())
-    })
 }
 
 #[cfg(test)]
@@ -92,14 +82,8 @@ mod test {
         Transaction, TxMerkleNode, TxOut,
     };
     use rand::{rngs::OsRng, RngCore};
-    use strata_btcio::test_utils::{
-        build_reveal_transaction_test, generate_inscription_script_test,
-    };
     use strata_primitives::l1::BitcoinAmount;
-    use strata_state::{
-        batch::SignedBatchCheckpoint,
-        tx::{InscriptionData, ProtocolOperation},
-    };
+    use strata_state::tx::{EnvelopePayload, PayloadTypeTag, ProtocolOperation};
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::TxFilterConfig;
@@ -108,7 +92,9 @@ mod test {
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
             test_taproot_addr,
         },
-        filter::filter_protocol_op_tx_refs,
+        filter_protocol_op_tx_refs,
+        messages::ProtocolOpTxRef,
+        reveal::builder::{build_reveal_transaction, generate_envelope_script},
     };
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
@@ -160,15 +146,17 @@ mod test {
             .unwrap()
     }
 
-    // Create an inscription transaction. The focus here is to create a tapscript, rather than a
+    // Create an commit reveal transaction. The focus here is to create a tapscript, rather than a
     // completely valid control block
-    fn create_inscription_tx(rollup_name: String) -> Transaction {
+    fn create_commit_reveal_tx(da_tag: &str, ckpt_tag: &str, num_envelopes: u32) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
-        let inscription_data = InscriptionData::new(borsh::to_vec(&signed_checkpoint).unwrap());
+        let signed_checkpoint: Vec<u8> = ArbitraryGenerator::new().generate();
+        let envelope_data = (0..num_envelopes)
+            .map(|_| EnvelopePayload::new(PayloadTypeTag::DA, signed_checkpoint.clone()))
+            .collect::<Vec<_>>();
 
-        let script = generate_inscription_script_test(inscription_data, &rollup_name, 1).unwrap();
+        let script = generate_envelope_script(&envelope_data, da_tag, ckpt_tag).unwrap();
 
         // Create controlblock
         let mut rand_bytes = [0; 32];
@@ -184,7 +172,7 @@ mod test {
         };
 
         // Create transaction using control block
-        let mut tx = build_reveal_transaction_test(inp_tx, address, 100, 10, &script, &cb).unwrap();
+        let mut tx = build_reveal_transaction(inp_tx, address, 100, 10, &script, &cb).unwrap();
         tx.input[0].witness.push([1; 3]);
         tx.input[0].witness.push(script);
         tx.input[0].witness.push(cb.serialize());
@@ -192,27 +180,46 @@ mod test {
     }
 
     #[test]
-    fn test_filter_relevant_txs_with_rollup_inscription() {
-        // Test with valid name
+    fn test_filter_relevant_txs_with_commit_reveal() {
+        // Test with valid tags
         let filter_config = create_tx_filter_config();
 
-        let rollup_name = filter_config.rollup_name.clone();
-        let tx = create_inscription_tx(rollup_name.clone());
+        let da_tag = filter_config.da_tag.clone();
+        let ckpt_tag = filter_config.ckpt_tag.clone();
+        let tx = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let block = create_test_block(vec![tx]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config.clone())
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
 
-        assert_eq!(txids[0], 0, "Should filter valid rollup name");
+        assert_eq!(txids[0], 0, "Should filter valid tags");
 
-        // Test with invalid name
-        let rollup_name = "invalidRollupName".to_string();
-        let tx = create_inscription_tx(rollup_name.clone());
+        // Test with invalid tag
+        let tx = create_commit_reveal_tx("invalid-da-tag", &ckpt_tag, 1);
         let block = create_test_block(vec![tx]);
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
-        assert!(result.is_empty(), "Should filter out invalid name");
+        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        assert!(result.is_empty(), "Should filter out invalid tag");
+    }
+
+    #[test]
+    fn test_filter_relevant_txs_of_commit_reveal_tx_with_multiple_envelope() {
+        let filter_config = create_tx_filter_config();
+        let num_envelopes = 20;
+        let da_tag = filter_config.da_tag.clone();
+        let ckpt_tag = filter_config.ckpt_tag.clone();
+        let tx = create_commit_reveal_tx(&da_tag, &ckpt_tag, num_envelopes);
+        let block = create_test_block(vec![tx]);
+
+        let txids: Vec<ProtocolOpTxRef> = filter_protocol_op_tx_refs(&block, filter_config);
+
+        assert_eq!(txids[0].index(), 0, "Should filter valid tags");
+        assert_eq!(
+            txids.len(),
+            num_envelopes as usize,
+            "Should have protocolOps equal to number of envelopes"
+        );
     }
 
     #[test]
@@ -222,7 +229,7 @@ mod test {
         let block = create_test_block(vec![tx1, tx2]);
         let filter_config = create_tx_filter_config();
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config)
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
@@ -232,13 +239,14 @@ mod test {
     #[test]
     fn test_filter_relevant_txs_multiple_matches() {
         let filter_config = create_tx_filter_config();
-        let rollup_name = filter_config.rollup_name.clone();
-        let tx1 = create_inscription_tx(rollup_name.clone());
+        let da_tag = filter_config.da_tag.clone();
+        let ckpt_tag = filter_config.ckpt_tag.clone();
+        let tx1 = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_inscription_tx(rollup_name);
+        let tx3 = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config)
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
@@ -263,7 +271,7 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -306,7 +314,7 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -341,7 +349,7 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config);
 
         assert!(
             result.is_empty(),
@@ -374,7 +382,7 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config);
 
         assert_eq!(result.len(), 2, "Should find two relevant transactions");
         assert_eq!(

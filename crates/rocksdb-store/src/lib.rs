@@ -76,7 +76,7 @@ pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
 use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
 use rockbound::{schema::ColumnFamilyName, Schema};
-pub use sequencer::db::RBSeqBlobDb;
+pub use sequencer::db::WriterDb;
 use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 pub use sync_event::db::SyncEventDb;
 

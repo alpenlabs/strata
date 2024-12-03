@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 strata-bridge-tx-builder.workspace = true
+strata-btcio-rpc-types.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
@@ -25,7 +26,7 @@ reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-strata-tx-parser.workspace = true
+strata-btcio-tx = { workspace = true, features = ["builder"] }
 thiserror.workspace = true
 threadpool.workspace = true
 tokio.workspace = true
