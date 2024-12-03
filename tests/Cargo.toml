@@ -20,9 +20,9 @@ strata-primitives.workspace = true
 strata-rocksdb.workspace = true
 strata-storage.workspace = true
 
-anyhow.workspace = true                                 # anyhow should be fine for tests
-bitcoin = { workspace = true, features = ["rand-std"] }
-bitcoind.workspace = true
+anyhow.workspace = true                                  # anyhow should be fine for tests
+bitcoincore-rpc = "0.19.0"
+corepc-node = { version = "0.4.0", features = ["28_0"] }
 threadpool.workspace = true
 tokio.workspace = true
 tracing.workspace = true

@@ -390,7 +390,7 @@ mod test {
     use std::env::set_var;
 
     use bitcoin::{consensus, hashes::Hash, NetworkKind};
-    use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
+    use corepc_node::BitcoinD;
     use strata_common::logging;
 
     use super::*;
@@ -411,14 +411,15 @@ mod test {
     ) -> anyhow::Result<Vec<BlockHash>> {
         let coinbase_address = match address {
             Some(address) => address,
-            None => bitcoind
-                .client
-                .get_new_address(None, None)?
-                .assume_checked(),
+            None => bitcoind.client.new_address()?,
         };
         let block_hashes = bitcoind
             .client
-            .generate_to_address(count as _, &coinbase_address)?;
+            .generate_to_address(count as _, &coinbase_address)?
+            .0
+            .iter()
+            .map(|hash| hash.parse::<BlockHash>())
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(block_hashes)
     }
 

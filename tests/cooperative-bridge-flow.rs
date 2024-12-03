@@ -2,13 +2,13 @@
 
 use std::sync::Arc;
 
-use bitcoin::{
-    key::rand::{self, Rng},
-    Network, OutPoint,
-};
-use bitcoind::{
-    bitcoincore_rpc::{json::ScanTxOutRequest, RpcApi},
-    BitcoinD,
+use bitcoincore_rpc::{
+    bitcoin::{
+        key::rand::{self, Rng},
+        Network, OutPoint,
+    },
+    json::ScanTxOutRequest,
+    Client, RpcApi,
 };
 use common::bridge::{perform_rollup_actions, perform_user_actions, setup, BridgeDuty, User};
 use rand::rngs::OsRng;
@@ -16,7 +16,6 @@ use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, get_aggregated_pubkey, CooperativeWithdrawalInfo, SpendPath,
 };
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
-use tokio::sync::Mutex;
 use tracing::{debug, event, span, Level};
 
 mod common;
@@ -25,7 +24,7 @@ mod common;
 async fn full_flow() {
     let num_operators = 3;
 
-    let (bitcoind, bridge_in_federation) = setup(num_operators).await;
+    let (bitcoind, client, bridge_in_federation) = setup(num_operators).await;
     let bridge_out_federation = bridge_in_federation.duplicate("bridge-out").await;
 
     let deposit_guard = span!(Level::WARN, "Initiating Deposit").entered();
@@ -69,7 +68,7 @@ async fn full_flow() {
     user.agent().mine_blocks(blocks_to_confirm_deposit).await;
 
     let outpoint =
-        get_bridge_out_outpoint(bridge_in_federation.pubkey_table.clone(), bitcoind.clone()).await;
+        get_bridge_out_outpoint(bridge_in_federation.pubkey_table.clone(), client.clone()).await;
 
     event!(Level::INFO, event = "Deposit flow complete");
 
@@ -124,10 +123,7 @@ async fn full_flow() {
     event!(Level::INFO, event = "Withdrawal flow complete");
 }
 
-async fn get_bridge_out_outpoint(
-    pubkey_table: PublickeyTable,
-    bitcoind: Arc<Mutex<BitcoinD>>,
-) -> OutPoint {
+async fn get_bridge_out_outpoint(pubkey_table: PublickeyTable, client: Arc<Client>) -> OutPoint {
     let aggregated_pubkey = get_aggregated_pubkey(pubkey_table);
     let spend_path = SpendPath::KeySpend {
         internal_key: aggregated_pubkey,
@@ -137,14 +133,10 @@ async fn get_bridge_out_outpoint(
 
     let bridge_script_pubkey = bridge_addr.script_pubkey();
 
-    let bitcoind = bitcoind.lock().await;
-
-    let result = bitcoind
-        .client
-        .scan_tx_out_set_blocking(&[ScanTxOutRequest::Single(format!(
-            "raw({})",
-            bridge_script_pubkey.to_hex_string()
-        ))]);
+    let result = client.scan_tx_out_set_blocking(&[ScanTxOutRequest::Single(format!(
+        "raw({})",
+        bridge_script_pubkey.to_hex_string()
+    ))]);
 
     assert!(
         result.is_ok(),

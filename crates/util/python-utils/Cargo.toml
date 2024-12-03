@@ -13,30 +13,27 @@ name = "strata_utils"
 crate-type = ["cdylib"]
 
 [dependencies]
+shrex = { version = "0.1.0", path = "../shrex", features = ["serde"] }
 
 bdk_bitcoind_rpc = "0.16.0"
 # TODO: once bdk_wallet 1.0 is released, update this and don't change!
 bdk_wallet = "1.0.0-beta.5"
-# "abi3-py310" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.10
 musig2.workspace = true
+# "abi3-py310" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.10
 pyo3 = { version = "0.22.6", features = ["extension-module", "abi3-py310"] }
 reth-primitives.workspace = true
 # TODO: secp256k1 is not used directly in this crate, but through the chain of re-imports from bdk.
 # However, removing this from the dependency list makes it fail to build.
 secp256k1.workspace = true
 
-# Internal crates
-shrex = { version = "0.1.0", path = "../shrex", features = ["serde"] }
-
 [target.'cfg(target_os = "macos")'.build-dependencies]
 pyo3-build-config = "0.22.6"
 
 [dev-dependencies]
-anyhow.workspace = true
-bitcoind.workspace = true
-tokio.workspace = true
-tracing.workspace = true
-
-# Internal crates
 strata-btcio.workspace = true
 strata-common.workspace = true
+
+anyhow.workspace = true
+corepc-node = { version = "0.4.0", features = ["28_0"] }
+tokio.workspace = true
+tracing.workspace = true
