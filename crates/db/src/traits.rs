@@ -275,12 +275,18 @@ pub trait ProofDatabase {
     /// Inserts a proof into the database.
     ///
     /// Returns `Ok(())` on success, or an error on failure.
-    fn insert_proof(&self, proof_id: ProofId, proof: Proof) -> DbResult<()>;
+    fn put_proof(&self, proof_id: ProofId, proof: Proof) -> DbResult<()>;
 
     /// Retrieves a proof by its ID.
     ///
     /// Returns `Some(proof)` if found, or `None` if not.
     fn get_proof(&self, proof_id: ProofId) -> DbResult<Option<Proof>>;
+
+    /// Deletes a proof by its ID.
+    ///
+    /// Tries to delete a proof by its ID, returning if it really
+    /// existed or not.  
+    fn del_proof(&self, proof_id: ProofId) -> DbResult<bool>;
 }
 
 pub trait BroadcastDatabase {
