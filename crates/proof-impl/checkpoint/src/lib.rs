@@ -3,7 +3,7 @@
 //! chain and that all L1-L2 transactions were processed.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, params::RollupParams, vk::RollupVerifyingKey};
+use strata_primitives::{buf::Buf32, params::RollupParams, proof::RollupVerifyingKey};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_state::batch::{BatchInfo, BootstrapState};
