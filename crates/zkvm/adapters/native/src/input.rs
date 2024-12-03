@@ -1,4 +1,4 @@
-use strata_zkvm::{ZkVmInputBuilder, ZkVmResult};
+use strata_zkvm::{AggregationInput, ZkVmInputBuilder, ZkVmResult};
 
 use crate::env::NativeMachine;
 
@@ -26,9 +26,10 @@ impl<'a> ZkVmInputBuilder<'a> for NativeMachineInputBuilder {
         self.write_buf(&slice)
     }
 
-    fn write_proof(&mut self, item: strata_zkvm::AggregationInput) -> ZkVmResult<&mut Self> {
-        // TODO: figure this out
-        self.write_buf(item.proof().as_bytes())
+    fn write_proof(&mut self, item: &AggregationInput) -> ZkVmResult<&mut Self> {
+        // For the native mode we only write the public values since the proof is expected to be
+        // empty
+        self.write_buf(item.receipt().public_values().as_bytes())
     }
 
     fn build(&mut self) -> ZkVmResult<Self::Input> {
