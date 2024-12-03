@@ -7,17 +7,19 @@ use crate::buf::Buf32;
 #[serde(rename_all = "snake_case")]
 pub enum RollupVerifyingKey {
     // Verifying Key used to verify proof created using SP1
+    #[serde(rename = "sp1")]
     SP1VerifyingKey(Buf32),
     // Verifying Key used to verify proof created using Risc0
+    #[serde(rename = "r0")]
     Risc0VerifyingKey(Buf32),
 }
 
-/// `ProofId` is an enumeration representing various identifiers for proofs.
-/// It is used to uniquely identify the proofing tasks for different types of proofs.
+/// `ProofKey` is an enumeration representing various identifiers for proofs.
+/// It is used to uniquely identify the proving tasks for different types of proofs.
 #[derive(
     Debug, Clone, Copy, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
-pub enum ProofId {
+pub enum ProofKey {
     /// Represents the height of the L1 block whose blockspace proof is being prepared.
     BtcBlockspace(u64),
 

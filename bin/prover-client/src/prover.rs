@@ -4,7 +4,7 @@ use std::{
 };
 
 use strata_db::traits::{ProofDatabase, ProverDatabase};
-use strata_primitives::proof::ProofId;
+use strata_primitives::proof::ProofKey;
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
@@ -311,8 +311,8 @@ impl Prover {
     // TODO: replace `task_id` with ProofKey
     fn save_proof_to_db(&self, _task_id: Uuid, _proof: &ProofReceipt) -> Result<(), anyhow::Error> {
         // Note: This works fine for now because proof is never read from DB right now
-        // let proof_id = ProofId::BtcBlockspace(1);
-        // self.db.proof_db().insert_proof(proof_id, proof.clone())?;
+        // let proof_key = ProofKey::BtcBlockspace(1);
+        // self.db.proof_db().insert_proof(proof_key, proof.clone())?;
         Ok(())
     }
 
@@ -321,8 +321,8 @@ impl Prover {
     fn read_proof_from_db(&self, task_id: Uuid) -> Result<Proof, anyhow::Error> {
         // used an arbitrary proof id for now
         // TODO: to be replaced once we move from Uuid to ProofId based status
-        let proof_id = ProofId::BtcBlockspace(1);
-        let proof_entry = self.db.proof_db().get_proof(proof_id)?;
+        let proof_key = ProofKey::BtcBlockspace(1);
+        let proof_entry = self.db.proof_db().get_proof(proof_key)?;
         match proof_entry {
             Some(proof) => Ok(proof),
             None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),

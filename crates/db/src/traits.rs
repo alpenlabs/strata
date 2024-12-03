@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
-use strata_primitives::{l1::*, prelude::*, proof::ProofId};
+use strata_primitives::{l1::*, prelude::*, proof::ProofKey};
 use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
@@ -275,18 +275,18 @@ pub trait ProofDatabase {
     /// Inserts a proof into the database.
     ///
     /// Returns `Ok(())` on success, or an error on failure.
-    fn put_proof(&self, proof_id: ProofId, proof: Proof) -> DbResult<()>;
+    fn put_proof(&self, proof_id: ProofKey, proof: Proof) -> DbResult<()>;
 
-    /// Retrieves a proof by its ID.
+    /// Retrieves a proof by its key.
     ///
     /// Returns `Some(proof)` if found, or `None` if not.
-    fn get_proof(&self, proof_id: ProofId) -> DbResult<Option<Proof>>;
+    fn get_proof(&self, proof_id: ProofKey) -> DbResult<Option<Proof>>;
 
-    /// Deletes a proof by its ID.
+    /// Deletes a proof by its key.
     ///
-    /// Tries to delete a proof by its ID, returning if it really
+    /// Tries to delete a proof by its key, returning if it really
     /// existed or not.  
-    fn del_proof(&self, proof_id: ProofId) -> DbResult<bool>;
+    fn del_proof(&self, proof_id: ProofKey) -> DbResult<bool>;
 }
 
 pub trait BroadcastDatabase {

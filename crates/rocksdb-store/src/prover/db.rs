@@ -6,7 +6,7 @@ use strata_db::{
     traits::{ProofDatabase, ProverDatabase},
     DbResult,
 };
-use strata_primitives::proof::ProofId;
+use strata_primitives::proof::ProofKey;
 use strata_zkvm::Proof;
 
 use super::schemas::ProofSchema;
@@ -24,31 +24,31 @@ impl ProofDb {
 }
 
 impl ProofDatabase for ProofDb {
-    fn put_proof(&self, proof_id: ProofId, proof: Proof) -> DbResult<()> {
+    fn put_proof(&self, proof_key: ProofKey, proof: Proof) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
-                if tx.get::<ProofSchema>(&proof_id)?.is_some() {
+                if tx.get::<ProofSchema>(&proof_key)?.is_some() {
                     return Err(DbError::EntryAlreadyExists);
                 }
 
-                tx.put::<ProofSchema>(&proof_id, &proof)?;
+                tx.put::<ProofSchema>(&proof_key, &proof)?;
 
                 Ok(())
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_proof(&self, proof_id: ProofId) -> DbResult<Option<Proof>> {
-        Ok(self.db.get::<ProofSchema>(&proof_id)?)
+    fn get_proof(&self, proof_key: ProofKey) -> DbResult<Option<Proof>> {
+        Ok(self.db.get::<ProofSchema>(&proof_key)?)
     }
 
-    fn del_proof(&self, proof_id: ProofId) -> DbResult<bool> {
+    fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
-                if tx.get::<ProofSchema>(&proof_id)?.is_none() {
+                if tx.get::<ProofSchema>(&proof_key)?.is_none() {
                     return Ok(false);
                 }
-                tx.delete::<ProofSchema>(&proof_id)?;
+                tx.delete::<ProofSchema>(&proof_key)?;
 
                 Ok::<_, anyhow::Error>(true)
             })
@@ -84,22 +84,22 @@ mod tests {
         ProofDb::new(db, db_ops)
     }
 
-    fn generate_proof() -> (ProofId, Proof) {
-        let proof_id = ProofId::BtcBlockspace(1);
+    fn generate_proof() -> (ProofKey, Proof) {
+        let proof_key = ProofKey::BtcBlockspace(1);
         let proof = Proof::default();
-        (proof_id, proof)
+        (proof_key, proof)
     }
 
     #[test]
     fn test_insert_new_proof() {
         let db = setup_db();
 
-        let (proof_id, proof) = generate_proof();
+        let (proof_key, proof) = generate_proof();
 
-        let result = db.put_proof(proof_id, proof.clone());
+        let result = db.put_proof(proof_key, proof.clone());
         assert!(result.is_ok(), "Proof should be inserted successfully");
 
-        let stored_proof = db.get_proof(proof_id).unwrap();
+        let stored_proof = db.get_proof(proof_key).unwrap();
         assert_eq!(stored_proof, Some(proof));
     }
 
@@ -107,11 +107,11 @@ mod tests {
     fn test_insert_duplicate_proof() {
         let db = setup_db();
 
-        let (proof_id, proof) = generate_proof();
+        let (proof_key, proof) = generate_proof();
 
-        db.put_proof(proof_id, proof.clone()).unwrap();
+        db.put_proof(proof_key, proof.clone()).unwrap();
 
-        let result = db.put_proof(proof_id, proof);
+        let result = db.put_proof(proof_key, proof);
         assert!(result.is_err(), "Duplicate proof insertion should fail");
     }
 
@@ -119,16 +119,16 @@ mod tests {
     fn test_get_nonexistent_proof() {
         let db = setup_db();
 
-        let (proof_id, proof) = generate_proof();
-        db.put_proof(proof_id, proof.clone()).unwrap();
+        let (proof_key, proof) = generate_proof();
+        db.put_proof(proof_key, proof.clone()).unwrap();
 
-        let res = db.del_proof(proof_id);
+        let res = db.del_proof(proof_key);
         assert!(matches!(res, Ok(true)));
 
-        let res = db.del_proof(proof_id);
+        let res = db.del_proof(proof_key);
         assert!(matches!(res, Ok(false)));
 
-        let stored_proof = db.get_proof(proof_id).unwrap();
+        let stored_proof = db.get_proof(proof_key).unwrap();
         assert_eq!(stored_proof, None, "Nonexistent proof should return None");
     }
 }
