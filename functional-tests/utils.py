@@ -1,4 +1,4 @@
-import logging as log
+import logging
 import math
 import os
 import subprocess
@@ -40,7 +40,7 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
         try:
             rpc.proxy.generatetoaddress(1, addr)
         except Exception as ex:
-            log.warning(f"{ex} while generating to address {addr}")
+            logging.warning(f"{ex} while generating to address {addr}")
             return
 
 
@@ -49,9 +49,9 @@ def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
     print(f"generating {n} blocks to address", addr)
     try:
         blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
-        print("made blocks", blk)
+        print(f"made blocks {blk}")
     except Exception as ex:
-        log.warning(f"{ex} while generating address")
+        logging.warning(f"{ex} while generating address")
         return
 
 
@@ -238,23 +238,6 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
         raise AssertionError("Expected rpc error")
 
 
-def get_logger(name: str, level=log.DEBUG) -> log.Logger:
-    logger = log.getLogger(name)
-
-    if not logger.handlers:
-        handler = log.StreamHandler()
-        logger.setLevel(level)
-        formatter = log.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
-        )
-        handler.setFormatter(formatter)
-
-        # Add the handler to the logger
-        logger.addHandler(handler)
-
-    return logger
-
-
 def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
     """
     Waits for a proof task to complete within a specified timeout period.
@@ -307,13 +290,13 @@ def generate_seqpubkey_from_seed(path: str) -> str:
     # fmt: on
 
     with open(path) as f:
-        print("sequencer root privkey", f.read())
+        print(f"sequencer root privkey {f.read()}")
 
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
     res.check_returncode()
     res = str(res.stdout, "utf8").strip()
     assert len(res) > 0, "no output generated"
-    print("SEQ PUBKEY", res)
+    print(f"SEQ PUBKEY {res}")
     return res
 
 
@@ -381,7 +364,7 @@ def generate_simple_params(
     opxpubs = [generate_opxpub_from_seed(p) for p in opseedpaths]
 
     params = generate_params(settings, seqkey, opxpubs)
-    print("Params", params)
+    print(f"Params {params}")
     return {"params": params, "opseedpaths": opseedpaths}
 
 
@@ -432,3 +415,55 @@ def get_bridge_pubkey_from_cfg(cfg_params) -> str:
     op_x_only_pks = [convert_to_xonly_pk(pk) for pk in op_pks]
     agg_pubkey = musig_aggregate_pks(op_x_only_pks)
     return agg_pubkey
+
+
+def setup_root_logger() -> int:
+    """
+    reads `LOG_LEVEL` from the environment. Defaults to `NOTSET` if not provided.
+    """
+    log_level = os.getenv("LOG_LEVEL", "NOTSET").upper()
+    log_level = getattr(logging, log_level, logging.NOTSET)
+    # Configure the root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    return log_level
+
+
+def setup_test_loggers(datadir_root: str, tests: List[str], log_level: int):
+    """
+    Set up loggers for a list of test names, with log files in a logs directory.
+    - Configures both file and stream handlers for each test logger.
+    - Logs are stored in `<datadir_root>/logs/<test_name>.log`.
+
+    Parameters:
+        datadir_root (str): Root directory for logs.
+        log level (int): Log level
+        tests (list of str): List of test names to create loggers for.
+    """
+    # Create the logs directory
+    log_dir = os.path.join(datadir_root, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Common formatter
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
+    )
+    # Set up individual loggers for each test
+    for test_name in tests:
+        logger = logging.getLogger(test_name)
+        # Avoid duplicate handlers
+        if logger.hasHandlers():
+            continue
+        # File handler
+        log_path = os.path.join(log_dir, f"{test_name}.log")
+        file_handler = logging.FileHandler(log_path)
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(formatter)
+        # Stream handler
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(log_level)
+        stream_handler.setFormatter(formatter)
+
+        # Add handlers to the logger
+        logger.addHandler(file_handler)
+        logger.addHandler(stream_handler)

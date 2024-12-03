@@ -21,7 +21,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
     A common thin layer for all instances of the Environments.
     """
 
-    def __init__(self, srvs, bridge_pk):
+    def __init__(self, srvs, path, bridge_pk):
         super().__init__(srvs)
         self._el_address_gen = (
             f"deada00{x:04X}dca3ebeefdeadf001900dca3ebeef" for x in range(16**4)
@@ -29,6 +29,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
         self._ext_btc_addr_idx = 0
         self._rec_btc_addr_idx = 0
         self._bridge_pk = bridge_pk
+        self.path = path
 
     def gen_el_address(self) -> str:
         """
@@ -213,7 +214,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             )
             svcs["prover_client"] = prover_client
 
-        return BasicLiveEnv(svcs, bridge_pk)
+        return BasicLiveEnv(svcs, ctx.envdd_path, bridge_pk)
 
 
 class HubNetworkEnvConfig(flexitest.EnvConfig):
@@ -354,7 +355,8 @@ def main(argv):
         tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
 
     datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
-
+    log_level = setup_root_logger()
+    setup_test_loggers(datadir_root, tests, log_level)
     btc_fac = factory.BitcoinFactory([12300 + i for i in range(30)])
     seq_fac = factory.StrataFactory([12400 + i for i in range(30)])
     fullnode_fac = factory.FullNodeFactory([12500 + i for i in range(30)])

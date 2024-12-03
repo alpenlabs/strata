@@ -1,4 +1,6 @@
+import logging
 import time
+from pathlib import Path
 
 import flexitest
 
@@ -10,6 +12,7 @@ BLOCK_NUMBER = 4
 class RecentBlocksTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")

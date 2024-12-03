@@ -1,3 +1,6 @@
+import logging
+from pathlib import Path
+
 import flexitest
 
 import net_settings
@@ -25,6 +28,7 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
         settings.proof_timeout = self.proof_timeout
 
         ctx.set_env(BasicEnvConfig(premine_blocks, rollup_settings=settings))
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -36,7 +40,7 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
         # Check for first 4 checkpoints
         for n in range(4):
             check_nth_checkpoint_finalized(n, seqrpc, None, proof_timeout=self.proof_timeout)
-            print(f"Pass checkpoint finalization for checkpoint {n}")
+            self.logger.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)
 

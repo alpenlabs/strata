@@ -1,3 +1,6 @@
+import logging
+from pathlib import Path
+
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import (
@@ -12,7 +15,7 @@ from constants import (
     DEFAULT_TAKEBACK_TIMEOUT,
     UNSPENDABLE_ADDRESS,
 )
-from utils import get_bridge_pubkey, get_logger, wait_until
+from utils import get_bridge_pubkey, wait_until
 
 # Local constants
 # D BTC
@@ -33,7 +36,7 @@ class BridgeDepositReclaimDrtSeenTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("operator_lag")
-        self.logger = get_logger("BridgeDepositReclaimDrtSeenTest")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

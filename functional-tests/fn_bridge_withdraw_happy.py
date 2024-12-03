@@ -1,4 +1,6 @@
+import logging
 import time
+from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -16,7 +18,7 @@ from constants import (
     SATS_TO_WEI,
     UNSPENDABLE_ADDRESS,
 )
-from utils import get_bridge_pubkey, get_logger, wait_until
+from utils import get_bridge_pubkey, wait_until
 
 # Local constants
 # D BTC
@@ -43,7 +45,7 @@ class BridgeWithdrawHappyTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = get_logger("BridgeWithdrawHappyTest")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         address = ctx.env.gen_ext_btc_address()

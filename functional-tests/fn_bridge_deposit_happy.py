@@ -1,11 +1,13 @@
+import logging
 import time
+from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
 from constants import DEFAULT_ROLLUP_PARAMS
-from utils import get_bridge_pubkey, get_logger
+from utils import get_bridge_pubkey
 
 
 @flexitest.register
@@ -22,7 +24,7 @@ class BridgeDepositHappyTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = get_logger("BridgeDepositHappyTest")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         el_address_1 = ctx.env.gen_el_address()
