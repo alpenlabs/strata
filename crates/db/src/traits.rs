@@ -266,12 +266,12 @@ pub trait BlobDatabase {
 
 /// A trait providing access to both prover data store and prover data provider.
 pub trait ProverDatabase {
-    type ProverTaskDB: ProverTaskDatabase;
+    type ProofDB: ProofDatabase;
 
-    fn prover_task_db(&self) -> &Arc<Self::ProverTaskDB>;
+    fn proof_db(&self) -> &Arc<Self::ProofDB>;
 }
 
-pub trait ProverTaskDatabase {
+pub trait ProofDatabase {
     /// Inserts a proof into the database.
     ///
     /// Returns `Ok(())` on success, or an error on failure.
