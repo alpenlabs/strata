@@ -8,14 +8,14 @@ use bitcoin::{
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
-use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState};
+use strata_state::{batch::{BatchCheckpoint, BatchInfo, BootstrapState}, tx::InscriptionBlob};
 use strata_zkvm::Proof;
 
 /// Represents data for a blob we're still planning to inscribe.
 // TODO rename to `BlockInscriptionEntry` to emphasize this isn't just about *all* blobs
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct BlobEntry {
-    pub blob: Vec<u8>,
+    pub blobs: Vec<InscriptionBlob>,
     pub commit_txid: Buf32,
     pub reveal_txid: Buf32,
     pub status: BlobL1Status,
@@ -23,13 +23,13 @@ pub struct BlobEntry {
 
 impl BlobEntry {
     pub fn new(
-        blob: Vec<u8>,
+        blobs: Vec<InscriptionBlob>,
         commit_txid: Buf32,
         reveal_txid: Buf32,
         status: BlobL1Status,
     ) -> Self {
         Self {
-            blob,
+            blobs,
             commit_txid,
             reveal_txid,
             status,
@@ -41,10 +41,10 @@ impl BlobEntry {
     /// NOTE: This won't have commit - reveal pairs associated with it.
     ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
     ///   by others. Those will be created and signed in a single step.
-    pub fn new_unsigned(blob: Vec<u8>) -> Self {
+    pub fn new_unsigned(blobs: Vec<InscriptionBlob>) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();
-        Self::new(blob, cid, rid, BlobL1Status::Unsigned)
+        Self::new(blobs, cid, rid, BlobL1Status::Unsigned)
     }
 }
 

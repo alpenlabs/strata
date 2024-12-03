@@ -29,7 +29,7 @@ pub async fn create_and_sign_blob_inscriptions(
     config: &WriterConfig,
 ) -> Result<(Buf32, Buf32), InscriptionError> {
     trace!("Creating and signing blob inscriptions");
-    let (commit, reveal) = build_inscription_txs(&blobentry.blob, &client, config).await?;
+    let (commit, reveal) = build_inscription_txs(&blobentry.blobs, &client, config).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");
@@ -65,7 +65,7 @@ mod test {
     use std::sync::Arc;
 
     use strata_db::types::{BlobEntry, BlobL1Status};
-    use strata_primitives::hash;
+    use strata_state::{da_blob::BlobCommitment, tx::{BlobType, InscriptionBlob}};
 
     use super::*;
     use crate::{
@@ -81,14 +81,15 @@ mod test {
         let config = get_config();
 
         // First insert an unsigned blob
-        let entry = BlobEntry::new_unsigned([1; 100].to_vec());
+        let inscription_blob = vec![InscriptionBlob::new(BlobType::DA, vec![1; 100])];
+        let entry = BlobEntry::new_unsigned(inscription_blob);
 
         assert_eq!(entry.status, BlobL1Status::Unsigned);
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
-        let intent_hash = hash::raw(&entry.blob);
-        iops.put_blob_entry_async(intent_hash, entry.clone())
+        let intent_hash = BlobCommitment::from_payload(&entry.blobs);
+        iops.put_blob_entry_async(intent_hash.into_inner(), entry.clone())
             .await
             .unwrap();
 
