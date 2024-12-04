@@ -337,7 +337,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             name = f"bridge.{i}"
             svcs[name] = br
 
-        return BasicLiveEnv(svcs, bridge_pk)
+        return BasicLiveEnv(svcs, ctx.envdd_path, bridge_pk)
 
 
 def main(argv):
