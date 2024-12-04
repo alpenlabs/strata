@@ -76,6 +76,8 @@ impl ProverDatabase for ProverDB {
 
 #[cfg(test)]
 mod tests {
+    use strata_state::l1::L1BlockId;
+
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance_for_prover;
 
@@ -85,7 +87,7 @@ mod tests {
     }
 
     fn generate_proof() -> (ProofKey, Proof) {
-        let proof_key = ProofKey::BtcBlockspace(1);
+        let proof_key = ProofKey::BtcBlockspace(L1BlockId::default());
         let proof = Proof::default();
         (proof_key, proof)
     }
