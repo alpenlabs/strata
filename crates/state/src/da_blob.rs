@@ -76,6 +76,7 @@ pub struct BlobIntent {
     dest: BlobDest,
 
     /// Commitment to the blob payload.
+    /// Wrapper for Hash (Buf32)
     commitment: BlobCommitment,
 
     /// Blob payload.
