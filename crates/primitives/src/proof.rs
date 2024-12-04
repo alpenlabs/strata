@@ -10,7 +10,7 @@ pub enum RollupVerifyingKey {
     #[serde(rename = "sp1")]
     SP1VerifyingKey(Buf32),
     // Verifying Key used to verify proof created using Risc0
-    #[serde(rename = "r0")]
+    #[serde(rename = "risc0")]
     Risc0VerifyingKey(Buf32),
 }
 
