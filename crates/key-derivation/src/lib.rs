@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Key derivation for Strata
+//!
+//! This crate contains the key derivation logic for Strata.
+//!
+//! It is split into two modules:
+//! - `operator`: Key derivation for bridge operators
+//! - `sequencer`: Key derivation for sequencer
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod error;
+pub mod operator;
+pub mod sequencer;
