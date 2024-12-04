@@ -9,7 +9,7 @@ use strata_state::tx::{BlobType, InscriptionBlob};
 use thiserror::Error;
 use tracing::debug;
 
-use super::utils::{next_bytes, next_int, next_op, peek_op_false};
+use super::utils::{next_bytes, next_int, next_op};
 
 pub const ROLLUP_NAME_TAG: &[u8] = &[1];
 pub const VERSION_TAG: &[u8] = &[2];
@@ -50,9 +50,12 @@ pub fn parse_inscription_data(
     let mut instructions = script.instructions().peekable();
     let mut index = 0;
     let mut blobs = Vec::new();
-
-    while peek_op_false(&mut instructions) {
-        blobs.push(parse_inscription_envelope(index, &mut instructions, rollup_name)?);
+    while enter_envelope(&mut instructions).is_ok() {
+        blobs.push(parse_inscription_envelope(
+            index,
+            &mut instructions,
+            rollup_name,
+        )?);
         index += 1;
     }
 
@@ -69,8 +72,6 @@ pub fn parse_inscription_envelope(
     instructions: &mut Peekable<Instructions<'_>>,
     rollup_name: &str,
 ) -> Result<InscriptionBlob, InscriptionParseError> {
-
-    enter_envelope(instructions)?;
     // Parse name
     if index == 0 {
         let name = next_bytes(instructions).ok_or(InscriptionParseError::InvalidFormat)?;
@@ -86,11 +87,16 @@ pub fn parse_inscription_envelope(
     let size = next_int(instructions).ok_or(InscriptionParseError::InvalidFormat)?;
     let batch_data = extract_n_bytes(size, instructions)?;
     // DA for now but this should be based on the TAG on the script itself
-    Ok(InscriptionBlob::new(BlobType::from_u32(tag).ok_or(InscriptionParseError::InvalidBatchTag)?,batch_data))
+    Ok(InscriptionBlob::new(
+        BlobType::from_u32(tag).ok_or(InscriptionParseError::InvalidBatchTag)?,
+        batch_data,
+    ))
 }
 
 /// Check for consecutive `OP_FALSE` and `OP_IF` that marks the beginning of an inscription
-fn enter_envelope(instructions: &mut Peekable<Instructions<'_>>) -> Result<(), InscriptionParseError> {
+fn enter_envelope(
+    instructions: &mut Peekable<Instructions<'_>>,
+) -> Result<(), InscriptionParseError> {
     // loop until OP_FALSE is found
     loop {
         let next = instructions.next();
@@ -121,7 +127,7 @@ fn enter_envelope(instructions: &mut Peekable<Instructions<'_>>) -> Result<(), I
 /// Extract bytes of `size` from the remaining instructions
 fn extract_n_bytes(
     size: u32,
-    instructions: &mut Peekable<Instructions<'_>>
+    instructions: &mut Peekable<Instructions<'_>>,
 ) -> Result<Vec<u8>, InscriptionParseError> {
     debug!("Extracting {} bytes from instructions", size);
     let mut data = vec![];
@@ -149,7 +155,10 @@ mod tests {
     #[test]
     fn test_parse_inscription_data() {
         let bytes = vec![0, 1, 2, 3];
-        let inscription_data = vec![InscriptionBlob::new(BlobType::DA,bytes.clone()),InscriptionBlob::new(BlobType::Checkpoint,bytes.clone())];
+        let inscription_data = vec![
+            InscriptionBlob::new(BlobType::DA, bytes.clone()),
+            InscriptionBlob::new(BlobType::Checkpoint, bytes.clone()),
+        ];
         let script =
             generate_inscription_script_test(inscription_data.clone(), "TestRollup").unwrap();
 
@@ -160,7 +169,7 @@ mod tests {
         assert_eq!(result, inscription_data);
         // Try with larger size
         let bytes = vec![1; 2000];
-        let inscription_data = vec![InscriptionBlob::new(BlobType::DA,bytes.clone())];
+        let inscription_data = vec![InscriptionBlob::new(BlobType::DA, bytes.clone())];
         let script =
             generate_inscription_script_test(inscription_data.clone(), "TestRollup").unwrap();
 

@@ -24,9 +24,18 @@ pub fn next_op(instructions: &mut Peekable<Instructions<'_>>) -> Option<Opcode> 
     }
 }
 
+/// peek next instruction
+pub fn peek_op<'a>(instructions: &'a mut Peekable<Instructions<'a>>) -> Option<&'a Opcode> {
+    let nxt = instructions.peek();
+    match nxt {
+        Some(Ok(Instruction::Op(op))) => Some(op),
+        _ => None,
+    }
+}
+
 /// peek next instruction to check if it op false or not
 pub fn peek_op_false(instructions: &mut Peekable<Instructions<'_>>) -> bool {
-    let nxt =  instructions.peek();
+    let nxt = instructions.peek();
     match nxt {
         Some(Ok(Instruction::PushBytes(bytes))) => {
             return bytes.as_bytes().is_empty();

@@ -30,19 +30,19 @@ use strata_rpc_types::{
     RpcBridgeDuties, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcExecUpdate,
     RpcL1Status, RpcSyncStatus,
 };
-use strata_state::{da_blob::BlobCommitment, tx::BlobType};
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
     batch::BatchCheckpoint,
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
-    da_blob::{BlobDest, BlobIntent},
+    da_blob::{BlobCommitment, BlobDest, BlobIntent},
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
     operation::ClientUpdateOutput,
-    sync_event::SyncEvent, tx::InscriptionBlob,
+    sync_event::SyncEvent,
+    tx::{BlobType, InscriptionBlob},
 };
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
@@ -656,15 +656,9 @@ impl SequencerServerImpl {
             checkpoint_handle,
         }
     }
-}
 
-#[async_trait]
-impl StrataSequencerApiServer for SequencerServerImpl {
-    async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()> {
-        let blob_vec: Vec<InscriptionBlob> = blobs
-            .into_iter()
-            .map(|blob| InscriptionBlob::new(BlobType::DA, blob.into_inner()))
-            .collect();
+    /// Submit inscription blob entry
+    async fn submit_blobs(&self, blob_vec: Vec<InscriptionBlob>) -> RpcResult<()> {
         let blob_commitment = BlobCommitment::from_payload(&blob_vec);
         let blobintent = BlobIntent::new(BlobDest::L1, blob_commitment, blob_vec);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
@@ -677,6 +671,24 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             return Err(Error::Other(e.to_string()).into());
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl StrataSequencerApiServer for SequencerServerImpl {
+    async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()> {
+        let blob_vec: Vec<InscriptionBlob> = blobs
+            .into_iter()
+            .map(|blob| InscriptionBlob::new(BlobType::DA, blob.into_inner()))
+            .collect();
+
+        self.submit_blobs(blob_vec).await
+    }
+
+    async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
+        let blob = vec![InscriptionBlob::new(BlobType::DA, blob.into_inner())];
+
+        self.submit_blobs(blob).await
     }
 
     async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid> {

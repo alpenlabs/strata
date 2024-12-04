@@ -7,7 +7,9 @@ use strata_state::{
 use super::messages::ProtocolOpTxRef;
 pub use crate::filter_types::TxFilterConfig;
 use crate::{
-    deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info}, filter_types::FilteredInscriptionType, inscription::parse_inscription_data
+    deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
+    filter_types::FilteredInscriptionType,
+    inscription::parse_inscription_data,
 };
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
@@ -35,11 +37,9 @@ pub fn filter_protocol_op_tx_refs(
 fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
     // Currently all we have are inscription txs, deposits and deposit requests
     parse_inscription_checkpoints(tx, filter_conf)
-        .map(|filtered_inscription| {
-            match filtered_inscription {
-                FilteredInscriptionType::Checkpoint(sbc) => ProtocolOperation::Checkpoint(sbc),
-                FilteredInscriptionType::DA(da) => ProtocolOperation::DA(da),
-            }
+        .map(|filtered_inscription| match filtered_inscription {
+            FilteredInscriptionType::Checkpoint(sbc) => ProtocolOperation::Checkpoint(sbc),
+            FilteredInscriptionType::DA(da) => ProtocolOperation::DA(da),
         })
         .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
         .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
@@ -70,11 +70,12 @@ fn parse_inscription_checkpoints<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> impl Iterator<Item = FilteredInscriptionType> + 'a {
-      tx.input.iter()
+    tx.input
+        .iter()
         .filter_map(|inp| {
-            inp.witness.tapscript().and_then(|scr| {
-                parse_inscription_data(&scr.into(), &filter_conf.rollup_name).ok()
-            })
+            inp.witness
+                .tapscript()
+                .and_then(|scr| parse_inscription_data(&scr.into(), &filter_conf.rollup_name).ok())
         })
         .flatten()
         .filter_map(|insc| match insc.data_type() {
@@ -84,7 +85,6 @@ fn parse_inscription_checkpoints<'a>(
             BlobType::DA => Some(FilteredInscriptionType::DA(insc.data().to_vec())),
         })
 }
-
 
 #[cfg(test)]
 mod test {
@@ -176,7 +176,10 @@ mod test {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
         let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
-        let inscription_data = vec![InscriptionBlob::new(BlobType::DA, borsh::to_vec(&signed_checkpoint).unwrap())];
+        let inscription_data = vec![InscriptionBlob::new(
+            BlobType::DA,
+            borsh::to_vec(&signed_checkpoint).unwrap(),
+        )];
 
         let script = generate_inscription_script_test(inscription_data, &rollup_name).unwrap();
 

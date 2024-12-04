@@ -133,9 +133,13 @@ pub trait StrataAdminApi {
 #[cfg_attr(not(feature = "client"), rpc(server))]
 #[cfg_attr(feature = "client", rpc(server, client))]
 pub trait StrataSequencerApi {
+    /// Adds L1Write sequencer duties which will be executed by sequencer
+    #[method(name = "strataadmin_submitDABlobs")]
+    async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()>;
+
     /// Adds L1Write sequencer duty which will be executed by sequencer
     #[method(name = "strataadmin_submitDABlob")]
-    async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()>;
+    async fn submit_da_blob(&self, blobs: HexBytes) -> RpcResult<()>;
 
     /// Verifies and adds the submitted proof to the checkpoint database
     #[method(name = "strataadmin_submitCheckpointProof")]

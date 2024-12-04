@@ -56,7 +56,8 @@ impl TxFilterConfig {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum FilteredInscriptionType {
     Checkpoint(SignedBatchCheckpoint),
-    DA(Vec<u8>)
+    DA(Vec<u8>),
 }
