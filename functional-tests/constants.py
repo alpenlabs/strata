@@ -18,7 +18,7 @@ PRECOMPILE_BRIDGEOUT_ADDRESS = "0x5400000000000000000000000000000000000001"
 
 # Unspendable address
 # Taken from python-strata-utils:
-UNSPENDABLE_ADDRESS = "bcrt1plh4vmrc7ejjt66d8rj5nx8hsvslw9ps9rp3a0v7kzq37ekt5lggskf39fp"
+UNSPENDABLE_ADDRESS = "bcrt1p7hgsjwtz2pkz45y97dglj4yuc88zsva2p0n5tmcz0zrvfmhcc2lsckedfk"
 
 # SATS to WEI
 SATS_TO_WEI = 10_000_000_000

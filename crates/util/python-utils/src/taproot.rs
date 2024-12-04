@@ -326,7 +326,7 @@ mod tests {
         let address = super::unspendable_address();
         assert_eq!(
             address,
-            "bcrt1plh4vmrc7ejjt66d8rj5nx8hsvslw9ps9rp3a0v7kzq37ekt5lggskf39fp"
+            "bcrt1p7hgsjwtz2pkz45y97dglj4yuc88zsva2p0n5tmcz0zrvfmhcc2lsckedfk"
         );
     }
 
@@ -364,7 +364,7 @@ mod tests {
         let address = wallet
             .reveal_next_address(KeychainKind::External)
             .to_string();
-        let expected = "bcrt1p5xnureuyyffay9w3atdfpwn3f9pgjskrk3gjscvf6rtp6ljvannqvrem7v";
+        let expected = "bcrt1phu7d8hrax7s2p7mwezx5w8sw0gdpwuxcm7zxxa4ev0kv6hhy8tyq2xp4um";
         assert_eq!(address, expected);
     }
 

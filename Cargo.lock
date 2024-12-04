@@ -12845,7 +12845,6 @@ name = "strata-bridge-tx-builder"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "lazy_static",
  "musig2",
  "serde",
  "strata-primitives",
