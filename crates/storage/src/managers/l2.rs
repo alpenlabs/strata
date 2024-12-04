@@ -26,7 +26,7 @@ impl L2BlockManager {
     pub async fn put_block_async(&self, bundle: L2BlockBundle) -> DbResult<()> {
         let id = bundle.block().header().get_blockid();
         self.ops.put_block_async(bundle).await?;
-        self.block_cache.purge_async(&id).await;
+        self.block_cache.purge(&id);
         Ok(())
     }
 
@@ -34,14 +34,14 @@ impl L2BlockManager {
     pub fn put_block_blocking(&self, bundle: L2BlockBundle) -> DbResult<()> {
         let id = bundle.block().header().get_blockid();
         self.ops.put_block_blocking(bundle)?;
-        self.block_cache.purge_blocking(&id);
+        self.block_cache.purge(&id);
         Ok(())
     }
 
     /// Gets a block either in the cache or from the underlying database.
     pub async fn get_block_async(&self, id: &L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         self.block_cache
-            .get_or_fetch_async(id, || self.ops.get_block_chan(*id))
+            .get_or_fetch(id, || self.ops.get_block_chan(*id))
             .await
     }
 
