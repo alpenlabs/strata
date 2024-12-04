@@ -34,4 +34,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build guest code
-        run: cd provers/sp1/ && cargo build --release -F "prover"
+        run: cd provers/sp1/ && RUSTFLAGS="-C link-arg=-fuse-ld=lld" cargo build --profile prover-ci -F "prover"

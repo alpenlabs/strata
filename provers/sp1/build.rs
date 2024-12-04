@@ -33,6 +33,8 @@ fn get_program_dependencies() -> HashMap<&'static str, Vec<&'static str>> {
 }
 
 fn main() {
+    println!("cargo::rustc-link-arg=-fuse-ld=lld");
+
     // List of guest programs to build
     let guest_programs = [
         BTC_BLOCKSPACE,
