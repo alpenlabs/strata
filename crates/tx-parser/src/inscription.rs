@@ -62,11 +62,11 @@ pub fn parse_inscription_data(
     Ok(blobs)
 }
 
-/// Parse [`InscriptionData`]
+/// Parse [`InscriptionBlob`]
 ///
 /// # Errors
 ///
-/// This function errors if it cannot parse the [`InscriptionData`]
+/// This function errors if it cannot parse the [`InscriptionBlob`]
 pub fn parse_inscription_envelope(
     index: u32,
     instructions: &mut Peekable<Instructions<'_>>,
