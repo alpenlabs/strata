@@ -353,22 +353,22 @@ mod tests {
     use super::*;
     use crate::genesis;
 
-    struct TestEvent {
+    struct TestEvent<'a> {
         event: SyncEvent,
-        expected_writes: Vec<ClientStateWrite>,
-        expected_actions: Vec<SyncAction>,
+        expected_writes: &'a [ClientStateWrite],
+        expected_actions: &'a [SyncAction],
     }
 
-    struct TestCase {
+    struct TestCase<'a> {
         description: &'static str,
-        events: Vec<TestEvent>, // List of events to process
+        events: &'a [TestEvent<'a>], // List of events to process
         state_assertions: Box<dyn Fn(&ClientState)>, // Closure to verify state after all events
     }
 
-    fn run_test_cases<D: Database>(
-        test_cases: Vec<TestCase>,
+    fn run_test_cases(
+        test_cases: &[TestCase],
         state: &mut ClientState,
-        database: &D,
+        database: &impl Database,
         params: &Params,
     ) {
         for case in test_cases {
@@ -427,15 +427,15 @@ mod tests {
         }
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash().into()).collect();
 
-        let test_cases = vec![
+        let test_cases = [
             TestCase {
                 description: "At horizon block",
-                events: vec![TestEvent {
+                events: &[TestEvent {
                     event: SyncEvent::L1Block(horizon, l1_chain[0].block_hash().into()),
-                    expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                    expected_writes: &[ClientStateWrite::AcceptL1Block(
                         l1_chain[0].block_hash().into(),
                     )],
-                    expected_actions: vec![],
+                    expected_actions: &[],
                 }],
                 state_assertions: Box::new({
                     let l1_chain = l1_chain.clone();
@@ -451,12 +451,12 @@ mod tests {
             },
             TestCase {
                 description: "At horizon block + 1",
-                events: vec![TestEvent {
+                events: &[TestEvent {
                     event: SyncEvent::L1Block(horizon + 1, l1_chain[1].block_hash().into()),
-                    expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                    expected_writes: &[ClientStateWrite::AcceptL1Block(
                         l1_chain[1].block_hash().into(),
                     )],
-                    expected_actions: vec![],
+                    expected_actions: &[],
                 }],
                 state_assertions: Box::new({
                     let l1_chain = l1_chain.clone();
@@ -473,15 +473,15 @@ mod tests {
             },
             TestCase {
                 description: "As the genesis of L2 is reached but not locked in yet",
-                events: vec![TestEvent {
+                events: &[TestEvent {
                     event: SyncEvent::L1Block(
                         genesis,
                         l1_chain[(genesis - horizon) as usize].block_hash().into(),
                     ),
-                    expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                    expected_writes: &[ClientStateWrite::AcceptL1Block(
                         l1_chain[(genesis - horizon) as usize].block_hash().into(),
                     )],
-                    expected_actions: vec![],
+                    expected_actions: &[],
                 }],
                 state_assertions: Box::new(move |state| {
                     assert!(!state.is_chain_active());
@@ -490,19 +490,19 @@ mod tests {
             },
             TestCase {
                 description: "At genesis + 1",
-                events: vec![TestEvent {
+                events: &[TestEvent {
                     event: SyncEvent::L1Block(
                         genesis + 1,
                         l1_chain[(genesis + 1 - horizon) as usize]
                             .block_hash()
                             .into(),
                     ),
-                    expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                    expected_writes: &[ClientStateWrite::AcceptL1Block(
                         l1_chain[(genesis + 1 - horizon) as usize]
                             .block_hash()
                             .into(),
                     )],
-                    expected_actions: vec![],
+                    expected_actions: &[],
                 }],
                 state_assertions: Box::new({
                     let l1_chain = l1_chain.clone();
@@ -527,19 +527,19 @@ mod tests {
             },
             TestCase {
                 description: "At genesis + 2",
-                events: vec![TestEvent {
+                events: &[TestEvent {
                     event: SyncEvent::L1Block(
                         genesis + 2,
                         l1_chain[(genesis + 2 - horizon) as usize]
                             .block_hash()
                             .into(),
                     ),
-                    expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                    expected_writes: &[ClientStateWrite::AcceptL1Block(
                         l1_chain[(genesis + 2 - horizon) as usize]
                             .block_hash()
                             .into(),
                     )],
-                    expected_actions: vec![],
+                    expected_actions: &[],
                 }],
                 state_assertions: Box::new({
                     let l1_chain = l1_chain.clone();
@@ -564,13 +564,13 @@ mod tests {
             },
             TestCase {
                 description: "At genesis + 3, lock in genesis",
-                events: vec![
+                events: &[
                     TestEvent {
                         event: SyncEvent::L1BlockGenesis(
                             genesis + 3,
                             l1_verification_state.clone(),
                         ),
-                        expected_writes: vec![
+                        expected_writes: &[
                             ClientStateWrite::ActivateChain,
                             ClientStateWrite::UpdateVerificationState(
                                 l1_verification_state.clone(),
@@ -579,7 +579,7 @@ mod tests {
                                 genesis_blockid,
                             ))),
                         ],
-                        expected_actions: vec![SyncAction::L2Genesis(
+                        expected_actions: &[SyncAction::L2Genesis(
                             l1_chain[(genesis - horizon) as usize].block_hash().into(),
                         )],
                     },
@@ -590,12 +590,12 @@ mod tests {
                                 .block_hash()
                                 .into(),
                         ),
-                        expected_writes: vec![ClientStateWrite::AcceptL1Block(
+                        expected_writes: &[ClientStateWrite::AcceptL1Block(
                             l1_chain[(genesis + 3 - horizon) as usize]
                                 .block_hash()
                                 .into(),
                         )],
-                        expected_actions: vec![],
+                        expected_actions: &[],
                     },
                 ],
                 state_assertions: Box::new({
@@ -606,34 +606,17 @@ mod tests {
                     }
                 }),
             },
+            TestCase {
+                description: "Rollback to genesis height",
+                events: &[TestEvent {
+                    event: SyncEvent::L1Revert(genesis),
+                    expected_writes: &[ClientStateWrite::RollbackL1BlocksTo(genesis)],
+                    expected_actions: &[],
+                }],
+                state_assertions: Box::new({ move |state| {} }),
+            },
         ];
 
-        run_test_cases(test_cases, &mut state, database.as_ref(), &params);
-    }
-
-    // TODO: so after reverting, should we not apply writes ???
-    // Keeping it out of our generalized table approach as this is different
-    #[test]
-    fn test_l1_reorg() {
-        let database = get_common_db();
-        let params = gen_params();
-        let mut state = gen_client_state(Some(&params));
-
-        let height = params.rollup().genesis_l1_height;
-        let event = SyncEvent::L1Revert(height);
-
-        let l1_block: L1BlockManifest = ArbitraryGenerator::new().generate();
-        database
-            .l1_db()
-            .put_block_data(height, l1_block.clone(), vec![])
-            .unwrap();
-
-        let res = process_event(&state, &event, database.as_ref(), &params).unwrap();
-        eprintln!("process_event on {event:?} -> {res:?}");
-        let expected_writes = [ClientStateWrite::RollbackL1BlocksTo(height)];
-        let expected_actions = [];
-
-        assert_eq!(res.actions(), expected_actions);
-        assert_eq!(res.writes(), expected_writes);
+        run_test_cases(&test_cases, &mut state, database.as_ref(), &params);
     }
 }
