@@ -8,7 +8,7 @@ use super::messages::ProtocolOpTxRef;
 pub use crate::filter_types::TxFilterConfig;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
-    filter_types::FilteredInscriptionType,
+    filter_types::{inscription_to_protocol_operation, FilteredInscriptionType},
     inscription::parse_inscription_data,
 };
 
@@ -37,10 +37,7 @@ pub fn filter_protocol_op_tx_refs(
 fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
     // Currently all we have are inscription txs, deposits and deposit requests
     parse_inscription_checkpoints(tx, filter_conf)
-        .map(|filtered_inscription| match filtered_inscription {
-            FilteredInscriptionType::Checkpoint(sbc) => ProtocolOperation::Checkpoint(sbc),
-            FilteredInscriptionType::DA(da) => ProtocolOperation::DA(da),
-        })
+        .map(inscription_to_protocol_operation)
         .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
         .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
         .collect()
@@ -119,6 +116,7 @@ mod test {
             test_taproot_addr,
         },
         filter::filter_protocol_op_tx_refs,
+        messages::ProtocolOpTxRef,
     };
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
@@ -172,14 +170,18 @@ mod test {
 
     // Create an inscription transaction. The focus here is to create a tapscript, rather than a
     // completely valid control block
-    fn create_inscription_tx(rollup_name: String) -> Transaction {
+    fn create_inscription_tx(rollup_name: String, num_envelopes: u32) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
         let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
-        let inscription_data = vec![InscriptionBlob::new(
-            BlobType::DA,
-            borsh::to_vec(&signed_checkpoint).unwrap(),
-        )];
+        let inscription_data = (0..num_envelopes)
+            .map(|_| {
+                InscriptionBlob::new(
+                    BlobType::Checkpoint,
+                    borsh::to_vec(&signed_checkpoint).unwrap(),
+                )
+            })
+            .collect();
 
         let script = generate_inscription_script_test(inscription_data, &rollup_name).unwrap();
 
@@ -210,7 +212,7 @@ mod test {
         let filter_config = create_tx_filter_config();
 
         let rollup_name = filter_config.rollup_name.clone();
-        let tx = create_inscription_tx(rollup_name.clone());
+        let tx = create_inscription_tx(rollup_name.clone(), 1);
         let block = create_test_block(vec![tx]);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config.clone())
@@ -222,10 +224,28 @@ mod test {
 
         // Test with invalid name
         let rollup_name = "invalidRollupName".to_string();
-        let tx = create_inscription_tx(rollup_name.clone());
+        let tx = create_inscription_tx(rollup_name.clone(), 1);
         let block = create_test_block(vec![tx]);
         let result = filter_protocol_op_tx_refs(&block, filter_config);
         assert!(result.is_empty(), "Should filter out invalid name");
+    }
+
+    #[test]
+    fn test_filter_relevant_txs_with_rollup_inscription_with_multiple_envelope() {
+        let filter_config = create_tx_filter_config();
+        let rollup_name = filter_config.rollup_name.clone();
+        let num_envelopes = 20;
+        let tx = create_inscription_tx(rollup_name.clone(), num_envelopes);
+        let block = create_test_block(vec![tx]);
+
+        let txids: Vec<ProtocolOpTxRef> = filter_protocol_op_tx_refs(&block, filter_config.clone());
+
+        assert_eq!(txids[0].index(), 0, "Should filter valid rollup name");
+        assert_eq!(
+            txids.len(),
+            num_envelopes as usize,
+            "Should have protocolOps equal to number of envelopes"
+        );
     }
 
     #[test]
@@ -246,9 +266,9 @@ mod test {
     fn test_filter_relevant_txs_multiple_matches() {
         let filter_config = create_tx_filter_config();
         let rollup_name = filter_config.rollup_name.clone();
-        let tx1 = create_inscription_tx(rollup_name.clone());
+        let tx1 = create_inscription_tx(rollup_name.clone(), 1);
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_inscription_tx(rollup_name);
+        let tx3 = create_inscription_tx(rollup_name, 1);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config)
