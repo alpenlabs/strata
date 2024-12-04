@@ -96,8 +96,7 @@ pub fn create_inscription_transactions(
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     // Start creating inscription content
-    let reveal_script =
-        build_reveal_script(rollup_name, &public_key, inscription_data)?;
+    let reveal_script = build_reveal_script(rollup_name, &public_key, inscription_data)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -494,19 +493,16 @@ pub fn generate_inscription_script(
     rollup_name: &str,
 ) -> anyhow::Result<ScriptBuf> {
     let mut builder = script::Builder::new();
-    for (index,inscription) in inscriptions.iter().enumerate() {
+    for (index, inscription) in inscriptions.iter().enumerate() {
+        builder = builder.push_opcode(OP_FALSE).push_opcode(OP_IF);
+
+        if index == 0 {
+            builder = builder.push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?);
+        }
+
         builder = builder
-            .push_opcode(OP_FALSE)
-            .push_opcode(OP_IF);
-
-            if index == 0 {
-                builder = builder
-                    .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?);
-            }
-
-            builder = builder
-                .push_int(inscription.data_type() as i64) // Batch Tag
-                .push_int(inscription.data().len() as i64);
+            .push_int(inscription.data_type() as i64) // Batch Tag
+            .push_int(inscription.data().len() as i64);
 
         trace!(batchdata_size = %inscription.data().len(), "Inserting batch data");
         for chunk in inscription.data().chunks(520) {
@@ -725,7 +721,7 @@ mod tests {
     fn test_create_inscription_transactions() {
         let (rollup_name, _, _, _, address, utxos) = get_mock_data();
 
-        let write_intent = [InscriptionBlob::new(BlobType::DA, vec![0u8;100])];
+        let write_intent = [InscriptionBlob::new(BlobType::DA, vec![0u8; 100])];
         let (commit, reveal) = super::create_inscription_transactions(
             rollup_name,
             &write_intent,

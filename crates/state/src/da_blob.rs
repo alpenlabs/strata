@@ -83,7 +83,7 @@ pub struct BlobIntent {
 }
 
 impl BlobIntent {
-    pub fn new(dest: BlobDest, commitment: BlobCommitment ,payload: Vec<InscriptionBlob>) -> Self {
+    pub fn new(dest: BlobDest, commitment: BlobCommitment, payload: Vec<InscriptionBlob>) -> Self {
         Self {
             dest,
             commitment,
@@ -130,13 +130,17 @@ impl BlobCommitment {
         self.0
     }
 
-    pub fn from_payload(payload: &[InscriptionBlob]) -> Self{
-        let commitment = payload.iter().fold(Buf32::zero(),|acc, blob| hash::raw(&[acc.0,hash::raw(blob.data()).0].concat()));
+    pub fn from_payload(payload: &[InscriptionBlob]) -> Self {
+        let commitment = payload.iter().fold(Buf32::zero(), |acc, blob| {
+            hash::raw(&[acc.0, hash::raw(blob.data()).0].concat())
+        });
         Self(commitment)
     }
 
-    pub fn verify_against_payload(&self,payload:&[InscriptionBlob]) -> bool {
-        let commitment = payload.iter().fold(Buf32::zero(),|acc, blob| hash::raw(&[acc.0,hash::raw(blob.data()).0].concat()));
+    pub fn verify_against_payload(&self, payload: &[InscriptionBlob]) -> bool {
+        let commitment = payload.iter().fold(Buf32::zero(), |acc, blob| {
+            hash::raw(&[acc.0, hash::raw(blob.data()).0].concat())
+        });
         commitment == self.0
     }
 }

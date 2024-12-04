@@ -15,8 +15,7 @@ pub enum ProtocolOperation {
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
     /// DA data
-    DA(Vec<u8>)
-    // TODO: add other kinds like statediffs
+    DA(Vec<u8>), // TODO: add other kinds like statediffs
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -52,7 +51,7 @@ pub struct InscriptionBlob {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum BlobType {
     Checkpoint = 0,
     DA = 1,
@@ -63,7 +62,7 @@ impl BlobType {
         match value {
             0 => Some(Self::Checkpoint),
             1 => Some(Self::DA),
-            _ => None
+            _ => None,
         }
     }
 }

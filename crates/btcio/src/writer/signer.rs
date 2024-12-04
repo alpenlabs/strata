@@ -65,7 +65,10 @@ mod test {
     use std::sync::Arc;
 
     use strata_db::types::{BlobEntry, BlobL1Status};
-    use strata_state::{da_blob::BlobCommitment, tx::{BlobType, InscriptionBlob}};
+    use strata_state::{
+        da_blob::BlobCommitment,
+        tx::{BlobType, InscriptionBlob},
+    };
 
     use super::*;
     use crate::{

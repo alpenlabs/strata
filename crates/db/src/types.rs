@@ -8,7 +8,10 @@ use bitcoin::{
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
-use strata_state::{batch::{BatchCheckpoint, BatchInfo, BootstrapState}, tx::InscriptionBlob};
+use strata_state::{
+    batch::{BatchCheckpoint, BatchInfo, BootstrapState},
+    tx::InscriptionBlob,
+};
 use strata_zkvm::Proof;
 
 /// Represents data for a blob we're still planning to inscribe.
