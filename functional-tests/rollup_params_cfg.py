@@ -1,5 +1,3 @@
-from typing import List
-
 from pydantic import BaseModel
 
 
@@ -13,9 +11,9 @@ class OperatorConfigItem(BaseModel):
 
 
 class OperatorConfig(BaseModel):
-    static: List[OperatorConfigItem]
+    static: list[OperatorConfigItem]
 
-    def get_operators_pubkeys(self) -> List[str]:
+    def get_operators_pubkeys(self) -> list[str]:
         return [operator.wallet_pk for operator in self.static]
 
 

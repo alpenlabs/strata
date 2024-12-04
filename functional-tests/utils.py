@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, List, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, musig_aggregate_pks
@@ -368,7 +368,7 @@ def generate_simple_params(
     return {"params": params, "opseedpaths": opseedpaths}
 
 
-def broadcast_tx(btcrpc: BitcoindClient, outputs: List[dict], options: dict) -> str:
+def broadcast_tx(btcrpc: BitcoindClient, outputs: list[dict], options: dict) -> str:
     """
     Broadcast a transaction to the Bitcoin network.
     """
@@ -429,7 +429,7 @@ def setup_root_logger() -> int:
     return log_level
 
 
-def setup_test_loggers(datadir_root: str, tests: List[str], log_level: int):
+def setup_test_loggers(datadir_root: str, tests: list[str], log_level: int):
     """
     Set up loggers for a list of test names, with log files in a logs directory.
     - Configures both file and stream handlers for each test logger.
