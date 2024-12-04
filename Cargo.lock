@@ -13141,6 +13141,11 @@ dependencies = [
 [[package]]
 name = "strata-key-derivation"
 version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "miniscript",
+ "thiserror",
+]
 
 [[package]]
 name = "strata-mmr"
