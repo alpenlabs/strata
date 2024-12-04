@@ -429,7 +429,7 @@ def setup_root_logger() -> int:
     return log_level
 
 
-def setup_test_loggers(datadir_root: str, tests: List[str], log_level: int):
+def setup_test_loggers(datadir_root: str, tests: list[str], log_level: int):
     """
     Set up loggers for a list of test names, with log files in a logs directory.
     - Configures both file and stream handlers for each test logger.
