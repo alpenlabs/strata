@@ -1,11 +1,6 @@
 use std::sync::LazyLock;
 
-use bdk_wallet::bitcoin::{
-    key::Parity,
-    secp256k1::{PublicKey, SecretKey, SECP256K1},
-    Amount, Network, XOnlyPublicKey,
-};
-use shrex::hex;
+use bdk_wallet::bitcoin::{Amount, Network};
 
 /// Magic bytes to add to the metadata output in transactions to help identify them.
 pub const MAGIC_BYTES: &[u8; 11] = b"alpenstrata";
@@ -20,35 +15,6 @@ pub(crate) const BRIDGE_IN_AMOUNT: Amount = Amount::from_sat(1_001_000_000);
 /// Bridge outs are enforced to be exactly 10 BTC
 #[allow(dead_code)] // TODO: Remove this when bridge out is implemented
 pub(crate) const BRIDGE_OUT_AMOUNT: Amount = Amount::from_int_btc(10);
-
-/// A provably unspendable, static public key from predetermined inputs created using method
-/// specified in [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23)
-pub(crate) static UNSPENDABLE: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
-    // Step 1: Our "random" point on the curve
-    let h_point = PublicKey::from_x_only_public_key(
-        XOnlyPublicKey::from_slice(&hex!(
-            "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
-        ))
-        .expect("valid xonly pub key"),
-        Parity::Even,
-    );
-
-    // Step 2: Our "random" scalar r
-
-    let r = SecretKey::from_slice(
-        &(hex!("82758434e13488368e0781c4a94019d3d6722f854d26c15d2d157acd1f464723")),
-    )
-    .expect("valid r");
-
-    // Calculate rG
-    let r_g = r.public_key(SECP256K1);
-
-    // Step 3: Combine H_point with rG to create the final public key: P = H + rG
-    let combined_point = h_point.combine(&r_g).expect("Failed to combine points");
-
-    // Step 4: Convert to the XOnly format
-    combined_point.x_only_public_key().0
-});
 
 /// An xpriv that is good enough for testing purposes.
 ///
@@ -72,15 +38,17 @@ pub(crate) static CHANGE_DESCRIPTOR: LazyLock<&'static str> =
 #[cfg(test)]
 mod tests {
     use bdk_wallet::bitcoin::Address;
+    use secp256k1::SECP256K1;
+    use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
 
     use super::*;
 
     #[test]
     fn unspendable() {
-        let unspendable_address = Address::p2tr(SECP256K1, *UNSPENDABLE, None, NETWORK);
+        let unspendable_address = Address::p2tr(SECP256K1, *UNSPENDABLE_PUBLIC_KEY, None, NETWORK);
         assert_eq!(
             unspendable_address.to_string(),
-            "bcrt1plh4vmrc7ejjt66d8rj5nx8hsvslw9ps9rp3a0v7kzq37ekt5lggskf39fp"
+            "bcrt1p7hgsjwtz2pkz45y97dglj4yuc88zsva2p0n5tmcz0zrvfmhcc2lsckedfk"
         );
     }
 }

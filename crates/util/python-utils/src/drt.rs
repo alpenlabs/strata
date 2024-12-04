@@ -11,9 +11,10 @@ use bdk_wallet::{
 };
 use pyo3::prelude::*;
 use reth_primitives::revm_primitives::alloy_primitives::Address as RethAddress;
+use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
 
 use crate::{
-    constants::{BRIDGE_IN_AMOUNT, MAGIC_BYTES, NETWORK, RECOVER_DELAY, UNSPENDABLE, XPRIV},
+    constants::{BRIDGE_IN_AMOUNT, MAGIC_BYTES, NETWORK, RECOVER_DELAY, XPRIV},
     error::Error,
     parse::{parse_address, parse_el_address, parse_xonly_pk},
     taproot::{bridge_wallet, new_bitcoind_client, sync_wallet, taproot_wallet, ExtractP2trPubkey},
@@ -249,7 +250,7 @@ pub(crate) fn bridge_in_descriptor(
     let recovery_xonly_pubkey = recovery_address.extract_p2tr_pubkey()?;
 
     let desc = bdk_wallet::descriptor!(
-        tr(UNSPENDABLE, {
+        tr(UNSPENDABLE_PUBLIC_KEY, {
             pk(bridge_pubkey),
             and_v(v:pk(recovery_xonly_pubkey),older(RECOVER_DELAY))
         })
@@ -288,7 +289,7 @@ pub(crate) fn take_back_descriptor(
 ) -> Result<DescriptorTemplateOut, Error> {
     let xkey = format!("{XPRIV}/86'/1'/0'/0/*");
     let desc = bdk_wallet::descriptor!(
-        tr(UNSPENDABLE, {
+        tr(UNSPENDABLE_PUBLIC_KEY, {
             pk(bridge_pubkey),
             and_v(v:pk(xkey.as_str()),older(RECOVER_DELAY))
         })
@@ -623,7 +624,7 @@ mod tests {
             .reveal_next_address(KeychainKind::External)
             .address
             .to_string();
-        let expected_address = "bcrt1p5wh09dkrfmr44zq85y55x92f5zjhkj2l0kvepd3fskw6aj8tch5q8t44sr";
+        let expected_address = "bcrt1pupc4tw9e2l7xlj7g5hg9587e78mcrfxkj23jklaf58jp2vwtuarq6eq4d9";
         assert_eq!(address, expected_address);
     }
 
