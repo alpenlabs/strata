@@ -1,5 +1,4 @@
-mod id;
-pub use id::*;
+pub use strata_primitives::l1::L1BlockId;
 
 mod tx;
 pub use tx::*;
