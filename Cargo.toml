@@ -12,6 +12,7 @@ members = [
   "crates/db",
   "crates/eectl",
   "crates/evmexec",
+  "crates/key-derivation",
   "crates/primitives",
   "crates/zkvm/adapters/risc0",
   "crates/zkvm/adapters/sp1",
