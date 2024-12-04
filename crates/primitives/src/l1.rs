@@ -23,7 +23,35 @@ use rand::rngs::OsRng;
 use reth_primitives::revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};
+use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError, impl_buf_wrapper};
+
+/// ID of an L1 block, usually the hash of its header.
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Default,
+    Arbitrary,
+    BorshSerialize,
+    BorshDeserialize,
+    Deserialize,
+    Serialize,
+)]
+pub struct L1BlockId(Buf32);
+
+impl L1BlockId {
+    /// Computes the blkid from the header buf.  This expensive in proofs and
+    /// should only be done when necessary.
+    pub fn compute_from_header_buf(buf: &[u8]) -> L1BlockId {
+        Self::from(crate::hash::sha256d(buf))
+    }
+}
+
+impl_buf_wrapper!(L1BlockId, Buf32, 32);
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
