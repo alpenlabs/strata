@@ -8,23 +8,23 @@ use strata_zkvm::ZkVmHost;
 
 use super::{evm_ee::EvmEeHandler, ProvingOp};
 use crate::{
-    errors::ProvingTaskError, primitives::vms::ProofVm, proving_ops::btc_ops::get_pm_rollup_params,
-    hosts,
+    errors::ProvingTaskError, hosts, primitives::vms::ProofVm,
+    proving_ops::btc_ops::get_pm_rollup_params,
 };
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
 pub struct ClStfHandler {
     cl_client: HttpClient,
-    el_dispatcher: Arc<EvmEeHandler>,
+    evm_ee_handler: Arc<EvmEeHandler>,
 }
 
 impl ClStfHandler {
     /// Creates a new CL operations instance.
-    pub fn new(cl_client: HttpClient, el_dispatcher: Arc<EvmEeHandler>) -> Self {
+    pub fn new(cl_client: HttpClient, evm_ee_handler: Arc<EvmEeHandler>) -> Self {
         Self {
             cl_client,
-            el_dispatcher,
+            evm_ee_handler,
         }
     }
 }
@@ -42,7 +42,7 @@ impl ProvingOp for ClStfHandler {
             _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
         };
         let ee_task = ProofKey::EvmEeStf(*block_num);
-        self.el_dispatcher
+        self.evm_ee_handler
             .create_task(task_tracker, &ee_task)
             .await?;
 
