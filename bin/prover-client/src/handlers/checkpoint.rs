@@ -11,7 +11,7 @@ use strata_zkvm::{AggregationInput, ZkVmHost};
 use super::{
     cl_agg::{self, ClAggHandler},
     l1_batch::L1BatchHandler,
-    ProofHandler,
+    ProvingOp,
 };
 use crate::{
     errors::ProvingTaskError, primitives::vms::ProofVm, proving_ops::btc_ops::get_pm_rollup_params,
@@ -53,7 +53,7 @@ impl CheckpointHandler {
     }
 }
 
-impl ProofHandler for CheckpointHandler {
+impl ProvingOp for CheckpointHandler {
     type Prover = CheckpointProver;
 
     async fn create_task(

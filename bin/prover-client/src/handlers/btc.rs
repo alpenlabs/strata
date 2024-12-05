@@ -5,7 +5,7 @@ use strata_primitives::proof::ProofKey;
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProverDB;
 
-use super::ProofHandler;
+use super::ProvingOp;
 use crate::{errors::ProvingTaskError, proving_ops::btc_ops::get_pm_rollup_params};
 
 /// Operations required for BTC block proving tasks.
@@ -21,7 +21,7 @@ impl BtcBlockspaceHandler {
     }
 }
 
-impl ProofHandler for BtcBlockspaceHandler {
+impl ProvingOp for BtcBlockspaceHandler {
     type Prover = BtcBlockspaceProver;
 
     async fn create_task(

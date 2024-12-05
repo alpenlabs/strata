@@ -8,7 +8,7 @@ use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProverDB;
 use strata_zkvm::ZkVmHost;
 
-use super::{btc::BtcBlockspaceHandler, ProofHandler};
+use super::{btc::BtcBlockspaceHandler, ProvingOp};
 use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, hosts};
 
 #[derive(Debug, Clone)]
@@ -17,7 +17,7 @@ pub struct L1BatchHandler {
     btc_client: Arc<BitcoinClient>,
 }
 
-impl ProofHandler for L1BatchHandler {
+impl ProvingOp for L1BatchHandler {
     type Prover = L1BatchProver;
 
     async fn create_task(
