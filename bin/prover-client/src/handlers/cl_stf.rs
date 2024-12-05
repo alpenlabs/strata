@@ -32,6 +32,25 @@ impl ClStfHandler {
 impl ProofHandler for ClStfHandler {
     type Prover = ClStfProver;
 
+    async fn create_task(
+        &self,
+        task_tracker: &mut crate::task2::TaskTracker,
+        task_id: &ProofKey,
+    ) -> Result<(), ProvingTaskError> {
+        let block_num = match task_id {
+            ProofKey::ClStf(id) => id,
+            _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
+        };
+        let ee_task = ProofKey::EvmEeStf(*block_num);
+        self.el_dispatcher
+            .create_task(task_tracker, &ee_task)
+            .await?;
+
+        task_tracker.insert_task(*task_id, vec![ee_task])?;
+
+        Ok(())
+    }
+
     async fn fetch_input(
         &self,
         task_id: &strata_primitives::proof::ProofKey,

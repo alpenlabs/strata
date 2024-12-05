@@ -4,7 +4,7 @@ use strata_primitives::proof::ProofKey;
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
 
 use super::ProofHandler;
-use crate::errors::ProvingTaskError;
+use crate::{errors::ProvingTaskError, task2::TaskTracker};
 
 /// Operations required for EL block proving tasks.
 #[derive(Debug, Clone)]
@@ -21,6 +21,14 @@ impl EvmEeHandler {
 
 impl ProofHandler for EvmEeHandler {
     type Prover = EvmEeProver;
+
+    async fn create_task(
+        &self,
+        task_tracker: &mut TaskTracker,
+        task_id: &ProofKey,
+    ) -> Result<(), ProvingTaskError> {
+        task_tracker.insert_task(*task_id, vec![])
+    }
 
     async fn fetch_input(
         &self,

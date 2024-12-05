@@ -24,6 +24,14 @@ impl BtcBlockspaceHandler {
 impl ProofHandler for BtcBlockspaceHandler {
     type Prover = BtcBlockspaceProver;
 
+    async fn create_task(
+        &self,
+        task_tracker: &mut crate::task2::TaskTracker,
+        task_id: &ProofKey,
+    ) -> Result<(), ProvingTaskError> {
+        task_tracker.insert_task(*task_id, vec![])
+    }
+
     async fn fetch_input(
         &self,
         task_id: &ProofKey,

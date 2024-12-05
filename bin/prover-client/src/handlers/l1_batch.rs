@@ -20,6 +20,31 @@ pub struct L1BatchHandler {
 impl ProofHandler for L1BatchHandler {
     type Prover = L1BatchProver;
 
+    async fn create_task(
+        &self,
+        task_tracker: &mut crate::task2::TaskTracker,
+        task_id: &ProofKey,
+    ) -> Result<(), ProvingTaskError> {
+        let (start_height, end_height) = match task_id {
+            ProofKey::L1Batch(start, end) => (start, end),
+            _ => return Err(ProvingTaskError::InvalidInput("L1Batch".to_string())),
+        };
+
+        let len = (end_height - start_height) as usize + 1;
+        let mut deps = Vec::with_capacity(len);
+        for height in *start_height..=*end_height {
+            let proof_key = ProofKey::BtcBlockspace(height);
+            self.btc_dispatcher
+                .create_task(task_tracker, &proof_key)
+                .await?;
+            deps.push(proof_key);
+        }
+
+        task_tracker.insert_task(*task_id, deps)?;
+
+        Ok(())
+    }
+
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
