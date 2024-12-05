@@ -1,5 +1,6 @@
 use std::{collections::HashMap, hash::Hash};
 
+use strata_primitives::proof::ProofKey;
 use strata_sp1_adapter::SP1Host;
 
 use crate::hosts;
@@ -12,6 +13,19 @@ pub enum ProofVm {
     CLAggregation,
     L1Batch,
     Checkpoint,
+}
+
+impl From<ProofKey> for ProofVm {
+    fn from(value: ProofKey) -> Self {
+        match value {
+            ProofKey::BtcBlockspace(_) => Self::BtcProving,
+            ProofKey::L1Batch(_, _) => Self::L1Batch,
+            ProofKey::EvmEeStf(_) => Self::ELProving,
+            ProofKey::ClStf(_) => Self::CLProving,
+            ProofKey::ClAgg(_, _) => Self::CLAggregation,
+            ProofKey::Checkpoint(_) => Self::Checkpoint,
+        }
+    }
 }
 
 pub struct ZkVMManager {
