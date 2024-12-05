@@ -1,5 +1,6 @@
 use strata_db::DbError;
 use strata_primitives::proof::ProofKey;
+use strata_zkvm::ZkVmError;
 use thiserror::Error;
 
 use crate::primitives::status::ProvingTaskStatus;
@@ -49,6 +50,9 @@ pub enum ProvingTaskError {
 
     #[error("{0}")]
     RpcError(String),
+
+    #[error("{0:?}")]
+    ZkVmError(ZkVmError),
 }
 
 // Define ProvingTaskType enum to represent EL and CL

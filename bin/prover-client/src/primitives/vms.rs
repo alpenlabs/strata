@@ -1,7 +1,21 @@
 use std::collections::HashMap;
 
+use strata_primitives::proof::ProofKey;
 use strata_sp1_adapter::SP1Host;
 use strata_hosts_hosts::{get_sp1_host, ProofVm};
+
+impl From<ProofKey> for ProofVm {
+    fn from(value: ProofKey) -> Self {
+        match value {
+            ProofKey::BtcBlockspace(_) => Self::BtcProving,
+            ProofKey::L1Batch(_, _) => Self::L1Batch,
+            ProofKey::EvmEeStf(_) => Self::ELProving,
+            ProofKey::ClStf(_) => Self::CLProving,
+            ProofKey::ClAgg(_, _) => Self::CLAggregation,
+            ProofKey::Checkpoint(_) => Self::Checkpoint,
+        }
+    }
+}
 
 pub struct ZkVMManager {
     vms: HashMap<ProofVm, &'static SP1Host>,
