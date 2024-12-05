@@ -8,13 +8,24 @@ use crate::{
 };
 
 pub mod btc;
-pub mod checkpoint;
-pub mod cl_agg;
-pub mod cl_stf;
-pub mod evm_ee;
-pub mod l1_batch;
+use btc::BtcBlockspaceHandler;
 
-pub trait ProofHandler {
+pub mod checkpoint;
+use checkpoint::CheckpointHandler;
+
+pub mod cl_agg;
+use cl_agg::ClAggHandler;
+
+pub mod cl_stf;
+use cl_stf::ClStfHandler;
+
+pub mod evm_ee;
+use evm_ee::EvmEeHandler;
+
+pub mod l1_batch;
+use l1_batch::L1BatchHandler;
+
+pub trait ProvingOp {
     type Prover: ZkVmProver;
 
     async fn create_task(
@@ -54,4 +65,13 @@ pub trait ProofHandler {
 
         Ok(())
     }
+}
+
+pub enum ProofHandler {
+    BtcBlockspace(BtcBlockspaceHandler),
+    L1Batch(L1BatchHandler),
+    EvmEe(EvmEeHandler),
+    ClStf(ClStfHandler),
+    ClAgg(ClAggHandler),
+    Checkpoint(CheckpointHandler),
 }
