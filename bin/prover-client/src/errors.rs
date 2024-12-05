@@ -1,3 +1,4 @@
+use strata_db::DbError;
 use strata_primitives::proof::ProofKey;
 use thiserror::Error;
 
@@ -31,8 +32,20 @@ pub enum ProvingTaskError {
     #[error("Dependency with ID {0:?} does not exist.")]
     DependencyNotFound(ProofKey),
 
+    #[error("Proof with ID {0:?} does not exist in DB.")]
+    ProofNotFound(ProofKey),
+
     #[error("Invalid status transition: {0:?} -> {1:?}")]
     InvalidStatusTransition(ProvingTaskStatus, ProvingTaskStatus),
+
+    #[error("Invalid input: Expected {0:?}")]
+    InvalidInput(String),
+
+    #[error("Database error: {0:?}")]
+    DatabaseError(DbError),
+
+    #[error("{0}")]
+    RpcError(String),
 }
 
 // Define ProvingTaskType enum to represent EL and CL
