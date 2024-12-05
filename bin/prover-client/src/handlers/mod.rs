@@ -5,6 +5,7 @@ use strata_zkvm::ZkVmProver;
 use crate::errors::ProvingTaskError;
 
 pub mod btc;
+pub mod evm_ee;
 pub mod l1_batch;
 
 pub trait ProofHandler {
