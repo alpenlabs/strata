@@ -36,8 +36,8 @@ impl ProofHandler for L1BatchHandler {
             let proof = db
                 .proof_db()
                 .get_proof(proof_key)
-                .map_err(|e| ProvingTaskError::DatabaseError(e))?
-                .ok_or(ProvingTaskError::DependencyNotFound(proof_key))?;
+                .map_err(ProvingTaskError::DatabaseError)?
+                .ok_or(ProvingTaskError::ProofNotFound(proof_key))?;
             batch.push(proof);
         }
 
