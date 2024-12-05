@@ -7,22 +7,22 @@ use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_rocksdb::prover::db::ProverDB;
 use strata_zkvm::ZkVmHost;
 
-use super::{evm_ee::EvmEeHandler, ProvingOp};
-use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, task2::TaskTracker, hosts};
+use super::{cl_stf::ClStfHandler, ProvingOp};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
 pub struct ClAggHandler {
     cl_client: HttpClient,
-    el_dispatcher: Arc<EvmEeHandler>,
+    cl_stf_handler: Arc<ClStfHandler>,
 }
 
 impl ClAggHandler {
     /// Creates a new CL operations instance.
-    pub fn new(cl_client: HttpClient, el_dispatcher: Arc<EvmEeHandler>) -> Self {
+    pub fn new(cl_client: HttpClient, cl_stf_handler: Arc<ClStfHandler>) -> Self {
         Self {
             cl_client,
-            el_dispatcher,
+            cl_stf_handler,
         }
     }
 }
@@ -44,7 +44,7 @@ impl ProvingOp for ClAggHandler {
         let mut deps = Vec::with_capacity(len);
         for height in *start_height..=*end_height {
             let proof_key = ProofKey::BtcBlockspace(height);
-            self.el_dispatcher
+            self.cl_stf_handler
                 .create_task(task_tracker, &proof_key)
                 .await?;
             deps.push(proof_key);

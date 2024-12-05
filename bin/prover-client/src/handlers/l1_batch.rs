@@ -9,12 +9,24 @@ use strata_rocksdb::prover::db::ProverDB;
 use strata_zkvm::ZkVmHost;
 
 use super::{btc::BtcBlockspaceHandler, ProvingOp};
-use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, hosts};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm};
 
 #[derive(Debug, Clone)]
 pub struct L1BatchHandler {
-    btc_dispatcher: Arc<BtcBlockspaceHandler>,
     btc_client: Arc<BitcoinClient>,
+    btc_blockspace_handler: Arc<BtcBlockspaceHandler>,
+}
+
+impl L1BatchHandler {
+    pub fn new(
+        btc_client: Arc<BitcoinClient>,
+        btc_blockspace_handler: Arc<BtcBlockspaceHandler>,
+    ) -> Self {
+        Self {
+            btc_client,
+            btc_blockspace_handler,
+        }
+    }
 }
 
 impl ProvingOp for L1BatchHandler {
@@ -34,7 +46,7 @@ impl ProvingOp for L1BatchHandler {
         let mut deps = Vec::with_capacity(len);
         for height in *start_height..=*end_height {
             let proof_key = ProofKey::BtcBlockspace(height);
-            self.btc_dispatcher
+            self.btc_blockspace_handler
                 .create_task(task_tracker, &proof_key)
                 .await?;
             deps.push(proof_key);
