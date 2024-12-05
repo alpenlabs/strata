@@ -17,7 +17,16 @@ pub enum RollupVerifyingKey {
 /// `ProofKey` is an enumeration representing various identifiers for proofs.
 /// It is used to uniquely identify the proving tasks for different types of proofs.
 #[derive(
-    Debug, Clone, Copy, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    BorshSerialize,
+    BorshDeserialize,
+    Serialize,
+    Deserialize,
 )]
 pub enum ProofKey {
     /// Represents the L1 block whose blockspace proof is being prepared.
