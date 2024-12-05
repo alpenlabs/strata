@@ -13268,6 +13268,7 @@ dependencies = [
  "serde_with",
  "strata-reth-evm",
  "strata-reth-primitives",
+ "strata-state",
  "strata-zkvm",
  "thiserror",
 ]

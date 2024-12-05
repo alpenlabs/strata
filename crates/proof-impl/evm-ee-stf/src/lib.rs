@@ -17,93 +17,24 @@
 // limitations under the License.
 pub mod db;
 pub mod mpt;
+pub mod primitives;
 pub mod processor;
 pub mod prover;
-
-use std::collections::HashMap;
-
-use alloy_consensus::{serde_bincode_compat, Header};
 use db::InMemoryDBHelper;
 use mpt::keccak;
+pub use primitives::{ELProofInput, ELProofPublicParams};
 use processor::{EvmConfig, EvmProcessor};
-use reth_primitives::{
-    revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256},
-    TransactionSignedNoHash, Withdrawal,
-};
+use reth_primitives::revm_primitives::alloy_primitives::B256;
 use revm::{primitives::SpecId, InMemoryDB};
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use strata_reth_evm::collect_withdrawal_intents;
-use strata_reth_primitives::WithdrawalIntent;
+use strata_state::block::ExecSegment;
 use strata_zkvm::ZkVmEnv;
-
-use crate::mpt::{MptNode, StorageEntry};
 
 // TODO: Read the evm config from the genesis config. This should be done in compile time.
 const EVM_CONFIG: EvmConfig = EvmConfig {
     chain_id: 12345,
     spec_id: SpecId::SHANGHAI,
 };
-
-/// Public Parameters that proof asserts
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ELProofPublicParams {
-    pub block_idx: u64,
-    pub prev_blockhash: FixedBytes<32>,
-    pub new_blockhash: FixedBytes<32>,
-    pub new_state_root: FixedBytes<32>,
-    pub txn_root: FixedBytes<32>,
-    pub withdrawal_intents: Vec<WithdrawalIntent>,
-    pub deposits_txns_root: FixedBytes<32>,
-}
-
-#[serde_as]
-/// Necessary information to prove the execution of the RETH block.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ELProofInput {
-    /// The Keccak 256-bit hash of the parent block's header, in its entirety.
-    /// N.B. The reason serde_bincode_compat is necessary:
-    /// `[serde_bincode_compat]`(alloy_consensus::serde_bincode_compat)
-    #[serde_as(as = "serde_bincode_compat::Header")]
-    pub parent_header: Header,
-
-    /// The 160-bit address to which all fees collected from the successful mining of this block
-    /// be transferred.
-    pub beneficiary: Address,
-
-    /// A scalar value equal to the current limit of gas expenditure per block.
-    pub gas_limit: u64,
-
-    /// A scalar value equal to the reasonable output of Unix's time() at this block's inception.
-    pub timestamp: u64,
-
-    /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
-    /// fewer.
-    pub extra_data: Bytes,
-
-    /// A 256-bit hash which, combined with the nonce, proves that a sufficient amount of
-    /// computation has been carried out on this block.
-    pub mix_hash: B256,
-
-    /// The state trie of the parent block.
-    pub parent_state_trie: MptNode,
-
-    /// The storage of the parent block.
-    pub parent_storage: HashMap<Address, StorageEntry>,
-
-    /// The relevant contracts for the block.
-    pub contracts: Vec<Bytes>,
-
-    /// The ancestor headers of the parent block.
-    pub ancestor_headers: Vec<Header>,
-
-    /// A list of transactions to process.
-    pub transactions: Vec<TransactionSignedNoHash>,
-
-    /// A list of withdrawals to process.
-    pub withdrawals: Vec<Withdrawal>,
-}
-
 /// Executes the block with the given input and EVM configuration, returning public parameters.
 pub fn process_block_transaction(
     mut input: ELProofInput,
@@ -153,14 +84,40 @@ pub fn process_block_transaction(
 }
 
 pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
-    let input: ELProofInput = zkvm.read_serde();
-    let public_params = process_block_transaction(input, EVM_CONFIG);
-    zkvm.commit_serde(&public_params);
+    // let input: ELProofInput = zkvm.read_serde();
+    // let public_params = process_block_transaction(input, EVM_CONFIG);
+    // zkvm.commit_serde(&public_params);
+    todo!()
+}
+
+// Wrapper function that processes N transactions
+pub fn process_blocks(zkvm: &impl ZkVmEnv) {
+    // Read the number of transactions to process
+    let n: u32 = zkvm.read_serde();
+    let mut exec_updates: Vec<ExecSegment> = Vec::new();
+    assert!(n > 0, "Min 1 blocks should be there");
+
+    // Loop N times, calling the existing function each time
+    for _ in 0..n {
+        let input: ELProofInput = zkvm.read_serde();
+        let block_output = process_block_transaction(input, EVM_CONFIG);
+        let exec_segment = block_2_exec_updates(&block_output);
+        exec_updates.push(exec_segment);
+    }
+
+    // TODO: add multiple transaction
+    // Do consistancy check
+    assert_eq!(exec_updates.len(), n as usize);
+}
+
+fn block_2_exec_updates(_pp: &ELProofPublicParams) -> ExecSegment {
+    todo!()
 }
 
 #[cfg(test)]
 mod tests {
     use revm::primitives::SpecId;
+    use serde::{Deserialize, Serialize};
 
     use super::*;
     const EVM_CONFIG: EvmConfig = EvmConfig {
@@ -200,7 +157,6 @@ mod tests {
 
         let input = test_data.witness;
         let op = process_block_transaction(input, EVM_CONFIG);
-
         assert_eq!(op, test_data.params);
     }
 }
