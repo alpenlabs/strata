@@ -65,18 +65,13 @@ impl ProvingTaskStatus {
 
 #[cfg(test)]
 mod tests {
-    use strata_state::l1::L1BlockId;
-    use strata_test_utils::ArbitraryGenerator;
-
     use super::*;
 
     // Helper function to generate test L1 block IDs
-    fn gen_deps(n: usize) -> HashSet<ProofKey> {
-        let mut deps = HashSet::with_capacity(n);
-        let gen = ArbitraryGenerator::new();
-        for _ in 0..n {
-            let blkid: L1BlockId = gen.generate();
-            let key = ProofKey::BtcBlockspace(blkid);
+    fn gen_deps(n: u64) -> HashSet<ProofKey> {
+        let mut deps = HashSet::with_capacity(n as usize);
+        for i in 0..n {
+            let key = ProofKey::BtcBlockspace(i);
             deps.insert(key);
         }
         deps

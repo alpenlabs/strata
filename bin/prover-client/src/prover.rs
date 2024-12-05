@@ -322,7 +322,7 @@ impl Prover {
     fn read_proof_from_db(&self, task_id: Uuid) -> Result<ProofReceipt, anyhow::Error> {
         // used an arbitrary proof id for now
         // TODO: to be replaced once we move from Uuid to ProofId based status
-        let proof_key = ProofKey::BtcBlockspace(L1BlockId::default());
+        let proof_key = ProofKey::BtcBlockspace(1);
         let proof_entry = self.db.proof_db().get_proof(proof_key)?;
         match proof_entry {
             Some(proof) => Ok(proof),

@@ -99,25 +99,13 @@ impl TaskTracker {
 
 #[cfg(test)]
 mod tests {
-    use strata_state::l1::L1BlockId;
-    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
-
-    fn gen_l1_block_ids(n: usize) -> Vec<L1BlockId> {
-        let mut blkids = Vec::with_capacity(n);
-        let gen = ArbitraryGenerator::new();
-        for _ in 0..n {
-            let blkid: L1BlockId = gen.generate();
-            blkids.push(blkid);
-        }
-        blkids
-    }
 
     #[test]
     fn test_insert_task_no_dependencies() {
         let mut tracker = TaskTracker::new();
-        let id = ProofKey::BtcBlockspace(L1BlockId::default());
+        let id = ProofKey::BtcBlockspace(1);
 
         tracker.insert_task(id, vec![]).unwrap();
         assert!(
@@ -129,12 +117,8 @@ mod tests {
     #[test]
     fn test_insert_task_with_dependencies() {
         let mut tracker = TaskTracker::new();
-        let l1_blkids = gen_l1_block_ids(2);
-        let id = ProofKey::L1Batch(l1_blkids[0], l1_blkids[1]);
-        let deps = vec![
-            ProofKey::BtcBlockspace(l1_blkids[0]),
-            ProofKey::BtcBlockspace(l1_blkids[1]),
-        ];
+        let id = ProofKey::L1Batch(1, 2);
+        let deps = vec![ProofKey::BtcBlockspace(1), ProofKey::BtcBlockspace(2)];
 
         for dep in &deps {
             tracker.insert_task(*dep, vec![]).unwrap();
@@ -161,12 +145,8 @@ mod tests {
     #[test]
     fn test_dependency_resolution() {
         let mut tracker = TaskTracker::new();
-        let l1_blkids = gen_l1_block_ids(2);
-        let id = ProofKey::L1Batch(l1_blkids[0], l1_blkids[1]);
-        let deps = vec![
-            ProofKey::BtcBlockspace(l1_blkids[0]),
-            ProofKey::BtcBlockspace(l1_blkids[1]),
-        ];
+        let id = ProofKey::L1Batch(1, 2);
+        let deps = vec![ProofKey::BtcBlockspace(1), ProofKey::BtcBlockspace(2)];
         for dep in &deps {
             tracker.insert_task(*dep, vec![]).unwrap();
         }
