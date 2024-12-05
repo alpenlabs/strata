@@ -16,6 +16,8 @@ strata-native-zkvm-adapter.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
+strata-proofimpl-cl-agg.workspace = true
+strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
 strata-prover-client-rpc-api.workspace = true
@@ -61,6 +63,9 @@ strata-risc0-guest-builder = { path = "../../provers/risc0", optional = true, fe
   "prover",
 ] }
 
+[dev-dependencies]
+strata-test-utils.workspace = true
+
 [features]
 default = ["sp1"]
 mock = [
@@ -70,3 +75,9 @@ mock = [
 ]
 risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder"]
 sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder"]
+prover = [
+  "strata-risc0-adapter/prover",
+  "strata-risc0-guest-builder/prover",
+  "strata-sp1-adapter/prover",
+  "strata-sp1-guest-builder/prover",
+]

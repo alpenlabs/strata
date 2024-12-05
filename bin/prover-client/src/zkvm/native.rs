@@ -8,13 +8,15 @@ use strata_proofimpl_cl_stf::process_cl_stf;
 use strata_proofimpl_evm_ee_stf::process_block_transaction_outer;
 use strata_proofimpl_l1_batch::process_l1_batch_proof;
 
+use crate::primitives::vms::ProofVm;
+
 /// A mock verification key used in native mode when proof verification is not performed.
 ///
 /// This constant provides a placeholder value for scenarios where a verification key is
 /// required by a function signature, but actual verification is skipped.
 const MOCK_VK: [u32; 8] = [0u32; 8];
 
-pub fn get_host(vm: ProofVm) -> impl ZkVmHost {
+pub fn get_host(vm: ProofVm) -> NativeHost {
     match vm {
         ProofVm::BtcProving => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
