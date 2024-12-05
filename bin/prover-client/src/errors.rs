@@ -1,4 +1,7 @@
+use strata_primitives::proof::ProofKey;
 use thiserror::Error;
+
+use crate::primitives::status::ProvingTaskStatus;
 
 // Define custom error type
 #[derive(Error, Debug)]
@@ -18,6 +21,18 @@ pub enum ProvingTaskError {
 
     #[error("Failed to create dependency task: {0}")]
     DependencyTaskCreation(String),
+
+    #[error("Task with ID {0:?} already exists.")]
+    TaskAlreadyFound(ProofKey),
+
+    #[error("Task with ID {0:?} does not exist.")]
+    TaskNotFound(ProofKey),
+
+    #[error("Dependency with ID {0:?} does not exist.")]
+    DependencyNotFound(ProofKey),
+
+    #[error("Invalid status transition: {0:?} -> {1:?}")]
+    InvalidStatusTransition(ProvingTaskStatus, ProvingTaskStatus),
 }
 
 // Define ProvingTaskType enum to represent EL and CL

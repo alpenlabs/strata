@@ -29,6 +29,8 @@ mod prover;
 mod proving_ops;
 mod rpc_server;
 mod task;
+mod task2;
+mod zkvm;
 
 #[tokio::main]
 async fn main() {
