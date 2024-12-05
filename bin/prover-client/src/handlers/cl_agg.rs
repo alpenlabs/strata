@@ -8,7 +8,7 @@ use strata_rocksdb::prover::db::ProverDB;
 use strata_zkvm::ZkVmHost;
 
 use super::{evm_ee::EvmEeHandler, ProofHandler};
-use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, zkvm};
+use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, task2::TaskTracker, zkvm};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
@@ -29,6 +29,31 @@ impl ClAggHandler {
 
 impl ProofHandler for ClAggHandler {
     type Prover = ClAggProver;
+
+    async fn create_task(
+        &self,
+        task_tracker: &mut TaskTracker,
+        task_id: &ProofKey,
+    ) -> Result<(), ProvingTaskError> {
+        let (start_height, end_height) = match task_id {
+            ProofKey::ClAgg(start, end) => (start, end),
+            _ => return Err(ProvingTaskError::InvalidInput("ClAgg".to_string())),
+        };
+
+        let len = (end_height - start_height) as usize + 1;
+        let mut deps = Vec::with_capacity(len);
+        for height in *start_height..=*end_height {
+            let proof_key = ProofKey::BtcBlockspace(height);
+            self.el_dispatcher
+                .create_task(task_tracker, &proof_key)
+                .await?;
+            deps.push(proof_key);
+        }
+
+        task_tracker.insert_task(*task_id, deps)?;
+
+        Ok(())
+    }
 
     async fn fetch_input(
         &self,
