@@ -9,7 +9,7 @@ use strata_rocksdb::prover::db::ProverDB;
 use strata_zkvm::ZkVmHost;
 
 use super::{btc::BtcBlockspaceHandler, ProofHandler};
-use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, zkvm};
+use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, hosts};
 
 #[derive(Debug, Clone)]
 pub struct L1BatchHandler {
@@ -74,7 +74,7 @@ impl ProofHandler for L1BatchHandler {
         .await
         .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
-        let blockspace_vk = zkvm::get_host(ProofVm::BtcProving).get_verification_key();
+        let blockspace_vk = hosts::get_host(ProofVm::BtcProving).get_verification_key();
 
         Ok(L1BatchProofInput {
             batch,
