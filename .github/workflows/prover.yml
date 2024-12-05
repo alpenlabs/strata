@@ -16,8 +16,13 @@ jobs:
         with:
           toolchain: nightly-2024-07-27
       
+      - name: Use Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      
       # Installs mold (modern ld), a drop-in replacement for lld.
-      # Under the hood, the following actions symlinks mold binary onto lld,
+      # Under the hood, the following action symlinks mold binary onto lld,
       # so everything is linked faster (hopefully).
       - name: Install mold linker
         uses: rui314/setup-mold@v1
@@ -30,12 +35,21 @@ jobs:
 
       - name: Install SP1 Toolchain
         run: |
-          curl -L https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up
+          curl -fsSL --proto '=https' --tlsv1.2 https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up
           export PATH=~/.sp1/bin:$PATH
           cargo prove --version
 
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build guest code
-        run: cd provers/sp1/ && RUSTFLAGS="-C link-arg=-fuse-ld=lld" cargo build --profile prover-ci -F "prover"
+      - name: Build prover guest code
+        run: cargo build --profile prover-ci -F "prover"
+        working-directory: provers/sp1
+        env:
+          RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+  
+      - name: Build prover client
+        run: cargo build --profile prover-ci -F "prover"
+        working-directory: provers/sp1
+        env:
+          RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
