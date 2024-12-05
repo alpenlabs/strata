@@ -7,6 +7,7 @@ version = "0.1.0"
 strata-reth-evm.workspace = true
 strata-reth-primitives.workspace = true
 strata-zkvm.workspace = true
+strata-state.workspace = true
 
 alloy-consensus = { workspace = true, features = ["serde-bincode-compat"] }
 alloy-eips.workspace = true
