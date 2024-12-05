@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bitcoin.workspace = true
-miniscript.workspace = true
+bitcoin = { workspace = true }
+secp256k1 = { workspace = true, features = ["global-context"] }
 thiserror.workspace = true
+
+[dev-dependencies]
+corepc-node = { version = "0.4.0", features = ["28_0"] }
