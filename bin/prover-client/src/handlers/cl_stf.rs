@@ -6,7 +6,7 @@ use strata_primitives::proof::ProofKey;
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_zkvm::ZkVmHost;
 
-use super::{evm_ee::EvmEeHandler, ProofHandler};
+use super::{evm_ee::EvmEeHandler, ProvingOp};
 use crate::{
     errors::ProvingTaskError, primitives::vms::ProofVm, proving_ops::btc_ops::get_pm_rollup_params,
     hosts,
@@ -29,7 +29,7 @@ impl ClStfHandler {
     }
 }
 
-impl ProofHandler for ClStfHandler {
+impl ProvingOp for ClStfHandler {
     type Prover = ClStfProver;
 
     async fn create_task(
