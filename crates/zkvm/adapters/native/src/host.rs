@@ -1,6 +1,8 @@
 use std::{fmt, sync::Arc};
 
-use strata_zkvm::{Proof, ProofType, VerificationKey, ZkVmHost, ZkVmResult};
+use strata_zkvm::{
+    Proof, ProofReceipt, ProofType, PublicValues, VerificationKey, ZkVmHost, ZkVmResult,
+};
 
 use crate::{env::NativeMachine, input::NativeMachineInputBuilder};
 
@@ -18,10 +20,12 @@ impl ZkVmHost for NativeHost {
         &self,
         native_machine: NativeMachine,
         _proof_type: ProofType,
-    ) -> ZkVmResult<(Proof, VerificationKey)> {
+    ) -> ZkVmResult<ProofReceipt> {
         (self.process_proof)(&native_machine)?;
         let output = native_machine.state.borrow().output.clone();
-        Ok((Proof::new(output), self.get_verification_key()))
+        let proof = Proof::default();
+        let public_values = PublicValues::new(output);
+        Ok(ProofReceipt::new(proof, public_values))
     }
 
     fn get_verification_key(&self) -> VerificationKey {
@@ -38,11 +42,7 @@ impl ZkVmHost for NativeHost {
         bincode::deserialize(proof.as_bytes()).map_err(|e| e.into())
     }
 
-    fn extract_raw_public_output(proof: &Proof) -> ZkVmResult<Vec<u8>> {
-        Ok(proof.as_bytes().to_vec())
-    }
-
-    fn verify(&self, _proof: &Proof) -> ZkVmResult<()> {
+    fn verify(&self, _proof: &ProofReceipt) -> ZkVmResult<()> {
         Ok(())
     }
 }

@@ -1,6 +1,6 @@
-use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput, ELProofPublicParams};
+use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
 use strata_test_utils::evm_ee::EvmSegment;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
 
 use super::ProofGenerator;
 
@@ -22,7 +22,7 @@ impl<H: ZkVmHost> ProofGenerator<u64, EvmEeProver> for ElProofGenerator<H> {
         Ok(input)
     }
 
-    fn gen_proof(&self, block_num: &u64) -> ZkVmResult<(Proof, ELProofPublicParams)> {
+    fn gen_proof(&self, block_num: &u64) -> ZkVmResult<ProofReceipt> {
         let host = self.get_host();
 
         let input = self.get_input(block_num)?;

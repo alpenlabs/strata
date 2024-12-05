@@ -1,10 +1,7 @@
 use bitcoin::Block;
-use strata_proofimpl_btc_blockspace::{
-    logic::{BlockspaceProofInput, BlockspaceProofOutput},
-    prover::BtcBlockspaceProver,
-};
+use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
 
 use super::ProofGenerator;
 
@@ -29,7 +26,7 @@ impl<H: ZkVmHost> ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGe
         Ok(input)
     }
 
-    fn gen_proof(&self, block: &Block) -> ZkVmResult<(Proof, BlockspaceProofOutput)> {
+    fn gen_proof(&self, block: &Block) -> ZkVmResult<ProofReceipt> {
         let host = self.get_host();
         let input = self.get_input(block)?;
         BtcBlockspaceProver::prove(&input, &host)

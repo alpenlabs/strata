@@ -1,5 +1,5 @@
 use bitcoin::consensus::serialize;
-use strata_zkvm::{Proof, ProofType, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult};
 
 use crate::logic::{BlockspaceProofInput, BlockspaceProofOutput};
 
@@ -27,10 +27,10 @@ impl ZkVmProver for BtcBlockspaceProver {
         Ok(zkvm_input)
     }
 
-    fn process_output<H>(proof: &Proof, _host: &H) -> ZkVmResult<Self::Output>
+    fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>
     where
         H: ZkVmHost,
     {
-        H::extract_borsh_public_output(proof)
+        H::extract_borsh_public_output(public_values)
     }
 }

@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use strata_zkvm::{Proof, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofReceipt, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult};
 
 pub mod btc;
 mod checkpoint;
@@ -17,14 +17,14 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
     fn get_host(&self) -> impl ZkVmHost;
 
     /// Generates a proof based on the input.
-    fn gen_proof(&self, input: &T) -> ZkVmResult<(Proof, P::Output)>;
+    fn gen_proof(&self, input: &T) -> ZkVmResult<ProofReceipt>;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
     fn get_proof_id(&self, input: &T) -> String;
 
     /// Retrieves a proof from cache or generates it if not found.
-    fn get_proof(&self, input: &T) -> ZkVmResult<(Proof, P::Output)> {
+    fn get_proof(&self, input: &T) -> ZkVmResult<ProofReceipt> {
         // 1. Create the unique proof ID
         let proof_id = format!("{}_{}.proof", self.get_proof_id(input), self.get_host());
         println!("Getting proof for {}", proof_id);
@@ -37,13 +37,12 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
                 .map_err(|e| ZkVmError::InputError(e.to_string()))?;
             let host = self.get_host();
             verify_proof(&proof, &host)?;
-            let output = P::process_output(&proof, &host)?;
-            return Ok((proof, output));
+            return Ok(proof);
         }
 
         // 3. Generate the proof
         println!("Proof not found in cache, generating proof...");
-        let (proof, output) = self.gen_proof(input)?;
+        let proof = self.gen_proof(input)?;
 
         // Verify the proof
         verify_proof(&proof, &self.get_host())?;
@@ -51,7 +50,7 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         // Save the proof to cache
         write_proof_to_file(&proof, &proof_file).unwrap();
 
-        Ok((proof, output))
+        Ok(proof)
     }
 
     // Simulate the proof. This is different than running the in the MOCK_PROVER mode
@@ -65,7 +64,7 @@ fn get_cache_dir() -> std::path::PathBuf {
 }
 
 /// Reads a proof from a file.
-fn read_proof_from_file(proof_file: &std::path::Path) -> Result<Proof> {
+fn read_proof_from_file(proof_file: &std::path::Path) -> Result<ProofReceipt> {
     use std::{fs::File, io::Read};
 
     use anyhow::Context;
@@ -76,12 +75,13 @@ fn read_proof_from_file(proof_file: &std::path::Path) -> Result<Proof> {
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)
         .context("Failed to read proof file")?;
+    let proof_receipt: ProofReceipt = bincode::deserialize(&buffer)?;
 
-    Ok(Proof::new(buffer))
+    Ok(proof_receipt)
 }
 
 /// Writes a proof to a file.
-fn write_proof_to_file(proof: &Proof, proof_file: &std::path::Path) -> Result<()> {
+fn write_proof_to_file(proof: &ProofReceipt, proof_file: &std::path::Path) -> Result<()> {
     use std::{fs::File, io::Write};
 
     use anyhow::Context;
@@ -94,13 +94,13 @@ fn write_proof_to_file(proof: &Proof, proof_file: &std::path::Path) -> Result<()
     let mut file = File::create(proof_file)
         .with_context(|| format!("Failed to create proof file {:?}", proof_file))?;
 
-    file.write_all(proof.as_bytes())
+    file.write_all(&bincode::serialize(&proof)?)
         .context("Failed to write proof to file")?;
 
     Ok(())
 }
 
 /// Verifies a proof independently.
-fn verify_proof(proof: &Proof, host: &impl ZkVmHost) -> ZkVmResult<()> {
+fn verify_proof(proof: &ProofReceipt, host: &impl ZkVmHost) -> ZkVmResult<()> {
     host.verify(proof)
 }

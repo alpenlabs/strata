@@ -26,7 +26,7 @@ pub trait ZkVmInputBuilder<'a> {
     ///
     /// This method is specifically used for cases where proof aggregation or composition
     /// is involved, allowing for proof and verification inputs to be provided to the zkVM.
-    fn write_proof(&mut self, item: AggregationInput) -> ZkVmResult<&mut Self>;
+    fn write_proof(&mut self, item: &AggregationInput) -> ZkVmResult<&mut Self>;
 
     fn build(&mut self) -> Result<Self::Input, ZkVmError>;
 }

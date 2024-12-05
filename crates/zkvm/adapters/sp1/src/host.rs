@@ -2,10 +2,12 @@ use std::fmt;
 
 use serde::{de::DeserializeOwned, Serialize};
 use sp1_sdk::{
-    HashableKey, ProverClient, SP1ProofWithPublicValues, SP1ProvingKey, SP1VerifyingKey,
+    HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1ProvingKey, SP1PublicValues,
+    SP1Stdin, SP1VerifyingKey,
 };
 use strata_zkvm::{
-    Proof, ProofType, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
+    Proof, ProofReceipt, ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost,
+    ZkVmInputBuilder, ZkVmResult,
 };
 
 use crate::input::SP1ProofInputBuilder;
@@ -58,7 +60,7 @@ impl ZkVmHost for SP1Host {
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> ZkVmResult<(Proof, VerificationKey)> {
+    ) -> ZkVmResult<ProofReceipt> {
         #[cfg(feature = "mock")]
         {
             std::env::set_var("SP1_PROVER", "mock");
@@ -75,23 +77,19 @@ impl ZkVmHost for SP1Host {
             ProofType::Groth16 => prover.groth16(),
         };
 
-        let proof = prover
+        let proof_info = prover
             .run()
             .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
 
         // Proof serialization
-        let serialized_proof = bincode::serialize(&proof)?;
+        let proof = Proof::new(bincode::serialize(&proof_info.proof)?);
+        let public_values = PublicValues::new(proof_info.public_values.to_vec());
 
-        Ok((Proof::new(serialized_proof), self.get_verification_key()))
-    }
-
-    fn extract_raw_public_output(proof: &Proof) -> Result<Vec<u8>, ZkVmError> {
-        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
-        Ok(proof.public_values.as_slice().to_vec())
+        Ok(ProofReceipt::new(proof, public_values))
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
-        proof: &Proof,
+        proof: &PublicValues,
     ) -> ZkVmResult<T> {
         let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
         let public_params: T = proof.public_values.read();
@@ -103,12 +101,24 @@ impl ZkVmHost for SP1Host {
         VerificationKey::new(verification_key)
     }
 
-    fn verify(&self, proof: &Proof) -> ZkVmResult<()> {
-        let proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
+    fn verify(&self, proof: &ProofReceipt) -> ZkVmResult<()> {
+        #[cfg(feature = "mock")]
+        {
+            std::env::set_var("SP1_PROVER", "mock");
+        }
+        let public_values = SP1PublicValues::from(proof.public_values().as_bytes());
+        let proof: SP1Proof = bincode::deserialize(proof.proof().as_bytes())?;
+        let sp1_version = sp1_sdk::SP1_CIRCUIT_VERSION.to_string();
+        let proof_with_public_values = SP1ProofWithPublicValues {
+            proof,
+            public_values,
+            stdin: SP1Stdin::default(),
+            sp1_version,
+        };
 
         let client = ProverClient::new();
         client
-            .verify(&proof, &self.verifying_key)
+            .verify(&proof_with_public_values, &self.verifying_key)
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
 
         Ok(())
@@ -128,11 +138,10 @@ mod tests {
 
     use std::{fs::File, io::Write};
 
-    use sp1_sdk::{HashableKey, SP1VerifyingKey};
+    use sp1_sdk::HashableKey;
     use strata_zkvm::{ProofType, ZkVmHost};
 
     use super::*;
-    use crate::SP1Verifier;
 
     // Adding compiled guest code `TEST_ELF` to save the build time
     // #![no_main]
@@ -148,12 +157,12 @@ mod tests {
         let input: u32 = 1;
 
         let mut prover_input_builder = SP1ProofInputBuilder::new();
-        prover_input_builder.write(&input).unwrap();
+        prover_input_builder.write_serde(&input).unwrap();
         let prover_input = prover_input_builder.build().unwrap();
 
         // assert proof generation works
         let zkvm = SP1Host::init(TEST_ELF);
-        let (proof, _) = zkvm
+        let proof = zkvm
             .prove(prover_input, ProofType::Core)
             .expect("Failed to generate proof");
 
@@ -161,28 +170,11 @@ mod tests {
         zkvm.verify(&proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = SP1Verifier::extract_public_output(&proof).expect(
+        let out: u32 = SP1Host::extract_serde_public_output(&proof.public_values).expect(
             "Failed to extract public
     outputs",
         );
         assert_eq!(input, out)
-    }
-
-    #[test]
-    fn test_mock_prover_with_public_param() {
-        let input: u32 = 1;
-
-        let mut prover_input_builder = SP1ProofInputBuilder::new();
-        prover_input_builder.write(&input).unwrap();
-        let prover_input = prover_input_builder.build().unwrap();
-
-        // assert proof generation works
-        let zkvm = SP1Host::init(TEST_ELF.to_vec(), ProverOptions::default());
-        let (proof, vk) = zkvm.prove(prover_input).expect("Failed to generate proof");
-
-        // assert proof verification works
-        SP1Verifier::verify_with_public_params(&vk, input, &proof)
-            .expect("Proof verification failed");
     }
 
     #[test]
@@ -192,7 +184,7 @@ mod tests {
         let input: u32 = 1;
 
         let prover_input = SP1ProofInputBuilder::new()
-            .write(&input)
+            .write_serde(&input)
             .unwrap()
             .build()
             .unwrap();
@@ -200,20 +192,19 @@ mod tests {
         let zkvm = SP1Host::init(TEST_ELF);
 
         // assert proof generation works
-        let (proof, vk) = zkvm
+        let proof = zkvm
             .prove(prover_input, ProofType::Groth16)
             .expect("Failed to generate proof");
 
-        let vk: SP1VerifyingKey = bincode::deserialize(vk.as_bytes()).unwrap();
-
         // Note: For the fixed ELF and fixed SP1 version, the vk is fixed
         assert_eq!(
-            vk.bytes32(),
+            zkvm.verifying_key.bytes32(),
             "0x00efb1120491119751e75bc55bc95b64d33f973ecf68fcf5cbff08506c5788f9"
         );
 
         let filename = "proof-groth16.bin";
         let mut file = File::create(filename).unwrap();
-        file.write_all(proof.as_bytes()).unwrap();
+        file.write_all(&bincode::serialize(&proof).expect("bincode serialization failed"))
+            .unwrap();
     }
 }
