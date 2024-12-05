@@ -1,4 +1,6 @@
+import logging
 import time
+from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -15,6 +17,7 @@ class L1ReadReorgTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         # standalone env for this test as it involves mutating the blockchain via invalidation
         ctx.set_env(BasicEnvConfig())
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
@@ -34,15 +37,15 @@ class L1ReadReorgTest(flexitest.Test):
         l1stat = seqrpc.strata_l1status()
 
         height_to_invalidate_from = int(l1stat["cur_height"]) - REORG_DEPTH
-        print("height to invalidate from", height_to_invalidate_from)
+        self.logger.debug(f"height to invalidate from {height_to_invalidate_from}")
         block_to_invalidate_from = btcrpc.proxy.getblockhash(height_to_invalidate_from)
         to_be_invalid_block = seqrpc.strata_getL1blockHash(height_to_invalidate_from + 1)
-        print("invalidating block", to_be_invalid_block)
+        self.logger.debug(f"invalidating block {to_be_invalid_block}")
         btcrpc.proxy.invalidateblock(block_to_invalidate_from)
 
         # Wait for at least 1 block to be added after invalidating `REORG_DEPTH` blocks.
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 1 + SEQ_SLACK_TIME_SECS)
         block_from_invalidated_height = seqrpc.strata_getL1blockHash(height_to_invalidate_from + 1)
-        print("now have block", block_from_invalidated_height)
+        self.logger.debug(f"now have block {block_from_invalidated_height}")
 
         assert to_be_invalid_block != block_from_invalidated_height, "Expected reorg from block 3"
