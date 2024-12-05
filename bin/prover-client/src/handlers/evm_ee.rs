@@ -3,7 +3,7 @@ use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
 
-use super::ProofHandler;
+use super::ProvingOp;
 use crate::{errors::ProvingTaskError, task2::TaskTracker};
 
 /// Operations required for EL block proving tasks.
@@ -19,7 +19,7 @@ impl EvmEeHandler {
     }
 }
 
-impl ProofHandler for EvmEeHandler {
+impl ProvingOp for EvmEeHandler {
     type Prover = EvmEeProver;
 
     async fn create_task(

@@ -7,7 +7,7 @@ use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_rocksdb::prover::db::ProverDB;
 use strata_zkvm::ZkVmHost;
 
-use super::{evm_ee::EvmEeHandler, ProofHandler};
+use super::{evm_ee::EvmEeHandler, ProvingOp};
 use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, task2::TaskTracker, hosts};
 
 /// Operations required for CL block proving tasks.
@@ -27,7 +27,7 @@ impl ClAggHandler {
     }
 }
 
-impl ProofHandler for ClAggHandler {
+impl ProvingOp for ClAggHandler {
     type Prover = ClAggProver;
 
     async fn create_task(
