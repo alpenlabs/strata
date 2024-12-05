@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     errors::ProvingTaskError, primitives::vms::ProofVm, proving_ops::btc_ops::get_pm_rollup_params,
-    zkvm,
+    hosts,
 };
 
 /// Operations required for BTC block proving tasks.
@@ -103,7 +103,7 @@ impl ProofHandler for CheckpointHandler {
             .get_proof(l1_batch_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(l1_batch_key))?;
-        let l1_batch_vk = zkvm::get_host(ProofVm::L1Batch).get_verification_key();
+        let l1_batch_vk = hosts::get_host(ProofVm::L1Batch).get_verification_key();
         let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);
 
         let cl_agg_key = ProofKey::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
@@ -112,7 +112,7 @@ impl ProofHandler for CheckpointHandler {
             .get_proof(cl_agg_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(cl_agg_key))?;
-        let cl_agg_vk = zkvm::get_host(ProofVm::CLAggregation).get_verification_key();
+        let cl_agg_vk = hosts::get_host(ProofVm::CLAggregation).get_verification_key();
         let l2_batch = AggregationInput::new(cl_agg_proof, cl_agg_vk);
 
         Ok(CheckpointProverInput {

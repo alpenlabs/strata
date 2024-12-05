@@ -8,7 +8,7 @@ use strata_rocksdb::prover::db::ProverDB;
 use strata_zkvm::ZkVmHost;
 
 use super::{evm_ee::EvmEeHandler, ProofHandler};
-use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, task2::TaskTracker, zkvm};
+use crate::{errors::ProvingTaskError, primitives::vms::ProofVm, task2::TaskTracker, hosts};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
@@ -76,7 +76,7 @@ impl ProofHandler for ClAggHandler {
             batch.push(proof);
         }
 
-        let cl_stf_vk = zkvm::get_host(ProofVm::CLProving).get_verification_key();
+        let cl_stf_vk = hosts::get_host(ProofVm::CLProving).get_verification_key();
         Ok(ClAggInput { batch, cl_stf_vk })
     }
 }
