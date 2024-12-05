@@ -76,7 +76,6 @@ impl ProverDatabase for ProverDB {
 
 #[cfg(test)]
 mod tests {
-    use strata_state::l1::L1BlockId;
     use strata_zkvm::{Proof, PublicValues};
 
     use super::*;
@@ -88,7 +87,7 @@ mod tests {
     }
 
     fn generate_proof() -> (ProofKey, ProofReceipt) {
-        let proof_key = ProofKey::BtcBlockspace(L1BlockId::default());
+        let proof_key = ProofKey::BtcBlockspace(1);
         let proof = Proof::default();
         let public_values = PublicValues::default();
         let proof_receipt = ProofReceipt::new(proof, public_values);

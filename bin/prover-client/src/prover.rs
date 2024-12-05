@@ -321,7 +321,7 @@ impl Prover {
 
     // TODO: fix this
     #[allow(dead_code)]
-    fn read_proof_from_db(&self, task_id: Uuid) -> Result<Proof, anyhow::Error> {
+    fn read_proof_from_db(&self, task_id: Uuid) -> Result<ProofReceipt, anyhow::Error> {
         // used an arbitrary proof id for now
         // TODO: to be replaced once we move from Uuid to ProofId based status
         let proof_key = ProofKey::BtcBlockspace(L1BlockId::default());
