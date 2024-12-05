@@ -140,10 +140,10 @@ mod tests {
     static XPRIV: LazyLock<Xpriv> = LazyLock::new(|| XPRIV_STR.parse().unwrap());
 
     // The first address derived from the xpriv above using a `tr()` descriptor.
-    const ADDRESS: &str = "bcrt1pzlfjwpazrmu4y0cud40370mykgwcv7efaphvthutwlu2ysqrzexqf8x2p7";
+    const ADDRESS: &str = "bcrt1p729l9680ht3zf7uhl6pgdrlhfp9r29cwajr5jk3k05fer62763fscz0w4s";
 
     // The second address derived from the xpriv above using a `tr()` descriptor.
-    const SENT_ADDRESS: &str = "bcrt1ptnumm8l25dl65gnp2kn563yn9z53nunt4puqang2yqe7quus65pshn4a7s";
+    const SENT_ADDRESS: &str = "bcrt1p5uhmu40t5yl97kr95s2m4sr8a9f3af2meqeefkx33symwex3wfqqfe77m3";
 
     #[test]
     fn test_operator_keys() {
