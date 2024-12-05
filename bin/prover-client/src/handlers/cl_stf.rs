@@ -9,7 +9,7 @@ use strata_zkvm::ZkVmHost;
 use super::{evm_ee::EvmEeHandler, ProofHandler};
 use crate::{
     errors::ProvingTaskError, primitives::vms::ProofVm, proving_ops::btc_ops::get_pm_rollup_params,
-    zkvm,
+    hosts,
 };
 
 /// Operations required for CL block proving tasks.
@@ -74,7 +74,7 @@ impl ProofHandler for ClStfHandler {
             .get_proof(evm_ee_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(evm_ee_key))?;
-        let evm_ee_vk = zkvm::get_host(ProofVm::ELProving).get_verification_key();
+        let evm_ee_vk = hosts::get_host(ProofVm::ELProving).get_verification_key();
 
         Ok(ClStfInput {
             rollup_params: get_pm_rollup_params(),
