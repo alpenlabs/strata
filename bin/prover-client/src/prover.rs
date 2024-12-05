@@ -11,7 +11,7 @@ use strata_rocksdb::{
 };
 use strata_sp1_adapter::SP1Host;
 use strata_sp1_guest_builder::*;
-use strata_zkvm::{Proof, ProofType, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{Proof, ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -122,7 +122,7 @@ where
             input_builder.write_serde(&l1_batch_input.btc_task_ids.len())?;
             // Write each proof input
             for proof_input in l1_batch_input.get_proofs() {
-                input_builder.write_proof(proof_input)?;
+                input_builder.write_proof(&proof_input)?;
             }
 
             (input_builder.build()?, ProofType::Compressed)
@@ -133,7 +133,7 @@ where
                 .write_serde(&get_pm_rollup_params())?
                 .write_buf(&cl_proof_input.cl_raw_witness)?
                 .write_proof(
-                    cl_proof_input
+                    &cl_proof_input
                         .el_proof
                         .expect("CL Proving was sent without EL proof"),
                 )?
@@ -150,7 +150,7 @@ where
 
             // Write each proof input
             for proof_input in l2_batch_input.get_proofs() {
-                input_builder.write_proof(proof_input)?;
+                input_builder.write_proof(&proof_input)?;
             }
 
             (input_builder.build()?, ProofType::Compressed)
@@ -167,14 +167,15 @@ where
 
             let mut input_builder = Vm::Input::new();
             input_builder.write_serde(&get_pm_rollup_params())?;
-            input_builder.write_proof(l1_batch_proof)?;
-            input_builder.write_proof(l2_batch_proof)?;
+            input_builder.write_proof(&l1_batch_proof)?;
+            input_builder.write_proof(&l2_batch_proof)?;
 
             (input_builder.build()?, ProofType::Groth16)
         }
     };
 
-    let (proof, vk) = vm.prove(zkvm_input, proof_type)?;
+    let proof = vm.prove(zkvm_input, proof_type)?;
+    let vk = vm.get_verification_key();
     let agg_input = ProofWithVkey::new(proof, vk);
     Ok(agg_input)
 }
@@ -291,7 +292,7 @@ impl Prover {
                     Ok(ProofSubmissionStatus::ProofGenerationInProgress)
                 }
                 ProvingTaskState::Proved(proof) => {
-                    self.save_proof_to_db(task_id, proof.proof())?;
+                    self.save_proof_to_db(task_id, proof.receipt())?;
 
                     let aggr_proof = proof.clone();
                     status_entry.remove();
@@ -308,10 +309,10 @@ impl Prover {
         }
     }
 
-    fn save_proof_to_db(&self, task_id: Uuid, proof: &Proof) -> Result<(), anyhow::Error> {
+    fn save_proof_to_db(&self, task_id: Uuid, proof: &ProofReceipt) -> Result<(), anyhow::Error> {
         self.db
             .prover_task_db()
-            .insert_new_task_entry(*task_id.as_bytes(), proof.into())?;
+            .insert_new_task_entry(*task_id.as_bytes(), bincode::serialize(&proof)?)?;
         Ok(())
     }
 

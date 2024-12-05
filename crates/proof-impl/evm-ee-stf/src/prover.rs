@@ -1,4 +1,4 @@
-use strata_zkvm::{ProofType, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofType, PublicValues, ZkVmProver, ZkVmResult};
 
 use crate::{ELProofInput, ELProofPublicParams};
 
@@ -19,10 +19,10 @@ impl ZkVmProver for EvmEeProver {
         B::new().write_serde(input)?.build()
     }
 
-    fn process_output<H>(proof: &strata_zkvm::Proof, _host: &H) -> ZkVmResult<Self::Output>
+    fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>
     where
         H: strata_zkvm::ZkVmHost,
     {
-        H::extract_serde_public_output(proof)
+        H::extract_serde_public_output(public_values)
     }
 }

@@ -1,9 +1,6 @@
-use strata_proofimpl_checkpoint::{
-    prover::{CheckpointProver, CheckpointProverInput},
-    CheckpointProofOutput,
-};
+use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{Proof, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{AggregationInput, ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
 
 use super::{
     btc::BtcBlockProofGenerator, cl::ClProofGenerator, el::ElProofGenerator,
@@ -45,34 +42,30 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointBatchInfo, CheckpointProver>
         let (l1_start_height, l1_end_height) = batch_info.l1_range;
         let (l2_start_height, l2_end_height) = batch_info.l2_range;
 
-        let l1_batch = self
+        let l1_batch_proof = self
             .l1_batch_prover
             .get_proof(&(l1_start_height as u32, l1_end_height as u32))
             .unwrap();
+        let l1_batch_vk = self.l1_batch_prover.get_host().get_verification_key();
+        let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);
 
-        let l2_batch = self
+        let l2_batch_proof = self
             .l2_batch_prover
             .get_proof(&(l2_start_height, l2_end_height))
             .unwrap();
-
-        let l1_batch_vk = self.l1_batch_prover.get_host().get_verification_key();
         let l2_batch_vk = self.l2_batch_prover.get_host().get_verification_key();
+        let l2_batch = AggregationInput::new(l2_batch_proof, l2_batch_vk);
 
         let input = CheckpointProverInput {
             rollup_params: rollup_params.clone(),
             l1_batch,
             l2_batch,
-            l1_batch_vk,
-            l2_batch_vk,
         };
 
         Ok(input)
     }
 
-    fn gen_proof(
-        &self,
-        batch_info: &CheckpointBatchInfo,
-    ) -> ZkVmResult<(Proof, CheckpointProofOutput)> {
+    fn gen_proof(&self, batch_info: &CheckpointBatchInfo) -> ZkVmResult<ProofReceipt> {
         let host = self.get_host();
         let input = self.get_input(batch_info)?;
         CheckpointProver::prove(&input, &host)
