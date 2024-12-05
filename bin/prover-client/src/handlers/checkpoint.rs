@@ -39,10 +39,50 @@ impl CheckpointHandler {
             l2_batch_dispatcher,
         }
     }
+
+    async fn fetch_info(&self, ckp_idx: u64) -> Result<RpcCheckpointInfo, ProvingTaskError> {
+        Ok(self
+            .cl_client
+            .request::<Option<RpcCheckpointInfo>, _>(
+                "strata_getCheckpointInfo",
+                rpc_params![ckp_idx],
+            )
+            .await
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
+            .ok_or(ProvingTaskError::WitnessNotFound)?)
+    }
 }
 
 impl ProofHandler for CheckpointHandler {
     type Prover = CheckpointProver;
+
+    async fn create_task(
+        &self,
+        task_tracker: &mut crate::task2::TaskTracker,
+        task_id: &ProofKey,
+    ) -> Result<(), ProvingTaskError> {
+        let ckp_idx = match task_id {
+            ProofKey::Checkpoint(idx) => idx,
+            _ => return Err(ProvingTaskError::InvalidInput("Checkpoint".to_string())),
+        };
+
+        let checkpoint_info = self.fetch_info(*ckp_idx).await?;
+
+        let l1_batch_key =
+            ProofKey::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
+        self.l1_batch_dispatcher
+            .create_task(task_tracker, &l1_batch_key)
+            .await?;
+
+        let cl_agg_key = ProofKey::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
+        self.l2_batch_dispatcher
+            .create_task(task_tracker, &cl_agg_key)
+            .await?;
+
+        task_tracker.insert_task(*task_id, vec![l1_batch_key, cl_agg_key])?;
+
+        Ok(())
+    }
 
     async fn fetch_input(
         &self,
@@ -54,15 +94,7 @@ impl ProofHandler for CheckpointHandler {
             _ => return Err(ProvingTaskError::InvalidInput("Checkpoint".to_string())),
         };
 
-        let checkpoint_info = self
-            .cl_client
-            .request::<Option<RpcCheckpointInfo>, _>(
-                "strata_getCheckpointInfo",
-                rpc_params![ckp_idx],
-            )
-            .await
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
-            .ok_or(ProvingTaskError::WitnessNotFound)?;
+        let checkpoint_info = self.fetch_info(*ckp_idx).await?;
 
         let l1_batch_key =
             ProofKey::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
