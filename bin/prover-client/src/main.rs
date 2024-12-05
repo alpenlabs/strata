@@ -23,6 +23,7 @@ mod config;
 mod db;
 mod dispatcher;
 mod errors;
+mod handlers;
 mod manager;
 mod primitives;
 mod prover;
