@@ -16,7 +16,8 @@
 //! - `m/56'/20'/100'` for the message signing key
 //! - `m/56'/20'/101'` for the wallet transaction signing key
 //!
-//! These follow the [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)
+//! These follow [BIP-43](https://github.com/bitcoin/bips/blob/master/bip-0043.mediawiki)
+//! and [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)
 //! levels for bitcoin keys:
 //!
 //! - `m/56'` is the BIP-44 purpose level
@@ -35,16 +36,16 @@ use miniscript::{descriptor::Tr, Descriptor};
 
 use crate::error::KeyError;
 
-/// The BIP-44 purpose index for operator keys.
+/// The BIP-44 "purpose" index for operator keys.
 const PURPOSE_IDX: u32 = 56;
 
-/// The BIP-44 coin type index for operator keys.
+/// The BIP-44 "coin type" index for operator keys.
 const COIN_TYPE_IDX: u32 = 20;
 
-/// The BIP-44 account index for operator keys.
+/// The BIP-44 "account" index for the operator message key.
 const ACCOUNT_MESSAGE_IDX: u32 = 100;
 
-/// The BIP-44 account index for the operator wallet key.
+/// The BIP-44 "account" index for the operator wallet key.
 const ACCOUNT_WALLET_IDX: u32 = 101;
 
 /// The operator's message signing and wallet transaction signing keys.
@@ -53,9 +54,11 @@ const ACCOUNT_WALLET_IDX: u32 = 101;
 /// key lifetimes, while adding some security against a leaked signing key.
 #[derive(Debug, Clone)]
 pub struct OperatorKeys {
-    /// The operator's message signing key.
+    /// The operator's master [`Xpriv`].
+    master: Xpriv,
+    /// The operator's message signing [`Xpriv`].
     signing: Xpriv,
-    /// The operator's wallet transaction signing key.
+    /// The operator's wallet transaction signing [`Xpriv`].
     wallet: Xpriv,
 }
 
@@ -77,13 +80,19 @@ impl OperatorKeys {
         let message_xpriv = master.derive_priv(SECP256K1, &message_path)?;
         let wallet_xpriv = master.derive_priv(SECP256K1, &wallet_path)?;
 
-        Ok(OperatorKeys {
+        Ok(Self {
+            master: *master,
             signing: message_xpriv,
             wallet: wallet_xpriv,
         })
     }
 
-    /// The operator's message signing [`Xpub`].
+    /// Operator's master [`Xpub`].
+    pub fn master_xpub(&self) -> Xpub {
+        Xpub::from_priv(SECP256K1, &self.master)
+    }
+
+    /// Operator's message signing [`Xpub`].
     ///
     /// Infallible according to
     /// [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
@@ -91,7 +100,7 @@ impl OperatorKeys {
         Xpub::from_priv(SECP256K1, &self.signing)
     }
 
-    /// The operator's wallet transaction signing [`Xpub`].
+    /// Operator's wallet transaction signing [`Xpub`].
     ///
     /// Infallible conversion from [`Xpriv`] to [`Xpub`] according to
     /// [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
@@ -99,13 +108,19 @@ impl OperatorKeys {
         Xpub::from_priv(SECP256K1, &self.wallet)
     }
 
-    /// The operator's wallet descriptor.
+    /// Operator's master descriptor.
+    pub fn master_descriptor(&self) -> Descriptor<XOnlyPublicKey> {
+        // use the `Tr` type to create a Taproot descriptor
+        todo!()
+    }
+
+    /// Operator's wallet descriptor.
     pub fn wallet_descriptor(&self) -> Descriptor<XOnlyPublicKey> {
         // use the `Tr` type to create a Taproot descriptor
         todo!()
     }
 
-    /// The operator's message descriptor.
+    /// Operator's message descriptor.
     pub fn message_descriptor(&self) -> Descriptor<XOnlyPublicKey> {
         // use the `Tr` type to create a Taproot descriptor
         todo!()
