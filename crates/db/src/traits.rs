@@ -11,7 +11,7 @@ use strata_state::{
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
     sync_event::SyncEvent,
 };
-use strata_zkvm::Proof;
+use strata_zkvm::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
@@ -275,12 +275,12 @@ pub trait ProofDatabase {
     /// Inserts a proof into the database.
     ///
     /// Returns `Ok(())` on success, or an error on failure.
-    fn put_proof(&self, proof_id: ProofKey, proof: Proof) -> DbResult<()>;
+    fn put_proof(&self, proof_id: ProofKey, proof: ProofReceipt) -> DbResult<()>;
 
     /// Retrieves a proof by its key.
     ///
     /// Returns `Some(proof)` if found, or `None` if not.
-    fn get_proof(&self, proof_id: ProofKey) -> DbResult<Option<Proof>>;
+    fn get_proof(&self, proof_id: ProofKey) -> DbResult<Option<ProofReceipt>>;
 
     /// Deletes a proof by its key.
     ///

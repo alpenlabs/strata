@@ -7,7 +7,7 @@ use strata_db::{
     DbResult,
 };
 use strata_primitives::proof::ProofKey;
-use strata_zkvm::Proof;
+use strata_zkvm::ProofReceipt;
 
 use super::schemas::ProofSchema;
 use crate::DbOpsConfig;
@@ -24,7 +24,7 @@ impl ProofDb {
 }
 
 impl ProofDatabase for ProofDb {
-    fn put_proof(&self, proof_key: ProofKey, proof: Proof) -> DbResult<()> {
+    fn put_proof(&self, proof_key: ProofKey, proof: ProofReceipt) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if tx.get::<ProofSchema>(&proof_key)?.is_some() {
@@ -38,7 +38,7 @@ impl ProofDatabase for ProofDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_proof(&self, proof_key: ProofKey) -> DbResult<Option<Proof>> {
+    fn get_proof(&self, proof_key: ProofKey) -> DbResult<Option<ProofReceipt>> {
         Ok(self.db.get::<ProofSchema>(&proof_key)?)
     }
 
@@ -77,6 +77,7 @@ impl ProverDatabase for ProverDB {
 #[cfg(test)]
 mod tests {
     use strata_state::l1::L1BlockId;
+    use strata_zkvm::{Proof, PublicValues};
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance_for_prover;
@@ -86,10 +87,12 @@ mod tests {
         ProofDb::new(db, db_ops)
     }
 
-    fn generate_proof() -> (ProofKey, Proof) {
+    fn generate_proof() -> (ProofKey, ProofReceipt) {
         let proof_key = ProofKey::BtcBlockspace(L1BlockId::default());
         let proof = Proof::default();
-        (proof_key, proof)
+        let public_values = PublicValues::default();
+        let proof_receipt = ProofReceipt::new(proof, public_values);
+        (proof_key, proof_receipt)
     }
 
     #[test]
@@ -99,7 +102,10 @@ mod tests {
         let (proof_key, proof) = generate_proof();
 
         let result = db.put_proof(proof_key, proof.clone());
-        assert!(result.is_ok(), "Proof should be inserted successfully");
+        assert!(
+            result.is_ok(),
+            "ProofReceipt should be inserted successfully"
+        );
 
         let stored_proof = db.get_proof(proof_key).unwrap();
         assert_eq!(stored_proof, Some(proof));
