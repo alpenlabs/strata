@@ -41,6 +41,9 @@ pub enum ProvingTaskError {
     #[error("Invalid input: Expected {0:?}")]
     InvalidInput(String),
 
+    #[error("Witness not found")]
+    WitnessNotFound,
+
     #[error("Database error: {0:?}")]
     DatabaseError(DbError),
 
