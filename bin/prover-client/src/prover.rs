@@ -186,42 +186,12 @@ impl Prover {
         let db = ProofDb::new(rbdb, db_ops);
 
         let mut zkvm_manager = ZkVMManager::new();
-        zkvm_manager.add_vm(
-            ProofVm::BtcProving,
-            SP1Host::new_from_bytes(
-                &GUEST_BTC_BLOCKSPACE_ELF,
-                &GUEST_BTC_BLOCKSPACE_PK,
-                &GUEST_BTC_BLOCKSPACE_VK,
-            ),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::L1Batch,
-            SP1Host::new_from_bytes(&GUEST_L1_BATCH_ELF, &GUEST_L1_BATCH_PK, &GUEST_L1_BATCH_VK),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::ELProving,
-            SP1Host::new_from_bytes(
-                &GUEST_EVM_EE_STF_ELF,
-                &GUEST_EVM_EE_STF_PK,
-                &GUEST_EVM_EE_STF_VK,
-            ),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::CLProving,
-            SP1Host::new_from_bytes(&GUEST_CL_STF_ELF, &GUEST_CL_STF_PK, &GUEST_CL_STF_VK),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::CLAggregation,
-            SP1Host::new_from_bytes(&GUEST_CL_AGG_ELF, &GUEST_CL_AGG_PK, &GUEST_CL_AGG_VK),
-        );
-        zkvm_manager.add_vm(
-            ProofVm::Checkpoint,
-            SP1Host::new_from_bytes(
-                &GUEST_CHECKPOINT_ELF,
-                &GUEST_CHECKPOINT_PK,
-                &GUEST_CHECKPOINT_VK,
-            ),
-        );
+        zkvm_manager.add_vm(ProofVm::BtcProving);
+        zkvm_manager.add_vm(ProofVm::L1Batch);
+        zkvm_manager.add_vm(ProofVm::ELProving);
+        zkvm_manager.add_vm(ProofVm::CLProving);
+        zkvm_manager.add_vm(ProofVm::CLAggregation);
+        zkvm_manager.add_vm(ProofVm::Checkpoint);
 
         Self {
             pool: rayon::ThreadPoolBuilder::new()
