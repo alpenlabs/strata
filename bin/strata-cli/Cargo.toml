@@ -48,7 +48,7 @@ strata-bridge-tx-builder.workspace = true
 strata-primitives.workspace = true
 terrors.workspace = true
 tokio.workspace = true
-zeroize = { version = "1.8.1", features = ["derive"] }
+zeroize.workspace = true
 zxcvbn = "3.1.0"
 
 # sha2 fails to compile on windows with the "asm" feature
