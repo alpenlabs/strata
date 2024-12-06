@@ -13146,7 +13146,6 @@ name = "strata-key-derivation"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "corepc-node",
  "secp256k1",
  "thiserror",
 ]

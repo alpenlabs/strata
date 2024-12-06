@@ -119,8 +119,8 @@ mod tests {
     use std::{collections::BTreeMap, sync::LazyLock};
 
     use bitcoin::{
-        absolute, consensus, psbt::Input, transaction::Version, Address, Amount, BlockHash,
-        OutPoint, Psbt, Sequence, TapSighashType, Transaction, TxIn, TxOut, Witness,
+        absolute, consensus, hashes::Hash, psbt::Input, transaction::Version, Address, Amount,
+        OutPoint, Psbt, Sequence, TapSighashType, Transaction, TxIn, TxOut, Txid, Witness,
     };
 
     use super::*;
@@ -133,33 +133,18 @@ mod tests {
 
     // The first address derived from the xpriv above using a `tr()` descriptor.
     const ADDRESS: &str = "bcrt1p729l9680ht3zf7uhl6pgdrlhfp9r29cwajr5jk3k05fer62763fscz0w4s";
-
     // The second address derived from the xpriv above using a `tr()` descriptor.
-    const SENT_ADDRESS: &str = "bcrt1p5uhmu40t5yl97kr95s2m4sr8a9f3af2meqeefkx33symwex3wfqqfe77m3";
+    const DEST_ADDRESS: &str = "bcrt1p5uhmu40t5yl97kr95s2m4sr8a9f3af2meqeefkx33symwex3wfqqfe77m3";
+
+    // Dummy values for the test.
+    const DUMMY_UTXO_AMOUNT: Amount = Amount::from_sat(20_000_000);
+    const SPEND_AMOUNT: Amount = Amount::from_sat(19_999_000); // 1000 sat fee.
 
     #[test]
     fn test_operator_keys() {
         // Parse stuff
         let address = ADDRESS.parse::<Address<_>>().unwrap().assume_checked();
-        let dest_address = SENT_ADDRESS.parse::<Address<_>>().unwrap().assume_checked();
-
-        // Start a bitcoind node
-        let bitcoind = corepc_node::BitcoinD::from_downloaded().unwrap();
-
-        // Mine some blocks
-        let blocks = bitcoind
-            .client
-            .generate_to_address(101, &address)
-            .unwrap()
-            .0;
-        assert_eq!(blocks.len(), 101);
-
-        // Mine more blocks
-        let _ = bitcoind
-            .client
-            .generate_to_address(1, &dest_address)
-            .unwrap()
-            .0;
+        let dest_address = DEST_ADDRESS.parse::<Address<_>>().unwrap().assume_checked();
 
         // Create the operator keys
         let operator_keys = OperatorKeys::new(&XPRIV).unwrap();
@@ -169,25 +154,22 @@ mod tests {
         let derivation_path = DerivationPath::master();
         let (x_only_pubkey, _) = wallet_pubkey.public_key.x_only_public_key();
 
-        // Get the coinbase of the last mined block.
-        let block_hash: BlockHash = blocks.first().unwrap().parse().unwrap();
-        let block = bitcoind.client.get_block(block_hash).unwrap();
-        let coinbase_tx = block.txdata.last().unwrap();
-
-        // Create a transaction with a single input and output.
-        let txid = coinbase_tx.compute_txid();
-        let outpoint = OutPoint::new(txid, 0);
+        // Create a dummy transaction with a single input and output.
+        let outpoint = OutPoint {
+            txid: Txid::all_zeros(),
+            vout: 0,
+        };
         let txin = TxIn {
             previous_output: outpoint,
             sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
             ..Default::default()
         };
         let txout = TxOut {
-            value: Amount::from_btc(49.99).unwrap(),
+            value: SPEND_AMOUNT,
             script_pubkey: dest_address.script_pubkey(),
         };
         let previous_txout = TxOut {
-            value: Amount::from_btc(50.0).unwrap(),
+            value: DUMMY_UTXO_AMOUNT,
             script_pubkey: address.script_pubkey(),
         };
 
@@ -235,8 +217,5 @@ mod tests {
         let signed_tx = psbt.extract_tx().expect("valid transaction");
         let serialized_signed_tx = consensus::encode::serialize_hex(&signed_tx);
         println!("serialized_signed_tx: {}", serialized_signed_tx);
-
-        // Broadcast the transaction
-        bitcoind.client.send_raw_transaction(&signed_tx).unwrap();
     }
 }
