@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use jsonrpsee::http_client::HttpClient;
 use strata_btcio::rpc::BitcoinClient;
@@ -13,14 +13,14 @@ use crate::{
         btc::BtcBlockspaceHandler, checkpoint::CheckpointHandler, cl_agg::ClAggHandler,
         cl_stf::ClStfHandler, evm_ee::EvmEeHandler, l1_batch::L1BatchHandler, ProofHandler,
     },
-    primitives::vms::ProofVm,
+    primitives::status::ProvingTaskStatus,
     task2::TaskTracker,
 };
 
 pub struct ProverManager {
     task_tracker: TaskTracker,
-    db: ProofDb,
-    handlers: HashMap<ProofVm, ProofHandler>,
+    db: ProverDB,
+    handler: ProofHandler,
 }
 
 impl ProverManager {
@@ -46,28 +46,32 @@ impl ProverManager {
             Arc::new(cl_agg_handler.clone()),
         );
 
-        let handlers = vec![
-            (
-                ProofVm::BtcProving,
-                ProofHandler::BtcBlockspace(btc_blockspace_handler),
-            ),
-            (ProofVm::L1Batch, ProofHandler::L1Batch(l1_batch_handler)),
-            (ProofVm::ELProving, ProofHandler::EvmEe(evm_ee_handler)),
-            (ProofVm::CLProving, ProofHandler::ClStf(cl_stf_handler)),
-            (ProofVm::CLAggregation, ProofHandler::ClAgg(cl_agg_handler)),
-            (
-                ProofVm::Checkpoint,
-                ProofHandler::Checkpoint(checkpoint_handler),
-            ),
-        ]
-        .into_iter()
-        .collect();
+        let handler = ProofHandler::new(
+            btc_blockspace_handler,
+            l1_batch_handler,
+            evm_ee_handler,
+            cl_stf_handler,
+            cl_agg_handler,
+            checkpoint_handler,
+        );
 
         let task_tracker = TaskTracker::new();
         Self {
             task_tracker,
-            db,
-            handlers,
+            db: ProverDB::new(Arc::new(db)),
+            handler,
+        }
+    }
+
+    pub async fn process_pending_tasks(&mut self) {
+        let pending_tasks = self
+            .task_tracker
+            .get_tasks_by_status(|status| matches!(status, ProvingTaskStatus::Pending));
+
+        for task in pending_tasks {
+            self.handler
+                .prove(&mut self.task_tracker, &task, &self.db)
+                .await;
         }
     }
 }
