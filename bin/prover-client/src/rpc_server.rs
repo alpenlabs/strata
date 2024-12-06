@@ -5,8 +5,9 @@ use std::sync::Arc;
 use anyhow::Context;
 use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::ProofId;
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
+use strata_rpc_types::ProofKey;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
 
@@ -65,43 +66,44 @@ impl ProverClientRpc {
         }
     }
 
-    pub async fn create_task(&self, task: ProofKey) -> RpcResult<ProofKey> {
-        self.handler
-            .create_task(self.task_tracker.clone(), &task)
+    pub async fn create_task(&self, task: ProofId) -> RpcResult<Vec<ProofKey>> {
+        let tasks = self
+            .handler
+            .create_task(self.task_tracker.clone(), task)
             .await
             .expect("failed to add proving task");
-        RpcResult::Ok(task)
+        RpcResult::Ok(tasks)
     }
 }
 
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
-    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<ProofKey> {
-        let task = ProofKey::BtcBlockspace(btc_block_num);
+    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<Vec<ProofKey>> {
+        let task = ProofId::BtcBlockspace(btc_block_num);
         self.create_task(task).await
     }
 
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<ProofKey> {
-        let task = ProofKey::BtcBlockspace(el_block_num);
+    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>> {
+        let task = ProofId::BtcBlockspace(el_block_num);
         self.create_task(task).await
     }
 
-    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<ProofKey> {
-        let task = ProofKey::ClStf(cl_block_num);
+    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<Vec<ProofKey>> {
+        let task = ProofId::ClStf(cl_block_num);
         self.create_task(task).await
     }
 
-    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<ProofKey> {
-        let task = ProofKey::L1Batch(l1_range.0, l1_range.1);
+    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
+        let task = ProofId::L1Batch(l1_range.0, l1_range.1);
         self.create_task(task).await
     }
 
-    async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<ProofKey> {
-        let task = ProofKey::ClAgg(l2_range.0, l2_range.1);
+    async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
+        let task = ProofId::ClAgg(l2_range.0, l2_range.1);
         self.create_task(task).await
     }
 
-    async fn prove_latest_checkpoint(&self) -> RpcResult<ProofKey> {
+    async fn prove_latest_checkpoint(&self) -> RpcResult<Vec<ProofKey>> {
         unimplemented!()
     }
 
@@ -110,12 +112,12 @@ impl StrataProverClientApiServer for ProverClientRpc {
         _checkpoint_idx: u64,
         _l1_range: (u64, u64),
         _l2_range: (u64, u64),
-    ) -> RpcResult<ProofKey> {
+    ) -> RpcResult<Vec<ProofKey>> {
         unimplemented!()
     }
 
-    async fn get_task_status(&self, id: ProofKey) -> RpcResult<Option<String>> {
-        let status = self.task_tracker.lock().await.get_task(id).cloned();
+    async fn get_task_status(&self, key: ProofKey) -> RpcResult<Option<String>> {
+        let status = self.task_tracker.lock().await.get_task(key).cloned();
         match status {
             Ok(status) => RpcResult::Ok(Some(format!("{:?}", status))),
             Err(_) => RpcResult::Ok(Some(format!("{:?}", status))),

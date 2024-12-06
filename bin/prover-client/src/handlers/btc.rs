@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
-use strata_primitives::proof::{ProofId, ProofKey};
+use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
@@ -25,7 +25,12 @@ impl BtcBlockspaceHandler {
 impl ProvingOp for BtcBlockspaceHandler {
     type Prover = BtcBlockspaceProver;
 
-    fn fetch_deps(&self, _proof_id: ProofId) -> Result<Vec<ProofId>, ProvingTaskError> {
+    async fn create_dep_tasks(
+        &self,
+        _task_tracker: Arc<Mutex<TaskTracker>>,
+        _proof_id: ProofId,
+        _hosts: &[ProofZkVmHost],
+    ) -> Result<Vec<ProofId>, ProvingTaskError> {
         Ok(vec![])
     }
 
@@ -34,8 +39,8 @@ impl ProvingOp for BtcBlockspaceHandler {
         task_id: &ProofKey,
         _db: &ProofDb,
     ) -> Result<BlockspaceProofInput, ProvingTaskError> {
-        let height = match task_id {
-            ProofKey::BtcBlockspace(id) => id,
+        let height = match task_id.id() {
+            ProofId::BtcBlockspace(id) => id,
             _ => return Err(ProvingTaskError::InvalidInput("BtcBlockspace".to_string())),
         };
 

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use strata_primitives::proof::{ProofKey, ProofZkVmHost};
+use strata_primitives::proof::ProofKey;
 
 use crate::{errors::ProvingTaskError, primitives::status::ProvingTaskStatus};
 
@@ -16,20 +16,8 @@ pub struct TaskTracker {
 impl TaskTracker {
     /// Creates a new `TaskTracker` instance.
     pub fn new() -> Self {
-        let mut hosts = Vec::new();
-
-        #[cfg(feature = "sp1")]
-        hosts.push(ProofZkVmHost::SP1);
-
-        #[cfg(feature = "risc0")]
-        hosts.push(ProofZkVmHost::Risc0);
-
-        #[cfg(not(any(feature = "sp1", feature = "risc0")))]
-        hosts.push(ProofZkVmHost::Native);
-
         TaskTracker {
             tasks: HashMap::new(),
-            hosts,
             in_progress_tasks: 0,
         }
     }
@@ -153,6 +141,8 @@ mod tests {
     use strata_state::l1::L1BlockId;
     use strata_test_utils::ArbitraryGenerator;
 
+    use strata_primitives::proof::{ProofId, ProofZkVmHost};
+
     use super::*;
 
     fn gen_l1_block_ids(n: usize) -> Vec<L1BlockId> {
@@ -203,7 +193,7 @@ mod tests {
     #[test]
     fn test_task_not_found_error() {
         let mut tracker = TaskTracker::new();
-        let id = ProofKey::Checkpoint(1);
+        let (id, _) = gen_task_with_deps(0);
 
         let result = tracker.update_status(id, ProvingTaskStatus::Pending);
         assert!(matches!(result, Err(ProvingTaskError::TaskNotFound(_))));

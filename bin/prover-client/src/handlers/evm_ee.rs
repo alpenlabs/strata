@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alloy_rpc_types::Block;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
@@ -26,12 +26,13 @@ impl EvmEeHandler {
 impl ProvingOp for EvmEeHandler {
     type Prover = EvmEeProver;
 
-    async fn create_task(
+    async fn create_dep_tasks(
         &self,
-        task_tracker: Arc<Mutex<TaskTracker>>,
-        task_id: &ProofKey,
-    ) -> Result<(), ProvingTaskError> {
-        task_tracker.lock().await.insert_task(*task_id, vec![])
+        _task_tracker: Arc<Mutex<TaskTracker>>,
+        _proof_id: ProofId,
+        _hosts: &[ProofZkVmHost],
+    ) -> Result<Vec<ProofId>, ProvingTaskError> {
+        Ok(vec![])
     }
 
     async fn fetch_input(
@@ -39,8 +40,8 @@ impl ProvingOp for EvmEeHandler {
         task_id: &ProofKey,
         _db: &ProofDb,
     ) -> Result<ELProofInput, ProvingTaskError> {
-        let block_num = match task_id {
-            ProofKey::EvmEeStf(id) => id,
+        let block_num = match task_id.id() {
+            ProofId::EvmEeStf(id) => id,
             _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
         };
 
