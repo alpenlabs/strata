@@ -23,6 +23,9 @@ use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
     secp256k1::SECP256K1,
 };
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
+use zeroize::ZeroizeOnDrop;
 
 use crate::error::KeyError;
 
@@ -113,6 +116,52 @@ impl OperatorKeys {
         Xpub::from_priv(SECP256K1, &self.wallet)
     }
 }
+
+#[cfg(feature = "zeroize")]
+impl Zeroize for OperatorKeys {
+    fn zeroize(&mut self) {
+        let Self {
+            master,
+            signing,
+            wallet,
+        } = self;
+
+        // # Security note
+        //
+        // Going over all possible "zeroizable" fields.
+        // What we cannot zeroize is:
+        //
+        // - Network
+        // - Child number
+        //
+        // These are fine to leave as they are since they are public parameters,
+        // and not secret values.
+
+        master.depth.zeroize();
+        let mut parent_fingerprint: [u8; 4] = *master.parent_fingerprint.as_mut();
+        parent_fingerprint.zeroize();
+        master.private_key.non_secure_erase();
+        let mut chaincode: [u8; 32] = *master.chain_code.as_mut();
+        chaincode.zeroize();
+
+        signing.depth.zeroize();
+        let mut parent_fingerprint: [u8; 4] = *signing.parent_fingerprint.as_mut();
+        parent_fingerprint.zeroize();
+        signing.private_key.non_secure_erase();
+        let mut chaincode: [u8; 32] = *signing.chain_code.as_mut();
+        chaincode.zeroize();
+
+        wallet.depth.zeroize();
+        let mut parent_fingerprint: [u8; 4] = *wallet.parent_fingerprint.as_mut();
+        parent_fingerprint.zeroize();
+        wallet.private_key.non_secure_erase();
+        let mut chaincode: [u8; 32] = *wallet.chain_code.as_mut();
+        chaincode.zeroize();
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl ZeroizeOnDrop for OperatorKeys {}
 
 #[cfg(test)]
 mod tests {
@@ -217,5 +266,12 @@ mod tests {
         let signed_tx = psbt.extract_tx().expect("valid transaction");
         let serialized_signed_tx = consensus::encode::serialize_hex(&signed_tx);
         println!("serialized_signed_tx: {}", serialized_signed_tx);
+    }
+
+    #[cfg(feature = "zeroize")]
+    #[test]
+    fn test_zeroize() {
+        let mut operator_keys = OperatorKeys::new(&XPRIV).unwrap();
+        operator_keys.zeroize();
     }
 }
