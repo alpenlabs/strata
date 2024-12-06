@@ -113,4 +113,12 @@ impl ProofKey {
     pub fn new(id: ProofId, host: ProofZkVmHost) -> Self {
         Self { id, host }
     }
+
+    pub fn id(&self) -> &ProofId {
+        &self.id
+    }
+
+    pub fn host(&self) -> &ProofZkVmHost {
+        &self.host
+    }
 }

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use strata_primitives::proof::{ProofKey, ProofZkVmHost};
+use strata_primitives::proof::ProofKey;
 
 use crate::{errors::ProvingTaskError, primitives::status::ProvingTaskStatus};
 
@@ -16,20 +16,8 @@ pub struct TaskTracker {
 impl TaskTracker {
     /// Creates a new `TaskTracker` instance.
     pub fn new() -> Self {
-        let mut hosts = Vec::new();
-
-        #[cfg(feature = "sp1")]
-        hosts.push(ProofZkVmHost::SP1);
-
-        #[cfg(feature = "risc0")]
-        hosts.push(ProofZkVmHost::Risc0);
-
-        #[cfg(not(any(feature = "sp1", feature = "risc0")))]
-        hosts.push(ProofZkVmHost::Native);
-
         TaskTracker {
             tasks: HashMap::new(),
-            hosts,
             in_progress_tasks: 0,
         }
     }
@@ -151,12 +139,30 @@ impl TaskTracker {
 #[cfg(test)]
 mod tests {
 
+    use strata_primitives::proof::{ProofId, ProofZkVmHost};
+
     use super::*;
+
+    // Helper function to generate test L1 block IDs
+    fn gen_task_with_deps(n: u64) -> (ProofKey, Vec<ProofKey>) {
+        let mut deps = Vec::with_capacity(n as usize);
+        let host = ProofZkVmHost::Native;
+        for i in 0..n {
+            let id = ProofId::BtcBlockspace(i);
+            let key = ProofKey::new(id, host);
+            deps.push(key);
+        }
+
+        let id = ProofId::L1Batch(1, n);
+        let key = ProofKey::new(id, host);
+
+        (key, deps)
+    }
 
     #[test]
     fn test_insert_task_no_dependencies() {
         let mut tracker = TaskTracker::new();
-        let id = ProofKey::BtcBlockspace(1);
+        let (id, _) = gen_task_with_deps(0);
 
         tracker.insert_task(id, vec![]).unwrap();
         assert!(
@@ -168,8 +174,7 @@ mod tests {
     #[test]
     fn test_insert_task_with_dependencies() {
         let mut tracker = TaskTracker::new();
-        let id = ProofKey::L1Batch(1, 2);
-        let deps = vec![ProofKey::BtcBlockspace(1), ProofKey::BtcBlockspace(2)];
+        let (id, deps) = gen_task_with_deps(2);
 
         for dep in &deps {
             tracker.insert_task(*dep, vec![]).unwrap();
@@ -187,7 +192,7 @@ mod tests {
     #[test]
     fn test_task_not_found_error() {
         let mut tracker = TaskTracker::new();
-        let id = ProofKey::Checkpoint(1);
+        let (id, _) = gen_task_with_deps(0);
 
         let result = tracker.update_status(id, ProvingTaskStatus::Pending);
         assert!(matches!(result, Err(ProvingTaskError::TaskNotFound(_))));
@@ -196,8 +201,7 @@ mod tests {
     #[test]
     fn test_dependency_resolution() {
         let mut tracker = TaskTracker::new();
-        let id = ProofKey::L1Batch(1, 2);
-        let deps = vec![ProofKey::BtcBlockspace(1), ProofKey::BtcBlockspace(2)];
+        let (id, deps) = gen_task_with_deps(2);
         for dep in &deps {
             tracker.insert_task(*dep, vec![]).unwrap();
         }
