@@ -12970,6 +12970,7 @@ dependencies = [
  "strata-db",
  "strata-eectl",
  "strata-evmexec",
+ "strata-key-derivation",
  "strata-mmr",
  "strata-primitives",
  "strata-rocksdb",
