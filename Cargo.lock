@@ -13148,6 +13148,7 @@ dependencies = [
  "bitcoin",
  "secp256k1",
  "thiserror",
+ "zeroize",
 ]
 
 [[package]]
