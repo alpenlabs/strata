@@ -16,7 +16,6 @@ rustdoc.all = "warn"
 strata-rpc-types = { workspace = true }
 
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
-uuid = { workspace = true }
 
 [features]
 client = ["jsonrpsee/client"]
