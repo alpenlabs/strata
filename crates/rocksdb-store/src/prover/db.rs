@@ -12,6 +12,7 @@ use strata_zkvm::ProofReceipt;
 use super::schemas::ProofSchema;
 use crate::DbOpsConfig;
 
+#[derive(Debug, Clone)]
 pub struct ProofDb {
     db: Arc<OptimisticTransactionDB>,
     ops: DbOpsConfig,
@@ -56,6 +57,7 @@ impl ProofDatabase for ProofDb {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ProverDB {
     db: Arc<ProofDb>,
 }

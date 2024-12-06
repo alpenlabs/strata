@@ -5,8 +5,8 @@ use strata_primitives::proof::ProofKey;
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProofDb;
 
-use super::ProvingOp;
-use crate::{errors::ProvingTaskError, proving_ops::btc_ops::get_pm_rollup_params};
+use super::{utils::get_pm_rollup_params, ProvingOp};
+use crate::errors::ProvingTaskError;
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]

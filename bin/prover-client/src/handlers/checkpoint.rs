@@ -8,11 +8,10 @@ use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcCheckpointInfo;
 use strata_zkvm::{AggregationInput, ZkVmHost};
 
-use super::{cl_agg::ClAggHandler, l1_batch::L1BatchHandler, ProvingOp};
-use crate::{
-    errors::ProvingTaskError, hosts, primitives::vms::ProofVm,
-    proving_ops::btc_ops::get_pm_rollup_params,
+use super::{
+    cl_agg::ClAggHandler, l1_batch::L1BatchHandler, utils::get_pm_rollup_params, ProvingOp,
 };
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
