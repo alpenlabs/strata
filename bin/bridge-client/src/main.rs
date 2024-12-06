@@ -6,10 +6,10 @@
 mod args;
 pub(crate) mod constants;
 pub(crate) mod db;
-mod descriptor;
 mod errors;
 mod modes;
 pub(crate) mod rpc_server;
+pub(crate) mod xpriv;
 
 use args::{Cli, OperationMode};
 use modes::{challenger, operator};
