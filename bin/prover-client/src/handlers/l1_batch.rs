@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use bitcoin::params::MAINNET;
 use strata_btcio::{reader::query::get_verification_state, rpc::BitcoinClient};
-use strata_db::traits::{ProofDatabase, ProverDatabase};
+use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
-use strata_rocksdb::prover::db::ProverDB;
+use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmHost;
 
 use super::{btc::BtcBlockspaceHandler, ProvingOp};
@@ -60,7 +60,7 @@ impl ProvingOp for L1BatchHandler {
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
-        db: &ProverDB,
+        db: &ProofDb,
     ) -> Result<L1BatchProofInput, ProvingTaskError> {
         let (start_height, end_height) = match task_id {
             ProofKey::L1Batch(start, end) => (start, end),
@@ -71,7 +71,6 @@ impl ProvingOp for L1BatchHandler {
         for height in *start_height..=*end_height {
             let proof_key = ProofKey::BtcBlockspace(height);
             let proof = db
-                .proof_db()
                 .get_proof(proof_key)
                 .map_err(ProvingTaskError::DatabaseError)?
                 .ok_or(ProvingTaskError::ProofNotFound(proof_key))?;
