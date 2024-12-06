@@ -1,9 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::ProofKey;
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmProver;
+use tokio::sync::Mutex;
 
 use crate::{errors::ProvingTaskError, hosts, task2::TaskTracker};
 
@@ -32,7 +33,7 @@ pub trait ProvingOp {
 
     async fn create_task(
         &self,
-        task_tracker: &mut TaskTracker,
+        task_tracker: Arc<Mutex<TaskTracker>>,
         task_id: &ProofKey,
     ) -> Result<(), ProvingTaskError>;
 
@@ -114,31 +115,30 @@ impl ProofHandler {
         }
     }
 
-    // pub async fn create_task(
-    //     &self,
-    //     task_tracker: Arc<Mutex<TaskTracker>>,
-    //     task_id: &ProofKey,
-    // ) -> Result<(), ProvingTaskError> {
-    //     match task_id {
-    //         ProofKey::BtcBlockspace(_) => {
-    //             self.btc_blockspace_handler
-    //                 .create_task(task_tracker, task_id)
-    //                 .await
-    //         }
-    //         ProofKey::L1Batch(_, _) => {
-    //             self.l1_batch_handler
-    //                 .create_task(task_tracker, task_id)
-    //                 .await
-    //         }
-    //         ProofKey::EvmEeStf(_) => self.evm_ee_handler.create_task(task_tracker,
-    // task_id).await,         ProofKey::ClStf(_) =>
-    // self.cl_stf_handler.create_task(task_tracker, task_id).await,         ProofKey::ClAgg(_,
-    // _) => self.cl_agg_handler.create_task(task_tracker, task_id).await,
-    //         ProofKey::Checkpoint(_) => {
-    //             self.checkpoint_handler
-    //                 .create_task(task_tracker, task_id)
-    //                 .await
-    //         }
-    //     }
-    // }
+    pub async fn create_task(
+        &self,
+        task_tracker: Arc<Mutex<TaskTracker>>,
+        task_id: &ProofKey,
+    ) -> Result<(), ProvingTaskError> {
+        match task_id {
+            ProofKey::BtcBlockspace(_) => {
+                self.btc_blockspace_handler
+                    .create_task(task_tracker, task_id)
+                    .await
+            }
+            ProofKey::L1Batch(_, _) => {
+                self.l1_batch_handler
+                    .create_task(task_tracker, task_id)
+                    .await
+            }
+            ProofKey::EvmEeStf(_) => self.evm_ee_handler.create_task(task_tracker, task_id).await,
+            ProofKey::ClStf(_) => self.cl_stf_handler.create_task(task_tracker, task_id).await,
+            ProofKey::ClAgg(_, _) => self.cl_agg_handler.create_task(task_tracker, task_id).await,
+            ProofKey::Checkpoint(_) => {
+                self.checkpoint_handler
+                    .create_task(task_tracker, task_id)
+                    .await
+            }
+        }
+    }
 }
