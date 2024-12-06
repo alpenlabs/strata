@@ -60,8 +60,7 @@ use bridge::schemas::{
 };
 pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     SequenceSchema::COLUMN_FAMILY_NAME,
-    prover::schemas::ProverTaskIdSchema::COLUMN_FAMILY_NAME,
-    prover::schemas::ProverTaskSchema::COLUMN_FAMILY_NAME,
+    prover::schemas::ProofSchema::COLUMN_FAMILY_NAME,
 ];
 
 // Re-exports
