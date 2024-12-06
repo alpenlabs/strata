@@ -47,9 +47,11 @@ jobs:
         working-directory: provers/sp1
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
-  
-      - name: Build prover client binary
-        run: cargo build --profile prover-ci -F "prover"
-        working-directory: bin/prover-client
-        env:
-          RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+      
+      # Temporary disabled. 
+      # TODO(STR-694): To be re-enabled once prover-client has its features and build stabilized.
+      #- name: Build prover client binary
+      #  run: cargo build --profile prover-ci -F "prover"
+      #  working-directory: bin/prover-client
+      #  env:
+      #    RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
