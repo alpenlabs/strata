@@ -30,15 +30,14 @@ use crate::{
     constants::{DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, ROCKSDB_RETRY_COUNT},
     db::open_rocksdb_database,
     rpc_server::{self, BridgeRpc},
-    xpriv::parse_master_xpriv,
+    xpriv::resolve_xpriv,
 };
 
 /// Bootstraps the bridge client in Operator mode by hooking up all the required auxiliary services
 /// including database, rpc server, etc. Logging needs to be initialized at the call
 /// site (main function) itself.
 pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
-    // Parse the paths
-    let master_xpriv_path = PathBuf::from(args.master_xpriv);
+    // Parse dirs
     let data_dir = args.datadir.map(PathBuf::from);
 
     // Initialize a rocksdb instance with the required column families.
@@ -69,7 +68,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         .expect("failed to connect to the rollup RPC server");
 
     // Get the keypair after deriving the wallet xpriv.
-    let operator_keys = parse_master_xpriv(&master_xpriv_path)?;
+    let operator_keys = resolve_xpriv(args.master_xpriv, args.master_xpriv_path)?;
     let wallet_xpriv = operator_keys.wallet_xpriv();
 
     let mut keypair = wallet_xpriv.to_keypair(SECP256K1);
