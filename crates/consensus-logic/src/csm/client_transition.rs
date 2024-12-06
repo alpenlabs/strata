@@ -94,7 +94,7 @@ pub fn process_event<D: Database>(
             let maturable_height = next_exp_height.saturating_sub(safe_depth);
 
             if maturable_height > params.rollup().horizon_l1_height && state.is_chain_active() {
-                let (wrs, acts) = handle_maturable_height(maturable_height, state);
+                let (wrs, acts) = handle_mature_l1_height(maturable_height, state, database);
                 writes.extend(wrs);
                 actions.extend(acts);
             }
@@ -224,15 +224,20 @@ pub fn process_event<D: Database>(
                 block.block().header().blockidx(),
             ));
             actions.push(SyncAction::UpdateTip(*blkid));
+
+            let (wrs, acts) = handle_checkpoint_finalization(state, blkid, params, database);
+            writes.extend(wrs);
+            actions.extend(acts);
         }
     }
 
     Ok(ClientUpdateOutput::new(writes, actions))
 }
 
-fn handle_maturable_height(
+fn handle_mature_l1_height(
     maturable_height: u64,
     state: &ClientState,
+    database: &impl Database,
 ) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
     let mut writes = Vec::new();
     let mut actions = Vec::new();
@@ -242,15 +247,34 @@ fn handle_maturable_height(
         .l1_view()
         .has_verified_checkpoint_before(maturable_height)
     {
-        debug!(%maturable_height, "Writing CheckpointFinalized");
-        writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
-
-        // Emit sync action for finalizing a l2 block
         if let Some(checkpt) = state
             .l1_view()
             .get_last_verified_checkpoint_before(maturable_height)
         {
-            actions.push(SyncAction::FinalizeBlock(checkpt.batch_info.l2_blockid));
+            // FinalizeBlock Should only be applied when l2_block is actually
+            // available in l2_db
+            // If l2 blocks is not in db then finalization will happen when
+            // l2Block is fetched from the network and the corresponding
+            //checkpoint is already finalized.
+            let l2_blockid = checkpt.batch_info.l2_blockid;
+
+            match database.l2_db().get_block_data(l2_blockid) {
+                Ok(Some(_)) => {
+                    debug!(%maturable_height, "Writing CheckpointFinalized");
+                    writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
+                    // Emit sync action for finalizing a l2 block
+                    info!(%maturable_height, %l2_blockid, "l2 block found in db, push FinalizeBlock SyncAction");
+                    actions.push(SyncAction::FinalizeBlock(l2_blockid));
+                }
+                Ok(None) => {
+                    warn!(
+                        %maturable_height,%l2_blockid, "l2 block not in db yet, skipping finalize"
+                    );
+                }
+                Err(e) => {
+                    error!(%e, "error while fetching block data from l2_db");
+                }
+            }
         } else {
             warn!(
             %maturable_height,
@@ -259,6 +283,52 @@ fn handle_maturable_height(
         }
     }
     (writes, actions)
+}
+
+fn handle_checkpoint_finalization(
+    state: &ClientState,
+    blkid: &L2BlockId,
+    params: &Params,
+    database: &impl Database,
+) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
+    let mut writes = Vec::new();
+    let mut actions = Vec::new();
+    let verified_checkpoints: &[L1Checkpoint] = state.l1_view().verified_checkpoints();
+    match find_l1_height_for_l2_blockid(verified_checkpoints, blkid) {
+        Some(l1_height) => {
+            let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
+
+            // Maturable height is the height at which l1 blocks are sufficiently buried
+            // and have negligible chance of reorg.
+            let maturable_height = state
+                .l1_view()
+                .next_expected_block()
+                .saturating_sub(safe_depth);
+
+            // The l1 height should be handled only if it is less than maturable height
+            if l1_height < maturable_height {
+                let (wrs, acts) = handle_mature_l1_height(l1_height, state, database);
+                writes.extend(wrs);
+                actions.extend(acts);
+            }
+        }
+        None => {
+            debug!(%blkid, "L2 block not found in verified checkpoints, possibly not a last block in the checkpoint.");
+        }
+    }
+    (writes, actions)
+}
+
+/// Searches for a given `L2BlockId` within a slice of `L1Checkpoint` structs
+/// and returns the height of the corresponding L1 block if found.
+fn find_l1_height_for_l2_blockid(
+    checkpoints: &[L1Checkpoint],
+    target_l2_blockid: &L2BlockId,
+) -> Option<u64> {
+    checkpoints
+        .binary_search_by(|checkpoint| checkpoint.batch_info.l2_blockid.cmp(target_l2_blockid))
+        .ok()
+        .map(|index| checkpoints[index].height)
 }
 
 /// Filters a list of `BatchCheckpoint`s, returning only those that form a valid sequence
