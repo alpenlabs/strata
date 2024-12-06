@@ -6,9 +6,10 @@ use strata_primitives::proof::ProofKey;
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmHost;
+use tokio::sync::Mutex;
 
 use super::{evm_ee::EvmEeHandler, utils::get_pm_rollup_params, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
@@ -32,7 +33,7 @@ impl ProvingOp for ClStfHandler {
 
     async fn create_task(
         &self,
-        task_tracker: &mut crate::task2::TaskTracker,
+        task_tracker: Arc<Mutex<TaskTracker>>,
         task_id: &ProofKey,
     ) -> Result<(), ProvingTaskError> {
         let block_num = match task_id {
@@ -41,10 +42,13 @@ impl ProvingOp for ClStfHandler {
         };
         let ee_task = ProofKey::EvmEeStf(*block_num);
         self.evm_ee_handler
-            .create_task(task_tracker, &ee_task)
+            .create_task(task_tracker.clone(), &ee_task)
             .await?;
 
-        task_tracker.insert_task(*task_id, vec![ee_task])?;
+        task_tracker
+            .lock()
+            .await
+            .insert_task(*task_id, vec![ee_task])?;
 
         Ok(())
     }

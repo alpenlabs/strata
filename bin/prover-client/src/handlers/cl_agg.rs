@@ -6,6 +6,7 @@ use strata_primitives::proof::ProofKey;
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmHost;
+use tokio::sync::Mutex;
 
 use super::{cl_stf::ClStfHandler, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::TaskTracker};
@@ -32,7 +33,7 @@ impl ProvingOp for ClAggHandler {
 
     async fn create_task(
         &self,
-        task_tracker: &mut TaskTracker,
+        task_tracker: Arc<Mutex<TaskTracker>>,
         task_id: &ProofKey,
     ) -> Result<(), ProvingTaskError> {
         let (start_height, end_height) = match task_id {
@@ -45,12 +46,12 @@ impl ProvingOp for ClAggHandler {
         for height in *start_height..=*end_height {
             let proof_key = ProofKey::BtcBlockspace(height);
             self.cl_stf_handler
-                .create_task(task_tracker, &proof_key)
+                .create_task(task_tracker.clone(), &proof_key)
                 .await?;
             deps.push(proof_key);
         }
 
-        task_tracker.insert_task(*task_id, deps)?;
+        task_tracker.lock().await.insert_task(*task_id, deps)?;
 
         Ok(())
     }

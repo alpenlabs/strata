@@ -7,11 +7,12 @@ use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInpu
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcCheckpointInfo;
 use strata_zkvm::{AggregationInput, ZkVmHost};
+use tokio::sync::Mutex;
 
 use super::{
     cl_agg::ClAggHandler, l1_batch::L1BatchHandler, utils::get_pm_rollup_params, ProvingOp,
 };
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
@@ -53,7 +54,7 @@ impl ProvingOp for CheckpointHandler {
 
     async fn create_task(
         &self,
-        task_tracker: &mut crate::task2::TaskTracker,
+        task_tracker: Arc<Mutex<TaskTracker>>,
         task_id: &ProofKey,
     ) -> Result<(), ProvingTaskError> {
         let ckp_idx = match task_id {
@@ -66,15 +67,18 @@ impl ProvingOp for CheckpointHandler {
         let l1_batch_key =
             ProofKey::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
         self.l1_batch_dispatcher
-            .create_task(task_tracker, &l1_batch_key)
+            .create_task(task_tracker.clone(), &l1_batch_key)
             .await?;
 
         let cl_agg_key = ProofKey::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
         self.l2_batch_dispatcher
-            .create_task(task_tracker, &cl_agg_key)
+            .create_task(task_tracker.clone(), &cl_agg_key)
             .await?;
 
-        task_tracker.insert_task(*task_id, vec![l1_batch_key, cl_agg_key])?;
+        task_tracker
+            .lock()
+            .await
+            .insert_task(*task_id, vec![l1_batch_key, cl_agg_key])?;
 
         Ok(())
     }

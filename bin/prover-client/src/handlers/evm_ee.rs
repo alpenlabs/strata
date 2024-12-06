@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use alloy_rpc_types::Block;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
 use strata_rocksdb::prover::db::ProofDb;
+use tokio::sync::Mutex;
 
 use super::ProvingOp;
 use crate::{errors::ProvingTaskError, task2::TaskTracker};
@@ -25,10 +28,10 @@ impl ProvingOp for EvmEeHandler {
 
     async fn create_task(
         &self,
-        task_tracker: &mut TaskTracker,
+        task_tracker: Arc<Mutex<TaskTracker>>,
         task_id: &ProofKey,
     ) -> Result<(), ProvingTaskError> {
-        task_tracker.insert_task(*task_id, vec![])
+        task_tracker.lock().await.insert_task(*task_id, vec![])
     }
 
     async fn fetch_input(
