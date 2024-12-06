@@ -1,21 +1,17 @@
 use std::sync::Arc;
 
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
-use strata_db::traits::{ProofDatabase, ProverDatabase};
+use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
-use strata_rocksdb::prover::db::ProverDB;
+use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcCheckpointInfo;
 use strata_zkvm::{AggregationInput, ZkVmHost};
 
-use super::{
-    cl_agg::{self, ClAggHandler},
-    l1_batch::L1BatchHandler,
-    ProvingOp,
-};
+use super::{cl_agg::ClAggHandler, l1_batch::L1BatchHandler, ProvingOp};
 use crate::{
-    errors::ProvingTaskError, primitives::vms::ProofVm, proving_ops::btc_ops::get_pm_rollup_params,
-    hosts,
+    errors::ProvingTaskError, hosts, primitives::vms::ProofVm,
+    proving_ops::btc_ops::get_pm_rollup_params,
 };
 
 /// Operations required for BTC block proving tasks.
@@ -87,7 +83,7 @@ impl ProvingOp for CheckpointHandler {
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
-        db: &ProverDB,
+        db: &ProofDb,
     ) -> Result<CheckpointProverInput, ProvingTaskError> {
         let ckp_idx = match task_id {
             ProofKey::Checkpoint(idx) => idx,
@@ -99,7 +95,6 @@ impl ProvingOp for CheckpointHandler {
         let l1_batch_key =
             ProofKey::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
         let l1_batch_proof = db
-            .proof_db()
             .get_proof(l1_batch_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(l1_batch_key))?;
@@ -108,7 +103,6 @@ impl ProvingOp for CheckpointHandler {
 
         let cl_agg_key = ProofKey::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
         let cl_agg_proof = db
-            .proof_db()
             .get_proof(cl_agg_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(cl_agg_key))?;

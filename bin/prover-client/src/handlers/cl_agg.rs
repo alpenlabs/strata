@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use jsonrpsee::http_client::HttpClient;
-use strata_db::traits::{ProofDatabase, ProverDatabase};
+use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
-use strata_rocksdb::prover::db::ProverDB;
+use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmHost;
 
 use super::{cl_stf::ClStfHandler, ProvingOp};
@@ -58,7 +58,7 @@ impl ProvingOp for ClAggHandler {
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
-        db: &ProverDB,
+        db: &ProofDb,
     ) -> Result<ClAggInput, ProvingTaskError> {
         let (start_height, end_height) = match task_id {
             ProofKey::ClAgg(start, end) => (start, end),
@@ -69,7 +69,6 @@ impl ProvingOp for ClAggHandler {
         for height in *start_height..=*end_height {
             let proof_key = ProofKey::ClStf(height);
             let proof = db
-                .proof_db()
                 .get_proof(proof_key)
                 .map_err(ProvingTaskError::DatabaseError)?
                 .ok_or(ProvingTaskError::ProofNotFound(proof_key))?;
