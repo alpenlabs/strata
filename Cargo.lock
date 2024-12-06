@@ -13344,7 +13344,6 @@ version = "0.1.0"
 dependencies = [
  "jsonrpsee",
  "strata-rpc-types",
- "uuid 1.10.0",
 ]
 
 [[package]]
