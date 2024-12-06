@@ -40,23 +40,16 @@ pub trait ProvingOp {
         db: &ProofDb,
     ) -> Result<<Self::Prover as ZkVmProver>::Input, ProvingTaskError>;
 
-    async fn prove(
-        &self,
-        task_tracker: &mut TaskTracker,
-        task_id: &ProofKey,
-        db: &ProofDb,
-    ) -> Result<(), ProvingTaskError> {
+    async fn prove(&self, task_id: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
         let input = self.fetch_input(task_id, db).await?;
 
         #[cfg(feature = "sp1")]
         {
-            task_tracker.update_status(*task_id, ProvingTaskStatus::ProvingInProgress)?;
             let host = hosts::sp1::get_host((*task_id).into());
             let proof = <Self::Prover as ZkVmProver>::prove(&input, host)
                 .map_err(ProvingTaskError::ZkVmError)?;
             db.put_proof(*task_id, proof)
                 .map_err(ProvingTaskError::DatabaseError)?;
-            task_tracker.update_status(*task_id, ProvingTaskStatus::Completed)?;
         }
 
         // TODO: add support for other ZkVmHost as well
@@ -95,27 +88,14 @@ impl ProofHandler {
         }
     }
 
-    pub async fn prove(
-        &self,
-        task_tracker: &mut TaskTracker,
-        task_id: &ProofKey,
-        db: &ProofDb,
-    ) -> Result<(), ProvingTaskError> {
+    pub async fn prove(&self, task_id: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
         match task_id {
-            ProofKey::BtcBlockspace(_) => {
-                self.btc_blockspace_handler
-                    .prove(task_tracker, task_id, db)
-                    .await
-            }
-            ProofKey::L1Batch(_, _) => self.l1_batch_handler.prove(task_tracker, task_id, db).await,
-            ProofKey::EvmEeStf(_) => self.evm_ee_handler.prove(task_tracker, task_id, db).await,
-            ProofKey::ClStf(_) => self.cl_stf_handler.prove(task_tracker, task_id, db).await,
-            ProofKey::ClAgg(_, _) => self.cl_agg_handler.prove(task_tracker, task_id, db).await,
-            ProofKey::Checkpoint(_) => {
-                self.checkpoint_handler
-                    .prove(task_tracker, task_id, db)
-                    .await
-            }
+            ProofKey::BtcBlockspace(_) => self.btc_blockspace_handler.prove(task_id, db).await,
+            ProofKey::L1Batch(_, _) => self.l1_batch_handler.prove(task_id, db).await,
+            ProofKey::EvmEeStf(_) => self.evm_ee_handler.prove(task_id, db).await,
+            ProofKey::ClStf(_) => self.cl_stf_handler.prove(task_id, db).await,
+            ProofKey::ClAgg(_, _) => self.cl_agg_handler.prove(task_id, db).await,
+            ProofKey::Checkpoint(_) => self.checkpoint_handler.prove(task_id, db).await,
         }
     }
 }
