@@ -7,7 +7,9 @@ use crate::{errors::ProvingTaskError, primitives::status::ProvingTaskStatus};
 /// Manages tasks and their states for proving operations.
 pub struct TaskTracker {
     /// A map of task IDs to their statuses.
-    pub tasks: HashMap<ProofKey, ProvingTaskStatus>,
+    tasks: HashMap<ProofKey, ProvingTaskStatus>,
+    /// Count of the tasks that are in progress
+    in_progress_tasks: usize,
 }
 
 impl TaskTracker {
@@ -15,12 +17,17 @@ impl TaskTracker {
     pub fn new() -> Self {
         TaskTracker {
             tasks: HashMap::new(),
+            in_progress_tasks: 0,
         }
     }
 
     /// Clears all tasks from the tracker.
     pub fn clear_tasks(&mut self) {
         self.tasks.clear();
+    }
+
+    pub fn in_progress_tasks_count(&self) -> usize {
+        self.in_progress_tasks
     }
 
     /// Inserts a new task with the given dependencies.
@@ -79,8 +86,13 @@ impl TaskTracker {
             // Check for valid status transitions
             status.transition(new_status.clone())?;
 
-            // Resolve dependencies if a task is completed
+            if new_status == ProvingTaskStatus::ProvingInProgress {
+                self.in_progress_tasks += 1;
+            }
+
             if new_status == ProvingTaskStatus::Completed {
+                self.in_progress_tasks -= 1;
+                // Resolve dependencies if a task is completed
                 for task_status in self.tasks.values_mut() {
                     if let ProvingTaskStatus::WaitingForDependencies(deps) = task_status {
                         deps.remove(&id);
