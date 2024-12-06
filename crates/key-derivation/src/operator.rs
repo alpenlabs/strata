@@ -16,10 +16,8 @@
 //! - `m/56'/20'/100` for the message signing key
 //! - `m/56'/20'/101` for the wallet transaction signing key
 
-use bitcoin::{
-    bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
-    secp256k1::SECP256K1,
-};
+use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
+use secp256k1::SECP256K1;
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
