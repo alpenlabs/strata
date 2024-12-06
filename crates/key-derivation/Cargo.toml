@@ -15,4 +15,3 @@ zeroize = { workspace = true, optional = true }
 
 [features]
 default = ["zeroize"]
-zeroize = ["zeroize/derive"]
