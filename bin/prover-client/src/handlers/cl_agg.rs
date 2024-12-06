@@ -8,7 +8,7 @@ use strata_zkvm::ZkVmHost;
 use tokio::sync::Mutex;
 
 use super::{cl_stf::ClStfHandler, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]

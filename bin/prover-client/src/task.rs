@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofKey, ProofZkVmHost};
 
 use crate::{errors::ProvingTaskError, primitives::status::ProvingTaskStatus};
 
@@ -16,8 +16,20 @@ pub struct TaskTracker {
 impl TaskTracker {
     /// Creates a new `TaskTracker` instance.
     pub fn new() -> Self {
+        let mut hosts = Vec::new();
+
+        #[cfg(feature = "sp1")]
+        hosts.push(ProofZkVmHost::SP1);
+
+        #[cfg(feature = "risc0")]
+        hosts.push(ProofZkVmHost::Risc0);
+
+        #[cfg(not(any(feature = "sp1", feature = "risc0")))]
+        hosts.push(ProofZkVmHost::Native);
+
         TaskTracker {
             tasks: HashMap::new(),
+            hosts,
             in_progress_tasks: 0,
         }
     }
