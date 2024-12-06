@@ -10,7 +10,7 @@ use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
 
-use crate::{handlers::ProofHandler, task2::TaskTracker};
+use crate::{handlers::ProofHandler, task::TaskTracker};
 
 pub(crate) async fn start<T>(
     rpc_impl: &T,

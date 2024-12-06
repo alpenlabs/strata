@@ -9,7 +9,7 @@ use strata_zkvm::ZkVmHost;
 use tokio::sync::Mutex;
 
 use super::{evm_ee::EvmEeHandler, utils::get_pm_rollup_params, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]

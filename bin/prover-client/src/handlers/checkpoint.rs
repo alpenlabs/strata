@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use super::{
     cl_agg::ClAggHandler, l1_batch::L1BatchHandler, utils::get_pm_rollup_params, ProvingOp,
 };
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]

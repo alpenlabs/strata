@@ -10,7 +10,7 @@ use manager::ProverManager;
 use rpc_server::ProverClientRpc;
 use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
-use task2::TaskTracker;
+use task::TaskTracker;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
 
@@ -23,7 +23,7 @@ mod hosts;
 mod manager;
 mod primitives;
 mod rpc_server;
-mod task2;
+mod task;
 
 #[tokio::main]
 async fn main() {
