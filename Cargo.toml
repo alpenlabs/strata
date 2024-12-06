@@ -85,6 +85,7 @@ strata-crypto = { path = "crates/crypto", default-features = false }
 strata-db = { path = "crates/db" }
 strata-eectl = { path = "crates/eectl" }
 strata-evmexec = { path = "crates/evmexec" }
+strata-key-derivation = { path = "crates/key-derivation" }
 strata-mmr = { path = "crates/util/mmr" }
 strata-native-zkvm-adapter = { path = "crates/zkvm/adapters/native" }
 strata-primitives = { path = "crates/primitives" }
