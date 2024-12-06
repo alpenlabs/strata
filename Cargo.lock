@@ -12753,10 +12753,8 @@ dependencies = [
  "async-trait",
  "bitcoin",
  "chrono",
- "corepc-node",
  "directories",
  "jsonrpsee",
- "miniscript",
  "rockbound",
  "strata-bridge-exec",
  "strata-bridge-rpc-api",
@@ -12764,6 +12762,7 @@ dependencies = [
  "strata-bridge-tx-builder",
  "strata-btcio",
  "strata-common",
+ "strata-key-derivation",
  "strata-primitives",
  "strata-rocksdb",
  "strata-rpc-api",
@@ -13143,7 +13142,6 @@ name = "strata-key-derivation"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "secp256k1",
  "thiserror",
  "zeroize",
 ]
