@@ -16,16 +16,8 @@
 //! - `m/56'/20'/100'` for the message signing key
 //! - `m/56'/20'/101'` for the wallet transaction signing key
 //!
-//! These follow [BIP-43](https://github.com/bitcoin/bips/blob/master/bip-0043.mediawiki)
-//! and [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)
-//! levels for bitcoin keys:
-//!
-//! - `m/56'` is the BIP-44 purpose level
-//! - `m/56'/20'` is the coin type level
-//! - `m/56'/20'/100'` is the account level
-//!
 //! These are all hardened child indices, allowing extra security if an operator derived
-//! [`Xpub`](bitcoin::bip32::Xpub) is compromised.
+//! [`Xpub`] is compromised.
 
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
@@ -34,17 +26,17 @@ use bitcoin::{
 
 use crate::error::KeyError;
 
-/// The BIP-44 "purpose" index for operator keys.
-const PURPOSE_IDX: u32 = 56;
+/// The base index for operator keys.
+const BASE_IDX: u32 = 56;
 
-/// The BIP-44 "coin type" index for operator keys.
-const COIN_TYPE_IDX: u32 = 20;
+/// The operator index for operator keys.
+const OPERATOR_IDX: u32 = 20;
 
-/// The BIP-44 "account" index for the operator message key.
-const ACCOUNT_MESSAGE_IDX: u32 = 100;
+/// The message index for the operator message key.
+const MESSAGE_IDX: u32 = 100;
 
-/// The BIP-44 "account" index for the operator wallet key.
-const ACCOUNT_WALLET_IDX: u32 = 101;
+/// The wallet index for the operator wallet key.
+const WALLET_IDX: u32 = 101;
 
 /// The operator's message signing and wallet transaction signing keys.
 ///
@@ -64,15 +56,15 @@ impl OperatorKeys {
     /// Creates a new [`OperatorKeys`] from a master [`Xpriv`].
     pub fn new(master: &Xpriv) -> Result<Self, KeyError> {
         let message_path = DerivationPath::master().extend([
-            ChildNumber::from_hardened_idx(PURPOSE_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(COIN_TYPE_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(ACCOUNT_MESSAGE_IDX).unwrap(),
+            ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
+            ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
+            ChildNumber::from_hardened_idx(MESSAGE_IDX).unwrap(),
         ]);
 
         let wallet_path = DerivationPath::master().extend([
-            ChildNumber::from_hardened_idx(PURPOSE_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(COIN_TYPE_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(ACCOUNT_WALLET_IDX).unwrap(),
+            ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
+            ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
+            ChildNumber::from_hardened_idx(WALLET_IDX).unwrap(),
         ]);
 
         let message_xpriv = master.derive_priv(SECP256K1, &message_path)?;
