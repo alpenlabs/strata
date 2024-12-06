@@ -52,7 +52,7 @@ impl ProofHandler {
             L1BatchHandler::new(btc_client.clone(), Arc::new(btc_blockspace_handler.clone()));
         let evm_ee_handler = EvmEeHandler::new(evm_ee_client.clone());
         let cl_stf_handler = ClStfHandler::new(cl_client.clone(), Arc::new(evm_ee_handler.clone()));
-        let cl_agg_handler = ClAggHandler::new(cl_client.clone(), Arc::new(cl_stf_handler.clone()));
+        let cl_agg_handler = ClAggHandler::new(Arc::new(cl_stf_handler.clone()));
         let checkpoint_handler = CheckpointHandler::new(
             cl_client.clone(),
             Arc::new(l1_batch_handler.clone()),

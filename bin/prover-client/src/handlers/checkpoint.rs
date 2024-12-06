@@ -37,15 +37,14 @@ impl CheckpointHandler {
     }
 
     async fn fetch_info(&self, ckp_idx: u64) -> Result<RpcCheckpointInfo, ProvingTaskError> {
-        Ok(self
-            .cl_client
+        self.cl_client
             .request::<Option<RpcCheckpointInfo>, _>(
                 "strata_getCheckpointInfo",
                 rpc_params![ckp_idx],
             )
             .await
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
-            .ok_or(ProvingTaskError::WitnessNotFound)?)
+            .ok_or(ProvingTaskError::WitnessNotFound)
     }
 }
 

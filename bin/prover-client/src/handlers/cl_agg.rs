@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
@@ -14,17 +13,13 @@ use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::Ta
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
 pub struct ClAggHandler {
-    cl_client: HttpClient,
     cl_stf_handler: Arc<ClStfHandler>,
 }
 
 impl ClAggHandler {
     /// Creates a new CL operations instance.
-    pub fn new(cl_client: HttpClient, cl_stf_handler: Arc<ClStfHandler>) -> Self {
-        Self {
-            cl_client,
-            cl_stf_handler,
-        }
+    pub fn new(cl_stf_handler: Arc<ClStfHandler>) -> Self {
+        Self { cl_stf_handler }
     }
 }
 
