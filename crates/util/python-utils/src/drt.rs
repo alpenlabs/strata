@@ -623,7 +623,7 @@ mod tests {
             .reveal_next_address(KeychainKind::External)
             .address
             .to_string();
-        let expected_address = "bcrt1p5wh09dkrfmr44zq85y55x92f5zjhkj2l0kvepd3fskw6aj8tch5q8t44sr";
+        let expected_address = "bcrt1pupc4tw9e2l7xlj7g5hg9587e78mcrfxkj23jklaf58jp2vwtuarq6eq4d9";
         assert_eq!(address, expected_address);
     }
 

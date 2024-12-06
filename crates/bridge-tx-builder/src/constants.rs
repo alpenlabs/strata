@@ -1,6 +1,12 @@
 //! Constants related to bridge transactions.
 
-use bitcoin::{secp256k1::XOnlyPublicKey, Amount};
+use std::sync::LazyLock;
+
+use bitcoin::{
+    hashes::{sha256, Hash},
+    secp256k1::XOnlyPublicKey,
+    Amount,
+};
 use strata_primitives::l1::BitcoinAmount;
 
 /// The value of each UTXO in the Bridge Multisig Address.
@@ -22,11 +28,8 @@ pub const OPERATOR_FEE: Amount = Amount::from_sat(BRIDGE_DENOMINATION.to_sat() /
 /// Magic bytes to add to the metadata output in transactions to help identify them.
 pub const MAGIC_BYTES: &[u8; 11] = b"alpenstrata";
 
-lazy_static::lazy_static! {
-    /// This is an unspendable pubkey.
-    ///
-    /// This is generated via <https://github.com/alpenlabs/unspendable-pubkey-gen> following [BIP 341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)
-    /// with `r = 0x82758434e13488368e0781c4a94019d3d6722f854d26c15d2d157acd1f464723`.
-    pub static ref UNSPENDABLE_INTERNAL_KEY: XOnlyPublicKey =
-        "2be4d02127fedf4c956f8e6d8248420b9af78746232315f72894f0b263c80e81".parse::<XOnlyPublicKey>().expect("should be a valid X-only public key");
-}
+/// A verifiably unspendable public key; this uses the hash-to-curve approach from [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)
+pub static UNSPENDABLE_INTERNAL_KEY: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
+    XOnlyPublicKey::from_slice(sha256::Hash::hash(b"Strata unspendable").as_byte_array())
+        .expect("valid xonly public key")
+});

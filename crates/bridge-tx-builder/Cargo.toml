@@ -16,7 +16,6 @@ rustdoc.all = "warn"
 strata-primitives.workspace = true
 
 bitcoin = { workspace = true, features = ["rand-std"] }
-lazy_static.workspace = true
 musig2 = { workspace = true, features = ["serde"] }
 serde.workspace = true
 thiserror.workspace = true
