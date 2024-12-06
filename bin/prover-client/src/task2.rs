@@ -106,7 +106,7 @@ impl TaskTracker {
     /// let pending_tasks =
     ///     task_tracker.get_tasks_by_status(|status| matches!(status, ProvingTaskStatus::Pending));
     /// ```
-    pub async fn get_tasks_by_status<F>(&self, filter_fn: F) -> Vec<&ProofKey>
+    pub fn get_tasks_by_status<F>(&self, filter_fn: F) -> Vec<ProofKey>
     where
         F: Fn(&ProvingTaskStatus) -> bool,
     {
@@ -114,7 +114,7 @@ impl TaskTracker {
             .iter()
             .filter_map(|(proof_key, task)| {
                 if filter_fn(task) {
-                    Some(proof_key) // Only return the `proof_key` if the task matches the filter
+                    Some(*proof_key) // Only return the `proof_key` if the task matches the filter
                 } else {
                     None
                 }
