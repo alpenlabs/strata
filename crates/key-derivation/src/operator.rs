@@ -24,8 +24,7 @@ use bitcoin::{
     secp256k1::SECP256K1,
 };
 #[cfg(feature = "zeroize")]
-use zeroize::Zeroize;
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::KeyError;
 
