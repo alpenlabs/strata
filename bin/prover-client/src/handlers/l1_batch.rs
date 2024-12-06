@@ -10,7 +10,7 @@ use strata_zkvm::ZkVmHost;
 use tokio::sync::Mutex;
 
 use super::{btc::BtcBlockspaceHandler, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task2::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
 
 #[derive(Debug, Clone)]
 pub struct L1BatchHandler {

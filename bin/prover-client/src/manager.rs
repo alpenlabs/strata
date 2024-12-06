@@ -10,7 +10,7 @@ use tokio::{sync::Mutex, time::sleep};
 
 use crate::{
     config::PROVER_MANAGER_INTERVAL, db::open_rocksdb_database, errors::ProvingTaskError,
-    handlers::ProofHandler, primitives::status::ProvingTaskStatus, task2::TaskTracker,
+    handlers::ProofHandler, primitives::status::ProvingTaskStatus, task::TaskTracker,
 };
 
 pub struct ProverManager {

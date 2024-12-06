@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofKey};
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
 
 use super::{utils::get_pm_rollup_params, ProvingOp};
-use crate::{errors::ProvingTaskError, task2::TaskTracker};
+use crate::{errors::ProvingTaskError, task::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
@@ -25,12 +25,8 @@ impl BtcBlockspaceHandler {
 impl ProvingOp for BtcBlockspaceHandler {
     type Prover = BtcBlockspaceProver;
 
-    async fn create_task(
-        &self,
-        task_tracker: Arc<Mutex<TaskTracker>>,
-        task_id: &ProofKey,
-    ) -> Result<(), ProvingTaskError> {
-        task_tracker.lock().await.insert_task(*task_id, vec![])
+    fn fetch_deps(&self, _proof_id: ProofId) -> Result<Vec<ProofId>, ProvingTaskError> {
+        Ok(vec![])
     }
 
     async fn fetch_input(

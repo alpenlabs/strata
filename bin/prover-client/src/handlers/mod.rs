@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmProver;
 use tokio::sync::Mutex;
 
-use crate::{errors::ProvingTaskError, hosts, task2::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 pub mod btc;
 pub mod checkpoint;
@@ -19,19 +19,41 @@ pub mod utils;
 
 pub use handler::ProofHandler;
 
+pub type ProvingTask = ProofKey;
+
 pub trait ProvingOp {
     type Prover: ZkVmProver;
+
+    fn fetch_deps(&self, proof_id: ProofId) -> Result<Vec<ProofId>, ProvingTaskError>;
 
     async fn create_task(
         &self,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        task_id: &ProofKey,
-    ) -> Result<(), ProvingTaskError>;
+        proof_id: ProofId,
+        hosts: &[ProofZkVmHost],
+    ) -> Result<(), ProvingTaskError> {
+        // Fetch dependencies for this task
+        let deps = self.fetch_deps(proof_id)?;
+
+        let mut task_tracker = task_tracker.lock().await;
+
+        // Insert tasks for each configured host
+        for host in hosts {
+            let task = ProvingTask::new(proof_id, *host);
+            let dep_tasks = deps
+                .iter()
+                .map(|&dep| ProvingTask::new(dep, *host))
+                .collect();
+            task_tracker.insert_task(task, dep_tasks)?;
+        }
+
+        Ok(())
+    }
 
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
-        task_tracker: &ProofDb,
+        db: &ProofDb,
     ) -> Result<<Self::Prover as ZkVmProver>::Input, ProvingTaskError>;
 
     async fn prove(

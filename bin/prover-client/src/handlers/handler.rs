@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jsonrpsee::http_client::HttpClient;
 use strata_btcio::rpc::BitcoinClient;
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofZkVmHost};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
 
@@ -10,7 +10,7 @@ use super::{
     btc::BtcBlockspaceHandler, checkpoint::CheckpointHandler, cl_agg::ClAggHandler,
     cl_stf::ClStfHandler, evm_ee::EvmEeHandler, l1_batch::L1BatchHandler, ProvingOp,
 };
-use crate::{errors::ProvingTaskError, task2::TaskTracker};
+use crate::{errors::ProvingTaskError, task::TaskTracker};
 
 #[derive(Debug, Clone)]
 pub struct ProofHandler {
@@ -71,43 +71,44 @@ impl ProofHandler {
 
     pub async fn prove(
         &self,
-        task_id: &ProofKey,
+        task_id: &ProofId,
         task_tracker: &ProofDb,
     ) -> Result<(), ProvingTaskError> {
         match task_id {
-            ProofKey::BtcBlockspace(_) => {
+            ProofId::BtcBlockspace(_) => {
                 self.btc_blockspace_handler
                     .prove(task_id, task_tracker)
                     .await
             }
-            ProofKey::L1Batch(_, _) => self.l1_batch_handler.prove(task_id, task_tracker).await,
-            ProofKey::EvmEeStf(_) => self.evm_ee_handler.prove(task_id, task_tracker).await,
-            ProofKey::ClStf(_) => self.cl_stf_handler.prove(task_id, task_tracker).await,
-            ProofKey::ClAgg(_, _) => self.cl_agg_handler.prove(task_id, task_tracker).await,
-            ProofKey::Checkpoint(_) => self.checkpoint_handler.prove(task_id, task_tracker).await,
+            ProofId::L1Batch(_, _) => self.l1_batch_handler.prove(task_id, task_tracker).await,
+            ProofId::EvmEeStf(_) => self.evm_ee_handler.prove(task_id, task_tracker).await,
+            ProofId::ClStf(_) => self.cl_stf_handler.prove(task_id, task_tracker).await,
+            ProofId::ClAgg(_, _) => self.cl_agg_handler.prove(task_id, task_tracker).await,
+            ProofId::Checkpoint(_) => self.checkpoint_handler.prove(task_id, task_tracker).await,
         }
     }
 
     pub async fn create_task(
         &self,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        task_id: &ProofKey,
+        proof_id: &ProofId,
+        vms: &[ProofZkVmHost],
     ) -> Result<(), ProvingTaskError> {
-        match task_id {
-            ProofKey::BtcBlockspace(_) => {
+        match proof_id {
+            ProofId::BtcBlockspace(_) => {
                 self.btc_blockspace_handler
                     .create_task(task_tracker, task_id)
                     .await
             }
-            ProofKey::L1Batch(_, _) => {
+            ProofId::L1Batch(_, _) => {
                 self.l1_batch_handler
                     .create_task(task_tracker, task_id)
                     .await
             }
-            ProofKey::EvmEeStf(_) => self.evm_ee_handler.create_task(task_tracker, task_id).await,
-            ProofKey::ClStf(_) => self.cl_stf_handler.create_task(task_tracker, task_id).await,
-            ProofKey::ClAgg(_, _) => self.cl_agg_handler.create_task(task_tracker, task_id).await,
-            ProofKey::Checkpoint(_) => {
+            ProofId::EvmEeStf(_) => self.evm_ee_handler.create_task(task_tracker, task_id).await,
+            ProofId::ClStf(_) => self.cl_stf_handler.create_task(task_tracker, task_id).await,
+            ProofId::ClAgg(_, _) => self.cl_agg_handler.create_task(task_tracker, task_id).await,
+            ProofId::Checkpoint(_) => {
                 self.checkpoint_handler
                     .create_task(task_tracker, task_id)
                     .await
