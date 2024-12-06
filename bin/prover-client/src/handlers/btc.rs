@@ -3,7 +3,7 @@ use std::sync::Arc;
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
-use strata_rocksdb::prover::db::ProverDB;
+use strata_rocksdb::prover::db::ProofDb;
 
 use super::ProvingOp;
 use crate::{errors::ProvingTaskError, proving_ops::btc_ops::get_pm_rollup_params};
@@ -35,7 +35,7 @@ impl ProvingOp for BtcBlockspaceHandler {
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
-        _db: &ProverDB,
+        _db: &ProofDb,
     ) -> Result<BlockspaceProofInput, ProvingTaskError> {
         let height = match task_id {
             ProofKey::BtcBlockspace(id) => id,

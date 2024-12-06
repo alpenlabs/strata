@@ -2,6 +2,7 @@ use alloy_rpc_types::Block;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
+use strata_rocksdb::prover::db::ProofDb;
 
 use super::ProvingOp;
 use crate::{errors::ProvingTaskError, task2::TaskTracker};
@@ -32,8 +33,8 @@ impl ProvingOp for EvmEeHandler {
 
     async fn fetch_input(
         &self,
-        task_id: &strata_primitives::proof::ProofKey,
-        _db: &strata_rocksdb::prover::db::ProverDB,
+        task_id: &ProofKey,
+        _db: &ProofDb,
     ) -> Result<ELProofInput, ProvingTaskError> {
         let block_num = match task_id {
             ProofKey::EvmEeStf(id) => id,

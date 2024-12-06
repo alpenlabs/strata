@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
-use strata_db::traits::{ProofDatabase, ProverDatabase};
+use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::ProofKey;
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
+use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmHost;
 
 use super::{evm_ee::EvmEeHandler, ProvingOp};
@@ -53,8 +54,8 @@ impl ProvingOp for ClStfHandler {
 
     async fn fetch_input(
         &self,
-        task_id: &strata_primitives::proof::ProofKey,
-        db: &strata_rocksdb::prover::db::ProverDB,
+        task_id: &ProofKey,
+        db: &ProofDb,
     ) -> Result<ClStfInput, ProvingTaskError> {
         let block_num = match task_id {
             ProofKey::ClStf(id) => id,
@@ -70,7 +71,6 @@ impl ProvingOp for ClStfHandler {
 
         let evm_ee_key = ProofKey::EvmEeStf(*block_num);
         let evm_ee_proof = db
-            .proof_db()
             .get_proof(evm_ee_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(evm_ee_key))?;
