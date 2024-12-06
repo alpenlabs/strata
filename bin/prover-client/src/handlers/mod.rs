@@ -67,11 +67,56 @@ pub trait ProvingOp {
     }
 }
 
-pub enum ProofHandler {
-    BtcBlockspace(BtcBlockspaceHandler),
-    L1Batch(L1BatchHandler),
-    EvmEe(EvmEeHandler),
-    ClStf(ClStfHandler),
-    ClAgg(ClAggHandler),
-    Checkpoint(CheckpointHandler),
+#[derive(Debug, Clone)]
+pub struct ProofHandler {
+    btc_blockspace_handler: BtcBlockspaceHandler,
+    l1_batch_handler: L1BatchHandler,
+    evm_ee_handler: EvmEeHandler,
+    cl_stf_handler: ClStfHandler,
+    cl_agg_handler: ClAggHandler,
+    checkpoint_handler: CheckpointHandler,
+}
+
+impl ProofHandler {
+    pub fn new(
+        btc_blockspace_handler: BtcBlockspaceHandler,
+        l1_batch_handler: L1BatchHandler,
+        evm_ee_handler: EvmEeHandler,
+        cl_stf_handler: ClStfHandler,
+        cl_agg_handler: ClAggHandler,
+        checkpoint_handler: CheckpointHandler,
+    ) -> Self {
+        Self {
+            btc_blockspace_handler,
+            l1_batch_handler,
+            evm_ee_handler,
+            cl_stf_handler,
+            cl_agg_handler,
+            checkpoint_handler,
+        }
+    }
+
+    pub async fn prove(
+        &self,
+        task_tracker: &mut TaskTracker,
+        task_id: &ProofKey,
+        db: &ProverDB,
+    ) -> Result<(), ProvingTaskError> {
+        match task_id {
+            ProofKey::BtcBlockspace(_) => {
+                self.btc_blockspace_handler
+                    .prove(task_tracker, task_id, db)
+                    .await
+            }
+            ProofKey::L1Batch(_, _) => self.l1_batch_handler.prove(task_tracker, task_id, db).await,
+            ProofKey::EvmEeStf(_) => self.evm_ee_handler.prove(task_tracker, task_id, db).await,
+            ProofKey::ClStf(_) => self.cl_stf_handler.prove(task_tracker, task_id, db).await,
+            ProofKey::ClAgg(_, _) => self.cl_agg_handler.prove(task_tracker, task_id, db).await,
+            ProofKey::Checkpoint(_) => {
+                self.checkpoint_handler
+                    .prove(task_tracker, task_id, db)
+                    .await
+            }
+        }
+    }
 }
