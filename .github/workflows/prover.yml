@@ -48,8 +48,8 @@ jobs:
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
   
-      - name: Build prover client
+      - name: Build prover client binary
         run: cargo build --profile prover-ci -F "prover"
-        working-directory: provers/sp1
+        working-directory: bin/prover-client
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
