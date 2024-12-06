@@ -2,20 +2,15 @@
 
 use std::sync::Arc;
 
-use anyhow::{Context, Ok};
+use anyhow::Context;
 use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
 use strata_primitives::proof::ProofKey;
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
-use strata_rpc_types::RpcCheckpointInfo;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
-use uuid::Uuid;
 
-use crate::{
-    errors::ProvingTaskError, manager2::ProverManager, primitives::status::ProvingTaskStatus,
-    task2::TaskTracker,
-};
+use crate::{handlers::ProofHandler, task2::TaskTracker};
 
 pub(crate) async fn start<T>(
     rpc_impl: &T,
@@ -54,129 +49,76 @@ where
     Ok(())
 }
 
-pub enum ServerRequest {
-    AddTask {
-        task: ProofKey,
-        response_tx: oneshot::Sender<ProvingTaskStatus>,
-    },
-    GetTaskStatus {
-        task: ProofKey,
-        response_tx: oneshot::Sender<ProvingTaskStatus>,
-    },
-}
-
 /// Struct to implement the `strata_prover_client_rpc_api::StrataProverClientApiServer` on.
 /// Contains fields corresponding the global context for the RPC.
 #[derive(Clone)]
 pub(crate) struct ProverClientRpc {
-    task_tx: mpsc::Sender<ServerRequest>,
+    task_tracker: Arc<Mutex<TaskTracker>>,
+    handler: Arc<ProofHandler>,
 }
 
 impl ProverClientRpc {
-    pub fn new(task_tx: mpsc::Sender<ServerRequest>) -> Self {
-        Self { task_tx }
+    pub fn new(task_tracker: Arc<Mutex<TaskTracker>>, handler: Arc<ProofHandler>) -> Self {
+        Self {
+            task_tracker,
+            handler,
+        }
     }
 
-    pub async fn add_task(
-        &self,
-        task: ProofKey,
-    ) -> Result<ProvingTaskStatus, mpsc::error::SendError<ServerRequest>> {
-        let (response_tx, response_rx) = oneshot::channel();
-
-        self.task_tx
-            .send(ServerRequest::AddTask { task, response_tx })
-            .await?;
-
-        // Wait for the initial task status
-        response_rx.await.map_err(|_| {
-            mpsc::error::SendError(ServerRequest::AddTask {
-                task,
-                response_tx: oneshot::channel().0,
-            })
-        })
-    }
-
-    pub async fn get_task_status(
-        &self,
-        task: ProofKey,
-    ) -> Result<ProvingTaskStatus, mpsc::error::SendError<ServerRequest>> {
-        let (response_tx, response_rx) = oneshot::channel();
-
-        self.task_tx
-            .send(ServerRequest::GetTaskStatus { task, response_tx })
-            .await?;
-
-        // Wait for the task status
-        response_rx.await.map_err(|_| {
-            mpsc::error::SendError(ServerRequest::GetTaskStatus {
-                task,
-                response_tx: oneshot::channel().0,
-            })
-        })
+    pub async fn create_task(&self, task: ProofKey) -> RpcResult<ProofKey> {
+        self.handler
+            .create_task(self.task_tracker.clone(), &task)
+            .await
+            .expect("failed to add proving task");
+        RpcResult::Ok(task)
     }
 }
 
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
-    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<Uuid> {
+    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<ProofKey> {
         let task = ProofKey::BtcBlockspace(btc_block_num);
-        let _ = self
-            .add_task(task)
-            .await
-            .expect("failed to add proving task, btc block");
-        RpcResult::Ok(Uuid::new_v4())
+        self.create_task(task).await
     }
 
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Uuid> {
-        let task = ProofKey::EvmEeStf(el_block_num);
-        let _ = self
-            .add_task(task)
-            .await
-            .expect("failed to add proving task, el block");
-        RpcResult::Ok(Uuid::new_v4())
+    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<ProofKey> {
+        let task = ProofKey::BtcBlockspace(el_block_num);
+        self.create_task(task).await
     }
 
-    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<Uuid> {
+    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<ProofKey> {
         let task = ProofKey::ClStf(cl_block_num);
-        let _ = self
-            .add_task(task)
-            .await
-            .expect("failed to add proving task, el block");
-        RpcResult::Ok(Uuid::new_v4())
+        self.create_task(task).await
     }
 
-    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Uuid> {
+    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<ProofKey> {
         let task = ProofKey::L1Batch(l1_range.0, l1_range.1);
-        let _ = self
-            .add_task(task)
-            .await
-            .expect("failed to add proving task, el block");
-        RpcResult::Ok(Uuid::new_v4())
+        self.create_task(task).await
     }
 
-    async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Uuid> {
+    async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<ProofKey> {
         let task = ProofKey::ClAgg(l2_range.0, l2_range.1);
-        let _ = self
-            .add_task(task)
-            .await
-            .expect("failed to add proving task, el block");
-        RpcResult::Ok(Uuid::new_v4())
+        self.create_task(task).await
     }
 
-    async fn prove_latest_checkpoint(&self) -> RpcResult<Uuid> {
+    async fn prove_latest_checkpoint(&self) -> RpcResult<ProofKey> {
         unimplemented!()
     }
 
     async fn prove_checkpoint_raw(
         &self,
-        checkpoint_idx: u64,
-        l1_range: (u64, u64),
-        l2_range: (u64, u64),
-    ) -> RpcResult<Uuid> {
+        _checkpoint_idx: u64,
+        _l1_range: (u64, u64),
+        _l2_range: (u64, u64),
+    ) -> RpcResult<ProofKey> {
         unimplemented!()
     }
 
-    async fn get_task_status(&self, task_id: Uuid) -> RpcResult<Option<String>> {
-        unimplemented!()
+    async fn get_task_status(&self, id: ProofKey) -> RpcResult<Option<String>> {
+        let status = self.task_tracker.lock().await.get_task(id).cloned();
+        match status {
+            Ok(status) => RpcResult::Ok(Some(format!("{:?}", status))),
+            Err(_) => RpcResult::Ok(Some(format!("{:?}", status))),
+        }
     }
 }
