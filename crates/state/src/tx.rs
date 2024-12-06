@@ -14,7 +14,9 @@ pub enum ProtocolOperation {
     DepositRequest(DepositRequestInfo),
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
-    // TODO: add other kinds like Proofs and statediffs
+    /// DA data. can be made through `submit_da_blob` RPC.
+    DA(Vec<u8>),
+    // TODO: add other kinds like statediffs
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -41,18 +43,46 @@ pub struct DepositRequestInfo {
     pub address: Vec<u8>,
 }
 
+/// Wrapper to hold various types of Inscription data as defined by [`BlobType`] enum.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct InscriptionData {
+pub struct InscriptionBlob {
+    /// for tagging purpose to understand what kind of inscription it is
+    data_type: BlobType,
     /// payload present in inscription transaction (either batchTx or checkpointTx)
-    batch_data: Vec<u8>,
+    data: Vec<u8>,
 }
 
-impl InscriptionData {
-    pub fn new(batch_data: Vec<u8>) -> Self {
-        Self { batch_data }
+/// Enum that acts as a tag to separates different types of inscription blobs.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[borsh(use_discriminant = true)]
+pub enum BlobType {
+    Checkpoint = 0,
+    DA = 1,
+}
+
+impl BlobType {
+    /// Used to convert Integer to Type mainly for parsing purpose
+    pub fn from_u32(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::Checkpoint),
+            1 => Some(Self::DA),
+            _ => None,
+        }
+    }
+}
+
+impl InscriptionBlob {
+    pub fn new(data_type: BlobType, data: Vec<u8>) -> Self {
+        Self { data_type, data }
     }
 
-    pub fn batch_data(&self) -> &[u8] {
-        &self.batch_data
+    /// Raw payload bytes
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Blob Inscription type
+    pub fn data_type(&self) -> BlobType {
+        self.data_type
     }
 }

@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+
 use bitcoin::script::Instructions;
 use strata_primitives::params::DepositTxParams;
 
@@ -11,7 +13,7 @@ pub struct DepositRequestScriptInfo {
 
 /// check if magic bytes(unique set of bytes used to identify relevant tx) is present or not
 pub fn check_magic_bytes(
-    instructions: &mut Instructions,
+    instructions: &mut Peekable<Instructions>,
     config: &DepositTxParams,
 ) -> Result<(), DepositParseError> {
     // magic bytes
@@ -27,7 +29,7 @@ pub fn check_magic_bytes(
 
 /// extracts the Execution environment bytes(most possibly EVM bytes)
 pub fn extract_ee_bytes<'a>(
-    instructions: &mut Instructions<'a>,
+    instructions: &mut Peekable<Instructions<'a>>,
     config: &DepositTxParams,
 ) -> Result<&'a [u8], DepositParseError> {
     match next_bytes(instructions) {
@@ -58,7 +60,7 @@ mod tests {
             .push_slice(PushBytesBuf::try_from(config.magic_bytes.clone()).unwrap())
             .push_opcode(OP_RETURN)
             .into_script();
-        let mut instructions = script.instructions();
+        let mut instructions = script.instructions().peekable();
 
         let result = check_magic_bytes(&mut instructions, &config);
         assert!(result.is_ok());
@@ -73,7 +75,7 @@ mod tests {
             )
             .push_opcode(OP_RETURN)
             .into_script();
-        let mut instructions = script.instructions();
+        let mut instructions = script.instructions().peekable();
 
         let result = check_magic_bytes(&mut instructions, &config);
         assert!(matches!(result, Err(DepositParseError::MagicBytesMismatch)));
@@ -83,7 +85,7 @@ mod tests {
     fn test_check_magic_bytes_missing() {
         let config = get_deposit_tx_config();
         let script = Builder::new().push_opcode(OP_RETURN).into_script();
-        let mut instructions = script.instructions();
+        let mut instructions = script.instructions().peekable();
 
         let result = check_magic_bytes(&mut instructions, &config);
         assert!(matches!(result, Err(DepositParseError::NoMagicBytes)));
@@ -97,7 +99,7 @@ mod tests {
             .push_slice(PushBytesBuf::try_from(ee_bytes.clone()).unwrap())
             .push_opcode(OP_RETURN)
             .into_script();
-        let mut instructions = script.instructions();
+        let mut instructions = script.instructions().peekable();
 
         let result = extract_ee_bytes(&mut instructions, &config);
         assert!(result.is_ok());
@@ -112,7 +114,7 @@ mod tests {
             .push_slice(PushBytesBuf::try_from(ee_bytes.clone()).unwrap())
             .push_opcode(OP_RETURN)
             .into_script();
-        let mut instructions = script.instructions();
+        let mut instructions = script.instructions().peekable();
 
         let result = extract_ee_bytes(&mut instructions, &config);
         assert!(matches!(
@@ -125,7 +127,7 @@ mod tests {
     fn test_extract_ee_bytes_missing() {
         let config = get_deposit_tx_config();
         let script = Builder::new().push_opcode(OP_RETURN).into_script();
-        let mut instructions = script.instructions();
+        let mut instructions = script.instructions().peekable();
 
         let result = extract_ee_bytes(&mut instructions, &config);
         assert!(matches!(result, Err(DepositParseError::NoDestAddress)));

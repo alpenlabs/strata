@@ -17,8 +17,9 @@ use strata_primitives::{
 use strata_state::{
     batch::SignedBatchCheckpoint,
     client_state::ClientState,
-    da_blob::{BlobDest, BlobIntent},
+    da_blob::{BlobCommitment, BlobDest, BlobIntent},
     prelude::*,
+    tx::{BlobType, InscriptionBlob},
 };
 use strata_storage::L2BlockManager;
 use strata_tasks::{ShutdownGuard, TaskExecutor};
@@ -424,11 +425,16 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let signature = sign_with_identity_key(&checkpoint_sighash, identity_key);
             let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, signature);
 
-            // serialize and send to l1 writer
-
-            let payload =
-                borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?;
-            let blob_intent = BlobIntent::new(BlobDest::L1, checkpoint_sighash, payload);
+            // serialize, create blob and send to l1 writer
+            let payload = InscriptionBlob::new(
+                BlobType::Checkpoint,
+                borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?,
+            );
+            let blob_intent = BlobIntent::new(
+                BlobDest::L1,
+                BlobCommitment::new(&checkpoint_sighash),
+                vec![payload],
+            );
 
             info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
             info!(blob_intent = ?blob_intent, "sending blob intent");

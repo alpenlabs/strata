@@ -5,6 +5,7 @@ use strata_primitives::{
     params::{DepositTxParams, RollupParams},
     sorted_vec::SortedVec,
 };
+use strata_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 
@@ -52,5 +53,21 @@ impl TxFilterConfig {
             expected_outpoints,
             deposit_config,
         })
+    }
+}
+
+/// Wrapper to hold Inscription Data after parsing and filtering.
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum FilteredInscriptionType {
+    Checkpoint(SignedBatchCheckpoint),
+    DA(Vec<u8>),
+}
+
+pub(crate) fn inscription_to_protocol_operation(
+    data: FilteredInscriptionType,
+) -> ProtocolOperation {
+    match data {
+        FilteredInscriptionType::Checkpoint(sbc) => ProtocolOperation::Checkpoint(sbc),
+        FilteredInscriptionType::DA(da) => ProtocolOperation::DA(da),
     }
 }
