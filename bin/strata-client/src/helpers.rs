@@ -184,10 +184,10 @@ pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
     let str_buf = std::str::from_utf8(&raw_buf)?;
     debug!(?path, "loading sequencer root key");
     let buf = base58::decode_check(str_buf)?;
-    let root_xpriv = Xpriv::decode(&buf)?;
+    let master_xpriv = Xpriv::decode(&buf)?;
 
     // Actually do the key derivation from the root key and then derive the pubkey from that.
-    let seq_xpriv = keyderiv::derive_seq_xpriv(&root_xpriv)?;
+    let seq_xpriv = keyderiv::derive_seq_xpriv(&master_xpriv)?;
     let seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
     let seq_xpub = Xpub::from_priv(SECP256K1, &seq_xpriv);
     let seq_pk = seq_xpub.to_x_only_pub().serialize();
