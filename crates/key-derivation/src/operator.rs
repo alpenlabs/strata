@@ -1,4 +1,4 @@
-//! Key derivation for bridge operators
+//! Key derivation for Strata bridge operators
 //!
 //! Bridge operators guarantee the security assumptions of the Strata BitVM-based
 //! bridge by enforcing that all peg-ins and peg-outs are valid.
@@ -23,7 +23,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::KeyError;
 
-/// The base index for operator keys.
+/// The Strata base index for operator keys.
 const BASE_IDX: u32 = 56;
 
 /// The operator index for operator keys.
@@ -36,16 +36,13 @@ const MESSAGE_IDX: u32 = 100;
 const WALLET_IDX: u32 = 101;
 
 /// The operator's message signing and wallet transaction signing keys.
-///
-/// The keys have different [`Xpriv`] derivation paths to allow for different
-/// key lifetimes, while adding some security against a leaked signing key.
 #[derive(Debug, Clone)]
 pub struct OperatorKeys {
-    /// The operator's master [`Xpriv`].
+    /// Operator's master [`Xpriv`].
     master: Xpriv,
-    /// The operator's message signing [`Xpriv`].
+    /// Operator's message signing [`Xpriv`].
     signing: Xpriv,
-    /// The operator's wallet transaction signing [`Xpriv`].
+    /// Operator's wallet transaction signing [`Xpriv`].
     wallet: Xpriv,
 }
 
