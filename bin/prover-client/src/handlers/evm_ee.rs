@@ -8,7 +8,7 @@ use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
 
 use super::ProvingOp;
-use crate::{errors::ProvingTaskError, task2::TaskTracker};
+use crate::{errors::ProvingTaskError, task::TaskTracker};
 
 /// Operations required for EL block proving tasks.
 #[derive(Debug, Clone)]
