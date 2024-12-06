@@ -13,11 +13,8 @@
 //!
 //! The derivation paths are:
 //!
-//! - `m/56'/20'/100'` for the message signing key
-//! - `m/56'/20'/101'` for the wallet transaction signing key
-//!
-//! These are all hardened child indices, allowing extra security if an operator derived
-//! [`Xpub`] is compromised.
+//! - `m/56'/20'/100` for the message signing key
+//! - `m/56'/20'/101` for the wallet transaction signing key
 
 use bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
@@ -60,13 +57,13 @@ impl OperatorKeys {
         let message_path = DerivationPath::master().extend([
             ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
             ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(MESSAGE_IDX).unwrap(),
+            ChildNumber::from_normal_idx(MESSAGE_IDX).unwrap(),
         ]);
 
         let wallet_path = DerivationPath::master().extend([
             ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
             ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(WALLET_IDX).unwrap(),
+            ChildNumber::from_normal_idx(WALLET_IDX).unwrap(),
         ]);
 
         let message_xpriv = master.derive_priv(SECP256K1, &message_path)?;
