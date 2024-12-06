@@ -1,6 +1,6 @@
 use strata_db::traits::{ProofDatabase, ProverDatabase};
 use strata_primitives::proof::ProofKey;
-use strata_rocksdb::prover::db::ProverDB;
+use strata_rocksdb::prover::db::{ProofDb, ProverDB};
 use strata_zkvm::ZkVmProver;
 
 use crate::{
@@ -37,25 +37,24 @@ pub trait ProvingOp {
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
-        db: &ProverDB,
+        db: &ProofDb,
     ) -> Result<<Self::Prover as ZkVmProver>::Input, ProvingTaskError>;
 
     async fn prove(
         &self,
         task_tracker: &mut TaskTracker,
         task_id: &ProofKey,
-        db: &ProverDB,
+        db: &ProofDb,
     ) -> Result<(), ProvingTaskError> {
-        task_tracker.update_status(*task_id, ProvingTaskStatus::ProvingInProgress)?;
         let input = self.fetch_input(task_id, db).await?;
 
         #[cfg(feature = "sp1")]
         {
+            task_tracker.update_status(*task_id, ProvingTaskStatus::ProvingInProgress)?;
             let host = hosts::sp1::get_host((*task_id).into());
             let proof = <Self::Prover as ZkVmProver>::prove(&input, host)
                 .map_err(ProvingTaskError::ZkVmError)?;
-            db.proof_db()
-                .put_proof(*task_id, proof)
+            db.put_proof(*task_id, proof)
                 .map_err(ProvingTaskError::DatabaseError)?;
             task_tracker.update_status(*task_id, ProvingTaskStatus::Completed)?;
         }
@@ -100,7 +99,7 @@ impl ProofHandler {
         &self,
         task_tracker: &mut TaskTracker,
         task_id: &ProofKey,
-        db: &ProverDB,
+        db: &ProofDb,
     ) -> Result<(), ProvingTaskError> {
         match task_id {
             ProofKey::BtcBlockspace(_) => {
