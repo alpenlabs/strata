@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hash::Hash};
 
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofKey};
 use strata_sp1_adapter::SP1Host;
 
 use crate::hosts;
@@ -17,13 +17,13 @@ pub enum ProofVm {
 
 impl From<ProofKey> for ProofVm {
     fn from(value: ProofKey) -> Self {
-        match value {
-            ProofKey::BtcBlockspace(_) => Self::BtcProving,
-            ProofKey::L1Batch(_, _) => Self::L1Batch,
-            ProofKey::EvmEeStf(_) => Self::ELProving,
-            ProofKey::ClStf(_) => Self::CLProving,
-            ProofKey::ClAgg(_, _) => Self::CLAggregation,
-            ProofKey::Checkpoint(_) => Self::Checkpoint,
+        match value.id() {
+            ProofId::BtcBlockspace(_) => Self::BtcProving,
+            ProofId::L1Batch(_, _) => Self::L1Batch,
+            ProofId::EvmEeStf(_) => Self::ELProving,
+            ProofId::ClStf(_) => Self::CLProving,
+            ProofId::ClAgg(_, _) => Self::CLAggregation,
+            ProofId::Checkpoint(_) => Self::Checkpoint,
         }
     }
 }

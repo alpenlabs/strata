@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bitcoin::params::MAINNET;
 use strata_btcio::{reader::query::get_verification_state, rpc::BitcoinClient};
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmHost;
@@ -33,29 +33,28 @@ impl L1BatchHandler {
 impl ProvingOp for L1BatchHandler {
     type Prover = L1BatchProver;
 
-    async fn create_task(
+    async fn create_dep_tasks(
         &self,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        task_id: &ProofKey,
-    ) -> Result<(), ProvingTaskError> {
-        let (start_height, end_height) = match task_id {
-            ProofKey::L1Batch(start, end) => (start, end),
+        proof_id: ProofId,
+        hosts: &[ProofZkVmHost],
+    ) -> Result<Vec<ProofId>, ProvingTaskError> {
+        let (start_height, end_height) = match proof_id {
+            ProofId::L1Batch(start, end) => (start, end),
             _ => return Err(ProvingTaskError::InvalidInput("L1Batch".to_string())),
         };
 
         let len = (end_height - start_height) as usize + 1;
         let mut deps = Vec::with_capacity(len);
-        for height in *start_height..=*end_height {
-            let proof_key = ProofKey::BtcBlockspace(height);
+        for height in start_height..=end_height {
+            let proof_id = ProofId::BtcBlockspace(height);
             self.btc_blockspace_handler
-                .create_task(task_tracker.clone(), &proof_key)
+                .create_task(task_tracker.clone(), proof_id, hosts)
                 .await?;
-            deps.push(proof_key);
+            deps.push(proof_id);
         }
 
-        task_tracker.lock().await.insert_task(*task_id, deps)?;
-
-        Ok(())
+        Ok(deps)
     }
 
     async fn fetch_input(
@@ -63,14 +62,15 @@ impl ProvingOp for L1BatchHandler {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<L1BatchProofInput, ProvingTaskError> {
-        let (start_height, end_height) = match task_id {
-            ProofKey::L1Batch(start, end) => (start, end),
+        let (start_height, end_height) = match task_id.id() {
+            ProofId::L1Batch(start, end) => (start, end),
             _ => return Err(ProvingTaskError::InvalidInput("L1Batch".to_string())),
         };
 
         let mut batch = Vec::new();
         for height in *start_height..=*end_height {
-            let proof_key = ProofKey::BtcBlockspace(height);
+            let proof_id = ProofId::BtcBlockspace(height);
+            let proof_key = ProofKey::new(proof_id, *task_id.host());
             let proof = db
                 .get_proof(proof_key)
                 .map_err(ProvingTaskError::DatabaseError)?

@@ -24,18 +24,27 @@ pub type ProvingTask = ProofKey;
 pub trait ProvingOp {
     type Prover: ZkVmProver;
 
-    fn fetch_deps(&self, proof_id: ProofId) -> Result<Vec<ProofId>, ProvingTaskError>;
+    async fn create_dep_tasks(
+        &self,
+        task_tracker: Arc<Mutex<TaskTracker>>,
+        proof_id: ProofId,
+        hosts: &[ProofZkVmHost],
+    ) -> Result<Vec<ProofId>, ProvingTaskError>;
 
     async fn create_task(
         &self,
         task_tracker: Arc<Mutex<TaskTracker>>,
         proof_id: ProofId,
         hosts: &[ProofZkVmHost],
-    ) -> Result<(), ProvingTaskError> {
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         // Fetch dependencies for this task
-        let deps = self.fetch_deps(proof_id)?;
+        let deps = self
+            .create_dep_tasks(task_tracker.clone(), proof_id, hosts)
+            .await?;
 
         let mut task_tracker = task_tracker.lock().await;
+
+        let mut tasks = Vec::with_capacity(hosts.len());
 
         // Insert tasks for each configured host
         for host in hosts {
@@ -45,9 +54,10 @@ pub trait ProvingOp {
                 .map(|&dep| ProvingTask::new(dep, *host))
                 .collect();
             task_tracker.insert_task(task, dep_tasks)?;
+            tasks.push(task);
         }
 
-        Ok(())
+        Ok(tasks)
     }
 
     async fn fetch_input(

@@ -9,23 +9,23 @@ use strata_rpc_types::ProofKey;
 pub trait StrataProverClientApi {
     /// Start proving the given btc block
     #[method(name = "proveBtcBlock")]
-    async fn prove_btc_block(&self, el_block_num: u64) -> RpcResult<ProofKey>;
+    async fn prove_btc_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given el block
     #[method(name = "proveELBlock")]
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<ProofKey>;
+    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given cl block
     #[method(name = "proveCLBlock")]
-    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<ProofKey>;
+    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given l1 Batch
     #[method(name = "proveL1Batch")]
-    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<ProofKey>;
+    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given l2 batch
     #[method(name = "proveL2Batch")]
-    async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<ProofKey>;
+    async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given checkpoint info
     #[method(name = "proveCheckpointRaw")]
@@ -34,11 +34,11 @@ pub trait StrataProverClientApi {
         checkpoint_idx: u64,
         l1_range: (u64, u64),
         l2_range: (u64, u64),
-    ) -> RpcResult<ProofKey>;
+    ) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the latest checkpoint info from the sequencer
     #[method(name = "proveLatestCheckPoint")]
-    async fn prove_latest_checkpoint(&self) -> RpcResult<ProofKey>;
+    async fn prove_latest_checkpoint(&self) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given el block
     #[method(name = "getTaskStatus")]
