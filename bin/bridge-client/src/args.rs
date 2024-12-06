@@ -16,16 +16,16 @@ pub(crate) struct Cli {
     pub mode: String,
 
     #[argh(
+        positional,
+        description = "path to the file containing the operator's master xpriv"
+    )]
+    pub master_xpriv: String,
+
+    #[argh(
         option,
         description = "path to the directory where to store the rocksdb databases (default: $HOME/.local/share/strata/)"
     )]
     pub datadir: Option<String>,
-
-    #[argh(
-        option,
-        description = "xpriv to be loaded into the bitcoin wallet using the RPC client (default: envvar STRATA_OP_ROOT_XPRIV)"
-    )]
-    pub root_xpriv: Option<String>,
 
     #[argh(
         option,
