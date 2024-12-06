@@ -8,7 +8,7 @@ use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, Mutex};
 
 use crate::{
     db::open_rocksdb_database,
@@ -18,6 +18,7 @@ use crate::{
         cl_stf::ClStfHandler, evm_ee::EvmEeHandler, l1_batch::L1BatchHandler, ProofHandler,
     },
     primitives::status::ProvingTaskStatus,
+    rpc_server::ServerRequest,
     task2::TaskTracker,
 };
 
@@ -25,6 +26,7 @@ pub struct ProverManager {
     task_tracker: Arc<Mutex<TaskTracker>>,
     db: ProverDB,
     handler: ProofHandler,
+    task_receiver: mpsc::Receiver<ServerRequest>,
     workers: usize,
 }
 
@@ -33,6 +35,7 @@ impl ProverManager {
         btc_client: BitcoinClient,
         evm_ee_client: HttpClient,
         cl_client: HttpClient,
+        task_receiver: mpsc::Receiver<ServerRequest>,
         workers: usize,
     ) -> Self {
         let rbdb = open_rocksdb_database().unwrap();
@@ -66,11 +69,12 @@ impl ProverManager {
             task_tracker,
             db: ProverDB::new(Arc::new(db)),
             handler,
+            task_receiver,
             workers,
         }
     }
 
-    pub async fn process_pending_tasks(&self) {
+    pub async fn process(&self) {
         // Acquire lock to get pending tasks
         let pending_tasks = {
             let task_tracker = self.task_tracker.lock().await;
@@ -91,6 +95,11 @@ impl ProverManager {
             let task_tracker = self.task_tracker.clone();
             tokio::spawn(async move { make_proof(handler, task_tracker, task, db).await });
         }
+    }
+
+    pub async fn create_task(&self, task_id: ProofKey) {
+        self.handler
+            .create_task(self.task_tracker.clone(), &task_id);
     }
 }
 

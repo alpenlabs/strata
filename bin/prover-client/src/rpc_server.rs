@@ -1,55 +1,21 @@
 //! Bootstraps an RPC server for the prover client.
 
+use std::sync::Arc;
+
 use anyhow::{Context, Ok};
 use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
+use strata_primitives::proof::ProofKey;
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use strata_rpc_types::RpcCheckpointInfo;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    dispatcher::TaskDispatcher,
-    proving_ops::{
-        btc_ops::BtcOperations,
-        checkpoint_ops::{CheckpointOperations, CheckpointOpsParam},
-        cl_ops::ClOperations,
-        el_ops::ElOperations,
-        l1_batch_ops::L1BatchOperations,
-        l2_batch_ops::L2BatchOperations,
-    },
+    errors::ProvingTaskError, manager2::ProverManager, primitives::status::ProvingTaskStatus,
+    task2::TaskTracker,
 };
-
-#[derive(Clone)]
-pub struct RpcContext {
-    pub btc_proving_task_dispatcher: TaskDispatcher<BtcOperations>,
-    pub el_proving_task_dispatcher: TaskDispatcher<ElOperations>,
-    pub cl_proving_task_dispatcher: TaskDispatcher<ClOperations>,
-    pub l1_batch_task_dispatcher: TaskDispatcher<L1BatchOperations>,
-    pub l2_batch_task_dispatcher: TaskDispatcher<L2BatchOperations>,
-    pub checkpoint_dispatcher: TaskDispatcher<CheckpointOperations>,
-}
-
-impl RpcContext {
-    pub fn new(
-        btc_proving_task_scheduler: TaskDispatcher<BtcOperations>,
-        el_proving_task_scheduler: TaskDispatcher<ElOperations>,
-        cl_proving_task_scheduler: TaskDispatcher<ClOperations>,
-        l1_batch_task_scheduler: TaskDispatcher<L1BatchOperations>,
-        l2_batch_task_scheduler: TaskDispatcher<L2BatchOperations>,
-        checkpoint_scheduler: TaskDispatcher<CheckpointOperations>,
-    ) -> Self {
-        Self {
-            btc_proving_task_dispatcher: btc_proving_task_scheduler,
-            el_proving_task_dispatcher: el_proving_task_scheduler,
-            cl_proving_task_dispatcher: cl_proving_task_scheduler,
-            l1_batch_task_dispatcher: l1_batch_task_scheduler,
-            l2_batch_task_dispatcher: l2_batch_task_scheduler,
-            checkpoint_dispatcher: checkpoint_scheduler,
-        }
-    }
-}
 
 pub(crate) async fn start<T>(
     rpc_impl: &T,
@@ -88,85 +54,117 @@ where
     Ok(())
 }
 
+pub enum ServerRequest {
+    AddTask {
+        task: ProofKey,
+        response_tx: oneshot::Sender<ProvingTaskStatus>,
+    },
+    GetTaskStatus {
+        task: ProofKey,
+        response_tx: oneshot::Sender<ProvingTaskStatus>,
+    },
+}
+
 /// Struct to implement the `strata_prover_client_rpc_api::StrataProverClientApiServer` on.
 /// Contains fields corresponding the global context for the RPC.
 #[derive(Clone)]
 pub(crate) struct ProverClientRpc {
-    context: RpcContext,
+    task_tx: mpsc::Sender<ServerRequest>,
 }
 
 impl ProverClientRpc {
-    pub fn new(context: RpcContext) -> Self {
-        Self { context }
+    pub fn new(task_tx: mpsc::Sender<ServerRequest>) -> Self {
+        Self { task_tx }
+    }
+
+    pub async fn add_task(
+        &self,
+        task: ProofKey,
+    ) -> Result<ProvingTaskStatus, mpsc::error::SendError<ServerRequest>> {
+        let (response_tx, response_rx) = oneshot::channel();
+
+        self.task_tx
+            .send(ServerRequest::AddTask { task, response_tx })
+            .await?;
+
+        // Wait for the initial task status
+        response_rx.await.map_err(|_| {
+            mpsc::error::SendError(ServerRequest::AddTask {
+                task,
+                response_tx: oneshot::channel().0,
+            })
+        })
+    }
+
+    pub async fn get_task_status(
+        &self,
+        task: ProofKey,
+    ) -> Result<ProvingTaskStatus, mpsc::error::SendError<ServerRequest>> {
+        let (response_tx, response_rx) = oneshot::channel();
+
+        self.task_tx
+            .send(ServerRequest::GetTaskStatus { task, response_tx })
+            .await?;
+
+        // Wait for the task status
+        response_rx.await.map_err(|_| {
+            mpsc::error::SendError(ServerRequest::GetTaskStatus {
+                task,
+                response_tx: oneshot::channel().0,
+            })
+        })
     }
 }
 
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
     async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<Uuid> {
-        let task_id = self
-            .context
-            .btc_proving_task_dispatcher
-            .create_task(btc_block_num)
+        let task = ProofKey::BtcBlockspace(btc_block_num);
+        let _ = self
+            .add_task(task)
             .await
-            .expect("failed to add proving task, l1 block");
-
-        RpcResult::Ok(task_id)
+            .expect("failed to add proving task, btc block");
+        RpcResult::Ok(Uuid::new_v4())
     }
 
-    async fn prove_el_blocks(&self, block_range: (u64, u64)) -> RpcResult<Uuid> {
-        let task_id = self
-            .context
-            .el_proving_task_dispatcher
-            .create_task(block_range)
+    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Uuid> {
+        let task = ProofKey::EvmEeStf(el_block_num);
+        let _ = self
+            .add_task(task)
             .await
             .expect("failed to add proving task, el block");
-
-        RpcResult::Ok(task_id)
+        RpcResult::Ok(Uuid::new_v4())
     }
 
     async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<Uuid> {
-        let task_id = self
-            .context
-            .cl_proving_task_dispatcher
-            .create_task(cl_block_num)
+        let task = ProofKey::ClStf(cl_block_num);
+        let _ = self
+            .add_task(task)
             .await
-            .expect("failed to add proving task, cl block");
-
-        RpcResult::Ok(task_id)
+            .expect("failed to add proving task, el block");
+        RpcResult::Ok(Uuid::new_v4())
     }
 
     async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Uuid> {
-        let task_id = self
-            .context
-            .l1_batch_task_dispatcher
-            .create_task(l1_range)
+        let task = ProofKey::L1Batch(l1_range.0, l1_range.1);
+        let _ = self
+            .add_task(task)
             .await
-            .expect("failed to add proving task, l1 batch");
-
-        RpcResult::Ok(task_id)
+            .expect("failed to add proving task, el block");
+        RpcResult::Ok(Uuid::new_v4())
     }
 
     async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Uuid> {
-        let task_id = self
-            .context
-            .l2_batch_task_dispatcher
-            .create_task(l2_range)
+        let task = ProofKey::ClAgg(l2_range.0, l2_range.1);
+        let _ = self
+            .add_task(task)
             .await
-            .expect("failed to add proving task, cl batch");
-
-        RpcResult::Ok(task_id)
+            .expect("failed to add proving task, el block");
+        RpcResult::Ok(Uuid::new_v4())
     }
 
     async fn prove_latest_checkpoint(&self) -> RpcResult<Uuid> {
-        let task_id = self
-            .context
-            .checkpoint_dispatcher
-            .create_task(CheckpointOpsParam::Latest)
-            .await
-            .expect("failed to add proving task, checkpoint");
-
-        RpcResult::Ok(task_id)
+        unimplemented!()
     }
 
     async fn prove_checkpoint_raw(
@@ -175,30 +173,10 @@ impl StrataProverClientApiServer for ProverClientRpc {
         l1_range: (u64, u64),
         l2_range: (u64, u64),
     ) -> RpcResult<Uuid> {
-        let checkpoint_info = RpcCheckpointInfo {
-            idx: checkpoint_idx,
-            l1_range,
-            l2_range,
-            l2_blockid: Default::default(),
-        };
-
-        let task_id = self
-            .context
-            .checkpoint_dispatcher
-            .create_task(CheckpointOpsParam::Manual(checkpoint_info))
-            .await
-            .expect("failed to add proving task, checkpoint");
-
-        RpcResult::Ok(task_id)
+        unimplemented!()
     }
 
     async fn get_task_status(&self, task_id: Uuid) -> RpcResult<Option<String>> {
-        let task_tracker = self.context.el_proving_task_dispatcher.task_tracker();
-
-        if let Some(task_status) = task_tracker.get_task_status(task_id).await {
-            return RpcResult::Ok(Some(task_status.to_string()));
-        }
-
-        RpcResult::Ok(None)
+        unimplemented!()
     }
 }
