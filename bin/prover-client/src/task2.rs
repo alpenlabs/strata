@@ -5,6 +5,7 @@ use strata_primitives::proof::ProofKey;
 use crate::{errors::ProvingTaskError, primitives::status::ProvingTaskStatus};
 
 /// Manages tasks and their states for proving operations.
+#[derive(Debug, Clone)]
 pub struct TaskTracker {
     /// A map of task IDs to their statuses.
     tasks: HashMap<ProofKey, ProvingTaskStatus>,
