@@ -15,7 +15,7 @@ use crate::errors::ProvingTaskError;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProvingTaskStatus {
     /// Waiting for dependencies to be resolved.
-    WaitingForDependencies(HashSet<ProofKey>),
+    WaitingForDependencies(HashSet<ProofKey>), // TODO: decouple deps from here
     /// Ready to be started
     Pending,
     /// Task is currently being executed.

@@ -692,9 +692,9 @@ checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bitcoin"
-version = "0.32.3"
+version = "0.32.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0032b0e8ead7074cda7fc4f034409607e3f03a6f71d66ade8a307f79b4d99e73"
+checksum = "ce6bc65742dea50536e35ad42492b234c27904a27f0abdcbce605015cb4ea026"
 dependencies = [
  "base58ck",
  "bech32",
@@ -3813,9 +3813,9 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "borsh",
+ "hex",
  "risc0-zkvm",
  "serde",
- "serde_json",
  "sha2",
  "strata-zkvm",
  "tracing-subscriber 0.3.18",
