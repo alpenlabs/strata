@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmHost;
@@ -31,26 +31,23 @@ impl ClStfHandler {
 impl ProvingOp for ClStfHandler {
     type Prover = ClStfProver;
 
-    async fn create_task(
+    async fn create_dep_tasks(
         &self,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        task_id: &ProofKey,
-    ) -> Result<(), ProvingTaskError> {
-        let block_num = match task_id {
-            ProofKey::ClStf(id) => id,
-            _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
+        proof_id: ProofId,
+        hosts: &[ProofZkVmHost],
+    ) -> Result<Vec<ProofId>, ProvingTaskError> {
+        let block_num = match proof_id {
+            ProofId::ClStf(id) => id,
+            _ => return Err(ProvingTaskError::InvalidInput("ClStf".to_string())),
         };
-        let ee_task = ProofKey::EvmEeStf(*block_num);
+
+        let ee_task = ProofId::EvmEeStf(block_num);
         self.evm_ee_handler
-            .create_task(task_tracker.clone(), &ee_task)
+            .create_task(task_tracker.clone(), ee_task, hosts)
             .await?;
 
-        task_tracker
-            .lock()
-            .await
-            .insert_task(*task_id, vec![ee_task])?;
-
-        Ok(())
+        Ok(vec![ee_task])
     }
 
     async fn fetch_input(
@@ -58,8 +55,8 @@ impl ProvingOp for ClStfHandler {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<ClStfInput, ProvingTaskError> {
-        let block_num = match task_id {
-            ProofKey::ClStf(id) => id,
+        let block_num = match task_id.id() {
+            ProofId::ClStf(id) => id,
             _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
         };
         let raw_witness: Option<Vec<u8>> = self
@@ -70,7 +67,8 @@ impl ProvingOp for ClStfHandler {
         let witness = raw_witness.ok_or(ProvingTaskError::WitnessNotFound)?;
         let (pre_state, l2_block) = borsh::from_slice(&witness)?;
 
-        let evm_ee_key = ProofKey::EvmEeStf(*block_num);
+        let id = ProofId::EvmEeStf(*block_num);
+        let evm_ee_key = ProofKey::new(id, *task_id.host());
         let evm_ee_proof = db
             .get_proof(evm_ee_key)
             .map_err(ProvingTaskError::DatabaseError)?

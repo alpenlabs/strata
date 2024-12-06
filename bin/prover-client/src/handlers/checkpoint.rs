@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcCheckpointInfo;
@@ -51,35 +51,30 @@ impl CheckpointHandler {
 impl ProvingOp for CheckpointHandler {
     type Prover = CheckpointProver;
 
-    async fn create_task(
+    async fn create_dep_tasks(
         &self,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        task_id: &ProofKey,
-    ) -> Result<(), ProvingTaskError> {
-        let ckp_idx = match task_id {
-            ProofKey::Checkpoint(idx) => idx,
+        proof_id: ProofId,
+        hosts: &[ProofZkVmHost],
+    ) -> Result<Vec<ProofId>, ProvingTaskError> {
+        let ckp_idx = match proof_id {
+            ProofId::Checkpoint(idx) => idx,
             _ => return Err(ProvingTaskError::InvalidInput("Checkpoint".to_string())),
         };
 
-        let checkpoint_info = self.fetch_info(*ckp_idx).await?;
+        let checkpoint_info = self.fetch_info(ckp_idx).await?;
 
-        let l1_batch_key =
-            ProofKey::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
+        let l1_batch_id = ProofId::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
         self.l1_batch_dispatcher
-            .create_task(task_tracker.clone(), &l1_batch_key)
+            .create_task(task_tracker.clone(), l1_batch_id, hosts)
             .await?;
 
-        let cl_agg_key = ProofKey::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
+        let l2_batch_id = ProofId::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
         self.l2_batch_dispatcher
-            .create_task(task_tracker.clone(), &cl_agg_key)
+            .create_task(task_tracker.clone(), l2_batch_id, hosts)
             .await?;
 
-        task_tracker
-            .lock()
-            .await
-            .insert_task(*task_id, vec![l1_batch_key, cl_agg_key])?;
-
-        Ok(())
+        Ok(vec![l1_batch_id, l2_batch_id])
     }
 
     async fn fetch_input(
@@ -87,15 +82,15 @@ impl ProvingOp for CheckpointHandler {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<CheckpointProverInput, ProvingTaskError> {
-        let ckp_idx = match task_id {
-            ProofKey::Checkpoint(idx) => idx,
+        let ckp_idx = match task_id.id() {
+            ProofId::Checkpoint(idx) => idx,
             _ => return Err(ProvingTaskError::InvalidInput("Checkpoint".to_string())),
         };
 
         let checkpoint_info = self.fetch_info(*ckp_idx).await?;
 
-        let l1_batch_key =
-            ProofKey::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
+        let l1_batch_id = ProofId::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
+        let l1_batch_key = ProofKey::new(l1_batch_id, *task_id.host());
         let l1_batch_proof = db
             .get_proof(l1_batch_key)
             .map_err(ProvingTaskError::DatabaseError)?
@@ -103,7 +98,8 @@ impl ProvingOp for CheckpointHandler {
         let l1_batch_vk = hosts::get_host(ProofVm::L1Batch).get_verification_key();
         let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);
 
-        let cl_agg_key = ProofKey::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
+        let cl_agg_id = ProofId::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
+        let cl_agg_key = ProofKey::new(cl_agg_id, *task_id.host());
         let cl_agg_proof = db
             .get_proof(cl_agg_key)
             .map_err(ProvingTaskError::DatabaseError)?
