@@ -23,9 +23,15 @@ pub(crate) struct Cli {
 
     #[argh(
         option,
-        description = "xpriv to be loaded into the bitcoin wallet using the RPC client (default: envvar STRATA_OP_ROOT_XPRIV)"
+        description = "xpriv to be used as the master operator's key (default: envvar STRATA_OP_MASTER_XPRIV)"
     )]
-    pub root_xpriv: Option<String>,
+    pub master_xpriv: Option<String>,
+
+    #[argh(
+        option,
+        description = "path to the file containing the master operator's xpriv (don't use with --master-xpriv or the envvar STRATA_OP_MASTER_XPRIV)"
+    )]
+    pub master_xpriv_path: Option<String>,
 
     #[argh(
         option,
