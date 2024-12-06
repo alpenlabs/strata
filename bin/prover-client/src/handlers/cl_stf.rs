@@ -7,11 +7,8 @@ use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmHost;
 
-use super::{evm_ee::EvmEeHandler, ProvingOp};
-use crate::{
-    errors::ProvingTaskError, hosts, primitives::vms::ProofVm,
-    proving_ops::btc_ops::get_pm_rollup_params,
-};
+use super::{evm_ee::EvmEeHandler, utils::get_pm_rollup_params, ProvingOp};
+use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
