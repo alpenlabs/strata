@@ -22,6 +22,7 @@ pub mod processor;
 pub mod prover;
 use db::InMemoryDBHelper;
 use mpt::keccak;
+use primitives::AcutallProofOutput2;
 pub use primitives::{ELProofInput, ELProofPublicParams};
 use processor::{EvmConfig, EvmProcessor};
 use reth_primitives::revm_primitives::alloy_primitives::B256;
@@ -83,31 +84,30 @@ pub fn process_block_transaction(
     }
 }
 
-pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
-    // let input: ELProofInput = zkvm.read_serde();
-    // let public_params = process_block_transaction(input, EVM_CONFIG);
-    // zkvm.commit_serde(&public_params);
-    todo!()
-}
+pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) -> AcutallProofOutput2 {
+    let total_blocks: u32 = zkvm.read_serde();
+    assert!(total_blocks > 0, "At least one block is required.");
 
-// Wrapper function that processes N transactions
-pub fn process_blocks(zkvm: &impl ZkVmEnv) {
-    // Read the number of transactions to process
-    let n: u32 = zkvm.read_serde();
-    let mut exec_updates: Vec<ExecSegment> = Vec::new();
-    assert!(n > 0, "Min 1 blocks should be there");
+    let mut exec_updates = Vec::with_capacity((total_blocks - 1) as usize);
 
-    // Loop N times, calling the existing function each time
-    for _ in 0..n {
-        let input: ELProofInput = zkvm.read_serde();
-        let block_output = process_block_transaction(input, EVM_CONFIG);
-        let exec_segment = block_2_exec_updates(&block_output);
+    // Process the first block
+    let first_input: ELProofInput = zkvm.read_serde();
+    let first_output = process_block_transaction(first_input, EVM_CONFIG);
+    let mut current_blockhash = first_output.new_blockhash;
+
+    // Process remaining blocks
+    for _ in 1..total_blocks {
+        let next_block_input: ELProofInput = zkvm.read_serde();
+        let next_block_output = process_block_transaction(next_block_input, EVM_CONFIG);
+        assert_eq!(next_block_output.prev_blockhash, current_blockhash);
+
+        let exec_segment = block_2_exec_updates(&next_block_output);
         exec_updates.push(exec_segment);
+
+        current_blockhash = next_block_output.new_blockhash;
     }
 
-    // TODO: add multiple transaction
-    // Do consistancy check
-    assert_eq!(exec_updates.len(), n as usize);
+    exec_updates
 }
 
 fn block_2_exec_updates(_pp: &ELProofPublicParams) -> ExecSegment {
