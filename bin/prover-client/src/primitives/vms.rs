@@ -30,7 +30,7 @@ impl<Vm: ZkVmHost> ZkVMManager<Vm> {
         // instance is reused to prove the same guest program
         let vm = zkvm::get_host(proof_vm);
         let vm = Box::new(vm);
-        let static_vm: &'static Vm = Box::leak(vm);
+        let static_vm: &mut impl ZkVmHost = Box::leak(vm);
         self.vms.insert(proof_vm, static_vm);
     }
 

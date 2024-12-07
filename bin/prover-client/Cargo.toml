@@ -6,7 +6,7 @@ version = "0.1.0"
 [[bin]]
 name = "strata-prover-client"
 path = "src/main.rs"
-required-features = ["prover"]
+# required-features = ["prover"]
 
 [dependencies]
 strata-btcio.workspace = true
@@ -18,6 +18,10 @@ strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
+strata-proofimpl-cl-agg.workspace = true
+strata-proofimpl-cl-stf.workspace = true
+
+
 strata-prover-client-rpc-api.workspace = true
 strata-rocksdb.workspace = true
 strata-rpc-types.workspace = true
@@ -62,7 +66,7 @@ strata-risc0-guest-builder = { path = "../../provers/risc0", optional = true, fe
 ] }
 
 [features]
-default = ["sp1"]
+default = ["mock"]
 mock = [
   "strata-sp1-guest-builder/mock",
   "strata-sp1-adapter/mock",
