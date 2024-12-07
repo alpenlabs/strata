@@ -6,13 +6,13 @@ use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcCheckpointInfo;
-use strata_zkvm::{AggregationInput, ZkVmHost};
+use strata_zkvm::AggregationInput;
 use tokio::sync::Mutex;
 
 use super::{
     cl_agg::ClAggHandler, l1_batch::L1BatchHandler, utils::get_pm_rollup_params, ProvingOp,
 };
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
@@ -95,7 +95,7 @@ impl ProvingOp for CheckpointHandler {
             .get_proof(l1_batch_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(l1_batch_key))?;
-        let l1_batch_vk = hosts::get_host(ProofVm::L1Batch).get_verification_key();
+        let l1_batch_vk = hosts::get_verification_key(task_id);
         let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);
 
         let cl_agg_id = ProofId::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
@@ -104,7 +104,7 @@ impl ProvingOp for CheckpointHandler {
             .get_proof(cl_agg_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(cl_agg_key))?;
-        let cl_agg_vk = hosts::get_host(ProofVm::CLAggregation).get_verification_key();
+        let cl_agg_vk = hosts::get_verification_key(task_id);
         let l2_batch = AggregationInput::new(cl_agg_proof, cl_agg_vk);
 
         Ok(CheckpointProverInput {

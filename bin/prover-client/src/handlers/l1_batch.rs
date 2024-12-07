@@ -6,11 +6,10 @@ use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
-use strata_zkvm::ZkVmHost;
 use tokio::sync::Mutex;
 
 use super::{btc::BtcBlockspaceHandler, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 #[derive(Debug, Clone)]
 pub struct L1BatchHandler {
@@ -86,7 +85,7 @@ impl ProvingOp for L1BatchHandler {
         .await
         .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
-        let blockspace_vk = hosts::get_host(ProofVm::BtcProving).get_verification_key();
+        let blockspace_vk = hosts::get_verification_key(task_id);
 
         Ok(L1BatchProofInput {
             batch,

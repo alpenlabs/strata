@@ -5,11 +5,10 @@ use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_rocksdb::prover::db::ProofDb;
-use strata_zkvm::ZkVmHost;
 use tokio::sync::Mutex;
 
 use super::{evm_ee::EvmEeHandler, utils::get_pm_rollup_params, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
@@ -73,7 +72,7 @@ impl ProvingOp for ClStfHandler {
             .get_proof(evm_ee_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(evm_ee_key))?;
-        let evm_ee_vk = hosts::get_host(ProofVm::ELProving).get_verification_key();
+        let evm_ee_vk = hosts::get_verification_key(task_id);
 
         Ok(ClStfInput {
             rollup_params: get_pm_rollup_params(),

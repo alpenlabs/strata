@@ -1,9 +1,6 @@
-use std::{collections::HashMap, hash::Hash};
+use std::hash::Hash;
 
-use strata_primitives::proof::{ProofId, ProofKey};
-use strata_sp1_adapter::SP1Host;
-
-use crate::hosts;
+use strata_primitives::proof::ProofId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProofVm {
@@ -15,9 +12,9 @@ pub enum ProofVm {
     Checkpoint,
 }
 
-impl From<ProofKey> for ProofVm {
-    fn from(value: ProofKey) -> Self {
-        match value.id() {
+impl From<ProofId> for ProofVm {
+    fn from(value: ProofId) -> Self {
+        match value {
             ProofId::BtcBlockspace(_) => Self::BtcProving,
             ProofId::L1Batch(_, _) => Self::L1Batch,
             ProofId::EvmEeStf(_) => Self::ELProving,
@@ -25,28 +22,5 @@ impl From<ProofKey> for ProofVm {
             ProofId::ClAgg(_, _) => Self::CLAggregation,
             ProofId::Checkpoint(_) => Self::Checkpoint,
         }
-    }
-}
-
-pub struct ZkVMManager {
-    vms: HashMap<ProofVm, &'static SP1Host>,
-}
-
-impl ZkVMManager {
-    pub fn new() -> Self {
-        Self {
-            vms: HashMap::new(),
-        }
-    }
-
-    pub fn add_vm(&mut self, proof_vm: ProofVm) {
-        // The `Vm` is expected to live for the lifetime of the ProverManager, ensuring the same
-        // instance is reused to prove the same guest program
-        let vm = hosts::get_host(proof_vm);
-        self.vms.insert(proof_vm, vm);
-    }
-
-    pub fn get(&self, proof_vm: &ProofVm) -> Option<&'static SP1Host> {
-        self.vms.get(proof_vm).map(|v| &**v)
     }
 }

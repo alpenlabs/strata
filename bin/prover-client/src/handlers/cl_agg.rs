@@ -4,11 +4,10 @@ use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_rocksdb::prover::db::ProofDb;
-use strata_zkvm::ZkVmHost;
 use tokio::sync::Mutex;
 
 use super::{cl_stf::ClStfHandler, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
@@ -71,7 +70,7 @@ impl ProvingOp for ClAggHandler {
             batch.push(proof);
         }
 
-        let cl_stf_vk = hosts::get_host(ProofVm::CLProving).get_verification_key();
+        let cl_stf_vk = hosts::get_verification_key(task_id);
         Ok(ClAggInput { batch, cl_stf_vk })
     }
 }
