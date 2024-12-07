@@ -68,7 +68,8 @@ impl ProvingOperations for ClOperations {
         task_tracker: Arc<TaskTracker>,
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
-        let el_task_id = self.el_dispatcher.create_task(input.block_num).await?;
+        let el_block_range = (input.block_num, input.block_num);
+        let el_task_id = self.el_dispatcher.create_task(el_block_range).await?;
 
         let prover_input = ZkVmInput::ClBlock(input);
 
