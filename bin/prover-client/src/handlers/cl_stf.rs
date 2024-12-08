@@ -73,7 +73,7 @@ impl ProvingOp for ClStfHandler {
             .get_proof(evm_ee_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(evm_ee_key))?;
-        let evm_ee_vk = hosts::get_host(ProofVm::ELProving).get_verification_key();
+        let evm_ee_vk = hosts::get_verification_key(&evm_ee_key);
 
         Ok(ClStfInput {
             rollup_params: get_pm_rollup_params(),
