@@ -3,7 +3,7 @@ use std::sync::Arc;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_rocksdb::prover::db::ProofDb;
-use strata_zkvm::{ProofReceipt, ZkVmError, ZkVmProver};
+use strata_zkvm::ZkVmProver;
 use tokio::sync::Mutex;
 
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
@@ -66,45 +66,36 @@ pub trait ProvingOp {
         db: &ProofDb,
     ) -> Result<<Self::Prover as ZkVmProver>::Input, ProvingTaskError>;
 
-    #[cfg(feature = "sp1")]
-    fn prove_sp1(
-        &self,
-        input: <Self::Prover as ZkVmProver>::Input,
-    ) -> Result<ProofReceipt, ZkVmError> {
-        use crate::primitives::vms::ProofVm;
-
-        let host = hosts::sp1::get_host(ProofVm::BtcProving);
-        <Self::Prover as ZkVmProver>::prove(&input, host)
-    }
-
-    #[cfg(feature = "risc0")]
-    fn prove_risc0(
-        &self,
-        input: <Self::Prover as ZkVmProver>::Input,
-    ) -> Result<ProofReceipt, ZkVmError> {
-        use crate::primitives::vms::ProofVm;
-
-        let host = hosts::risc0::get_host(ProofVm::BtcProving);
-        <Self::Prover as ZkVmProver>::prove(&input, host)
-    }
-
-    fn prove_native(
-        &self,
-        input: <Self::Prover as ZkVmProver>::Input,
-    ) -> Result<ProofReceipt, ZkVmError> {
-        use crate::primitives::vms::ProofVm;
-
-        let host = hosts::native::get_host(ProofVm::BtcProving);
-        <Self::Prover as ZkVmProver>::prove(&input, &host)
-    }
-
     async fn prove(&self, task_id: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
         let input = self.fetch_input(task_id, db).await?;
 
         let proof_res = match task_id.host() {
-            ProofZkVmHost::Native => self.prove_native(input),
-            ProofZkVmHost::SP1 => self.prove_sp1(input),
-            ProofZkVmHost::Risc0 => self.prove_risc0(input),
+            ProofZkVmHost::Native => {
+                let host = hosts::native::get_host((*task_id.id()).into());
+                <Self::Prover as ZkVmProver>::prove(&input, &host)
+            }
+            ProofZkVmHost::SP1 => {
+                #[cfg(feature = "sp1")]
+                {
+                    let host = hosts::sp1::get_host((*task_id.id()).into());
+                    <Self::Prover as ZkVmProver>::prove(&input, host)
+                }
+                #[cfg(not(feature = "sp1"))]
+                {
+                    panic!("The `sp1` feature is not enabled. Enable the feature to use SP1 functionality.");
+                }
+            }
+            ProofZkVmHost::Risc0 => {
+                #[cfg(feature = "risc0")]
+                {
+                    let host = hosts::risc0::get_host((*task_id.id()).into());
+                    <Self::Prover as ZkVmProver>::prove(&input, host)
+                }
+                #[cfg(not(feature = "risc0"))]
+                {
+                    panic!("The `risc0` feature is not enabled. Enable the feature to use Risc0 functionality.");
+                }
+            }
         };
 
         let proof = proof_res.map_err(ProvingTaskError::ZkVmError)?;
