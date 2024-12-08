@@ -71,7 +71,10 @@ impl ProvingOp for ClAggHandler {
             batch.push(proof);
         }
 
-        let cl_stf_vk = hosts::get_host(ProofVm::CLProving).get_verification_key();
+        let cl_stf_vk = hosts::get_verification_key(&ProofKey::new(
+            ProofId::ClStf(*start_height),
+            *task_id.host(),
+        ));
         Ok(ClAggInput { batch, cl_stf_vk })
     }
 }

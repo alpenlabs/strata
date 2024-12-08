@@ -78,12 +78,15 @@ pub async fn make_proof(
         task_tracker.update_status(task, ProvingTaskStatus::ProvingInProgress)?;
     }
 
-    let _ = handler.prove(&task, &db).await;
-    // TODO: handle different errors for different failure condition
+    let res = handler.prove(&task, &db).await;
 
     {
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.update_status(task, ProvingTaskStatus::Completed)?;
+        match res {
+            Ok(_) => task_tracker.update_status(task, ProvingTaskStatus::Completed)?,
+            // TODO: handle different errors for different failure condition
+            Err(_) => task_tracker.update_status(task, ProvingTaskStatus::Failed)?,
+        }
     }
 
     Ok(())
