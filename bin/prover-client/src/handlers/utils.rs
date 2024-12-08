@@ -1,68 +1,11 @@
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use bitcoin::{
-    secp256k1::{SecretKey, SECP256K1},
-    Block,
-};
+use musig2::secp256k1::{SecretKey, SECP256K1};
 use rand::{rngs::StdRng, SeedableRng};
-use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::{
     block_credential,
     operator::OperatorPubkeys,
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     proof::RollupVerifyingKey,
 };
-use tracing::debug;
-use uuid::Uuid;
-
-use super::ops::ProvingOperations;
-use crate::{
-    errors::{ProvingTaskError, ProvingTaskType},
-    primitives::prover_input::ZkVmInput,
-    task::TaskTracker,
-};
-
-/// Operations required for BTC block proving tasks.
-#[derive(Debug, Clone)]
-pub struct BtcOperations {
-    btc_client: Arc<BitcoinClient>,
-}
-
-impl BtcOperations {
-    /// Creates a new BTC operations instance.
-    pub fn new(btc_client: Arc<BitcoinClient>) -> Self {
-        Self { btc_client }
-    }
-}
-
-#[async_trait]
-impl ProvingOperations for BtcOperations {
-    type Input = (Block, RollupParams);
-    type Params = u64; // params is the block height
-
-    fn proving_task_type(&self) -> ProvingTaskType {
-        ProvingTaskType::Btc
-    }
-
-    async fn fetch_input(&self, block_num: Self::Params) -> Result<Self::Input, anyhow::Error> {
-        debug!(%block_num, "Fetching BTC block input");
-        let block = self.btc_client.get_block_at(block_num).await?;
-        debug!("Fetched BTC block {}", block_num);
-        Ok((block, get_pm_rollup_params()))
-    }
-
-    async fn append_task(
-        &self,
-        task_tracker: Arc<TaskTracker>,
-        input: Self::Input,
-    ) -> Result<Uuid, ProvingTaskError> {
-        let (block, rollup_params) = input;
-        let prover_input = ZkVmInput::BtcBlock(block, rollup_params);
-        let task_id = task_tracker.create_task(prover_input, vec![]).await;
-        Ok(task_id)
-    }
-}
 
 // TODO: Move from manual param generation to importing params from the file
 pub fn get_pm_rollup_params() -> RollupParams {

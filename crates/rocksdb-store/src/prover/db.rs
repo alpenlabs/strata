@@ -6,12 +6,13 @@ use strata_db::{
     traits::{ProofDatabase, ProverDatabase},
     DbResult,
 };
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofId, ProofKey};
 use strata_zkvm::ProofReceipt;
 
-use super::schemas::ProofSchema;
+use super::schemas::{ProofDepsSchema, ProofSchema};
 use crate::DbOpsConfig;
 
+#[derive(Debug, Clone)]
 pub struct ProofDb {
     db: Arc<OptimisticTransactionDB>,
     ops: DbOpsConfig,
@@ -54,8 +55,40 @@ impl ProofDatabase for ProofDb {
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
+
+    fn put_proof_deps(&self, proof_id: ProofId, deps: Vec<ProofId>) -> DbResult<()> {
+        self.db
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
+                if tx.get::<ProofDepsSchema>(&proof_id)?.is_some() {
+                    return Err(DbError::EntryAlreadyExists);
+                }
+
+                tx.put::<ProofDepsSchema>(&proof_id, &deps)?;
+
+                Ok(())
+            })
+            .map_err(|e| DbError::TransactionError(e.to_string()))
+    }
+
+    fn get_proof_deps(&self, proof_id: ProofId) -> DbResult<Option<Vec<ProofId>>> {
+        Ok(self.db.get::<ProofDepsSchema>(&proof_id)?)
+    }
+
+    fn del_proof_deps(&self, proof_id: ProofId) -> DbResult<bool> {
+        self.db
+            .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
+                if tx.get::<ProofDepsSchema>(&proof_id)?.is_none() {
+                    return Ok(false);
+                }
+                tx.delete::<ProofDepsSchema>(&proof_id)?;
+
+                Ok::<_, anyhow::Error>(true)
+            })
+            .map_err(|e| DbError::TransactionError(e.to_string()))
+    }
 }
 
+#[derive(Debug, Clone)]
 pub struct ProverDB {
     db: Arc<ProofDb>,
 }
@@ -76,6 +109,8 @@ impl ProverDatabase for ProverDB {
 
 #[cfg(test)]
 mod tests {
+    use strata_primitives::proof::{ProofId, ProofZkVmHost};
+    use strata_state::l1::L1BlockId;
     use strata_zkvm::{Proof, PublicValues};
 
     use super::*;
@@ -87,7 +122,9 @@ mod tests {
     }
 
     fn generate_proof() -> (ProofKey, ProofReceipt) {
-        let proof_key = ProofKey::BtcBlockspace(1);
+        let proof_id = ProofId::BtcBlockspace(L1BlockId::default());
+        let host = ProofZkVmHost::Native;
+        let proof_key = ProofKey::new(proof_id, host);
         let proof = Proof::default();
         let public_values = PublicValues::default();
         let proof_receipt = ProofReceipt::new(proof, public_values);
