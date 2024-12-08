@@ -25,29 +25,37 @@ impl ClAggHandler {
 
 impl ProvingOp for ClAggHandler {
     type Prover = ClAggProver;
+    type Params = (u64, u64);
 
-    async fn create_dep_tasks(
+    async fn fetch_proof_ids(
         &self,
+        params: (u64, u64),
         task_tracker: Arc<Mutex<TaskTracker>>,
-        proof_id: ProofId,
+        db: &ProofDb,
         hosts: &[ProofZkVmHost],
-    ) -> Result<Vec<ProofId>, ProvingTaskError> {
-        let (start_height, end_height) = match proof_id {
-            ProofId::ClAgg(start, end) => (start, end),
-            _ => return Err(ProvingTaskError::InvalidInput("ClAgg".to_string())),
-        };
+    ) -> Result<(ProofId, Vec<ProofId>), ProvingTaskError> {
+        let (start_height, end_height) = params;
 
         let len = (end_height - start_height) as usize + 1;
-        let mut deps = Vec::with_capacity(len);
+        let mut cl_stf_deps = Vec::with_capacity(len);
+
+        let start_blkid = self.cl_stf_handler.get_id(start_height).await?;
+        let end_blkid = self.cl_stf_handler.get_id(end_height).await?;
+        let cl_agg_proof_id = ProofId::ClAgg(start_blkid, end_blkid);
+
         for height in start_height..=end_height {
-            let proof_id = ProofId::ClStf(height);
+            let blkid = self.cl_stf_handler.get_id(height).await?;
+            let proof_id = ProofId::ClStf(blkid);
             self.cl_stf_handler
-                .create_task(task_tracker.clone(), proof_id, hosts)
+                .create_task(height, task_tracker.clone(), db, hosts)
                 .await?;
-            deps.push(proof_id);
+            cl_stf_deps.push(proof_id);
         }
 
-        Ok(deps)
+        db.put_proof_deps(cl_agg_proof_id, cl_stf_deps.clone())
+            .map_err(ProvingTaskError::DatabaseError)?;
+
+        Ok((cl_agg_proof_id, cl_stf_deps))
     }
 
     async fn fetch_input(
@@ -55,15 +63,19 @@ impl ProvingOp for ClAggHandler {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<ClAggInput, ProvingTaskError> {
-        let (start_height, end_height) = match task_id.id() {
+        let (start_blkid, _) = match task_id.id() {
             ProofId::ClAgg(start, end) => (start, end),
             _ => return Err(ProvingTaskError::InvalidInput("ClAgg".to_string())),
         };
 
+        let deps = db
+            .get_proof_deps(*task_id.id())
+            .map_err(ProvingTaskError::DatabaseError)?
+            .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
+
         let mut batch = Vec::new();
-        for height in *start_height..=*end_height {
-            let id = ProofId::ClStf(height);
-            let proof_key = ProofKey::new(id, *task_id.host());
+        for proof_id in deps {
+            let proof_key = ProofKey::new(proof_id, *task_id.host());
             let proof = db
                 .get_proof(proof_key)
                 .map_err(ProvingTaskError::DatabaseError)?
@@ -72,7 +84,7 @@ impl ProvingOp for ClAggHandler {
         }
 
         let cl_stf_vk = hosts::get_verification_key(&ProofKey::new(
-            ProofId::ClStf(*start_height),
+            ProofId::ClStf(*start_blkid),
             *task_id.host(),
         ));
         Ok(ClAggInput { batch, cl_stf_vk })

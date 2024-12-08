@@ -50,31 +50,37 @@ impl CheckpointHandler {
 
 impl ProvingOp for CheckpointHandler {
     type Prover = CheckpointProver;
+    type Params = u64;
 
-    async fn create_dep_tasks(
+    async fn fetch_proof_ids(
         &self,
+        ckp_idx: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        proof_id: ProofId,
+        db: &ProofDb,
         hosts: &[ProofZkVmHost],
-    ) -> Result<Vec<ProofId>, ProvingTaskError> {
-        let ckp_idx = match proof_id {
-            ProofId::Checkpoint(idx) => idx,
-            _ => return Err(ProvingTaskError::InvalidInput("Checkpoint".to_string())),
-        };
-
+    ) -> Result<(ProofId, Vec<ProofId>), ProvingTaskError> {
         let checkpoint_info = self.fetch_info(ckp_idx).await?;
 
-        let l1_batch_id = ProofId::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
-        self.l1_batch_dispatcher
-            .create_task(task_tracker.clone(), l1_batch_id, hosts)
-            .await?;
+        let ckp_proof_id = ProofId::Checkpoint(ckp_idx);
 
-        let l2_batch_id = ProofId::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
-        self.l2_batch_dispatcher
-            .create_task(task_tracker.clone(), l2_batch_id, hosts)
+        let l1_batch_keys = self
+            .l1_batch_dispatcher
+            .create_task(checkpoint_info.l1_range, task_tracker.clone(), db, hosts)
             .await?;
+        let l1_batch_id = l1_batch_keys.first().expect("at least one").id();
 
-        Ok(vec![l1_batch_id, l2_batch_id])
+        let l2_batch_keys = self
+            .l2_batch_dispatcher
+            .create_task(checkpoint_info.l2_range, task_tracker.clone(), db, hosts)
+            .await?;
+        let l2_batch_id = l2_batch_keys.first().expect("at least one").id();
+
+        let deps = vec![*l1_batch_id, *l2_batch_id];
+
+        db.put_proof_deps(ckp_proof_id, deps.clone())
+            .map_err(ProvingTaskError::DatabaseError)?;
+
+        Ok((ckp_proof_id, deps))
     }
 
     async fn fetch_input(
@@ -82,14 +88,12 @@ impl ProvingOp for CheckpointHandler {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<CheckpointProverInput, ProvingTaskError> {
-        let ckp_idx = match task_id.id() {
-            ProofId::Checkpoint(idx) => idx,
-            _ => return Err(ProvingTaskError::InvalidInput("Checkpoint".to_string())),
-        };
+        let deps = db
+            .get_proof_deps(*task_id.id())
+            .map_err(ProvingTaskError::DatabaseError)?
+            .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
 
-        let checkpoint_info = self.fetch_info(*ckp_idx).await?;
-
-        let l1_batch_id = ProofId::L1Batch(checkpoint_info.l1_range.0, checkpoint_info.l1_range.1);
+        let l1_batch_id = deps[0];
         let l1_batch_key = ProofKey::new(l1_batch_id, *task_id.host());
         let l1_batch_proof = db
             .get_proof(l1_batch_key)
@@ -98,7 +102,7 @@ impl ProvingOp for CheckpointHandler {
         let l1_batch_vk = hosts::get_verification_key(&l1_batch_key);
         let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);
 
-        let cl_agg_id = ProofId::ClAgg(checkpoint_info.l2_range.0, checkpoint_info.l2_range.1);
+        let cl_agg_id = deps[1];
         let cl_agg_key = ProofKey::new(cl_agg_id, *task_id.host());
         let cl_agg_proof = db
             .get_proof(cl_agg_key)

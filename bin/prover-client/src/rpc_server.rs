@@ -5,13 +5,17 @@ use std::sync::Arc;
 use anyhow::Context;
 use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
-use strata_primitives::proof::ProofId;
+use strata_db::traits::ProverDatabase;
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
+use strata_rocksdb::prover::db::ProverDB;
 use strata_rpc_types::ProofKey;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
 
-use crate::{handlers::ProofHandler, task::TaskTracker};
+use crate::{
+    handlers::{ProofHandler, ProvingOp},
+    task::TaskTracker,
+};
 
 pub(crate) async fn start<T>(
     rpc_impl: &T,
@@ -56,51 +60,93 @@ where
 pub(crate) struct ProverClientRpc {
     task_tracker: Arc<Mutex<TaskTracker>>,
     handler: Arc<ProofHandler>,
+    db: ProverDB,
 }
 
 impl ProverClientRpc {
-    pub fn new(task_tracker: Arc<Mutex<TaskTracker>>, handler: Arc<ProofHandler>) -> Self {
+    pub fn new(
+        task_tracker: Arc<Mutex<TaskTracker>>,
+        handler: Arc<ProofHandler>,
+        db: ProverDB,
+    ) -> Self {
         Self {
             task_tracker,
             handler,
+            db,
         }
-    }
-
-    pub async fn create_task(&self, task: ProofId) -> RpcResult<Vec<ProofKey>> {
-        let tasks = self
-            .handler
-            .create_task(self.task_tracker.clone(), task)
-            .await
-            .expect("failed to add proving task");
-        RpcResult::Ok(tasks)
     }
 }
 
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
     async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<Vec<ProofKey>> {
-        let task = ProofId::BtcBlockspace(btc_block_num);
-        self.create_task(task).await
+        Ok(self
+            .handler
+            .btc_handler()
+            .create_task(
+                btc_block_num,
+                self.task_tracker.clone(),
+                self.db.proof_db(),
+                self.handler.vms(),
+            )
+            .await
+            .expect("failed to create task"))
     }
 
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>> {
-        let task = ProofId::BtcBlockspace(el_block_num);
-        self.create_task(task).await
+        Ok(self
+            .handler
+            .evm_ee_handler()
+            .create_task(
+                el_block_num,
+                self.task_tracker.clone(),
+                self.db.proof_db(),
+                self.handler.vms(),
+            )
+            .await
+            .expect("failed to create task"))
     }
 
     async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<Vec<ProofKey>> {
-        let task = ProofId::ClStf(cl_block_num);
-        self.create_task(task).await
+        Ok(self
+            .handler
+            .cl_stf_handler()
+            .create_task(
+                cl_block_num,
+                self.task_tracker.clone(),
+                self.db.proof_db(),
+                self.handler.vms(),
+            )
+            .await
+            .expect("failed to create task"))
     }
 
     async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
-        let task = ProofId::L1Batch(l1_range.0, l1_range.1);
-        self.create_task(task).await
+        Ok(self
+            .handler
+            .l1_batch_handler()
+            .create_task(
+                l1_range,
+                self.task_tracker.clone(),
+                self.db.proof_db(),
+                self.handler.vms(),
+            )
+            .await
+            .expect("failed to create task"))
     }
 
     async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
-        let task = ProofId::ClAgg(l2_range.0, l2_range.1);
-        self.create_task(task).await
+        Ok(self
+            .handler
+            .cl_agg_handler()
+            .create_task(
+                l2_range,
+                self.task_tracker.clone(),
+                self.db.proof_db(),
+                self.handler.vms(),
+            )
+            .await
+            .expect("failed to create task"))
     }
 
     async fn prove_latest_checkpoint(&self) -> RpcResult<Vec<ProofKey>> {

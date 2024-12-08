@@ -24,23 +24,26 @@ pub type ProvingTask = ProofKey;
 
 pub trait ProvingOp {
     type Prover: ZkVmProver;
+    type Params;
 
-    async fn create_dep_tasks(
+    async fn fetch_proof_ids(
         &self,
+        params: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        proof_id: ProofId,
+        db: &ProofDb,
         hosts: &[ProofZkVmHost],
-    ) -> Result<Vec<ProofId>, ProvingTaskError>;
+    ) -> Result<(ProofId, Vec<ProofId>), ProvingTaskError>;
 
     async fn create_task(
         &self,
+        params: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        proof_id: ProofId,
+        db: &ProofDb,
         hosts: &[ProofZkVmHost],
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         // Fetch dependencies for this task
-        let deps = self
-            .create_dep_tasks(task_tracker.clone(), proof_id, hosts)
+        let (proof_id, deps) = self
+            .fetch_proof_ids(params, task_tracker.clone(), db, hosts)
             .await?;
 
         let mut task_tracker = task_tracker.lock().await;

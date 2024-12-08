@@ -142,17 +142,30 @@ mod tests {
     use strata_test_utils::ArbitraryGenerator;
 
     use strata_primitives::proof::{ProofId, ProofZkVmHost};
+    use strata_state::l1::L1BlockId;
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
 
-    fn gen_l1_block_ids(n: usize) -> Vec<L1BlockId> {
-        let mut blkids = Vec::with_capacity(n);
+    // Helper function to generate test L1 block IDs
+    fn gen_task_with_deps(n: u64) -> (ProofKey, Vec<ProofKey>) {
+        let mut deps = Vec::with_capacity(n as usize);
+        let host = ProofZkVmHost::Native;
         let gen = ArbitraryGenerator::new();
+
+        let start: L1BlockId = gen.generate();
+        let end: L1BlockId = gen.generate();
         for _ in 0..n {
             let blkid: L1BlockId = gen.generate();
-            blkids.push(blkid);
+            let id = ProofId::BtcBlockspace(blkid);
+            let key = ProofKey::new(id, host);
+            deps.push(key);
         }
-        blkids
+
+        let id = ProofId::L1Batch(start, end);
+        let key = ProofKey::new(id, host);
+
+        (key, deps)
     }
 
     #[test]

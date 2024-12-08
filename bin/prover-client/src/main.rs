@@ -4,12 +4,17 @@ use std::sync::Arc;
 
 use args::Args;
 use config::NUM_PROVER_WORKERS;
+use db::open_rocksdb_database;
 use handlers::ProofHandler;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
 use rpc_server::ProverClientRpc;
 use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
+use strata_rocksdb::{
+    prover::db::{ProofDb, ProverDB},
+    DbOpsConfig,
+};
 use task::TaskTracker;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
@@ -53,6 +58,11 @@ async fn main() {
     let handler = Arc::new(ProofHandler::init(btc_client, el_client, cl_client));
     let task_tracker = Arc::new(Mutex::new(TaskTracker::new()));
 
+    let rbdb = open_rocksdb_database().unwrap();
+    let db_ops = DbOpsConfig { retry_count: 3 };
+    let db = ProofDb::new(rbdb, db_ops);
+    let db = ProverDB::new(Arc::new(db));
+
     let manager = ProverManager::new(task_tracker.clone(), handler.clone(), NUM_PROVER_WORKERS);
     debug!("Initialized Prover Manager");
 
@@ -64,19 +74,26 @@ async fn main() {
     if args.enable_dev_rpcs {
         // Run the rpc server on dev mode only
         let rpc_url = args.get_dev_rpc_url();
-        run_rpc_server(task_tracker, handler, rpc_url, args.enable_dev_rpcs)
-            .await
-            .expect("prover client rpc")
+        run_rpc_server(
+            task_tracker.clone(),
+            handler.clone(),
+            db.clone(),
+            rpc_url,
+            args.enable_dev_rpcs,
+        )
+        .await
+        .expect("prover client rpc")
     }
 }
 
 async fn run_rpc_server(
     task_tracker: Arc<Mutex<TaskTracker>>,
     handler: Arc<ProofHandler>,
+    db: ProverDB,
     rpc_url: String,
     enable_dev_rpc: bool,
 ) -> anyhow::Result<()> {
-    let rpc_impl = ProverClientRpc::new(task_tracker, handler);
+    let rpc_impl = ProverClientRpc::new(task_tracker, handler, db);
     rpc_server::start(&rpc_impl, rpc_url, enable_dev_rpc).await?;
     anyhow::Ok(())
 }
