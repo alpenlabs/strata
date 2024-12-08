@@ -86,7 +86,10 @@ impl ProvingOp for L1BatchHandler {
         .await
         .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
-        let blockspace_vk = hosts::get_host(ProofVm::BtcProving).get_verification_key();
+        let blockspace_vk = hosts::get_verification_key(&ProofKey::new(
+            ProofId::BtcBlockspace(*start_height),
+            *task_id.host(),
+        ));
 
         Ok(L1BatchProofInput {
             batch,
