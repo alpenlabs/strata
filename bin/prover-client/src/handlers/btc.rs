@@ -4,6 +4,7 @@ use strata_btcio::rpc::{traits::Reader, BitcoinClient};
 use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProofDb;
+use strata_state::l1::L1BlockId;
 use tokio::sync::Mutex;
 
 use super::{utils::get_pm_rollup_params, ProvingOp};
@@ -20,18 +21,32 @@ impl BtcBlockspaceHandler {
     pub fn new(btc_client: Arc<BitcoinClient>) -> Self {
         Self { btc_client }
     }
+
+    pub async fn get_id(&self, block_num: u64) -> Result<L1BlockId, ProvingTaskError> {
+        Ok(self
+            .btc_client
+            .get_block_hash(block_num)
+            .await
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
+            .into())
+    }
 }
 
 impl ProvingOp for BtcBlockspaceHandler {
     type Prover = BtcBlockspaceProver;
+    type Params = u64;
 
-    async fn create_dep_tasks(
+    async fn fetch_proof_ids(
         &self,
+        block_num: u64,
         _task_tracker: Arc<Mutex<TaskTracker>>,
-        _proof_id: ProofId,
+        _db: &ProofDb,
         _hosts: &[ProofZkVmHost],
-    ) -> Result<Vec<ProofId>, ProvingTaskError> {
-        Ok(vec![])
+    ) -> Result<(ProofId, Vec<ProofId>), ProvingTaskError> {
+        Ok((
+            ProofId::BtcBlockspace(self.get_id(block_num).await?),
+            vec![],
+        ))
     }
 
     async fn fetch_input(
@@ -39,12 +54,12 @@ impl ProvingOp for BtcBlockspaceHandler {
         task_id: &ProofKey,
         _db: &ProofDb,
     ) -> Result<BlockspaceProofInput, ProvingTaskError> {
-        let height = match task_id.id() {
-            ProofId::BtcBlockspace(id) => id,
+        let blkid = match task_id.id() {
+            ProofId::BtcBlockspace(id) => *id,
             _ => return Err(ProvingTaskError::InvalidInput("BtcBlockspace".to_string())),
         };
 
-        let block = self.btc_client.get_block_at(*height).await.unwrap();
+        let block = self.btc_client.get_block(&blkid.into()).await.unwrap();
 
         Ok(BlockspaceProofInput {
             rollup_params: get_pm_rollup_params(),

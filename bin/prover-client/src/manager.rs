@@ -13,6 +13,7 @@ use crate::{
     handlers::ProofHandler, status::ProvingTaskStatus, task::TaskTracker,
 };
 
+#[derive(Debug, Clone)]
 pub struct ProverManager {
     task_tracker: Arc<Mutex<TaskTracker>>,
     handler: Arc<ProofHandler>,

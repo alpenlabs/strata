@@ -5,13 +5,12 @@ use strata_btcio::rpc::BitcoinClient;
 use strata_primitives::proof::{ProofId, ProofZkVmHost};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
-use tokio::sync::Mutex;
 
 use super::{
     btc::BtcBlockspaceHandler, checkpoint::CheckpointHandler, cl_agg::ClAggHandler,
     cl_stf::ClStfHandler, evm_ee::EvmEeHandler, l1_batch::L1BatchHandler, ProvingOp,
 };
-use crate::{errors::ProvingTaskError, task::TaskTracker};
+use crate::errors::ProvingTaskError;
 
 #[derive(Debug, Clone)]
 pub struct ProofHandler {
@@ -91,61 +90,42 @@ impl ProofHandler {
         )
     }
 
-    pub async fn prove(
-        &self,
-        proof_key: &ProofKey,
-        task_tracker: &ProofDb,
-    ) -> Result<(), ProvingTaskError> {
+    pub async fn prove(&self, proof_key: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
         match proof_key.id() {
-            ProofId::BtcBlockspace(_) => {
-                self.btc_blockspace_handler
-                    .prove(proof_key, task_tracker)
-                    .await
-            }
-            ProofId::L1Batch(_, _) => self.l1_batch_handler.prove(proof_key, task_tracker).await,
-            ProofId::EvmEeStf(_) => self.evm_ee_handler.prove(proof_key, task_tracker).await,
-            ProofId::ClStf(_) => self.cl_stf_handler.prove(proof_key, task_tracker).await,
-            ProofId::ClAgg(_, _) => self.cl_agg_handler.prove(proof_key, task_tracker).await,
-            ProofId::Checkpoint(_) => self.checkpoint_handler.prove(proof_key, task_tracker).await,
+            ProofId::BtcBlockspace(_) => self.btc_blockspace_handler.prove(proof_key, db).await,
+            ProofId::L1Batch(_, _) => self.l1_batch_handler.prove(proof_key, db).await,
+            ProofId::EvmEeStf(_) => self.evm_ee_handler.prove(proof_key, db).await,
+            ProofId::ClStf(_) => self.cl_stf_handler.prove(proof_key, db).await,
+            ProofId::ClAgg(_, _) => self.cl_agg_handler.prove(proof_key, db).await,
+            ProofId::Checkpoint(_) => self.checkpoint_handler.prove(proof_key, db).await,
         }
     }
 
-    pub async fn create_task(
-        &self,
-        task_tracker: Arc<Mutex<TaskTracker>>,
-        proof_id: ProofId,
-    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        match proof_id {
-            ProofId::BtcBlockspace(_) => {
-                self.btc_blockspace_handler
-                    .create_task(task_tracker, proof_id, &self.vms)
-                    .await
-            }
-            ProofId::L1Batch(_, _) => {
-                self.l1_batch_handler
-                    .create_task(task_tracker, proof_id, &self.vms)
-                    .await
-            }
-            ProofId::EvmEeStf(_) => {
-                self.evm_ee_handler
-                    .create_task(task_tracker, proof_id, &self.vms)
-                    .await
-            }
-            ProofId::ClStf(_) => {
-                self.cl_stf_handler
-                    .create_task(task_tracker, proof_id, &self.vms)
-                    .await
-            }
-            ProofId::ClAgg(_, _) => {
-                self.cl_agg_handler
-                    .create_task(task_tracker, proof_id, &self.vms)
-                    .await
-            }
-            ProofId::Checkpoint(_) => {
-                self.checkpoint_handler
-                    .create_task(task_tracker, proof_id, &self.vms)
-                    .await
-            }
-        }
+    pub fn btc_handler(&self) -> &BtcBlockspaceHandler {
+        &self.btc_blockspace_handler
+    }
+
+    pub fn l1_batch_handler(&self) -> &L1BatchHandler {
+        &self.l1_batch_handler
+    }
+
+    pub fn evm_ee_handler(&self) -> &EvmEeHandler {
+        &self.evm_ee_handler
+    }
+
+    pub fn cl_stf_handler(&self) -> &ClStfHandler {
+        &self.cl_stf_handler
+    }
+
+    pub fn cl_agg_handler(&self) -> &ClAggHandler {
+        &self.cl_agg_handler
+    }
+
+    pub fn checkpoint_handler(&self) -> &CheckpointHandler {
+        &self.checkpoint_handler
+    }
+
+    pub fn vms(&self) -> &[ProofZkVmHost] {
+        &self.vms
     }
 }

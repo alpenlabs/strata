@@ -67,6 +67,8 @@ impl ProvingTaskStatus {
 mod tests {
     use strata_state::l1::L1BlockId;
     use strata_test_utils::ArbitraryGenerator;
+    use strata_state::l1::L1BlockId;
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
 
