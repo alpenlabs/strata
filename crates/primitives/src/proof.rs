@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-use crate::buf::Buf32;
+use crate::{buf::Buf32, l1::L1BlockId, l2::L2BlockId};
 
 /// Represents the verifying key used for verifying ZK proofs in a rollup context.
 ///
@@ -39,23 +39,23 @@ pub enum RollupVerifyingKey {
 )]
 pub enum ProofId {
     /// Identifier for the L1 block height used in a Bitcoin blockspace proof.
-    BtcBlockspace(u64),
+    BtcBlockspace(L1BlockId),
 
     /// Identifier for a batch of L1 blocks being proven.
     /// Includes the starting and ending block heights.
-    L1Batch(u64, u64),
+    L1Batch(L1BlockId, L1BlockId),
 
     /// Identifier for the height of an EVM Execution Environment (EE) block
     /// used in generating the State Transition Function (STF) proof.
-    EvmEeStf(u64),
+    EvmEeStf(Buf32),
 
     /// Identifier for the height of a Consensus Layer (CL) block
     /// used in generating the State Transition Function (STF) proof.
-    ClStf(u64),
+    ClStf(L2BlockId),
 
     /// Identifier for a batch of Consensus Layer (CL) blocks being proven.
     /// Includes the starting and ending block heights.
-    ClAgg(u64, u64),
+    ClAgg(L2BlockId, L2BlockId),
 
     /// Identifier for a specific checkpoint being proven.
     Checkpoint(u64),
