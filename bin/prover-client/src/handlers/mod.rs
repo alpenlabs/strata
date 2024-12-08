@@ -4,6 +4,7 @@ use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmProver;
+use strata_zkvm::ZkVmProver;
 use tokio::sync::Mutex;
 
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
@@ -66,22 +67,39 @@ pub trait ProvingOp {
         db: &ProofDb,
     ) -> Result<<Self::Prover as ZkVmProver>::Input, ProvingTaskError>;
 
-    async fn prove(
-        &self,
-        task_id: &ProofKey,
-        task_tracker: &ProofDb,
-    ) -> Result<(), ProvingTaskError> {
-        let input = self.fetch_input(task_id, task_tracker).await?;
+    async fn prove(&self, task_id: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
+        let input = self.fetch_input(task_id, db).await?;
 
-        #[cfg(feature = "sp1")]
-        {
-            let host = hosts::sp1::get_host((*task_id).into());
-            let proof = <Self::Prover as ZkVmProver>::prove(&input, host)
-                .map_err(ProvingTaskError::ZkVmError)?;
-            task_tracker
-                .put_proof(*task_id, proof)
-                .map_err(ProvingTaskError::DatabaseError)?;
-        }
+        let proof_res = match task_id.host() {
+            ProofZkVmHost::Native => {
+                let host = hosts::native::get_host((*task_id.id()).into());
+                <Self::Prover as ZkVmProver>::prove(&input, &host)
+            }
+            ProofZkVmHost::SP1 => {
+                #[cfg(feature = "sp1")]
+                {
+                    let host = hosts::sp1::get_host((*task_id.id()).into());
+                    <Self::Prover as ZkVmProver>::prove(&input, host)
+                }
+                #[cfg(not(feature = "sp1"))]
+                {
+                    panic!("The `sp1` feature is not enabled. Enable the feature to use SP1 functionality.");
+                }
+            }
+            ProofZkVmHost::Risc0 => {
+                #[cfg(feature = "risc0")]
+                {
+                    let host = hosts::risc0::get_host((*task_id.id()).into());
+                    <Self::Prover as ZkVmProver>::prove(&input, host)
+                }
+                #[cfg(not(feature = "risc0"))]
+                {
+                    panic!("The `risc0` feature is not enabled. Enable the feature to use Risc0 functionality.");
+                }
+            }
+        };
+
+        let proof = proof_res.map_err(ProvingTaskError::ZkVmError)?;
 
         // TODO: add support for other ZkVmHost as well
         // Requires making changes to the ProofKey to include Host as well
