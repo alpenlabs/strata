@@ -8,7 +8,7 @@ pub fn get_verification_key(key: &ProofKey) -> VerificationKey {
         ProofZkVmHost::SP1 => {
             #[cfg(feature = "sp1")]
             {
-                sp1::get_host((*key.id()).into()).get_verification_key()
+                sp1::get_host(key.id()).get_verification_key()
             }
             #[cfg(not(feature = "sp1"))]
             {
@@ -18,13 +18,13 @@ pub fn get_verification_key(key: &ProofKey) -> VerificationKey {
         ProofZkVmHost::Risc0 => {
             #[cfg(feature = "risc0")]
             {
-                risc0::get_host((*key.id()).into()).get_verification_key()
+                risc0::get_host(key.id()).get_verification_key()
             }
             #[cfg(not(feature = "risc0"))]
             {
                 panic!("The `risc0` feature is not enabled. Enable the feature to use Risc0 functionality.");
             }
         }
-        ProofZkVmHost::Native => native::get_host((*key.id()).into()).get_verification_key(),
+        ProofZkVmHost::Native => native::get_host(key.id()).get_verification_key(),
     }
 }

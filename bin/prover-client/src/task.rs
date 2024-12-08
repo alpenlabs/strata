@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use strata_primitives::proof::ProofKey;
 
-use crate::{errors::ProvingTaskError, primitives::status::ProvingTaskStatus};
+use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 
 /// Manages tasks and their states for proving operations.
 #[derive(Debug, Clone)]
