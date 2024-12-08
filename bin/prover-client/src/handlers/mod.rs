@@ -72,13 +72,13 @@ pub trait ProvingOp {
 
         let proof_res = match task_id.host() {
             ProofZkVmHost::Native => {
-                let host = hosts::native::get_host((*task_id.id()).into());
+                let host = hosts::native::get_host(task_id.id());
                 <Self::Prover as ZkVmProver>::prove(&input, &host)
             }
             ProofZkVmHost::SP1 => {
                 #[cfg(feature = "sp1")]
                 {
-                    let host = hosts::sp1::get_host((*task_id.id()).into());
+                    let host = hosts::sp1::get_host(task_id.id());
                     <Self::Prover as ZkVmProver>::prove(&input, host)
                 }
                 #[cfg(not(feature = "sp1"))]
@@ -89,7 +89,7 @@ pub trait ProvingOp {
             ProofZkVmHost::Risc0 => {
                 #[cfg(feature = "risc0")]
                 {
-                    let host = hosts::risc0::get_host((*task_id.id()).into());
+                    let host = hosts::risc0::get_host(task_id.id());
                     <Self::Prover as ZkVmProver>::prove(&input, host)
                 }
                 #[cfg(not(feature = "risc0"))]

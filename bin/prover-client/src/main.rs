@@ -21,8 +21,8 @@ mod errors;
 mod handlers;
 mod hosts;
 mod manager;
-mod primitives;
 mod rpc_server;
+mod status;
 mod task;
 
 #[tokio::main]

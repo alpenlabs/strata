@@ -3,7 +3,7 @@ use strata_primitives::proof::ProofKey;
 use strata_zkvm::ZkVmError;
 use thiserror::Error;
 
-use crate::primitives::status::ProvingTaskStatus;
+use crate::status::ProvingTaskStatus;
 
 // Define custom error type
 #[derive(Error, Debug)]
