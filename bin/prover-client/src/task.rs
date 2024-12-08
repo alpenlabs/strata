@@ -140,6 +140,8 @@ impl TaskTracker {
 mod tests {
 
     use strata_primitives::proof::{ProofId, ProofZkVmHost};
+    use strata_state::l1::L1BlockId;
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
 
@@ -147,13 +149,18 @@ mod tests {
     fn gen_task_with_deps(n: u64) -> (ProofKey, Vec<ProofKey>) {
         let mut deps = Vec::with_capacity(n as usize);
         let host = ProofZkVmHost::Native;
-        for i in 0..n {
-            let id = ProofId::BtcBlockspace(i);
+        let gen = ArbitraryGenerator::new();
+
+        let start: L1BlockId = gen.generate();
+        let end: L1BlockId = gen.generate();
+        for _ in 0..n {
+            let blkid: L1BlockId = gen.generate();
+            let id = ProofId::BtcBlockspace(blkid);
             let key = ProofKey::new(id, host);
             deps.push(key);
         }
 
-        let id = ProofId::L1Batch(1, n);
+        let id = ProofId::L1Batch(start, end);
         let key = ProofKey::new(id, host);
 
         (key, deps)
