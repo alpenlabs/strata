@@ -29,7 +29,7 @@ pub const HASH_SIZE: usize = 32;
 ///
 /// But this is fine; we only need a generator with no efficiently-computable discrete logarithm
 /// relation against the standard generator.
-pub const UNSPENDABLE_PUBLIC_KEY_INPUT: &'static [u8; 18] = b"Strata unspendable";
+pub const UNSPENDABLE_PUBLIC_KEY_INPUT: &[u8] = b"Strata unspendable";
 pub static UNSPENDABLE_PUBLIC_KEY: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
     XOnlyPublicKey::from_slice(sha256::Hash::hash(UNSPENDABLE_PUBLIC_KEY_INPUT).as_byte_array())
         .expect("valid xonly public key")
