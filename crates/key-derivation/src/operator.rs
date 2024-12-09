@@ -51,7 +51,7 @@ impl OperatorKeys {
     pub fn new(master: &Xpriv) -> Result<Self, KeyError> {
         let message_path = message_path();
         let wallet_path = wallet_path();
-        let message_xpriv = master.derive_priv(SECP256K1, &message_path)?;
+        let message_xpriv = master.derive_priv(SECP256K1, &message_path?)?;
         let wallet_xpriv = master.derive_priv(SECP256K1, &wallet_path)?;
 
         Ok(Self {
@@ -219,8 +219,8 @@ pub struct OperatorPubKeys {
 impl OperatorPubKeys {
     /// Creates a new [`OperatorPubKeys`] from a master [`Xpub`].
     pub fn new(master: &Xpub) -> Result<Self, KeyError> {
-        let message_path = message_path();
-        let wallet_path = wallet_path();
+        let message_path = ChildNumber::from_normal_idx(MESSAGE_IDX)?;
+        let wallet_path = ChildNumber::from_normal_idx(WALLET_IDX)?;
 
         let message_xpub = master.derive_pub(SECP256K1, &message_path)?;
         let wallet_xpub = master.derive_pub(SECP256K1, &wallet_path)?;
@@ -249,12 +249,12 @@ impl OperatorPubKeys {
 }
 
 /// [`DerivationPath`] for the operator's message signing key.
-fn message_path() -> DerivationPath {
-    DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
-        ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
-        ChildNumber::from_normal_idx(MESSAGE_IDX).unwrap(),
-    ])
+fn message_path() -> Result<DerivationPath, KeyError> {
+    Ok(DerivationPath::master().extend([
+        ChildNumber::from_hardened_idx(BASE_IDX)?,
+        ChildNumber::from_hardened_idx(OPERATOR_IDX)?,
+        ChildNumber::from_normal_idx(MESSAGE_IDX)?,
+    ]))
 }
 
 /// [`DerivationPath`] for the operator's wallet key.
