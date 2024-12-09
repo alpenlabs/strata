@@ -5,7 +5,11 @@ use std::sync::Arc;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
-use strata_primitives::{l1::*, prelude::*, proof::ProofKey};
+use strata_primitives::{
+    l1::*,
+    prelude::*,
+    proof::{ProofId, ProofKey},
+};
 use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
@@ -287,6 +291,22 @@ pub trait ProofDatabase {
     /// Tries to delete a proof by its key, returning if it really
     /// existed or not.  
     fn del_proof(&self, proof_id: ProofKey) -> DbResult<bool>;
+
+    /// Inserts dependencies for a given [`ProofId`] into the database.
+    ///
+    /// Returns `Ok(())` on success, or an error on failure.
+    fn put_proof_deps(&self, proof_id: ProofId, deps: Vec<ProofId>) -> DbResult<()>;
+
+    /// Retrieves proof dependencies by it's [`ProofId`].
+    ///
+    /// Returns `Some(dependencies)` if found, or `None` if not.
+    fn get_proof_deps(&self, proof_id: ProofId) -> DbResult<Option<Vec<ProofId>>>;
+
+    /// Deletes dependencies for a given proof ID.
+    ///
+    /// Tries to delete dependencies of by its ProofId, returning if it really
+    /// existed or not.  
+    fn del_proof_deps(&self, proof_id: ProofId) -> DbResult<bool>;
 }
 
 pub trait BroadcastDatabase {
