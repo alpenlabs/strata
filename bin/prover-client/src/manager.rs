@@ -1,23 +1,20 @@
 use std::{sync::Arc, time::Duration};
 
-use strata_db::traits::ProverDatabase;
 use strata_primitives::proof::ProofKey;
-use strata_rocksdb::{
-    prover::db::{ProofDb, ProverDB},
-    DbOpsConfig,
-};
+use strata_rocksdb::prover::db::ProofDb;
 use tokio::{sync::Mutex, time::sleep};
+use tracing::warn;
 
 use crate::{
-    config::PROVER_MANAGER_INTERVAL, db::open_rocksdb_database, errors::ProvingTaskError,
-    handlers::ProofHandler, status::ProvingTaskStatus, task::TaskTracker,
+    config::PROVER_MANAGER_INTERVAL, errors::ProvingTaskError, handlers::ProofHandler,
+    status::ProvingTaskStatus, task::TaskTracker,
 };
 
 #[derive(Debug, Clone)]
 pub struct ProverManager {
     task_tracker: Arc<Mutex<TaskTracker>>,
     handler: Arc<ProofHandler>,
-    db: ProverDB,
+    db: Arc<ProofDb>,
     workers: usize,
 }
 
@@ -25,15 +22,12 @@ impl ProverManager {
     pub fn new(
         task_tracker: Arc<Mutex<TaskTracker>>,
         handler: Arc<ProofHandler>,
+        db: Arc<ProofDb>,
         workers: usize,
     ) -> Self {
-        let rbdb = open_rocksdb_database().unwrap();
-        let db_ops = DbOpsConfig { retry_count: 3 };
-        let db = ProofDb::new(rbdb, db_ops);
-
         Self {
             task_tracker,
-            db: ProverDB::new(Arc::new(db)),
+            db,
             handler,
             workers,
         }
@@ -58,7 +52,7 @@ impl ProverManager {
                 }
 
                 let handler = self.handler.clone();
-                let db = self.db.proof_db().clone();
+                let db = self.db.clone();
                 let task_tracker = self.task_tracker.clone();
                 tokio::spawn(async move { make_proof(handler, task_tracker, task, db).await });
             }
@@ -86,7 +80,10 @@ pub async fn make_proof(
         match res {
             Ok(_) => task_tracker.update_status(task, ProvingTaskStatus::Completed)?,
             // TODO: handle different errors for different failure condition
-            Err(_) => task_tracker.update_status(task, ProvingTaskStatus::Failed)?,
+            Err(e) => {
+                warn!("error proving: {:?} {:?}", task, e);
+                task_tracker.update_status(task, ProvingTaskStatus::Failed)?
+            }
         }
     }
 
