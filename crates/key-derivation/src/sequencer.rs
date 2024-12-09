@@ -151,7 +151,7 @@ pub struct SequencerPubKeys {
 }
 
 impl SequencerPubKeys {
-    /// Creates a new [`OperatorPubKeys`] from a master [`Xpub`].
+    /// Creates a new [`SequencerPubKeys`] from a master [`Xpub`].
     pub fn new(master: &Xpub) -> Result<Self, KeyError> {
         let path = derived_path();
 
