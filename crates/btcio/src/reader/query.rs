@@ -5,8 +5,8 @@ use std::{
 };
 
 use anyhow::bail;
-use bitcoin::{hashes::Hash, BlockHash};
-use strata_primitives::buf::Buf32;
+use bitcoin::{hashes::Hash, Block, BlockHash};
+use strata_primitives::{buf::Buf32, l1::Epoch};
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
@@ -21,7 +21,10 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    reader::{config::ReaderConfig, state::ReaderState},
+    reader::{
+        config::ReaderConfig,
+        state::{EpochFilterConfig, ReaderState},
+    },
     rpc::traits::Reader,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -73,6 +76,8 @@ async fn do_reader_task<R: Reader>(
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
+        check_and_update_epoch_scan_rules_change(&ctx, &mut state).await?;
+
         if let Err(err) = poll_for_new_blocks(&ctx, &mut state, &mut status_updates)
             .instrument(poll_span)
             .await
@@ -103,6 +108,68 @@ async fn do_reader_task<R: Reader>(
 
         apply_status_updates(&status_updates, &ctx.status_channel).await;
     }
+}
+
+/// Checks for epoch and scan rule update. If so, rescan recent blocks to account for possibly
+/// missed relevant txs.
+async fn check_and_update_epoch_scan_rules_change<R: Reader>(
+    ctx: &ReaderContext<R>,
+    state: &mut ReaderState,
+) -> anyhow::Result<()> {
+    let latest_epoch = ctx.status_channel.epoch().unwrap_or(0);
+    // TODO: check if latest_epoch < current epoch. should panic if so?
+    let curr_epoch = match state.epoch() {
+        Epoch::Exact(e) => *e,
+        Epoch::AtTransition(_from, to) => *to,
+    };
+    let is_new_epoch = curr_epoch == latest_epoch;
+    let curr_filter_config = match state.filter_config() {
+        EpochFilterConfig::AtEpoch(c) => c.clone(),
+        EpochFilterConfig::AtTransition(_, c) => c.clone(),
+    };
+    if is_new_epoch {
+        // TODO: pass in chainstate to `derive_from`
+        let new_config = TxFilterConfig::derive_from(ctx.config.params.rollup())?;
+
+        // If filter rule has changed, first revert recent scanned blocks and rescan them with new
+        // rule
+        if new_config != curr_filter_config {
+            // Send L1 revert so that the recent txs can be appropriately re-filtered
+            let revert_ev =
+                L1Event::RevertTo(state.best_block_idx() - state.recent_blocks().len() as u64);
+            if ctx.event_tx.send(revert_ev).await.is_err() {
+                warn!("unable to submit L1 reorg event, did persistence task exit?");
+            }
+
+            state.set_filter_config(EpochFilterConfig::AtTransition(
+                curr_filter_config,
+                new_config,
+            ));
+            state.set_epoch(Epoch::AtTransition(curr_epoch, latest_epoch));
+
+            rescan_recent_blocks(ctx, state).await?;
+        } else {
+            state.set_filter_config(EpochFilterConfig::AtEpoch(curr_filter_config));
+            state.set_epoch(Epoch::Exact(curr_epoch));
+        }
+    }
+    // TODO: anything else?
+    Ok(())
+}
+
+async fn rescan_recent_blocks<R: Reader>(
+    ctx: &ReaderContext<R>,
+    state: &mut ReaderState,
+) -> anyhow::Result<()> {
+    let recent_len = state.recent_blocks().len() as u64;
+    let mut status_updates: Vec<L1StatusUpdate> = Vec::new(); // TODO: is this necessary
+    let recent = state.recent_blocks().to_vec();
+    for (i, blk_hash) in recent.iter().enumerate() {
+        let height = state.best_block_idx() - recent_len + i as u64;
+        let block = ctx.client.get_block(blk_hash).await?;
+        process_block(ctx, state, &mut status_updates, height, block).await?;
+    }
+    Ok(())
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
@@ -140,7 +207,16 @@ async fn init_reader_state<R: Reader>(
         real_cur_height = height;
     }
 
-    let state = ReaderState::new(real_cur_height + 1, lookback, init_queue);
+    let params = ctx.config.params.clone();
+    let filter_config = TxFilterConfig::derive_from(params.rollup())?;
+    let epoch = ctx.status_channel.epoch().unwrap_or(0);
+    let state = ReaderState::new(
+        real_cur_height + 1,
+        lookback,
+        init_queue,
+        EpochFilterConfig::AtEpoch(filter_config), // TODO: decide if it is transitional or exact
+        Epoch::Exact(epoch),                       // TODO: decide if it is transitional or exact
+    );
     Ok(state)
 }
 
@@ -229,11 +305,28 @@ async fn fetch_and_process_block<R: Reader>(
     status_updates: &mut Vec<L1StatusUpdate>,
 ) -> anyhow::Result<BlockHash> {
     let block = ctx.client.get_block_at(height).await?;
+    process_block(ctx, state, status_updates, height, block).await
+}
+
+async fn process_block<R: Reader>(
+    ctx: &ReaderContext<R>,
+    state: &mut ReaderState,
+    status_updates: &mut Vec<L1StatusUpdate>,
+    height: u64,
+    block: Block,
+) -> anyhow::Result<BlockHash> {
     let txs = block.txdata.len();
 
     let params = ctx.config.params.clone();
-    let filter_config = TxFilterConfig::derive_from(params.rollup())?;
-    let filtered_txs = filter_protocol_op_tx_refs(&block, filter_config);
+    let filtered_txs = match state.filter_config() {
+        EpochFilterConfig::AtEpoch(config) => filter_protocol_op_tx_refs(&block, config),
+        EpochFilterConfig::AtTransition(from_config, to_config) => {
+            let mut txs = filter_protocol_op_tx_refs(&block, from_config);
+            let txs1 = filter_protocol_op_tx_refs(&block, to_config);
+            txs.extend_from_slice(&txs1);
+            txs
+        }
+    };
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");
@@ -264,7 +357,12 @@ async fn fetch_and_process_block<R: Reader>(
         }
     }
 
-    if let Err(e) = ctx.event_tx.send(L1Event::BlockData(block_data)).await {
+    // TODO: probably need to send the current epoch as well
+    if let Err(e) = ctx
+        .event_tx
+        .send(L1Event::BlockData(block_data, state.epoch().clone()))
+        .await
+    {
         error!("failed to submit L1 block event, did the persistence task crash?");
         return Err(e.into());
     }
