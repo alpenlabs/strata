@@ -4,13 +4,21 @@ use std::{
 };
 
 use strata_db::traits::{ProverDatabase, ProverTaskDatabase};
+<<<<<<< HEAD
+=======
+use strata_primitives::proof::ProofKey;
+>>>>>>> 54493371 (prover client build fix)
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
+<<<<<<< HEAD
 use strata_sp1_adapter::SP1Host;
 use strata_sp1_guest_builder::*;
+=======
+use strata_state::l1::L1BlockId;
+>>>>>>> 54493371 (prover client build fix)
 use strata_zkvm::{Proof, ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
@@ -91,7 +99,7 @@ pub(crate) struct Prover {
     prover_state: Arc<RwLock<ProverState>>,
     db: ProverDB,
     pool: rayon::ThreadPool,
-    vm_manager: ZkVMManager<SP1Host>, // TODO: make this generic
+    vm_manager: ZkVMManager, // TODO: make this generic
 }
 
 fn make_proof<Vm>(zkvm_input: ZkVmInput, vm: &'static Vm) -> Result<ProofWithVkey, anyhow::Error>
