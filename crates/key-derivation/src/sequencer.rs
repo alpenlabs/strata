@@ -13,7 +13,7 @@ const BASE_IDX: u32 = 56;
 /// The Strata sequencer index.
 const SEQUENCER_IDX: u32 = 10;
 
-/// The Strata sequencer's master, and derived keys.
+/// The Strata sequencer's master, and derived _private_ keys.
 #[derive(Debug, Clone)]
 pub struct SequencerKeys {
     /// Sequencer's master [`Xpriv`].
@@ -26,10 +26,7 @@ pub struct SequencerKeys {
 impl SequencerKeys {
     /// Creates a new [`SequencerKeys`] from a master [`Xpriv`].
     pub fn new(master: &Xpriv) -> Result<Self, KeyError> {
-        let path = DerivationPath::master().extend([
-            ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(SEQUENCER_IDX).unwrap(),
-        ]);
+        let path = derived_path();
 
         let derived = master.derive_priv(SECP256K1, &path)?;
         Ok(Self {
@@ -143,6 +140,47 @@ impl Zeroize for SequencerKeys {
 
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for SequencerKeys {}
+
+/// Sequencer's master and derivation _public_ keys.
+#[derive(Debug, Clone)]
+pub struct SequencerPubKeys {
+    /// Sequencer's master [`Xpub`].
+    master: Xpub,
+    /// Sequencer's derived [`Xpub`].
+    derived: Xpub,
+}
+
+impl SequencerPubKeys {
+    /// Creates a new [`OperatorPubKeys`] from a master [`Xpub`].
+    pub fn new(master: &Xpub) -> Result<Self, KeyError> {
+        let path = derived_path();
+
+        let derived_xpub = master.derive_pub(SECP256K1, &path)?;
+
+        Ok(Self {
+            master: *master,
+            derived: derived_xpub,
+        })
+    }
+
+    /// Sequencer's master [`Xpub`].
+    pub fn master_xpub(&self) -> &Xpub {
+        &self.master
+    }
+
+    /// Sequencer's derived [`Xpub`].
+    pub fn message_xpub(&self) -> &Xpub {
+        &self.derived
+    }
+}
+
+/// The [`DerivationPath`] for the sequencer's derived key.
+fn derived_path() -> DerivationPath {
+    DerivationPath::master().extend([
+        ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(SEQUENCER_IDX).unwrap(),
+    ])
+}
 
 #[cfg(test)]
 mod tests {
