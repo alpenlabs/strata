@@ -4,14 +4,14 @@ use std::{
 };
 
 use strata_db::traits::{ProofDatabase, ProverDatabase};
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
 use strata_state::l1::L1BlockId;
-use strata_zkvm::{Proof, ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm::{ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -319,10 +319,11 @@ impl Prover {
 
     // TODO: fix this
     #[allow(dead_code)]
-    fn read_proof_from_db(&self, task_id: Uuid) -> Result<Proof, anyhow::Error> {
+    fn read_proof_from_db(&self, task_id: Uuid) -> Result<ProofReceipt, anyhow::Error> {
         // used an arbitrary proof id for now
         // TODO: to be replaced once we move from Uuid to ProofId based status
-        let proof_key = ProofKey::BtcBlockspace(L1BlockId::default());
+        let proof_context = ProofContext::BtcBlockspace(L1BlockId::default());
+        let proof_key = ProofKey::new(proof_context, ProofZkVm::Native);
         let proof_entry = self.db.proof_db().get_proof(proof_key)?;
         match proof_entry {
             Some(proof) => Ok(proof),

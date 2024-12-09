@@ -6,7 +6,7 @@ use strata_db::{
     traits::{ProofDatabase, ProverDatabase},
     DbResult,
 };
-use strata_primitives::proof::{ProofId, ProofKey};
+use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_zkvm::ProofReceipt;
 
 use super::schemas::{ProofDepsSchema, ProofSchema};
@@ -55,7 +55,7 @@ impl ProofDatabase for ProofDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn put_proof_deps(&self, proof_id: ProofId, deps: Vec<ProofId>) -> DbResult<()> {
+    fn put_proof_deps(&self, proof_id: ProofContext, deps: Vec<ProofContext>) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if tx.get::<ProofDepsSchema>(&proof_id)?.is_some() {
@@ -69,11 +69,11 @@ impl ProofDatabase for ProofDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_proof_deps(&self, proof_id: ProofId) -> DbResult<Option<Vec<ProofId>>> {
+    fn get_proof_deps(&self, proof_id: ProofContext) -> DbResult<Option<Vec<ProofContext>>> {
         Ok(self.db.get::<ProofDepsSchema>(&proof_id)?)
     }
 
-    fn del_proof_deps(&self, proof_id: ProofId) -> DbResult<bool> {
+    fn del_proof_deps(&self, proof_id: ProofContext) -> DbResult<bool> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
                 if tx.get::<ProofDepsSchema>(&proof_id)?.is_none() {
@@ -109,7 +109,7 @@ impl ProverDatabase for ProverDB {
 mod tests {
     use strata_primitives::{
         buf::Buf32,
-        proof::{ProofId, ProofZkVm},
+        proof::{ProofContext, ProofZkVm},
     };
     use strata_state::l1::L1BlockId;
     use strata_zkvm::{Proof, PublicValues};
@@ -123,22 +123,22 @@ mod tests {
     }
 
     fn generate_proof() -> (ProofKey, ProofReceipt) {
-        let proof_id = ProofId::BtcBlockspace(L1BlockId::default());
+        let proof_context = ProofContext::BtcBlockspace(L1BlockId::default());
         let host = ProofZkVm::Native;
-        let proof_key = ProofKey::new(proof_id, host);
+        let proof_key = ProofKey::new(proof_context, host);
         let proof = Proof::default();
         let public_values = PublicValues::default();
         let proof_receipt = ProofReceipt::new(proof, public_values);
         (proof_key, proof_receipt)
     }
 
-    fn generate_proof_id_with_deps() -> (ProofId, Vec<ProofId>) {
+    fn generate_proof_id_with_deps() -> (ProofContext, Vec<ProofContext>) {
         let l1_blkid_1: L1BlockId = Buf32::from([1u8; 32]).into();
         let l1_blkid_2: L1BlockId = Buf32::from([2u8; 32]).into();
-        let proof_id = ProofId::L1Batch(l1_blkid_1, l1_blkid_2);
+        let proof_id = ProofContext::L1Batch(l1_blkid_1, l1_blkid_2);
         let deps = vec![
-            ProofId::BtcBlockspace(l1_blkid_1),
-            ProofId::BtcBlockspace(l1_blkid_2),
+            ProofContext::BtcBlockspace(l1_blkid_1),
+            ProofContext::BtcBlockspace(l1_blkid_2),
         ];
         (proof_id, deps)
     }

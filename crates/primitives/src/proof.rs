@@ -20,7 +20,7 @@ pub enum RollupVerifyingKey {
     Risc0VerifyingKey(Buf32),
 }
 
-/// Represents a unique identifier for different types of proofs.
+/// Represents a context for different types of proofs.
 ///
 /// This enum categorizes proofs by their associated context, including the type of proof and its
 /// range or scope. Each variant includes relevant metadata required to distinguish and track the
@@ -37,7 +37,7 @@ pub enum RollupVerifyingKey {
     Serialize,
     Deserialize,
 )]
-pub enum ProofId {
+pub enum ProofContext {
     /// Identifier for the L1 block height used in a Bitcoin blockspace proof.
     BtcBlockspace(L1BlockId),
 
@@ -61,9 +61,9 @@ pub enum ProofId {
     Checkpoint(u64),
 }
 
-/// Represents the ZKVM host used for proof generation.
+/// Represents the ZkVm host used for proof generation.
 ///
-/// This enum identifies the ZKVM environment utilized to create a proof.
+/// This enum identifies the ZkVm environment utilized to create a proof.
 /// Available hosts:
 /// - `SP1`: SP1 ZKVM.
 /// - `Risc0`: Risc0 ZKVM.
@@ -88,8 +88,8 @@ pub enum ProofZkVm {
 
 /// Represents a unique key for identifying any type of proof.
 ///
-/// A `ProofKey` combines a `ProofId` (which specifies the type of proof and its scope)
-/// with a `ProofZkVmHost` (which specifies the ZKVM host used for proof generation).
+/// A `ProofKey` combines a `ProofContext` (which specifies the type of proof and its scope)
+/// with a `ProofZkVm` (which specifies the ZKVM host used for proof generation).
 #[derive(
     Debug,
     Clone,
@@ -104,18 +104,18 @@ pub enum ProofZkVm {
 )]
 pub struct ProofKey {
     /// The unique identifier for the proof type and its context.
-    id: ProofId,
+    context: ProofContext,
     /// The ZKVM host used for proof generation.
     host: ProofZkVm,
 }
 
 impl ProofKey {
-    pub fn new(id: ProofId, host: ProofZkVm) -> Self {
-        Self { id, host }
+    pub fn new(context: ProofContext, host: ProofZkVm) -> Self {
+        Self { context, host }
     }
 
-    pub fn id(&self) -> &ProofId {
-        &self.id
+    pub fn context(&self) -> &ProofContext {
+        &self.context
     }
 
     pub fn host(&self) -> &ProofZkVm {
