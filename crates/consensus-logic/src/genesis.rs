@@ -94,7 +94,7 @@ fn load_pre_genesis_l1_manifests(
             return Err(Error::MissingL1BlockHeight(height).into());
         };
 
-        manifests.push(mf);
+        manifests.push(mf.into_manifest());
     }
 
     Ok(manifests)
