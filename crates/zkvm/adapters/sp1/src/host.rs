@@ -89,10 +89,9 @@ impl ZkVmHost for SP1Host {
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
-        proof: &PublicValues,
+        public_values: &PublicValues,
     ) -> ZkVmResult<T> {
-        let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
-        let public_params: T = proof.public_values.read();
+        let public_params: T = bincode::deserialize(public_values.as_bytes())?;
         Ok(public_params)
     }
 
