@@ -10,9 +10,11 @@ Most tests depend upon `bitcoind` being available. The tests here execute
 this binary and then, perform various tests.
 
 ```bash
-# for MacOS
+# for macOS
 brew install bitcoin
 ```
+
+Note that in macOS, you may need to specifically add a firewall rule to allow incoming local `bitcoind` connections.
 
 ```bash
 # for Linux (x86_64)
@@ -35,7 +37,7 @@ bitcoind --version
 
 We use Poetry for managing the test dependencies.
 
-First, install the `poetry`:
+First, install `poetry`:
 
 ```bash
 # install via apt
@@ -48,20 +50,30 @@ pipx install poetry
 brew install poetry
 ```
 
-Check, that the `poetry` is installed:
+Check, that `poetry` is installed:
+
 ```bash
 poetry --version
 ```
 
-Finally, install all test dependencies by running:
+Finally, install all test dependencies (without installing the root package):
+
 ```bash
-poetry install
+poetry install --no-root
 ```
 
 ## Running tests
 
+You can run all tests:
+
 ```bash
 ./run_test.sh
+```
+
+Or, you can run a specific test:
+
+```bash
+./run_test.sh fn_bridge_deposit_happy
 ```
 
 ## Running prover tasks
