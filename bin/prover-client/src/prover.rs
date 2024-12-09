@@ -5,20 +5,26 @@ use std::{
 
 use strata_db::traits::{ProverDatabase, ProverTaskDatabase};
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 use strata_primitives::proof::ProofKey;
 >>>>>>> 54493371 (prover client build fix)
+=======
+>>>>>>> 3af5efbb (lint fix)
 use strata_proofimpl_evm_ee_stf::ELProofInput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
 <<<<<<< HEAD
+<<<<<<< HEAD
 use strata_sp1_adapter::SP1Host;
 use strata_sp1_guest_builder::*;
 =======
 use strata_state::l1::L1BlockId;
 >>>>>>> 54493371 (prover client build fix)
+=======
+>>>>>>> 3af5efbb (lint fix)
 use strata_zkvm::{Proof, ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;

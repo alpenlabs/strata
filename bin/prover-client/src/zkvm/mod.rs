@@ -3,8 +3,6 @@ use crate::primitives::vms::ProofVm;
 pub mod native;
 #[cfg(feature = "risc0")]
 pub mod risc0;
-#[cfg(feature = "risc0")]
-use strata_risc0_adapter::Risc0Host;
 #[cfg(feature = "sp1")]
 pub mod sp1;
 #[cfg(feature = "sp1")]
