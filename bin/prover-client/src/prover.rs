@@ -22,7 +22,6 @@ use crate::{
     },
     proving_ops::btc_ops::get_pm_rollup_params,
 };
-
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 enum ProvingTaskState {
