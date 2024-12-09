@@ -51,11 +51,13 @@ brew install poetry
 ```
 
 Check, that `poetry` is installed:
+
 ```bash
 poetry --version
 ```
 
-Finally, install all test dependencies by running:
+Finally, install all test dependencies (without installing the root package):
+
 ```bash
 poetry install --no-root
 ```
@@ -69,6 +71,7 @@ You can run all tests:
 ```
 
 Or, you can run a specific test:
+
 ```bash
 ./run_test.sh fn_bridge_deposit_happy
 ```
