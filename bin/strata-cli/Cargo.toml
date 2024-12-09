@@ -45,6 +45,7 @@ shrex = { version = "0.1.0", path = "../../crates/util/shrex", features = [
 ] }
 sled = "0.34.7"
 strata-bridge-tx-builder.workspace = true
+strata-primitives.workspace = true
 terrors.workspace = true
 tokio.workspace = true
 zeroize = { version = "1.8.1", features = ["derive"] }

@@ -12,11 +12,11 @@ use bitcoin::{
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
     bridge::TxSigningData,
+    constants::UNSPENDABLE_PUBLIC_KEY,
     l1::{BitcoinAddress, BitcoinPsbt, TaprootSpendPath},
 };
 
 use super::{
-    constants::UNSPENDABLE_INTERNAL_KEY,
     errors::{BridgeTxBuilderResult, DepositTransactionError},
     operations::{create_tx_ins, create_tx_outs, metadata_script, n_of_n_script},
     TxKind,
@@ -135,7 +135,7 @@ impl DepositInfo {
 
         let address = Address::p2tr(
             SECP256K1,
-            *UNSPENDABLE_INTERNAL_KEY,
+            *UNSPENDABLE_PUBLIC_KEY,
             Some(merkle_root),
             *build_context.network(),
         );
@@ -146,11 +146,11 @@ impl DepositInfo {
             return Err(DepositTransactionError::InvalidTapLeafHash)?;
         }
 
-        let (output_key, parity) = UNSPENDABLE_INTERNAL_KEY.tap_tweak(SECP256K1, Some(merkle_root));
+        let (output_key, parity) = UNSPENDABLE_PUBLIC_KEY.tap_tweak(SECP256K1, Some(merkle_root));
 
         let control_block = ControlBlock {
             leaf_version: taproot::LeafVersion::TapScript,
-            internal_key: *UNSPENDABLE_INTERNAL_KEY,
+            internal_key: *UNSPENDABLE_PUBLIC_KEY,
             merkle_branch: vec![*takeback_script_hash]
                 .try_into()
                 .map_err(|_e| DepositTransactionError::InvalidTapLeafHash)?,
@@ -308,13 +308,13 @@ mod tests {
             .unwrap();
 
         let spend_info = taproot_builder
-            .finalize(SECP256K1, *UNSPENDABLE_INTERNAL_KEY)
+            .finalize(SECP256K1, *UNSPENDABLE_PUBLIC_KEY)
             .unwrap();
 
         let network = Network::Regtest;
         let address = Address::p2tr(
             SECP256K1,
-            *UNSPENDABLE_INTERNAL_KEY,
+            *UNSPENDABLE_PUBLIC_KEY,
             spend_info.merkle_root(),
             network,
         );

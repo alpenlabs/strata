@@ -13,11 +13,10 @@ use bdk_wallet::{
 use console::{style, Term};
 use indicatif::ProgressBar;
 use strata_bridge_tx_builder::constants::MAGIC_BYTES;
+use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
 
 use crate::{
-    constants::{
-        BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, SIGNET_BLOCK_TIME, UNSPENDABLE,
-    },
+    constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, SIGNET_BLOCK_TIME},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
@@ -166,7 +165,7 @@ fn bridge_in_descriptor(
     let recovery_xonly_pubkey = recovery_address.extract_p2tr_pubkey()?;
 
     let desc = bdk_wallet::descriptor!(
-        tr(UNSPENDABLE, {
+        tr(UNSPENDABLE_PUBLIC_KEY, {
             pk(bridge_pubkey),
             and_v(v:pk(recovery_xonly_pubkey),older(RECOVER_DELAY))
         })

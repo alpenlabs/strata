@@ -1,12 +1,7 @@
-use std::{sync::LazyLock, time::Duration};
+use std::time::Duration;
 
 use alloy::consensus::constants::ETH_TO_WEI;
-use bdk_wallet::bitcoin::{
-    key::Parity,
-    secp256k1::{PublicKey, SecretKey, SECP256K1},
-    Amount, Network, XOnlyPublicKey,
-};
-use shrex::hex;
+use bdk_wallet::bitcoin::{Amount, Network};
 
 /// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
 pub const RECOVER_DELAY: u32 = 1008;
@@ -42,49 +37,3 @@ pub const SIGNET_BLOCK_TIME: Duration = Duration::from_secs(30);
 
 pub const BRIDGE_MUSIG2_PUBKEY: &str =
     "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
-
-/// A provably unspendable, static public key from predetermined inputs created using method specified in [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-23)
-pub static UNSPENDABLE: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
-    // Step 1: Our "random" point on the curve
-    let h_point = PublicKey::from_x_only_public_key(
-        XOnlyPublicKey::from_slice(&hex!(
-            "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
-        ))
-        .expect("valid xonly pub key"),
-        Parity::Even,
-    );
-
-    // Step 2: Our "random" scalar r
-
-    let r = SecretKey::from_slice(
-        &(hex!("82758434e13488368e0781c4a94019d3d6722f854d26c15d2d157acd1f464723")),
-    )
-    .expect("valid r");
-
-    // Calculate rG
-    let r_g = r.public_key(SECP256K1);
-
-    // Step 3: Combine H_point with rG to create the final public key: P = H + rG
-    let combined_point = h_point.combine(&r_g).expect("Failed to combine points");
-
-    // Step 4: Convert to the XOnly format
-    combined_point.x_only_public_key().0
-});
-
-#[cfg(test)]
-mod tests {
-    use bdk_wallet::bitcoin::XOnlyPublicKey;
-    use shrex::hex;
-
-    use super::UNSPENDABLE;
-    #[test]
-    fn test_unspendable() {
-        assert_eq!(
-            *UNSPENDABLE,
-            XOnlyPublicKey::from_slice(&hex!(
-                "2be4d02127fedf4c956f8e6d8248420b9af78746232315f72894f0b263c80e81"
-            ))
-            .expect("valid pub key")
-        )
-    }
-}
