@@ -141,39 +141,6 @@ impl Zeroize for SequencerKeys {
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for SequencerKeys {}
 
-/// Sequencer's master and derivation _public_ keys.
-#[derive(Debug, Clone)]
-pub struct SequencerPubKeys {
-    /// Sequencer's master [`Xpub`].
-    master: Xpub,
-    /// Sequencer's derived [`Xpub`].
-    derived: Xpub,
-}
-
-impl SequencerPubKeys {
-    /// Creates a new [`SequencerPubKeys`] from a master [`Xpub`].
-    pub fn new(master: &Xpub) -> Result<Self, KeyError> {
-        let path = ChildNumber::from_normal_idx(SEQUENCER_IDX)?;
-
-        let derived_xpub = master.derive_pub(SECP256K1, &path)?;
-
-        Ok(Self {
-            master: *master,
-            derived: derived_xpub,
-        })
-    }
-
-    /// Sequencer's master [`Xpub`].
-    pub fn master_xpub(&self) -> &Xpub {
-        &self.master
-    }
-
-    /// Sequencer's derived [`Xpub`].
-    pub fn message_xpub(&self) -> &Xpub {
-        &self.derived
-    }
-}
-
 /// The [`DerivationPath`] for the sequencer's derived key.
 fn derived_path() -> Result<DerivationPath, KeyError> {
     Ok(DerivationPath::master().extend([

@@ -40,8 +40,17 @@ const WALLET_IDX: u32 = 101;
 pub struct OperatorKeys {
     /// Operator's master [`Xpriv`].
     master: Xpriv,
+
+    /// Operator's base [`Xpriv`].
+    ///
+    /// # Notes
+    ///
+    /// This is the [`Xpriv`] that is generated from only hardened paths.
+    base: Xpriv,
+
     /// Operator's message signing [`Xpriv`].
     message: Xpriv,
+
     /// Operator's wallet transaction signing [`Xpriv`].
     wallet: Xpriv,
 }
@@ -49,13 +58,17 @@ pub struct OperatorKeys {
 impl OperatorKeys {
     /// Creates a new [`OperatorKeys`] from a master [`Xpriv`].
     pub fn new(master: &Xpriv) -> Result<Self, KeyError> {
+        let base_path = base_path()?;
         let message_path = message_path();
         let wallet_path = wallet_path();
+
+        let base_xpriv = master.derive_priv(SECP256K1, &base_path)?;
         let message_xpriv = master.derive_priv(SECP256K1, &message_path?)?;
         let wallet_xpriv = master.derive_priv(SECP256K1, &wallet_path)?;
 
         Ok(Self {
             master: *master,
+            base: base_xpriv,
             message: message_xpriv,
             wallet: wallet_xpriv,
         })
@@ -64,6 +77,15 @@ impl OperatorKeys {
     /// Operator's master [`Xpriv`].
     pub fn master_xpriv(&self) -> &Xpriv {
         &self.master
+    }
+
+    /// Operator's base [`Xpriv`].
+    ///
+    /// # Notes
+    ///
+    /// This is the [`Xpriv`] that is generated from only hardened paths from the master [`Xpriv`].
+    pub fn base_xpriv(&self) -> &Xpriv {
+        &self.base
     }
 
     /// Operator's wallet transaction signing [`Xpriv`].
@@ -79,6 +101,18 @@ impl OperatorKeys {
     /// Operator's master [`Xpub`].
     pub fn master_xpub(&self) -> Xpub {
         Xpub::from_priv(SECP256K1, &self.master)
+    }
+
+    /// Operator's base [`Xpub`]
+    ///
+    /// Infallible conversion from [`Xpriv`] to [`Xpub`] according to
+    /// [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
+    ///
+    /// # Notes
+    ///
+    /// This is the [`Xpub`] that is generated from only hardened paths from the master [`Xpriv`].
+    pub fn base_xpub(&self) -> Xpub {
+        Xpub::from_priv(SECP256K1, &self.base)
     }
 
     /// Operator's message signing [`Xpub`].
@@ -112,7 +146,8 @@ impl Zeroize for OperatorKeys {
     fn zeroize(&mut self) {
         let Self {
             master,
-            message: signing,
+            base,
+            message,
             wallet,
         } = self;
 
@@ -152,24 +187,48 @@ impl Zeroize for OperatorKeys {
             };
         }
 
-        // Zeroize signing components
-        signing.depth.zeroize();
+        // Zeroize base components
+        base.depth.zeroize();
         {
-            let fingerprint: &mut [u8; 4] = signing.parent_fingerprint.as_mut();
+            let fingerprint: &mut [u8; 4] = base.parent_fingerprint.as_mut();
             fingerprint.copy_from_slice(&[0u8; 4]);
         }
-        signing.private_key.non_secure_erase();
+        base.private_key.non_secure_erase();
         {
-            let chaincode: &mut [u8; 32] = signing.chain_code.as_mut();
+            let chaincode: &mut [u8; 32] = base.chain_code.as_mut();
             chaincode.copy_from_slice(&[0u8; 32]);
         }
-        let raw_ptr = &mut signing.child_number as *mut ChildNumber;
+        let raw_ptr = &mut base.child_number as *mut ChildNumber;
         // SAFETY: `signing.child_number` is a valid enum variant
         //          and will not be accessed after zeroization.
         //          Also there are only two possible variants that will
         //          always have an `index` which is a `u32`.
         unsafe {
-            *raw_ptr = if signing.child_number.is_normal() {
+            *raw_ptr = if base.child_number.is_normal() {
+                ChildNumber::Normal { index: 0 }
+            } else {
+                ChildNumber::Hardened { index: 0 }
+            };
+        }
+
+        // Zeroize message components
+        message.depth.zeroize();
+        {
+            let fingerprint: &mut [u8; 4] = message.parent_fingerprint.as_mut();
+            fingerprint.copy_from_slice(&[0u8; 4]);
+        }
+        message.private_key.non_secure_erase();
+        {
+            let chaincode: &mut [u8; 32] = message.chain_code.as_mut();
+            chaincode.copy_from_slice(&[0u8; 32]);
+        }
+        let raw_ptr = &mut message.child_number as *mut ChildNumber;
+        // SAFETY: `signing.child_number` is a valid enum variant
+        //          and will not be accessed after zeroization.
+        //          Also there are only two possible variants that will
+        //          always have an `index` which is a `u32`.
+        unsafe {
+            *raw_ptr = if message.child_number.is_normal() {
                 ChildNumber::Normal { index: 0 }
             } else {
                 ChildNumber::Hardened { index: 0 }
@@ -205,47 +264,12 @@ impl Zeroize for OperatorKeys {
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for OperatorKeys {}
 
-/// Operator's message signing and wallet transaction signing _public_ keys.
-#[derive(Debug, Clone)]
-pub struct OperatorPubKeys {
-    /// Operator's master [`Xpub`].
-    master: Xpub,
-    /// Operator's message signing [`Xpub`].
-    message: Xpub,
-    /// Operator's wallet transaction signing [`Xpub`].
-    wallet: Xpub,
-}
-
-impl OperatorPubKeys {
-    /// Creates a new [`OperatorPubKeys`] from a master [`Xpub`].
-    pub fn new(master: &Xpub) -> Result<Self, KeyError> {
-        let message_path = ChildNumber::from_normal_idx(MESSAGE_IDX)?;
-        let wallet_path = ChildNumber::from_normal_idx(WALLET_IDX)?;
-
-        let message_xpub = master.derive_pub(SECP256K1, &message_path)?;
-        let wallet_xpub = master.derive_pub(SECP256K1, &wallet_path)?;
-
-        Ok(Self {
-            master: *master,
-            message: message_xpub,
-            wallet: wallet_xpub,
-        })
-    }
-
-    /// Operator's master [`Xpub`].
-    pub fn master_xpub(&self) -> &Xpub {
-        &self.master
-    }
-
-    /// Operator's message signing [`Xpub`].
-    pub fn message_xpub(&self) -> &Xpub {
-        &self.message
-    }
-
-    /// Operator's wallet transaction signing [`Xpub`].
-    pub fn wallet_xpub(&self) -> &Xpub {
-        &self.wallet
-    }
+/// Base [`DerivationPath`] for the operator.
+fn base_path() -> Result<DerivationPath, KeyError> {
+    Ok(DerivationPath::master().extend([
+        ChildNumber::from_hardened_idx(BASE_IDX)?,
+        ChildNumber::from_hardened_idx(OPERATOR_IDX)?,
+    ]))
 }
 
 /// [`DerivationPath`] for the operator's message signing key.
@@ -264,6 +288,24 @@ fn wallet_path() -> DerivationPath {
         ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
         ChildNumber::from_normal_idx(WALLET_IDX).unwrap(),
     ])
+}
+
+/// Converts the base [`Xpub`] to the message [`Xpub`].
+pub fn convert_base_xpub_to_message_xpub(base_xpub: &Xpub) -> Xpub {
+    let message_partial_path = ChildNumber::from_normal_idx(MESSAGE_IDX)
+        .expect("unfallible as long MESSAGE_IDX is not changed");
+    base_xpub
+        .derive_pub(SECP256K1, &message_partial_path)
+        .expect("unfallible")
+}
+
+/// Converts the base [`Xpub`] to the wallet [`Xpub`].
+pub fn convert_base_xpub_to_wallet_xpub(base_xpub: &Xpub) -> Xpub {
+    let wallet_partial_path = ChildNumber::from_normal_idx(WALLET_IDX)
+        .expect("unfallible as long WALLET_IDX is not changed");
+    base_xpub
+        .derive_pub(SECP256K1, &wallet_partial_path)
+        .expect("unfallible")
 }
 
 #[cfg(test)]
@@ -381,11 +423,13 @@ mod tests {
 
         // Store original values
         let master_chaincode = *keys.master_xpriv().chain_code.as_bytes();
+        let base_chaincode = *keys.base_xpriv().chain_code.as_bytes();
         let message_chaincode = *keys.message_xpriv().chain_code.as_bytes();
         let wallet_chaincode = *keys.wallet_xpriv().chain_code.as_bytes();
 
         // Verify data exists
         assert_ne!(master_chaincode, [0u8; 32]);
+        assert_ne!(base_chaincode, [0u8; 32]);
         assert_ne!(message_chaincode, [0u8; 32]);
         assert_ne!(wallet_chaincode, [0u8; 32]);
 
@@ -395,23 +439,34 @@ mod tests {
         // Verify fields are zeroed
         // NOTE: SecretKey::non_secure_erase writes `1`s to the memory.
         assert_eq!(keys.master_xpriv().private_key.secret_bytes(), [1u8; 32]);
+        assert_eq!(keys.base_xpriv().private_key.secret_bytes(), [1u8; 32]);
         assert_eq!(keys.message_xpriv().private_key.secret_bytes(), [1u8; 32]);
         assert_eq!(keys.wallet_xpriv().private_key.secret_bytes(), [1u8; 32]);
+
         assert_eq!(*keys.master_xpriv().chain_code.as_bytes(), [0u8; 32]);
+        assert_eq!(*keys.base_xpriv().chain_code.as_bytes(), [0u8; 32]);
         assert_eq!(*keys.message_xpriv().chain_code.as_bytes(), [0u8; 32]);
         assert_eq!(*keys.wallet_xpriv().chain_code.as_bytes(), [0u8; 32]);
+
         assert_eq!(*keys.master_xpriv().parent_fingerprint.as_bytes(), [0u8; 4]);
+        assert_eq!(*keys.base_xpriv().parent_fingerprint.as_bytes(), [0u8; 4]);
         assert_eq!(
             *keys.message_xpriv().parent_fingerprint.as_bytes(),
             [0u8; 4]
         );
         assert_eq!(*keys.wallet_xpriv().parent_fingerprint.as_bytes(), [0u8; 4]);
+
         assert_eq!(keys.master_xpriv().depth, 0);
+        assert_eq!(keys.base_xpriv().depth, 0);
         assert_eq!(keys.message_xpriv().depth, 0);
         assert_eq!(keys.wallet_xpriv().depth, 0);
 
         // Check if child numbers are zeroed while maintaining their hardened/normal status
         match keys.master_xpriv().child_number {
+            ChildNumber::Normal { index } => assert_eq!(index, 0),
+            ChildNumber::Hardened { index } => assert_eq!(index, 0),
+        }
+        match keys.base_xpriv().child_number {
             ChildNumber::Normal { index } => assert_eq!(index, 0),
             ChildNumber::Hardened { index } => assert_eq!(index, 0),
         }

@@ -9,9 +9,8 @@ use bitcoin::{
     Network,
 };
 use rand::{CryptoRng, RngCore};
-use secp256k1::SECP256K1;
 use strata_key_derivation::{
-    operator::{OperatorKeys, OperatorPubKeys},
+    operator::{convert_base_xpub_to_message_xpub, convert_base_xpub_to_wallet_xpub, OperatorKeys},
     sequencer::SequencerKeys,
 };
 use strata_primitives::{
@@ -123,9 +122,9 @@ fn exec_genopxpub(cmd: SubcOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<()> 
         anyhow::bail!("privkey unset");
     };
 
-    let op_xpriv = derive_op_root_xpriv(&xpriv)?;
-    let op_xpub = Xpub::from_priv(SECP256K1, &op_xpriv);
-    let raw_buf = op_xpub.encode();
+    let op_keys = OperatorKeys::new(&xpriv)?;
+    let op_base_xpub = op_keys.base_xpub();
+    let raw_buf = op_base_xpub.encode();
     let s = base58::encode_check(&raw_buf);
 
     println!("{s}");
@@ -258,15 +257,6 @@ fn resolve_xpriv(
     }
 }
 
-/// Derives the master [`Xpriv`] for a Strata bridge operator.
-///
-/// Master [`Xpriv`]s can be derived into other [`Xpriv`]s
-/// and used in network initialization.
-fn derive_op_root_xpriv(master: &Xpriv) -> anyhow::Result<Xpriv> {
-    let op_keys = OperatorKeys::new(master)?;
-    Ok(*op_keys.master_xpriv())
-}
-
 /// Inputs for constructing the network parameters.
 pub struct ParamsConfig {
     /// Name of the network.
@@ -304,12 +294,10 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
         .opkeys
         .into_iter()
         .map(|xpk| {
-            let op_pub_keys = OperatorPubKeys::new(&xpk).expect("valid operator pubkeys");
-
-            let message_key = op_pub_keys.message_xpub();
-            let wallet_key = op_pub_keys.wallet_xpub();
-            let message_key_buf = message_key.to_x_only_pub().serialize().into();
-            let wallet_key_buf = wallet_key.to_x_only_pub().serialize().into();
+            let message_xpub = convert_base_xpub_to_message_xpub(&xpk);
+            let wallet_xpub = convert_base_xpub_to_wallet_xpub(&xpk);
+            let message_key_buf = message_xpub.to_x_only_pub().serialize().into();
+            let wallet_key_buf = wallet_xpub.to_x_only_pub().serialize().into();
             OperatorPubkeys::new(message_key_buf, wallet_key_buf)
         })
         .collect::<Vec<_>>();
