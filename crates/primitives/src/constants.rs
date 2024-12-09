@@ -23,12 +23,15 @@ pub const HASH_SIZE: usize = 32;
 /// A verifiably unspendable public key, produced by hashing a fixed string to a curve group
 /// generator.
 ///
+/// This is related to the technique used in [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs).
+///
 /// Note that this is _not_ necessarily a uniformly-sampled curve point!
 ///
 /// But this is fine; we only need a generator with no efficiently-computable discrete logarithm
 /// relation against the standard generator.
+pub const UNSPENDABLE_PUBLIC_KEY_INPUT: &'static [u8; 18] = b"Strata unspendable";
 pub static UNSPENDABLE_PUBLIC_KEY: LazyLock<XOnlyPublicKey> = LazyLock::new(|| {
-    XOnlyPublicKey::from_slice(sha256::Hash::hash(b"Strata unspendable").as_byte_array())
+    XOnlyPublicKey::from_slice(sha256::Hash::hash(UNSPENDABLE_PUBLIC_KEY_INPUT).as_byte_array())
         .expect("valid xonly public key")
 });
 
