@@ -128,6 +128,52 @@ impl L1TxProof {
     }
 }
 
+/// Includes `L1BlockManifest` along with scan rules that it is applied to
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct L1BlockManifestWithScanRule {
+    /// The actual l1 manifest
+    manifest: L1BlockManifest,
+    /// Rules with which the corresponding block is scaned
+    // FIXME: use non-empty vec
+    rules: Vec<ScanRule>,
+}
+
+impl L1BlockManifestWithScanRule {
+    pub fn new(manifest: L1BlockManifest, rules: Vec<ScanRule>) -> Self {
+        Self { manifest, rules }
+    }
+
+    pub fn header(&self) -> &[u8] {
+        self.manifest.header()
+    }
+
+    pub fn block_hash(&self) -> Buf32 {
+        self.manifest.block_hash()
+    }
+
+    pub fn txs_root(&self) -> Buf32 {
+        self.manifest.txs_root()
+    }
+
+    pub fn into_manifest(self) -> L1BlockManifest {
+        self.manifest
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct ScanRule {
+    /// Epoch corresponding to the rule
+    epoch: u64,
+    /// Hash of the scan rule to uniquely identify it
+    ruleid: Buf32,
+}
+
+impl ScanRule {
+    pub fn new(epoch: u64, ruleid: Buf32) -> Self {
+        Self { epoch, ruleid }
+    }
+}
+
 /// Describes an L1 block and associated data that we need to keep around.
 // TODO should we include the block index here?
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]

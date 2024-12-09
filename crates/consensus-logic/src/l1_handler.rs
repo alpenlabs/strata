@@ -10,7 +10,7 @@ use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{L1BlockManifest, L1TxProof},
+    l1::{L1BlockManifest, L1BlockManifestWithScanRule, L1TxProof},
     params::{Params, RollupParams},
     proof::RollupVerifyingKey,
 };
@@ -92,6 +92,7 @@ where
 
             let l1blkid = blockdata.block().block_hash();
 
+            // TODO; pass in epoch and scan rule reference
             let manifest = generate_block_manifest(blockdata.block());
             let l1txs: Vec<_> = generate_l1txs(&blockdata);
             let num_txs = l1txs.len();
@@ -192,7 +193,7 @@ pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) 
 
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
-fn generate_block_manifest(block: &Block) -> L1BlockManifest {
+fn generate_block_manifest(block: &Block) -> L1BlockManifestWithScanRule {
     let blockid = Buf32::from(block.block_hash().to_raw_hash().to_byte_array());
     let root = block
         .witness_root()
@@ -200,7 +201,9 @@ fn generate_block_manifest(block: &Block) -> L1BlockManifest {
         .unwrap_or_default();
     let header = serialize(&block.header);
 
-    L1BlockManifest::new(blockid, header, Buf32::from(root))
+    let mf = L1BlockManifest::new(blockid, header, Buf32::from(root));
+    let scan_rules = vec![]; // TODO: get rules here
+    L1BlockManifestWithScanRule::new(mf, scan_rules)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
