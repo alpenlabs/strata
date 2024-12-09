@@ -18,7 +18,8 @@ class ProverClientTest(flexitest.Test):
         time.sleep(60)
 
         # Dispatch the prover task
-        task_id = prover_client_rpc.dev_strata_proveCLBlock(1)
+        task_ids = prover_client_rpc.dev_strata_proveCLBlock(1)
+        task_id = task_ids[0]
         print("got the task id: {}", task_id)
         assert task_id is not None
 

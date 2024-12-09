@@ -1,94 +1,91 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use tokio::time::{sleep, Duration};
-use tracing::info;
-use uuid::Uuid;
+use strata_primitives::proof::ProofKey;
+use strata_rocksdb::prover::db::ProofDb;
+use tokio::{sync::Mutex, time::sleep};
+use tracing::warn;
 
 use crate::{
-    config::PROVER_MANAGER_INTERVAL,
-    primitives::tasks_scheduler::{ProofSubmissionStatus, ProvingTaskStatus},
-    prover::Prover,
-    task::TaskTracker,
+    config::PROVER_MANAGER_INTERVAL, errors::ProvingTaskError, handlers::ProofHandler,
+    status::ProvingTaskStatus, task::TaskTracker,
 };
 
-/// Manages proof generation tasks, including processing and tracking task statuses.
+#[derive(Debug, Clone)]
 pub struct ProverManager {
-    task_tracker: Arc<TaskTracker>,
-    prover: Prover,
+    task_tracker: Arc<Mutex<TaskTracker>>,
+    handler: Arc<ProofHandler>,
+    db: Arc<ProofDb>,
+    workers: usize,
 }
 
 impl ProverManager {
-    pub fn new(task_tracker: Arc<TaskTracker>) -> Self {
+    pub fn new(
+        task_tracker: Arc<Mutex<TaskTracker>>,
+        handler: Arc<ProofHandler>,
+        db: Arc<ProofDb>,
+        workers: usize,
+    ) -> Self {
         Self {
             task_tracker,
-            prover: Prover::new(),
+            db,
+            handler,
+            workers,
         }
     }
 
-    /// Main event loop that continuously processes pending tasks and tracks proving progress.
-    pub async fn run(&self) {
+    pub async fn process_pending_tasks(&self) {
         loop {
-            self.process_pending_tasks().await;
-            self.track_proving_progress().await;
+            // Acquire lock to get pending tasks
+            let pending_tasks = {
+                let task_tracker = self.task_tracker.lock().await;
+                task_tracker
+                    .get_tasks_by_status(|status| matches!(status, ProvingTaskStatus::Pending))
+            };
+
+            // Now iterate without holding the lock
+            for task in pending_tasks {
+                {
+                    let task_tracker = self.task_tracker.lock().await;
+                    if task_tracker.in_progress_tasks_count() >= self.workers {
+                        break; // No need to spawn more
+                    }
+                }
+
+                let handler = self.handler.clone();
+                let db = self.db.clone();
+                let task_tracker = self.task_tracker.clone();
+                tokio::spawn(async move { make_proof(handler, task_tracker, task, db).await });
+            }
+
             sleep(Duration::from_secs(PROVER_MANAGER_INTERVAL)).await;
         }
     }
+}
 
-    /// Process all tasks that have the `Pending` status.
-    /// This function fetches the pending tasks, submits their witness data to the prover,
-    /// and starts the proving process for each task.
-    /// If starting the proving process fails, the task status stays as `Pending`.
-    async fn process_pending_tasks(&self) {
-        let pending_tasks = self
-            .task_tracker
-            .get_tasks_by_status(ProvingTaskStatus::Pending)
-            .await;
+pub async fn make_proof(
+    handler: Arc<ProofHandler>,
+    task_tracker: Arc<Mutex<TaskTracker>>,
+    task: ProofKey,
+    db: Arc<ProofDb>,
+) -> Result<(), ProvingTaskError> {
+    {
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.update_status(task, ProvingTaskStatus::ProvingInProgress)?;
+    }
 
-        for task in pending_tasks {
-            self.prover.submit_witness(task.id, task.prover_input);
-            if self.prover.start_proving(task.id).is_ok() {
-                self.task_tracker
-                    .update_status(task.id, ProvingTaskStatus::Processing)
-                    .await;
+    let res = handler.prove(&task, &db).await;
+
+    {
+        let mut task_tracker = task_tracker.lock().await;
+        match res {
+            Ok(_) => task_tracker.update_status(task, ProvingTaskStatus::Completed)?,
+            // TODO: handle different errors for different failure condition
+            Err(e) => {
+                warn!("error proving: {:?} {:?}", task, e);
+                task_tracker.update_status(task, ProvingTaskStatus::Failed)?
             }
         }
     }
 
-    /// Tracks the progress of tasks with the `Processing` status.
-    /// This function checks the proof submission status for each task and,
-    /// upon success, updates the task status to `Completed`.
-    /// Additionally, post-processing hooks may need to be added to handle specific logic,
-    pub async fn track_proving_progress(&self) {
-        let in_progress_task_ids = self
-            .task_tracker
-            .get_task_ids_by_status(ProvingTaskStatus::Processing)
-            .await;
-
-        for task_id in in_progress_task_ids {
-            match self
-                .prover
-                .get_proof_submission_status_and_remove_on_success(task_id)
-            {
-                Ok(status) => self.apply_proof_status_update(task_id, status).await,
-                Err(e) => {
-                    tracing::error!(
-                        "Failed to get proof submission status for task {}: {}",
-                        task_id,
-                        e
-                    );
-                }
-            }
-        }
-    }
-
-    async fn apply_proof_status_update(&self, task_id: Uuid, status: ProofSubmissionStatus) {
-        match status {
-            ProofSubmissionStatus::Success(proof) => {
-                self.task_tracker.mark_task_completed(task_id, proof).await;
-            }
-            ProofSubmissionStatus::ProofGenerationInProgress => {
-                info!("Task {} proof generation in progress", task_id);
-            }
-        }
-    }
+    Ok(())
 }

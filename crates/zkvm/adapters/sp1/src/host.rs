@@ -66,7 +66,7 @@ impl ZkVmHost for SP1Host {
             std::env::set_var("SP1_PROVER", "mock");
         }
 
-        sp1_sdk::utils::setup_logger();
+        // sp1_sdk::utils::setup_logger();
         let client = ProverClient::new();
 
         // Start proving
@@ -89,10 +89,9 @@ impl ZkVmHost for SP1Host {
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
-        proof: &PublicValues,
+        public_values: &PublicValues,
     ) -> ZkVmResult<T> {
-        let mut proof: SP1ProofWithPublicValues = bincode::deserialize(proof.as_bytes())?;
-        let public_params: T = proof.public_values.read();
+        let public_params: T = bincode::deserialize(public_values.as_bytes())?;
         Ok(public_params)
     }
 

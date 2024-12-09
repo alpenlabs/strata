@@ -61,6 +61,7 @@ use bridge::schemas::{
 pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     SequenceSchema::COLUMN_FAMILY_NAME,
     prover::schemas::ProofSchema::COLUMN_FAMILY_NAME,
+    prover::schemas::ProofDepsSchema::COLUMN_FAMILY_NAME,
 ];
 
 // Re-exports
