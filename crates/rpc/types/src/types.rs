@@ -169,7 +169,8 @@ pub struct RpcBlockHeader {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DaBlob {
-    /// The destination or identifier for the blob.
+    /// The intended destination for the blob.
+    // TODO make into enum
     pub dest: u8,
 
     ///  The commitment hash for blob
@@ -207,14 +208,21 @@ pub struct RpcExecUpdate {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcSyncStatus {
-    /// Current head L2 slot known to this node
+    /// Current head L2 slot known to this node.
+    // TODO rename to "slot"
     pub tip_height: u64,
 
+    /// Current epoch that we're running in.
+    pub cur_epoch: u64,
+
     /// Last L2 block we've chosen as the current tip.
-    pub tip_block_id: strata_state::id::L2BlockId,
+    pub tip_block_id: L2BlockId,
 
     /// L2 block that's been finalized and proven on L1.
     pub finalized_block_id: L2BlockId,
+
+    /// L2 epoch that's been finalized and proven on L1.
+    pub finalized_epoch: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -226,11 +234,14 @@ pub struct RawBlockWitness {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcCheckpointInfo {
     /// The index of the checkpoint
-    pub idx: u64,
+    pub epoch: u64,
+
     /// L1 height  the checkpoint covers
     pub l1_range: (u64, u64),
+
     /// L2 height the checkpoint covers
     pub l2_range: (u64, u64),
+
     /// L2 block that this checkpoint covers
     pub l2_blockid: L2BlockId,
 }
@@ -238,7 +249,7 @@ pub struct RpcCheckpointInfo {
 impl From<BatchInfo> for RpcCheckpointInfo {
     fn from(value: BatchInfo) -> Self {
         Self {
-            idx: value.idx,
+            epoch: value.epoch(),
             l1_range: value.l1_range,
             l2_range: value.l2_range,
             l2_blockid: value.l2_blockid,

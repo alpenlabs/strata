@@ -55,12 +55,13 @@ fn process_l1_segment(
         let new_tip_block = l1seg.new_payloads().last().unwrap();
         let new_tip_blkid = new_tip_block.record().blkid();
         let new_tip_height = new_tip_block.idx();
-        let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
-        let cur_safe_height = state.l1_safe_height();
 
-        // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
-        // TODO This probably needs to be adjusted for PoW.
-        if new_tip_height < cur_safe_height {
+        // Set the new L1 height according to the new block.
+        state.set_safe_l1_tip(*new_tip_blkid, new_tip_height);
+
+        // Check that the new chain is actually longer, if it's shorter then we
+        // didn't do anything.
+        if new_tip_height <= state.l1_safe_height() {
             return Err(TsnError::L1SegNotExtend);
         }
 
@@ -69,30 +70,37 @@ fn process_l1_segment(
         // Collect the indexes of current operators.
         let op_idxs: Vec<_> = state.epoch_state().operator_table().indices().collect();
 
+        // Now go through all the new blocks and act on the payloads they have.
         for e in l1seg.new_payloads() {
             // TODO maybe consolidate these to have ops for each tx
 
             for tx in e.deposit_update_txs() {
-                if let ProtocolOperation::Deposit(deposit_info) = tx.tx().protocol_operation() {
-                    let intent = DepositIntent::new(deposit_info.amt, deposit_info.address.clone());
+                let op = tx.tx().protocol_operation();
+                match op {
+                    ProtocolOperation::Deposit(dinfo) => {
+                        let intent = DepositIntent::new(dinfo.amt, dinfo.address.clone());
+                        state.create_new_deposit_entry(&dinfo.outpoint, &op_idxs, dinfo.amt);
+                        state.submit_ee_deposit_intent(intent);
+                    }
 
-                    state.create_new_deposit_entry(
-                        &deposit_info.outpoint,
-                        &op_idxs,
-                        deposit_info.amt,
-                    );
+                    ProtocolOperation::Checkpoint(ckpt) => {
+                        // We assume this is signed here, so we can just continue with it.
+                        let batch_info = ckpt.checkpoint().batch_info();
+                        let epoch = batch_info.epoch();
+                        let blkid = batch_info.l2_blockid();
+                        let slot = batch_info.final_l2_slot();
+                        state.set_finalized_epoch(epoch, slot, *blkid);
+                    }
 
-                    state.submit_ee_deposit_intent(intent);
+                    // ignore anything else, we don't use them, should be removed
+                    _ => {}
                 }
             }
 
-            for tx in e.da_txs() {
+            for _tx in e.da_txs() {
                 // TODO make all this work
             }
         }
-
-        // Finally set the new height correctly.
-        state.set_safe_l1_tip(*new_tip_blkid, new_tip_height);
     }
 
     Ok(())
@@ -289,7 +297,7 @@ mod tests {
         // TODO refactor
         //let header_record = chs.l1_view();
 
-        let tip_height = chs.epoch_state().safe_block_idx();
+        let tip_height = chs.epoch_state().safe_l1_height();
         //let maturation_queue = header_record.maturation_queue();
 
         let epoch_state = chs.epoch_state().clone(); // TODO refactor
@@ -354,7 +362,7 @@ mod tests {
         let mut chs: Chainstate = ArbitraryGenerator::new().generate();
         let params = gen_params();
         //let header_record = chs.l1_view();
-        let old_safe_height = chs.epoch_state().safe_block_idx();
+        let old_safe_height = chs.epoch_state().safe_l1_height();
         let new_blocks_cnt = 10;
 
         let epoch_state = chs.epoch_state().clone();
@@ -382,7 +390,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Check that blocks were matured
-        let new_safe_height = state_cache.epoch_state().safe_block_idx();
+        let new_safe_height = state_cache.epoch_state().safe_l1_height();
         assert_eq!(new_safe_height, old_safe_height + new_blocks_cnt as u64);
     }
 }

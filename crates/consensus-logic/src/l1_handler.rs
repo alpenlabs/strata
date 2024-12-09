@@ -166,7 +166,7 @@ fn check_for_da_batch(
 /// If the checkpoint proof is empty, this function returns an `Ok(())`.
 pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) -> ZkVmResult<()> {
     let rollup_vk = rollup_params.rollup_vk;
-    let checkpoint_idx = checkpoint.batch_info().idx();
+    let checkpoint_idx = checkpoint.batch_info().epoch();
     let proof = checkpoint.proof();
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover

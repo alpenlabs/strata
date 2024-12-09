@@ -309,7 +309,7 @@ fn apply_action<D: Database>(
 
         SyncAction::WriteCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
-                let idx = c.batch_info().idx();
+                let idx = c.batch_info().epoch();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Confirmed;
                 let entry = CheckpointEntry::new(
@@ -327,7 +327,7 @@ fn apply_action<D: Database>(
 
         SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
-                let idx = c.batch_info().idx();
+                let idx = c.batch_info().epoch();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Finalized;
                 let entry = CheckpointEntry::new(

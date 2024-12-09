@@ -100,7 +100,7 @@ impl BatchCheckpointDuty {
     }
 
     pub fn idx(&self) -> u64 {
-        self.batch_info.idx()
+        self.batch_info.epoch()
     }
 
     pub fn batch_info(&self) -> &BatchInfo {
