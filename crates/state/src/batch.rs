@@ -87,12 +87,14 @@ impl From<SignedBatchCheckpoint> for BatchCheckpoint {
     }
 }
 
+/// Info about the blocks that were finalized in a checkpoint.
+// FIXME these fields *really* need to be reworked, it's so confusing
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct BatchInfo {
-    /// The index of the checkpoint
-    pub idx: u64,
+    /// The index of the epoch that this checkpoint finalized.
+    pub epoch: u64,
 
     /// L1 height range(inclusive) the checkpoint covers
     pub l1_range: (u64, u64),
@@ -136,7 +138,7 @@ impl BatchInfo {
         rollup_params_commitment: Buf32,
     ) -> Self {
         Self {
-            idx: checkpoint_idx,
+            epoch: checkpoint_idx,
             l1_range,
             l2_range,
             l1_transition,
@@ -147,8 +149,8 @@ impl BatchInfo {
         }
     }
 
-    pub fn idx(&self) -> u64 {
-        self.idx
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn l2_blockid(&self) -> &L2BlockId {
@@ -161,6 +163,22 @@ impl BatchInfo {
 
     pub fn final_l1_state_hash(&self) -> &Buf32 {
         &self.l1_transition.1
+    }
+
+    pub fn initial_l2_slot(&self) -> u64 {
+        self.l2_range.0
+    }
+
+    pub fn final_l2_slot(&self) -> u64 {
+        self.l2_range.1
+    }
+
+    pub fn initial_l1_height(&self) -> u64 {
+        self.l1_range.0
+    }
+
+    pub fn final_l1_height(&self) -> u64 {
+        self.l1_range.1
     }
 
     pub fn initial_l2_state_hash(&self) -> &Buf32 {
@@ -186,7 +204,7 @@ impl BatchInfo {
     /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]
     pub fn get_initial_bootstrap_state(&self) -> BootstrapState {
         BootstrapState::new(
-            self.idx,
+            self.epoch,
             self.l1_range.0,
             self.l1_transition.0,
             self.l2_range.0,
@@ -198,7 +216,7 @@ impl BatchInfo {
     /// Creates a [`BootstrapState`] by taking the final state of the [`BatchInfo`]
     pub fn get_final_bootstrap_state(&self) -> BootstrapState {
         BootstrapState::new(
-            self.idx,
+            self.epoch,
             self.l1_range.1,
             self.l1_transition.1,
             self.l2_range.1,

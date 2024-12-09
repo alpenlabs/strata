@@ -120,7 +120,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
-    let safe_l1_blkid = prev_chstate.epoch_state().safe_block_blkid();
+    let safe_l1_blkid = prev_chstate.epoch_state().safe_l1_blkid();
     let (exec_seg, block_acc) = prepare_exec_data(
         slot,
         ts,
