@@ -8,7 +8,9 @@ use rand::rngs::OsRng;
 use utils::{exec_subc, resolve_network};
 
 /// List of keys that are used in examples that we don't want people to actually
-/// use.  If any of these are present in a command invocation we abort immediately.
+/// use.
+///
+/// If any of these are present in a command invocation we abort immediately.
 const KEY_BLACKLIST: &[&str] = &[
     "XGUgTAJNpexzrjgnbMvGtDBCZEwxd6KQE4PNDWE6YLZYBTGoS",
     "tpubDASVk1m5cxpmUbwVEZEQb8maDVx9kDxBhSLCqsKHJJmZ8htSegpHx7G3RFudZCdDLtNKTosQiBLbbFsVA45MemurWenzn16Y1ft7NkQekcD",

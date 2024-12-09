@@ -13057,6 +13057,7 @@ dependencies = [
  "rand",
  "secp256k1",
  "serde_json",
+ "strata-key-derivation",
  "strata-primitives",
  "strata-sp1-guest-builder",
  "terrors",
