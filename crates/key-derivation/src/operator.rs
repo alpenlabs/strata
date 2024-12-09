@@ -118,6 +118,7 @@ impl Drop for OperatorKeys {
 
 #[cfg(feature = "zeroize")]
 impl Zeroize for OperatorKeys {
+    #[inline]
     fn zeroize(&mut self) {
         let Self {
             master,
