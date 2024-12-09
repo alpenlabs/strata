@@ -6,7 +6,6 @@ version = "0.1.0"
 [dependencies]
 strata-primitives.workspace = true
 
-borsh.workspace = true
 secp256k1.workspace = true
 sha2.workspace = true
 

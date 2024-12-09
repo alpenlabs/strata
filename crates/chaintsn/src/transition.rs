@@ -5,7 +5,6 @@
 use std::{cmp::max, collections::HashMap};
 
 use bitcoin::{OutPoint, Transaction};
-use borsh::BorshDeserialize;
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
     l1::{BitcoinAmount, L1TxRef, OutputRef},
