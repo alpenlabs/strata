@@ -199,7 +199,9 @@ mod tests {
     use strata_primitives::{
         bridge::OperatorIdx,
         buf::Buf32,
-        l1::{BitcoinAmount, L1BlockManifest, L1TxProof, OutputRef, XOnlyPk},
+        l1::{
+            BitcoinAmount, EpochedL1BlockManifest, L1BlockManifest, L1TxProof, OutputRef, XOnlyPk,
+        },
     };
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
@@ -381,7 +383,7 @@ mod tests {
                 })
                 .collect();
 
-            let mf: L1BlockManifest = arb.generate();
+            let mf: EpochedL1BlockManifest = arb.generate();
 
             // Insert block data
             let res = l1_db.put_block_data(idx, mf.clone(), txs.clone());

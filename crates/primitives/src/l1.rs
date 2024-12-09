@@ -130,17 +130,25 @@ impl L1TxProof {
 
 /// Includes `L1BlockManifest` along with scan rules that it is applied to
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct L1BlockManifestWithScanRule {
+pub struct EpochedL1BlockManifest {
     /// The actual l1 manifest
     manifest: L1BlockManifest,
-    /// Rules with which the corresponding block is scaned
-    // FIXME: use non-empty vec
-    rules: Vec<ScanRule>,
+    /// Epoch, whose scan rules are applied to this manifest
+    epoch: Epoch,
 }
 
-impl L1BlockManifestWithScanRule {
-    pub fn new(manifest: L1BlockManifest, rules: Vec<ScanRule>) -> Self {
-        Self { manifest, rules }
+/// Epoch that is either exact or transitioning from one to another.
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum Epoch {
+    /// Exact epoch
+    Exact(u64),
+    /// Transitioning Epoch(from, to)
+    AtTransition(u64, u64),
+}
+
+impl EpochedL1BlockManifest {
+    pub fn new(manifest: L1BlockManifest, epoch: Epoch) -> Self {
+        Self { manifest, epoch }
     }
 
     pub fn header(&self) -> &[u8] {
@@ -157,20 +165,6 @@ impl L1BlockManifestWithScanRule {
 
     pub fn into_manifest(self) -> L1BlockManifest {
         self.manifest
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct ScanRule {
-    /// Epoch corresponding to the rule
-    epoch: u64,
-    /// Hash of the scan rule to uniquely identify it
-    ruleid: Buf32,
-}
-
-impl ScanRule {
-    pub fn new(epoch: u64, ruleid: Buf32) -> Self {
-        Self { epoch, ruleid }
     }
 }
 

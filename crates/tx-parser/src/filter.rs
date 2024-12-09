@@ -15,14 +15,14 @@ use crate::{
 /// [`TxFilterConfig`]s
 pub fn filter_protocol_op_tx_refs(
     block: &Block,
-    filter_config: TxFilterConfig,
+    filter_config: &TxFilterConfig,
 ) -> Vec<ProtocolOpTxRef> {
     block
         .txdata
         .iter()
         .enumerate()
         .flat_map(|(i, tx)| {
-            extract_protocol_ops(tx, &filter_config)
+            extract_protocol_ops(tx, filter_config)
                 .into_iter()
                 .map(move |relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
         })
