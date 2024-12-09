@@ -176,7 +176,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
         l2_range: (u64, u64),
     ) -> RpcResult<Uuid> {
         let checkpoint_info = RpcCheckpointInfo {
-            idx: checkpoint_idx,
+            epoch: checkpoint_idx,
             l1_range,
             l2_range,
             l2_blockid: Default::default(),

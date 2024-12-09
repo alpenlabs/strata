@@ -17,6 +17,7 @@ use crate::{
     bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::{Chainstate, EpochState},
+    epoch::EpochCommitment,
     header::L2Header,
     id::L2BlockId,
     l1::{self, L1MaturationEntry},
@@ -140,7 +141,7 @@ impl StateCache {
     }
 
     pub fn l1_safe_height(&self) -> u64 {
-        self.epoch_state().last_l1_block_idx
+        self.epoch_state().last_l1_block_height
     }
 
     /// Finalizes the changes made to the state, exporting it and a write batch
@@ -195,7 +196,7 @@ impl StateCache {
     pub fn set_safe_l1_tip(&mut self, blkid: L1BlockId, idx: u64) {
         let es = self.epoch_state_mut();
         es.last_l1_blkid = blkid;
-        es.last_l1_block_idx = idx;
+        es.last_l1_block_height = idx;
     }
 
     /// Creates a new deposit entry in the epoch state's deposit table.
@@ -257,6 +258,21 @@ impl StateCache {
         } else {
             panic!("stateop: unexpected deposit state");
         };
+    }
+
+    pub fn set_cur_epoch(&mut self, epoch: u64) {
+        self.new_ch_state.cur_epoch = epoch;
+    }
+
+    /// Sets the finalized epoch data.
+    pub fn set_finalized_epoch(&mut self, epoch: u64, slot: u64, blkid: L2BlockId) {
+        // Sanity check to make sure this function is being called correctly.
+        assert!(
+            epoch <= slot,
+            "stateop: epoch seems too high for slot (epoch {epoch} vs slot {slot})"
+        );
+        let es = self.epoch_state_mut();
+        es.finalized_epoch = EpochCommitment::new(epoch, slot, blkid);
     }
 
     // TODO add more manipulator functions
