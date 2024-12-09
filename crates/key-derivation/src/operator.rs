@@ -72,18 +72,18 @@ impl OperatorKeys {
     }
 
     /// Operator's master [`Xpriv`].
-    pub fn master_xpriv(&self) -> Xpriv {
-        self.master
+    pub fn master_xpriv(&self) -> &Xpriv {
+        &self.master
     }
 
     /// Operator's wallet transaction signing [`Xpriv`].
-    pub fn wallet_xpriv(&self) -> Xpriv {
-        self.wallet
+    pub fn wallet_xpriv(&self) -> &Xpriv {
+        &self.wallet
     }
 
     /// Operator's message signing [`Xpriv`].
-    pub fn message_xpriv(&self) -> Xpriv {
-        self.signing
+    pub fn message_xpriv(&self) -> &Xpriv {
+        &self.signing
     }
 
     /// Operator's master [`Xpub`].
@@ -239,7 +239,7 @@ mod tests {
         }];
 
         // Sign the PSBT
-        psbt.sign(&wallet_key, SECP256K1)
+        psbt.sign(wallet_key, SECP256K1)
             .expect("could not sign PSBT");
 
         // Finalize the PSBT
