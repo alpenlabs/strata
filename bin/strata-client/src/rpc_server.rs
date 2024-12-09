@@ -209,9 +209,14 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         })
         .await?;
 
+        // TODO
+        let epoch = 0;
+        warn!(%epoch, "using dummy epoch value");
+
         Ok(RpcClientStatus {
             chain_tip: *chain_tip.as_ref(),
             chain_tip_slot: slot,
+            cur_epoch: epoch,
             finalized_blkid: *finalized_blkid.as_ref(),
             last_l1_block: *last_l1.as_ref(),
             buried_l1_height: l1_view.buried_l1_height(),
