@@ -23,25 +23,25 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::KeyError;
 
-/// The Strata base index for operator keys.
+/// Strata base index for operator keys.
 const BASE_IDX: u32 = 56;
 
-/// The operator index for operator keys.
+/// Operator index for operator keys.
 const OPERATOR_IDX: u32 = 20;
 
-/// The message index for the operator message key.
+/// Message index for the operator message key.
 const MESSAGE_IDX: u32 = 100;
 
-/// The wallet index for the operator wallet key.
+/// Wallet index for the operator wallet key.
 const WALLET_IDX: u32 = 101;
 
-/// The operator's message signing and wallet transaction signing keys.
+/// Operator's message signing and wallet transaction signing _private_ keys.
 #[derive(Debug, Clone)]
 pub struct OperatorKeys {
     /// Operator's master [`Xpriv`].
     master: Xpriv,
     /// Operator's message signing [`Xpriv`].
-    signing: Xpriv,
+    message: Xpriv,
     /// Operator's wallet transaction signing [`Xpriv`].
     wallet: Xpriv,
 }
@@ -49,24 +49,14 @@ pub struct OperatorKeys {
 impl OperatorKeys {
     /// Creates a new [`OperatorKeys`] from a master [`Xpriv`].
     pub fn new(master: &Xpriv) -> Result<Self, KeyError> {
-        let message_path = DerivationPath::master().extend([
-            ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
-            ChildNumber::from_normal_idx(MESSAGE_IDX).unwrap(),
-        ]);
-
-        let wallet_path = DerivationPath::master().extend([
-            ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
-            ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
-            ChildNumber::from_normal_idx(WALLET_IDX).unwrap(),
-        ]);
-
+        let message_path = message_path();
+        let wallet_path = wallet_path();
         let message_xpriv = master.derive_priv(SECP256K1, &message_path)?;
         let wallet_xpriv = master.derive_priv(SECP256K1, &wallet_path)?;
 
         Ok(Self {
             master: *master,
-            signing: message_xpriv,
+            message: message_xpriv,
             wallet: wallet_xpriv,
         })
     }
@@ -83,7 +73,7 @@ impl OperatorKeys {
 
     /// Operator's message signing [`Xpriv`].
     pub fn message_xpriv(&self) -> &Xpriv {
-        &self.signing
+        &self.message
     }
 
     /// Operator's master [`Xpub`].
@@ -96,7 +86,7 @@ impl OperatorKeys {
     /// Infallible according to
     /// [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
     pub fn message_xpub(&self) -> Xpub {
-        Xpub::from_priv(SECP256K1, &self.signing)
+        Xpub::from_priv(SECP256K1, &self.message)
     }
 
     /// Operator's wallet transaction signing [`Xpub`].
@@ -122,7 +112,7 @@ impl Zeroize for OperatorKeys {
     fn zeroize(&mut self) {
         let Self {
             master,
-            signing,
+            message: signing,
             wallet,
         } = self;
 
@@ -214,6 +204,67 @@ impl Zeroize for OperatorKeys {
 
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for OperatorKeys {}
+
+/// Operator's message signing and wallet transaction signing _public_ keys.
+#[derive(Debug, Clone)]
+pub struct OperatorPubKeys {
+    /// Operator's master [`Xpub`].
+    master: Xpub,
+    /// Operator's message signing [`Xpub`].
+    message: Xpub,
+    /// Operator's wallet transaction signing [`Xpub`].
+    wallet: Xpub,
+}
+
+impl OperatorPubKeys {
+    /// Creates a new [`OperatorPubKeys`] from a master [`Xpub`].
+    pub fn new(master: &Xpub) -> Result<Self, KeyError> {
+        let message_path = message_path();
+        let wallet_path = wallet_path();
+
+        let message_xpub = master.derive_pub(SECP256K1, &message_path)?;
+        let wallet_xpub = master.derive_pub(SECP256K1, &wallet_path)?;
+
+        Ok(Self {
+            master: *master,
+            message: message_xpub,
+            wallet: wallet_xpub,
+        })
+    }
+
+    /// Operator's master [`Xpub`].
+    pub fn master_xpub(&self) -> &Xpub {
+        &self.master
+    }
+
+    /// Operator's message signing [`Xpub`].
+    pub fn message_xpub(&self) -> &Xpub {
+        &self.message
+    }
+
+    /// Operator's wallet transaction signing [`Xpub`].
+    pub fn wallet_xpub(&self) -> &Xpub {
+        &self.wallet
+    }
+}
+
+/// [`DerivationPath`] for the operator's message signing key.
+fn message_path() -> DerivationPath {
+    DerivationPath::master().extend([
+        ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
+        ChildNumber::from_normal_idx(MESSAGE_IDX).unwrap(),
+    ])
+}
+
+/// [`DerivationPath`] for the operator's wallet key.
+fn wallet_path() -> DerivationPath {
+    DerivationPath::master().extend([
+        ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
+        ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
+        ChildNumber::from_normal_idx(WALLET_IDX).unwrap(),
+    ])
+}
 
 #[cfg(test)]
 mod tests {
