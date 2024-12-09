@@ -1,4 +1,6 @@
+import logging
 import time
+from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -11,6 +13,7 @@ from utils import generate_n_blocks, wait_until
 class L1WriterTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

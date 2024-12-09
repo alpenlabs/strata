@@ -1,3 +1,6 @@
+import logging
+from pathlib import Path
+
 import flexitest
 
 
@@ -5,6 +8,7 @@ import flexitest
 class ElGenesisTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")

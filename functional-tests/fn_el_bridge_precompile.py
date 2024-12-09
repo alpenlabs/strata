@@ -1,5 +1,7 @@
+import logging
 import os
 import time
+from pathlib import Path
 
 import flexitest
 from web3 import Web3
@@ -23,9 +25,10 @@ event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
 class ElBridgePrecompileTest(flexitest.Test):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
+        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
-        print("SKIPPING TEST fn_el_bridge_precompile")
+        self.logger.debug("SKIPPING TEST fn_el_bridge_precompile")
         return True
 
         reth = ctx.get_service("reth")
@@ -35,7 +38,7 @@ class ElBridgePrecompileTest(flexitest.Test):
         dest = web3.to_checksum_address(PRECOMPILE_BRIDGEOUT_ADDRESS)
         # 64 bytes
         dest_pk = os.urandom(32).hex()
-        print(dest_pk)
+        self.logger.debug(dest_pk)
 
         assert web3.is_connected(), "cannot connect to reth"
 
@@ -57,7 +60,7 @@ class ElBridgePrecompileTest(flexitest.Test):
                 "data": dest_pk,
             }
         )
-        print(txid.to_0x_hex())
+        self.logger.debug(txid.to_0x_hex())
 
         # build block
         time.sleep(2)
