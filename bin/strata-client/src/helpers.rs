@@ -184,7 +184,7 @@ pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
 
     // Actually do the key derivation from the root key and then derive the pubkey from that.
     let seq_keys = SequencerKeys::new(&master_xpriv)?;
-    let seq_xpriv = seq_keys.derived();
+    let seq_xpriv = seq_keys.derived_xpriv();
     let seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
     let seq_xpub = seq_keys.derived_xpub();
     let seq_pk = seq_xpub.to_x_only_pub().serialize();

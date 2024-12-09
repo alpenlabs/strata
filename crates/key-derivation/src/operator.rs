@@ -108,6 +108,14 @@ impl OperatorKeys {
     }
 }
 
+// Manual Drop implementation to zeroize keys on drop.
+impl Drop for OperatorKeys {
+    fn drop(&mut self) {
+        #[cfg(feature = "zeroize")]
+        self.zeroize();
+    }
+}
+
 #[cfg(feature = "zeroize")]
 impl Zeroize for OperatorKeys {
     fn zeroize(&mut self) {
@@ -120,34 +128,86 @@ impl Zeroize for OperatorKeys {
         // # Security note
         //
         // Going over all possible "zeroizable" fields.
-        // What we cannot zeroize is:
+        // What we cannot zeroize is only:
         //
-        // - Network
-        // - Child number
+        // - Network: enum
         //
         // These are fine to leave as they are since they are public parameters,
         // and not secret values.
+        //
+        // NOTE: `Xpriv.private_key` (`SecretKey`) `non_secure_erase` writes `1`s to the memory.
 
+        // Zeroize master components
         master.depth.zeroize();
-        let mut parent_fingerprint: [u8; 4] = *master.parent_fingerprint.as_mut();
-        parent_fingerprint.zeroize();
+        {
+            let fingerprint: &mut [u8; 4] = master.parent_fingerprint.as_mut();
+            fingerprint.copy_from_slice(&[0u8; 4]);
+        }
         master.private_key.non_secure_erase();
-        let mut chaincode: [u8; 32] = *master.chain_code.as_mut();
-        chaincode.zeroize();
+        {
+            let chaincode: &mut [u8; 32] = master.chain_code.as_mut();
+            chaincode.copy_from_slice(&[0u8; 32]);
+        }
+        let raw_ptr = &mut master.child_number as *mut ChildNumber;
+        // SAFETY: `master.child_number` is a valid enum variant
+        //          and will not be accessed after zeroization.
+        //          Also there are only two possible variants that will
+        //          always have an `index` which is a `u32`.
+        unsafe {
+            *raw_ptr = if master.child_number.is_normal() {
+                ChildNumber::Normal { index: 0 }
+            } else {
+                ChildNumber::Hardened { index: 0 }
+            };
+        }
 
+        // Zeroize signing components
         signing.depth.zeroize();
-        let mut parent_fingerprint: [u8; 4] = *signing.parent_fingerprint.as_mut();
-        parent_fingerprint.zeroize();
+        {
+            let fingerprint: &mut [u8; 4] = signing.parent_fingerprint.as_mut();
+            fingerprint.copy_from_slice(&[0u8; 4]);
+        }
         signing.private_key.non_secure_erase();
-        let mut chaincode: [u8; 32] = *signing.chain_code.as_mut();
-        chaincode.zeroize();
+        {
+            let chaincode: &mut [u8; 32] = signing.chain_code.as_mut();
+            chaincode.copy_from_slice(&[0u8; 32]);
+        }
+        let raw_ptr = &mut signing.child_number as *mut ChildNumber;
+        // SAFETY: `signing.child_number` is a valid enum variant
+        //          and will not be accessed after zeroization.
+        //          Also there are only two possible variants that will
+        //          always have an `index` which is a `u32`.
+        unsafe {
+            *raw_ptr = if signing.child_number.is_normal() {
+                ChildNumber::Normal { index: 0 }
+            } else {
+                ChildNumber::Hardened { index: 0 }
+            };
+        }
 
+        // Zeroize wallet components
         wallet.depth.zeroize();
-        let mut parent_fingerprint: [u8; 4] = *wallet.parent_fingerprint.as_mut();
-        parent_fingerprint.zeroize();
+        {
+            let fingerprint: &mut [u8; 4] = wallet.parent_fingerprint.as_mut();
+            fingerprint.copy_from_slice(&[0u8; 4]);
+        }
         wallet.private_key.non_secure_erase();
-        let mut chaincode: [u8; 32] = *wallet.chain_code.as_mut();
-        chaincode.zeroize();
+        {
+            let chaincode: &mut [u8; 32] = wallet.chain_code.as_mut();
+            chaincode.copy_from_slice(&[0u8; 32]);
+        }
+        let raw_ptr = &mut wallet.child_number as *mut ChildNumber;
+        // SAFETY: `wallet.child_number` is a valid enum variant
+        //          and will not be accessed after zeroization.
+        //          Also there are only two possible variants that will
+        //          always have an `index` which is a `u32`.
+        unsafe {
+            *raw_ptr = if wallet.child_number.is_normal() {
+                ChildNumber::Normal { index: 0 }
+            } else {
+                ChildNumber::Hardened { index: 0 }
+            };
+        }
     }
 }
 
@@ -259,10 +319,57 @@ mod tests {
         println!("serialized_signed_tx: {}", serialized_signed_tx);
     }
 
-    #[cfg(feature = "zeroize")]
     #[test]
+    #[cfg(feature = "zeroize")]
     fn test_zeroize() {
-        let mut operator_keys = OperatorKeys::new(&XPRIV).unwrap();
-        operator_keys.zeroize();
+        use bitcoin::Network;
+
+        let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
+        let mut keys = OperatorKeys::new(&master).unwrap();
+
+        // Store original values
+        let master_chaincode = *keys.master_xpriv().chain_code.as_bytes();
+        let message_chaincode = *keys.message_xpriv().chain_code.as_bytes();
+        let wallet_chaincode = *keys.wallet_xpriv().chain_code.as_bytes();
+
+        // Verify data exists
+        assert_ne!(master_chaincode, [0u8; 32]);
+        assert_ne!(message_chaincode, [0u8; 32]);
+        assert_ne!(wallet_chaincode, [0u8; 32]);
+
+        // Manually zeroize
+        keys.zeroize();
+
+        // Verify fields are zeroed
+        // NOTE: SecretKey::non_secure_erase writes `1`s to the memory.
+        assert_eq!(keys.master_xpriv().private_key.secret_bytes(), [1u8; 32]);
+        assert_eq!(keys.message_xpriv().private_key.secret_bytes(), [1u8; 32]);
+        assert_eq!(keys.wallet_xpriv().private_key.secret_bytes(), [1u8; 32]);
+        assert_eq!(*keys.master_xpriv().chain_code.as_bytes(), [0u8; 32]);
+        assert_eq!(*keys.message_xpriv().chain_code.as_bytes(), [0u8; 32]);
+        assert_eq!(*keys.wallet_xpriv().chain_code.as_bytes(), [0u8; 32]);
+        assert_eq!(*keys.master_xpriv().parent_fingerprint.as_bytes(), [0u8; 4]);
+        assert_eq!(
+            *keys.message_xpriv().parent_fingerprint.as_bytes(),
+            [0u8; 4]
+        );
+        assert_eq!(*keys.wallet_xpriv().parent_fingerprint.as_bytes(), [0u8; 4]);
+        assert_eq!(keys.master_xpriv().depth, 0);
+        assert_eq!(keys.message_xpriv().depth, 0);
+        assert_eq!(keys.wallet_xpriv().depth, 0);
+
+        // Check if child numbers are zeroed while maintaining their hardened/normal status
+        match keys.master_xpriv().child_number {
+            ChildNumber::Normal { index } => assert_eq!(index, 0),
+            ChildNumber::Hardened { index } => assert_eq!(index, 0),
+        }
+        match keys.message_xpriv().child_number {
+            ChildNumber::Normal { index } => assert_eq!(index, 0),
+            ChildNumber::Hardened { index } => assert_eq!(index, 0),
+        }
+        match keys.wallet_xpriv().child_number {
+            ChildNumber::Normal { index } => assert_eq!(index, 0),
+            ChildNumber::Hardened { index } => assert_eq!(index, 0),
+        }
     }
 }
