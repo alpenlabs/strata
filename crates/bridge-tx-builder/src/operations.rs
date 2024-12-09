@@ -15,12 +15,9 @@ use bitcoin::{
     Witness,
 };
 use musig2::KeyAggContext;
-use strata_primitives::bridge::PublickeyTable;
+use strata_primitives::{bridge::PublickeyTable, constants::UNSPENDABLE_PUBLIC_KEY};
 
-use super::{
-    constants::{MAGIC_BYTES, UNSPENDABLE_INTERNAL_KEY},
-    errors::BridgeTxBuilderError,
-};
+use super::{constants::MAGIC_BYTES, errors::BridgeTxBuilderError};
 use crate::errors::BridgeTxBuilderResult;
 
 /// Create a script with the spending condition that a MuSig2 aggregated signature corresponding to
@@ -70,7 +67,7 @@ pub enum SpendPath<'path> {
         internal_key: UntweakedPublicKey,
     },
     /// Script path spend that only allows spending via scripts in the taproot tree, with the
-    /// internal key being the [`static@UNSPENDABLE_INTERNAL_KEY`].
+    /// internal key being the [`static@UNSPENDABLE_PUBLIC_KEY`].
     ScriptSpend {
         /// The scripts that live in the leaves of the taproot tree.
         scripts: &'path [ScriptBuf],
@@ -101,7 +98,7 @@ pub fn create_taproot_addr<'creator>(
                 return Err(BridgeTxBuilderError::EmptyTapscript);
             }
 
-            build_taptree(*UNSPENDABLE_INTERNAL_KEY, *network, scripts)
+            build_taptree(*UNSPENDABLE_PUBLIC_KEY, *network, scripts)
         }
         SpendPath::Both {
             internal_key,

@@ -19,7 +19,6 @@ use strata_bridge_tx_builder::{
     prelude::{
         create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey, metadata_script,
         n_of_n_script, CooperativeWithdrawalInfo, DepositInfo, TxBuildContext, BRIDGE_DENOMINATION,
-        UNSPENDABLE_INTERNAL_KEY,
     },
     TxKind,
 };
@@ -27,6 +26,7 @@ use strata_common::logging;
 use strata_primitives::{
     bridge::{Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable},
     buf::{Buf20, Buf32},
+    constants::UNSPENDABLE_PUBLIC_KEY,
     l1::{BitcoinAddress, XOnlyPk},
 };
 use strata_rocksdb::{bridge::db::BridgeTxRocksDb, test_utils::get_rocksdb_tmp_instance};
@@ -759,7 +759,7 @@ pub(crate) async fn perform_user_actions(
     let (drt, take_back_leaf_hash, taproot_addr, el_address) = create_drt(
         outpoint,
         federation_pubkey_table,
-        *UNSPENDABLE_INTERNAL_KEY,
+        *UNSPENDABLE_PUBLIC_KEY,
         change_address,
         amount,
     );

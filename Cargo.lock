@@ -12845,7 +12845,6 @@ name = "strata-bridge-tx-builder"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "lazy_static",
  "musig2",
  "serde",
  "strata-primitives",
@@ -12933,6 +12932,7 @@ dependencies = [
  "shrex",
  "sled",
  "strata-bridge-tx-builder",
+ "strata-primitives",
  "terrors",
  "tokio",
  "zeroize",
@@ -13343,7 +13343,7 @@ dependencies = [
 
 [[package]]
 name = "strata-python-utils"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "bdk_bitcoind_rpc",
@@ -13357,6 +13357,7 @@ dependencies = [
  "shrex",
  "strata-btcio",
  "strata-common",
+ "strata-primitives",
  "tokio",
  "tracing",
 ]
