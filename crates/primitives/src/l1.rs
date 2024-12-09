@@ -116,6 +116,46 @@ impl L1TxProof {
     }
 }
 
+/// Includes `L1BlockManifest` along with scan rules that it is applied to
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct EpochedL1BlockManifest {
+    /// The actual l1 manifest
+    manifest: L1BlockManifest,
+    /// Epoch, whose scan rules are applied to this manifest
+    epoch: Epoch,
+}
+
+/// Epoch that is either exact or transitioning from one to another.
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum Epoch {
+    /// Exact epoch
+    Exact(u64),
+    /// Transitioning Epoch(from, to)
+    AtTransition(u64, u64),
+}
+
+impl EpochedL1BlockManifest {
+    pub fn new(manifest: L1BlockManifest, epoch: Epoch) -> Self {
+        Self { manifest, epoch }
+    }
+
+    pub fn header(&self) -> &[u8] {
+        self.manifest.header()
+    }
+
+    pub fn block_hash(&self) -> Buf32 {
+        self.manifest.block_hash()
+    }
+
+    pub fn txs_root(&self) -> Buf32 {
+        self.manifest.txs_root()
+    }
+
+    pub fn into_manifest(self) -> L1BlockManifest {
+        self.manifest
+    }
+}
+
 /// Describes an L1 block and associated data that we need to keep around.
 // TODO should we include the block index here?
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
