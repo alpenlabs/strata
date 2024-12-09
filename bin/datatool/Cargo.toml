@@ -8,6 +8,7 @@ name = "strata-datatool"
 path = "src/main.rs"
 
 [dependencies]
+strata-key-derivation.workspace = true
 strata-primitives.workspace = true
 strata-sp1-guest-builder = { path = "../../provers/sp1" }
 

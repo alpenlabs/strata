@@ -5,11 +5,15 @@ use std::{
 
 use bitcoin::{
     base58,
-    bip32::{ChildNumber, DerivationPath, Xpriv, Xpub},
+    bip32::{Xpriv, Xpub},
     Network,
 };
 use rand::{CryptoRng, RngCore};
 use secp256k1::SECP256K1;
+use strata_key_derivation::{
+    operator::{OperatorKeys, OperatorPubKeys},
+    sequencer::SequencerKeys,
+};
 use strata_primitives::{
     block_credential,
     buf::Buf32,
@@ -26,16 +30,18 @@ use crate::{
     KEY_BLACKLIST,
 };
 
-// TODO move some of these into a keyderiv crate
-const DERIV_BASE_IDX: u32 = 56;
-const DERIV_SEQ_IDX: u32 = 10;
-const DERIV_OP_IDX: u32 = 20;
-const DERIV_OP_SIGNING_IDX: u32 = 100;
-const DERIV_OP_WALLET_IDX: u32 = 101;
+/// Sequencer key environment variable.
 const SEQKEY_ENVVAR: &str = "STRATA_SEQ_KEY";
+
+/// Operator key environment variable.
 const OPKEY_ENVVAR: &str = "STRATA_OP_KEY";
+
+/// The default network to use.
+///
+/// Right now this is [`Network::Signet`].
 const DEFAULT_NETWORK: Network = Network::Signet;
 
+/// Resolves a [`Network`] from a string.
 pub(super) fn resolve_network(arg: Option<&str>) -> anyhow::Result<Network> {
     match arg {
         Some("signet") => Ok(Network::Signet),
@@ -45,6 +51,7 @@ pub(super) fn resolve_network(arg: Option<&str>) -> anyhow::Result<Network> {
     }
 }
 
+/// Executes a `gen*` subcommand.
 pub(super) fn exec_subc(cmd: SubcommandGen, ctx: &mut CmdContext) -> anyhow::Result<()> {
     match cmd {
         SubcommandGen::Seed(subc) => exec_genseed(subc, ctx),
@@ -55,6 +62,9 @@ pub(super) fn exec_subc(cmd: SubcommandGen, ctx: &mut CmdContext) -> anyhow::Res
     }
 }
 
+/// Executes the `genseed` subcommand.
+///
+/// Generates a new [`Xpriv`] and writes it to a file.
 fn exec_genseed(cmd: SubcSeed, ctx: &mut CmdContext) -> anyhow::Result<()> {
     if cmd.path.exists() && !cmd.force {
         anyhow::bail!("not overwriting file, add --force to overwrite");
@@ -68,13 +78,17 @@ fn exec_genseed(cmd: SubcSeed, ctx: &mut CmdContext) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Executes the `genseqpubkey` subcommand.
+///
+/// Generates the sequencer [`Xpub`] from the provided [`Xpriv`]
+/// and prints it to stdout.
 fn exec_genseqpubkey(cmd: SubcSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
     let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, SEQKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
 
-    let seq_xpriv = derive_seq_xpriv(&xpriv)?;
-    let seq_xpub = Xpub::from_priv(SECP256K1, &seq_xpriv);
+    let seq_keys = SequencerKeys::new(&xpriv)?;
+    let seq_xpub = seq_keys.derived_xpub();
     let raw_buf = seq_xpub.to_x_only_pub().serialize();
     let s = base58::encode_check(&raw_buf);
 
@@ -83,12 +97,16 @@ fn exec_genseqpubkey(cmd: SubcSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Resul
     Ok(())
 }
 
+/// Executes the `genseqprivkey` subcommand.
+///
+/// Generates the sequencer [`Xpriv`] and prints it to stdout.
 fn exec_genseqprivkey(cmd: SubcSeqPrivkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
     let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, SEQKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
 
-    let seq_xpriv = derive_seq_xpriv(&xpriv)?;
+    let seq_keys = SequencerKeys::new(&xpriv)?;
+    let seq_xpriv = seq_keys.derived_xpriv();
     let raw_buf = seq_xpriv.to_priv().to_bytes();
     let s = base58::encode_check(&raw_buf);
 
@@ -97,12 +115,15 @@ fn exec_genseqprivkey(cmd: SubcSeqPrivkey, _ctx: &mut CmdContext) -> anyhow::Res
     Ok(())
 }
 
+/// Executes the `genopxpub` subcommand.
+///
+/// Generates the root xpub for an operator.
 fn exec_genopxpub(cmd: SubcOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<()> {
     let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, OPKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
     };
 
-    let op_xpriv = derive_op_root_xpub(&xpriv)?;
+    let op_xpriv = derive_op_root_xpriv(&xpriv)?;
     let op_xpub = Xpub::from_priv(SECP256K1, &op_xpriv);
     let raw_buf = op_xpub.encode();
     let s = base58::encode_check(&raw_buf);
@@ -112,6 +133,10 @@ fn exec_genopxpub(cmd: SubcOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<()> 
     Ok(())
 }
 
+/// Executes the `genparams` subcommand.
+///
+/// Generates the params for a Strata network.
+/// Either writes to a file or prints to stdout depending on the provided options.
 fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
     // Parse the sequencer key, trimming whitespace for convenience.
     let seqkey = match cmd.seqkey.as_ref().map(|s| s.trim()) {
@@ -160,7 +185,9 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         .unwrap_or(1_000_000_000);
 
     // Parse the checkpoint verification key.
-    let rollup_vk: Buf32 = GUEST_CHECKPOINT_VK_HASH_STR.parse().unwrap();
+    let rollup_vk: Buf32 = GUEST_CHECKPOINT_VK_HASH_STR
+        .parse()
+        .expect("invalid checkpoint verifier key hash");
 
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
@@ -190,14 +217,19 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Generates a new xpriv.
+/// Generates a new [`Xpriv`].
+///
+/// # Notes
+///
+/// The seed is generated from the provided RNG trait-bounded
+/// to a CSPRNG (Cryptographically Secure Pseudo-Random Number Generator).
 fn gen_priv<R: CryptoRng + RngCore>(rng: &mut R, net: Network) -> Xpriv {
     let mut seed = [0u8; 32];
     rng.fill_bytes(&mut seed);
     Xpriv::new_master(net, &seed).expect("valid seed")
 }
 
-/// Reads an xprv from file as a string, verifying the checksom.
+/// Reads an [`Xpriv`] from file as a string and verifies the checksum.
 fn read_xpriv(path: &Path) -> anyhow::Result<Xpriv> {
     let raw_buf = fs::read(path)?;
     let str_buf = std::str::from_utf8(&raw_buf)?;
@@ -205,7 +237,7 @@ fn read_xpriv(path: &Path) -> anyhow::Result<Xpriv> {
     Ok(Xpriv::decode(&buf)?)
 }
 
-/// Resolves a key from set vars and whatnot.
+/// Resolves an [`Xpriv`] either from a file path or an environment variable.
 fn resolve_xpriv(
     path: &Option<PathBuf>,
     from_env: bool,
@@ -226,54 +258,41 @@ fn resolve_xpriv(
     }
 }
 
-fn derive_strata_scheme_xpriv(master: &Xpriv, last: u32) -> anyhow::Result<Xpriv> {
-    let derivation_path = DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(DERIV_BASE_IDX).unwrap(),
-        ChildNumber::from_hardened_idx(last).unwrap(),
-    ]);
-    Ok(master.derive_priv(SECP256K1, &derivation_path)?)
+/// Derives the master [`Xpriv`] for a Strata bridge operator.
+///
+/// Master [`Xpriv`]s can be derived into other [`Xpriv`]s
+/// and used in network initialization.
+fn derive_op_root_xpriv(master: &Xpriv) -> anyhow::Result<Xpriv> {
+    let op_keys = OperatorKeys::new(master)?;
+    Ok(*op_keys.master_xpriv())
 }
 
-/// Derives the sequencer xpriv.
-fn derive_seq_xpriv(master: &Xpriv) -> anyhow::Result<Xpriv> {
-    derive_strata_scheme_xpriv(master, DERIV_SEQ_IDX)
-}
-
-/// Derives the root xpub for a Strata operator which can be turned into an xpub
-/// and used in network init.
-fn derive_op_root_xpub(master: &Xpriv) -> anyhow::Result<Xpriv> {
-    derive_strata_scheme_xpriv(master, DERIV_OP_IDX)
-}
-
-/// Derives the signing and wallet xprivs for a Strata operator.
-fn derive_op_purpose_xpubs(op_xpub: &Xpub) -> (Xpub, Xpub) {
-    let signing_path = DerivationPath::master()
-        .extend([ChildNumber::from_normal_idx(DERIV_OP_SIGNING_IDX).unwrap()]);
-
-    let wallet_path = DerivationPath::master()
-        .extend([ChildNumber::from_normal_idx(DERIV_OP_WALLET_IDX).unwrap()]);
-
-    let signing_xpub = op_xpub.derive_pub(SECP256K1, &signing_path).unwrap();
-    let wallet_xpub = op_xpub.derive_pub(SECP256K1, &wallet_path).unwrap();
-
-    (signing_xpub, wallet_xpub)
-}
-
-/// Describes inputs for how we want to set params.
+/// Inputs for constructing the network parameters.
 pub struct ParamsConfig {
+    /// Name of the network.
     name: String,
+    /// Network to use.
     #[allow(unused)]
     bitcoin_network: Network,
+    /// Block time in seconds.
     block_time_sec: u64,
+    /// Number of slots in an epoch.
     epoch_slots: u32,
+    /// Height at which the genesis block is triggered.
     genesis_trigger: u64,
+    /// Sequencer's key.
     seqkey: Option<Buf32>,
+    /// Operators' keys.
     opkeys: Vec<Xpub>,
+    /// Verifier's key.
     rollup_vk: Buf32,
+    /// Amount of sats to deposit.
     deposit_sats: u64,
+    /// Timeout for proofs.
     proof_timeout: Option<u32>,
 }
 
+/// Constructs the parameters for a Strata network.
 // TODO convert this to also initialize the sync params
 fn construct_params(config: ParamsConfig) -> RollupParams {
     let cr = config
@@ -285,15 +304,17 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
         .opkeys
         .into_iter()
         .map(|xpk| {
-            let (signing_key, wallet_key) = derive_op_purpose_xpubs(&xpk);
-            let signing_key_buf = signing_key.to_x_only_pub().serialize().into();
+            let op_pub_keys = OperatorPubKeys::new(&xpk).expect("valid operator pubkeys");
+
+            let message_key = op_pub_keys.message_xpub();
+            let wallet_key = op_pub_keys.wallet_xpub();
+            let message_key_buf = message_key.to_x_only_pub().serialize().into();
             let wallet_key_buf = wallet_key.to_x_only_pub().serialize().into();
-            OperatorPubkeys::new(signing_key_buf, wallet_key_buf)
+            OperatorPubkeys::new(message_key_buf, wallet_key_buf)
         })
         .collect::<Vec<_>>();
 
     // TODO add in bitcoin network
-
     RollupParams {
         rollup_name: config.name,
         block_time: config.block_time_sec * 1000,
@@ -329,7 +350,7 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
     }
 }
 
-/// Returns an `Err` if the provided key we're trying to parse is on the blacklist.
+/// Returns an [`Err`] if the provided key is on the [`KEY_BLACKLIST`].
 fn check_key_not_blacklisted(s: &str) -> anyhow::Result<()> {
     let ts = s.trim();
     if KEY_BLACKLIST.contains(&ts) {
@@ -355,6 +376,14 @@ fn parse_xpub(s: &str) -> anyhow::Result<Xpub> {
     Ok(xpk)
 }
 
+/// Parses an abbreviated amount string.
+///
+/// # Possible suffixes
+///
+/// - `K` for thousand.
+/// - `M` for million.
+/// - `G` for billion.
+/// - `T` for trillion.
 fn parse_abbr_amt(s: &str) -> anyhow::Result<u64> {
     // Thousand.
     if let Some(v) = s.strip_suffix("K") {
