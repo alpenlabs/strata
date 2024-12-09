@@ -3,7 +3,10 @@ use std::sync::Arc;
 use bitcoin::params::MAINNET;
 use strata_btcio::{
     reader::query::get_verification_state,
-    rpc::{traits::Reader, BitcoinClient},
+    rpc::{
+        traits::{Reader, Wallet},
+        BitcoinClient,
+    },
 };
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
@@ -92,13 +95,23 @@ impl ProvingOp for L1BatchHandler {
             batch.push(proof);
         }
 
-        let start_height = self
+        let start_block = self
             .btc_client
             .get_block(&start_blkid.into())
             .await
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+
+        let start_height = self
+            .btc_client
+            .get_transaction(
+                &start_block
+                    .coinbase()
+                    .expect("expect coinbase tx")
+                    .compute_txid(),
+            )
+            .await
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
-            .bip34_block_height()
-            .expect("expected bip34 block height");
+            .block_height();
 
         let state = get_verification_state(
             self.btc_client.as_ref(),

@@ -81,10 +81,17 @@ impl ProvingOp for ClStfHandler {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<ClStfInput, ProvingTaskError> {
-        let block_num = match task_id.id() {
+        let block_id = match task_id.id() {
             ProofId::ClStf(id) => id,
             _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
         };
+
+        let block_header: RpcBlockHeader = self
+            .cl_client
+            .request("strata_getHeaderById", rpc_params![block_id])
+            .await
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+        let block_num = block_header.block_idx;
         let raw_witness: Option<Vec<u8>> = self
             .cl_client
             .request("strata_getCLBlockWitness", rpc_params![block_num])

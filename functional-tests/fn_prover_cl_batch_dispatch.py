@@ -17,8 +17,9 @@ class ProverClientTest(flexitest.Test):
         # Wait for the Prover Manager setup
         time.sleep(60)
 
-        task_id = prover_client_rpc.dev_strata_proveL2Batch((1, 2))
-        print("got the task id: {}", task_id)
+        task_ids = prover_client_rpc.dev_strata_proveL2Batch((1, 2))
+        print("got the task ids: {}", task_ids)
+        task_id = task_ids[0]
         assert task_id is not None
 
         time_out = 10 * 60
