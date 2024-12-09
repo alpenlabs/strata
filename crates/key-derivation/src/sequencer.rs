@@ -28,7 +28,7 @@ impl SequencerKeys {
     pub fn new(master: &Xpriv) -> Result<Self, KeyError> {
         let path = derived_path();
 
-        let derived = master.derive_priv(SECP256K1, &path)?;
+        let derived = master.derive_priv(SECP256K1, &path?)?;
         Ok(Self {
             master: *master,
             derived,
@@ -153,7 +153,7 @@ pub struct SequencerPubKeys {
 impl SequencerPubKeys {
     /// Creates a new [`SequencerPubKeys`] from a master [`Xpub`].
     pub fn new(master: &Xpub) -> Result<Self, KeyError> {
-        let path = derived_path();
+        let path = ChildNumber::from_normal_idx(SEQUENCER_IDX)?;
 
         let derived_xpub = master.derive_pub(SECP256K1, &path)?;
 
@@ -175,11 +175,11 @@ impl SequencerPubKeys {
 }
 
 /// The [`DerivationPath`] for the sequencer's derived key.
-fn derived_path() -> DerivationPath {
-    DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
-        ChildNumber::from_hardened_idx(SEQUENCER_IDX).unwrap(),
-    ])
+fn derived_path() -> Result<DerivationPath, KeyError> {
+    Ok(DerivationPath::master().extend([
+        ChildNumber::from_hardened_idx(BASE_IDX)?,
+        ChildNumber::from_hardened_idx(SEQUENCER_IDX)?,
+    ]))
 }
 
 #[cfg(test)]
