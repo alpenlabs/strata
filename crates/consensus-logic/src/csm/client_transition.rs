@@ -204,7 +204,7 @@ pub fn process_event<D: Database>(
 
             debug!(?chainstate, "Chainstate for new tip block");
             // height of last matured L1 block in chain state
-            let chs_last_buried = chainstate.epoch_state().safe_block_idx().saturating_sub(1);
+            let chs_last_buried = chainstate.epoch_state().safe_l1_height().saturating_sub(1);
             // buried height in client state
             let cls_last_buried = state.l1_view().buried_l1_height();
 
@@ -405,14 +405,15 @@ pub fn filter_verified_checkpoints(
     } else {
         last_finalized
     }
-    .map(|x| (x.batch_info.idx() + 1, Some(&x.batch_info)))
+    .map(|x| (x.batch_info.epoch() + 1, Some(&x.batch_info)))
     .unwrap_or((0, None)); // expect the first checkpoint
 
     let mut result_checkpoints = Vec::new();
 
     for checkpoint in checkpoints {
-        let curr_idx = checkpoint.batch_checkpoint.batch_info().idx;
         let proof_receipt = checkpoint.batch_checkpoint.get_proof_receipt();
+        let curr_idx = checkpoint.batch_checkpoint.batch_info().epoch();
+
         if curr_idx != expected_idx {
             warn!(%expected_idx, %curr_idx, "Received invalid checkpoint idx, ignoring.");
             continue;

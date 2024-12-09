@@ -119,7 +119,7 @@ pub fn init_forkchoice_manager<D: Database>(
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
     let sync_state = init_csm_state.sync().expect("csm state should be init");
-    let chain_tip_height = sync_state.chain_tip_height();
+    let chain_tip_height = sync_state.tip_height();
 
     let finalized_blockid = *sync_state.finalized_blkid();
     let finalized_block = l2_block_manager

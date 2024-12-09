@@ -179,7 +179,7 @@ pub fn apply_writes_to_state(
                 debug!(%height, %blkid, "received AcceptL2Block");
                 let ss = state.expect_sync_mut();
                 ss.tip_blkid = blkid;
-                ss.tip_height = height;
+                ss.tip_slot = height;
             }
 
             UpdateBuried(new_idx) => {
@@ -230,20 +230,20 @@ pub fn apply_writes_to_state(
                 // checkpoint
                 l1v.verified_checkpoints.drain(..total_finalized);
 
-                if let Some(checkpt) = new_finalized {
+                if let Some(ckpt) = new_finalized {
                     // Check if heights match accordingly
                     if !l1v
                         .last_finalized_checkpoint
                         .as_ref()
-                        .is_none_or(|prev_chp| {
-                            checkpt.batch_info.idx() == prev_chp.batch_info.idx() + 1
+                        .is_none_or(|prev_ckpt| {
+                            ckpt.batch_info.epoch() == prev_ckpt.batch_info.epoch() + 1
                         })
                     {
                         panic!("operation: mismatched indices of pending checkpoint");
                     }
 
-                    let fin_blockid = *checkpt.batch_info.l2_blockid();
-                    l1v.last_finalized_checkpoint = Some(checkpt);
+                    let fin_blockid = *ckpt.batch_info.l2_blockid();
+                    l1v.last_finalized_checkpoint = Some(ckpt);
 
                     // Update finalized blockid in StateSync
                     state.expect_sync_mut().finalized_blkid = fin_blockid;

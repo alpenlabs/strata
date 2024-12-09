@@ -5,6 +5,7 @@ use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use crate::{
     bridge_ops::{self, WithdrawalIntent},
     bridge_state::{self, DepositEntry, DepositsTable, OperatorTable},
+    epoch::EpochCommitment,
     exec_env::{self, ExecEnvState},
     genesis::GenesisStateData,
     prelude::*,
@@ -28,9 +29,11 @@ pub struct Chainstate {
     ///
     /// Immediately after genesis, this is 0, so the first checkpoint batch is
     /// checkpoint 0, moving us into checkpoint period 1.
-    pub(crate) epoch: u64,
+    pub(crate) cur_epoch: u64,
 
     /// Epoch-level state that we only change as of the last block of an epoch.
+    ///
+    /// This is what tracks finalization.
     // TODO this might be reworked to be managed separately
     pub(crate) epoch_state: EpochState,
 
@@ -48,7 +51,7 @@ impl Chainstate {
         Self {
             last_block: gdata.genesis_blkid(),
             slot: 0,
-            epoch: 0,
+            cur_epoch: 0,
             epoch_state: EpochState::from_genesis(gdata),
             pending_withdraws: StateQueue::new_empty(),
             exec_env_state: gdata.exec_state().clone(),
@@ -67,8 +70,14 @@ impl Chainstate {
         self.last_block
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.epoch
+    /// Index of the current epoch.
+    pub fn cur_epoch(&self) -> u64 {
+        self.cur_epoch
+    }
+
+    /// Index of the last epoch we've observed as finalized on L1.
+    pub fn finalized_epoch(&self) -> u64 {
+        self.epoch_state().finalized_epoch_idx()
     }
 
     pub fn epoch_state(&self) -> &EpochState {
@@ -102,10 +111,11 @@ impl Chainstate {
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
+        // TODO convert to using SSZ when we get to that
         let hashed_state = HashedChainstate {
             last_block: self.last_block.into(),
             slot: self.slot,
-            epoch: self.epoch,
+            epoch: self.cur_epoch,
             epoch_state: compute_borsh_hash(&self.epoch_state),
             pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
             exec_env_hash: compute_borsh_hash(&self.exec_env_state),
@@ -150,15 +160,16 @@ struct HashedChainstate {
 /// Toplevel epoch state that only changes as of the last block of the epoch.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct EpochState {
-    /// Last L1 block ID that we've processed.
+    /// Epoch commitment the last epoch that we've observed as finalized on L1.
+    ///
+    /// This might lag by >1 epoch due to various things.
+    pub(crate) finalized_epoch: EpochCommitment,
+
+    /// Last L1 block ID that we've processed and accepted.
     pub(crate) last_l1_blkid: L1BlockId,
 
-    /// Last L1 block number that we've processed.
-    pub(crate) last_l1_block_idx: u64,
-
-    /// Blkid of the last block in the previous epoch (which would be
-    /// `cur_epoch - 1`).
-    pub(crate) last_epoch_final_block: L2BlockId,
+    /// Last L1 block height that we've processed and accepted.
+    pub(crate) last_l1_block_height: u64,
 
     /// Operator table we store registered operators for.
     pub(crate) operator_table: bridge_state::OperatorTable,
@@ -170,21 +181,37 @@ pub struct EpochState {
 impl EpochState {
     pub fn from_genesis(gd: &GenesisStateData) -> Self {
         Self {
+            finalized_epoch: EpochCommitment::zero(),
             last_l1_blkid: *gd.l1_state().safe_block().blkid(),
             // FIXME make this accurately reflect the epoch level state
-            last_l1_block_idx: 0,
-            last_epoch_final_block: Buf32::zero().into(),
+            last_l1_block_height: 0,
             operator_table: gd.operator_table().clone(),
             deposits_table: bridge_state::DepositsTable::new_empty(),
         }
     }
 
-    pub fn safe_block_blkid(&self) -> &L1BlockId {
+    pub fn finalized_epoch_commitment(&self) -> &EpochCommitment {
+        &self.finalized_epoch
+    }
+
+    pub fn finalized_epoch_idx(&self) -> u64 {
+        self.finalized_epoch.epoch()
+    }
+
+    pub fn finalized_last_slot(&self) -> u64 {
+        self.finalized_epoch.last_slot()
+    }
+
+    pub fn finalized_last_blkid(&self) -> &L2BlockId {
+        self.finalized_epoch.last_blkid()
+    }
+
+    pub fn safe_l1_blkid(&self) -> &L1BlockId {
         &self.last_l1_blkid
     }
 
-    pub fn safe_block_idx(&self) -> u64 {
-        self.last_l1_block_idx
+    pub fn safe_l1_height(&self) -> u64 {
+        self.last_l1_block_height
     }
 
     pub fn get_deposit(&self, idx: u32) -> Option<&DepositEntry> {
@@ -198,9 +225,7 @@ impl EpochState {
     /// Returns if we're in the genesis epoch.  This is identified by the "last
     /// epoch's" final block being the zero blkid.
     pub fn is_genesis_epoch(&self) -> bool {
-        // FIXME maybe this should have a `.is_zero()`?
-        let b: Buf32 = self.last_epoch_final_block.into();
-        b.is_zero()
+        self.finalized_epoch_commitment().is_null()
     }
 
     /// Returns a ref to the operator table.

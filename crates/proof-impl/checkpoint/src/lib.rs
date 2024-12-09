@@ -82,7 +82,7 @@ pub fn process_checkpoint_proof(
                 batch_info.rollup_params_commitment()
             );
 
-            batch_info.idx = prev_checkpoint.batch_info().idx + 1;
+            batch_info.epoch = prev_checkpoint.batch_info().epoch + 1;
 
             // If there exist proof for the prev_batch, use the prev_batch bootstrap state, else set
             // the current batch initial info as bootstrap

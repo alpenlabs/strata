@@ -211,12 +211,14 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
         // TODO
         let epoch = 0;
-        warn!(%epoch, "using dummy epoch value");
+        let fin_epoch = 0;
+        warn!(%epoch, %fin_epoch, "using dummy epoch value");
 
         Ok(RpcClientStatus {
             chain_tip: *chain_tip.as_ref(),
             chain_tip_slot: slot,
             cur_epoch: epoch,
+            finalized_epoch: fin_epoch,
             finalized_blkid: *finalized_blkid.as_ref(),
             last_l1_block: *last_l1.as_ref(),
             buried_l1_height: l1_view.buried_l1_height(),
@@ -396,9 +398,11 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let sync_state = self.status_channel.sync_state();
         Ok(sync_state
             .map(|sync| RpcSyncStatus {
-                tip_height: sync.chain_tip_height(),
+                tip_height: sync.tip_height(),
+                cur_epoch: sync.,
                 tip_block_id: *sync.chain_tip_blkid(),
                 finalized_block_id: *sync.finalized_blkid(),
+                finalized_epoch: 0,
             })
             .ok_or(Error::ClientNotStarted)?)
     }
@@ -586,7 +590,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         }
 
         if let Some(sync_status) = sync_state {
-            if block_height < sync_status.chain_tip_height() {
+            if block_height < sync_status.tip_height() {
                 return Ok(L2BlockStatus::Confirmed);
             }
         }

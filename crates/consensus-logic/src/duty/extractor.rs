@@ -20,7 +20,7 @@ pub fn extract_duties(
         return Ok(Vec::new());
     };
 
-    let tip_height = ss.chain_tip_height();
+    let tip_height = ss.tip_height();
     let tip_blkid = *ss.chain_tip_blkid();
 
     // Since we're not rotating sequencers, for now we just *always* produce a
@@ -138,7 +138,7 @@ fn extract_batch_duties(
             let l2_transition = (checkpoint.l2_transition.1, current_chain_state_root);
 
             let new_batch = BatchInfo::new(
-                checkpoint.idx + 1,
+                checkpoint.epoch + 1,
                 l1_range,
                 l2_range,
                 l1_transition,

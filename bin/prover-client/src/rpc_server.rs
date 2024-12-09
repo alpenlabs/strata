@@ -159,11 +159,25 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn prove_checkpoint_raw(
         &self,
-        _checkpoint_idx: u64,
-        _l1_range: (u64, u64),
-        _l2_range: (u64, u64),
-    ) -> RpcResult<Vec<ProofKey>> {
-        unimplemented!()
+        checkpoint_idx: u64,
+        l1_range: (u64, u64),
+        l2_range: (u64, u64),
+    ) -> RpcResult<Uuid> {
+        let checkpoint_info = RpcCheckpointInfo {
+            epoch: checkpoint_idx,
+            l1_range,
+            l2_range,
+            l2_blockid: Default::default(),
+        };
+
+        let task_id = self
+            .context
+            .checkpoint_dispatcher
+            .create_task(CheckpointOpsParam::Manual(checkpoint_info))
+            .await
+            .expect("failed to add proving task, checkpoint");
+
+        RpcResult::Ok(task_id)
     }
 
     async fn get_task_status(&self, key: ProofKey) -> RpcResult<String> {
