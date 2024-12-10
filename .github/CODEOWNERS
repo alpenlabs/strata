@@ -14,33 +14,33 @@ tests/                 @alpenlabs/rust @alpenlabs/ci
 
 # Libs
 # Note that the globbing here is to future-proof against new crates
-/crates/                @alpenlabs/rust    # fallback catch all
-/crates/bridge*/        @alpenlabs/bridge
-/crates/btc*/           @alpenlabs/btc
-/crates/common/         @alpenlabs/rust
-/crates/chaintsn/       @alpenlabs/rust
-/crates/consensus*/     @alpenlabs/chain-core
-/crates/db/             @alpenlabs/database
-/crates/eectl/          @alpenlabs/evm
-/crates/evm*/           @alpenlabs/evm
+/crates/             @alpenlabs/rust    # fallback catch all
+/crates/bridge*/     @alpenlabs/bridge
+/crates/btc*/        @alpenlabs/btc
+/crates/common/      @alpenlabs/rust
+/crates/chaintsn/    @alpenlabs/rust
+/crates/consensus*/  @alpenlabs/chain-core
+/crates/db/          @alpenlabs/database
+/crates/eectl/       @alpenlabs/evm
+/crates/evm*/        @alpenlabs/evm
 /crates/key-derivation/ @alpenlabs/crypto @alpenlabs/rust
-/crates/primitives/     @alpenlabs/crypto @alpenlabs/rust
-/crates/crypto/         @alpenlabs/crypto @alpenlabs/rust
-/crates/proof*/         @alpenlabs/prover
-/crates/reth/           @alpenlabs/evm
-/crates/rocksdb*/       @alpenlabs/database
-/crates/rpc/            @alpenlabs/chain-core @alpenlabs/btc
-/crates/state/          @alpenlabs/chain-core
-/crates/status/         @alpenlabs/chain-core
-/crates/storage/        @alpenlabs/chain-core
-/crates/sync/           @alpenlabs/chain-core
-/crates/tasks/          @alpenlabs/chain-core
-/crates/test-utils/     @alpenlabs/rust @alpenlabs/ci
-/crates/util*/          @alpenlabs/rust
-/crates/tx-parser/      @alpenlabs/rust @alpenlabs/btc
-/crates/*jmt*/          @alpenlabs/database
-/crates/zkvm/           @alpenlabs/prover
-/prover/                @alpenlabs/prover
+/crates/primitives/  @alpenlabs/crypto @alpenlabs/rust
+/crates/crypto/      @alpenlabs/crypto @alpenlabs/rust
+/crates/proof*/      @alpenlabs/prover
+/crates/reth/        @alpenlabs/evm
+/crates/rocksdb*/    @alpenlabs/database
+/crates/rpc/         @alpenlabs/chain-core @alpenlabs/btc
+/crates/state/       @alpenlabs/chain-core
+/crates/status/      @alpenlabs/chain-core
+/crates/storage/     @alpenlabs/chain-core
+/crates/sync/        @alpenlabs/chain-core
+/crates/tasks/       @alpenlabs/chain-core
+/crates/test-utils/  @alpenlabs/rust @alpenlabs/ci
+/crates/util*/       @alpenlabs/rust
+/crates/tx-parser/   @alpenlabs/rust @alpenlabs/btc
+/crates/*jmt*/       @alpenlabs/database
+/crates/zkvm/        @alpenlabs/prover
+/prover/             @alpenlabs/prover
 
 # Binaries/CLIs
 bin/                @alpenlabs/bin                   # catch all
