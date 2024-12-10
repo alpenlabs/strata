@@ -103,17 +103,17 @@ def wait_until_with_value(
     raise AssertionError(error_with)
 
 
-def wait_until_checkpoint(seqrpc, timeout: int = 5, step: float = 2):
+def wait_until_next_epoch(seqrpc, timeout: int = 5, step: float = 2):
     """Waits until the current checkpoint index increases."""
-    first_ckpt_idx = seqrpc.strata_getLatestCheckpointIndex()
+    init_epoch = seqrpc.strata_syncStatus()["tip_epoch"]
 
     def _f():
-        status = seqrpc.strata_clientStatus()
-        print("waiting for epoch, client status", status)
-        cur_ckpt_index = seqrpc.strata_getLatestCheckpointIndex()
-        return cur_ckpt_idx > first_ckpt_idx
+        status = seqrpc.strata_syncStatus()
+        print("waiting for epoch, sync status", status)
+        cur_epoch = status["tip_epoch"]
+        return cur_epoch > init_epoch
 
-    wait_until(_f, "Epoch never finalized", timeout, step)
+    wait_until(_f, "Epoch never advanced", timeout, step)
 
 
 @dataclass

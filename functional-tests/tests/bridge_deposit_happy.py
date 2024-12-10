@@ -83,7 +83,7 @@ class BridgeDepositHappyTest(testenv.StrataTester):
 
         # time for the deposit inclusion
         timeout = 70 # TODO needs to be until the end of the epoch
-        wait_until_checkpoint(seq.create_rpc(), timeout)
+        wait_until_next_epoch(seq.create_rpc(), timeout)
 
     def drain_wallet(self, ctx: flexitest.RunContext):
         """

@@ -131,12 +131,15 @@ pub struct RpcClientStatus {
     /// L2 chain tip slot.
     pub chain_tip_slot: u64,
 
-    /// Current L2 epoch.
+    /// Current L2 epoch that the tip block is a part of.
     pub cur_epoch: u64,
 
     /// L2 block that's been finalized and proven on L1.
     #[serde(with = "hex::serde")]
     pub finalized_blkid: [u8; 32],
+
+    /// Epoch that's been finalized on L1.
+    pub finalized_epoch: u64,
 
     /// Recent L1 block that we might still reorg.
     #[serde(with = "hex::serde")]
@@ -220,8 +223,8 @@ pub struct RpcSyncStatus {
     // TODO rename to "slot"
     pub tip_height: u64,
 
-    /// Current epoch that we're running in.
-    pub cur_epoch: u64,
+    /// Current head L2 slot known to this node.
+    pub tip_epoch: u64,
 
     /// Last L2 block we've chosen as the current tip.
     pub tip_block_id: L2BlockId,
@@ -358,14 +361,18 @@ impl RpcDepositEntry {
 
 /// status of L2 Block
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum L2BlockStatus {
-    /// Unknown block height
+    /// Unknown block height.
     Unknown,
-    /// Block is received and present in the longest chain
-    Confirmed,
-    /// Block is now conformed on L1, and present at certain L1 height
-    Verified(u64),
-    /// Block is now finalized, certain depth has been reached in L1
+
+    /// Block is received and present in the longest chain.
+    Accepted,
+
+    /// Block is now confirmed on L1, and present at certain L1 height.
+    Committed(u64),
+
+    /// Block is now finalized, certain depth has been reached in L1.
     Finalized(u64),
 }
 
