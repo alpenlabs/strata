@@ -6,7 +6,7 @@ use bitcoin::{
     taproot::ControlBlock,
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
-use strata_state::tx::InscriptionData;
+use strata_state::tx::InscriptionBlob;
 
 use crate::{
     rpc::{
@@ -212,11 +212,10 @@ impl Signer for TestBitcoinClient {
 }
 
 pub fn generate_inscription_script_test(
-    inscription_data: InscriptionData,
+    inscription_data: Vec<InscriptionBlob>,
     rollup_name: &str,
-    version: u8,
 ) -> anyhow::Result<ScriptBuf> {
-    generate_inscription_script(inscription_data, rollup_name, version)
+    generate_inscription_script(&inscription_data, rollup_name)
 }
 
 pub fn build_reveal_transaction_test(

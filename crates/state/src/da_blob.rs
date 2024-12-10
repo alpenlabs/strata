@@ -5,7 +5,9 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, hash};
+
+use crate::tx::InscriptionBlob;
 
 /// DA destination identifier.   This will eventually be used to enable
 /// storing blobs on alternative availability schemes.
@@ -48,7 +50,7 @@ pub struct BlobSpec {
 
     /// Commitment to the blob (probably just a hash or a
     /// merkle root) that we expect to see committed to DA.
-    blob_commitment: Buf32,
+    blob_commitment: BlobCommitment,
 }
 
 impl BlobSpec {
@@ -58,7 +60,7 @@ impl BlobSpec {
     }
 
     /// Commitment to the blob payload.
-    pub fn commitment(&self) -> &Buf32 {
+    pub fn commitment(&self) -> &BlobCommitment {
         &self.blob_commitment
     }
 }
@@ -74,14 +76,15 @@ pub struct BlobIntent {
     dest: BlobDest,
 
     /// Commitment to the blob payload.
-    commitment: Buf32,
+    /// Wrapper for Hash (Buf32)
+    commitment: BlobCommitment,
 
     /// Blob payload.
-    payload: Vec<u8>,
+    payload: Vec<InscriptionBlob>,
 }
 
 impl BlobIntent {
-    pub fn new(dest: BlobDest, commitment: Buf32, payload: Vec<u8>) -> Self {
+    pub fn new(dest: BlobDest, commitment: BlobCommitment, payload: Vec<InscriptionBlob>) -> Self {
         Self {
             dest,
             commitment,
@@ -97,12 +100,12 @@ impl BlobIntent {
     /// Commitment to the blob payload, which might be context-specific.  This
     /// is conceptually unrelated to the blob ID that we use for tracking which
     /// blobs we've written in the L1 writer bookkeeping.
-    pub fn commitment(&self) -> &Buf32 {
+    pub fn commitment(&self) -> &BlobCommitment {
         &self.commitment
     }
 
     /// The blob payload that matches the commitment.
-    pub fn payload(&self) -> &[u8] {
+    pub fn payload(&self) -> &[InscriptionBlob] {
         &self.payload
     }
 
@@ -113,5 +116,32 @@ impl BlobIntent {
             dest: self.dest,
             blob_commitment: self.commitment,
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct BlobCommitment(pub Buf32);
+
+impl BlobCommitment {
+    pub fn new(commitment: &Buf32) -> Self {
+        Self(*commitment)
+    }
+
+    pub fn into_inner(&self) -> Buf32 {
+        self.0
+    }
+
+    pub fn from_payload(payload: &[InscriptionBlob]) -> Self {
+        let commitment = payload.iter().fold(Buf32::zero(), |acc, blob| {
+            hash::raw(&[acc.0, hash::raw(blob.data()).0].concat())
+        });
+        Self(commitment)
+    }
+
+    pub fn verify_against_payload(&self, payload: &[InscriptionBlob]) -> bool {
+        let commitment = payload.iter().fold(Buf32::zero(), |acc, blob| {
+            hash::raw(&[acc.0, hash::raw(blob.data()).0].concat())
+        });
+        commitment == self.0
     }
 }

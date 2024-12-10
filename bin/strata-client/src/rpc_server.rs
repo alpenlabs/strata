@@ -22,7 +22,6 @@ use strata_db::{
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
-    hash,
     params::Params,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
@@ -37,12 +36,13 @@ use strata_state::{
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
-    da_blob::{BlobDest, BlobIntent},
+    da_blob::{BlobCommitment, BlobDest, BlobIntent},
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
     operation::ClientUpdateOutput,
     sync_event::SyncEvent,
+    tx::{BlobType, InscriptionBlob},
 };
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
@@ -281,7 +281,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
                     .iter()
                     .map(|blob| DaBlob {
                         dest: blob.dest().into(),
-                        blob_commitment: *blob.commitment().as_ref(),
+                        blob_commitment: *blob.commitment().into_inner().as_ref(),
                     })
                     .collect();
 
@@ -656,13 +656,11 @@ impl SequencerServerImpl {
             checkpoint_handle,
         }
     }
-}
 
-#[async_trait]
-impl StrataSequencerApiServer for SequencerServerImpl {
-    async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
-        let commitment = hash::raw(&blob.0);
-        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
+    /// Submit inscription blob entry
+    async fn submit_blobs(&self, blob_vec: Vec<InscriptionBlob>) -> RpcResult<()> {
+        let blob_commitment = BlobCommitment::from_payload(&blob_vec);
+        let blobintent = BlobIntent::new(BlobDest::L1, blob_commitment, blob_vec);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
         if let Err(e) = self
@@ -673,6 +671,24 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             return Err(Error::Other(e.to_string()).into());
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl StrataSequencerApiServer for SequencerServerImpl {
+    async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()> {
+        let blob_vec: Vec<InscriptionBlob> = blobs
+            .into_iter()
+            .map(|blob| InscriptionBlob::new(BlobType::DA, blob.into_inner()))
+            .collect();
+
+        self.submit_blobs(blob_vec).await
+    }
+
+    async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
+        let blob = vec![InscriptionBlob::new(BlobType::DA, blob.into_inner())];
+
+        self.submit_blobs(blob).await
     }
 
     async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid> {
