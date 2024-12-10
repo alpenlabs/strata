@@ -8,7 +8,6 @@ use reth_primitives::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use strata_reth_primitives::WithdrawalIntent;
-use strata_state::block::ExecSegment;
 
 use crate::mpt::{MptNode, StorageEntry};
 
@@ -23,11 +22,6 @@ pub struct ELProofPublicParams {
     pub withdrawal_intents: Vec<WithdrawalIntent>,
     pub deposits_txns_root: FixedBytes<32>,
 }
-
-// Instead of EL Proof Public pramams send the execupdates
-// So, make ELProofPublicParams -> ExecSegment
-pub type AcutallProofOutput1 = Vec<ELProofPublicParams>;
-pub type AcutallProofOutput2 = Vec<ExecSegment>;
 
 #[serde_as]
 /// Necessary information to prove the execution of the RETH block.
