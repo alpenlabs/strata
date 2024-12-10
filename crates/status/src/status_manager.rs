@@ -1,5 +1,5 @@
 //! Manages and updates unified status bundles
-use std::sync::Arc;
+use std::{cell::Ref, sync::Arc};
 
 use strata_primitives::l1::L1Status;
 use strata_state::{
@@ -9,7 +9,7 @@ use strata_state::{
 };
 use thiserror::Error;
 use tokio::sync::watch::{self, error::RecvError};
-use tracing::warn;
+use tracing::{instrument::WithSubscriber, warn};
 
 #[derive(Debug, Error)]
 pub enum StatusError {
@@ -66,7 +66,7 @@ impl StatusChannel {
     // Receiver methods
 
     /// Gets the latest [`LocalL1State`].
-    pub fn l1_view(&self) -> LocalL1State {
+    pub fn get_l1_view(&self) -> LocalL1State {
         self.receiver.cl.borrow().l1_view().clone()
     }
 
@@ -81,30 +81,33 @@ impl StatusChannel {
     }
 
     /// Gets the latest [`SyncState`].
-    pub fn sync_state(&self) -> Option<SyncState> {
+    pub fn get_sync_state(&self) -> Option<SyncState> {
         self.receiver.cl.borrow().sync().cloned()
     }
 
+    fn get_chainstate_cloned(&self) -> Option<Chainstate> {
+        self.receiver.chs.borrow().clone()
+    }
+
+    /// Gets the epoch of the current chain tip.
+    pub fn get_cur_l2_epoch(&self) -> Option<u64> {
+        self.get_chainstate_cloned().map(|chs| chs.cur_epoch())
+    }
+
     /// Gets the latest operator table.
-    pub fn operator_table(&self) -> Option<OperatorTable> {
-        self.receiver
-            .chs
-            .borrow()
-            .clone()
+    pub fn get_cur_operator_table(&self) -> Option<OperatorTable> {
+        self.get_chainstate_cloned()
             .map(|chs| chs.operator_table().clone())
     }
 
     /// Gets the latest deposits table.
-    pub fn deposits_table(&self) -> Option<DepositsTable> {
-        self.receiver
-            .chs
-            .borrow()
-            .clone()
+    pub fn get_cur_deposits_table(&self) -> Option<DepositsTable> {
+        self.get_chainstate_cloned()
             .map(|chs| chs.deposits_table().clone())
     }
 
     /// Gets the latest [`L1Status`].
-    pub fn l1_status(&self) -> L1Status {
+    pub fn get_l1_reader_status(&self) -> L1Status {
         self.receiver.l1.borrow().clone()
     }
 
