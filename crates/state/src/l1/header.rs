@@ -61,8 +61,8 @@ impl L1HeaderRecord {
     }
 }
 
-impl From<&strata_primitives::l1::L1BlockManifest> for L1HeaderRecord {
-    fn from(value: &strata_primitives::l1::L1BlockManifest) -> Self {
+impl From<&strata_primitives::l1::L1BlockRecord> for L1HeaderRecord {
+    fn from(value: &strata_primitives::l1::L1BlockRecord) -> Self {
         Self {
             blkid: value.block_hash().into(),
             buf: value.header().to_vec(),

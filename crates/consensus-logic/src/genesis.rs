@@ -2,7 +2,7 @@ use strata_db::{errors::DbError, traits::*};
 use strata_primitives::{
     buf::{Buf32, Buf64},
     evm_exec::create_evm_extra_payload,
-    l1::L1BlockManifest,
+    l1::L1BlockRecord,
     params::{OperatorConfig, Params},
 };
 use strata_state::{
@@ -87,14 +87,14 @@ fn load_pre_genesis_l1_manifests(
     l1_db: &impl L1Database,
     horizon_height: u64,
     genesis_height: u64,
-) -> anyhow::Result<Vec<L1BlockManifest>> {
+) -> anyhow::Result<Vec<L1BlockRecord>> {
     let mut manifests = Vec::new();
     for height in horizon_height..=genesis_height {
         let Some(mf) = l1_db.get_block_manifest(height)? else {
             return Err(Error::MissingL1BlockHeight(height).into());
         };
 
-        manifests.push(mf.into_manifest());
+        manifests.push(mf.into_record());
     }
 
     Ok(manifests)
@@ -141,7 +141,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
 
 pub fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
-    pregenesis_mfs: Vec<L1BlockManifest>,
+    pregenesis_mfs: Vec<L1BlockRecord>,
     params: &Params,
 ) -> Chainstate {
     let genesis_blkid = gblock.header().get_blockid();
