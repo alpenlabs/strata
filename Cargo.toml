@@ -1,72 +1,72 @@
 [workspace]
 members = [
-  "crates/bridge-exec",
-  "crates/bridge-relay",
-  "crates/bridge-sig-manager",
-  "crates/bridge-tx-builder",
-  "crates/btcio",
-  "crates/chaintsn",
-  "crates/common",
-  "crates/consensus-logic",
-  "crates/crypto",
-  "crates/db",
-  "crates/eectl",
-  "crates/evmexec",
-  "crates/key-derivation",
-  "crates/primitives",
-  "crates/zkvm/adapters/risc0",
-  "crates/zkvm/adapters/sp1",
-  "crates/zkvm/adapters/native",
-  "crates/proof-impl/btc-blockspace",
-  "crates/proof-impl/checkpoint",
-  "crates/proof-impl/cl-agg",
-  "crates/proof-impl/cl-stf",
-  "crates/proof-impl/evm-ee-stf",
-  "crates/proof-impl/l1-batch",
-  "crates/zkvm/zkvm",
-  "crates/reth/db",
-  "crates/reth/evm",
-  "crates/reth/exex",
-  "crates/reth/node",
-  "crates/reth/rpc",
-  "crates/rpc/api",
-  "crates/rpc/bridge-api",
-  "crates/rpc/prover-client-api",
-  "crates/rpc/types",
-  "crates/rpc/utils",
-  "crates/state",
-  "crates/status",
-  "crates/storage",
-  "crates/sync",
-  "crates/tasks",
-  "crates/test-utils",
-  "crates/tx-parser",
-  "crates/util/mmr",
-  "crates/util/shrex",
-  "crates/vtxjmt",
-  "provers/risc0",
-  "provers/sp1",
-  "provers/tests",
+    "crates/bridge-exec",
+    "crates/bridge-relay",
+    "crates/bridge-sig-manager",
+    "crates/bridge-tx-builder",
+    "crates/btcio",
+    "crates/chaintsn",
+    "crates/common",
+    "crates/consensus-logic",
+    "crates/crypto",
+    "crates/db",
+    "crates/eectl",
+    "crates/evmexec",
+    "crates/key-derivation",
+    "crates/primitives",
+    "crates/zkvm/adapters/risc0",
+    "crates/zkvm/adapters/sp1",
+    "crates/zkvm/adapters/native",
+    "crates/proof-impl/btc-blockspace",
+    "crates/proof-impl/checkpoint",
+    "crates/proof-impl/cl-agg",
+    "crates/proof-impl/cl-stf",
+    "crates/proof-impl/evm-ee-stf",
+    "crates/proof-impl/l1-batch",
+    "crates/zkvm/zkvm",
+    "crates/reth/db",
+    "crates/reth/evm",
+    "crates/reth/exex",
+    "crates/reth/node",
+    "crates/reth/rpc",
+    "crates/rpc/api",
+    "crates/rpc/bridge-api",
+    "crates/rpc/prover-client-api",
+    "crates/rpc/types",
+    "crates/rpc/utils",
+    "crates/state",
+    "crates/status",
+    "crates/storage",
+    "crates/sync",
+    "crates/tasks",
+    "crates/test-utils",
+    "crates/tx-parser",
+    "crates/util/mmr",
+    "crates/util/shrex",
+    "crates/vtxjmt",
+    "provers/risc0",
+    "provers/sp1",
+    "provers/tests",
 
-  # binaries listed separately
-  "bin/bridge-client",
-  "bin/datatool",
-  "bin/strata-cli",
-  "bin/strata-client",
-  "bin/strata-reth",
-  "bin/prover-client",
+    # binaries listed separately
+    "bin/bridge-client",
+    "bin/datatool",
+    "bin/strata-cli",
+    "bin/strata-client",
+    "bin/strata-reth",
+    "bin/prover-client",
 
-  # integration tests
-  "tests",
-  "crates/util/python-utils",
+    # integration tests
+    "tests",
+    "crates/util/python-utils",
 ]
 
 default-members = [
-  "bin/bridge-client",
-  "bin/datatool",
-  "bin/prover-client",
-  "bin/strata-reth",
-  "bin/strata-client",
+    "bin/bridge-client",
+    "bin/datatool",
+    "bin/prover-client",
+    "bin/strata-reth",
+    "bin/strata-client",
 ]
 
 resolver = "2"
@@ -127,16 +127,16 @@ alloy-primitives = { version = "0.8.7", default-features = false }
 alloy-rlp = "0.3.4"
 alloy-rlp-derive = "0.3.4"
 alloy-rpc-types = { version = "0.4.2", features = [
-  "eth",
+    "eth",
 ], default-features = false }
 alloy-rpc-types-eth = { version = "0.4.2", default-features = false, features = [
-  "serde",
+    "serde",
 ] }
 alloy-serde = { version = "0.4.2", default-features = false }
 alloy-sol-types = "0.8.0"
 revm = { version = "14.0.3", features = ["std"], default-features = false }
 revm-primitives = { version = "10.0.0", features = [
-  "std",
+    "std",
 ], default-features = false }
 
 # reth itself:
@@ -161,7 +161,7 @@ reth-node-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
 reth-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0", default-features = false, features = [
-  "std",
+    "std",
 ] }
 reth-primitives-traits = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0", default-features = false }
 reth-provider = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
@@ -216,11 +216,11 @@ rand = "0.8.5"
 rand_chacha = { version = "0.3.1", default-features = false }
 rand_core = { version = "0.6", default-features = false }
 reqwest = { version = "0.12.7", default-features = false, features = [
-  "http2",
-  "rustls-tls",
-  "charset",
-  "zstd",
-  "json",
+    "http2",
+    "rustls-tls",
+    "charset",
+    "zstd",
+    "json",
 ] }
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "v2.0.1-alpen.2" }
 secp256k1 = { version = "0.29.1", features = ["global-context", "std"] }
@@ -240,7 +240,7 @@ tracing = "0.1"
 tracing-opentelemetry = "0.27"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
-zeroize = { version = "1.8.1", features = ["derive"] }
+zeroize = "1.8.1"
 
 # This is needed for custom build of SP1
 [profile.release.build-override]
