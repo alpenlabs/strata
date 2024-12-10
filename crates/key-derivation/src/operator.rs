@@ -167,18 +167,20 @@ impl Zeroize for OperatorKeys {
         master.depth.zeroize();
         {
             let fingerprint: &mut [u8; 4] = master.parent_fingerprint.as_mut();
-            fingerprint.copy_from_slice(&[0u8; 4]);
+            fingerprint.zeroize();
         }
         master.private_key.non_secure_erase();
         {
             let chaincode: &mut [u8; 32] = master.chain_code.as_mut();
-            chaincode.copy_from_slice(&[0u8; 32]);
+            chaincode.zeroize();
         }
         let raw_ptr = &mut master.child_number as *mut ChildNumber;
         // SAFETY: `master.child_number` is a valid enum variant
         //          and will not be accessed after zeroization.
         //          Also there are only two possible variants that will
         //          always have an `index` which is a `u32`.
+        //          Note that `ChildNumber` does not have the `#[non_exhaustive]`
+        //          attribute.
         unsafe {
             *raw_ptr = if master.child_number.is_normal() {
                 ChildNumber::Normal { index: 0 }
@@ -191,18 +193,20 @@ impl Zeroize for OperatorKeys {
         base.depth.zeroize();
         {
             let fingerprint: &mut [u8; 4] = base.parent_fingerprint.as_mut();
-            fingerprint.copy_from_slice(&[0u8; 4]);
+            fingerprint.zeroize();
         }
         base.private_key.non_secure_erase();
         {
             let chaincode: &mut [u8; 32] = base.chain_code.as_mut();
-            chaincode.copy_from_slice(&[0u8; 32]);
+            chaincode.zeroize();
         }
         let raw_ptr = &mut base.child_number as *mut ChildNumber;
-        // SAFETY: `signing.child_number` is a valid enum variant
+        // SAFETY: `base.child_number` is a valid enum variant
         //          and will not be accessed after zeroization.
         //          Also there are only two possible variants that will
         //          always have an `index` which is a `u32`.
+        //          Note that `ChildNumber` does not have the `#[non_exhaustive]`
+        //          attribute.
         unsafe {
             *raw_ptr = if base.child_number.is_normal() {
                 ChildNumber::Normal { index: 0 }
@@ -215,18 +219,20 @@ impl Zeroize for OperatorKeys {
         message.depth.zeroize();
         {
             let fingerprint: &mut [u8; 4] = message.parent_fingerprint.as_mut();
-            fingerprint.copy_from_slice(&[0u8; 4]);
+            fingerprint.zeroize();
         }
         message.private_key.non_secure_erase();
         {
             let chaincode: &mut [u8; 32] = message.chain_code.as_mut();
-            chaincode.copy_from_slice(&[0u8; 32]);
+            chaincode.zeroize();
         }
         let raw_ptr = &mut message.child_number as *mut ChildNumber;
-        // SAFETY: `signing.child_number` is a valid enum variant
+        // SAFETY: `message.child_number` is a valid enum variant
         //          and will not be accessed after zeroization.
         //          Also there are only two possible variants that will
         //          always have an `index` which is a `u32`.
+        //          Note that `ChildNumber` does not have the `#[non_exhaustive]`
+        //          attribute.
         unsafe {
             *raw_ptr = if message.child_number.is_normal() {
                 ChildNumber::Normal { index: 0 }
@@ -239,18 +245,20 @@ impl Zeroize for OperatorKeys {
         wallet.depth.zeroize();
         {
             let fingerprint: &mut [u8; 4] = wallet.parent_fingerprint.as_mut();
-            fingerprint.copy_from_slice(&[0u8; 4]);
+            fingerprint.zeroize();
         }
         wallet.private_key.non_secure_erase();
         {
             let chaincode: &mut [u8; 32] = wallet.chain_code.as_mut();
-            chaincode.copy_from_slice(&[0u8; 32]);
+            chaincode.zeroize();
         }
         let raw_ptr = &mut wallet.child_number as *mut ChildNumber;
         // SAFETY: `wallet.child_number` is a valid enum variant
         //          and will not be accessed after zeroization.
         //          Also there are only two possible variants that will
         //          always have an `index` which is a `u32`.
+        //          Note that `ChildNumber` does not have the `#[non_exhaustive]`
+        //          attribute.
         unsafe {
             *raw_ptr = if wallet.child_number.is_normal() {
                 ChildNumber::Normal { index: 0 }

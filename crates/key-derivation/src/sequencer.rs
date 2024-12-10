@@ -92,18 +92,20 @@ impl Zeroize for SequencerKeys {
         master.depth.zeroize();
         {
             let fingerprint: &mut [u8; 4] = master.parent_fingerprint.as_mut();
-            fingerprint.copy_from_slice(&[0u8; 4]);
+            fingerprint.zeroize();
         }
         master.private_key.non_secure_erase();
         {
             let chaincode: &mut [u8; 32] = master.chain_code.as_mut();
-            chaincode.copy_from_slice(&[0u8; 32]);
+            chaincode.zeroize();
         }
         let raw_ptr = &mut master.child_number as *mut ChildNumber;
         // SAFETY: `master.child_number` is a valid enum variant
         //          and will not be accessed after zeroization.
         //          Also there are only two possible variants that will
         //          always have an `index` which is a `u32`.
+        //          Note that `ChildNumber` does not have the `#[non_exhaustive]`
+        //          attribute.
         unsafe {
             *raw_ptr = if master.child_number.is_normal() {
                 ChildNumber::Normal { index: 0 }
@@ -116,18 +118,20 @@ impl Zeroize for SequencerKeys {
         derived.depth.zeroize();
         {
             let fingerprint: &mut [u8; 4] = derived.parent_fingerprint.as_mut();
-            fingerprint.copy_from_slice(&[0u8; 4]);
+            fingerprint.zeroize();
         }
         derived.private_key.non_secure_erase();
         {
             let chaincode: &mut [u8; 32] = derived.chain_code.as_mut();
-            chaincode.copy_from_slice(&[0u8; 32]);
+            chaincode.zeroize();
         }
         let raw_ptr = &mut derived.child_number as *mut ChildNumber;
         // SAFETY: `derived.child_number` is a valid enum variant
         //          and will not be accessed after zeroization.
         //          Also there are only two possible variants that will
         //          always have an `index` which is a `u32`.
+        //          Note that `ChildNumber` does not have the `#[non_exhaustive]`
+        //          attribute.
         unsafe {
             *raw_ptr = if derived.child_number.is_normal() {
                 ChildNumber::Normal { index: 0 }
