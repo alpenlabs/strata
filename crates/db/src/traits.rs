@@ -47,7 +47,7 @@ pub trait L1Database {
     /// Atomically extends the chain with a new block, providing the manifest
     /// and a list of transactions we find relevant.  Returns error if
     /// provided out-of-order.
-    fn put_block_data(&self, idx: u64, mf: EpochedL1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()>;
+    fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()>;
 
     /// Stores an MMR checkpoint so we have to query less far back.  If the
     /// provided height does not match the entries in the MMR, will return an
@@ -64,7 +64,7 @@ pub trait L1Database {
     fn get_chain_tip(&self) -> DbResult<Option<u64>>;
 
     /// Gets the block manifest for a block index.
-    fn get_block_manifest(&self, idx: u64) -> DbResult<Option<EpochedL1BlockManifest>>;
+    fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>>;
 
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.

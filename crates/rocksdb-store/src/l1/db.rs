@@ -8,7 +8,7 @@ use strata_db::{errors::DbError, traits::*, DbResult};
 use strata_mmr::CompactMmr;
 use strata_primitives::{
     buf::Buf32,
-    l1::{EpochedL1BlockManifest, L1TxRef},
+    l1::{L1BlockManifest, L1TxRef},
 };
 use strata_state::l1::L1Tx;
 use tracing::*;
@@ -42,7 +42,7 @@ impl L1Db {
 }
 
 impl L1Database for L1Db {
-    fn put_block_data(&self, idx: u64, mf: EpochedL1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
+    fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
         // If there is latest block then expect the idx to be 1 greater than the block number, else
         // allow arbitrary block number to be inserted
         match self.get_latest_block_number()? {
@@ -179,7 +179,7 @@ impl L1Database for L1Db {
         Ok(res)
     }
 
-    fn get_block_manifest(&self, idx: u64) -> DbResult<Option<EpochedL1BlockManifest>> {
+    fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>> {
         Ok(self.db.get::<L1BlockSchema>(&idx)?)
     }
 
@@ -238,11 +238,11 @@ mod tests {
         idx: u64,
         db: &L1Db,
         num_txs: usize,
-    ) -> (EpochedL1BlockManifest, Vec<L1Tx>, CompactMmr) {
+    ) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
         let mut arb = ArbitraryGenerator::new();
 
         // TODO maybe tweak this to make it a bit more realistic?
-        let mf: EpochedL1BlockManifest = arb.generate();
+        let mf: L1BlockManifest = arb.generate();
         let txs: Vec<L1Tx> = (0..num_txs)
             .map(|i| {
                 let proof = L1TxProof::new(i as u32, arb.generate());
@@ -289,7 +289,7 @@ mod tests {
                 .collect();
             let res = db.put_block_data(
                 invalid_idx,
-                ArbitraryGenerator::new().generate::<EpochedL1BlockManifest>(),
+                ArbitraryGenerator::new().generate::<L1BlockManifest>(),
                 txs,
             );
             assert!(res.is_err(), "Should fail to insert to db");

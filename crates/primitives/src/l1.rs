@@ -130,9 +130,9 @@ impl L1TxProof {
 
 /// Includes `L1BlockManifest` along with scan rules that it is applied to
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct EpochedL1BlockManifest {
+pub struct L1BlockManifest {
     /// The actual l1 manifest
-    manifest: L1BlockManifest,
+    record: L1BlockRecord,
     /// Epoch, whose scan rules are applied to this manifest
     epoch: Epoch,
 }
@@ -146,32 +146,32 @@ pub enum Epoch {
     AtTransition(u64, u64),
 }
 
-impl EpochedL1BlockManifest {
-    pub fn new(manifest: L1BlockManifest, epoch: Epoch) -> Self {
-        Self { manifest, epoch }
+impl L1BlockManifest {
+    pub fn new(record: L1BlockRecord, epoch: Epoch) -> Self {
+        Self { record, epoch }
     }
 
     pub fn header(&self) -> &[u8] {
-        self.manifest.header()
+        self.record.header()
     }
 
     pub fn block_hash(&self) -> Buf32 {
-        self.manifest.block_hash()
+        self.record.block_hash()
     }
 
     pub fn txs_root(&self) -> Buf32 {
-        self.manifest.txs_root()
+        self.record.txs_root()
     }
 
-    pub fn into_manifest(self) -> L1BlockManifest {
-        self.manifest
+    pub fn into_record(self) -> L1BlockRecord {
+        self.record
     }
 }
 
 /// Describes an L1 block and associated data that we need to keep around.
 // TODO should we include the block index here?
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct L1BlockManifest {
+pub struct L1BlockRecord {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
     /// here.  This is what we use in the MMR.
     blockid: Buf32,
@@ -185,7 +185,7 @@ pub struct L1BlockManifest {
     txs_root: Buf32,
 }
 
-impl L1BlockManifest {
+impl L1BlockRecord {
     pub fn new(blockid: Buf32, header: Vec<u8>, txs_root: Buf32) -> Self {
         Self {
             blockid,
@@ -208,7 +208,7 @@ impl L1BlockManifest {
     }
 }
 
-impl From<Block> for L1BlockManifest {
+impl From<Block> for L1BlockRecord {
     fn from(block: Block) -> Self {
         let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array());
         let root = block

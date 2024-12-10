@@ -454,7 +454,7 @@ pub fn filter_verified_checkpoints(
 mod tests {
     use bitcoin::params::MAINNET;
     use strata_db::traits::L1Database;
-    use strata_primitives::{block_credential, l1::L1BlockManifest};
+    use strata_primitives::{block_credential, l1::L1BlockRecord};
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{l1::L1BlockId, operation};
     use strata_test_utils::{

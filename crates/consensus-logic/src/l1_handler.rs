@@ -10,7 +10,7 @@ use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{Epoch, EpochedL1BlockManifest, L1BlockManifest, L1TxProof},
+    l1::{Epoch, L1BlockManifest, L1BlockRecord, L1TxProof},
     params::{Params, RollupParams},
     proof::RollupVerifyingKey,
 };
@@ -192,7 +192,7 @@ pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) 
 
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
-fn generate_block_manifest(block: &Block, epoch: Epoch) -> EpochedL1BlockManifest {
+fn generate_block_manifest(block: &Block, epoch: Epoch) -> L1BlockManifest {
     let blockid = Buf32::from(block.block_hash().to_raw_hash().to_byte_array());
     let root = block
         .witness_root()
@@ -200,8 +200,8 @@ fn generate_block_manifest(block: &Block, epoch: Epoch) -> EpochedL1BlockManifes
         .unwrap_or_default();
     let header = serialize(&block.header);
 
-    let mf = L1BlockManifest::new(blockid, header, Buf32::from(root));
-    EpochedL1BlockManifest::new(mf, epoch)
+    let mf = L1BlockRecord::new(blockid, header, Buf32::from(root));
+    L1BlockManifest::new(mf, epoch)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
