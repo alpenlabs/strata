@@ -120,7 +120,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     // TODO this is a total stub, we have to fill it in with something
     let exec_seg = ExecSegment::new(genesis_update);
 
-    let body = L2BlockBody::new(l1_seg, exec_seg);
+    let body = L2BlockBody::new(None, exec_seg);
 
     // TODO stub
     let exec_payload = vec![];

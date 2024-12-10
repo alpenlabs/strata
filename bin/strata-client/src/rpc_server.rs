@@ -8,6 +8,7 @@ use bitcoin::{
     secp256k1::{PublicKey, XOnlyPublicKey},
     Transaction as BTransaction, Txid,
 };
+use borsh::BorshSerialize;
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
@@ -114,7 +115,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_l1_status(&self) -> RpcResult<RpcL1Status> {
-        let l1s = self.status_channel.l1_status();
+        let l1s = self.status_channel.get_l1_reader_status();
         Ok(RpcL1Status::from_l1_status(
             l1s,
             self.sync_manager.params().rollup().network,
@@ -141,8 +142,8 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_client_status(&self) -> RpcResult<RpcClientStatus> {
-        let sync_state = self.status_channel.sync_state();
-        let l1_view = self.status_channel.l1_view();
+        let sync_state = self.status_channel.get_sync_state();
+        let l1_view = self.status_channel.get_l1_view();
 
         let last_l1 = l1_view.tip_blkid().cloned().unwrap_or_else(|| {
             // TODO figure out a better way to do this
@@ -151,27 +152,35 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         });
 
         // Copy these out of the sync state, if they're there.
-        let (chain_tip, finalized_blkid) = sync_state
-            .map(|ss| (*ss.chain_tip_blkid(), *ss.finalized_blkid()))
+        let (chain_tip, finalized_blkid, finalized_epoch) = sync_state
+            .map(|ss| {
+                (
+                    *ss.chain_tip_blkid(),
+                    *ss.finalized_blkid(),
+                    ss.finalized_epoch(),
+                )
+            })
             .unwrap_or_default();
 
-        // FIXME make this load from cache, and put the data we actually want
-        // here in the client state
-        // FIXME error handling
-        let db = self.database.clone();
-        let slot: u64 = wait_blocking("load_cur_block", move || {
-            let l2_db = db.l2_db();
-            l2_db
-                .get_block_data(chain_tip)
-                .map(|b| b.map(|b| b.header().blockidx()).unwrap_or(u64::MAX))
-                .map_err(Error::from)
-        })
-        .await?;
+        let Some(block) = self
+            .l2_block_manager
+            .get_block_async(&chain_tip)
+            .map_err(Error::from)
+            .await?
+        else {
+            // We should never encounter this.
+            return Err(Error::MissingL2Block(chain_tip).into());
+        };
+
+        let slot: u64 = block.block().header().blockidx();
+        let epoch = self.status_channel.get_cur_l2_epoch().unwrap_or(0);
 
         Ok(RpcClientStatus {
             chain_tip: *chain_tip.as_ref(),
             chain_tip_slot: slot,
+            cur_epoch: epoch,
             finalized_blkid: *finalized_blkid.as_ref(),
+            finalized_epoch,
             last_l1_block: *last_l1.as_ref(),
             buried_l1_height: l1_view.buried_l1_height(),
         })
@@ -179,7 +188,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
     async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<RpcBlockHeader>> {
         // FIXME: sync state should have a block number
-        let sync_state = self.status_channel.sync_state();
+        let sync_state = self.status_channel.get_sync_state();
         let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
         let db = self.database.clone();
 
@@ -210,7 +219,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_headers_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<RpcBlockHeader>>> {
-        let sync_state = self.status_channel.sync_state();
+        let sync_state = self.status_channel.get_sync_state();
         let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
         let db = self.database.clone();
 
@@ -343,7 +352,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {
         let deps = self
             .status_channel
-            .deposits_table()
+            .get_cur_deposits_table()
             .ok_or(Error::BeforeGenesis)?;
 
         Ok(deps.get_all_deposits_idxs_iters_iter().collect())
@@ -352,7 +361,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<RpcDepositEntry> {
         let deps = self
             .status_channel
-            .deposits_table()
+            .get_cur_deposits_table()
             .ok_or(Error::BeforeGenesis)?;
         Ok(deps
             .get_deposit(deposit_id)
@@ -361,12 +370,15 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn sync_status(&self) -> RpcResult<RpcSyncStatus> {
-        let sync_state = self.status_channel.sync_state();
+        let sync_state = self.status_channel.get_sync_state();
+        let cur_epoch = self.status_channel.get_cur_l2_epoch().unwrap_or(0);
         Ok(sync_state
             .map(|sync| RpcSyncStatus {
-                tip_height: sync.chain_tip_height(),
+                tip_height: sync.tip_height(),
+                tip_epoch: cur_epoch,
                 tip_block_id: *sync.chain_tip_blkid(),
                 finalized_block_id: *sync.finalized_blkid(),
+                finalized_epoch: sync.finalized_epoch(),
             })
             .ok_or(Error::ClientNotStarted)?)
     }
@@ -467,7 +479,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
         let deps_table = self
             .status_channel
-            .deposits_table()
+            .get_cur_deposits_table()
             .ok_or(Error::BeforeGenesis)?;
 
         let withdrawal_duties = extract_withdrawal_infos(&deps_table).map(BridgeDuty::from);
@@ -487,7 +499,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
         let operator_table = self
             .status_channel
-            .operator_table()
+            .get_cur_operator_table()
             .ok_or(Error::BeforeGenesis)?;
         let operator_map: BTreeMap<OperatorIdx, PublicKey> = operator_table
             .operators()
@@ -527,20 +539,20 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {
-        let sync_state = self.status_channel.sync_state();
-        let l1_view = self.status_channel.l1_view();
+        let sync_state = self.status_channel.get_sync_state();
+        let l1_view = self.status_channel.get_l1_view();
         if let Some(last_checkpoint) = l1_view.last_finalized_checkpoint() {
             if last_checkpoint.batch_info.includes_l2_block(block_height) {
                 return Ok(L2BlockStatus::Finalized(last_checkpoint.height));
             }
         }
         if let Some(l1_height) = l1_view.get_verified_l1_height(block_height) {
-            return Ok(L2BlockStatus::Verified(l1_height));
+            return Ok(L2BlockStatus::Committed(l1_height));
         }
 
         if let Some(sync_status) = sync_state {
-            if block_height < sync_status.chain_tip_height() {
-                return Ok(L2BlockStatus::Confirmed);
+            if block_height < sync_status.tip_height() {
+                return Ok(L2BlockStatus::Accepted);
             }
         }
 
