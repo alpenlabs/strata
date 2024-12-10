@@ -1,3 +1,8 @@
+//! Utility functions for Strata `datatool` binary.
+//!
+//! It contains functions for generating keys, parsing amounts, and constructing
+//! network parameters.
+//! These functions are called from the CLI's subcommands.
 use std::{
     fs,
     path::{Path, PathBuf},

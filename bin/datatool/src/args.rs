@@ -1,3 +1,5 @@
+//! Command line arguments for Strata's `datatool` binary.
+
 use std::path::PathBuf;
 
 use argh::FromArgs;

@@ -1,3 +1,9 @@
+//! Command line tool for generating test data for Strata.
+//!
+//! # Warning
+//!
+//! This tool is intended for use in testing and development only. It generates
+//! keys and other data that should not be used in production.
 mod args;
 mod utils;
 
