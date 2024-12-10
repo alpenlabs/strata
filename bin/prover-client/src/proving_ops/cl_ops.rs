@@ -68,6 +68,7 @@ impl ProvingOperations for ClOperations {
         task_tracker: Arc<TaskTracker>,
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
+        // Create proving task for the corresponding EL block
         let el_block_range = (input.block_num, input.block_num);
         let el_task_id = self.el_dispatcher.create_task(el_block_range).await?;
 
