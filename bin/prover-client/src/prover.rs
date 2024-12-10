@@ -97,11 +97,15 @@ where
 {
     let (zkvm_input, proof_type) = match zkvm_input {
         ZkVmInput::ElBlock(el_input) => {
-            let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            (
-                Vm::Input::new().write_serde(&el_input)?.build()?,
-                ProofType::Compressed,
-            )
+            let el_inputs: Vec<ELProofInput> = bincode::deserialize(&el_input.data)?;
+
+            let mut input_builder = Vm::Input::new();
+            input_builder.write_serde(&el_inputs.len())?;
+            for el_input in el_inputs {
+                input_builder.write_serde(&el_input)?;
+            }
+
+            (input_builder.build()?, ProofType::Compressed)
         }
 
         ZkVmInput::BtcBlock(block, rollup_params) => (

@@ -2707,8 +2707,10 @@ dependencies = [
  "rlp",
  "serde",
  "serde_with",
+ "strata-primitives",
  "strata-reth-evm",
  "strata-reth-primitives",
+ "strata-state",
  "strata-zkvm",
  "thiserror",
 ]

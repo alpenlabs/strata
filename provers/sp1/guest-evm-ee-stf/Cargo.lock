@@ -1071,6 +1071,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethnum"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
+
+[[package]]
 name = "fastrand"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1575,6 +1581,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
+ "proc-macro-crate",
  "proc-macro2",
  "quote",
  "syn 2.0.87",
@@ -2568,6 +2575,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "strata-bridge-tx-builder"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "lazy_static",
+ "musig2",
+ "serde",
+ "strata-primitives",
+ "thiserror",
+]
+
+[[package]]
+name = "strata-crypto"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "secp256k1",
+ "sha2",
+ "strata-primitives",
+]
+
+[[package]]
 name = "strata-primitives"
 version = "0.1.0"
 dependencies = [
@@ -2608,8 +2637,10 @@ dependencies = [
  "rlp",
  "serde",
  "serde_with",
+ "strata-primitives",
  "strata-reth-evm",
  "strata-reth-primitives",
+ "strata-state",
  "strata-zkvm",
  "thiserror",
 ]
@@ -2646,6 +2677,26 @@ dependencies = [
  "sp1-primitives",
  "sp1-verifier",
  "sp1-zkvm",
+ "strata-primitives",
+ "strata-zkvm",
+ "tracing",
+]
+
+[[package]]
+name = "strata-state"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "ethnum",
+ "hex",
+ "num_enum",
+ "serde",
+ "sha2",
+ "strata-bridge-tx-builder",
+ "strata-crypto",
  "strata-primitives",
  "strata-zkvm",
  "tracing",
