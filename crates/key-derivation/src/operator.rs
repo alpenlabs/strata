@@ -16,24 +16,16 @@
 //! - `m/56'/20'/100` for the message signing key
 //! - `m/56'/20'/101` for the wallet transaction signing key
 
-use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
+use bitcoin::bip32::{ChildNumber, Xpriv, Xpub};
 use secp256k1::SECP256K1;
+use strata_primitives::constants::{
+    STRATA_OPERATOR_BASE_DERIVATION_PATH, STRATA_OPERATOR_MESSAGE_IDX, STRATA_OPERATOR_WALLET_IDX,
+    STRATA_OP_MESSAGE_DERIVATION_PATH, STRATA_OP_WALLET_DERIVATION_PATH,
+};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::KeyError;
-
-/// Strata base index for operator keys.
-const BASE_IDX: u32 = 56;
-
-/// Operator index for operator keys.
-const OPERATOR_IDX: u32 = 20;
-
-/// Message index for the operator message key.
-const MESSAGE_IDX: u32 = 100;
-
-/// Wallet index for the operator wallet key.
-const WALLET_IDX: u32 = 101;
 
 /// Operator's message signing and wallet transaction signing _private_ keys.
 #[derive(Debug, Clone)]
@@ -58,13 +50,9 @@ pub struct OperatorKeys {
 impl OperatorKeys {
     /// Creates a new [`OperatorKeys`] from a master [`Xpriv`].
     pub fn new(master: &Xpriv) -> Result<Self, KeyError> {
-        let base_path = base_path()?;
-        let message_path = message_path();
-        let wallet_path = wallet_path();
-
-        let base_xpriv = master.derive_priv(SECP256K1, &base_path)?;
-        let message_xpriv = master.derive_priv(SECP256K1, &message_path?)?;
-        let wallet_xpriv = master.derive_priv(SECP256K1, &wallet_path)?;
+        let base_xpriv = master.derive_priv(SECP256K1, &*STRATA_OPERATOR_BASE_DERIVATION_PATH)?;
+        let message_xpriv = master.derive_priv(SECP256K1, &*STRATA_OP_MESSAGE_DERIVATION_PATH)?;
+        let wallet_xpriv = master.derive_priv(SECP256K1, &*STRATA_OP_WALLET_DERIVATION_PATH)?;
 
         Ok(Self {
             master: *master,
@@ -272,35 +260,9 @@ impl Zeroize for OperatorKeys {
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for OperatorKeys {}
 
-/// Base [`DerivationPath`] for the operator.
-fn base_path() -> Result<DerivationPath, KeyError> {
-    Ok(DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(BASE_IDX)?,
-        ChildNumber::from_hardened_idx(OPERATOR_IDX)?,
-    ]))
-}
-
-/// [`DerivationPath`] for the operator's message signing key.
-fn message_path() -> Result<DerivationPath, KeyError> {
-    Ok(DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(BASE_IDX)?,
-        ChildNumber::from_hardened_idx(OPERATOR_IDX)?,
-        ChildNumber::from_normal_idx(MESSAGE_IDX)?,
-    ]))
-}
-
-/// [`DerivationPath`] for the operator's wallet key.
-fn wallet_path() -> DerivationPath {
-    DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(BASE_IDX).unwrap(),
-        ChildNumber::from_hardened_idx(OPERATOR_IDX).unwrap(),
-        ChildNumber::from_normal_idx(WALLET_IDX).unwrap(),
-    ])
-}
-
 /// Converts the base [`Xpub`] to the message [`Xpub`].
 pub fn convert_base_xpub_to_message_xpub(base_xpub: &Xpub) -> Xpub {
-    let message_partial_path = ChildNumber::from_normal_idx(MESSAGE_IDX)
+    let message_partial_path = ChildNumber::from_normal_idx(STRATA_OPERATOR_MESSAGE_IDX)
         .expect("unfallible as long MESSAGE_IDX is not changed");
     base_xpub
         .derive_pub(SECP256K1, &message_partial_path)
@@ -309,7 +271,7 @@ pub fn convert_base_xpub_to_message_xpub(base_xpub: &Xpub) -> Xpub {
 
 /// Converts the base [`Xpub`] to the wallet [`Xpub`].
 pub fn convert_base_xpub_to_wallet_xpub(base_xpub: &Xpub) -> Xpub {
-    let wallet_partial_path = ChildNumber::from_normal_idx(WALLET_IDX)
+    let wallet_partial_path = ChildNumber::from_normal_idx(STRATA_OPERATOR_WALLET_IDX)
         .expect("unfallible as long WALLET_IDX is not changed");
     base_xpub
         .derive_pub(SECP256K1, &wallet_partial_path)
@@ -321,8 +283,9 @@ mod tests {
     use std::{collections::BTreeMap, sync::LazyLock};
 
     use bitcoin::{
-        absolute, consensus, hashes::Hash, psbt::Input, transaction::Version, Address, Amount,
-        OutPoint, Psbt, Sequence, TapSighashType, Transaction, TxIn, TxOut, Txid, Witness,
+        absolute, bip32::DerivationPath, consensus, hashes::Hash, psbt::Input,
+        transaction::Version, Address, Amount, OutPoint, Psbt, Sequence, TapSighashType,
+        Transaction, TxIn, TxOut, Txid, Witness,
     };
 
     use super::*;

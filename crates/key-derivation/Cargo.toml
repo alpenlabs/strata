@@ -9,6 +9,8 @@ rust.unused_crate_dependencies = "deny"
 rust.unused_must_use = "deny"
 
 [dependencies]
+strata-primitives.workspace = true
+
 bitcoin = { workspace = true, features = ["rand-std"] }
 secp256k1.workspace = true
 thiserror.workspace = true

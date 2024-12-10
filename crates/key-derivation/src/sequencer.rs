@@ -1,17 +1,12 @@
 //! Key derivation for Strata sequencer
 
-use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
+use bitcoin::bip32::{ChildNumber, Xpriv, Xpub};
 use secp256k1::SECP256K1;
+use strata_primitives::constants::STRATA_SEQUENCER_DERIVATION_PATH;
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::KeyError;
-
-/// The Strata base index for sequencer keys.
-const BASE_IDX: u32 = 56;
-
-/// The Strata sequencer index.
-const SEQUENCER_IDX: u32 = 10;
 
 /// The Strata sequencer's master, and derived _private_ keys.
 #[derive(Debug, Clone)]
@@ -26,9 +21,8 @@ pub struct SequencerKeys {
 impl SequencerKeys {
     /// Creates a new [`SequencerKeys`] from a master [`Xpriv`].
     pub fn new(master: &Xpriv) -> Result<Self, KeyError> {
-        let path = derived_path();
+        let derived = master.derive_priv(SECP256K1, &*STRATA_SEQUENCER_DERIVATION_PATH)?;
 
-        let derived = master.derive_priv(SECP256K1, &path?)?;
         Ok(Self {
             master: *master,
             derived,
@@ -144,14 +138,6 @@ impl Zeroize for SequencerKeys {
 
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for SequencerKeys {}
-
-/// The [`DerivationPath`] for the sequencer's derived key.
-fn derived_path() -> Result<DerivationPath, KeyError> {
-    Ok(DerivationPath::master().extend([
-        ChildNumber::from_hardened_idx(BASE_IDX)?,
-        ChildNumber::from_hardened_idx(SEQUENCER_IDX)?,
-    ]))
-}
 
 #[cfg(test)]
 mod tests {
