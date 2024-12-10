@@ -9,8 +9,6 @@ use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
 };
-use strata_sp1_adapter::SP1Host;
-use strata_sp1_guest_builder::*;
 use strata_zkvm::{Proof, ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
@@ -91,7 +89,7 @@ pub(crate) struct Prover {
     prover_state: Arc<RwLock<ProverState>>,
     db: ProverDB,
     pool: rayon::ThreadPool,
-    vm_manager: ZkVMManager<SP1Host>, // TODO: make this generic
+    vm_manager: ZkVMManager, // TODO: make this generic
 }
 
 fn make_proof<Vm>(zkvm_input: ZkVmInput, vm: &'static Vm) -> Result<ProofWithVkey, anyhow::Error>

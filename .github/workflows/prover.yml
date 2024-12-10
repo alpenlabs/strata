@@ -15,12 +15,12 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: nightly-2024-07-27
-      
+
       - name: Use Cargo cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      
+
       # Installs mold (modern ld), a drop-in replacement for lld.
       # Under the hood, the following action symlinks mold binary onto lld,
       # so everything is linked faster (hopefully).
@@ -47,11 +47,3 @@ jobs:
         working-directory: provers/sp1
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
-      
-      # Temporary disabled. 
-      # TODO(STR-694): To be re-enabled once prover-client has its features and build stabilized.
-      #- name: Build prover client binary
-      #  run: cargo build --profile prover-ci -F "prover"
-      #  working-directory: bin/prover-client
-      #  env:
-      #    RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
