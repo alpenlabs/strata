@@ -12,7 +12,7 @@ use crate::{cache, ops};
 /// Caching manager of L2 blocks in the block database.
 pub struct L2BlockManager {
     ops: ops::l2::L2DataOps,
-    block_cache: cache::CacheTable<L2BlockId, Option<L2BlockBundle>>,
+    block_cache: cache::CacheTable<L2BlockId, L2BlockBundle>,
 }
 
 impl L2BlockManager {

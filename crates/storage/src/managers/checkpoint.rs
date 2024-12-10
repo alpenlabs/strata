@@ -7,7 +7,7 @@ use crate::{cache, ops};
 
 pub struct CheckpointDbManager {
     ops: ops::checkpoint::CheckpointDataOps,
-    checkpoint_cache: cache::CacheTable<u64, Option<CheckpointEntry>>,
+    checkpoint_cache: cache::CacheTable<u64, CheckpointEntry>,
 }
 
 impl CheckpointDbManager {
