@@ -5,7 +5,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
 from constants import DEFAULT_ROLLUP_PARAMS
-from utils import get_bridge_pubkey, get_logger, wait_until_checkpoint
+from utils import get_bridge_pubkey, get_logger, wait_until_next_epoch
 
 
 @flexitest.register
@@ -82,7 +82,7 @@ class BridgeDepositHappyTest(flexitest.Test):
 
         # time for the deposit inclusion
         timeout = 70 # TODO needs to be until the end of the epoch
-        wait_until_checkpoint(seq.create_rpc(), timeout)
+        wait_until_next_epoch(seq.create_rpc(), timeout)
 
     def drain_wallet(self, ctx: flexitest.RunContext):
         """

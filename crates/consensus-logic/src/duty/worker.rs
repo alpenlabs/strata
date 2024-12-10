@@ -379,7 +379,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let target_slot = data.target_slot();
             let parent = data.parent();
 
-            let l1_view = sync_manager.status_channel().l1_view();
+            let l1_view = sync_manager.status_channel().get_l1_view();
 
             // TODO get the cur client state from the sync manager, the one used
             // to initiate this duty and pass it into `sign_and_store_block`
