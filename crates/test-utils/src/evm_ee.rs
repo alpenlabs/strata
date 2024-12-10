@@ -2,9 +2,10 @@ use std::{collections::HashMap, path::PathBuf};
 
 use strata_consensus_logic::genesis::make_genesis_block;
 use strata_primitives::buf::{Buf32, Buf64};
-use strata_proofimpl_cl_stf::{reconstruct_exec_segment, Chainstate, StateCache};
+use strata_proofimpl_cl_stf::{Chainstate, StateCache};
 use strata_proofimpl_evm_ee_stf::{
-    process_block_transaction, processor::EvmConfig, ELProofInput, ELProofPublicParams,
+    generate_exec_update, process_block_transaction, processor::EvmConfig, ELProofInput,
+    ELProofPublicParams,
 };
 use strata_state::{
     block::{L1Segment, L2Block, L2BlockBody},
@@ -101,7 +102,7 @@ impl L2Segment {
         for height in 1..=end_height {
             let el_proof_in = evm_segment.get_input(&height);
             let el_proof_out = evm_segment.get_output(&height);
-            let evm_ee_segment = reconstruct_exec_segment(el_proof_out);
+            let evm_ee_segment = generate_exec_update(el_proof_out);
             let l1_segment = L1Segment::new_empty();
             let body = L2BlockBody::new(l1_segment, evm_ee_segment);
 
