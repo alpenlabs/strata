@@ -234,6 +234,27 @@ pub fn process_event<D: Database>(
     Ok(ClientUpdateOutput::new(writes, actions))
 }
 
+/// Handles the maturation of L1 height by finalizing checkpoints and emitting
+/// sync actions.
+///
+/// This function checks if there are any verified checkpoints at or before the
+/// given `maturable_height`. If such checkpoints exist, it attempts to
+/// finalize them by checking if the corresponding L2 block is available in the
+/// L2 database. If the L2 block is found, it marks the checkpoint as finalized
+/// and emits a sync action to finalize the L2 block. If the L2 block is not
+/// found, it logs a warning and skips the finalization.
+///
+/// # Arguments
+///
+/// * `maturable_height` - The height at which L1 blocks are considered mature.
+/// * `state` - A reference to the current client state.
+/// * `database` - A reference to the database interface.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * A vector of [`ClientStateWrite`] representing the state changes to be written.
+/// * A vector of [`SyncAction`] representing the actions to be synchronized.
 fn handle_mature_l1_height(
     maturable_height: u64,
     state: &ClientState,
@@ -285,6 +306,27 @@ fn handle_mature_l1_height(
     (writes, actions)
 }
 
+/// Handles the finalization of a checkpoint by processing the corresponding L2
+/// block ID.
+///
+/// This function checks if the given L2 block ID corresponds to a verified
+/// checkpoint. If it does, it calculates the maturable height based on the
+/// rollup parameters and the current state. If the L1 height associated with
+/// the L2 block ID is less than the maturable height, it calls
+/// [`handle_mature_l1_height`] and returns writes and sync actions.
+///
+/// # Arguments
+///
+/// * `state` - A reference to the current client state.
+/// * `blkid` - A reference to the L2 block ID to be finalized.
+/// * `params` - A reference to the rollup parameters.
+/// * `database` - A reference to the database interface.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * A vector of [`ClientStateWrite`] representing the state changes to be written.
+/// * A vector of [`SyncAction`] representing the actions to be synchronized.
 fn handle_checkpoint_finalization(
     state: &ClientState,
     blkid: &L2BlockId,
@@ -319,7 +361,7 @@ fn handle_checkpoint_finalization(
     (writes, actions)
 }
 
-/// Searches for a given `L2BlockId` within a slice of `L1Checkpoint` structs
+/// Searches for a given [`L2BlockId`] within a slice of [`L1Checkpoint`] structs
 /// and returns the height of the corresponding L1 block if found.
 fn find_l1_height_for_l2_blockid(
     checkpoints: &[L1Checkpoint],
@@ -331,7 +373,7 @@ fn find_l1_height_for_l2_blockid(
         .map(|index| checkpoints[index].height)
 }
 
-/// Filters a list of `BatchCheckpoint`s, returning only those that form a valid sequence
+/// Filters a list of [`BatchCheckpoint`]s, returning only those that form a valid sequence
 /// of checkpoints.
 ///
 /// A valid checkpoint is one whose proof passes verification, and its index follows
@@ -340,12 +382,13 @@ fn find_l1_height_for_l2_blockid(
 /// # Arguments
 ///
 /// * `state` - The client's current state, which provides the L1 view and pending checkpoints.
-/// * `checkpoints` - A slice of `BatchCheckpoint`s to be filtered.
+/// * `checkpoints` - A slice of [`BatchCheckpoint`]s to be filtered.
 /// * `params` - Parameters required for verifying checkpoint proofs.
 ///
 /// # Returns
 ///
-/// A vector containing the valid sequence of `BatchCheckpoint`s, starting from the first valid one.
+/// A vector containing the valid sequence of [`BatchCheckpoint`]s, starting from the first valid
+/// one.
 pub fn filter_verified_checkpoints(
     state: &ClientState,
     checkpoints: &[BatchCheckpoint],
