@@ -17,7 +17,7 @@ mod macros;
 pub mod operator;
 pub mod params;
 pub mod prelude;
+pub mod proof;
 pub mod relay;
 pub mod sorted_vec;
 pub mod utils;
-pub mod vk;

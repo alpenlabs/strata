@@ -63,7 +63,7 @@ DEFAULT_ROLLUP_PARAMS: dict = {
     # in `bridge-tx-builder/src/constants.rs`
     "withdraw_extra_fee": int(330 + 5.5 * 200),
     "rollup_vk": {
-        "risc0_verifying_key": ROLLUP_VK,
+        "risc0": ROLLUP_VK,
     },
     "dispatch_assignment_dur": 64,
     "proof_publish_mode": {

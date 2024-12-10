@@ -18,7 +18,7 @@ class OperatorConfig(BaseModel):
 
 
 class RollupVk(BaseModel):
-    s_p1_verifying_key: str
+    sp1: str
 
 
 class ProofPublishMode(BaseModel):
