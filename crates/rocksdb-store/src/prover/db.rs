@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt, TransactionRetry};
-use strata_db::{
-    errors::DbError,
-    traits::{ProofDatabase, ProverDatabase},
-    DbResult,
-};
+use strata_db::{errors::DbError, traits::ProofDatabase, DbResult};
 use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_zkvm::ProofReceipt;
 
@@ -55,53 +51,35 @@ impl ProofDatabase for ProofDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn put_proof_deps(&self, proof_id: ProofContext, deps: Vec<ProofContext>) -> DbResult<()> {
+    fn put_proof_deps(&self, proof_context: ProofContext, deps: Vec<ProofContext>) -> DbResult<()> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
-                if tx.get::<ProofDepsSchema>(&proof_id)?.is_some() {
+                if tx.get::<ProofDepsSchema>(&proof_context)?.is_some() {
                     return Err(DbError::EntryAlreadyExists);
                 }
 
-                tx.put::<ProofDepsSchema>(&proof_id, &deps)?;
+                tx.put::<ProofDepsSchema>(&proof_context, &deps)?;
 
                 Ok(())
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_proof_deps(&self, proof_id: ProofContext) -> DbResult<Option<Vec<ProofContext>>> {
-        Ok(self.db.get::<ProofDepsSchema>(&proof_id)?)
+    fn get_proof_deps(&self, proof_context: ProofContext) -> DbResult<Option<Vec<ProofContext>>> {
+        Ok(self.db.get::<ProofDepsSchema>(&proof_context)?)
     }
 
-    fn del_proof_deps(&self, proof_id: ProofContext) -> DbResult<bool> {
+    fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool> {
         self.db
             .with_optimistic_txn(TransactionRetry::Count(self.ops.retry_count), |tx| {
-                if tx.get::<ProofDepsSchema>(&proof_id)?.is_none() {
+                if tx.get::<ProofDepsSchema>(&proof_context)?.is_none() {
                     return Ok(false);
                 }
-                tx.delete::<ProofDepsSchema>(&proof_id)?;
+                tx.delete::<ProofDepsSchema>(&proof_context)?;
 
                 Ok::<_, anyhow::Error>(true)
             })
             .map_err(|e| DbError::TransactionError(e.to_string()))
-    }
-}
-
-pub struct ProverDB {
-    db: Arc<ProofDb>,
-}
-
-impl ProverDB {
-    pub fn new(db: Arc<ProofDb>) -> Self {
-        Self { db }
-    }
-}
-
-impl ProverDatabase for ProverDB {
-    type ProofDB = ProofDb;
-
-    fn proof_db(&self) -> &Arc<Self::ProofDB> {
-        &self.db
     }
 }
 
@@ -132,15 +110,15 @@ mod tests {
         (proof_key, proof_receipt)
     }
 
-    fn generate_proof_id_with_deps() -> (ProofContext, Vec<ProofContext>) {
+    fn generate_proof_context_with_deps() -> (ProofContext, Vec<ProofContext>) {
         let l1_blkid_1: L1BlockId = Buf32::from([1u8; 32]).into();
         let l1_blkid_2: L1BlockId = Buf32::from([2u8; 32]).into();
-        let proof_id = ProofContext::L1Batch(l1_blkid_1, l1_blkid_2);
+        let proof_context = ProofContext::L1Batch(l1_blkid_1, l1_blkid_2);
         let deps = vec![
             ProofContext::BtcBlockspace(l1_blkid_1),
             ProofContext::BtcBlockspace(l1_blkid_2),
         ];
-        (proof_id, deps)
+        (proof_context, deps)
     }
 
     #[test]
@@ -192,15 +170,15 @@ mod tests {
     fn test_insert_new_deps() {
         let db = setup_db();
 
-        let (proof_id, deps) = generate_proof_id_with_deps();
+        let (proof_context, deps) = generate_proof_context_with_deps();
 
-        let result = db.put_proof_deps(proof_id, deps.clone());
+        let result = db.put_proof_deps(proof_context, deps.clone());
         assert!(
             result.is_ok(),
             "ProofReceipt should be inserted successfully"
         );
 
-        let stored_deps = db.get_proof_deps(proof_id).unwrap();
+        let stored_deps = db.get_proof_deps(proof_context).unwrap();
         assert_eq!(stored_deps, Some(deps));
     }
 
@@ -208,11 +186,11 @@ mod tests {
     fn test_insert_duplicate_proof_deps() {
         let db = setup_db();
 
-        let (proof_id, deps) = generate_proof_id_with_deps();
+        let (proof_context, deps) = generate_proof_context_with_deps();
 
-        db.put_proof_deps(proof_id, deps.clone()).unwrap();
+        db.put_proof_deps(proof_context, deps.clone()).unwrap();
 
-        let result = db.put_proof_deps(proof_id, deps);
+        let result = db.put_proof_deps(proof_context, deps);
         assert!(
             result.is_err(),
             "Duplicate proof deps insertion should fail"
@@ -223,16 +201,16 @@ mod tests {
     fn test_get_nonexistent_proof_deps() {
         let db = setup_db();
 
-        let (proof_id, deps) = generate_proof_id_with_deps();
-        db.put_proof_deps(proof_id, deps.clone()).unwrap();
+        let (proof_context, deps) = generate_proof_context_with_deps();
+        db.put_proof_deps(proof_context, deps.clone()).unwrap();
 
-        let res = db.del_proof_deps(proof_id);
+        let res = db.del_proof_deps(proof_context);
         assert!(matches!(res, Ok(true)));
 
-        let res = db.del_proof_deps(proof_id);
+        let res = db.del_proof_deps(proof_context);
         assert!(matches!(res, Ok(false)));
 
-        let stored_proof = db.get_proof_deps(proof_id).unwrap();
+        let stored_proof = db.get_proof_deps(proof_context).unwrap();
         assert_eq!(
             stored_proof, None,
             "Nonexistent proof deps should return None"

@@ -268,45 +268,38 @@ pub trait BlobDatabase {
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
 }
 
-/// A trait providing access to both prover data store and prover data provider.
-pub trait ProverDatabase {
-    type ProofDB: ProofDatabase;
-
-    fn proof_db(&self) -> &Arc<Self::ProofDB>;
-}
-
 pub trait ProofDatabase {
     /// Inserts a proof into the database.
     ///
     /// Returns `Ok(())` on success, or an error on failure.
-    fn put_proof(&self, proof_id: ProofKey, proof: ProofReceipt) -> DbResult<()>;
+    fn put_proof(&self, proof_key: ProofKey, proof: ProofReceipt) -> DbResult<()>;
 
     /// Retrieves a proof by its key.
     ///
     /// Returns `Some(proof)` if found, or `None` if not.
-    fn get_proof(&self, proof_id: ProofKey) -> DbResult<Option<ProofReceipt>>;
+    fn get_proof(&self, proof_key: ProofKey) -> DbResult<Option<ProofReceipt>>;
 
     /// Deletes a proof by its key.
     ///
     /// Tries to delete a proof by its key, returning if it really
     /// existed or not.  
-    fn del_proof(&self, proof_id: ProofKey) -> DbResult<bool>;
+    fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool>;
 
     /// Inserts dependencies for a given [`ProofContext`] into the database.
     ///
     /// Returns `Ok(())` on success, or an error on failure.
-    fn put_proof_deps(&self, proof_id: ProofContext, deps: Vec<ProofContext>) -> DbResult<()>;
+    fn put_proof_deps(&self, proof_context: ProofContext, deps: Vec<ProofContext>) -> DbResult<()>;
 
     /// Retrieves proof dependencies by it's [`ProofContext`].
     ///
     /// Returns `Some(dependencies)` if found, or `None` if not.
-    fn get_proof_deps(&self, proof_id: ProofContext) -> DbResult<Option<Vec<ProofContext>>>;
+    fn get_proof_deps(&self, proof_context: ProofContext) -> DbResult<Option<Vec<ProofContext>>>;
 
     /// Deletes dependencies for a given [`ProofContext`].
     ///
-    /// Tries to delete dependencies of by its ProofId, returning if it really
+    /// Tries to delete dependencies of by its context, returning if it really
     /// existed or not.  
-    fn del_proof_deps(&self, proof_id: ProofContext) -> DbResult<bool>;
+    fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool>;
 }
 
 pub trait BroadcastDatabase {

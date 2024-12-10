@@ -9,6 +9,6 @@ define_table_with_default_codec!(
 );
 
 define_table_with_default_codec!(
-    /// A table to store dependencies of ProofId
+    /// A table to store dependencies of a proof context
     (ProofDepsSchema) ProofContext => Vec<ProofContext>
 );

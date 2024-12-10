@@ -3,13 +3,10 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use strata_db::traits::{ProofDatabase, ProverDatabase};
+use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_proofimpl_evm_ee_stf::ELProofInput;
-use strata_rocksdb::{
-    prover::db::{ProofDb, ProverDB},
-    DbOpsConfig,
-};
+use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use strata_state::l1::L1BlockId;
 use strata_zkvm::{ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
@@ -89,7 +86,7 @@ impl ProverState {
 // the prover will reject new jobs.
 pub(crate) struct Prover {
     prover_state: Arc<RwLock<ProverState>>,
-    db: ProverDB,
+    db: ProofDb,
     pool: rayon::ThreadPool,
     vm_manager: ZkVMManager, // TODO: make this generic
 }
@@ -204,7 +201,7 @@ impl Prover {
                 tasks_status: Default::default(),
                 pending_tasks_count: Default::default(),
             })),
-            db: ProverDB::new(Arc::new(db)),
+            db,
             vm_manager: zkvm_manager,
         }
     }
@@ -321,10 +318,10 @@ impl Prover {
     #[allow(dead_code)]
     fn read_proof_from_db(&self, task_id: Uuid) -> Result<ProofReceipt, anyhow::Error> {
         // used an arbitrary proof id for now
-        // TODO: to be replaced once we move from Uuid to ProofId based status
+        // TODO: to be replaced once we move from Uuid to ProofKey based status
         let proof_context = ProofContext::BtcBlockspace(L1BlockId::default());
         let proof_key = ProofKey::new(proof_context, ProofZkVm::Native);
-        let proof_entry = self.db.proof_db().get_proof(proof_key)?;
+        let proof_entry = self.db.get_proof(proof_key)?;
         match proof_entry {
             Some(proof) => Ok(proof),
             None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),
