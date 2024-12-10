@@ -102,6 +102,19 @@ def wait_until_with_value(
     raise AssertionError(error_with)
 
 
+def wait_until_checkpoint(seqrpc, timeout: int = 5, step: float = 2):
+    """Waits until the current checkpoint index increases."""
+    first_ckpt_idx = seqrpc.strata_getLatestCheckpointIndex()
+
+    def _f():
+        status = seqrpc.strata_clientStatus()
+        print("waiting for epoch, client status", status)
+        cur_ckpt_index = seqrpc.strata_getLatestCheckpointIndex()
+        return cur_ckpt_idx > first_ckpt_idx
+
+    wait_until(_f, "Epoch never finalized", timeout, step)
+
+
 @dataclass
 class ManualGenBlocksConfig:
     btcrpc: BitcoindClient

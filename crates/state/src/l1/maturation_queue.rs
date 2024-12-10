@@ -42,6 +42,10 @@ impl L1MaturationEntry {
         self.record.blkid()
     }
 
+    pub fn deposit_update_txs(&self) -> &[DepositUpdateTx] {
+        &self.deposit_update_txs
+    }
+
     pub fn into_parts(self) -> (L1HeaderRecord, Vec<DepositUpdateTx>, Vec<DaTx>) {
         (self.record, self.deposit_update_txs, self.da_txs)
     }
