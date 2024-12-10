@@ -87,27 +87,25 @@ pub fn process_block_transaction(
     }
 }
 
+/// Processes a sequence of EL block transactions from the given `zkvm` environment, ensuring block
+/// hash continuity and committing the resulting updates.
 pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
-    let total_blocks: u32 = zkvm.read_serde();
-    assert!(total_blocks > 0, "At least one block is required.");
+    let num_blocks: u32 = zkvm.read_serde();
+    assert!(num_blocks > 0, "At least one block is required.");
 
-    let mut exec_updates = Vec::with_capacity((total_blocks - 1) as usize);
+    let mut exec_updates = Vec::with_capacity(num_blocks as usize);
+    let mut current_blockhash = None;
 
-    // Process the first block
-    let first_input: ELProofInput = zkvm.read_serde();
-    let first_output = process_block_transaction(first_input, EVM_CONFIG);
-    let mut current_blockhash = first_output.new_blockhash;
+    for _ in 0..num_blocks {
+        let input: ELProofInput = zkvm.read_serde();
+        let output = process_block_transaction(input, EVM_CONFIG);
 
-    // Process remaining blocks
-    for _ in 1..total_blocks {
-        let next_block_input: ELProofInput = zkvm.read_serde();
-        let next_block_output = process_block_transaction(next_block_input, EVM_CONFIG);
-        assert_eq!(next_block_output.prev_blockhash, current_blockhash);
+        if let Some(expected_hash) = current_blockhash {
+            assert_eq!(output.prev_blockhash, expected_hash, "Block hash mismatch");
+        }
 
-        let exec_segment = generate_exec_update(&next_block_output);
-        exec_updates.push(exec_segment);
-
-        current_blockhash = next_block_output.new_blockhash;
+        current_blockhash = Some(output.new_blockhash);
+        exec_updates.push(generate_exec_update(&output));
     }
 
     zkvm.commit_borsh(&exec_updates);
