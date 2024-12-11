@@ -6,7 +6,6 @@ use bitcoin::{
     taproot::ControlBlock,
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
-use strata_state::tx::InscriptionBlob;
 
 use crate::{
     rpc::{
@@ -17,7 +16,7 @@ use crate::{
         },
         ClientResult,
     },
-    writer::builder::{build_reveal_transaction, generate_inscription_script, InscriptionError},
+    writer::builder::{build_reveal_transaction, CommitRevealTxError},
 };
 
 /// A test implementation of a Bitcoin client.
@@ -211,13 +210,6 @@ impl Signer for TestBitcoinClient {
     }
 }
 
-pub fn generate_inscription_script_test(
-    inscription_data: Vec<InscriptionBlob>,
-    rollup_name: &str,
-) -> anyhow::Result<ScriptBuf> {
-    generate_inscription_script(&inscription_data, rollup_name)
-}
-
 pub fn build_reveal_transaction_test(
     input_transaction: Transaction,
     recipient: Address,
@@ -225,7 +217,7 @@ pub fn build_reveal_transaction_test(
     fee_rate: u64,
     reveal_script: &ScriptBuf,
     control_block: &ControlBlock,
-) -> Result<Transaction, InscriptionError> {
+) -> Result<Transaction, CommitRevealTxError> {
     build_reveal_transaction(
         input_transaction,
         recipient,

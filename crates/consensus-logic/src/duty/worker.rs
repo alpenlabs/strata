@@ -6,7 +6,7 @@ use std::{
     time::{self},
 };
 
-use strata_btcio::writer::InscriptionHandle;
+use strata_btcio::writer::EnvelopeHandle;
 use strata_crypto::sign_schnorr_sig;
 use strata_db::traits::*;
 use strata_eectl::engine::ExecEngineCtl;
@@ -17,9 +17,9 @@ use strata_primitives::{
 use strata_state::{
     batch::SignedBatchCheckpoint,
     client_state::ClientState,
-    da_blob::{BlobCommitment, BlobDest, BlobIntent},
+    da_blob::{DataBundleDest, PayloadCommitment, PayloadIntent},
     prelude::*,
-    tx::{BlobType, InscriptionBlob},
+    tx::{EnvelopePayload, PayloadTypeTag},
 };
 use strata_storage::L2BlockManager;
 use strata_tasks::{ShutdownGuard, TaskExecutor};
@@ -229,7 +229,7 @@ pub fn duty_dispatch_task<
     sync_manager: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    inscription_handle: Arc<InscriptionHandle>,
+    envelope_handle: Arc<EnvelopeHandle>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
     checkpoint_handle: Arc<CheckpointHandle>,
@@ -295,7 +295,7 @@ pub fn duty_dispatch_task<
             let sync_manager = sync_manager.clone();
             let database = database.clone();
             let engine = engine.clone();
-            let inscription_handle = inscription_handle.clone();
+            let envelope_handle = envelope_handle.clone();
             let params = params.clone();
             let duty_status_tx = duty_status_tx.clone();
             let checkpoint_handle = checkpoint_handle.clone();
@@ -307,7 +307,7 @@ pub fn duty_dispatch_task<
                     sync_manager,
                     database,
                     engine,
-                    inscription_handle,
+                    envelope_handle,
                     params,
                     duty_status_tx,
                     checkpoint_handle,
@@ -335,7 +335,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
     sync_manager: Arc<SyncManager>,
     database: Arc<D>,
     engine: Arc<E>,
-    inscription_handle: Arc<InscriptionHandle>,
+    envelope_handle: Arc<EnvelopeHandle>,
     params: Arc<Params>,
     duty_status_tx: std::sync::mpsc::Sender<DutyExecStatus>,
     checkpoint_handle: Arc<CheckpointHandle>,
@@ -347,7 +347,7 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         &sync_manager,
         database.as_ref(),
         engine.as_ref(),
-        inscription_handle.as_ref(),
+        envelope_handle.as_ref(),
         &params,
         checkpoint_handle,
         pool,
@@ -370,7 +370,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     sync_manager: &SyncManager,
     database: &D,
     engine: &E,
-    inscription_handle: &InscriptionHandle,
+    envelope_handle: &EnvelopeHandle,
     params: &Arc<Params>,
     checkpoint_handle: Arc<CheckpointHandle>,
     pool: threadpool::ThreadPool,
@@ -426,20 +426,20 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, signature);
 
             // serialize, create blob and send to l1 writer
-            let payload = InscriptionBlob::new(
-                BlobType::Checkpoint,
+            let payload = EnvelopePayload::new(
+                PayloadTypeTag::Checkpoint,
                 borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?,
             );
-            let blob_intent = BlobIntent::new(
-                BlobDest::L1,
-                BlobCommitment::new(&checkpoint_sighash),
-                vec![payload],
+            let blob_intent = PayloadIntent::new(
+                DataBundleDest::L1,
+                PayloadCommitment::new(&checkpoint_sighash),
+                payload,
             );
 
             info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
             info!(blob_intent = ?blob_intent, "sending blob intent");
 
-            inscription_handle
+            envelope_handle
                 .submit_intent(blob_intent)
                 // add type for DA related errors ?
                 .map_err(|err| Error::Other(err.to_string()))?;
