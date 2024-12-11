@@ -14,7 +14,7 @@ use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
 use reth_revm::{db::CacheDB, primitives::FixedBytes};
 use reth_rpc_types_compat::proof::from_primitive_account_proof;
 use reth_trie::{HashedPostState, TrieInput};
-use strata_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, ELProofInput};
+use strata_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, ElBlockStfInput};
 use strata_reth_db::WitnessStore;
 use tracing::{debug, error};
 
@@ -102,7 +102,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
     block_id: FixedBytes<32>,
     ctx: &ExExContext<Node>,
     exec_outcome: &ExecutionOutcome,
-) -> eyre::Result<ELProofInput> {
+) -> eyre::Result<ElBlockStfInput> {
     let current_block = ctx
         .provider()
         .block_by_hash(block_id)?
@@ -189,7 +189,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
     )
     .expect("Proof to tries infallible");
 
-    let input = ELProofInput {
+    let input = ElBlockStfInput {
         beneficiary: current_block.header.beneficiary,
         gas_limit: current_block.gas_limit,
         timestamp: current_block.header.timestamp,

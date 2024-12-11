@@ -8,12 +8,16 @@ use reth_primitives::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use strata_reth_primitives::WithdrawalIntent;
+use strata_state::block::ExecSegment;
 
 use crate::mpt::{MptNode, StorageEntry};
 
 /// Public Parameters that proof asserts
+pub type ElProofOutput = Vec<ExecSegment>;
+
+/// Result of the block execution
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ELProofPublicParams {
+pub struct ElBlockStfOutput {
     pub block_idx: u64,
     pub prev_blockhash: FixedBytes<32>,
     pub new_blockhash: FixedBytes<32>,
@@ -24,9 +28,9 @@ pub struct ELProofPublicParams {
 }
 
 #[serde_as]
-/// Necessary information to prove the execution of the RETH block.
+/// Necessary information to prove the execution of a EL block.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ELProofInput {
+pub struct ElBlockStfInput {
     /// The Keccak 256-bit hash of the parent block's header, in its entirety.
     /// N.B. The reason serde_bincode_compat is necessary:
     /// `[serde_bincode_compat]`(alloy_consensus::serde_bincode_compat)
