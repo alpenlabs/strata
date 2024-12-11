@@ -22,7 +22,7 @@ use crate::{errors::ParseError, macros::internal};
 /// # Example
 ///
 /// ```
-/// # use strata_primitives::prelude::Buf20
+/// # use strata_primitives::prelude::Buf20;
 /// use zeroize::Zeroize;
 ///
 /// let mut buf = Buf20::from([1; 20]);
@@ -56,7 +56,7 @@ impl Zeroize for Buf20 {
 /// # Example
 ///
 /// ```
-/// # use strata_primitives::prelude::Buf32
+/// # use strata_primitives::prelude::Buf32;
 /// use zeroize::Zeroize;
 ///
 /// let mut buf = Buf32::from([1; 32]);
