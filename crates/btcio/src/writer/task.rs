@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use strata_db::{
     traits::SequencerDatabase,
-    types::{EnvelopeEntry, L1TxStatus, PayloadL1Status},
+    types::{CommitRevealEntry, L1TxStatus, PayloadL1Status},
 };
 use strata_primitives::buf::Buf32;
 use strata_state::da_blob::{BundledPayloadIntent, DataBundleDest, PayloadIntent};
@@ -35,7 +35,7 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = EnvelopeEntry::new_unsigned(vec![intent.payload().clone()]);
+        let entry = CommitRevealEntry::new_unsigned(vec![intent.payload().clone()]);
         self.submit_entry_sync(intent.commitment().into_inner(), entry)
     }
 
@@ -45,7 +45,7 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = EnvelopeEntry::new_unsigned(vec![intent.payload().clone()]);
+        let entry = CommitRevealEntry::new_unsigned(vec![intent.payload().clone()]);
         self.submit_entry_async(intent.commitment().into_inner(), entry)
             .await
     }
@@ -56,7 +56,7 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = EnvelopeEntry::new_unsigned(intent.payload().to_vec());
+        let entry = CommitRevealEntry::new_unsigned(intent.payload().to_vec());
         self.submit_entry_sync(intent.commitment().into_inner(), entry)
     }
 
@@ -69,12 +69,12 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = EnvelopeEntry::new_unsigned(intent.payload().to_vec());
+        let entry = CommitRevealEntry::new_unsigned(intent.payload().to_vec());
         self.submit_entry_async(intent.commitment().into_inner(), entry)
             .await
     }
 
-    fn submit_entry_sync(&self, commitment: Buf32, entry: EnvelopeEntry) -> anyhow::Result<()> {
+    fn submit_entry_sync(&self, commitment: Buf32, entry: CommitRevealEntry) -> anyhow::Result<()> {
         debug!(?commitment, "Received intent");
         if self.ops.get_entry_blocking(commitment)?.is_some() {
             warn!(?commitment, "Received duplicate intent");
@@ -87,7 +87,7 @@ impl EnvelopeHandle {
     async fn submit_entry_async(
         &self,
         commitment: Buf32,
-        entry: EnvelopeEntry,
+        entry: CommitRevealEntry,
     ) -> anyhow::Result<()> {
         debug!(?commitment, "Received intent");
         if self.ops.get_entry_async(commitment).await?.is_some() {
@@ -137,7 +137,7 @@ pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
 }
 
 /// Looks into the database from descending index order till it reaches 0 or `Finalized`
-/// [`EnvelopeEntry`] from which the rest of the [`EnvelopeEntry`]s should be watched.
+/// [`CommitRevealEntry`] from which the rest of the [`CommitRevealEntry`]s should be watched.
 fn get_next_entry_idx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u64> {
     let mut next_idx = insc_ops.get_next_entry_idx_blocking()?;
 
@@ -258,7 +258,7 @@ pub async fn watcher_task(
 }
 
 async fn update_l1_status(
-    entry: &EnvelopeEntry,
+    entry: &CommitRevealEntry,
     new_status: &PayloadL1Status,
     status_channel: &StatusChannel,
 ) {
@@ -278,7 +278,7 @@ async fn update_l1_status(
 
 async fn update_existing_entry(
     idx: u64,
-    updated_entry: EnvelopeEntry,
+    updated_entry: CommitRevealEntry,
     envelope_ops: &EnvelopeDataOps,
 ) -> anyhow::Result<()> {
     let msg = format!("Expect to find entry {idx} in db");
@@ -286,7 +286,7 @@ async fn update_existing_entry(
     Ok(envelope_ops.put_entry_async(id, updated_entry).await?)
 }
 
-/// Determine the status of the [`EnvelopeEntry`] based on the status of its commit and reveal
+/// Determine the status of the [`CommitRevealEntry`] based on the status of its commit and reveal
 /// transactions in bitcoin.
 fn determine_envelope_entry_next_status(
     commit_status: &L1TxStatus,
@@ -335,23 +335,23 @@ mod test {
     fn test_initialize_writer_state_with_existing_envelopes() {
         let iops = get_envelope_ops();
 
-        let mut e1: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let mut e1: CommitRevealEntry = ArbitraryGenerator::new().generate();
         e1.status = PayloadL1Status::Finalized;
         let hash: Buf32 = [1; 32].into();
         iops.put_entry_blocking(hash, e1).unwrap();
         let expected_idx = iops.get_next_entry_idx_blocking().unwrap();
 
-        let mut e2: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let mut e2: CommitRevealEntry = ArbitraryGenerator::new().generate();
         e2.status = PayloadL1Status::Published;
         let hash: Buf32 = [2; 32].into();
         iops.put_entry_blocking(hash, e2).unwrap();
 
-        let mut e3: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let mut e3: CommitRevealEntry = ArbitraryGenerator::new().generate();
         e3.status = PayloadL1Status::Unsigned;
         let hash: Buf32 = [3; 32].into();
         iops.put_entry_blocking(hash, e3).unwrap();
 
-        let mut e4: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let mut e4: CommitRevealEntry = ArbitraryGenerator::new().generate();
         e4.status = PayloadL1Status::Unsigned;
         let hash: Buf32 = [4; 32].into();
         iops.put_entry_blocking(hash, e4).unwrap();

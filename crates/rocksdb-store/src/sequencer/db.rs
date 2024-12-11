@@ -3,8 +3,8 @@ use std::sync::Arc;
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
-    traits::{EnvelopeDatabase, SequencerDatabase},
-    types::EnvelopeEntry,
+    traits::{CommitRevealDatabase, SequencerDatabase},
+    types::CommitRevealEntry,
     DbResult,
 };
 use strata_primitives::buf::Buf32;
@@ -12,12 +12,12 @@ use strata_primitives::buf::Buf32;
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 use crate::{sequence::get_next_id, DbOpsConfig};
 
-pub struct EnvelopeDb {
+pub struct CommitRevealDb {
     db: Arc<OptimisticTransactionDB>,
     ops: DbOpsConfig,
 }
 
-impl EnvelopeDb {
+impl CommitRevealDb {
     /// Wraps an existing database handle.
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
@@ -27,8 +27,8 @@ impl EnvelopeDb {
     }
 }
 
-impl EnvelopeDatabase for EnvelopeDb {
-    fn put_entry(&self, entry_hash: Buf32, entry: EnvelopeEntry) -> DbResult<()> {
+impl CommitRevealDatabase for CommitRevealDb {
+    fn put_entry(&self, entry_hash: Buf32, entry: CommitRevealEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
@@ -48,7 +48,7 @@ impl EnvelopeDatabase for EnvelopeDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<EnvelopeEntry>> {
+    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<CommitRevealEntry>> {
         Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
 
@@ -71,10 +71,10 @@ impl<D> SequencerDB<D> {
     }
 }
 
-impl<B: EnvelopeDatabase> SequencerDatabase for SequencerDB<B> {
-    type EnvelopeDB = B;
+impl<B: CommitRevealDatabase> SequencerDatabase for SequencerDB<B> {
+    type CommitRevealDB = B;
 
-    fn envelope_db(&self) -> &Arc<Self::EnvelopeDB> {
+    fn commit_reveal_db(&self) -> &Arc<Self::CommitRevealDB> {
         &self.db
     }
 }
@@ -82,7 +82,7 @@ impl<B: EnvelopeDatabase> SequencerDatabase for SequencerDB<B> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::EnvelopeDatabase;
+    use strata_db::traits::CommitRevealDatabase;
     use strata_primitives::buf::Buf32;
     use strata_test_utils::ArbitraryGenerator;
     use test;
@@ -93,9 +93,9 @@ mod tests {
     #[test]
     fn test_put_blob_new_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = EnvelopeDb::new(db, db_ops);
+        let seq_db = CommitRevealDb::new(db, db_ops);
 
-        let envelope_entry: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let envelope_entry: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         seq_db
@@ -112,8 +112,8 @@ mod tests {
     #[test]
     fn test_put_envelope_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = EnvelopeDb::new(db, db_ops);
-        let envelope_entry: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let seq_db = CommitRevealDb::new(db, db_ops);
+        let envelope_entry: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         seq_db
@@ -129,15 +129,15 @@ mod tests {
     #[test]
     fn test_update_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = EnvelopeDb::new(db, db_ops);
+        let seq_db = CommitRevealDb::new(db, db_ops);
 
-        let envelope: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         // Insert
         seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
 
-        let updated_envelope: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let updated_envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
         seq_db
@@ -150,9 +150,9 @@ mod tests {
     #[test]
     fn test_get_envelope_by_id() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = EnvelopeDb::new(db, db_ops);
+        let seq_db = CommitRevealDb::new(db, db_ops);
 
-        let envelope: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
@@ -164,9 +164,9 @@ mod tests {
     #[test]
     fn test_get_last_envelope_idx() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = EnvelopeDb::new(db, db_ops);
+        let seq_db = CommitRevealDb::new(db, db_ops);
 
-        let envelope: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         let last_envelope_idx = seq_db.get_last_idx().unwrap();
@@ -178,7 +178,7 @@ mod tests {
         seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
         // Now the last idx is 0
 
-        let envelope: EnvelopeEntry = ArbitraryGenerator::new().generate();
+        let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [1; 32].into();
 
         seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();

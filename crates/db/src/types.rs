@@ -15,16 +15,16 @@ use strata_state::{
 use strata_zkvm::Proof;
 
 /// Represents data for a payloads we're still planning to inscribe into commit reveal transaction.
-/// Multiple Envelopes can exist in same transactions
+/// Multiple Envelopes can exist in same transaction
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct EnvelopeEntry {
+pub struct CommitRevealEntry {
     pub envelopes: Vec<EnvelopePayload>,
     pub commit_txid: Buf32,
     pub reveal_txid: Buf32,
     pub status: PayloadL1Status,
 }
 
-impl EnvelopeEntry {
+impl CommitRevealEntry {
     pub fn new(
         blobs: Vec<EnvelopePayload>,
         commit_txid: Buf32,

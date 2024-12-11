@@ -4,7 +4,7 @@ use bitcoin::{Address, Network};
 use strata_db::{traits::BroadcastDatabase, types::L1TxEntry};
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance,
-    EnvelopeDb, L1BroadcastDb,
+    CommitRevealDb, L1BroadcastDb,
 };
 use strata_storage::ops::{
     envelope::{Context, EnvelopeDataOps},
@@ -17,9 +17,9 @@ use crate::{
 };
 
 /// Returns `Arc` of `SequencerDB` for testing
-pub fn get_db() -> Arc<SequencerDB<EnvelopeDb>> {
+pub fn get_db() -> Arc<SequencerDB<CommitRevealDb>> {
     let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-    let seqdb = Arc::new(EnvelopeDb::new(db, db_ops));
+    let seqdb = Arc::new(CommitRevealDb::new(db, db_ops));
     Arc::new(SequencerDB::new(seqdb))
 }
 
