@@ -24,7 +24,7 @@ use strata_primitives::{
     keys::ZeroizableXpriv,
     operator::OperatorPubkeys,
     params::{ProofPublishMode, RollupParams},
-    vk::RollupVerifyingKey,
+    proof::RollupVerifyingKey,
 };
 use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
 
