@@ -40,7 +40,7 @@ use strata_reth_evm::set_evm_handles;
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},
-    ELProofInput,
+    ElBlockStfInput,
 };
 
 /// The divisor for the gas limit bound.
@@ -56,7 +56,7 @@ pub struct EvmConfig {
 #[derive(Clone)]
 pub struct EvmProcessor<D> {
     /// An input containing all necessary data to execute the block.
-    pub input: ELProofInput,
+    pub input: ElBlockStfInput,
 
     /// A database to store all state changes.
     pub db: Option<D>,

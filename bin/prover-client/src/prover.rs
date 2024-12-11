@@ -4,7 +4,7 @@ use std::{
 };
 
 use strata_db::traits::{ProverDatabase, ProverTaskDatabase};
-use strata_proofimpl_evm_ee_stf::ELProofInput;
+use strata_proofimpl_evm_ee_stf::ElBlockStfInput;
 use strata_rocksdb::{
     prover::db::{ProofDb, ProverDB},
     DbOpsConfig,
@@ -23,7 +23,6 @@ use crate::{
     },
     proving_ops::btc_ops::get_pm_rollup_params,
 };
-
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 enum ProvingTaskState {
@@ -99,11 +98,15 @@ where
 {
     let (zkvm_input, proof_type) = match zkvm_input {
         ZkVmInput::ElBlock(el_input) => {
-            let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            (
-                Vm::Input::new().write_serde(&el_input)?.build()?,
-                ProofType::Compressed,
-            )
+            let el_inputs: Vec<ElBlockStfInput> = bincode::deserialize(&el_input.data)?;
+            let mut input_builder = Vm::Input::new();
+
+            input_builder.write_serde(&el_inputs.len())?;
+            for el_input in el_inputs {
+                input_builder.write_serde(&el_input)?;
+            }
+
+            (input_builder.build()?, ProofType::Compressed)
         }
 
         ZkVmInput::BtcBlock(block, rollup_params) => (

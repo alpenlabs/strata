@@ -12,9 +12,9 @@ pub trait StrataProverClientApi {
     #[method(name = "proveBtcBlock")]
     async fn prove_btc_block(&self, el_block_num: u64) -> RpcResult<Uuid>;
 
-    /// Start proving the given el block
-    #[method(name = "proveELBlock")]
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Uuid>;
+    /// Start proving the given el blocks
+    #[method(name = "proveElBlocks")]
+    async fn prove_el_blocks(&self, block_range: (u64, u64)) -> RpcResult<Uuid>;
 
     /// Start proving the given cl block
     #[method(name = "proveCLBlock")]
