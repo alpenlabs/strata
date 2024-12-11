@@ -12773,6 +12773,7 @@ dependencies = [
  "threadpool",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
