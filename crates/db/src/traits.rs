@@ -14,7 +14,7 @@ use strata_state::{
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{CheckpointEntry, EnvelopeEntry, L1TxEntry},
+    types::{CheckpointEntry, CommitRevealEntry, L1TxEntry},
     DbResult,
 };
 
@@ -240,21 +240,22 @@ pub trait CheckpointDatabase {
 
 /// NOTE: We might have to merge this with the [`Database`]
 /// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`CommitRevealEnvelopeEntry`]
+/// [`CommitRevealEntry`]
 pub trait SequencerDatabase {
-    type EnvelopeDB: EnvelopeDatabase;
+    type CommitRevealDB: CommitRevealDatabase;
 
-    fn envelope_db(&self) -> &Arc<Self::EnvelopeDB>;
+    fn commit_reveal_db(&self) -> &Arc<Self::CommitRevealDB>;
 }
 
-/// A trait encapsulating provider and store traits to create/update [`CommitRevealEnvelopeEntry`]
-/// in the database and to fetch [`CommitRevealEnvelopeEntry`] and indices from the database
-pub trait EnvelopeDatabase {
-    /// Store the [`CommitRevealEnvelopeEntry`].
-    fn put_entry(&self, entryid: Buf32, entry: EnvelopeEntry) -> DbResult<()>;
+/// Commit Reveal Transaction Entry Database
+/// A trait encapsulating provider and store traits to create/update [`CommitRevealEntry`]
+/// in the database and to fetch [`CommitRevealEntry`] and indices from the database
+pub trait CommitRevealDatabase {
+    /// Store the [`CommitRevealEntry`].
+    fn put_entry(&self, entryid: Buf32, entry: CommitRevealEntry) -> DbResult<()>;
 
-    /// Get a [`CommitRevealEnvelopeEntry`] by its hash
-    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<EnvelopeEntry>>;
+    /// Get a [`CommitRevealEntry`] by its hash
+    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<CommitRevealEntry>>;
 
     /// Get the blob ID corresponding to the index
     fn get_id(&self, entryidx: u64) -> DbResult<Option<Buf32>>;

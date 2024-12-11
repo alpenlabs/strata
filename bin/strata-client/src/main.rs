@@ -25,7 +25,7 @@ use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, SyncParams};
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, EnvelopeDb,
+    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, CommitRevealDb, DbOpsConfig,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
@@ -394,7 +394,7 @@ fn start_sequencer_tasks(
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
     runtime: &Runtime,
-    seq_db: Arc<SequencerDB<EnvelopeDb>>,
+    seq_db: Arc<SequencerDB<CommitRevealDb>>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     methods: &mut Methods,
