@@ -2,24 +2,21 @@
 
 use std::{
     env,
+    fs::read_to_string,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use bitcoin::bip32::Xpriv;
 use strata_key_derivation::operator::OperatorKeys;
 use strata_primitives::keys::ZeroizableXpriv;
-use zeroize::Zeroize;
 
 /// The environment variable that contains the operator's master [`Xpriv`].
 const OPXPRIV_ENVVAR: &str = "STRATA_OP_MASTER_XPRIV";
 
 /// Parses the master [`Xpriv`] from a file.
 pub(crate) fn parse_master_xpriv(path: &Path) -> anyhow::Result<OperatorKeys> {
-    let mut xpriv_str = std::fs::read_to_string(path)?;
-    let xpriv: ZeroizableXpriv = xpriv_str.parse::<Xpriv>()?.into();
-
-    // Zeroize the buffer
-    xpriv_str.zeroize();
+    let xpriv: ZeroizableXpriv = Xpriv::from_str(read_to_string(path)?.as_ref())?.into();
 
     OperatorKeys::new(&xpriv).map_err(|_| anyhow::anyhow!("invalid master xpriv"))
 }
