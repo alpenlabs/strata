@@ -385,7 +385,9 @@ fn parse_xpub(s: &str) -> anyhow::Result<Xpub> {
 
 /// Parses an abbreviated amount string.
 ///
-/// # Possible suffixes
+/// User may of may not use suffixes to denote the amount.
+///
+/// # Possible suffixes (case sensitive)
 ///
 /// - `K` for thousand.
 /// - `M` for million.
