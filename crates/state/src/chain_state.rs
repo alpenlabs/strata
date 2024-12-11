@@ -1,6 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
+use strata_primitives::{buf::Buf32, hash::compute_borsh_hash, l1::L1BlockCommitment};
 
 use crate::{
     bridge_ops::{self, WithdrawalIntent},
@@ -22,18 +22,21 @@ pub struct Chainstate {
     pub(crate) last_block: L2BlockId,
 
     /// The slot of the last produced block.
-    pub(crate) slot: u64,
+    pub(crate) last_slot: u64,
 
     /// The checkpoint epoch period we're currently in, and so the index we
     /// expect the next checkpoint to be for.
     ///
     /// Immediately after genesis, this is 0, so the first checkpoint batch is
     /// checkpoint 0, moving us into checkpoint period 1.
+    ///
+    /// This gets updated when we process the L1 segment from the final block of
+    /// an epoch.
     pub(crate) cur_epoch: u64,
 
     /// Epoch-level state that we only change as of the last block of an epoch.
     ///
-    /// This is what tracks finalization.
+    /// This is what tracks finalization from the perspective of the L2 chain.
     // TODO this might be reworked to be managed separately
     pub(crate) epoch_state: EpochState,
 
@@ -50,7 +53,7 @@ impl Chainstate {
     pub fn from_genesis(gdata: &GenesisStateData) -> Self {
         Self {
             last_block: gdata.genesis_blkid(),
-            slot: 0,
+            last_slot: 0,
             cur_epoch: 0,
             epoch_state: EpochState::from_genesis(gdata),
             pending_withdraws: StateQueue::new_empty(),
@@ -60,7 +63,7 @@ impl Chainstate {
 
     /// Returns the slot last processed on the chainstate.
     pub fn chain_tip_slot(&self) -> u64 {
-        self.slot
+        self.last_slot
     }
 
     /// Returns the blockid of the last processed block, which was used to
@@ -114,7 +117,7 @@ impl Chainstate {
         // TODO convert to using SSZ when we get to that
         let hashed_state = HashedChainstate {
             last_block: self.last_block.into(),
-            slot: self.slot,
+            slot: self.last_slot,
             epoch: self.cur_epoch,
             epoch_state: compute_borsh_hash(&self.epoch_state),
             pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
@@ -165,11 +168,11 @@ pub struct EpochState {
     /// This might lag by >1 epoch due to various things.
     pub(crate) finalized_epoch: EpochCommitment,
 
-    /// Last L1 block ID that we've processed and accepted.
-    pub(crate) last_l1_blkid: L1BlockId,
-
-    /// Last L1 block height that we've processed and accepted.
-    pub(crate) last_l1_block_height: u64,
+    /// Safe L1 block ID that we've processed and accepted.
+    ///
+    /// This isn't necessarily the most recent one, but the one we trust won't
+    /// be rolled back.
+    pub(crate) safe_l1_block: L1BlockCommitment,
 
     /// Operator table we store registered operators for.
     pub(crate) operator_table: bridge_state::OperatorTable,
@@ -180,11 +183,11 @@ pub struct EpochState {
 
 impl EpochState {
     pub fn from_genesis(gd: &GenesisStateData) -> Self {
+        // FIXME make this accurately reflect the epoch level state
+        let l1_block = L1BlockCommitment::new(0, *gd.l1_state().safe_block().blkid());
         Self {
             finalized_epoch: EpochCommitment::zero(),
-            last_l1_blkid: *gd.l1_state().safe_block().blkid(),
-            // FIXME make this accurately reflect the epoch level state
-            last_l1_block_height: 0,
+            safe_l1_block: l1_block,
             operator_table: gd.operator_table().clone(),
             deposits_table: bridge_state::DepositsTable::new_empty(),
         }
@@ -207,11 +210,11 @@ impl EpochState {
     }
 
     pub fn safe_l1_blkid(&self) -> &L1BlockId {
-        &self.last_l1_blkid
+        self.safe_l1_block.blkid()
     }
 
     pub fn safe_l1_height(&self) -> u64 {
-        self.last_l1_block_height
+        self.safe_l1_block.heieght()
     }
 
     pub fn get_deposit(&self, idx: u32) -> Option<&DepositEntry> {

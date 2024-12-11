@@ -65,6 +65,29 @@ impl From<L1BlockId> for BlockHash {
     }
 }
 
+/// Commitment to a particular L1 block with both height and blkid.
+///
+/// This is analogous in intention to the `EpochCommitment` type.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize)]
+pub struct L1BlockCommitment {
+    height: u64,
+    blkid: L1BlockId,
+}
+
+impl L1BlockCommitment {
+    pub fn new(height: u64, blkid: L1BlockId) -> Self {
+        Self { height, blkid }
+    }
+
+    pub fn heieght(&self) -> u64 {
+        self.height
+    }
+
+    pub fn blkid(&self) -> &L1BlockId {
+        &self.blkid
+    }
+}
+
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
 #[derive(
