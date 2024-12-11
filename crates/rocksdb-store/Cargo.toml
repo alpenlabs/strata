@@ -8,6 +8,7 @@ strata-db.workspace = true
 strata-mmr.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
+strata-zkvm.workspace = true
 
 anyhow.workspace = true
 arbitrary.workspace = true

@@ -8,7 +8,7 @@ use strata_primitives::{
     buf::Buf64,
     operator::OperatorPubkeys,
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
-    vk::RollupVerifyingKey,
+    proof::RollupVerifyingKey,
 };
 use strata_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},

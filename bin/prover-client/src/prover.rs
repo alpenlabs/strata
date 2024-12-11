@@ -3,13 +3,12 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use strata_db::traits::{ProverDatabase, ProverTaskDatabase};
+use strata_db::traits::ProofDatabase;
+use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_proofimpl_evm_ee_stf::ELProofInput;
-use strata_rocksdb::{
-    prover::db::{ProofDb, ProverDB},
-    DbOpsConfig,
-};
-use strata_zkvm::{Proof, ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
+use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
+use strata_state::l1::L1BlockId;
+use strata_zkvm::{ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -87,7 +86,7 @@ impl ProverState {
 // the prover will reject new jobs.
 pub(crate) struct Prover {
     prover_state: Arc<RwLock<ProverState>>,
-    db: ProverDB,
+    db: ProofDb,
     pool: rayon::ThreadPool,
     vm_manager: ZkVMManager, // TODO: make this generic
 }
@@ -202,7 +201,7 @@ impl Prover {
                 tasks_status: Default::default(),
                 pending_tasks_count: Default::default(),
             })),
-            db: ProverDB::new(Arc::new(db)),
+            db,
             vm_manager: zkvm_manager,
         }
     }
@@ -307,22 +306,24 @@ impl Prover {
         }
     }
 
-    fn save_proof_to_db(&self, task_id: Uuid, proof: &ProofReceipt) -> Result<(), anyhow::Error> {
-        self.db
-            .prover_task_db()
-            .insert_new_task_entry(*task_id.as_bytes(), bincode::serialize(&proof)?)?;
+    // TODO: replace `task_id` with ProofKey
+    fn save_proof_to_db(&self, _task_id: Uuid, _proof: &ProofReceipt) -> Result<(), anyhow::Error> {
+        // Note: This works fine for now because proof is never read from DB right now
+        // let proof_key = ProofKey::BtcBlockspace(1);
+        // self.db.proof_db().insert_proof(proof_key, proof.clone())?;
         Ok(())
     }
 
-    // This might be used later?
+    // TODO: fix this
     #[allow(dead_code)]
-    fn read_proof_from_db(&self, task_id: Uuid) -> Result<Proof, anyhow::Error> {
-        let proof_entry = self
-            .db
-            .prover_task_db()
-            .get_task_entry_by_id(*task_id.as_bytes())?;
+    fn read_proof_from_db(&self, task_id: Uuid) -> Result<ProofReceipt, anyhow::Error> {
+        // used an arbitrary proof id for now
+        // TODO: to be replaced once we move from Uuid to ProofKey based status
+        let proof_context = ProofContext::BtcBlockspace(L1BlockId::default());
+        let proof_key = ProofKey::new(proof_context, ProofZkVm::Native);
+        let proof_entry = self.db.get_proof(proof_key)?;
         match proof_entry {
-            Some(raw_proof) => Ok(Proof::new(raw_proof)),
+            Some(proof) => Ok(proof),
             None => Err(anyhow::anyhow!("Proof not found for {:?}", task_id)),
         }
     }
