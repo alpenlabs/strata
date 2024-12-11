@@ -10,7 +10,7 @@ use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{Epoch, L1BlockManifest, L1BlockRecord, L1TxProof},
+    l1::{L1BlockManifest, L1BlockRecord, L1TxProof},
     params::{Params, RollupParams},
     proof::RollupVerifyingKey,
 };
@@ -192,7 +192,7 @@ pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) 
 
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
-fn generate_block_manifest(block: &Block, epoch: Epoch) -> L1BlockManifest {
+fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
     let blockid = Buf32::from(block.block_hash().to_raw_hash().to_byte_array());
     let root = block
         .witness_root()

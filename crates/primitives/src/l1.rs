@@ -131,23 +131,14 @@ impl L1TxProof {
 /// Includes `L1BlockManifest` along with scan rules that it is applied to
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockManifest {
-    /// The actual l1 manifest
+    /// The actual l1 record
     record: L1BlockRecord,
     /// Epoch, whose scan rules are applied to this manifest
-    epoch: Epoch,
-}
-
-/// Epoch that is either exact or transitioning from one to another.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum Epoch {
-    /// Exact epoch
-    Exact(u64),
-    /// Transitioning Epoch(from, to)
-    AtTransition(u64, u64),
+    epoch: u64,
 }
 
 impl L1BlockManifest {
-    pub fn new(record: L1BlockRecord, epoch: Epoch) -> Self {
+    pub fn new(record: L1BlockRecord, epoch: u64) -> Self {
         Self { record, epoch }
     }
 

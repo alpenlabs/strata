@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::bail;
 use bitcoin::{hashes::Hash, Block, BlockHash};
-use strata_primitives::{buf::Buf32, l1::Epoch};
+use strata_primitives::buf::Buf32;
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
@@ -21,10 +21,7 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    reader::{
-        config::ReaderConfig,
-        state::{EpochFilterConfig, ReaderState},
-    },
+    reader::{config::ReaderConfig, state::ReaderState},
     rpc::traits::Reader,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -76,7 +73,7 @@ async fn do_reader_task<R: Reader>(
         let cur_best_height = state.best_block_idx();
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        check_and_update_epoch_scan_rules_change(&ctx, &mut state).await?;
+        check_and_handle_epoch_filter_rules_change(&ctx, &mut state).await?;
 
         if let Err(err) = poll_for_new_blocks(&ctx, &mut state, &mut status_updates)
             .instrument(poll_span)
@@ -112,28 +109,22 @@ async fn do_reader_task<R: Reader>(
 
 /// Checks for epoch and scan rule update. If so, rescan recent blocks to account for possibly
 /// missed relevant txs.
-async fn check_and_update_epoch_scan_rules_change<R: Reader>(
+async fn check_and_handle_epoch_filter_rules_change<R: Reader>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
 ) -> anyhow::Result<()> {
     let latest_epoch = ctx.status_channel.epoch().unwrap_or(0);
     // TODO: check if latest_epoch < current epoch. should panic if so?
-    let curr_epoch = match state.epoch() {
-        Epoch::Exact(e) => *e,
-        Epoch::AtTransition(_from, to) => *to,
-    };
+    let curr_epoch = state.epoch();
     let is_new_epoch = curr_epoch == latest_epoch;
-    let curr_filter_config = match state.filter_config() {
-        EpochFilterConfig::AtEpoch(c) => c.clone(),
-        EpochFilterConfig::AtTransition(_, c) => c.clone(),
-    };
+    let curr_filter_config = state.filter_config();
     if is_new_epoch {
         // TODO: pass in chainstate to `derive_from`
         let new_config = TxFilterConfig::derive_from(ctx.config.params.rollup())?;
 
         // If filter rule has changed, first revert recent scanned blocks and rescan them with new
         // rule
-        if new_config != curr_filter_config {
+        if new_config != *curr_filter_config {
             // Send L1 revert so that the recent txs can be appropriately re-filtered
             let revert_ev =
                 L1Event::RevertTo(state.best_block_idx() - state.recent_blocks().len() as u64);
@@ -141,17 +132,10 @@ async fn check_and_update_epoch_scan_rules_change<R: Reader>(
                 warn!("unable to submit L1 reorg event, did persistence task exit?");
             }
 
-            state.set_filter_config(EpochFilterConfig::AtTransition(
-                curr_filter_config,
-                new_config,
-            ));
-            state.set_epoch(Epoch::AtTransition(curr_epoch, latest_epoch));
-
+            state.set_filter_config(new_config);
             rescan_recent_blocks(ctx, state).await?;
-        } else {
-            state.set_filter_config(EpochFilterConfig::AtEpoch(curr_filter_config));
-            state.set_epoch(Epoch::Exact(curr_epoch));
         }
+        state.set_epoch(latest_epoch);
     }
     // TODO: anything else?
     Ok(())
@@ -214,8 +198,8 @@ async fn init_reader_state<R: Reader>(
         real_cur_height + 1,
         lookback,
         init_queue,
-        EpochFilterConfig::AtEpoch(filter_config), // TODO: decide if it is transitional or exact
-        Epoch::Exact(epoch),                       // TODO: decide if it is transitional or exact
+        filter_config,
+        epoch,
     );
     Ok(state)
 }
@@ -318,15 +302,7 @@ async fn process_block<R: Reader>(
     let txs = block.txdata.len();
 
     let params = ctx.config.params.clone();
-    let filtered_txs = match state.filter_config() {
-        EpochFilterConfig::AtEpoch(config) => filter_protocol_op_tx_refs(&block, config),
-        EpochFilterConfig::AtTransition(from_config, to_config) => {
-            let mut txs = filter_protocol_op_tx_refs(&block, from_config);
-            let txs1 = filter_protocol_op_tx_refs(&block, to_config);
-            txs.extend_from_slice(&txs1);
-            txs
-        }
-    };
+    let filtered_txs = filter_protocol_op_tx_refs(&block, state.filter_config());
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");
@@ -360,7 +336,7 @@ async fn process_block<R: Reader>(
     // TODO: probably need to send the current epoch as well
     if let Err(e) = ctx
         .event_tx
-        .send(L1Event::BlockData(block_data, state.epoch().clone()))
+        .send(L1Event::BlockData(block_data, state.epoch()))
         .await
     {
         error!("failed to submit L1 block event, did the persistence task crash?");

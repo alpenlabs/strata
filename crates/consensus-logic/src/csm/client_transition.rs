@@ -535,7 +535,11 @@ mod tests {
         let l1_db = database.l1_db();
         for (i, b) in l1_chain.iter().enumerate() {
             l1_db
-                .put_block_data(i as u64 + horizon, b.clone(), Vec::new())
+                .put_block_data(
+                    i as u64 + horizon,
+                    L1BlockManifest::new(b.clone(), 0),
+                    Vec::new(),
+                )
                 .expect("test: insert blocks");
         }
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash().into()).collect();

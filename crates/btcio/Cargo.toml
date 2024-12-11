@@ -37,8 +37,8 @@ strata-rocksdb = { workspace = true, features = ["test_utils"] }
 strata-test-utils.workspace = true
 
 arbitrary.workspace = true
-mockall.workspace = true
 corepc-node = { version = "0.4.0", features = ["28_0"] }
+mockall.workspace = true
 
 [features]
 test_utils = []
