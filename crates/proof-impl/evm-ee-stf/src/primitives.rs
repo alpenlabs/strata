@@ -13,14 +13,14 @@ use strata_state::block::ExecSegment;
 use crate::mpt::{MptNode, StorageEntry};
 
 /// Public Parameters that proof asserts
-pub type ElProofOutput = Vec<ExecSegment>;
+pub type EvmEeProofOutput = Vec<ExecSegment>;
 
 /// Public Parameters that proof asserts
-pub type ElProofInput = Vec<ElBlockStfInput>;
+pub type EvmEeProofInput = Vec<EvmBlockStfInput>;
 
 /// Result of the block execution
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ElBlockStfOutput {
+pub struct EvmBlockStfOutput {
     pub block_idx: u64,
     pub prev_blockhash: FixedBytes<32>,
     pub new_blockhash: FixedBytes<32>,
@@ -30,10 +30,10 @@ pub struct ElBlockStfOutput {
     pub deposits_txns_root: FixedBytes<32>,
 }
 
+/// Necessary information to prove the execution of a Evm block.
 #[serde_as]
-/// Necessary information to prove the execution of a EL block.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ElBlockStfInput {
+pub struct EvmBlockStfInput {
     /// The Keccak 256-bit hash of the parent block's header, in its entirety.
     /// N.B. The reason serde_bincode_compat is necessary:
     /// `[serde_bincode_compat]`(alloy_consensus::serde_bincode_compat)

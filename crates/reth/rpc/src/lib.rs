@@ -10,7 +10,7 @@ use reth_primitives::revm_primitives::alloy_primitives::B256;
 pub use rpc::StrataRPC;
 pub use sequencer::SequencerClient;
 use serde::{Deserialize, Serialize};
-use strata_proofimpl_evm_ee_stf::ElBlockStfInput;
+use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 
 #[cfg_attr(not(test), rpc(server, namespace = "strataee"))]
 #[cfg_attr(test, rpc(server, client, namespace = "strataee"))]
@@ -29,5 +29,5 @@ pub trait StrataRpcApi {
 #[serde(untagged)]
 pub enum BlockWitness {
     Raw(#[serde(with = "hex::serde")] Vec<u8>),
-    Json(ElBlockStfInput),
+    Json(EvmBlockStfInput),
 }
