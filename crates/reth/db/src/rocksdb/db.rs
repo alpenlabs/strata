@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use reth_primitives::revm_primitives::alloy_primitives::B256;
 use rockbound::{SchemaDBOperations, SchemaDBOperationsExt};
-use strata_proofimpl_evm_ee_stf::ELProofInput;
+use strata_proofimpl_evm_ee_stf::ElBlockStfInput;
 
 use super::schema::BlockWitnessSchema;
 use crate::{errors::DbError, DbResult, WitnessProvider, WitnessStore};
@@ -29,10 +29,10 @@ impl<DB> WitnessDB<DB> {
 }
 
 impl<DB: SchemaDBOperations> WitnessProvider for WitnessDB<DB> {
-    fn get_block_witness(&self, block_hash: B256) -> DbResult<Option<ELProofInput>> {
+    fn get_block_witness(&self, block_hash: B256) -> DbResult<Option<ElBlockStfInput>> {
         let raw = self.db.get::<BlockWitnessSchema>(&block_hash)?;
 
-        let parsed: Option<ELProofInput> = raw
+        let parsed: Option<ElBlockStfInput> = raw
             .map(|bytes| bincode::deserialize(&bytes))
             .transpose()
             .map_err(|err| DbError::CodecError(err.to_string()))?;
@@ -46,7 +46,7 @@ impl<DB: SchemaDBOperations> WitnessProvider for WitnessDB<DB> {
 }
 
 impl<DB: SchemaDBOperations> WitnessStore for WitnessDB<DB> {
-    fn put_block_witness(&self, block_hash: B256, witness: &ELProofInput) -> crate::DbResult<()> {
+    fn put_block_witness(&self, block_hash: B256, witness: &ElBlockStfInput) -> crate::DbResult<()> {
         let serialized =
             bincode::serialize(witness).map_err(|err| DbError::Other(err.to_string()))?;
         Ok(self
@@ -63,7 +63,7 @@ impl<DB: SchemaDBOperations> WitnessStore for WitnessDB<DB> {
 mod tests {
     use rockbound::SchemaDBOperations;
     use serde::Deserialize;
-    use strata_proofimpl_evm_ee_stf::{ELProofInput, ELProofPublicParams};
+    use strata_proofimpl_evm_ee_stf::{ElBlockStfInput, ElBlockStfOutput};
     use tempfile::TempDir;
 
     use super::*;
@@ -89,8 +89,8 @@ mod tests {
 
     #[derive(Deserialize)]
     struct TestData {
-        witness: ELProofInput,
-        params: ELProofPublicParams,
+        witness: ElBlockStfInput,
+        params: ElBlockStfOutput,
     }
 
     fn get_mock_data() -> TestData {
@@ -145,7 +145,7 @@ mod tests {
             .expect("failed to put witness data");
         // assert block is present in the db
         let received_witness = db.get_block_witness(block_hash);
-        assert!(matches!(received_witness, Ok(Some(ELProofInput { .. }))));
+        assert!(matches!(received_witness, Ok(Some(ElBlockStfInput { .. }))));
 
         // deleting existing block is ok
         let res = db.del_block_witness(block_hash);

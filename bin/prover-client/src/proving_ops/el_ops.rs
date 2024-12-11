@@ -3,7 +3,7 @@ use std::sync::Arc;
 use alloy_rpc_types::Block;
 use async_trait::async_trait;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
-use strata_proofimpl_evm_ee_stf::ELProofInput;
+use strata_proofimpl_evm_ee_stf::ElBlockStfInput;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -40,7 +40,7 @@ impl ProvingOperations for ElOperations {
 
     async fn fetch_input(&self, block_range: Self::Params) -> Result<Self::Input, anyhow::Error> {
         let (start_block_num, end_block_num) = block_range;
-        let mut el_proof_inputs: Vec<ELProofInput> = Vec::new();
+        let mut el_proof_inputs: Vec<ElBlockStfInput> = Vec::new();
 
         for block_num in start_block_num..=end_block_num {
             let block: Block = self
@@ -51,7 +51,7 @@ impl ProvingOperations for ElOperations {
                 )
                 .await?;
             let block_hash = block.header.hash;
-            let el_proof_input: ELProofInput = self
+            let el_proof_input: ElBlockStfInput = self
                 .el_client
                 .request("strataee_getBlockWitness", rpc_params![block_hash, true])
                 .await?;

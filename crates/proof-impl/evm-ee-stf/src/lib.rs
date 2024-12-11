@@ -22,7 +22,7 @@ pub mod processor;
 pub mod prover;
 use db::InMemoryDBHelper;
 use mpt::keccak;
-pub use primitives::{ELProofInput, ELProofPublicParams};
+pub use primitives::{ElBlockStfInput, ElBlockStfOutput};
 use processor::{EvmConfig, EvmProcessor};
 use reth_primitives::revm_primitives::alloy_primitives::B256;
 use revm::{primitives::SpecId, InMemoryDB};
@@ -41,9 +41,9 @@ const EVM_CONFIG: EvmConfig = EvmConfig {
 };
 /// Executes the block with the given input and EVM configuration, returning public parameters.
 pub fn process_block_transaction(
-    mut input: ELProofInput,
+    mut input: ElBlockStfInput,
     evm_config: EvmConfig,
-) -> ELProofPublicParams {
+) -> ElBlockStfOutput {
     // Calculate the previous block hash
     let previous_block_hash = B256::from(keccak(alloy_rlp::encode(input.parent_header.clone())));
 
@@ -76,7 +76,7 @@ pub fn process_block_transaction(
             .collect::<Vec<_>>();
 
     // Construct the public parameters for the proof
-    ELProofPublicParams {
+    ElBlockStfOutput {
         block_idx: block_header.number,
         new_blockhash: new_block_hash,
         new_state_root: block_header.state_root,
@@ -97,7 +97,7 @@ pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
     let mut current_blockhash = None;
 
     for _ in 0..num_blocks {
-        let input: ELProofInput = zkvm.read_serde();
+        let input: ElBlockStfInput = zkvm.read_serde();
         let output = process_block_transaction(input, EVM_CONFIG);
 
         if let Some(expected_hash) = current_blockhash {
@@ -112,7 +112,7 @@ pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
 }
 
 /// Generates an execution segment from the given ELProof public parameters.
-pub fn generate_exec_update(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
+pub fn generate_exec_update(el_proof_pp: &ElBlockStfOutput) -> ExecSegment {
     // create_evm_extra_payload
     let update_input = UpdateInput::new(
         el_proof_pp.block_idx,
@@ -140,8 +140,8 @@ mod tests {
 
     #[derive(Serialize, Deserialize)]
     struct TestData {
-        witness: ELProofInput,
-        params: ELProofPublicParams,
+        witness: ElBlockStfInput,
+        params: ElBlockStfOutput,
     }
 
     fn get_mock_data() -> TestData {
@@ -160,7 +160,7 @@ mod tests {
         let test_data = get_mock_data();
 
         let s = bincode::serialize(&test_data.witness).unwrap();
-        let d: ELProofInput = bincode::deserialize(&s[..]).unwrap();
+        let d: ElBlockStfInput = bincode::deserialize(&s[..]).unwrap();
         assert_eq!(d, test_data.witness);
     }
 
