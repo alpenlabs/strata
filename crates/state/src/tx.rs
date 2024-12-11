@@ -1,8 +1,9 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use num_enum::TryFromPrimitive;
 use strata_primitives::l1::{BitcoinAmount, OutputRef};
 
-use crate::batch::SignedBatchCheckpoint;
+use crate::{batch::SignedBatchCheckpoint, da_blob::BundledCommitment};
 
 /// Information related to relevant transactions to be stored in L1Tx
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -15,7 +16,7 @@ pub enum ProtocolOperation {
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
     /// DA data. can be made through `submit_da_blob` RPC.
-    DA(Vec<u8>),
+    DA(BundledCommitment),
     // TODO: add other kinds like statediffs
 }
 
@@ -43,36 +44,28 @@ pub struct DepositRequestInfo {
     pub address: Vec<u8>,
 }
 
-/// Wrapper to hold various types of Inscription data as defined by [`BlobType`] enum.
+/// Wrapper to hold various types of Envelope data as defined by [`PayloadTypeTag`] enum.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct InscriptionBlob {
-    /// for tagging purpose to understand what kind of inscription it is
-    data_type: BlobType,
-    /// payload present in inscription transaction (either batchTx or checkpointTx)
+pub struct EnvelopePayload {
+    /// for tagging purpose to understand what kind of envelope it is
+    data_type: PayloadTypeTag,
+    /// payload present in envelope
     data: Vec<u8>,
 }
 
-/// Enum that acts as a tag to separates different types of inscription blobs.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+/// Enum that acts as a tag to separates different types of envelope blobs.
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, TryFromPrimitive,
+)]
 #[borsh(use_discriminant = true)]
-pub enum BlobType {
+#[repr(u8)]
+pub enum PayloadTypeTag {
     Checkpoint = 0,
     DA = 1,
 }
 
-impl BlobType {
-    /// Used to convert Integer to Type mainly for parsing purpose
-    pub fn from_u32(value: u32) -> Option<Self> {
-        match value {
-            0 => Some(Self::Checkpoint),
-            1 => Some(Self::DA),
-            _ => None,
-        }
-    }
-}
-
-impl InscriptionBlob {
-    pub fn new(data_type: BlobType, data: Vec<u8>) -> Self {
+impl EnvelopePayload {
+    pub fn new(data_type: PayloadTypeTag, data: Vec<u8>) -> Self {
         Self { data_type, data }
     }
 
@@ -81,8 +74,8 @@ impl InscriptionBlob {
         &self.data
     }
 
-    /// Blob Inscription type
-    pub fn data_type(&self) -> BlobType {
+    /// Envelope type
+    pub fn data_type(&self) -> PayloadTypeTag {
         self.data_type
     }
 }

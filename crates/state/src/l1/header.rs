@@ -21,8 +21,8 @@ pub struct L1HeaderRecord {
 
     /// Root of the transaction witnesses tree.
     ///
-    /// This is how we check inscriptions, since those are only present in the
-    /// witness transaction serialization.
+    /// This is how we check reveal transaction that contain envelopes, since those are only
+    /// present in the witness transaction serialization.
     pub(crate) wtxs_root: Buf32,
 }
 

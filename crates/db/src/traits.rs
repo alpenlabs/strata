@@ -19,7 +19,7 @@ use strata_zkvm::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{BlobEntry, CheckpointEntry, L1TxEntry},
+    types::{CheckpointEntry, EnvelopeEntry, L1TxEntry},
     DbResult,
 };
 
@@ -245,27 +245,27 @@ pub trait CheckpointDatabase {
 
 /// NOTE: We might have to merge this with the [`Database`]
 /// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`BlobEntry`]
+/// [`CommitRevealEnvelopeEntry`]
 pub trait SequencerDatabase {
-    type BlobDB: BlobDatabase;
+    type EnvelopeDB: EnvelopeDatabase;
 
-    fn blob_db(&self) -> &Arc<Self::BlobDB>;
+    fn envelope_db(&self) -> &Arc<Self::EnvelopeDB>;
 }
 
-/// A trait encapsulating provider and store traits to create/update [`BlobEntry`] in the database
-/// and to fetch [`BlobEntry`] and indices from the database
-pub trait BlobDatabase {
-    /// Store the [`BlobEntry`].
-    fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
+/// A trait encapsulating provider and store traits to create/update [`CommitRevealEnvelopeEntry`]
+/// in the database and to fetch [`CommitRevealEnvelopeEntry`] and indices from the database
+pub trait EnvelopeDatabase {
+    /// Store the [`CommitRevealEnvelopeEntry`].
+    fn put_entry(&self, entryid: Buf32, entry: EnvelopeEntry) -> DbResult<()>;
 
-    /// Get a [`BlobEntry`] by its hash
-    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
+    /// Get a [`CommitRevealEnvelopeEntry`] by its hash
+    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<EnvelopeEntry>>;
 
     /// Get the blob ID corresponding to the index
-    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>>;
+    fn get_id(&self, entryidx: u64) -> DbResult<Option<Buf32>>;
 
     /// Get the last blob index
-    fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
+    fn get_last_idx(&self) -> DbResult<Option<u64>>;
 }
 
 pub trait ProofDatabase {

@@ -125,7 +125,7 @@ where
     }
 }
 
-/// Parses inscriptions and checks for batch data in the transactions
+/// Parses reveal transactions and checks for batch data in the transactions
 fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
@@ -135,10 +135,9 @@ fn check_for_da_batch(
     let signed_checkpts = protocol_ops_txs
         .iter()
         .filter_map(|ops_txs| match ops_txs.proto_op() {
-            strata_state::tx::ProtocolOperation::Checkpoint(inscription) => Some((
-                inscription,
-                &blockdata.block().txdata[ops_txs.index() as usize],
-            )),
+            strata_state::tx::ProtocolOperation::Checkpoint(batch) => {
+                Some((batch, &blockdata.block().txdata[ops_txs.index() as usize]))
+            }
             _ => None,
         });
 

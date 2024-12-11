@@ -11,7 +11,7 @@ use bitcoin::{
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
-use strata_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
+use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle, l1_handler::verify_proof, sync_manager::SyncManager,
 };
@@ -36,13 +36,13 @@ use strata_state::{
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
-    da_blob::{BlobCommitment, BlobDest, BlobIntent},
+    da_blob::{BundledCommitment, BundledPayloadIntent, DataBundleDest},
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
     operation::ClientUpdateOutput,
     sync_event::SyncEvent,
-    tx::{BlobType, InscriptionBlob},
+    tx::{EnvelopePayload, PayloadTypeTag},
 };
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
@@ -636,7 +636,7 @@ impl StrataAdminApiServer for AdminServerImpl {
 }
 
 pub struct SequencerServerImpl {
-    inscription_handle: Arc<InscriptionHandle>,
+    envelope_handle: Arc<EnvelopeHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     checkpoint_handle: Arc<CheckpointHandle>,
     params: Arc<Params>,
@@ -644,28 +644,29 @@ pub struct SequencerServerImpl {
 
 impl SequencerServerImpl {
     pub fn new(
-        inscription_handle: Arc<InscriptionHandle>,
+        envelope_handle: Arc<EnvelopeHandle>,
         broadcast_handle: Arc<L1BroadcastHandle>,
         params: Arc<Params>,
         checkpoint_handle: Arc<CheckpointHandle>,
     ) -> Self {
         Self {
-            inscription_handle,
+            envelope_handle,
             broadcast_handle,
             params,
             checkpoint_handle,
         }
     }
 
-    /// Submit inscription blob entry
-    async fn submit_blobs(&self, blob_vec: Vec<InscriptionBlob>) -> RpcResult<()> {
-        let blob_commitment = BlobCommitment::from_payload(&blob_vec);
-        let blobintent = BlobIntent::new(BlobDest::L1, blob_commitment, blob_vec);
+    /// Submit DA payload entries to be placed in commit reveal Envelope
+    /// multiple Envelopes can exist in same transaction
+    async fn submit_blobs(&self, blob_vec: Vec<EnvelopePayload>) -> RpcResult<()> {
+        let blob_commitment = BundledCommitment::from_payload(&blob_vec);
+        let blobintent = BundledPayloadIntent::new(DataBundleDest::L1, blob_commitment, blob_vec);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
         if let Err(e) = self
-            .inscription_handle
-            .submit_intent_async(blobintent)
+            .envelope_handle
+            .submit_bundled_intent_async(blobintent)
             .await
         {
             return Err(Error::Other(e.to_string()).into());
@@ -677,16 +678,16 @@ impl SequencerServerImpl {
 #[async_trait]
 impl StrataSequencerApiServer for SequencerServerImpl {
     async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()> {
-        let blob_vec: Vec<InscriptionBlob> = blobs
+        let blob_vec: Vec<EnvelopePayload> = blobs
             .into_iter()
-            .map(|blob| InscriptionBlob::new(BlobType::DA, blob.into_inner()))
+            .map(|blob| EnvelopePayload::new(PayloadTypeTag::DA, blob.into_inner()))
             .collect();
 
         self.submit_blobs(blob_vec).await
     }
 
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
-        let blob = vec![InscriptionBlob::new(BlobType::DA, blob.into_inner())];
+        let blob = vec![EnvelopePayload::new(PayloadTypeTag::DA, blob.into_inner())];
 
         self.submit_blobs(blob).await
     }

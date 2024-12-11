@@ -10,29 +10,29 @@ use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
 use strata_state::{
     batch::{BatchCheckpoint, BatchInfo, BootstrapState},
-    tx::InscriptionBlob,
+    tx::EnvelopePayload,
 };
 use strata_zkvm::Proof;
 
-/// Represents data for a blob we're still planning to inscribe.
-// TODO rename to `BlockInscriptionEntry` to emphasize this isn't just about *all* blobs
+/// Represents data for a payloads we're still planning to inscribe into commit reveal transaction.
+/// Multiple Envelopes can exist in same transactions
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct BlobEntry {
-    pub blobs: Vec<InscriptionBlob>,
+pub struct EnvelopeEntry {
+    pub envelopes: Vec<EnvelopePayload>,
     pub commit_txid: Buf32,
     pub reveal_txid: Buf32,
-    pub status: BlobL1Status,
+    pub status: PayloadL1Status,
 }
 
-impl BlobEntry {
+impl EnvelopeEntry {
     pub fn new(
-        blobs: Vec<InscriptionBlob>,
+        blobs: Vec<EnvelopePayload>,
         commit_txid: Buf32,
         reveal_txid: Buf32,
-        status: BlobL1Status,
+        status: PayloadL1Status,
     ) -> Self {
         Self {
-            blobs,
+            envelopes: blobs,
             commit_txid,
             reveal_txid,
             status,
@@ -44,16 +44,16 @@ impl BlobEntry {
     /// NOTE: This won't have commit - reveal pairs associated with it.
     ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
     ///   by others. Those will be created and signed in a single step.
-    pub fn new_unsigned(blobs: Vec<InscriptionBlob>) -> Self {
+    pub fn new_unsigned(blobs: Vec<EnvelopePayload>) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();
-        Self::new(blobs, cid, rid, BlobL1Status::Unsigned)
+        Self::new(blobs, cid, rid, PayloadL1Status::Unsigned)
     }
 }
 
 /// Various status that transactions corresponding to a blob can be in L1
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum BlobL1Status {
+pub enum PayloadL1Status {
     /// The blob has not been signed yet, i.e commit-reveal transactions have not been created yet.
     Unsigned,
 
