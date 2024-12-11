@@ -1,12 +1,12 @@
 use strata_zkvm::{ProofType, PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
 
-use crate::{ELProofInput, ELProofPublicParams};
+use crate::{ElBlockStfInput, ElBlockStfOutput};
 
 pub struct EvmEeProver;
 
 impl ZkVmProver for EvmEeProver {
-    type Input = ELProofInput;
-    type Output = ELProofPublicParams;
+    type Input = ElBlockStfInput;
+    type Output = ElBlockStfOutput;
 
     fn proof_type() -> ProofType {
         ProofType::Compressed
