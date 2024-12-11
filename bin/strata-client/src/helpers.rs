@@ -15,6 +15,7 @@ use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, Engine
 use strata_key_derivation::sequencer::SequencerKeys;
 use strata_primitives::{
     buf::Buf32,
+    keys::ZeroizableXpriv,
     l1::L1Status,
     params::{Params, RollupParams},
 };
@@ -27,6 +28,7 @@ use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
 use tokio::runtime::Runtime;
 use tracing::*;
+use zeroize::Zeroize;
 
 use crate::{args::Args, config::Config, errors::InitError, network};
 
@@ -180,17 +182,20 @@ pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
     let str_buf = std::str::from_utf8(&raw_buf)?;
     debug!(?path, "loading sequencer root key");
     let buf = base58::decode_check(str_buf)?;
-    let master_xpriv = Xpriv::decode(&buf)?;
+    let master_xpriv = ZeroizableXpriv::new(Xpriv::decode(&buf)?);
 
     // Actually do the key derivation from the root key and then derive the pubkey from that.
     let seq_keys = SequencerKeys::new(&master_xpriv)?;
     let seq_xpriv = seq_keys.derived_xpriv();
-    let seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
+    let mut seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
     let seq_xpub = seq_keys.derived_xpub();
     let seq_pk = seq_xpub.to_x_only_pub().serialize();
 
     let ik = IdentityKey::Sequencer(seq_sk);
     let ident = Identity::Sequencer(Buf32::from(seq_pk));
+
+    // Zeroize the Buf32 representation of the Xpriv.
+    seq_sk.zeroize();
 
     // Changed this to the pubkey so that we don't just log our privkey.
     debug!(?ident, "ready to sign as sequencer");
