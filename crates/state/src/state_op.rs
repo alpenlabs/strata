@@ -9,7 +9,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
-    l1::{BitcoinAmount, OutputRef},
+    l1::{BitcoinAmount, L1BlockCommitment, OutputRef},
 };
 use tracing::*;
 
@@ -140,9 +140,7 @@ impl StateCache {
         self.new_epoch_state.is_some()
     }
 
-    pub fn l1_safe_height(&self) -> u64 {
-        self.epoch_state().last_l1_block_height
-    }
+    // TODO reorganize these functions?
 
     /// Finalizes the changes made to the state, exporting it and a write batch
     /// that can be applied to the previous state to produce it.
@@ -163,40 +161,48 @@ impl StateCache {
 
     /// Sets the current slot in the state.
     pub fn set_cur_header(&mut self, header: &impl L2Header) {
-        self.new_ch_state.slot = header.blockidx();
+        self.new_ch_state.last_slot = header.blockidx();
         self.new_ch_state.last_block = header.get_blockid();
     }
 
-    /// remove a deposit intent from the pending deposits queue.
-    pub fn consume_deposit_intent(&mut self, idx: u64) {
-        let deposits = self.new_ch_state.exec_env_state.pending_deposits_mut();
-
-        let front_idx = deposits
-            .front_idx()
-            .expect("stateop: empty deposit intent queue");
-
-        // deposit intent indices processed sequentially, without any gaps
-        let to_drop_count = idx
-            .checked_sub(front_idx) // ensures to_drop_idx >= front_idx
-            .expect("stateop: unable to consume deposit intent")
-            + 1;
-
-        deposits
-            .pop_front_n_vec(to_drop_count as usize) // ensures to_drop_idx < front_idx + len
-            .expect("stateop: unable to consume deposit intent");
+    /// Sets the current epoch.
+    ///
+    /// # Panics
+    ///
+    /// If this doesn't increase the current epoch.
+    pub fn set_cur_epoch(&mut self, epoch: u64) {
+        let cur_epoch = self.new_ch_state.cur_epoch;
+        assert!(
+            epoch > cur_epoch,
+            "stateop: epoch changed but not increasing (new {epoch}, cur {cur_epoch})"
+        );
+        self.new_ch_state.cur_epoch = epoch;
     }
 
-    /// Inserts a new operator with the specified pubkeys into the operator table.
-    pub fn insert_operator(&mut self, signing_pk: Buf32, wallet_pk: Buf32) {
-        self.epoch_state_mut()
-            .operator_table
-            .insert(signing_pk, wallet_pk);
-    }
-
-    pub fn set_safe_l1_tip(&mut self, blkid: L1BlockId, idx: u64) {
+    /// Sets the finalized epoch data.
+    ///
+    /// # Panics
+    ///
+    /// If the epoch is greater than the slot.
+    pub fn set_finalized_epoch(&mut self, epoch: u64, slot: u64, blkid: L2BlockId) {
+        // Sanity check to make sure this function is being called correctly.
+        assert!(
+            epoch <= slot,
+            "stateop: epoch seems too high for slot (epoch {epoch} vs slot {slot})"
+        );
         let es = self.epoch_state_mut();
-        es.last_l1_blkid = blkid;
-        es.last_l1_block_height = idx;
+        es.finalized_epoch = EpochCommitment::new(epoch, slot, blkid);
+    }
+
+    /// Sets the L1 block that we consider to be safe and won't be rolled back.
+    pub fn set_safe_l1_tip(&mut self, height: u64, blkid: L1BlockId) {
+        // TODO maybe make sure this always increases?
+        let es = self.epoch_state_mut();
+        es.safe_l1_block = L1BlockCommitment::new(height, blkid);
+    }
+
+    pub fn safe_l1_height(&self) -> u64 {
+        self.epoch_state().safe_l1_height()
     }
 
     /// Creates a new deposit entry in the epoch state's deposit table.
@@ -260,19 +266,30 @@ impl StateCache {
         };
     }
 
-    pub fn set_cur_epoch(&mut self, epoch: u64) {
-        self.new_ch_state.cur_epoch = epoch;
+    /// remove a deposit intent from the pending deposits queue.
+    pub fn consume_deposit_intent(&mut self, idx: u64) {
+        let deposits = self.new_ch_state.exec_env_state.pending_deposits_mut();
+
+        let front_idx = deposits
+            .front_idx()
+            .expect("stateop: empty deposit intent queue");
+
+        // deposit intent indices processed sequentially, without any gaps
+        let to_drop_count = idx
+            .checked_sub(front_idx) // ensures to_drop_idx >= front_idx
+            .expect("stateop: unable to consume deposit intent")
+            + 1;
+
+        deposits
+            .pop_front_n_vec(to_drop_count as usize) // ensures to_drop_idx < front_idx + len
+            .expect("stateop: unable to consume deposit intent");
     }
 
-    /// Sets the finalized epoch data.
-    pub fn set_finalized_epoch(&mut self, epoch: u64, slot: u64, blkid: L2BlockId) {
-        // Sanity check to make sure this function is being called correctly.
-        assert!(
-            epoch <= slot,
-            "stateop: epoch seems too high for slot (epoch {epoch} vs slot {slot})"
-        );
-        let es = self.epoch_state_mut();
-        es.finalized_epoch = EpochCommitment::new(epoch, slot, blkid);
+    /// Inserts a new operator with the specified pubkeys into the operator table.
+    pub fn insert_operator(&mut self, signing_pk: Buf32, wallet_pk: Buf32) {
+        self.epoch_state_mut()
+            .operator_table
+            .insert(signing_pk, wallet_pk);
     }
 
     // TODO add more manipulator functions
