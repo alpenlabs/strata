@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_message_signer_serde() {
-        let generator = ArbitraryGenerator::new();
+        let mut generator = ArbitraryGenerator::new();
         let txid: BitcoinTxid = generator.generate();
         let scope = Scope::V0PubNonce(txid);
         let payload: Musig2PubNonce = generator.generate();
