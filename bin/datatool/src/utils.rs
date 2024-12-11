@@ -31,6 +31,7 @@ use crate::{
     args::{
         CmdContext, SubcOpXpub, SubcParams, SubcSeqPrivkey, SubcSeqPubkey, SubcXpriv, Subcommand,
     },
+    types::ZeroizableXpriv,
     KEY_BLACKLIST,
 };
 
@@ -68,7 +69,7 @@ pub(super) fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result
 
 /// Executes the `genxpriv` subcommand.
 ///
-/// Generates a new [`Xpriv`] and writes it to a file.
+/// Generates a new [`Xpriv`] that will [`Zeroize`](zeroize) on [`Drop`] and writes it to a file.
 fn exec_genxpriv(cmd: SubcXpriv, ctx: &mut CmdContext) -> anyhow::Result<()> {
     if cmd.path.exists() && !cmd.force {
         anyhow::bail!("not overwriting file, add --force to overwrite");
@@ -103,7 +104,8 @@ fn exec_genseqpubkey(cmd: SubcSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Resul
 
 /// Executes the `genseqprivkey` subcommand.
 ///
-/// Generates the sequencer [`Xpriv`] and prints it to stdout.
+/// Generates the sequencer [`Xpriv`] that will [`Zeroize`](zeroize) on [`Drop`] and prints it to
+/// stdout.
 fn exec_genseqprivkey(cmd: SubcSeqPrivkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
     let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, SEQKEY_ENVVAR)? else {
         anyhow::bail!("privkey unset");
@@ -221,47 +223,63 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Generates a new [`Xpriv`].
+/// Generates a new [`Xpriv`] that will [`Zeroize`](zeroize) on [`Drop`].
 ///
 /// # Notes
 ///
 /// The seed is generated from the provided RNG trait-bounded
 /// to a CSPRNG (Cryptographically Secure Pseudo-Random Number Generator).
-fn gen_priv<R: CryptoRng + RngCore>(rng: &mut R, net: Network) -> Xpriv {
+fn gen_priv<R: CryptoRng + RngCore>(rng: &mut R, net: Network) -> ZeroizableXpriv {
     let mut seed = [0u8; 32];
     rng.fill_bytes(&mut seed);
-    Xpriv::new_master(net, &seed).expect("valid seed")
+    Xpriv::new_master(net, &seed).expect("valid seed").into()
 }
 
 /// Reads an [`Xpriv`] from file as a string and verifies the checksum.
-fn read_xpriv(path: &Path) -> anyhow::Result<Xpriv> {
+///
+/// # Notes
+///
+/// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
+fn read_xpriv(path: &Path) -> anyhow::Result<ZeroizableXpriv> {
     let raw_buf = fs::read(path)?;
     let str_buf = std::str::from_utf8(&raw_buf)?;
     let buf = base58::decode_check(str_buf)?;
-    Ok(Xpriv::decode(&buf)?)
+    Ok(Xpriv::decode(&buf)?.into())
 }
 
 /// Parses an [`Xpriv`] from environment variable.
-fn parse_xpriv_from_env(env: &'static str) -> anyhow::Result<Option<Xpriv>> {
+///
+/// # Notes
+///
+/// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
+fn parse_xpriv_from_env(env: &'static str) -> anyhow::Result<Option<ZeroizableXpriv>> {
     let Ok(val) = std::env::var(env) else {
         anyhow::bail!("got --key-from-env but {env} not set or invalid");
     };
 
     let buf = base58::decode_check(&val)?;
-    Ok(Some(Xpriv::decode(&buf)?))
+    Ok(Some(Xpriv::decode(&buf)?.into()))
 }
 
 /// Parses an [`Xpriv`] from file path.
-fn parse_xpriv_from_path(path: &Path) -> anyhow::Result<Option<Xpriv>> {
-    Ok(Some(read_xpriv(path)?))
+///
+/// # Notes
+///
+/// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
+fn parse_xpriv_from_path(path: &Path) -> anyhow::Result<Option<ZeroizableXpriv>> {
+    Ok(Some(read_xpriv(path)?).into())
 }
 
 /// Resolves an [`Xpriv`] either from a file path or an environment variable.
+///
+/// # Notes
+///
+/// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
 fn resolve_xpriv(
     path: &Option<PathBuf>,
     from_env: bool,
     env: &'static str,
-) -> anyhow::Result<Option<Xpriv>> {
+) -> anyhow::Result<Option<ZeroizableXpriv>> {
     match (path, from_env) {
         (Some(_), true) => anyhow::bail!("got key path and --key-from-env, pick a lane"),
         (Some(path), false) => parse_xpriv_from_path(path),

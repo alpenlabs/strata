@@ -13061,6 +13061,7 @@ dependencies = [
  "strata-primitives",
  "strata-sp1-guest-builder",
  "terrors",
+ "zeroize",
 ]
 
 [[package]]

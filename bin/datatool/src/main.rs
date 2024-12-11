@@ -5,6 +5,7 @@
 //! This tool is intended for use in testing and development only. It generates
 //! keys and other data that should not be used in production.
 mod args;
+mod types;
 mod utils;
 
 use std::path::PathBuf;

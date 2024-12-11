@@ -21,3 +21,7 @@ rand.workspace = true
 secp256k1 = { workspace = true, features = ["global-context", "std"] }
 serde_json.workspace = true
 terrors = "0.3.0"
+zeroize = { workspace = true, optional = true }
+
+[features]
+default = ["zeroize"]
