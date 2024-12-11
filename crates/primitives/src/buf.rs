@@ -6,17 +6,52 @@ use bitcoin::{
     BlockHash, Txid,
 };
 use reth_primitives::revm_primitives::alloy_primitives::hex;
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
 
 use crate::{errors::ParseError, macros::internal};
 
-// 20-byte buf
+/// A 20-byte buffer.
+///
+/// # Warning
+///
+/// This type is not zeroized on drop.
+/// However, it implements the [`Zeroize`] trait, so you can zeroize it manually.
+///
+/// # Example
+///
+/// ```
+/// let mut buf = Buf20::from([1; 20]);
+/// buf.zeroize();
+/// ```
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf20(pub [u8; 20]);
 internal::impl_buf_common!(Buf20, 20);
 internal::impl_buf_serde!(Buf20, 20);
 
-// 32-byte buf, useful for hashes and schnorr pubkeys
+// NOTE: we cannot do `ZeroizeOnDrop` since `Buf20` is `Copy`.
+impl Zeroize for Buf20 {
+    #[inline]
+    fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
+}
 
+/// A 32-byte buffer.
+///
+/// This is useful for hashes, transaction IDs, secret and public keys.
+///
+/// # Warning
+///
+/// This type is not zeroized on drop.
+/// However, it implements the [`Zeroize`] trait, so you can zeroize it manually.
+///
+/// # Example
+///
+/// ```
+/// let mut buf = Buf32::from([1; 20]);
+/// buf.zeroize();
+/// ```
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf32(pub [u8; 32]);
 internal::impl_buf_common!(Buf32, 32);
@@ -78,6 +113,15 @@ impl From<XOnlyPublicKey> for Buf32 {
     }
 }
 
+// NOTE: we cannot do `ZeroizeOnDrop` since `Buf32` is `Copy`.
+#[cfg(feature = "zeroize")]
+impl Zeroize for Buf32 {
+    #[inline]
+    fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
+}
+
 // 64-byte buf, useful for schnorr signatures
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf64(pub [u8; 64]);
@@ -92,7 +136,7 @@ impl From<schnorr::Signature> for Buf64 {
 
 #[cfg(test)]
 mod tests {
-    use super::Buf32;
+    use super::*;
 
     #[test]
     fn test_buf32_deserialization() {
@@ -142,5 +186,13 @@ mod tests {
             .unwrap(),
             String::from("\"0x01010101010101010101010101010101010101010101010101010101010101aa\"")
         );
+    }
+
+    #[test]
+    #[cfg(feature = "zeroize")]
+    fn test_zeroize() {
+        let mut buf = Buf32::from([1; 32]);
+        buf.zeroize();
+        assert_eq!(buf, Buf32::from([0; 32]));
     }
 }
