@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
 use bitcoin::BlockHash;
-use strata_primitives::l1::Epoch;
 use strata_tx_parser::filter::TxFilterConfig;
 
 /// State we use in various parts of the reader.
@@ -17,22 +16,10 @@ pub struct ReaderState {
     max_depth: usize,
 
     /// Current transaction filtering config
-    filter_config: EpochFilterConfig,
+    filter_config: TxFilterConfig,
 
     /// Current epoch
-    epoch: Epoch,
-}
-
-/// Filter config that can be exact or transitioning from one epoch to another.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
-pub enum EpochFilterConfig {
-    /// Config at a particular epoch
-    AtEpoch(TxFilterConfig),
-    /// Configs at transitioning epochs(from, to).
-    /// NOTE: The assumption is that we don't have to consider for more than two transitioning
-    /// configs
-    AtTransition(TxFilterConfig, TxFilterConfig),
+    epoch: u64,
 }
 
 impl ReaderState {
@@ -43,8 +30,8 @@ impl ReaderState {
         next_height: u64,
         max_depth: usize,
         recent_blocks: VecDeque<BlockHash>,
-        filter_config: EpochFilterConfig,
-        epoch: Epoch,
+        filter_config: TxFilterConfig,
+        epoch: u64,
     ) -> Self {
         assert!(!recent_blocks.is_empty());
         Self {
@@ -65,11 +52,11 @@ impl ReaderState {
         self.recent_blocks.as_slices().0
     }
 
-    pub fn epoch(&self) -> &Epoch {
-        &self.epoch
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
-    pub fn set_epoch(&mut self, epoch: Epoch) {
+    pub fn set_epoch(&mut self, epoch: u64) {
         self.epoch = epoch;
     }
 
@@ -81,11 +68,11 @@ impl ReaderState {
         self.next_height - 1
     }
 
-    pub fn filter_config(&self) -> &EpochFilterConfig {
+    pub fn filter_config(&self) -> &TxFilterConfig {
         &self.filter_config
     }
 
-    pub fn set_filter_config(&mut self, filter_config: EpochFilterConfig) {
+    pub fn set_filter_config(&mut self, filter_config: TxFilterConfig) {
         self.filter_config = filter_config;
     }
 
