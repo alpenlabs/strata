@@ -17,13 +17,18 @@ use crate::{errors::ParseError, macros::internal};
 ///
 /// This type is not zeroized on drop.
 /// However, it implements the [`Zeroize`] trait, so you can zeroize it manually.
+/// This is useful for secret data that needs to be zeroized after use.
 ///
 /// # Example
 ///
 /// ```
 /// # use strata_primitives::prelude::Buf20
+/// use zeroize::Zeroize;
+///
 /// let mut buf = Buf20::from([1; 20]);
 /// buf.zeroize();
+///
+/// assert_eq!(buf, Buf20::from([0; 20]));
 /// ```
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf20(pub [u8; 20]);
@@ -46,13 +51,18 @@ impl Zeroize for Buf20 {
 ///
 /// This type is not zeroized on drop.
 /// However, it implements the [`Zeroize`] trait, so you can zeroize it manually.
+/// This is useful for secret data that needs to be zeroized after use.
 ///
 /// # Example
 ///
 /// ```
 /// # use strata_primitives::prelude::Buf32
+/// use zeroize::Zeroize;
+///
 /// let mut buf = Buf32::from([1; 32]);
 /// buf.zeroize();
+///
+/// assert_eq!(buf, Buf32::from([0; 32]));
 /// ```
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf32(pub [u8; 32]);
