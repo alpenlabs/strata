@@ -18,16 +18,39 @@ impl Default for ArbitraryGenerator {
     }
 }
 impl ArbitraryGenerator {
+    /// Creates a new `ArbitraryGenerator` with a default buffer size.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `ArbitraryGenerator`.
     pub fn new() -> Self {
         ArbitraryGenerator {
             buf: vec![0u8; ARB_GEN_LEN],
         }
     }
+
+    /// Creates a new `ArbitraryGenerator` with a specified buffer size.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - The size of the buffer to be used.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `ArbitraryGenerator` with the specified buffer size.
     pub fn new_with_size(s: usize) -> Self {
         ArbitraryGenerator { buf: vec![0u8; s] }
     }
 
-    /// Legacy interface: no arguments
+    /// Generates an arbitrary instance of type `T` using the default RNG, [`OsRng`].
+    ///
+    /// # Returns
+    ///
+    /// An arbitrary instance of type `T`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it fails to generate an arbitrary instance.
     pub fn generate<'a, T>(&'a mut self) -> T
     where
         T: Arbitrary<'a> + Clone,
@@ -35,7 +58,21 @@ impl ArbitraryGenerator {
         self.generate_with_rng::<T, OsRng>(None)
     }
 
-    /// Core function: accepts an optional RNG
+    /// Generates an arbitrary instance of type `T` using an optional RNG.
+    ///
+    /// # Arguments
+    ///
+    /// * `rng` - An optional RNG to be used for generating the arbitrary instance. If `None`, the
+    ///   default RNG, [`OsRng`], will be used. The provided RNG must implement the [`RngCore`] and
+    ///   [`CryptoRng`] traits.
+    ///
+    /// # Returns
+    ///
+    /// An arbitrary instance of type `T`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it fails to generate an arbitrary instance.
     pub fn generate_with_rng<'a, T, R>(&'a mut self, rng: Option<&mut R>) -> T
     where
         T: Arbitrary<'a> + Clone,
