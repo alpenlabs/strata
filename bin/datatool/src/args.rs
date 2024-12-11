@@ -20,13 +20,13 @@ pub(crate) struct Args {
     pub(crate) datadir: Option<PathBuf>,
 
     #[argh(subcommand)]
-    pub(crate) subc: SubcommandGen,
+    pub(crate) subc: Subcommand,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
-pub(crate) enum SubcommandGen {
-    Seed(SubcSeed),
+pub(crate) enum Subcommand {
+    Xpriv(SubcXpriv),
     SeqPubkey(SubcSeqPubkey),
     SeqPrivkey(SubcSeqPrivkey),
     OpXpub(SubcOpXpub),
@@ -36,10 +36,10 @@ pub(crate) enum SubcommandGen {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
-    name = "genseed",
-    description = "generates a xpriv and writes it to a file"
+    name = "genxpriv",
+    description = "generates a master xpriv and writes it to a file"
 )]
-pub(crate) struct SubcSeed {
+pub(crate) struct SubcXpriv {
     #[argh(positional, description = "output path")]
     pub(crate) path: PathBuf,
 
@@ -52,7 +52,7 @@ pub(crate) struct SubcSeed {
 #[argh(
     subcommand,
     name = "genseqpubkey",
-    description = "generates a sequencer pubkey from seed"
+    description = "generates a sequencer pubkey from a master xpriv"
 )]
 pub(crate) struct SubcSeqPubkey {
     #[argh(option, description = "reads key from specified file", short = 'f')]
@@ -71,7 +71,7 @@ pub(crate) struct SubcSeqPubkey {
 #[argh(
     subcommand,
     name = "genseqprivkey",
-    description = "generates a sequencer privkey from seed"
+    description = "generates a sequencer privkey from a master xpriv"
 )]
 pub(crate) struct SubcSeqPrivkey {
     #[argh(option, description = "reads key from specified file", short = 'f')]
@@ -90,7 +90,7 @@ pub(crate) struct SubcSeqPrivkey {
 #[argh(
     subcommand,
     name = "genopxpub",
-    description = "generates an operator xpub from seed"
+    description = "generates an operator xpub from a master xpriv"
 )]
 pub(crate) struct SubcOpXpub {
     #[argh(option, description = "reads key from specified file", short = 'f')]

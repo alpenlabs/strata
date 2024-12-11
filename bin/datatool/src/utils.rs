@@ -29,7 +29,7 @@ use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
 
 use crate::{
     args::{
-        CmdContext, SubcOpXpub, SubcParams, SubcSeed, SubcSeqPrivkey, SubcSeqPubkey, SubcommandGen,
+        CmdContext, SubcOpXpub, SubcParams, SubcSeqPrivkey, SubcSeqPubkey, SubcXpriv, Subcommand,
     },
     KEY_BLACKLIST,
 };
@@ -56,20 +56,20 @@ pub(super) fn resolve_network(arg: Option<&str>) -> anyhow::Result<Network> {
 }
 
 /// Executes a `gen*` subcommand.
-pub(super) fn exec_subc(cmd: SubcommandGen, ctx: &mut CmdContext) -> anyhow::Result<()> {
+pub(super) fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result<()> {
     match cmd {
-        SubcommandGen::Seed(subc) => exec_genseed(subc, ctx),
-        SubcommandGen::SeqPubkey(subc) => exec_genseqpubkey(subc, ctx),
-        SubcommandGen::SeqPrivkey(subc) => exec_genseqprivkey(subc, ctx),
-        SubcommandGen::OpXpub(subc) => exec_genopxpub(subc, ctx),
-        SubcommandGen::Params(subc) => exec_genparams(subc, ctx),
+        Subcommand::Xpriv(subc) => exec_genxpriv(subc, ctx),
+        Subcommand::SeqPubkey(subc) => exec_genseqpubkey(subc, ctx),
+        Subcommand::SeqPrivkey(subc) => exec_genseqprivkey(subc, ctx),
+        Subcommand::OpXpub(subc) => exec_genopxpub(subc, ctx),
+        Subcommand::Params(subc) => exec_genparams(subc, ctx),
     }
 }
 
-/// Executes the `genseed` subcommand.
+/// Executes the `genxpriv` subcommand.
 ///
 /// Generates a new [`Xpriv`] and writes it to a file.
-fn exec_genseed(cmd: SubcSeed, ctx: &mut CmdContext) -> anyhow::Result<()> {
+fn exec_genxpriv(cmd: SubcXpriv, ctx: &mut CmdContext) -> anyhow::Result<()> {
     if cmd.path.exists() && !cmd.force {
         anyhow::bail!("not overwriting file, add --force to overwrite");
     }
