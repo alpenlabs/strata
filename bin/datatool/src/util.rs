@@ -225,8 +225,8 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
 /// # Notes
 ///
 /// Takes a mutable reference to an RNG to allow flexibility in testing.
-/// The actual generation requires a high-entropy source like [`OsRng`] to
-/// securely generate extended private keys.
+/// The actual generation requires a high-entropy source like [`OsRng`](rand::rngs::OsRng)
+/// to securely generate extended private keys.
 fn gen_priv<R: CryptoRng + RngCore>(rng: &mut R, net: Network) -> ZeroizableXpriv {
     let mut seed = [0u8; 32];
     rng.fill_bytes(&mut seed);

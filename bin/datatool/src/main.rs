@@ -5,13 +5,13 @@
 //! This tool is intended for use in testing and development only. It generates
 //! keys and other data that should not be used in production.
 mod args;
-mod utils;
+mod util;
 
 use std::path::PathBuf;
 
 use args::CmdContext;
 use rand::rngs::OsRng;
-use utils::{exec_subc, resolve_network};
+use util::{exec_subc, resolve_network};
 
 fn main() {
     let args: args::Args = argh::from_env();

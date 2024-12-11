@@ -19,6 +19,9 @@ pub(crate) fn parse_master_xpriv(path: &Path) -> anyhow::Result<OperatorKeys> {
 }
 
 /// Resolves the master [`Xpriv`] from ENV vars or CLI.
+///
+/// If the `--master-xpriv` CLI argument is provided, it will be used.
+/// Otherwise, the `STRATA_OP_MASTER_XPRIV` ENV var will be used.
 pub(crate) fn resolve_xpriv(
     cli_arg: Option<String>,
     cli_path: Option<String>,

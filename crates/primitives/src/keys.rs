@@ -97,7 +97,7 @@ mod tests {
         let was_zeroized = Arc::new(AtomicBool::new(false));
         let was_zeroized_clone = Arc::clone(&was_zeroized);
 
-        // Create a wrapper struct that will set our flag when dropped
+        // Create a wrapper struct that will set a flag when dropped
         struct TestWrapper {
             inner: ZeroizableXpriv,
             flag: Arc<AtomicBool>,
@@ -109,21 +109,21 @@ mod tests {
                 let bytes = self.inner.private_key.secret_bytes();
                 // The inner ZeroizableXpriv will be dropped after this,
                 // triggering zeroization
-                self.flag.store(bytes != [1u8; 32], Ordering::SeqCst);
+                // NOTE: SecretKey::non_secure_erase writes `1`s to the memory.
+                self.flag.store(bytes != [1u8; 32], Ordering::Relaxed);
             }
         }
 
         // Create and drop our test wrapper
         {
             let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
-            let wrapper = TestWrapper {
+            let _ = TestWrapper {
                 inner: ZeroizableXpriv::new(xpriv),
                 flag: was_zeroized_clone,
             };
-            drop(wrapper);
         }
 
         // Check if zeroization occurred
-        assert!(was_zeroized.load(Ordering::SeqCst));
+        assert!(was_zeroized.load(Ordering::Relaxed));
     }
 }
