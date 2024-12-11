@@ -15,6 +15,9 @@ use crate::mpt::{MptNode, StorageEntry};
 /// Public Parameters that proof asserts
 pub type ElProofOutput = Vec<ExecSegment>;
 
+/// Public Parameters that proof asserts
+pub type ElProofInput = Vec<ElBlockStfInput>;
+
 /// Result of the block execution
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ElBlockStfOutput {
