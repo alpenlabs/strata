@@ -21,17 +21,15 @@ use strata_key_derivation::{
 use strata_primitives::{
     block_credential,
     buf::Buf32,
+    keys::ZeroizableXpriv,
     operator::OperatorPubkeys,
     params::{ProofPublishMode, RollupParams},
     vk::RollupVerifyingKey,
 };
 use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
 
-use crate::{
-    args::{
-        CmdContext, SubcOpXpub, SubcParams, SubcSeqPrivkey, SubcSeqPubkey, SubcXpriv, Subcommand,
-    },
-    types::ZeroizableXpriv,
+use crate::args::{
+    CmdContext, SubcOpXpub, SubcParams, SubcSeqPrivkey, SubcSeqPubkey, SubcXpriv, Subcommand,
 };
 
 /// Sequencer key environment variable.

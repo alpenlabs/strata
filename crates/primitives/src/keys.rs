@@ -1,4 +1,6 @@
-//! Types for the datatool crate.
+//! Key types used in the Strata library.
+//!
+//! [`Zeroize`] and [`Zeroize`] on drop should always ensure that keys are zeroized.
 
 use std::ops::Deref;
 

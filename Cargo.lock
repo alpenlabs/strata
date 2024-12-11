@@ -13195,6 +13195,7 @@ dependencies = [
  "strata-test-utils",
  "thiserror",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
