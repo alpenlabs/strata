@@ -93,11 +93,12 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
     assert_eq!(
         el_pp_deserialized.len(),
         1,
-        "Expected exactly one ExecSegment."
+        "execsegment: expected exactly one"
     );
+
     let exec_update = el_pp_deserialized
         .first()
-        .expect("Failed to fetch the first ExecSegment.");
+        .expect("execsegment: failed to fetch the first");
 
     let new_state = verify_and_transition(prev_state.clone(), block, exec_update, &rollup_params);
 

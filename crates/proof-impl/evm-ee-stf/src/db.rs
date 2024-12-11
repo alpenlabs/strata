@@ -29,13 +29,13 @@ use revm::{
 
 use crate::{
     mpt::{keccak, StateAccount, KECCAK_EMPTY},
-    ElBlockStfInput,
+    EvmBlockStfInput,
 };
 
 /// A helper trait to extend [`InMemoryDB`] with additional functionality.
 pub trait InMemoryDBHelper {
-    /// Create an [`InMemoryDB`] from a given [`ELProofInput`].
-    fn initialize(input: &mut ElBlockStfInput) -> Result<Self>
+    /// Create an [`InMemoryDB`] from a given [`EvmBlockStfInput`].
+    fn initialize(input: &mut EvmBlockStfInput) -> Result<Self>
     where
         Self: Sized;
 
@@ -53,7 +53,7 @@ pub trait InMemoryDBHelper {
 }
 
 impl InMemoryDBHelper for InMemoryDB {
-    fn initialize(input: &mut ElBlockStfInput) -> Result<Self> {
+    fn initialize(input: &mut EvmBlockStfInput) -> Result<Self> {
         // For each contract's byte code, hash it and store it in a map.
         let contracts: HashMap<B256, Bytes> = input
             .contracts

@@ -5,7 +5,7 @@ use std::{
 
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
-use strata_proofimpl_evm_ee_stf::ElBlockStfInput;
+use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use strata_state::l1::L1BlockId;
 use strata_zkvm::{ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
@@ -97,7 +97,7 @@ where
 {
     let (zkvm_input, proof_type) = match zkvm_input {
         ZkVmInput::ElBlock(el_input) => {
-            let el_inputs: Vec<ElBlockStfInput> = bincode::deserialize(&el_input.data)?;
+            let el_inputs: Vec<EvmBlockStfInput> = bincode::deserialize(&el_input.data)?;
             let mut input_builder = Vm::Input::new();
 
             input_builder.write_serde(&el_inputs.len())?;
