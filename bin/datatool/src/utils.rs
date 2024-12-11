@@ -32,7 +32,6 @@ use crate::{
         CmdContext, SubcOpXpub, SubcParams, SubcSeqPrivkey, SubcSeqPubkey, SubcXpriv, Subcommand,
     },
     types::ZeroizableXpriv,
-    KEY_BLACKLIST,
 };
 
 /// Sequencer key environment variable.
@@ -369,21 +368,9 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
     }
 }
 
-/// Returns an [`Err`] if the provided key is on the [`KEY_BLACKLIST`].
-fn check_key_not_blacklisted(s: &str) -> anyhow::Result<()> {
-    let ts = s.trim();
-    if KEY_BLACKLIST.contains(&ts) {
-        anyhow::bail!("that was an example!  generate your own keys!");
-    }
-
-    Ok(())
-}
-
 /// Parses an [`Xpub`] from [`&str`], richly generating [`anyhow::Result`]s from
 /// it.
 fn parse_xpub(s: &str) -> anyhow::Result<Xpub> {
-    check_key_not_blacklisted(s)?;
-
     let Ok(buf) = base58::decode_check(s) else {
         anyhow::bail!("failed to parse key: {s}");
     };
