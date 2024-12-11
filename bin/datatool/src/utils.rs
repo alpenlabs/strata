@@ -241,6 +241,21 @@ fn read_xpriv(path: &Path) -> anyhow::Result<Xpriv> {
     Ok(Xpriv::decode(&buf)?)
 }
 
+/// Parses an [`Xpriv`] from environment variable.
+fn parse_xpriv_from_env(env: &'static str) -> anyhow::Result<Option<Xpriv>> {
+    let Ok(val) = std::env::var(env) else {
+        anyhow::bail!("got --key-from-env but {env} not set or invalid");
+    };
+
+    let buf = base58::decode_check(&val)?;
+    Ok(Some(Xpriv::decode(&buf)?))
+}
+
+/// Parses an [`Xpriv`] from file path.
+fn parse_xpriv_from_path(path: &Path) -> anyhow::Result<Option<Xpriv>> {
+    Ok(Some(read_xpriv(path)?))
+}
+
 /// Resolves an [`Xpriv`] either from a file path or an environment variable.
 fn resolve_xpriv(
     path: &Option<PathBuf>,
@@ -249,15 +264,8 @@ fn resolve_xpriv(
 ) -> anyhow::Result<Option<Xpriv>> {
     match (path, from_env) {
         (Some(_), true) => anyhow::bail!("got key path and --key-from-env, pick a lane"),
-        (Some(path), false) => Ok(Some(read_xpriv(path)?)),
-        (None, true) => {
-            let Ok(val) = std::env::var(env) else {
-                anyhow::bail!("got --key-from-env but {env} not set or invalid");
-            };
-
-            let buf = base58::decode_check(&val)?;
-            Ok(Some(Xpriv::decode(&buf)?))
-        }
+        (Some(path), false) => parse_xpriv_from_path(path),
+        (None, true) => parse_xpriv_from_env(env),
         _ => Ok(None),
     }
 }
