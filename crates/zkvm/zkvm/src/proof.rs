@@ -6,7 +6,16 @@ use serde::{Deserialize, Serialize};
 ///
 /// Provides common utilities such as byte access and emptiness checks.
 #[derive(
-    Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    BorshSerialize,
+    BorshDeserialize,
+    PartialEq,
+    Eq,
+    Arbitrary,
+    Default,
 )]
 pub struct ByteWrapper(Vec<u8>);
 
@@ -36,12 +45,6 @@ impl From<ByteWrapper> for Vec<u8> {
 impl From<&ByteWrapper> for Vec<u8> {
     fn from(value: &ByteWrapper) -> Self {
         value.0.clone()
-    }
-}
-
-impl Default for ByteWrapper {
-    fn default() -> Self {
-        ByteWrapper::new(Vec::new())
     }
 }
 

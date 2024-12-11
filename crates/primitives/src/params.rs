@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     block_credential::CredRule, l1::BitcoinAddress, operator::OperatorPubkeys, prelude::Buf32,
-    vk::RollupVerifyingKey,
+    proof::RollupVerifyingKey,
 };
 
 /// Consensus parameters that don't change for the lifetime of the network

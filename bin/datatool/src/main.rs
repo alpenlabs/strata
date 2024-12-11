@@ -16,7 +16,7 @@ use strata_primitives::{
     buf::Buf32,
     operator::OperatorPubkeys,
     params::{ProofPublishMode, RollupParams},
-    vk::RollupVerifyingKey,
+    proof::RollupVerifyingKey,
 };
 use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
 

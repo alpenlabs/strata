@@ -13588,6 +13588,7 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "strata-test-utils",
+ "strata-zkvm",
  "tempfile",
  "thiserror",
  "tracing",

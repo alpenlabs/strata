@@ -10,7 +10,7 @@ use strata_primitives::{
     operator::OperatorPubkeys,
     params::{OperatorConfig, RollupParams},
     prelude::*,
-    vk::RollupVerifyingKey,
+    proof::RollupVerifyingKey,
 };
 use tracing::warn;
 

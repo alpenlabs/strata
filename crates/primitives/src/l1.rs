@@ -15,8 +15,8 @@ use bitcoin::{
     secp256k1::{SecretKey, XOnlyPublicKey, SECP256K1},
     taproot::{ControlBlock, TaprootMerkleBranch},
     transaction::Version,
-    Address, AddressType, Amount, Block, Network, OutPoint, Psbt, ScriptBuf, Sequence, TapNodeHash,
-    Transaction, TxIn, TxOut, Txid, Witness,
+    Address, AddressType, Amount, Block, BlockHash, Network, OutPoint, Psbt, ScriptBuf, Sequence,
+    TapNodeHash, Transaction, TxIn, TxOut, Txid, Witness,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use rand::rngs::OsRng;
@@ -52,6 +52,18 @@ impl L1BlockId {
 }
 
 impl_buf_wrapper!(L1BlockId, Buf32, 32);
+
+impl From<BlockHash> for L1BlockId {
+    fn from(value: BlockHash) -> Self {
+        L1BlockId(value.into())
+    }
+}
+
+impl From<L1BlockId> for BlockHash {
+    fn from(value: L1BlockId) -> Self {
+        BlockHash::from_byte_array(value.0.into())
+    }
+}
 
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.

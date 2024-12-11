@@ -5,12 +5,17 @@ use std::sync::Arc;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
-use strata_primitives::{l1::*, prelude::*};
+use strata_primitives::{
+    l1::*,
+    prelude::*,
+    proof::{ProofContext, ProofKey},
+};
 use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
     sync_event::SyncEvent,
 };
+use strata_zkvm::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
@@ -263,34 +268,38 @@ pub trait BlobDatabase {
     fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
 }
 
-/// A trait providing access to both prover data store and prover data provider.
-pub trait ProverDatabase {
-    type ProverTaskDB: ProverTaskDatabase;
+pub trait ProofDatabase {
+    /// Inserts a proof into the database.
+    ///
+    /// Returns `Ok(())` on success, or an error on failure.
+    fn put_proof(&self, proof_key: ProofKey, proof: ProofReceipt) -> DbResult<()>;
 
-    fn prover_task_db(&self) -> &Arc<Self::ProverTaskDB>;
-}
+    /// Retrieves a proof by its key.
+    ///
+    /// Returns `Some(proof)` if found, or `None` if not.
+    fn get_proof(&self, proof_key: ProofKey) -> DbResult<Option<ProofReceipt>>;
 
-pub trait ProverTaskDatabase {
-    /// Adds a new txentry to database
-    fn insert_new_task_entry(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<u64>;
+    /// Deletes a proof by its key.
+    ///
+    /// Tries to delete a proof by its key, returning if it really
+    /// existed or not.  
+    fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool>;
 
-    /// Updates an existing txentry
-    fn update_task_entry_by_id(&self, txid: [u8; 16], txentry: Vec<u8>) -> DbResult<()>;
+    /// Inserts dependencies for a given [`ProofContext`] into the database.
+    ///
+    /// Returns `Ok(())` on success, or an error on failure.
+    fn put_proof_deps(&self, proof_context: ProofContext, deps: Vec<ProofContext>) -> DbResult<()>;
 
-    /// Updates an existing txentry
-    fn update_task_entry(&self, idx: u64, txentry: Vec<u8>) -> DbResult<()>;
+    /// Retrieves proof dependencies by it's [`ProofContext`].
+    ///
+    /// Returns `Some(dependencies)` if found, or `None` if not.
+    fn get_proof_deps(&self, proof_context: ProofContext) -> DbResult<Option<Vec<ProofContext>>>;
 
-    /// Fetch [`Vec<u8>`] from db
-    fn get_task_entry_by_id(&self, txid: [u8; 16]) -> DbResult<Option<Vec<u8>>>;
-
-    /// Get next index to be inserted to
-    fn get_next_task_idx(&self) -> DbResult<u64>;
-
-    /// Get transaction id for index
-    fn get_taskid(&self, idx: u64) -> DbResult<Option<[u8; 16]>>;
-
-    /// get txentry by idx
-    fn get_task_entry(&self, idx: u64) -> DbResult<Option<Vec<u8>>>;
+    /// Deletes dependencies for a given [`ProofContext`].
+    ///
+    /// Tries to delete dependencies of by its context, returning if it really
+    /// existed or not.  
+    fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool>;
 }
 
 pub trait BroadcastDatabase {
