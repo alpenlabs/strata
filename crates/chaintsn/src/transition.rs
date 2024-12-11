@@ -24,6 +24,7 @@ use strata_state::{
 
 use crate::{
     clock,
+    epoch::{self, EpochData},
     errors::TsnError,
     macros::*,
     slot_rng::{self, SlotRng},
@@ -53,6 +54,7 @@ pub fn process_block(
     let mut rng = compute_init_slot_rng(state);
 
     // Check that the L1 segment is missing/present as we expect.
+    // TODO maybe we can loosen this?
     let is_epoch_final = clock::is_epoch_final_slot(header.blockidx(), params);
     if body.l1_segment().is_some() {
         if !is_epoch_final {
@@ -69,6 +71,13 @@ pub fn process_block(
 
     // Go through each stage and play out the operations it has.
     process_execution_update(state, body.exec_segment().update())?;
+
+    // Now do the epoch level updates.
+    // TODO move this to its own phase
+    if let Some(l1seg) = body.l1_segment() {
+        let epoch_data = EpochData::new(l1seg);
+        epoch::process_epoch(state, &epoch_data, params)?;
+    }
 
     Ok(())
 }

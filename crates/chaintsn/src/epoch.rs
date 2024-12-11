@@ -15,10 +15,27 @@ use strata_state::{
 use crate::{errors::TsnError, slot_rng::SlotRng};
 
 /// Rollup epoch-level input.
-pub struct EpochData {
-    final_l2_blockid: L2BlockId,
-    l1_segment: L1Segment,
+pub struct EpochData<'b> {
+    //final_l2_blockid: L2BlockId,
+    l1_segment: &'b L1Segment,
     // TODO deposits, DA, checkpoints
+}
+
+impl<'b> EpochData<'b> {
+    pub fn new(l1_segment: &'b L1Segment) -> Self {
+        Self { l1_segment }
+    }
+
+    pub fn l1_segment(&self) -> &'b L1Segment {
+        self.l1_segment
+    }
+
+    pub fn new_l1_tip(&self) -> Option<&L1BlockId> {
+        self.l1_segment()
+            .new_payloads()
+            .last()
+            .map(|payload| payload.record().blkid())
+    }
 }
 
 /// Performs the once-per-epoch updates we make to a block.
@@ -27,15 +44,19 @@ pub struct EpochData {
 /// perform checkins with the L1 state.
 pub fn process_epoch(
     state: &mut StateCache,
-    epoch_data: EpochData,
+    epoch_data: &EpochData<'_>,
     params: &RollupParams,
 ) -> Result<(), TsnError> {
     // FIXME make this actually init correctly
-    let mut rng = SlotRng::from_seed(*epoch_data.final_l2_blockid.as_ref());
+    let mut rng = compute_init_epoch_rng(epoch_data);
 
     // Assign withdrawals to deposits.
     process_l1_segment(state, &epoch_data.l1_segment, params)?;
     process_deposit_updates(state, &mut rng, params)?;
+
+    // Increment the epoch counter.
+    let cur_epoch = state.state().cur_epoch();
+    state.set_cur_epoch(cur_epoch + 1);
 
     Ok(())
 }
@@ -57,11 +78,11 @@ fn process_l1_segment(
         let new_tip_height = new_tip_block.idx();
 
         // Set the new L1 height according to the new block.
-        state.set_safe_l1_tip(*new_tip_blkid, new_tip_height);
+        state.set_safe_l1_tip(new_tip_height, *new_tip_blkid);
 
         // Check that the new chain is actually longer, if it's shorter then we
         // didn't do anything.
-        if new_tip_height <= state.l1_safe_height() {
+        if new_tip_height <= state.safe_l1_height() {
             return Err(TsnError::L1SegNotExtend);
         }
 
@@ -89,6 +110,9 @@ fn process_l1_segment(
                         let epoch = batch_info.epoch();
                         let blkid = batch_info.l2_blockid();
                         let slot = batch_info.final_l2_slot();
+
+                        // TODO validation to make sure this makes sense
+
                         state.set_finalized_epoch(epoch, slot, *blkid);
                     }
 
@@ -104,6 +128,14 @@ fn process_l1_segment(
     }
 
     Ok(())
+}
+
+fn compute_init_epoch_rng(epoch_data: &EpochData<'_>) -> SlotRng {
+    let base_blkid = epoch_data
+        .new_l1_tip()
+        .copied()
+        .unwrap_or(L1BlockId::default());
+    SlotRng::from_seed(*base_blkid.as_ref())
 }
 
 /// Iterates over the deposits table, making updates where needed.
@@ -125,7 +157,7 @@ fn process_deposit_updates(
     // This determines how long we'll keep trying to service a withdrawal before
     // updating it or doing something else with it.  This is also what we use
     // when we decide to reset an assignment.
-    let cur_block_height = state.l1_safe_height();
+    let cur_block_height = state.safe_l1_height();
     let new_exec_height = cur_block_height as u32 + params.dispatch_assignment_dur;
 
     // Sequence in which we assign the operators to the deposits.  This is kinda
