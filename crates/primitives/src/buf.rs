@@ -134,7 +134,27 @@ impl Zeroize for Buf32 {
     }
 }
 
-// 64-byte buf, useful for schnorr signatures
+/// A 64-byte buffer.
+///
+/// This is useful for schnorr signatures.
+///
+/// # Warning
+///
+/// This type is not zeroized on drop.
+/// However, it implements the [`Zeroize`] trait, so you can zeroize it manually.
+/// This is useful for secret data that needs to be zeroized after use.
+///
+/// # Example
+///
+/// ```
+/// # use strata_primitives::prelude::Buf64;
+/// use zeroize::Zeroize;
+///
+/// let mut buf = Buf32::from([1; 64]);
+/// buf.zeroize();
+///
+/// assert_eq!(buf, Buf32::from([0; 64]));
+/// ```
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf64(pub [u8; 64]);
 internal::impl_buf_common!(Buf64, 64);
@@ -143,6 +163,15 @@ internal::impl_buf_serde!(Buf64, 64);
 impl From<schnorr::Signature> for Buf64 {
     fn from(value: schnorr::Signature) -> Self {
         value.serialize().into()
+    }
+}
+
+// NOTE: we cannot do `ZeroizeOnDrop` since `Buf64` is `Copy`.
+#[cfg(feature = "zeroize")]
+impl Zeroize for Buf64 {
+    #[inline]
+    fn zeroize(&mut self) {
+        self.0.zeroize();
     }
 }
 
@@ -203,8 +232,14 @@ mod tests {
     #[test]
     #[cfg(feature = "zeroize")]
     fn test_zeroize() {
-        let mut buf = Buf32::from([1; 32]);
-        buf.zeroize();
-        assert_eq!(buf, Buf32::from([0; 32]));
+        let mut buf20 = Buf20::from([1; 20]);
+        let mut buf32 = Buf32::from([1; 32]);
+        let mut buf64 = Buf64::from([1; 64]);
+        buf20.zeroize();
+        buf32.zeroize();
+        buf64.zeroize();
+        assert_eq!(buf20, Buf20::from([0; 20]));
+        assert_eq!(buf32, Buf32::from([0; 32]));
+        assert_eq!(buf64, Buf64::from([0; 64]));
     }
 }
