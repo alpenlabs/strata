@@ -1364,7 +1364,7 @@ mod tests {
 
     #[test]
     fn test_bitcoin_txid_serialize_deserialize() {
-        let generator = ArbitraryGenerator::new();
+        let mut generator = ArbitraryGenerator::new();
         let txid: BitcoinTxid = generator.generate();
 
         let serialized_txid =

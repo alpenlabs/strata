@@ -1,46 +1,74 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use arbitrary::{Arbitrary, Unstructured};
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 
 pub mod bitcoin;
 pub mod bridge;
 pub mod evm_ee;
 pub mod l2;
 
-const ARB_GEN_LEN: usize = 1 << 24; // 16 MiB
+/// The default buffer size for the `ArbitraryGenerator`.
+const ARB_GEN_LEN: usize = 1024;
 
 pub struct ArbitraryGenerator {
-    buf: Vec<u8>,
-    off: AtomicUsize,
+    buf: Vec<u8>, // Persistent buffer
 }
-
 impl Default for ArbitraryGenerator {
     fn default() -> Self {
         Self::new()
     }
 }
-
 impl ArbitraryGenerator {
+    /// Creates a new `ArbitraryGenerator` with a default buffer size.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `ArbitraryGenerator`.
     pub fn new() -> Self {
         Self::new_with_size(ARB_GEN_LEN)
     }
 
-    pub fn new_with_size(n: usize) -> Self {
-        let mut buf = vec![0; n];
-        OsRng.fill_bytes(&mut buf); // 128 wasn't enough
-        let off = AtomicUsize::new(0);
-        ArbitraryGenerator { buf, off }
+    /// Creates a new `ArbitraryGenerator` with a specified buffer size.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - The size of the buffer to be used.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `ArbitraryGenerator` with the specified buffer size.
+    pub fn new_with_size(s: usize) -> Self {
+        Self { buf: vec![0u8; s] }
     }
 
-    pub fn generate<'a, T: Arbitrary<'a> + Clone>(&'a self) -> T {
-        // Doing hacky atomics to make this actually be reusable, this is pretty bad.
-        let off = self.off.load(Ordering::Relaxed);
-        let mut u = Unstructured::new(&self.buf[off..]);
-        let prev_off = u.len();
-        let inst = T::arbitrary(&mut u).expect("failed to generate arbitrary instance");
-        let additional_off = prev_off - u.len();
-        self.off.store(off + additional_off, Ordering::Relaxed);
-        inst
+    /// Generates an arbitrary instance of type `T` using the default RNG, [`OsRng`].
+    ///
+    /// # Returns
+    ///
+    /// An arbitrary instance of type `T`.
+    pub fn generate<'a, T>(&'a mut self) -> T
+    where
+        T: Arbitrary<'a> + Clone,
+    {
+        self.generate_with_rng::<T, OsRng>(&mut OsRng)
+    }
+
+    /// Generates an arbitrary instance of type `T`.
+    ///
+    /// # Arguments
+    ///
+    /// * `rng` - An RNG to be used for generating the arbitrary instance. Provided RNG must
+    ///   implement the [`RngCore`] and [`CryptoRng`] traits.
+    ///
+    /// # Returns
+    ///
+    /// An arbitrary instance of type `T`.
+    pub fn generate_with_rng<'a, T, R>(&'a mut self, rng: &mut R) -> T
+    where
+        T: Arbitrary<'a> + Clone,
+        R: RngCore + CryptoRng,
+    {
+        rng.fill_bytes(&mut self.buf);
+        let mut u = Unstructured::new(&self.buf);
+        T::arbitrary(&mut u).expect("Failed to generate arbitrary instance")
     }
 }

@@ -340,7 +340,7 @@ mod tests {
         max_txs_per_block: usize,
         needle: (Vec<u8>, ProtocolOperation),
     ) -> usize {
-        let arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new();
         assert!(
             num_blocks.gt(&0) && max_txs_per_block.gt(&0),
             "num_blocks and max_tx_per_block must be at least 1"
@@ -400,7 +400,7 @@ mod tests {
 
     /// Create a known transaction that should be present in some block.
     fn get_needle() -> (Vec<u8>, ProtocolOperation, DepositInfo) {
-        let arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new();
         let network = Network::Regtest;
 
         let el_address: [u8; 20] = arb.generate();
@@ -472,20 +472,20 @@ mod tests {
     ///    So, you can assume that this flag represents whether the pair is valid (true) or invalid
     ///    (false).
     fn generate_mock_tx() -> (Vec<u8>, ProtocolOperation, bool) {
-        let arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new();
 
         let should_be_valid: bool = arb.generate();
 
         if should_be_valid.not() {
-            let (invalid_tx, invalid_protocol_op) = generate_invalid_tx(&arb);
+            let (invalid_tx, invalid_protocol_op) = generate_invalid_tx(&mut arb);
             return (invalid_tx, invalid_protocol_op, should_be_valid);
         }
 
-        let (valid_tx, valid_protocol_op) = generate_valid_tx(&arb);
+        let (valid_tx, valid_protocol_op) = generate_valid_tx(&mut arb);
         (valid_tx, valid_protocol_op, should_be_valid)
     }
 
-    fn generate_invalid_tx(arb: &ArbitraryGenerator) -> (Vec<u8>, ProtocolOperation) {
+    fn generate_invalid_tx(arb: &mut ArbitraryGenerator) -> (Vec<u8>, ProtocolOperation) {
         let random_protocol_op: ProtocolOperation = arb.generate();
 
         // true => tx invalid
@@ -512,7 +512,7 @@ mod tests {
         (tx_with_invalid_script_pubkey, random_protocol_op)
     }
 
-    fn generate_valid_tx(arb: &ArbitraryGenerator) -> (Vec<u8>, ProtocolOperation) {
+    fn generate_valid_tx(arb: &mut ArbitraryGenerator) -> (Vec<u8>, ProtocolOperation) {
         let (tx, spend_info, script_to_spend) = generate_mock_unsigned_tx();
 
         let random_hash = *spend_info
@@ -568,7 +568,7 @@ mod tests {
         let empty_deposits = empty_chain_state.deposits_table_mut();
         let mut deposits_table = DepositsTable::new_empty();
 
-        let arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new();
 
         let mut operators: Vec<OperatorIdx> = arb.generate();
         loop {
