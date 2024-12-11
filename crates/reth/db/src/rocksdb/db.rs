@@ -46,7 +46,11 @@ impl<DB: SchemaDBOperations> WitnessProvider for WitnessDB<DB> {
 }
 
 impl<DB: SchemaDBOperations> WitnessStore for WitnessDB<DB> {
-    fn put_block_witness(&self, block_hash: B256, witness: &ElBlockStfInput) -> crate::DbResult<()> {
+    fn put_block_witness(
+        &self,
+        block_hash: B256,
+        witness: &ElBlockStfInput,
+    ) -> crate::DbResult<()> {
         let serialized =
             bincode::serialize(witness).map_err(|err| DbError::Other(err.to_string()))?;
         Ok(self

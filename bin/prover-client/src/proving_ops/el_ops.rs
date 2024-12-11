@@ -29,7 +29,7 @@ impl ElOperations {
 
 #[async_trait]
 impl ProvingOperations for ElOperations {
-    /// Used serialized [`ELProofInput`] because [`ELProofInput::parent_state_trie`] contains
+    /// Used serialized [`ElBlockStfInput`] because [`ElBlockStfInput::parent_state_trie`] contains
     /// RefCell, which is not Sync or Send
     type Input = Vec<u8>;
     type Params = (u64, u64);

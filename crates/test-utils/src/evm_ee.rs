@@ -24,8 +24,8 @@ pub struct EvmSegment {
 }
 
 impl EvmSegment {
-    /// Initializes the EvmSegment by loading existing [`ELProofInput`] data from the specified
-    /// range of block heights and generating corresponding ELProofPublicParams.
+    /// Initializes the EvmSegment by loading existing [`ElBlockStfInput`] data from the specified
+    /// range of block heights and generating corresponding ElBlockStfOutput.
     ///
     /// This function reads witness data from JSON files, processes them, and stores the results
     /// for testing purposes of the STF proofs.
@@ -57,14 +57,14 @@ impl EvmSegment {
         Self { inputs, outputs }
     }
 
-    /// Retrieves the [`ELProofInput`] associated with the given block height.
+    /// Retrieves the [`ElBlockStfInput`] associated with the given block height.
     ///
     /// Panics if no input is found for the specified height.
     pub fn get_input(&self, height: &u64) -> &ElBlockStfInput {
         self.inputs.get(height).expect("No input found at height")
     }
 
-    /// Retrieves the [`ELProofPublicParams`] associated with the given block height.
+    /// Retrieves the [`ElBlockStfOutput`] associated with the given block height.
     ///
     /// Panics if no output is found for the specified height.
     pub fn get_output(&self, height: &u64) -> &ElBlockStfOutput {
