@@ -182,6 +182,6 @@ pub(crate) struct CmdContext {
     /// The Bitcoin network we're building on top of.
     pub(crate) bitcoin_network: Network,
 
-    /// Shared RNG, just [`OsRng`] for now.
+    /// Shared RNG, must be a cryptographically secure, high-entropy RNG.
     pub(crate) rng: OsRng,
 }
