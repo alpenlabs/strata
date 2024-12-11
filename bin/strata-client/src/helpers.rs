@@ -24,7 +24,7 @@ use strata_primitives::{
 };
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainstateDb,
-    ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
+    ClientStateDb, CommitRevealDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, SyncEventDb,
 };
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
@@ -68,8 +68,8 @@ pub fn init_broadcaster_database(
 pub fn init_sequencer_database(
     rbdb: Arc<OptimisticTransactionDB>,
     ops_config: DbOpsConfig,
-) -> Arc<SequencerDB<RBSeqBlobDb>> {
-    let seqdb = RBSeqBlobDb::new(rbdb, ops_config).into();
+) -> Arc<SequencerDB<CommitRevealDb>> {
+    let seqdb = CommitRevealDb::new(rbdb, ops_config).into();
     SequencerDB::new(seqdb).into()
 }
 

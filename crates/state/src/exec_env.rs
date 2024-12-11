@@ -19,7 +19,7 @@ pub struct ExecEnvState {
     /// seen on the corresponding DA layer yet.
     ///
     /// This must always be sorted.
-    waiting_da_blobs: Vec<da_blob::BlobSpec>,
+    waiting_da_blobs: Vec<da_blob::PayloadSpec>,
 
     /// Deposits that have been queued by something but haven't been accepted in
     /// an update yet.  The sequencer should be processing these as soon as

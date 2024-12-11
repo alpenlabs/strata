@@ -1,8 +1,9 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use num_enum::TryFromPrimitive;
 use strata_primitives::l1::{BitcoinAmount, OutputRef};
 
-use crate::batch::SignedBatchCheckpoint;
+use crate::{batch::SignedBatchCheckpoint, da_blob::BundledCommitment};
 
 /// Information related to relevant transactions to be stored in L1Tx
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -14,7 +15,9 @@ pub enum ProtocolOperation {
     DepositRequest(DepositRequestInfo),
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
-    // TODO: add other kinds like Proofs and statediffs
+    /// DA data. can be made through `submit_da_blob` RPC.
+    DA(BundledCommitment),
+    // TODO: add other kinds like statediffs
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -41,18 +44,38 @@ pub struct DepositRequestInfo {
     pub address: Vec<u8>,
 }
 
+/// Wrapper to hold various types of Envelope data as defined by [`PayloadTypeTag`] enum.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct InscriptionData {
-    /// payload present in inscription transaction (either batchTx or checkpointTx)
-    batch_data: Vec<u8>,
+pub struct EnvelopePayload {
+    /// for tagging purpose to understand what kind of envelope it is
+    data_type: PayloadTypeTag,
+    /// payload present in envelope
+    data: Vec<u8>,
 }
 
-impl InscriptionData {
-    pub fn new(batch_data: Vec<u8>) -> Self {
-        Self { batch_data }
+/// Enum that acts as a tag to separates different types of envelope blobs.
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, TryFromPrimitive,
+)]
+#[borsh(use_discriminant = true)]
+#[repr(u8)]
+pub enum PayloadTypeTag {
+    Checkpoint = 0,
+    DA = 1,
+}
+
+impl EnvelopePayload {
+    pub fn new(data_type: PayloadTypeTag, data: Vec<u8>) -> Self {
+        Self { data_type, data }
     }
 
-    pub fn batch_data(&self) -> &[u8] {
-        &self.batch_data
+    /// Raw payload bytes
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Envelope type
+    pub fn data_type(&self) -> PayloadTypeTag {
+        self.data_type
     }
 }

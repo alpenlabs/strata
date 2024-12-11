@@ -25,8 +25,7 @@ use bitcoin::{
     Witness,
 };
 use rand::{rngs::OsRng, RngCore};
-use strata_state::tx::InscriptionData;
-use strata_tx_parser::inscription::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
+use strata_state::tx::EnvelopePayload;
 use thiserror::Error;
 use tracing::trace;
 
@@ -35,15 +34,14 @@ use crate::{
         traits::{Reader, Signer, Wallet},
         types::ListUnspent,
     },
-    writer::config::{InscriptionFeePolicy, WriterConfig},
+    writer::config::{FeePolicy, WriterConfig},
 };
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
-const INSCRIPTION_VERSION: u8 = 1;
 
 // TODO: these might need to be in rollup params
 #[derive(Debug, Error)]
-pub enum InscriptionError {
+pub enum CommitRevealTxError {
     #[error("insufficient funds for tx (need {0} sats, have {1} sats)")]
     NotEnoughUtxos(u64, u64),
 
@@ -58,21 +56,21 @@ pub enum InscriptionError {
 // Btcio depends on `tx-parser`. So this file is behind a feature flag 'test-utils' and on dev
 // dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
 // dependency doesn't happen
-pub async fn build_inscription_txs(
-    payload: &[u8],
+pub async fn build_commit_reveal_txs(
+    envelope_data: &[EnvelopePayload],
     rpc_client: &Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     let network = rpc_client.network().await?;
     let utxos = rpc_client.get_utxos().await?;
 
-    let fee_rate = match config.inscription_fee_policy {
-        InscriptionFeePolicy::Smart => rpc_client.estimate_smart_fee(1).await? * 2,
-        InscriptionFeePolicy::Fixed(val) => val,
+    let fee_rate = match config.fee_policy {
+        FeePolicy::Smart => rpc_client.estimate_smart_fee(1).await? * 2,
+        FeePolicy::Fixed(val) => val,
     };
-    create_inscription_transactions(
+    build_commit_reveal_transactions_inner(
         &config.rollup_name,
-        payload,
+        envelope_data,
         utxos,
         config.sequencer_address.clone(),
         config.amount_for_reveal_txn,
@@ -83,24 +81,21 @@ pub async fn build_inscription_txs(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn create_inscription_transactions(
+pub fn build_commit_reveal_transactions_inner(
     rollup_name: &str,
-    write_intent: &[u8],
+    envelope_data: &[EnvelopePayload],
     utxos: Vec<ListUnspent>,
     recipient: Address,
     reveal_value: u64,
     fee_rate: u64,
     network: Network,
-) -> Result<(Transaction, Transaction), InscriptionError> {
+) -> Result<(Transaction, Transaction), CommitRevealTxError> {
     // Create commit key
     let key_pair = generate_key_pair()?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
-    let insc_data = InscriptionData::new(write_intent.to_vec());
-
-    // Start creating inscription content
-    let reveal_script =
-        build_reveal_script(rollup_name, &public_key, insc_data, INSCRIPTION_VERSION)?;
+    // Start creating envelope content
+    let reveal_script = build_reveal_script(rollup_name, &public_key, envelope_data)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -157,7 +152,7 @@ pub fn create_inscription_transactions(
         &key_pair,
     )?;
 
-    // Check if inscription is locked to the correct address
+    // Check if envelope is locked to the correct address
     assert_correct_address(&key_pair, &taproot_spend_info, &reveal_address, network);
 
     Ok((unsigned_commit_tx, reveal_tx))
@@ -199,7 +194,7 @@ fn get_size(
 fn choose_utxos(
     utxos: &[ListUnspent],
     amount: u64,
-) -> Result<(Vec<ListUnspent>, u64), InscriptionError> {
+) -> Result<(Vec<ListUnspent>, u64), CommitRevealTxError> {
     let mut bigger_utxos: Vec<&ListUnspent> = utxos
         .iter()
         .filter(|utxo| utxo.amount.to_sat() >= amount)
@@ -237,7 +232,7 @@ fn choose_utxos(
         }
 
         if sum < amount {
-            return Err(InscriptionError::NotEnoughUtxos(amount, sum));
+            return Err(CommitRevealTxError::NotEnoughUtxos(amount, sum));
         }
 
         Ok((chosen_utxos, sum))
@@ -250,7 +245,7 @@ fn build_commit_transaction(
     change_address: Address,
     output_value: u64,
     fee_rate: u64,
-) -> Result<(Transaction, Vec<ListUnspent>), InscriptionError> {
+) -> Result<(Transaction, Vec<ListUnspent>), CommitRevealTxError> {
     // get single input single output transaction size
     let mut size = get_size(
         &default_txin(),
@@ -351,7 +346,7 @@ pub fn build_reveal_transaction(
     fee_rate: u64,
     reveal_script: &ScriptBuf,
     control_block: &ControlBlock,
-) -> Result<Transaction, InscriptionError> {
+) -> Result<Transaction, CommitRevealTxError> {
     let outputs: Vec<TxOut> = vec![TxOut {
         value: Amount::from_sat(output_value),
         script_pubkey: recipient.script_pubkey(),
@@ -375,7 +370,7 @@ pub fn build_reveal_transaction(
     let input_required = Amount::from_sat(output_value + fee);
     if input_utxo.value < Amount::from_sat(BITCOIN_DUST_LIMIT) || input_utxo.value < input_required
     {
-        return Err(InscriptionError::NotEnoughUtxos(
+        return Err(CommitRevealTxError::NotEnoughUtxos(
             input_required.to_sat(),
             input_utxo.value.to_sat(),
         ));
@@ -397,19 +392,18 @@ pub fn generate_key_pair() -> Result<UntweakedKeypair, anyhow::Error> {
 }
 
 /// Builds reveal script such that it contains opcodes for verifying the internal key as well as the
-/// inscription block
+/// envelope block
 fn build_reveal_script(
     rollup_name: &str,
     taproot_public_key: &XOnlyPublicKey,
-    insc_data: InscriptionData,
-    version: u8,
+    envelopes: &[EnvelopePayload],
 ) -> Result<ScriptBuf, anyhow::Error> {
     let mut script_bytes = script::Builder::new()
         .push_x_only_key(taproot_public_key)
         .push_opcode(OP_CHECKSIG)
         .into_script()
         .into_bytes();
-    let script = generate_inscription_script(insc_data, rollup_name, version)?;
+    let script = generate_envelope_script(envelopes, rollup_name)?;
     script_bytes.extend(script.into_bytes());
     Ok(ScriptBuf::from(script_bytes))
 }
@@ -493,27 +487,26 @@ fn assert_correct_address(
 }
 
 // Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
-pub fn generate_inscription_script(
-    inscription_data: InscriptionData,
+pub fn generate_envelope_script(
+    envelopes: &[EnvelopePayload],
     rollup_name: &str,
-    version: u8,
 ) -> anyhow::Result<ScriptBuf> {
-    let mut builder = script::Builder::new()
-        .push_opcode(OP_FALSE)
-        .push_opcode(OP_IF)
-        .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
-        .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
-        .push_slice(PushBytesBuf::try_from(VERSION_TAG.to_vec())?)
-        .push_slice(PushBytesBuf::from([version]))
-        .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
-        .push_int(inscription_data.batch_data().len() as i64);
+    let mut builder = script::Builder::new();
+    for (index, envelope) in envelopes.iter().enumerate() {
+        builder = builder.push_opcode(OP_FALSE).push_opcode(OP_IF);
 
-    trace!(batchdata_size = %inscription_data.batch_data().len(), "Inserting batch data");
-    for chunk in inscription_data.batch_data().chunks(520) {
-        trace!(size=%chunk.len(), "inserting chunk");
-        builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
+        if index == 0 {
+            builder = builder.push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?);
+        }
+
+        builder = builder.push_int(envelope.data_type() as i64); // Batch Tag
+
+        trace!(batchdata_size = %envelope.data().len(), "Inserting batch data");
+        for chunk in envelope.data().chunks(520) {
+            builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
+        }
+        builder = builder.push_opcode(OP_ENDIF);
     }
-    builder = builder.push_opcode(OP_ENDIF);
 
     Ok(builder.into_script())
 }
@@ -527,9 +520,10 @@ mod tests {
         taproot::ControlBlock, Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn,
         TxOut, Witness,
     };
+    use strata_state::tx::PayloadTypeTag;
 
     use super::*;
-    use crate::{rpc::types::ListUnspent, writer::builder::InscriptionError};
+    use crate::{rpc::types::ListUnspent, writer::builder::CommitRevealTxError};
 
     const BTC_TO_SATS: u64 = 100_000_000;
     const REVEAL_OUTPUT_AMOUNT: u64 = BITCOIN_DUST_LIMIT;
@@ -640,7 +634,7 @@ mod tests {
 
         assert!(matches!(
             res,
-            Err(InscriptionError::NotEnoughUtxos(50_000_000_000, _))
+            Err(CommitRevealTxError::NotEnoughUtxos(50_000_000_000, _))
         ));
     }
 
@@ -716,15 +710,15 @@ mod tests {
         );
 
         assert!(tx.is_err());
-        assert!(matches!(tx, Err(InscriptionError::NotEnoughUtxos(_, _))));
+        assert!(matches!(tx, Err(CommitRevealTxError::NotEnoughUtxos(_, _))));
     }
 
     #[test]
-    fn test_create_inscription_transactions() {
+    fn test_create_commit_reveal_txs() {
         let (rollup_name, _, _, _, address, utxos) = get_mock_data();
 
-        let write_intent = vec![0u8; 100];
-        let (commit, reveal) = super::create_inscription_transactions(
+        let write_intent = [EnvelopePayload::new(PayloadTypeTag::DA, vec![0u8; 100])];
+        let (commit, reveal) = super::build_commit_reveal_transactions_inner(
             rollup_name,
             &write_intent,
             utxos.to_vec(),

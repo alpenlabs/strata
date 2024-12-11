@@ -8,7 +8,7 @@ use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     rpc::{traits::Reader, BitcoinClient},
-    writer::{config::WriterConfig, start_inscription_task},
+    writer::{config::WriterConfig, start_envelope_task},
 };
 use strata_common::logging;
 use strata_consensus_logic::{
@@ -25,7 +25,7 @@ use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, SyncParams};
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
+    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, CommitRevealDb, DbOpsConfig,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
@@ -394,7 +394,7 @@ fn start_sequencer_tasks(
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
     runtime: &Runtime,
-    seq_db: Arc<SequencerDB<RBSeqBlobDb>>,
+    seq_db: Arc<SequencerDB<CommitRevealDb>>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     methods: &mut Methods,
@@ -435,8 +435,8 @@ fn start_sequencer_tasks(
         params.rollup().rollup_name.clone(),
     )?;
 
-    // Start inscription tasks
-    let inscription_handle = start_inscription_task(
+    // Start envelope inscribing related tasks
+    let envelope_handle = start_envelope_task(
         executor,
         bitcoin_client,
         writer_config,
@@ -447,7 +447,7 @@ fn start_sequencer_tasks(
     )?;
 
     let admin_rpc = rpc_server::SequencerServerImpl::new(
-        inscription_handle.clone(),
+        envelope_handle.clone(),
         broadcast_handle,
         params.clone(),
         checkpoint_handle.clone(),
@@ -482,7 +482,7 @@ fn start_sequencer_tasks(
             sync_manager,
             database,
             engine,
-            inscription_handle,
+            envelope_handle,
             pool,
             params,
             checkpoint_handle,

@@ -216,7 +216,7 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
         wait_until(
             lambda: manual_gen.btcrpc.proxy.gettransaction(published_txid)["confirmations"] > 0,
             timeout=5,
-            error_with="Published inscription not confirmed",
+            error_with="Published checkpoint transaction not confirmed",
         )
 
 
