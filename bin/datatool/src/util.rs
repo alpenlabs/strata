@@ -265,7 +265,7 @@ fn parse_xpriv_from_env(env: &'static str) -> anyhow::Result<Option<ZeroizableXp
 ///
 /// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
 fn parse_xpriv_from_path(path: &Path) -> anyhow::Result<Option<ZeroizableXpriv>> {
-    Ok(Some(read_xpriv(path)?).into())
+    Ok(Some(read_xpriv(path)?))
 }
 
 /// Resolves an [`Xpriv`] either from a file path or an environment variable.

@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn test_deref() {
         let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
-        let zeroizable_xpriv = ZeroizableXpriv::new(xpriv.clone());
+        let zeroizable_xpriv = ZeroizableXpriv::new(xpriv);
 
         assert_eq!(*zeroizable_xpriv, xpriv);
     }
