@@ -8,9 +8,9 @@ The basic flow to generate a params file with it looks like this:
 
 ```
 # Generate keys for the different parties each on different machines.
-strata-datatool genseed sequencer.bin
-strata-datatool genseed operator1.bin
-strata-datatool genseed operator2.bin
+strata-datatool genxpriv sequencer.bin
+strata-datatool genxpriv operator1.bin
+strata-datatool genxpriv operator2.bin
 
 # Generate the pubkeys, also on their original machines.
 strata-datatool genseqpubkey -f sequencer.bin

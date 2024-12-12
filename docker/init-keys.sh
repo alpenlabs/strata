@@ -35,12 +35,12 @@ OP3_SEED_FILE=$CONFIG_FILE/operator3.bin
 OP4_SEED_FILE=$CONFIG_FILE/operator4.bin
 OP5_SEED_FILE=$CONFIG_FILE/operator5.bin
 
-$DATATOOL_PATH -b regtest genseed -f $SEQ_SEED_FILE
-$DATATOOL_PATH -b regtest genseed -f $OP1_SEED_FILE
-$DATATOOL_PATH -b regtest genseed -f $OP2_SEED_FILE
-$DATATOOL_PATH -b regtest genseed -f $OP3_SEED_FILE
-$DATATOOL_PATH -b regtest genseed -f $OP4_SEED_FILE
-$DATATOOL_PATH -b regtest genseed -f $OP5_SEED_FILE
+$DATATOOL_PATH -b regtest genxpriv -f $SEQ_SEED_FILE
+$DATATOOL_PATH -b regtest genxpriv -f $OP1_SEED_FILE
+$DATATOOL_PATH -b regtest genxpriv -f $OP2_SEED_FILE
+$DATATOOL_PATH -b regtest genxpriv -f $OP3_SEED_FILE
+$DATATOOL_PATH -b regtest genxpriv -f $OP4_SEED_FILE
+$DATATOOL_PATH -b regtest genxpriv -f $OP5_SEED_FILE
 
 seqkey=$($DATATOOL_PATH -b regtest genseqpubkey -f ${SEQ_SEED_FILE})
 op1pubkey=$($DATATOOL_PATH -b regtest genopxpub -f ${OP1_SEED_FILE})
