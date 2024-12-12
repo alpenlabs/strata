@@ -127,8 +127,9 @@ impl StatusChannel {
     /// Waits until there's a new client state and returns the client state.
     pub async fn wait_for_client_change(&self) -> Result<ClientState, RecvError> {
         let mut s = self.receiver.cl.clone();
+        s.mark_unchanged();
         s.changed().await?;
-        let state = s.borrow().clone();
+        let state = s.borrow_and_update().clone();
         Ok(state)
     }
 
@@ -136,10 +137,8 @@ impl StatusChannel {
     pub async fn wait_until_genesis(&self) -> Result<ClientState, RecvError> {
         let mut rx = self.receiver.cl.clone();
         loop {
-            if rx.borrow().has_genesis_occurred() {
-                return Ok(rx.borrow().clone());
-            }
-            rx.changed().await?;
+            let chs = rx.wait_for(|chs| chs.has_genesis_occurred()).await?;
+            return Ok(chs.clone());
         }
     }
 
