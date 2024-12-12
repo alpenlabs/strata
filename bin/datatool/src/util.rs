@@ -77,12 +77,15 @@ fn exec_genxpriv(cmd: SubcXpriv, ctx: &mut CmdContext) -> anyhow::Result<()> {
     let xpriv = gen_priv(&mut ctx.rng, ctx.bitcoin_network);
     let mut buf = xpriv.encode();
     let mut s = base58::encode_check(&buf);
-    fs::write(&cmd.path, s.as_bytes())?;
+    let result = fs::write(&cmd.path, s.as_bytes());
 
     buf.zeroize();
     s.zeroize();
 
-    Ok(())
+    match result {
+        Ok(_) => Ok(()),
+        Err(_) => anyhow::bail!("failed to write to file {:?}", cmd.path),
+    }
 }
 
 /// Executes the `genseqpubkey` subcommand.
@@ -96,13 +99,10 @@ fn exec_genseqpubkey(cmd: SubcSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Resul
 
     let seq_keys = SequencerKeys::new(&xpriv)?;
     let seq_xpub = seq_keys.derived_xpub();
-    let mut raw_buf = seq_xpub.to_x_only_pub().serialize();
-    let mut s = base58::encode_check(&raw_buf);
+    let raw_buf = seq_xpub.to_x_only_pub().serialize();
+    let s = base58::encode_check(&raw_buf);
 
     println!("{s}");
-
-    raw_buf.zeroize();
-    s.zeroize();
 
     Ok(())
 }
@@ -118,10 +118,14 @@ fn exec_genseqprivkey(cmd: SubcSeqPrivkey, _ctx: &mut CmdContext) -> anyhow::Res
 
     let seq_keys = SequencerKeys::new(&xpriv)?;
     let seq_xpriv = seq_keys.derived_xpriv();
-    let raw_buf = seq_xpriv.to_priv().to_bytes();
-    let s = base58::encode_check(&raw_buf);
+    let mut raw_buf = seq_xpriv.to_priv().to_bytes();
+    let mut s = base58::encode_check(&raw_buf);
 
     println!("{s}");
+
+    // Zeroize the buffers after printing.
+    raw_buf.zeroize();
+    s.zeroize();
 
     Ok(())
 }
