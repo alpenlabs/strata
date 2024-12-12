@@ -5,13 +5,13 @@ from pathlib import Path
 import flexitest
 
 from utils import wait_for_proof_with_time_out
+from setup import StrataTest
 
 
 @flexitest.register
-class ProverClientTest(flexitest.Test):
+class ProverClientTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         prover_client = ctx.get_service("prover_client")
@@ -22,7 +22,7 @@ class ProverClientTest(flexitest.Test):
 
         # Test on with the latest checkpoint
         task_id = prover_client_rpc.dev_strata_proveLatestCheckPoint()
-        self.logger.debug(f"got the task id: {task_id}")
+        self.debug(f"got the task id: {task_id}")
         assert task_id is not None
 
         time_out = 10 * 60

@@ -4,15 +4,16 @@ from pathlib import Path
 
 import flexitest
 
+from setup import StrataTest
+
 NUM_BLOCKS_TO_RECEIVE = 10
 BLOCK_NUMBER = 4
 
 
 @flexitest.register
-class RecentBlocksTest(flexitest.Test):
+class RecentBlocksTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")

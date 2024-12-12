@@ -16,10 +16,11 @@ from utils import (
     submit_checkpoint,
     wait_until,
 )
+from setup import StrataTest
 
 
 @flexitest.register
-class BitcoinReorgChecksTest(flexitest.Test):
+class BitcoinReorgChecksTest(StrataTest):
     """This tests finalization when there is reorg on L1"""
 
     def __init__(self, ctx: flexitest.InitContext):
@@ -32,7 +33,6 @@ class BitcoinReorgChecksTest(flexitest.Test):
                 auto_generate_blocks=False,
             )
         )
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -60,7 +60,7 @@ class BitcoinReorgChecksTest(flexitest.Test):
         # Sanity Check for first checkpoint
         idx = 0
         check_nth_checkpoint_finalized(idx, seqrpc, manual_gen)
-        self.logger.debug(f"Pass checkpoint finalization for checkpoint {idx}")
+        self.debug(f"Pass checkpoint finalization for checkpoint {idx}")
 
         # TODO remove this after adding a proper config file
         # We need to wait for the tx to be published to L1

@@ -5,13 +5,13 @@ import flexitest
 from web3 import Web3
 
 from utils import wait_until
+from setup import StrataTest
 
 
 @flexitest.register
-class FullnodeElBlockGenerationTest(flexitest.Test):
+class FullnodeElBlockGenerationTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("hub1")
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq_web3: Web3 = ctx.get_service("seq_reth").create_web3()

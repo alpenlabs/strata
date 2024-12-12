@@ -5,15 +5,15 @@ from pathlib import Path
 import flexitest
 from solcx import compile_source, install_solc, set_solc_version
 from web3 import Web3
+from setup import StrataTest
 
 
 @flexitest.register
-class ElBlockWitnessDataGenerationTest(flexitest.Test):
+class ElBlockWitnessDataGenerationTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         install_solc(version="0.8.16")
         set_solc_version("0.8.16")
         ctx.set_env("basic")
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")
@@ -40,7 +40,7 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         witness_data = rethrpc.strataee_getBlockWitness(blockhash, True)
         assert witness_data is not None, "non empty witness"
 
-        self.logger.debug(witness_data)
+        self.debug(witness_data)
 
 
 def get_contract():

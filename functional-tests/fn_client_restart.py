@@ -13,15 +13,15 @@ from utils import (
     check_submit_proof_fails_for_nonexistent_batch,
     wait_until,
 )
+from setup import StrataTest
 
 
 @flexitest.register
-class BlockFinalizationSeqRestartTest(flexitest.Test):
+class BlockFinalizationSeqRestartTest(StrataTest):
     """This tests finalization when sequencer client restarts"""
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()))
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -32,7 +32,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         # Check for first 2 checkpoints
         for n in range(2):
             check_nth_checkpoint_finalized(n, seqrpc)
-            self.logger.debug(f"Pass checkpoint finalization for checkpoint {n}")
+            self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         # Stop sequencer
         seq.stop()
@@ -46,7 +46,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         # Check for next 2 checkpoints
         for n in range(2, 4):
             check_nth_checkpoint_finalized(n, seqrpc)
-            self.logger.debug(f"Pass checkpoint finalization for checkpoint {n}")
+            self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)
 

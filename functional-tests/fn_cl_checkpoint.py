@@ -5,15 +5,15 @@ from pathlib import Path
 import flexitest
 
 from utils import wait_until
+from setup import StrataTest
 
 REORG_DEPTH = 3
 
 
 @flexitest.register
-class CLBlockWitnessDataGenerationTest(flexitest.Test):
+class CLBlockWitnessDataGenerationTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")

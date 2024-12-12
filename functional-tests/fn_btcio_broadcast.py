@@ -5,13 +5,13 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from utils import wait_until_with_value
+from setup import StrataTest
 
 
 @flexitest.register
-class BroadcastTest(flexitest.Test):
+class BroadcastTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
@@ -32,10 +32,10 @@ class BroadcastTest(flexitest.Test):
         raw_tx = btcrpc.proxy.createrawtransaction(inputs, dest)
 
         signed_tx = btcrpc.proxy.signrawtransactionwithwallet(raw_tx)["hex"]
-        self.logger.debug(f"Signed Tx {signed_tx}")
+        self.debug(f"Signed Tx {signed_tx}")
 
         txid = seqrpc.strataadmin_broadcastRawTx(signed_tx)
-        self.logger.debug(f"Rpc returned txid {txid}")
+        self.debug(f"Rpc returned txid {txid}")
 
         wait_until_with_value(
             lambda: btcrpc.gettransaction(txid),

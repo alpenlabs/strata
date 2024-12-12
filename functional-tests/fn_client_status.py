@@ -4,13 +4,13 @@ from pathlib import Path
 import flexitest
 
 from utils import wait_until
+from setup import StrataTest
 
 
 @flexitest.register
-class L1ClientStatusTest(flexitest.Test):
+class L1ClientStatusTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -24,10 +24,10 @@ class L1ClientStatusTest(flexitest.Test):
         )
 
         proto_ver = seqrpc.strata_protocolVersion()
-        self.logger.debug(f"protocol version { proto_ver}")
+        self.debug(f"protocol version { proto_ver}")
         assert proto_ver == 1, "query protocol version"
 
         client_status = seqrpc.strata_clientStatus()
-        self.logger.debug(f"client status { client_status}")
+        self.debug(f"client status { client_status}")
 
         return True
