@@ -25,7 +25,6 @@ pub struct ReaderState {
 impl ReaderState {
     /// Constructs a new reader state instance using some context about how we
     /// want to manage it.
-    // FIXME: the args list is getting long
     pub fn new(
         next_height: u64,
         max_depth: usize,

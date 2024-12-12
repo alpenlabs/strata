@@ -128,7 +128,7 @@ impl L1TxProof {
     }
 }
 
-/// Includes `L1BlockManifest` along with scan rules that it is applied to
+/// Includes [`L1BlockManifest`] along with scan rules that it is applied to
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockManifest {
     /// The actual l1 record
@@ -281,7 +281,7 @@ impl<'a> Arbitrary<'a> for OutputRef {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Arbitrary)]
 pub struct L1Status {
     /// If the last time we tried to poll the client (as of `last_update`)
     /// we were successful.
@@ -298,7 +298,7 @@ pub struct L1Status {
     pub cur_tip_blkid: String,
 
     /// Last published txid where L2 blob was present
-    pub last_published_txid: Option<Txid>,
+    pub last_published_txid: Option<Buf32>,
 
     /// UNIX millis time of the last time we got a new update from the L1 connector.
     pub last_update: u64,

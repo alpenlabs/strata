@@ -27,3 +27,6 @@ tracing.workspace = true   # ideally this shouldn't be in this trait
 [dev-dependencies]
 rand.workspace = true
 strata-test-utils.workspace = true
+
+[features]
+test_utils = []

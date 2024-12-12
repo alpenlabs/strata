@@ -34,6 +34,7 @@ tracing.workspace = true
 [dev-dependencies]
 strata-common.workspace = true
 strata-rocksdb = { workspace = true, features = ["test_utils"] }
+strata-state = { workspace = true, features = ["test_utils"] }
 strata-test-utils.workspace = true
 
 arbitrary.workspace = true
