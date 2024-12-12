@@ -6,13 +6,13 @@ import flexitest
 
 from entry import BasicEnvConfig
 from utils import wait_until_with_value
+from setup import StrataTest
 
 
 @flexitest.register
-class ElBlockGenerationTest(flexitest.Test):
+class ElBlockGenerationTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(1000))
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")

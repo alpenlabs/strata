@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, Dict
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, musig_aggregate_pks
@@ -429,7 +429,7 @@ def setup_root_logger() -> int:
     return log_level
 
 
-def setup_test_loggers(datadir_root: str, tests: list[str], log_level: int):
+def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     """
     Set up loggers for a list of test names, with log files in a logs directory.
     - Configures both file and stream handlers for each test logger.
@@ -437,8 +437,10 @@ def setup_test_loggers(datadir_root: str, tests: list[str], log_level: int):
 
     Parameters:
         datadir_root (str): Root directory for logs.
-        log level (int): Log level
         tests (list of str): List of test names to create loggers for.
+
+    Returns:
+        logging.Logger
     """
     # Create the logs directory
     log_dir = os.path.join(datadir_root, "logs")
@@ -449,21 +451,20 @@ def setup_test_loggers(datadir_root: str, tests: list[str], log_level: int):
         "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
     )
     # Set up individual loggers for each test
-    for test_name in tests:
-        logger = logging.getLogger(test_name)
-        # Avoid duplicate handlers
-        if logger.hasHandlers():
-            continue
-        # File handler
-        log_path = os.path.join(log_dir, f"{test_name}.log")
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setLevel(log_level)
-        file_handler.setFormatter(formatter)
-        # Stream handler
-        stream_handler = logging.StreamHandler()
-        stream_handler.setLevel(log_level)
-        stream_handler.setFormatter(formatter)
+    logger = logging.getLogger(test_name)
+    # Avoid duplicate handlers
+    if logger.hasHandlers():
+        return logger
+    # File handler
+    log_path = os.path.join(log_dir, f"{test_name}.log")
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setFormatter(formatter)
+    # Stream handler
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
 
-        # Add handlers to the logger
-        logger.addHandler(file_handler)
-        logger.addHandler(stream_handler)
+    # Add handlers to the logger
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+
+    return logger

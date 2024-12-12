@@ -7,13 +7,13 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
 from utils import generate_n_blocks, wait_until
+from setup import StrataTest
 
 
 @flexitest.register
-class L1WriterTest(flexitest.Test):
+class L1WriterTest(StrataTest):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = logging.getLogger(Path(__file__).stem)
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

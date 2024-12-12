@@ -13,6 +13,7 @@ import factory
 import net_settings
 from constants import *
 from rollup_params_cfg import RollupConfig
+from setup import ExtendedTestRuntime
 from utils import *
 
 
@@ -354,9 +355,6 @@ def main(argv):
         # Run all tests, excluding those containing "fn_prover", unless explicitly passed in argv
         tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
 
-    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
-    log_level = setup_root_logger()
-    setup_test_loggers(datadir_root, tests, log_level)
     btc_fac = factory.BitcoinFactory([12300 + i for i in range(30)])
     seq_fac = factory.StrataFactory([12400 + i for i in range(30)])
     fullnode_fac = factory.FullNodeFactory([12500 + i for i in range(30)])
@@ -388,9 +386,12 @@ def main(argv):
         "prover": BasicEnvConfig(101, enable_prover_client=True),
     }
 
-    rt = flexitest.TestRuntime(global_envs, datadir_root, factories)
+    setup_root_logger()
+    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
+    rt = ExtendedTestRuntime(global_envs, datadir_root, factories)
     rt.prepare_registered_tests()
 
+    print("registered test")
     results = rt.run_tests(tests)
     rt.save_json_file("results.json", results)
     flexitest.dump_results(results)
