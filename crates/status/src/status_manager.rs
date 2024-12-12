@@ -145,10 +145,8 @@ impl StatusChannel {
     /// Waits until genesis and returns the client state.
     pub async fn wait_until_genesis(&self) -> Result<ClientState, RecvError> {
         let mut rx = self.receiver.cl.clone();
-        loop {
-            let chs = rx.wait_for(|chs| chs.has_genesis_occurred()).await?;
-            return Ok(chs.clone());
-        }
+        let chs = rx.wait_for(|chs| chs.has_genesis_occurred()).await?;
+        Ok(chs.clone())
     }
 
     // Sender methods
