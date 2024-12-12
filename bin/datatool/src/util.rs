@@ -27,6 +27,7 @@ use strata_primitives::{
     proof::RollupVerifyingKey,
 };
 use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
+use zeroize::Zeroize;
 
 use crate::args::{
     CmdContext, SubcOpXpub, SubcParams, SubcSeqPrivkey, SubcSeqPubkey, SubcXpriv, Subcommand,
@@ -73,9 +74,12 @@ fn exec_genxpriv(cmd: SubcXpriv, ctx: &mut CmdContext) -> anyhow::Result<()> {
     }
 
     let xpriv = gen_priv(&mut ctx.rng, ctx.bitcoin_network);
-    let buf = xpriv.encode();
-    let s = base58::encode_check(&buf);
+    let mut buf = xpriv.encode();
+    let mut s = base58::encode_check(&buf);
     fs::write(&cmd.path, s.as_bytes())?;
+
+    buf.zeroize();
+    s.zeroize();
 
     Ok(())
 }
@@ -91,10 +95,13 @@ fn exec_genseqpubkey(cmd: SubcSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Resul
 
     let seq_keys = SequencerKeys::new(&xpriv)?;
     let seq_xpub = seq_keys.derived_xpub();
-    let raw_buf = seq_xpub.to_x_only_pub().serialize();
-    let s = base58::encode_check(&raw_buf);
+    let mut raw_buf = seq_xpub.to_x_only_pub().serialize();
+    let mut s = base58::encode_check(&raw_buf);
 
     println!("{s}");
+
+    raw_buf.zeroize();
+    s.zeroize();
 
     Ok(())
 }
@@ -230,7 +237,17 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
 fn gen_priv<R: CryptoRng + RngCore>(rng: &mut R, net: Network) -> ZeroizableXpriv {
     let mut seed = [0u8; 32];
     rng.fill_bytes(&mut seed);
-    Xpriv::new_master(net, &seed).expect("valid seed").into()
+    let mut xpriv = Xpriv::new_master(net, &seed).expect("valid seed");
+    let zeroizable_xpriv: ZeroizableXpriv = xpriv.into();
+
+    // Zeroize the seed after generating the xpriv.
+    seed.zeroize();
+    // Zeroize the xpriv after generating it.
+    //
+    // NOTE: `zeroizable_xpriv` is zeroized on drop.
+    xpriv.private_key.non_secure_erase();
+
+    zeroizable_xpriv
 }
 
 /// Reads an [`Xpriv`] from file as a string and verifies the checksum.
@@ -239,10 +256,22 @@ fn gen_priv<R: CryptoRng + RngCore>(rng: &mut R, net: Network) -> ZeroizableXpri
 ///
 /// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
 fn read_xpriv(path: &Path) -> anyhow::Result<ZeroizableXpriv> {
-    let raw_buf = fs::read(path)?;
-    let str_buf = std::str::from_utf8(&raw_buf)?;
-    let buf = base58::decode_check(str_buf)?;
-    Ok(Xpriv::decode(&buf)?.into())
+    let mut raw_buf = fs::read(path)?;
+    let str_buf: &str = std::str::from_utf8(&raw_buf)?;
+    let mut buf = base58::decode_check(str_buf)?;
+
+    // Parse into a ZeroizableXpriv.
+    let xpriv = Xpriv::decode(&buf)?;
+    let zeroizable_xpriv: ZeroizableXpriv = xpriv.into();
+
+    // Zeroize the buffers after parsing.
+    //
+    // NOTE: `zeroizable_xpriv` is zeroized on drop;
+    //        and `str_buf` is a reference to `raw_buf`.
+    raw_buf.zeroize();
+    buf.zeroize();
+
+    Ok(zeroizable_xpriv)
 }
 
 /// Parses an [`Xpriv`] from environment variable.
@@ -251,12 +280,25 @@ fn read_xpriv(path: &Path) -> anyhow::Result<ZeroizableXpriv> {
 ///
 /// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
 fn parse_xpriv_from_env(env: &'static str) -> anyhow::Result<Option<ZeroizableXpriv>> {
-    let Ok(val) = std::env::var(env) else {
-        anyhow::bail!("got --key-from-env but {env} not set or invalid");
+    let mut env_val = match std::env::var(env) {
+        Ok(v) => v,
+        Err(_) => anyhow::bail!("got --key-from-env but {env} not set or invalid"),
     };
 
-    let buf = base58::decode_check(&val)?;
-    Ok(Some(Xpriv::decode(&buf)?.into()))
+    let mut buf = base58::decode_check(&env_val)?;
+
+    // Parse into a ZeroizableXpriv.
+    let mut xpriv = Xpriv::decode(&buf)?;
+    let zeroizable_xpriv: ZeroizableXpriv = xpriv.into();
+
+    // Zeroize the buffers after parsing.
+    //
+    // NOTE: `zeroizable_xpriv` is zeroized on drop.
+    env_val.zeroize();
+    buf.zeroize();
+    xpriv.private_key.non_secure_erase();
+
+    Ok(Some(zeroizable_xpriv))
 }
 
 /// Parses an [`Xpriv`] from file path.
