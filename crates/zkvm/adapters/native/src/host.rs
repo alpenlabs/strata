@@ -32,14 +32,16 @@ impl ZkVmHost for NativeHost {
         VerificationKey::default()
     }
 
-    fn extract_borsh_public_output<T: borsh::BorshDeserialize>(proof: &Proof) -> ZkVmResult<T> {
-        borsh::from_slice(proof.as_bytes()).map_err(|e| e.into())
+    fn extract_borsh_public_output<T: borsh::BorshDeserialize>(
+        public_values_raw: &PublicValues,
+    ) -> ZkVmResult<T> {
+        borsh::from_slice(public_values_raw.as_bytes()).map_err(|e| e.into())
     }
 
     fn extract_serde_public_output<T: serde::Serialize + serde::de::DeserializeOwned>(
-        proof: &Proof,
+        public_values_raw: &PublicValues,
     ) -> ZkVmResult<T> {
-        bincode::deserialize(proof.as_bytes()).map_err(|e| e.into())
+        bincode::deserialize(public_values_raw.as_bytes()).map_err(|e| e.into())
     }
 
     fn verify(&self, _proof: &ProofReceipt) -> ZkVmResult<()> {
