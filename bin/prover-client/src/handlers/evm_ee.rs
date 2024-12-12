@@ -4,7 +4,7 @@ use alloy_rpc_types::Block;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_primitives::{
     buf::Buf32,
-    proof::{ProofId, ProofKey, ProofZkVmHost},
+    proof::{ProofContext, ProofKey, ProofZkVm},
 };
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
 use strata_rocksdb::prover::db::ProofDb;
@@ -45,11 +45,11 @@ impl ProvingOp for EvmEeHandler {
         block_num: u64,
         _task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
-        _hosts: &[ProofZkVmHost],
-    ) -> Result<(ProofId, Vec<ProofId>), ProvingTaskError> {
+        _hosts: &[ProofZkVm],
+    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         let block = self.get_block(block_num).await?;
         let blkid: Buf32 = block.header.hash.into();
-        Ok((ProofId::EvmEeStf(blkid), vec![]))
+        Ok((ProofContext::EvmEeStf(blkid), vec![]))
     }
 
     async fn fetch_input(
@@ -57,8 +57,8 @@ impl ProvingOp for EvmEeHandler {
         task_id: &ProofKey,
         _db: &ProofDb,
     ) -> Result<ELProofInput, ProvingTaskError> {
-        let block_hash = match task_id.id() {
-            ProofId::EvmEeStf(id) => id,
+        let block_hash = match task_id.context() {
+            ProofContext::EvmEeStf(id) => id,
             _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
         };
 
