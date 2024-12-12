@@ -13,11 +13,11 @@ from utils import (
     check_submit_proof_fails_for_nonexistent_batch,
     wait_until,
 )
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class BlockFinalizationSeqRestartTest(StrataTest):
+class BlockFinalizationSeqRestartTest(TestStrata):
     """This tests finalization when sequencer client restarts"""
 
     def __init__(self, ctx: flexitest.InitContext):

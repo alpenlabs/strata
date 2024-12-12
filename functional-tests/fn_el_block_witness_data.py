@@ -5,11 +5,11 @@ from pathlib import Path
 import flexitest
 from solcx import compile_source, install_solc, set_solc_version
 from web3 import Web3
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class ElBlockWitnessDataGenerationTest(StrataTest):
+class ElBlockWitnessDataGenerationTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         install_solc(version="0.8.16")
         set_solc_version("0.8.16")

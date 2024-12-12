@@ -1,9 +1,9 @@
 import flexitest
 from utils import setup_test_logger
 
-class StrataTest(flexitest.Test):
+class TestStrata(flexitest.Test):
     """
-    Class to be used instead of StrataTest for accessing logger
+    Class to be used instead of TestStrata for accessing logger
     """
     def premain(self, ctx: flexitest.RunContext):
         logger = setup_test_logger(ctx.datadir_root, ctx.name)
@@ -15,7 +15,7 @@ class StrataTest(flexitest.Test):
 
 class ExtendedTestRuntime(flexitest.TestRuntime):
     """
-    Extended StrataTestRuntime to call custom run context
+    Extended TestStrataRuntime to call custom run context
     """
     def create_run_context(self, name: str, env: flexitest.LiveEnv) -> flexitest.RunContext:
         return RunContext(self.datadir_root,name,env)

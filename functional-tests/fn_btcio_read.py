@@ -8,11 +8,11 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from constants import MAX_HORIZON_POLL_INTERVAL_SECS
 from entry import BasicEnvConfig
 from utils import generate_n_blocks, wait_until
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class L1StatusTest(StrataTest):
+class L1StatusTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(auto_generate_blocks=False))
 

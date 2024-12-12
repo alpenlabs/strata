@@ -4,14 +4,14 @@ from pathlib import Path
 
 import flexitest
 
-from setup import StrataTest
+from setup import TestStrata
 
 NUM_BLOCKS_TO_RECEIVE = 10
 BLOCK_NUMBER = 4
 
 
 @flexitest.register
-class RecentBlocksTest(StrataTest):
+class RecentBlocksTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

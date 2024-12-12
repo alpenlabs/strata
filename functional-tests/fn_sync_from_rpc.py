@@ -4,10 +4,10 @@ from pathlib import Path
 
 import flexitest
 
-from setup import StrataTest
+from setup import TestStrata
 
 @flexitest.register
-class FullnodeElBlockGenerationTest(StrataTest):
+class FullnodeElBlockGenerationTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("hub1")
 

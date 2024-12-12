@@ -4,14 +4,14 @@ from pathlib import Path
 
 import flexitest
 
-from setup import StrataTest
+from setup import TestStrata
 
 UNSET_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 MAX_GENESIS_TRIES = 10
 
 
 @flexitest.register
-class SyncGenesisTest(StrataTest):
+class SyncGenesisTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

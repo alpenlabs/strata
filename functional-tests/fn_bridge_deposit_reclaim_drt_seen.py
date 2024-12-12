@@ -16,7 +16,7 @@ from constants import (
     UNSPENDABLE_ADDRESS,
 )
 from utils import get_bridge_pubkey, wait_until
-from setup import StrataTest
+from setup import TestStrata
 
 # Local constants
 # D BTC
@@ -26,7 +26,7 @@ TAKE_BACK_FEE = 17_243
 
 
 @flexitest.register
-class BridgeDepositReclaimDrtSeenTest(StrataTest):
+class BridgeDepositReclaimDrtSeenTest(TestStrata):
     """
     Tests the functionality of broadcasting a deposit request transaction (DRT) for the bridge
     and verifying that the reclaim path works as expected.

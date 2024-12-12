@@ -4,11 +4,11 @@ from pathlib import Path
 
 import flexitest
 from web3 import Web3
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class ElBalanceTransferTest(StrataTest):
+class ElBalanceTransferTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

@@ -7,11 +7,11 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
 from utils import generate_n_blocks, wait_until
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class L1WriterTest(StrataTest):
+class L1WriterTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

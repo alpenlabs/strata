@@ -3,11 +3,11 @@ from pathlib import Path
 
 import flexitest
 
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class L1ConnectTest(StrataTest):
+class L1ConnectTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

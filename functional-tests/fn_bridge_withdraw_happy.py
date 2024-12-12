@@ -11,7 +11,7 @@ from strata_utils import (
 )
 from web3 import Web3
 from web3.middleware import SignAndSendRawMiddlewareBuilder
-from setup import StrataTest
+from setup import TestStrata
 
 from constants import (
     DEFAULT_ROLLUP_PARAMS,
@@ -36,7 +36,7 @@ WITHDRAWAL_EXTRA_FEE = DEFAULT_ROLLUP_PARAMS["withdraw_extra_fee"]
 
 
 @flexitest.register
-class BridgeWithdrawHappyTest(StrataTest):
+class BridgeWithdrawHappyTest(TestStrata):
     """
     Makes two DRT deposits to the same EL address, then makes a withdrawal to a change address.
 

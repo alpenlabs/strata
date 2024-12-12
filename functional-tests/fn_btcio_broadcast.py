@@ -4,12 +4,12 @@ from pathlib import Path
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-from utils import wait_until_with_value
-from setup import StrataTest
+from utils import wait_until
+from setup import TestStrata
 
 
 @flexitest.register
-class BroadcastTest(StrataTest):
+class BroadcastTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
@@ -37,17 +37,15 @@ class BroadcastTest(StrataTest):
         txid = seqrpc.strataadmin_broadcastRawTx(signed_tx)
         self.debug(f"Rpc returned txid {txid}")
 
-        wait_until_with_value(
-            lambda: btcrpc.gettransaction(txid),
-            predicate=lambda v: v is not None,
+        wait_until(
+            lambda: btcrpc.gettransaction(txid) is not None,
             error_with="Tx was not published",
             timeout=10,
         )
 
         # Also check from strata rpc
-        wait_until_with_value(
-            lambda: seqrpc.strata_getTxStatus(txid),
-            predicate=lambda v: v["status"] in ("Confirmed", "Finalized"),
+        wait_until(
+            lambda: seqrpc.strata_getTxStatus(txid)["status"] in ("Confirmed", "Finalized"),
             error_with="Tx was not identified by strata",
             timeout=3,
         )

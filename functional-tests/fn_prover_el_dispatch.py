@@ -5,11 +5,11 @@ from pathlib import Path
 import flexitest
 
 from utils import wait_for_proof_with_time_out
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class ProverClientTest(StrataTest):
+class ProverClientTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
 
