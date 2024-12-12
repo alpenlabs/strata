@@ -73,7 +73,9 @@ pub enum BlobL1Status {
 
 /// This is the entry that gets saved to the database corresponding to a bitcoin transaction that
 /// the broadcaster will publish and watches for until finalization
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
 pub struct L1TxEntry {
     /// Raw serialized transaction. This is basically `consensus::serialize()` of [`Transaction`]
     tx_raw: Vec<u8>,

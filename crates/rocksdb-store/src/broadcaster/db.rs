@@ -82,6 +82,14 @@ impl L1BroadcastDatabase for L1BroadcastDb {
             )))
         }
     }
+
+    fn get_last_broadcast_entry(&self) -> DbResult<Option<L1TxEntry>> {
+        if let Some((_, txentry)) = get_last::<BcastL1TxSchema>(self.db.as_ref())? {
+            Ok(Some(txentry))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 pub struct BroadcastDb {
