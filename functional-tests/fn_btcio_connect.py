@@ -1,6 +1,3 @@
-import logging
-from pathlib import Path
-
 import flexitest
 
 from setup import TestStrata

@@ -1,10 +1,9 @@
-import logging
 import time
-from pathlib import Path
 
 import flexitest
 
 from setup import TestStrata
+
 
 @flexitest.register
 class FullnodeElBlockGenerationTest(TestStrata):

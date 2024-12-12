@@ -1,10 +1,7 @@
-import logging
-from pathlib import Path
-
 import flexitest
 
-from utils import wait_until
 from setup import TestStrata
+from utils import wait_until
 
 
 @flexitest.register

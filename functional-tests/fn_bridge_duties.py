@@ -1,12 +1,9 @@
-import logging
-from pathlib import Path
-
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from utils import broadcast_tx, wait_until
 from setup import TestStrata
+from utils import broadcast_tx, wait_until
 
 
 @flexitest.register

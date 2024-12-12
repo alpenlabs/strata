@@ -1,11 +1,9 @@
-import logging
 import time
-from pathlib import Path
 
 import flexitest
 
-from utils import wait_for_proof_with_time_out
 from setup import TestStrata
+from utils import wait_for_proof_with_time_out
 
 
 @flexitest.register

@@ -1,11 +1,9 @@
-import logging
 import time
-from pathlib import Path
 
 import flexitest
 
-from utils import wait_until
 from setup import TestStrata
+from utils import wait_until
 
 REORG_DEPTH = 3
 

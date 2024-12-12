@@ -1,6 +1,3 @@
-import logging
-from pathlib import Path
-
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import (
@@ -15,8 +12,8 @@ from constants import (
     DEFAULT_TAKEBACK_TIMEOUT,
     UNSPENDABLE_ADDRESS,
 )
-from utils import get_bridge_pubkey, wait_until
 from setup import TestStrata
+from utils import get_bridge_pubkey, wait_until
 
 # Local constants
 # D BTC

@@ -1,6 +1,3 @@
-import logging
-from pathlib import Path
-
 import flexitest
 
 import net_settings
@@ -8,12 +5,12 @@ from constants import (
     ERROR_PROOF_ALREADY_CREATED,
 )
 from entry import BasicEnvConfig
+from setup import TestStrata
 from utils import (
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,
     wait_until,
 )
-from setup import TestStrata
 
 
 @flexitest.register

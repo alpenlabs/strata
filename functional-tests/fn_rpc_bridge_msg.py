@@ -1,12 +1,11 @@
-import logging
 import time
-from pathlib import Path
 
 import flexitest
 
+from setup import TestStrata
+
 WAIT_TIME = 2
 
-from setup import TestStrata
 
 @flexitest.register
 class BridgeMsgTest(TestStrata):

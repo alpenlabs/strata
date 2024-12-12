@@ -1,6 +1,4 @@
-import logging
 import time
-from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient

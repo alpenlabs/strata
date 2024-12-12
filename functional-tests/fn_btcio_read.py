@@ -1,14 +1,12 @@
-import logging
 import time
-from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import MAX_HORIZON_POLL_INTERVAL_SECS
 from entry import BasicEnvConfig
-from utils import generate_n_blocks, wait_until
 from setup import TestStrata
+from utils import generate_n_blocks, wait_until
 
 
 @flexitest.register

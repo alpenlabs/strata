@@ -1,6 +1,4 @@
-import logging
 import time
-from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -11,7 +9,6 @@ from strata_utils import (
 )
 from web3 import Web3
 from web3.middleware import SignAndSendRawMiddlewareBuilder
-from setup import TestStrata
 
 from constants import (
     DEFAULT_ROLLUP_PARAMS,
@@ -19,6 +16,7 @@ from constants import (
     SATS_TO_WEI,
     UNSPENDABLE_ADDRESS,
 )
+from setup import TestStrata
 from utils import get_bridge_pubkey, wait_until
 
 # Local constants

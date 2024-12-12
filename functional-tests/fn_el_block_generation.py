@@ -1,12 +1,10 @@
-import logging
 from functools import partial
-from pathlib import Path
 
 import flexitest
 
 from entry import BasicEnvConfig
-from utils import wait_until_with_value
 from setup import TestStrata
+from utils import wait_until_with_value
 
 
 @flexitest.register

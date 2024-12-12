@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, Optional, TypeVar, Dict
+from typing import Any, Callable, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, musig_aggregate_pks

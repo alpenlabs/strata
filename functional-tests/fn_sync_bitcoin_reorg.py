@@ -1,6 +1,4 @@
-import logging
 import time
-from pathlib import Path
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -9,6 +7,7 @@ from flexitest.service import Service
 import net_settings
 from constants import FAST_BATCH_ROLLUP_PARAMS
 from entry import BasicEnvConfig
+from setup import TestStrata
 from utils import (
     ManualGenBlocksConfig,
     check_nth_checkpoint_finalized,
@@ -16,7 +15,6 @@ from utils import (
     submit_checkpoint,
     wait_until,
 )
-from setup import TestStrata
 
 
 @flexitest.register
