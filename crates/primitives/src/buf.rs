@@ -150,10 +150,10 @@ impl Zeroize for Buf32 {
 /// # use strata_primitives::prelude::Buf64;
 /// use zeroize::Zeroize;
 ///
-/// let mut buf = Buf32::from([1; 64]);
+/// let mut buf = Buf64::from([1; 64]);
 /// buf.zeroize();
 ///
-/// assert_eq!(buf, Buf32::from([0; 64]));
+/// assert_eq!(buf, Buf64::from([0; 64]));
 /// ```
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Buf64(pub [u8; 64]);
