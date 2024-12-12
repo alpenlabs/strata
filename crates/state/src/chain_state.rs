@@ -131,6 +131,13 @@ impl Chainstate {
     }
 }
 
+#[cfg(any(test, feature = "test_utils"))]
+impl Chainstate {
+    pub fn set_epoch(&mut self, ep: u64) {
+        self.epoch = ep;
+    }
+}
+
 impl<'a> Arbitrary<'a> for Chainstate {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let gdata = GenesisStateData::arbitrary(u)?;
