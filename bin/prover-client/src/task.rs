@@ -1,178 +1,227 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use tokio::sync::Mutex;
-use tracing::info;
-use uuid::Uuid;
+use strata_primitives::proof::ProofKey;
 
-use crate::primitives::{
-    prover_input::{ProofWithVkey, ZkVmInput},
-    tasks_scheduler::{ProvingTask, ProvingTaskStatus},
-};
+use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 
-/// The `TaskTracker` manages the lifecycle of proving tasks. It provides functionality
-/// to create tasks, update their status, and retrieve tasks based on their current state.
-#[derive(Debug)]
+/// Manages tasks and their states for proving operations.
+#[derive(Debug, Clone)]
 pub struct TaskTracker {
-    tasks: Mutex<HashMap<Uuid, ProvingTask>>,
+    /// A map of task IDs to their statuses.
+    tasks: HashMap<ProofKey, ProvingTaskStatus>,
+    /// Count of the tasks that are in progress
+    in_progress_tasks: usize,
 }
 
 impl TaskTracker {
+    /// Creates a new `TaskTracker` instance.
     pub fn new() -> Self {
         TaskTracker {
-            tasks: Mutex::new(HashMap::new()),
+            tasks: HashMap::new(),
+            in_progress_tasks: 0,
         }
     }
 
-    pub async fn clear_tasks(&self) {
-        let mut tasks = self.tasks.lock().await;
-        tasks.clear();
+    /// Clears all tasks from the tracker.
+    pub fn clear_tasks(&mut self) {
+        self.tasks.clear();
     }
 
-    pub async fn create_task(&self, prover_input: ZkVmInput, dependencies: Vec<Uuid>) -> Uuid {
-        let task_id = Uuid::new_v4();
-        let status = if dependencies.is_empty() {
+    pub fn in_progress_tasks_count(&self) -> usize {
+        self.in_progress_tasks
+    }
+
+    /// Inserts a new task with the given dependencies.
+    ///
+    /// - If no dependencies are provided, the task is marked as `Pending`.
+    /// - If dependencies are provided, the task is marked as `WaitingForDependencies`.
+    ///
+    /// Returns an error if the task already exists.
+    pub fn insert_task(
+        &mut self,
+        id: ProofKey,
+        deps: Vec<ProofKey>,
+    ) -> Result<(), ProvingTaskError> {
+        if self.tasks.contains_key(&id) {
+            return Err(ProvingTaskError::TaskAlreadyFound(id));
+        }
+
+        for dep in &deps {
+            if !self.tasks.contains_key(dep) {
+                return Err(ProvingTaskError::DependencyNotFound(*dep));
+            }
+        }
+
+        let status = if deps.is_empty() {
             ProvingTaskStatus::Pending
         } else {
-            ProvingTaskStatus::WaitingForDependencies
+            ProvingTaskStatus::WaitingForDependencies(HashSet::from_iter(deps))
         };
-        let task = ProvingTask {
-            id: task_id,
-            prover_input,
-            status,
-            dependencies,
-            proof: None,
-        };
-        let mut tasks = self.tasks.lock().await;
-        tasks.insert(task_id, task);
-        info!("Added proving task {:?}", task_id);
-        task_id
+
+        self.tasks.insert(id, status);
+
+        Ok(())
+    }
+
+    /// Retrieves the status of a task by its ID.
+    ///
+    /// Returns an error if the task does not exist.
+    pub fn get_task(&self, id: ProofKey) -> Result<&ProvingTaskStatus, ProvingTaskError> {
+        self.tasks
+            .get(&id)
+            .ok_or(ProvingTaskError::TaskNotFound(id))
     }
 
     /// Updates the status of a task.
-    pub async fn update_status(&self, task_id: Uuid, status: ProvingTaskStatus) {
-        let mut tasks = self.tasks.lock().await;
-        if let Some(task) = tasks.get_mut(&task_id) {
-            task.status = status;
-        }
-    }
-
-    /// Marks a task as completed and updates dependent tasks accordingly.
     ///
-    /// This function updates the status of the completed task and checks if any tasks that depend
-    /// on it can now be marked as pending. If all dependencies of a dependent task are
-    /// completed, it updates the dependent task's status to `Pending` and prepares it for
-    /// proving.
-    pub async fn mark_task_completed(&self, task_id: Uuid, proof: ProofWithVkey) {
-        info!("Task {:?} marked as completed", task_id);
-        let mut tasks = self.tasks.lock().await;
+    /// - Allows valid transitions as per the state machine.
+    /// - Automatically resolves dependencies if a task is completed.
+    ///
+    /// Returns an error for invalid transitions or if the task does not exist.
+    pub fn update_status(
+        &mut self,
+        id: ProofKey,
+        new_status: ProvingTaskStatus,
+    ) -> Result<(), ProvingTaskError> {
+        if let Some(status) = self.tasks.get_mut(&id) {
+            // Check for valid status transitions
+            status.transition(new_status.clone())?;
 
-        // Update the completed task's status and proof
-        if let Some(task) = tasks.get_mut(&task_id) {
-            task.status = ProvingTaskStatus::Completed;
-            task.proof = Some(proof.clone());
-        }
+            if new_status == ProvingTaskStatus::ProvingInProgress {
+                self.in_progress_tasks += 1;
+            }
 
-        // Collect dependent tasks and their completion status
-        let dependent_tasks_infos: Vec<(Uuid, bool)> = tasks
-            .iter()
-            // Filter tasks that depend on the completed task
-            .filter(|(_, dependent_task)| dependent_task.dependencies.contains(&task_id))
-            // Check if all dependencies for this task are completed
-            .map(|(id, dependent_task)| {
-                let all_dependencies_completed = dependent_task.dependencies.iter().all(|dep_id| {
-                    tasks
-                        .get(dep_id)
-                        .map_or(false, |t| t.status == ProvingTaskStatus::Completed)
-                });
-                // Return the task ID and completion status of dependencies
-                (*id, all_dependencies_completed)
-            })
-            .collect();
-
-        info!(
-            "Processing {:?} dependents, found {:?} dependents",
-            task_id,
-            dependent_tasks_infos.len()
-        );
-
-        // Update each dependent task based on the completion status of its dependencies
-        for (dep_id, all_dependencies_completed) in dependent_tasks_infos {
-            if let Some(dependent_task) = tasks.get_mut(&dep_id) {
-                update_prover_input_with_proof(
-                    &mut dependent_task.prover_input,
-                    task_id,
-                    proof.clone(),
-                );
-
-                if all_dependencies_completed {
-                    dependent_task.status = ProvingTaskStatus::Pending;
-                    info!("Dependent Task {:?} is now ready for proving", dep_id);
+            if new_status == ProvingTaskStatus::Completed {
+                self.in_progress_tasks -= 1;
+                // Resolve dependencies if a task is completed
+                for task_status in self.tasks.values_mut() {
+                    if let ProvingTaskStatus::WaitingForDependencies(deps) = task_status {
+                        deps.remove(&id);
+                        if deps.is_empty() {
+                            task_status.transition(ProvingTaskStatus::Pending)?;
+                        }
+                    }
                 }
             }
+            Ok(())
+        } else {
+            Err(ProvingTaskError::TaskNotFound(id))
         }
     }
 
-    /// Retrieves a task by its ID.
-    pub async fn get_task(&self, task_id: Uuid) -> Option<ProvingTask> {
-        let tasks = self.tasks.lock().await;
-        tasks.get(&task_id).cloned()
-    }
-
-    /// Retrieves a task status by its ID.
-    /// Used in places where only status is needed, to avoid (potentially expensive) cloning
-    /// of the whole [`ProvingTask`].
-    pub async fn get_task_status(&self, task_id: Uuid) -> Option<ProvingTaskStatus> {
-        let tasks = self.tasks.lock().await;
-        tasks.get(&task_id).map(|task| task.status)
-    }
-
-    /// Retrieves all the task for the given [`ProvingTaskStatus`].
-    pub async fn get_tasks_by_status(&self, status: ProvingTaskStatus) -> Vec<ProvingTask> {
-        let tasks = self.tasks.lock().await;
-        tasks
-            .values()
-            .filter(|task| task.status == status)
-            .cloned()
-            .collect()
-    }
-
-    /// Retrieves all the task ids for the given status.
-    /// Used in places where only the id is needed, to avoid (potentially expensive) cloning
-    /// of the whole [`ProvingTask`].
-    pub async fn get_task_ids_by_status(&self, status: ProvingTaskStatus) -> Vec<Uuid> {
-        let tasks = self.tasks.lock().await;
-        tasks
-            .values()
-            .filter(|task| task.status == status)
-            .map(|task| task.id)
+    /// Filters and retrieves a list of `ProofKey` references for tasks whose status
+    /// matches the given filter function.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let task_tracker = TaskTracker::new();
+    /// let pending_tasks =
+    ///     task_tracker.get_tasks_by_status(|status| matches!(status, ProvingTaskStatus::Pending));
+    /// ```
+    pub fn get_tasks_by_status<F>(&self, filter_fn: F) -> Vec<ProofKey>
+    where
+        F: Fn(&ProvingTaskStatus) -> bool,
+    {
+        self.tasks
+            .iter()
+            .filter_map(|(proof_key, task)| {
+                if filter_fn(task) {
+                    Some(*proof_key) // Only return the `proof_key` if the task matches the filter
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 }
 
-/// Updates the current task's `prover_input` by incorporating the proof from a dependent task.
-fn update_prover_input_with_proof(
-    prover_input: &mut ZkVmInput,
-    task_id: Uuid,
-    proof: ProofWithVkey,
-) {
-    match prover_input {
-        ZkVmInput::L1Batch(ref mut btc_batch_input) => {
-            btc_batch_input.insert_proof(task_id, proof);
+#[cfg(test)]
+mod tests {
+    use strata_primitives::proof::{ProofContext, ProofZkVm};
+    use strata_state::l1::L1BlockId;
+    use strata_test_utils::ArbitraryGenerator;
+
+    use super::*;
+
+    // Helper function to generate test L1 block IDs
+    fn gen_task_with_deps(n: u64) -> (ProofKey, Vec<ProofKey>) {
+        let mut deps = Vec::with_capacity(n as usize);
+        let host = ProofZkVm::Native;
+        let mut gen = ArbitraryGenerator::new();
+
+        let start: L1BlockId = gen.generate();
+        let end: L1BlockId = gen.generate();
+        for _ in 0..n {
+            let blkid: L1BlockId = gen.generate();
+            let id = ProofContext::BtcBlockspace(blkid);
+            let key = ProofKey::new(id, host);
+            deps.push(key);
         }
-        ZkVmInput::L2Batch(ref mut l2_batch_input) => {
-            l2_batch_input.insert_proof(task_id, proof);
+
+        let id = ProofContext::L1Batch(start, end);
+        let key = ProofKey::new(id, host);
+
+        (key, deps)
+    }
+
+    #[test]
+    fn test_insert_task_no_dependencies() {
+        let mut tracker = TaskTracker::new();
+        let (id, _) = gen_task_with_deps(0);
+
+        tracker.insert_task(id, vec![]).unwrap();
+        assert!(
+            matches!(tracker.get_task(id), Ok(&ProvingTaskStatus::Pending)),
+            "Task with no dependencies should be Pending"
+        );
+    }
+
+    #[test]
+    fn test_insert_task_with_dependencies() {
+        let mut tracker = TaskTracker::new();
+        let (id, deps) = gen_task_with_deps(2);
+
+        for dep in &deps {
+            tracker.insert_task(*dep, vec![]).unwrap();
         }
-        ZkVmInput::Checkpoint(ref mut input) => {
-            if input.l1_batch_id == task_id {
-                input.l1_batch_proof = Some(proof.clone());
-            }
-            if input.l2_batch_id == task_id {
-                input.l2_batch_proof = Some(proof);
-            }
+        tracker.insert_task(id, deps.clone()).unwrap();
+        assert!(
+            matches!(
+                tracker.get_task(id),
+                Ok(&ProvingTaskStatus::WaitingForDependencies(_))
+            ),
+            "Task with dependencies should be WaitingForDependencies"
+        );
+    }
+
+    #[test]
+    fn test_task_not_found_error() {
+        let mut tracker = TaskTracker::new();
+        let (id, _) = gen_task_with_deps(0);
+
+        let result = tracker.update_status(id, ProvingTaskStatus::Pending);
+        assert!(matches!(result, Err(ProvingTaskError::TaskNotFound(_))));
+    }
+
+    #[test]
+    fn test_dependency_resolution() {
+        let mut tracker = TaskTracker::new();
+        let (id, deps) = gen_task_with_deps(2);
+        for dep in &deps {
+            tracker.insert_task(*dep, vec![]).unwrap();
         }
-        ZkVmInput::ClBlock(ref mut input) => {
-            input.el_proof = Some(proof);
+        tracker.insert_task(id, deps.clone()).unwrap();
+
+        for dep in &deps {
+            tracker
+                .update_status(*dep, ProvingTaskStatus::ProvingInProgress)
+                .and_then(|_| tracker.update_status(*dep, ProvingTaskStatus::Completed))
+                .unwrap();
         }
-        _ => {}
+        assert!(
+            matches!(tracker.get_task(id), Ok(&ProvingTaskStatus::Pending)),
+            "Task should become Pending after all dependencies are resolved"
+        );
     }
 }
