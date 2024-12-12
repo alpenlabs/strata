@@ -6,11 +6,11 @@ import flexitest
 
 from entry import BasicEnvConfig
 from utils import wait_until_with_value
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class ElBlockGenerationTest(StrataTest):
+class ElBlockGenerationTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(BasicEnvConfig(1000))
 

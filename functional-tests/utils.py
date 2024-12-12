@@ -417,16 +417,15 @@ def get_bridge_pubkey_from_cfg(cfg_params) -> str:
     return agg_pubkey
 
 
-def setup_root_logger() -> int:
+def setup_root_logger():
     """
-    reads `LOG_LEVEL` from the environment. Defaults to `NOTSET` if not provided.
+    reads `LOG_LEVEL` from the environment. Defaults to `WARNING` if not provided.
     """
-    log_level = os.getenv("LOG_LEVEL", "NOTSET").upper()
+    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
     log_level = getattr(logging, log_level, logging.NOTSET)
     # Configure the root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
-    return log_level
 
 
 def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:

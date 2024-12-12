@@ -12,11 +12,11 @@ from utils import (
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,
 )
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class BlockFinalizationTimeoutTest(StrataTest):
+class BlockFinalizationTimeoutTest(TestStrata):
     """
     This checks for finalization if proof is not submitted within a timeout period
     """

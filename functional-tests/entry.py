@@ -30,7 +30,6 @@ class BasicLiveEnv(flexitest.LiveEnv):
         self._ext_btc_addr_idx = 0
         self._rec_btc_addr_idx = 0
         self._bridge_pk = bridge_pk
-        self.path = path
 
     def gen_el_address(self) -> str:
         """
@@ -391,7 +390,6 @@ def main(argv):
     rt = ExtendedTestRuntime(global_envs, datadir_root, factories)
     rt.prepare_registered_tests()
 
-    print("registered test")
     results = rt.run_tests(tests)
     rt.save_json_file("results.json", results)
     flexitest.dump_results(results)

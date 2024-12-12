@@ -12,7 +12,7 @@ from strata_utils import (
 
 from constants import DEFAULT_ROLLUP_PARAMS, DEFAULT_TAKEBACK_TIMEOUT, UNSPENDABLE_ADDRESS
 from utils import get_bridge_pubkey, wait_until
-from setup import StrataTest
+from setup import TestStrata
 
 # Local constants
 # D BTC
@@ -22,7 +22,7 @@ TAKE_BACK_FEE = 17_243
 
 
 @flexitest.register
-class BridgeDepositReclaimTest(StrataTest):
+class BridgeDepositReclaimTest(TestStrata):
     """
     A test class for reclaim path scenarios of bridge deposits.
 

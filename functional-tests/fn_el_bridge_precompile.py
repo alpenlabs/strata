@@ -8,7 +8,7 @@ from web3 import Web3
 from web3._utils.events import get_event_data
 
 from constants import PRECOMPILE_BRIDGEOUT_ADDRESS
-from setup import StrataTest
+from setup import TestStrata
 
 withdrawal_intent_event_abi = {
     "anonymous": False,
@@ -23,12 +23,12 @@ event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
 
 
 @flexitest.register
-class ElBridgePrecompileTest(StrataTest):
+class ElBridgePrecompileTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
-        self.debug("SKIPPING TEST fn_el_bridge_precompile")
+        self.warning("SKIPPING TEST fn_el_bridge_precompile")
         return True
 
         reth = ctx.get_service("reth")

@@ -5,13 +5,13 @@ from pathlib import Path
 import flexitest
 
 from utils import wait_until
-from setup import StrataTest
+from setup import TestStrata
 
 REORG_DEPTH = 3
 
 
 @flexitest.register
-class CLBlockWitnessDataGenerationTest(StrataTest):
+class CLBlockWitnessDataGenerationTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

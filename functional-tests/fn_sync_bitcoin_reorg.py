@@ -16,11 +16,11 @@ from utils import (
     submit_checkpoint,
     wait_until,
 )
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class BitcoinReorgChecksTest(StrataTest):
+class BitcoinReorgChecksTest(TestStrata):
     """This tests finalization when there is reorg on L1"""
 
     def __init__(self, ctx: flexitest.InitContext):

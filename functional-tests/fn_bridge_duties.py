@@ -6,11 +6,11 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
 from utils import broadcast_tx, wait_until
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class BridgeDutiesTest(StrataTest):
+class BridgeDutiesTest(TestStrata):
     """
     Test that the bridge client can fetch bridge duties correctly.
     """

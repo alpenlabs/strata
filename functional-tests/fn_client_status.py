@@ -4,11 +4,11 @@ from pathlib import Path
 import flexitest
 
 from utils import wait_until
-from setup import StrataTest
+from setup import TestStrata
 
 
 @flexitest.register
-class L1ClientStatusTest(StrataTest):
+class L1ClientStatusTest(TestStrata):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
