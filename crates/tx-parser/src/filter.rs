@@ -15,14 +15,14 @@ use crate::{
 /// [`TxFilterConfig`]s
 pub fn filter_protocol_op_tx_refs(
     block: &Block,
-    filter_config: TxFilterConfig,
+    filter_config: &TxFilterConfig,
 ) -> Vec<ProtocolOpTxRef> {
     block
         .txdata
         .iter()
         .enumerate()
         .flat_map(|(i, tx)| {
-            extract_protocol_ops(tx, &filter_config)
+            extract_protocol_ops(tx, filter_config)
                 .into_iter()
                 .map(move |relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
         })
@@ -200,7 +200,7 @@ mod test {
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config.clone())
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
@@ -211,7 +211,7 @@ mod test {
         let rollup_name = "invalidRollupName".to_string();
         let tx = create_inscription_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, &filter_config);
         assert!(result.is_empty(), "Should filter out invalid name");
     }
 
@@ -222,7 +222,7 @@ mod test {
         let block = create_test_block(vec![tx1, tx2]);
         let filter_config = create_tx_filter_config();
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config)
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
@@ -238,7 +238,7 @@ mod test {
         let tx3 = create_inscription_tx(rollup_name);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config)
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
@@ -263,7 +263,7 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, &filter_config);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -306,7 +306,7 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, &filter_config);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -341,7 +341,7 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, &filter_config);
 
         assert!(
             result.is_empty(),
@@ -374,7 +374,7 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, &filter_config);
 
         assert_eq!(result.len(), 2, "Should find two relevant transactions");
         assert_eq!(
