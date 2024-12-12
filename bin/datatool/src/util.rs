@@ -3,6 +3,7 @@
 //! It contains functions for generating keys, parsing amounts, and constructing
 //! network parameters.
 //! These functions are called from the CLI's subcommands.
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -310,7 +311,13 @@ fn parse_xpriv_from_path(path: &Path) -> anyhow::Result<Option<ZeroizableXpriv>>
     Ok(Some(read_xpriv(path)?))
 }
 
-/// Resolves an [`Xpriv`] either from a file path or an environment variable.
+/// Resolves an [`Xpriv`] from the file path (if provided) or environment variable (if
+/// `--key-from-env` set). Only one source should be specified.
+///
+/// Priority:
+///
+/// 1. File path (if provided with path argument)
+/// 2. Environment variable (if --key-from-env flag is set)
 ///
 /// # Notes
 ///
