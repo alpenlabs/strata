@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use strata_primitives::proof::ProofId;
+use strata_primitives::proof::ProofContext;
 use strata_sp1_adapter::SP1Host;
 use strata_sp1_guest_builder::*;
 
@@ -52,13 +52,13 @@ pub static CHECKPOINT_HOST: LazyLock<SP1Host> = std::sync::LazyLock::new(|| {
     }
 });
 
-pub fn get_host(id: &ProofId) -> &'static SP1Host {
+pub fn get_host(id: &ProofContext) -> &'static SP1Host {
     match id {
-        ProofId::BtcBlockspace(_) => &BTC_BLOCKSPACE_HOST,
-        ProofId::L1Batch(_, _) => &L1_BATCH_HOST,
-        ProofId::EvmEeStf(_) => &EVM_EE_STF_HOST,
-        ProofId::ClStf(_) => &CL_STF_HOST,
-        ProofId::ClAgg(_, _) => &CL_AGG_HOST,
-        ProofId::Checkpoint(_) => &CHECKPOINT_HOST,
+        ProofContext::BtcBlockspace(_) => &BTC_BLOCKSPACE_HOST,
+        ProofContext::L1Batch(_, _) => &L1_BATCH_HOST,
+        ProofContext::EvmEeStf(_) => &EVM_EE_STF_HOST,
+        ProofContext::ClStf(_) => &CL_STF_HOST,
+        ProofContext::ClAgg(_, _) => &CL_AGG_HOST,
+        ProofContext::Checkpoint(_) => &CHECKPOINT_HOST,
     }
 }

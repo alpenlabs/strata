@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
+use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_rocksdb::prover::db::ProofDb;
-use strata_zkvm::ZkVmHost;
 use tokio::sync::Mutex;
 
 use super::{cl_stf::ClStfHandler, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
@@ -32,8 +31,8 @@ impl ProvingOp for ClAggHandler {
         params: (u64, u64),
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-        hosts: &[ProofZkVmHost],
-    ) -> Result<(ProofId, Vec<ProofId>), ProvingTaskError> {
+        hosts: &[ProofZkVm],
+    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         let (start_height, end_height) = params;
 
         let len = (end_height - start_height) as usize + 1;
@@ -41,11 +40,11 @@ impl ProvingOp for ClAggHandler {
 
         let start_blkid = self.cl_stf_handler.get_id(start_height).await?;
         let end_blkid = self.cl_stf_handler.get_id(end_height).await?;
-        let cl_agg_proof_id = ProofId::ClAgg(start_blkid, end_blkid);
+        let cl_agg_proof_id = ProofContext::ClAgg(start_blkid, end_blkid);
 
         for height in start_height..=end_height {
             let blkid = self.cl_stf_handler.get_id(height).await?;
-            let proof_id = ProofId::ClStf(blkid);
+            let proof_id = ProofContext::ClStf(blkid);
             self.cl_stf_handler
                 .create_task(height, task_tracker.clone(), db, hosts)
                 .await?;
@@ -63,13 +62,13 @@ impl ProvingOp for ClAggHandler {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<ClAggInput, ProvingTaskError> {
-        let (start_blkid, _) = match task_id.id() {
-            ProofId::ClAgg(start, end) => (start, end),
+        let (start_blkid, _) = match task_id.context() {
+            ProofContext::ClAgg(start, end) => (start, end),
             _ => return Err(ProvingTaskError::InvalidInput("ClAgg".to_string())),
         };
 
         let deps = db
-            .get_proof_deps(*task_id.id())
+            .get_proof_deps(*task_id.context())
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
 
@@ -84,7 +83,7 @@ impl ProvingOp for ClAggHandler {
         }
 
         let cl_stf_vk = hosts::get_verification_key(&ProofKey::new(
-            ProofId::ClStf(*start_blkid),
+            ProofContext::ClStf(*start_blkid),
             *task_id.host(),
         ));
         Ok(ClAggInput { batch, cl_stf_vk })

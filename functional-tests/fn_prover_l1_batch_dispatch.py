@@ -18,8 +18,10 @@ class ProverClientTest(testenv.StrataTester):
         # Wait for the some block building
         time.sleep(60)
 
-        task_id = prover_client_rpc.dev_strata_proveL1Batch((1, 2))
-        self.debug(f"got the task id: {task_id}")
+        task_ids = prover_client_rpc.dev_strata_proveL1Batch((1, 2))
+        self.debug(f"got the task ids: {}", task_ids)
+        task_id = task_ids[0]
+        print("using task id: {task_id}")
         assert task_id is not None
 
         time_out = 10 * 60
