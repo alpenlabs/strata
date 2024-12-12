@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jsonrpsee::http_client::HttpClient;
 use strata_btcio::rpc::BitcoinClient;
-use strata_primitives::proof::{ProofId, ProofZkVmHost};
+use strata_primitives::proof::{ProofContext, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
 
@@ -20,7 +20,7 @@ pub struct ProofHandler {
     cl_stf_handler: ClStfHandler,
     cl_agg_handler: ClAggHandler,
     checkpoint_handler: CheckpointHandler,
-    vms: Vec<ProofZkVmHost>,
+    vms: Vec<ProofZkVm>,
 }
 
 impl ProofHandler {
@@ -31,7 +31,7 @@ impl ProofHandler {
         cl_stf_handler: ClStfHandler,
         cl_agg_handler: ClAggHandler,
         checkpoint_handler: CheckpointHandler,
-        vms: Vec<ProofZkVmHost>,
+        vms: Vec<ProofZkVm>,
     ) -> Self {
         Self {
             btc_blockspace_handler,
@@ -66,17 +66,17 @@ impl ProofHandler {
 
         #[cfg(feature = "sp1")]
         {
-            vms.push(ProofZkVmHost::SP1);
+            vms.push(ProofZkVm::SP1);
         }
 
         #[cfg(feature = "risc0")]
         {
-            vms.push(ProofZkVmHost::Risc0);
+            vms.push(ProofZkVm::Risc0);
         }
 
         #[cfg(all(not(feature = "risc0"), not(feature = "sp1")))]
         {
-            vms.push(ProofZkVmHost::Native);
+            vms.push(ProofZkVm::Native);
         }
 
         ProofHandler::new(
@@ -91,13 +91,15 @@ impl ProofHandler {
     }
 
     pub async fn prove(&self, proof_key: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
-        match proof_key.id() {
-            ProofId::BtcBlockspace(_) => self.btc_blockspace_handler.prove(proof_key, db).await,
-            ProofId::L1Batch(_, _) => self.l1_batch_handler.prove(proof_key, db).await,
-            ProofId::EvmEeStf(_) => self.evm_ee_handler.prove(proof_key, db).await,
-            ProofId::ClStf(_) => self.cl_stf_handler.prove(proof_key, db).await,
-            ProofId::ClAgg(_, _) => self.cl_agg_handler.prove(proof_key, db).await,
-            ProofId::Checkpoint(_) => self.checkpoint_handler.prove(proof_key, db).await,
+        match proof_key.context() {
+            ProofContext::BtcBlockspace(_) => {
+                self.btc_blockspace_handler.prove(proof_key, db).await
+            }
+            ProofContext::L1Batch(_, _) => self.l1_batch_handler.prove(proof_key, db).await,
+            ProofContext::EvmEeStf(_) => self.evm_ee_handler.prove(proof_key, db).await,
+            ProofContext::ClStf(_) => self.cl_stf_handler.prove(proof_key, db).await,
+            ProofContext::ClAgg(_, _) => self.cl_agg_handler.prove(proof_key, db).await,
+            ProofContext::Checkpoint(_) => self.checkpoint_handler.prove(proof_key, db).await,
         }
     }
 
@@ -125,7 +127,7 @@ impl ProofHandler {
         &self.checkpoint_handler
     }
 
-    pub fn vms(&self) -> &[ProofZkVmHost] {
+    pub fn vms(&self) -> &[ProofZkVm] {
         &self.vms
     }
 }

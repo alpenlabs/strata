@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
-use strata_primitives::proof::ProofId;
+use strata_primitives::proof::ProofContext;
 use strata_proofimpl_btc_blockspace::logic::process_blockspace_proof_outer;
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
 use strata_proofimpl_cl_agg::process_cl_agg;
@@ -16,39 +16,39 @@ use strata_zkvm::ZkVmHost;
 /// required by a function signature, but actual verification is skipped.
 const MOCK_VK: [u32; 8] = [0u32; 8];
 
-pub fn get_host(id: &ProofId) -> NativeHost {
+pub fn get_host(id: &ProofContext) -> NativeHost {
     match id {
-        ProofId::BtcBlockspace(_) => NativeHost {
+        ProofContext::BtcBlockspace(_) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_blockspace_proof_outer(zkvm);
                 Ok(())
             })),
         },
-        ProofId::L1Batch(_, _) => NativeHost {
+        ProofContext::L1Batch(_, _) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_l1_batch_proof(zkvm, &MOCK_VK);
                 Ok(())
             })),
         },
-        ProofId::EvmEeStf(_) => NativeHost {
+        ProofContext::EvmEeStf(_) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_block_transaction_outer(zkvm);
                 Ok(())
             })),
         },
-        ProofId::ClStf(_) => NativeHost {
+        ProofContext::ClStf(_) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_cl_stf(zkvm, &MOCK_VK);
                 Ok(())
             })),
         },
-        ProofId::ClAgg(_, _) => NativeHost {
+        ProofContext::ClAgg(_, _) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_cl_agg(zkvm, &MOCK_VK);
                 Ok(())
             })),
         },
-        ProofId::Checkpoint(_) => NativeHost {
+        ProofContext::Checkpoint(_) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_checkpoint_proof_outer(zkvm, &MOCK_VK, &MOCK_VK);
                 Ok(())

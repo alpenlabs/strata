@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::{ProofId, ProofKey, ProofZkVmHost};
+use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcCheckpointInfo;
-use strata_zkvm::{AggregationInput, ZkVmHost};
+use strata_zkvm::AggregationInput;
 use tokio::sync::Mutex;
 
 use super::{
     cl_agg::ClAggHandler, l1_batch::L1BatchHandler, utils::get_pm_rollup_params, ProvingOp,
 };
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
@@ -57,23 +57,23 @@ impl ProvingOp for CheckpointHandler {
         ckp_idx: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-        hosts: &[ProofZkVmHost],
-    ) -> Result<(ProofId, Vec<ProofId>), ProvingTaskError> {
+        hosts: &[ProofZkVm],
+    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         let checkpoint_info = self.fetch_info(ckp_idx).await?;
 
-        let ckp_proof_id = ProofId::Checkpoint(ckp_idx);
+        let ckp_proof_id = ProofContext::Checkpoint(ckp_idx);
 
         let l1_batch_keys = self
             .l1_batch_dispatcher
             .create_task(checkpoint_info.l1_range, task_tracker.clone(), db, hosts)
             .await?;
-        let l1_batch_id = l1_batch_keys.first().expect("at least one").id();
+        let l1_batch_id = l1_batch_keys.first().expect("at least one").context();
 
         let l2_batch_keys = self
             .l2_batch_dispatcher
             .create_task(checkpoint_info.l2_range, task_tracker.clone(), db, hosts)
             .await?;
-        let l2_batch_id = l2_batch_keys.first().expect("at least one").id();
+        let l2_batch_id = l2_batch_keys.first().expect("at least one").context();
 
         let deps = vec![*l1_batch_id, *l2_batch_id];
 
@@ -89,7 +89,7 @@ impl ProvingOp for CheckpointHandler {
         db: &ProofDb,
     ) -> Result<CheckpointProverInput, ProvingTaskError> {
         let deps = db
-            .get_proof_deps(*task_id.id())
+            .get_proof_deps(*task_id.context())
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
 

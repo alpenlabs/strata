@@ -5,9 +5,8 @@ use std::sync::Arc;
 use anyhow::Context;
 use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
-use strata_db::traits::ProverDatabase;
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
-use strata_rocksdb::prover::db::ProverDB;
+use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
@@ -60,14 +59,14 @@ where
 pub(crate) struct ProverClientRpc {
     task_tracker: Arc<Mutex<TaskTracker>>,
     handler: Arc<ProofHandler>,
-    db: ProverDB,
+    db: Arc<ProofDb>,
 }
 
 impl ProverClientRpc {
     pub fn new(
         task_tracker: Arc<Mutex<TaskTracker>>,
         handler: Arc<ProofHandler>,
-        db: ProverDB,
+        db: Arc<ProofDb>,
     ) -> Self {
         Self {
             task_tracker,
@@ -86,7 +85,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .create_task(
                 btc_block_num,
                 self.task_tracker.clone(),
-                self.db.proof_db(),
+                &self.db,
                 self.handler.vms(),
             )
             .await
@@ -100,7 +99,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .create_task(
                 el_block_num,
                 self.task_tracker.clone(),
-                self.db.proof_db(),
+                &self.db,
                 self.handler.vms(),
             )
             .await
@@ -114,7 +113,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .create_task(
                 cl_block_num,
                 self.task_tracker.clone(),
-                self.db.proof_db(),
+                &self.db,
                 self.handler.vms(),
             )
             .await
@@ -128,7 +127,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .create_task(
                 l1_range,
                 self.task_tracker.clone(),
-                self.db.proof_db(),
+                &self.db,
                 self.handler.vms(),
             )
             .await
@@ -142,7 +141,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .create_task(
                 l2_range,
                 self.task_tracker.clone(),
-                self.db.proof_db(),
+                &self.db,
                 self.handler.vms(),
             )
             .await

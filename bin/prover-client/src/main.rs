@@ -11,10 +11,7 @@ use manager::ProverManager;
 use rpc_server::ProverClientRpc;
 use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
-use strata_rocksdb::{
-    prover::db::{ProofDb, ProverDB},
-    DbOpsConfig,
-};
+use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use task::TaskTracker;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
@@ -60,10 +57,14 @@ async fn main() {
 
     let rbdb = open_rocksdb_database().unwrap();
     let db_ops = DbOpsConfig { retry_count: 3 };
-    let db = ProofDb::new(rbdb, db_ops);
-    let db = ProverDB::new(Arc::new(db));
+    let db = Arc::new(ProofDb::new(rbdb, db_ops));
 
-    let manager = ProverManager::new(task_tracker.clone(), handler.clone(), NUM_PROVER_WORKERS);
+    let manager = ProverManager::new(
+        task_tracker.clone(),
+        handler.clone(),
+        db.clone(),
+        NUM_PROVER_WORKERS,
+    );
     debug!("Initialized Prover Manager");
 
     // run prover manager in background
@@ -89,7 +90,7 @@ async fn main() {
 async fn run_rpc_server(
     task_tracker: Arc<Mutex<TaskTracker>>,
     handler: Arc<ProofHandler>,
-    db: ProverDB,
+    db: Arc<ProofDb>,
     rpc_url: String,
     enable_dev_rpc: bool,
 ) -> anyhow::Result<()> {

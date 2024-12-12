@@ -121,12 +121,4 @@ impl ProofKey {
     pub fn host(&self) -> &ProofZkVm {
         &self.host
     }
-
-    pub fn id(&self) -> &ProofId {
-        &self.id
-    }
-
-    pub fn host(&self) -> &ProofZkVmHost {
-        &self.host
-    }
 }

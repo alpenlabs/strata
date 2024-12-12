@@ -4,7 +4,7 @@ use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_db::traits::ProofDatabase;
 use strata_primitives::{
     buf::Buf32,
-    proof::{ProofId, ProofKey, ProofZkVmHost},
+    proof::{ProofContext, ProofKey, ProofZkVm},
 };
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_rocksdb::prover::db::ProofDb;
@@ -13,7 +13,7 @@ use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
 
 use super::{evm_ee::EvmEeHandler, utils::get_pm_rollup_params, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, primitives::vms::ProofVm, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
@@ -46,6 +46,15 @@ impl ClStfHandler {
             .into();
         Ok(cl_stf_id_buf.into())
     }
+
+    pub async fn get_slot(&self, id: L2BlockId) -> Result<u64, ProvingTaskError> {
+        let header: RpcBlockHeader = self
+            .cl_client
+            .request("strata_getHeaderById", rpc_params![id])
+            .await
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+        Ok(header.block_idx)
+    }
 }
 
 impl ProvingOp for ClStfHandler {
@@ -57,8 +66,8 @@ impl ProvingOp for ClStfHandler {
         block_num: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-        hosts: &[ProofZkVmHost],
-    ) -> Result<(ProofId, Vec<ProofId>), ProvingTaskError> {
+        hosts: &[ProofZkVm],
+    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         let evm_ee_tasks = self
             .evm_ee_handler
             .create_task(block_num, task_tracker.clone(), db, hosts)
@@ -66,9 +75,9 @@ impl ProvingOp for ClStfHandler {
         let evm_ee_id = evm_ee_tasks
             .first()
             .expect("creation of task should result on at least one key")
-            .id();
+            .context();
 
-        let cl_stf_id = ProofId::ClStf(self.get_id(block_num).await?);
+        let cl_stf_id = ProofContext::ClStf(self.get_id(block_num).await?);
 
         db.put_proof_deps(cl_stf_id, vec![*evm_ee_id])
             .map_err(ProvingTaskError::DatabaseError)?;
@@ -81,10 +90,11 @@ impl ProvingOp for ClStfHandler {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<ClStfInput, ProvingTaskError> {
-        let block_num = match task_id.id() {
-            ProofId::ClStf(id) => id,
+        let block_id = match task_id.context() {
+            ProofContext::ClStf(id) => id,
             _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
         };
+        let block_num = self.get_slot(*block_id).await?;
         let raw_witness: Option<Vec<u8>> = self
             .cl_client
             .request("strata_getCLBlockWitness", rpc_params![block_num])
@@ -94,7 +104,7 @@ impl ProvingOp for ClStfHandler {
         let (pre_state, l2_block) = borsh::from_slice(&witness)?;
 
         let evm_ee_ids = db
-            .get_proof_deps(*task_id.id())
+            .get_proof_deps(*task_id.context())
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
         let evm_ee_id = evm_ee_ids
