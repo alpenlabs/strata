@@ -1,21 +1,5 @@
-use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 use sp1_verifier::{Groth16Verifier, GROTH16_VK_BYTES};
 use strata_zkvm::{Proof, ZkVmError, ZkVmResult};
-
-/// Verification Key required to verify proof generated from `ZKVMHost`
-#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub struct VerificationKey(pub Vec<u8>);
-
-impl VerificationKey {
-    pub fn new(data: Vec<u8>) -> Self {
-        Self(data)
-    }
-
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
-}
 
 pub fn verify_groth16(
     proof: &Proof,
