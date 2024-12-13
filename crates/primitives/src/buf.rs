@@ -5,7 +5,7 @@ use bitcoin::{
     secp256k1::{schnorr, SecretKey, XOnlyPublicKey},
     BlockHash, Txid, Wtxid,
 };
-use reth_primitives::revm_primitives::alloy_primitives::hex;
+use revm_primitives::alloy_primitives::hex;
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
 

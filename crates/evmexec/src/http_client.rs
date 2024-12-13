@@ -1,18 +1,16 @@
 use std::sync::Arc;
 
-use alloy_rpc_types::{
-    engine::{
-        ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
-        JwtSecret, PayloadId,
-    },
-    serde_helpers::WithOtherFields,
+use alloy_rpc_types::engine::{
+    ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
+    JwtSecret, PayloadId,
 };
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
 #[cfg(test)]
 use mockall::automock;
-use reth_primitives::{revm_primitives::alloy_primitives::BlockHash, Block};
+use reth_primitives::Block;
 use reth_rpc_api::{EngineApiClient, EthApiClient};
 use reth_rpc_layer::{AuthClientLayer, AuthClientService};
+use revm_primitives::alloy_primitives::BlockHash;
 use strata_reth_node::{
     StrataEngineTypes, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
 };
@@ -104,9 +102,10 @@ impl EngineRpc for EngineRpcClient {
 
     async fn block_by_hash(&self, block_hash: BlockHash) -> RpcResult<Option<Block>> {
         let block = <HttpClient<AuthClientService<HttpBackend>> as EthApiClient<
-            alloy_rpc_types::Transaction,
-            alloy_rpc_types::Block<WithOtherFields<alloy_rpc_types::Transaction>>,
-            alloy_rpc_types::Receipt,
+            alloy_network::AnyRpcTransaction,
+            alloy_network::AnyRpcBlock,
+            alloy_network::AnyTransactionReceipt,
+            alloy_network::AnyRpcBlock,
         >>::block_by_hash(&self.client, block_hash, true)
         .await?;
 

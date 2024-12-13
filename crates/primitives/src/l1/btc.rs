@@ -20,7 +20,7 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use rand::rngs::OsRng;
-use reth_primitives::revm_primitives::FixedBytes;
+use revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};

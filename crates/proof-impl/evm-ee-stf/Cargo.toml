@@ -17,14 +17,21 @@ alloy-rlp.workspace = true
 alloy-rlp-derive.workspace = true
 alloy-rpc-types.workspace = true
 alloy-rpc-types-eth.workspace = true
+alloy-trie.workspace = true
+
 anyhow.workspace = true
 k256 = { version = "=0.13.3", features = [
   "std",
   "ecdsa",
 ], default-features = false }
 reth-primitives = { workspace = true, features = ["serde-bincode-compat"] }
-reth-trie-common.workspace = true
+reth-primitives-traits.workspace = true
+reth-trie-common = { workspace = true, features = [
+  "serde-bincode-compat",
+  "eip1186",
+] }
 revm.workspace = true
+revm-primitives.workspace = true
 rlp = "0.5.2"
 serde.workspace = true
 serde_with.workspace = true

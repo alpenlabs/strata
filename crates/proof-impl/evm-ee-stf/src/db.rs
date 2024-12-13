@@ -21,11 +21,11 @@ use std::collections::hash_map::Entry;
 // use hashbrown::hash_map::Entry;
 use alloy_primitives::map::{DefaultHashBuilder, HashMap};
 use anyhow::{anyhow, Result};
-use reth_primitives::revm_primitives::alloy_primitives::{Address, Bytes, B256, U256};
 use revm::{
     db::{AccountState, DbAccount, InMemoryDB},
     primitives::{AccountInfo, Bytecode},
 };
+use revm_primitives::alloy_primitives::{Address, Bytes, B256, U256};
 
 use crate::{
     mpt::{keccak, StateAccount, KECCAK_EMPTY},
