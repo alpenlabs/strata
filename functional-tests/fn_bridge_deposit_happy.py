@@ -31,7 +31,6 @@ class BridgeDepositHappyTest(TestStrata):
         addr_1 = ctx.env.gen_ext_btc_address()
         addr_2 = ctx.env.gen_ext_btc_address()
         addr_3 = ctx.env.gen_ext_btc_address()
-        print(self.test)
 
         # 1st deposit
         self.test_deposit(ctx, addr_1, el_address_1)
