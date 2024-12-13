@@ -74,7 +74,7 @@ jobs:
           curl -fsSLO --proto "=https" --tlsv1.2 "https://bitcoincore.org/bin/bitcoin-core-$BITCOIND_VERSION/bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
           sha256sum -c <<< "$SHASUM bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
           tar xzf "bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
-          sudo install -m 0755 -t /usr/local/bin bitcoin-$BITCOIND_VERSION/bin/*
+          sudo install -m 0755 -t /usr/local/bin bitcoin-"$BITCOIND_VERSION"/bin/*
           bitcoind --version
           rm -rf "bitcoin-$BITCOIND_VERSION" "bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
 
@@ -116,19 +116,19 @@ jobs:
         id: funcTestsRun1
         continue-on-error: true
         run: |
-          export "PATH=$(realpath target/debug/):$PATH"
+          NEWPATH="$(realpath target/debug/)"
+          export PATH="${NEWPATH}:${PATH}"
           which strata-client
-          cd functional-tests && \
-          poetry run python entry.py
+          cd functional-tests && poetry run python entry.py
 
       # Run again just to be sure as some tests are flaky
       - name: Run functional tests (2)
         if: steps.funcTestsRun1.outcome == 'failure'
         run: |
-          export PATH="$(realpath target/debug/):$PATH"
+          NEWPATH="$(realpath target/debug/)"
+          export PATH="${NEWPATH}:${PATH}"
           which strata-client
-          cd functional-tests && \
-          poetry run python entry.py
+          cd functional-tests && poetry run python entry.py
 
   functional-tests-success:
     name: Check that all checks pass

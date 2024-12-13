@@ -50,7 +50,10 @@ jobs:
 
           {
             echo "commit_message<<EOF"
-            printf "$TITLE\n\n$cargo_update_log\n"
+            echo "$TITLE"
+            echo ""
+            echo "$cargo_update_log"
+            echo ""
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
