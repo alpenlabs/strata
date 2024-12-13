@@ -13766,8 +13766,6 @@ dependencies = [
  "reth-primitives",
  "reth-provider",
  "reth-transaction-pool",
- "reth-trie",
- "reth-trie-common",
  "reth-trie-db",
  "revm",
  "revm-primitives",
