@@ -18,4 +18,4 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Run zizmor 🌈
-        run: uvx zizmor ./.github/workflows
+        run: uvx zizmor .
