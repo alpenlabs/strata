@@ -1,4 +1,3 @@
-#![allow(dead_code)] // TODO: remove once the bridge state `sanity_check` fn is used.
 #![allow(stable_features)] // FIX: this is needed for sp1 toolchain.
 #![feature(is_sorted)]
 
