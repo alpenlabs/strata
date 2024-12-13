@@ -2,12 +2,7 @@ use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use alloy_rpc_types::engine::JwtSecret;
 use anyhow::Context;
-use bitcoin::{
-    base58,
-    bip32::{Xpriv, Xpub},
-    secp256k1::SECP256K1,
-    Address, Network,
-};
+use bitcoin::{base58, bip32::Xpriv, Address, Network};
 use format_serde_error::SerdeError;
 use rockbound::{rocksdb, OptimisticTransactionDB};
 use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
@@ -17,8 +12,10 @@ use strata_consensus_logic::{
 };
 use strata_db::{database::CommonDatabase, traits::Database};
 use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
+use strata_key_derivation::sequencer::SequencerKeys;
 use strata_primitives::{
     buf::Buf32,
+    keys::ZeroizableXpriv,
     l1::L1Status,
     params::{Params, RollupParams},
 };
@@ -31,8 +28,9 @@ use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
 use tokio::runtime::Runtime;
 use tracing::*;
+use zeroize::Zeroize;
 
-use crate::{args::Args, config::Config, errors::InitError, keyderiv, network};
+use crate::{args::Args, config::Config, errors::InitError, network};
 
 pub type CommonDb =
     CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainstateDb, RBCheckpointDB>;
@@ -184,16 +182,20 @@ pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
     let str_buf = std::str::from_utf8(&raw_buf)?;
     debug!(?path, "loading sequencer root key");
     let buf = base58::decode_check(str_buf)?;
-    let root_xpriv = Xpriv::decode(&buf)?;
+    let master_xpriv = ZeroizableXpriv::new(Xpriv::decode(&buf)?);
 
     // Actually do the key derivation from the root key and then derive the pubkey from that.
-    let seq_xpriv = keyderiv::derive_seq_xpriv(&root_xpriv)?;
-    let seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
-    let seq_xpub = Xpub::from_priv(SECP256K1, &seq_xpriv);
+    let seq_keys = SequencerKeys::new(&master_xpriv)?;
+    let seq_xpriv = seq_keys.derived_xpriv();
+    let mut seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
+    let seq_xpub = seq_keys.derived_xpub();
     let seq_pk = seq_xpub.to_x_only_pub().serialize();
 
     let ik = IdentityKey::Sequencer(seq_sk);
     let ident = Identity::Sequencer(Buf32::from(seq_pk));
+
+    // Zeroize the Buf32 representation of the Xpriv.
+    seq_sk.zeroize();
 
     // Changed this to the pubkey so that we don't just log our privkey.
     debug!(?ident, "ready to sign as sequencer");

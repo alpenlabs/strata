@@ -286,7 +286,7 @@ def generate_seed_at(path: str):
     cmd = [
         "strata-datatool",
         "-b", "regtest",
-        "genseed",
+        "genxpriv",
         "-f", path
     ]
     # fmt: on

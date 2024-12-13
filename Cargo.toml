@@ -12,6 +12,7 @@ members = [
   "crates/db",
   "crates/eectl",
   "crates/evmexec",
+  "crates/key-derivation",
   "crates/primitives",
   "crates/zkvm/adapters/risc0",
   "crates/zkvm/adapters/sp1",
@@ -84,6 +85,7 @@ strata-crypto = { path = "crates/crypto", default-features = false }
 strata-db = { path = "crates/db" }
 strata-eectl = { path = "crates/eectl" }
 strata-evmexec = { path = "crates/evmexec" }
+strata-key-derivation = { path = "crates/key-derivation" }
 strata-mmr = { path = "crates/util/mmr" }
 strata-native-zkvm-adapter = { path = "crates/zkvm/adapters/native" }
 strata-primitives = { path = "crates/primitives" }
@@ -238,6 +240,7 @@ tracing = "0.1"
 tracing-opentelemetry = "0.27"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
+zeroize = { version = "1.8.1", features = ["derive"] }
 
 # This is needed for custom build of SP1
 [profile.release.build-override]

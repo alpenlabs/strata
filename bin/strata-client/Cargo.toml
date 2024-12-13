@@ -16,6 +16,7 @@ strata-consensus-logic.workspace = true
 strata-db.workspace = true
 strata-eectl.workspace = true
 strata-evmexec.workspace = true
+strata-key-derivation.workspace = true
 strata-primitives.workspace = true
 strata-rocksdb.workspace = true
 strata-rpc-api.workspace = true
@@ -51,6 +52,7 @@ threadpool.workspace = true
 tokio.workspace = true
 toml.workspace = true
 tracing.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 arbitrary.workspace = true

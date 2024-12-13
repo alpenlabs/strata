@@ -308,7 +308,7 @@ class BridgeClientFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_operator(
         self,
-        root_xpriv: str,
+        master_xpriv: str,
         node_url: str,
         bitcoind_config: dict,
         ctx: flexitest.EnvContext,
@@ -326,7 +326,7 @@ class BridgeClientFactory(flexitest.Factory):
             "strata-bridge-client",
             "operator",
             "--datadir", datadir,
-            "--root-xpriv", root_xpriv,
+            "--master-xpriv", master_xpriv,
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
             "--btc-url", "http://" + bitcoind_config["bitcoind_sock"],
@@ -341,7 +341,7 @@ class BridgeClientFactory(flexitest.Factory):
         # TODO remove this after adding a proper config file
         # ruff: noqa: F841
         envvars = {
-            "STRATA_OP_XPRIV": root_xpriv,
+            "STRATA_OP_MASTER_XPRIV": master_xpriv,
         }
 
         props = {"id": idx, "rpc_host": rpc_host, "rpc_port": rpc_port}

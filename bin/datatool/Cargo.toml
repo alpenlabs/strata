@@ -8,6 +8,7 @@ name = "strata-datatool"
 path = "src/main.rs"
 
 [dependencies]
+strata-key-derivation.workspace = true
 strata-primitives.workspace = true
 strata-sp1-guest-builder = { path = "../../provers/sp1" }
 
@@ -20,3 +21,7 @@ rand.workspace = true
 secp256k1 = { workspace = true, features = ["global-context", "std"] }
 serde_json.workspace = true
 terrors = "0.3.0"
+zeroize = { workspace = true, optional = true }
+
+[features]
+default = ["zeroize"]

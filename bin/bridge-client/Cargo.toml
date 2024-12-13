@@ -19,6 +19,7 @@ strata-bridge-sig-manager.workspace = true
 strata-bridge-tx-builder.workspace = true
 strata-btcio.workspace = true
 strata-common.workspace = true
+strata-key-derivation.workspace = true
 strata-primitives.workspace = true
 strata-rocksdb.workspace = true
 strata-rpc-api = { workspace = true, features = ["client"] }
@@ -33,12 +34,9 @@ bitcoin.workspace = true
 chrono.workspace = true
 directories = "5.0.1"
 jsonrpsee.workspace = true
-miniscript.workspace = true
 rockbound.workspace = true
 thiserror.workspace = true
 threadpool.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-
-[dev-dependencies]
-corepc-node = { version = "0.4.0", features = ["28_0"] }
+zeroize.workspace = true

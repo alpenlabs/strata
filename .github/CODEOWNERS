@@ -23,6 +23,7 @@ tests/                 @alpenlabs/rust @alpenlabs/ci
 /crates/db/          @alpenlabs/database
 /crates/eectl/       @alpenlabs/evm
 /crates/evm*/        @alpenlabs/evm
+/crates/key-derivation/ @alpenlabs/crypto @alpenlabs/rust
 /crates/primitives/  @alpenlabs/crypto @alpenlabs/rust
 /crates/crypto/      @alpenlabs/crypto @alpenlabs/rust
 /crates/proof*/      @alpenlabs/prover
