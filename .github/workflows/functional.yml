@@ -71,12 +71,12 @@ jobs:
           BITCOIND_ARCH: "x86_64-linux-gnu"
           SHASUM: "7fe294b02b25b51acb8e8e0a0eb5af6bbafa7cd0c5b0e5fcbb61263104a82fbc"
         run: |
-          curl -fsSLO --proto "=https" --tlsv1.2 "https://bitcoincore.org/bin/bitcoin-core-${{ env.BITCOIND_VERSION }}/bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
-          sha256sum -c <<< "$SHASUM bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
-          tar xzf "bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
-          sudo install -m 0755 -t /usr/local/bin bitcoin-${{ env.BITCOIND_VERSION }}/bin/*
+          curl -fsSLO --proto "=https" --tlsv1.2 "https://bitcoincore.org/bin/bitcoin-core-$BITCOIND_VERSION/bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
+          sha256sum -c <<< "$SHASUM bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
+          tar xzf "bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
+          sudo install -m 0755 -t /usr/local/bin bitcoin-$BITCOIND_VERSION/bin/*
           bitcoind --version
-          rm -rf "bitcoin-${{ env.BITCOIND_VERSION }}" "bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
+          rm -rf "bitcoin-$BITCOIND_VERSION" "bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
 
       - name: Set up Python
         uses: actions/setup-python@v5

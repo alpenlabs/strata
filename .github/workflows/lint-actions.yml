@@ -20,5 +20,7 @@ jobs:
         run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
         shell: bash
       - name: Check workflow files
-        run: SHELLCHECK_OPTS="-S error" ${{ steps.get_actionlint.outputs.executable }} -color
+        env:
+          ACTIONLINT_VERSION: ${{ steps.get_actionlint.outputs.version }}
+        run: SHELLCHECK_OPTS="-S error" $ACTIONLINT_VERSION -color
         shell: bash
