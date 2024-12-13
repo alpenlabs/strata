@@ -77,14 +77,14 @@ fn process_l1_segment(
         let new_tip_blkid = new_tip_block.record().blkid();
         let new_tip_height = new_tip_block.idx();
 
-        // Set the new L1 height according to the new block.
-        state.set_safe_l1_tip(new_tip_height, *new_tip_blkid);
-
         // Check that the new chain is actually longer, if it's shorter then we
         // didn't do anything.
         if new_tip_height <= state.safe_l1_height() {
             return Err(TsnError::L1SegNotExtend);
         }
+
+        // Set the new L1 height according to the new block.
+        state.set_safe_l1_tip(new_tip_height, *new_tip_blkid);
 
         // TODO make sure that the block hashes all connect up sensibly.
 
