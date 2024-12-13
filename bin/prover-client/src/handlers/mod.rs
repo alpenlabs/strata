@@ -1,3 +1,18 @@
+//! A module defining traits and operations for proof generation using ZKVMs.
+//!
+//! This module provides the `ProvingOp` trait, which encapsulates the lifecycle of proof generation
+//! tasks. Each proof generation task includes fetching necessary proof dependencies, creating
+//! tasks, fetching inputs, and performing the proof computation using various supported ZKVMs.
+//!
+//! The operations are designed to interact with a `ProofDb` for storing and retrieving proofs,
+//! a `TaskTracker` for managing task dependencies, and `ProofZkVm` hosts for ZKVM-specific
+//! computations.
+//!
+//! Supported ZKVMs:
+//! - Native
+//! - SP1 (requires `sp1` feature enabled)
+//! - Risc0 (requires `risc0` feature enabled)
+
 use std::sync::Arc;
 
 use strata_db::traits::ProofDatabase;
@@ -19,13 +34,37 @@ pub mod utils;
 
 pub use handler::ProofHandler;
 
+/// Type alias for the key representing a proof generation task.
 pub type ProvingTask = ProofKey;
 
+/// A trait defining the operations required for proof generation.
+///
+/// This trait outlines the steps for proof generation tasks, including fetching proof dependencies,
+/// creating tasks, fetching inputs for the prover, and executing the proof computation using
+/// supported ZKVMs.
 pub trait ProvingOp {
+    /// The prover type associated with this operation, implementing the `ZkVmProver` trait.
     type Prover: ZkVmProver;
+
+    /// Parameters required for this operation.
+    ///
+    /// The `Params` type is designed to be easy to understand, such as a block height for Bitcoin
+    /// blockspace proofs. The `fetch_proof_context` method converts these simple parameters
+    /// into more detailed `ProofContext`, which includes all the necessary information (e.g.,
+    /// block hash) to generate proofs.
     type Params;
 
-    async fn fetch_proof_ids(
+    /// Fetches the proof contexts and their dependencies for the specified parameters.
+    ///
+    /// # Arguments
+    /// - `params`: The parameters specific to the operation.
+    /// - `task_tracker`: A shared task tracker for managing task dependencies.
+    /// - `db`: A reference to the proof database.
+    /// - `hosts`: A list of configured ZkVm hosts.
+    ///
+    /// # Returns
+    /// A tuple containing the primary `ProofContext` and a vector of dependent `ProofContext`s.
+    async fn fetch_proof_contexts(
         &self,
         params: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
@@ -33,6 +72,16 @@ pub trait ProvingOp {
         hosts: &[ProofZkVm],
     ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError>;
 
+    /// Creates proof generation tasks for the specified parameters.
+    ///
+    /// # Arguments
+    /// - `params`: The parameters specific to the operation.
+    /// - `task_tracker`: A shared task tracker for managing task dependencies.
+    /// - `db`: A reference to the proof database.
+    /// - `hosts`: A list of configured ZKVM hosts.
+    ///
+    /// # Returns
+    /// A vector of `ProofKey`s representing the created tasks.
     async fn create_task(
         &self,
         params: Self::Params,
@@ -42,7 +91,7 @@ pub trait ProvingOp {
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         // Fetch dependencies for this task
         let (proof_id, deps) = self
-            .fetch_proof_ids(params, task_tracker.clone(), db, hosts)
+            .fetch_proof_contexts(params, task_tracker.clone(), db, hosts)
             .await?;
 
         let mut task_tracker = task_tracker.lock().await;
@@ -63,12 +112,28 @@ pub trait ProvingOp {
         Ok(tasks)
     }
 
+    /// Fetches the input required for the proof computation.
+    ///
+    /// # Arguments
+    /// - `task_id`: The key representing the proof task.
+    /// - `db`: A reference to the proof database.
+    ///
+    /// # Returns
+    /// The input required by the prover for the specified task.
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<<Self::Prover as ZkVmProver>::Input, ProvingTaskError>;
 
+    /// Executes the proof computation for the specified task.
+    ///
+    /// # Arguments
+    /// - `task_id`: The key representing the proof task.
+    /// - `db`: A reference to the proof database.
+    ///
+    /// # Returns
+    /// An empty result if the proof computation is successful.
     async fn prove(&self, task_id: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
         let input = self.fetch_input(task_id, db).await?;
 

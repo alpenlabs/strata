@@ -52,7 +52,7 @@ impl ProvingOp for CheckpointHandler {
     type Prover = CheckpointProver;
     type Params = u64;
 
-    async fn fetch_proof_ids(
+    async fn fetch_proof_contexts(
         &self,
         ckp_idx: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,

@@ -36,7 +36,7 @@ impl ProvingOp for BtcBlockspaceHandler {
     type Prover = BtcBlockspaceProver;
     type Params = u64;
 
-    async fn fetch_proof_ids(
+    async fn fetch_proof_contexts(
         &self,
         block_num: u64,
         _task_tracker: Arc<Mutex<TaskTracker>>,
