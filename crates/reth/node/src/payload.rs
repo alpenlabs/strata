@@ -125,7 +125,7 @@ impl BuiltPayload for StrataBuiltPayload {
     }
 
     fn requests(&self) -> Option<Requests> {
-        None
+        self.inner.requests()
     }
 }
 

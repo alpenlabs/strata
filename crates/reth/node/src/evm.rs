@@ -4,9 +4,11 @@ use reth_chainspec::ChainSpec;
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv, NextBlockEnvAttributes};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{Header, TransactionSigned};
+use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
 use revm_primitives::{
     Address, AnalysisKind, BlockEnv, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, U256,
 };
+use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
 #[derive(Debug, Clone)]
@@ -65,6 +67,28 @@ impl ConfigureEvmEnv for StrataEvmConfig {
 
 impl ConfigureEvm for StrataEvmConfig {
     type DefaultExternalContext<'a> = ();
+
+    fn evm<DB: Database>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
+        EvmBuilder::default()
+            .with_db(db)
+            // add additional precompiles
+            .append_handler_register(set_evm_handles)
+            .build()
+    }
+
+    fn evm_with_inspector<DB, I>(&self, db: DB, inspector: I) -> Evm<'_, I, DB>
+    where
+        DB: Database,
+        I: GetInspector<DB>,
+    {
+        EvmBuilder::default()
+            .with_db(db)
+            .with_external_context(inspector)
+            // add additional precompiles
+            .append_handler_register(set_evm_handles)
+            .append_handler_register(inspector_handle_register)
+            .build()
+    }
 
     #[doc = " Provides the default external context."]
     fn default_external_context<'a>(&self) -> Self::DefaultExternalContext<'a> {

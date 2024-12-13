@@ -14,7 +14,7 @@ use reth_basic_payload_builder::*;
 use reth_chain_state::ExecutedBlock;
 use reth_chainspec::{ChainSpec, ChainSpecProvider, EthereumHardforks};
 use reth_errors::RethError;
-use reth_evm::system_calls::SystemCaller;
+use reth_evm::{system_calls::SystemCaller, ConfigureEvmEnv, NextBlockEnvAttributes};
 use reth_evm_ethereum::{eip6110::parse_deposits_from_receipts, EthEvmConfig};
 use reth_node_api::{
     ConfigureEvm, FullNodeTypes, NodeTypesWithEngine, PayloadBuilderAttributes, TxTy,
@@ -30,14 +30,13 @@ use reth_transaction_pool::{
     error::InvalidPoolTransactionError, BestTransactions, BestTransactionsAttributes,
     PoolTransaction, TransactionPool,
 };
-use reth_trie::HashedPostState;
-use reth_trie_common::KeccakKeyHasher;
 use revm::{
     db::{states::bundle_state::BundleRetention, State},
     DatabaseCommit,
 };
 use revm_primitives::{
-    calc_excess_blob_gas, EVMError, EnvWithHandlerCfg, InvalidTransaction, ResultAndState, U256,
+    calc_excess_blob_gas, BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg,
+    InvalidTransaction, ResultAndState, TxEnv, U256,
 };
 use strata_reth_evm::collect_withdrawal_intents;
 use tracing::{debug, trace, warn};
@@ -56,6 +55,24 @@ pub struct StrataPayloadBuilder {
     evm_config: StrataEvmConfig,
 }
 
+impl StrataPayloadBuilder {
+    /// Returns the configured [`CfgEnvWithHandlerCfg`] and [`BlockEnv`] for the targeted payload
+    /// (that has the `parent` as its parent).
+    pub fn cfg_and_block_env(
+        &self,
+        attributes: &StrataPayloadBuilderAttributes,
+        parent: &Header,
+    ) -> Result<(CfgEnvWithHandlerCfg, BlockEnv), <StrataEvmConfig as ConfigureEvmEnv>::Error> {
+        let next_attributes = NextBlockEnvAttributes {
+            timestamp: attributes.timestamp(),
+            suggested_fee_recipient: attributes.suggested_fee_recipient(),
+            prev_randao: attributes.prev_randao(),
+        };
+        self.evm_config
+            .next_cfg_and_block_env(parent, next_attributes)
+    }
+}
+
 impl<Pool, Client> PayloadBuilder<Pool, Client> for StrataPayloadBuilder
 where
     Client: StateProviderFactory + ChainSpecProvider<ChainSpec = ChainSpec>,
@@ -68,7 +85,11 @@ where
         &self,
         args: BuildArguments<Pool, Client, Self::Attributes, Self::BuiltPayload>,
     ) -> Result<BuildOutcome<Self::BuiltPayload>, PayloadBuilderError> {
-        try_build_payload(self.evm_config.clone(), args)
+        let (cfg_env, block_env) = self
+            .cfg_and_block_env(&args.config.attributes, &args.config.parent_header)
+            .map_err(PayloadBuilderError::other)?;
+
+        try_build_payload(self.evm_config.clone(), args, cfg_env, block_env)
     }
 
     fn build_empty_payload(
@@ -189,6 +210,8 @@ where
 pub fn try_build_payload<EvmConfig, Pool, Client>(
     evm_config: EvmConfig,
     args: BuildArguments<Pool, Client, StrataPayloadBuilderAttributes, StrataBuiltPayload>,
+    initialized_cfg: CfgEnvWithHandlerCfg,
+    initialized_block_env: BlockEnv,
 ) -> Result<BuildOutcome<StrataBuiltPayload>, PayloadBuilderError>
 where
     EvmConfig: ConfigureEvm<Header = Header, Transaction = TransactionSigned>,
@@ -204,42 +227,28 @@ where
         best_payload,
     } = args;
 
-    // convert to eth payload
-    let best_payload = best_payload.map(|p| p.inner);
-
-    let chain_spec = client.chain_spec();
-    let state_provider = client.state_by_block_hash(config.parent_header.hash())?;
-    let state = StateProviderDatabase::new(state_provider);
-    let mut db = State::builder()
-        .with_database_ref(cached_reads.as_db(state))
-        .with_bundle_update()
-        .build();
-
     let PayloadConfig {
         parent_header,
         attributes,
         extra_data,
     } = config;
 
-    debug!(target: "payload_builder", id=%attributes.payload_id(), parent_hash = ?parent_header.hash(), parent_number = parent_header.number, "building new payload");
+    // convert to eth payload
+    let best_payload = best_payload.map(|p| p.inner);
 
-    let (initialized_cfg, initialized_block_env) = evm_config
-        .next_cfg_and_block_env(
-            &parent_header,
-            reth_evm::NextBlockEnvAttributes {
-                timestamp: attributes.timestamp(),
-                suggested_fee_recipient: attributes.suggested_fee_recipient(),
-                prev_randao: attributes.prev_randao(),
-            },
-        )
-        .map_err(PayloadBuilderError::other)?;
+    let chain_spec = client.chain_spec();
+    let state_provider = client.state_by_block_hash(parent_header.hash())?;
+    let state = StateProviderDatabase::new(state_provider);
+    let mut db = State::builder()
+        .with_database(cached_reads.as_db_mut(state))
+        .with_bundle_update()
+        .build();
+
+    debug!(target: "payload_builder", id=%attributes.payload_id(), parent_hash = ?parent_header.hash(), parent_number = parent_header.number, "building new payload");
 
     let mut cumulative_gas_used = 0;
     let mut sum_blob_gas_used = 0;
-    let block_gas_limit: u64 = initialized_block_env
-        .gas_limit
-        .try_into()
-        .unwrap_or(chain_spec.max_gas_limit);
+    let block_gas_limit: u64 = initialized_block_env.gas_limit.to::<u64>();
     let base_fee = initialized_block_env.basefee.to::<u64>();
 
     let mut executed_senders = Vec::new();
@@ -285,6 +294,13 @@ where
         )
         .map_err(|err| PayloadBuilderError::Internal(err.into()))?;
 
+    let env = EnvWithHandlerCfg::new_with_cfg_env(
+        initialized_cfg.clone(),
+        initialized_block_env.clone(),
+        TxEnv::default(),
+    );
+    let mut evm = evm_config.evm_with_env(&mut db, env);
+
     let mut receipts = Vec::new();
     // let mut withdrawal_intents = Vec::new();
     while let Some(pool_tx) = best_txs.next() {
@@ -329,14 +345,8 @@ where
             }
         }
 
-        let env = EnvWithHandlerCfg::new_with_cfg_env(
-            initialized_cfg.clone(),
-            initialized_block_env.clone(),
-            evm_config.tx_env(tx.as_signed(), tx.signer()),
-        );
-
-        // Configure the environment for the block.
-        let mut evm = evm_config.evm_with_env(&mut db, env);
+        // Configure the environment for the tx.
+        *evm.tx_mut() = evm_config.tx_env(tx.as_signed(), tx.signer());
 
         let ResultAndState { result, state } = match evm.transact() {
             Ok(res) => res,
@@ -368,10 +378,8 @@ where
             }
         };
         debug!(?result, "EVM transaction executed");
-        // drop evm so db is released.
-        drop(evm);
         // commit changes
-        db.commit(state);
+        evm.db_mut().commit(state);
 
         // add to the total blob gas used if the transaction successfully executed
         if let Some(blob_tx) = tx.transaction.as_eip4844() {
@@ -409,6 +417,9 @@ where
         executed_senders.push(tx.signer());
         executed_txs.push(tx.into_signed());
     }
+
+    // drop evm so db is released.
+    drop(evm);
 
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
@@ -477,14 +488,14 @@ where
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call
-    db.merge_transitions(BundleRetention::PlainState);
+    db.merge_transitions(BundleRetention::Reverts);
     let requests_hash = requests.as_ref().map(|requests| requests.requests_hash());
 
     let execution_outcome = ExecutionOutcome::new(
         db.take_bundle(),
         vec![receipts].into(),
         block_number,
-        vec![Requests::default()],
+        vec![requests.clone().unwrap_or_default()],
     );
     let receipts_root = execution_outcome
         .receipts_root_slow(block_number)
@@ -494,12 +505,10 @@ where
         .expect("Number is in range");
 
     // calculate the state root
-    let hashed_state =
-        HashedPostState::from_bundle_state::<KeccakKeyHasher>(&execution_outcome.state().state);
+    let hashed_state = db.database.db.hashed_post_state(execution_outcome.state());
     let (state_root, trie_output) = {
-        let state_provider = db.database.0.inner.borrow_mut();
-        state_provider
-            .db
+        db.database
+            .inner()
             .state_root_with_updates(hashed_state.clone())
             .inspect_err(|err| {
                 warn!(target: "payload_builder",

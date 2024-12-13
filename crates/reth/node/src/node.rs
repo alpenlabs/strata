@@ -9,7 +9,7 @@ use reth_node_builder::{
 };
 use reth_node_ethereum::{
     node::{EthereumConsensusBuilder, EthereumNetworkBuilder, EthereumPoolBuilder},
-    BasicBlockExecutorProvider, EthExecutionStrategyFactory, EthExecutorProvider,
+    BasicBlockExecutorProvider, EthExecutionStrategyFactory,
 };
 use reth_primitives::{BlockBody, PooledTransactionsElement};
 use reth_provider::{
@@ -313,15 +313,20 @@ where
     Node: FullNodeTypes<Types: NodeTypes<ChainSpec = ChainSpec, Primitives = StrataPrimitives>>,
 {
     type EVM = StrataEvmConfig;
-    type Executor = BasicBlockExecutorProvider<EthExecutionStrategyFactory>;
+    type Executor = BasicBlockExecutorProvider<EthExecutionStrategyFactory<Self::EVM>>;
 
     async fn build_evm(
         self,
         ctx: &BuilderContext<Node>,
     ) -> eyre::Result<(Self::EVM, Self::Executor)> {
+        let evm_config = StrataEvmConfig::new(ctx.chain_spec());
+
         Ok((
-            StrataEvmConfig::new(ctx.chain_spec()),
-            EthExecutorProvider::ethereum(ctx.chain_spec()),
+            evm_config.clone(),
+            BasicBlockExecutorProvider::new(EthExecutionStrategyFactory::new(
+                ctx.chain_spec(),
+                evm_config,
+            )),
         ))
     }
 }
