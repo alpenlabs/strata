@@ -442,14 +442,23 @@ fn handle_new_state<D: Database>(
     let csm_tip = sync.chain_tip_blkid();
     debug!(?csm_tip, "got new CSM state");
 
+    // Decide if we're going to update the finalized tip first.  If it didn't
+    // change then there's no point.
+    let new_fin_tip = sync.finalized_blkid();
+    let should_update_fin_tip = match fcm_state.cur_csm_state.sync() {
+        Some(ss) => ss.finalized_blkid() != new_fin_tip,
+        None => true,
+    };
+
     // Update the new state.
     fcm_state.cur_csm_state = Arc::new(cs);
 
-    let blkid = sync.finalized_blkid();
-    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
-    info!(?blkid, "updated finalized tip");
-    trace!(?fin_report, "finalization report");
-    // TODO do something with the finalization report
+    if should_update_fin_tip {
+        let fin_report = fcm_state.chain_tracker.update_finalized_tip(new_fin_tip)?;
+        info!(blkid = ?new_fin_tip, "updated finalized tip");
+        trace!(?fin_report, "finalization report");
+        // TODO do something with the finalization report?
+    }
 
     // TODO recheck every remaining block's validity using the new state
     // starting from the bottom up, putting into a new chain tracker

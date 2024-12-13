@@ -36,7 +36,7 @@ pub fn process_event<D: Database>(
             // If the block is before the horizon we don't care about it.
             if *height < params.rollup().horizon_l1_height {
                 #[cfg(test)]
-                eprintln!("early L1 block at h={height}, you may have set up the test env wrong");
+                warn!("early L1 block at h={height}, you may have set up the test env wrong");
 
                 warn!(%height, "ignoring unexpected L1Block event before horizon");
                 return Ok(ClientUpdateOutput::new(writes, actions));
@@ -83,7 +83,7 @@ pub fn process_event<D: Database>(
                 writes.push(ClientStateWrite::AcceptL1Block(*l1blkid));
             } else {
                 #[cfg(test)]
-                eprintln!("not sure what to do here h={height} exp={next_exp_height}");
+                warn!("not sure what to do here h={height} exp={next_exp_height}");
                 return Err(Error::OutOfOrderL1Block(next_exp_height, *height, *l1blkid));
             }
 
