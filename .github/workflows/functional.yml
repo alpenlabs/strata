@@ -116,7 +116,7 @@ jobs:
         id: funcTestsRun1
         continue-on-error: true
         run: |
-          export PATH=$(realpath target/debug/):$PATH
+          export "PATH=$(realpath target/debug/):$PATH"
           which strata-client
           cd functional-tests && \
           poetry run python entry.py
@@ -125,7 +125,7 @@ jobs:
       - name: Run functional tests (2)
         if: steps.funcTestsRun1.outcome == 'failure'
         run: |
-          export PATH=$(realpath target/debug/):$PATH
+          export PATH="$(realpath target/debug/):$PATH"
           which strata-client
           cd functional-tests && \
           poetry run python entry.py

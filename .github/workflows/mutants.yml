@@ -30,7 +30,7 @@ jobs:
       - name: Relative diff
         run: |
           git branch -av
-          git diff origin/$DEFAULT_BRANCH | tee git.diff
+          git diff "origin/$DEFAULT_BRANCH" | tee git.diff
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         name: Install `cargo-mutants`
