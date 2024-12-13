@@ -86,6 +86,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
 
     /// Gets the number of elements in the cache.
     // TODO replace this with an atomic we update after every op
+    #[allow(dead_code)]
     pub fn get_len(&self) -> usize {
         let cache = self.cache.lock();
         cache.len()
@@ -98,6 +99,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
     }
 
     /// Inserts an entry into the table, dropping the previous value.
+    #[allow(dead_code)]
     pub fn insert(&self, k: K, v: V) {
         let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
         self.cache.lock().put(k, slot);
