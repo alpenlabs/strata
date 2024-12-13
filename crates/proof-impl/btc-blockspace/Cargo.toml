@@ -17,4 +17,5 @@ strata-zkvm.workspace = true
 [dev-dependencies]
 hex.workspace = true
 rand.workspace = true
+rand_core.workspace = true
 strata-test-utils.workspace = true

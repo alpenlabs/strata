@@ -12,7 +12,7 @@ borsh.workspace = true
 digest.workspace = true
 hex.workspace = true
 musig2 = { workspace = true, features = ["serde"] }
-rand = { workspace = true, optional = true }
+rand_core = { workspace = true, optional = true }
 reth-primitives.workspace = true
 secp256k1 = { workspace = true, optional = true }
 serde.workspace = true
@@ -23,10 +23,11 @@ tracing.workspace = true
 zeroize = { workspace = true, optional = true }
 
 [dev-dependencies]
+rand.workspace = true
 strata-test-utils.workspace = true
 
 [features]
 default = ["std", "rand", "zeroize"]
-rand = ["std", "dep:rand"]
+rand = ["std", "dep:rand_core"]
 std = ["dep:secp256k1"]
 zeroize = ["std", "dep:zeroize"]

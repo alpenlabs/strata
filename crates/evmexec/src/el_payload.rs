@@ -118,7 +118,7 @@ impl From<ElPayload> for ExecutionPayloadV1 {
 #[cfg(test)]
 mod tests {
     use arbitrary::{Arbitrary, Unstructured};
-    use rand::{rngs::OsRng, RngCore};
+    use rand_core::{OsRng, RngCore};
 
     use super::*;
 

@@ -5,10 +5,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use bitcoin::{
     hashes::Hash,
-    key::{
-        rand::{rngs::OsRng, RngCore},
-        Keypair, TapTweak,
-    },
+    key::{Keypair, TapTweak},
     secp256k1::{schnorr::Signature, PublicKey, SecretKey, XOnlyPublicKey},
     sighash::SighashCache,
     witness::Witness,
@@ -17,6 +14,7 @@ use bitcoin::{
 use musig2::{
     aggregate_partial_signatures, secp256k1::SECP256K1, AggNonce, KeyAggContext, SecNonce,
 };
+use rand_core::{OsRng, RngCore};
 use strata_db::entities::bridge_tx_state::BridgeTxState;
 use strata_primitives::{
     bridge::{

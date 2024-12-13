@@ -11,7 +11,8 @@ sha2.workspace = true
 
 
 [dev-dependencies]
-rand = { version = "0.8.5", features = ["getrandom", "std_rng"] }
+rand_core.workspace = true
+rand.workspace = true
 
 [features]
 default = ["rand"]

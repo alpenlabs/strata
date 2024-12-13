@@ -277,7 +277,8 @@ impl From<HexChar> for char {
 
 #[cfg(test)]
 mod tests {
-    use rand::{rngs::OsRng, Rng};
+    use rand::Rng;
+    use rand_core::OsRng;
 
     use super::*;
 

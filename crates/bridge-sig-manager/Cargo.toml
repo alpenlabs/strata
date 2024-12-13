@@ -19,6 +19,7 @@ strata-storage.workspace = true
 
 bitcoin = { workspace = true, features = ["rand-std"] }
 musig2.workspace = true
+rand_core.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 

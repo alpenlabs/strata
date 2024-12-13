@@ -184,14 +184,14 @@ mod tests {
     use bitcoin::{
         absolute::LockTime,
         consensus::Encodable,
-        key::rand::{self, Rng},
         opcodes::{OP_FALSE, OP_TRUE},
         script::Builder,
         taproot::LeafVersion,
         transaction::Version,
         ScriptBuf, Sequence, TxIn, TxOut, Witness,
     };
-    use rand::rngs::OsRng;
+    use rand::Rng;
+    use rand_core::OsRng;
     use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
     use strata_common::logging;
     use strata_db::traits::L1Database;

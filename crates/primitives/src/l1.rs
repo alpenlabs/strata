@@ -11,7 +11,7 @@ use bitcoin::{
     address::NetworkUnchecked,
     consensus::serialize,
     hashes::{sha256d, Hash},
-    key::{rand, Keypair, Parity, TapTweak},
+    key::{Keypair, Parity, TapTweak},
     secp256k1::{SecretKey, XOnlyPublicKey, SECP256K1},
     taproot::{ControlBlock, TaprootMerkleBranch},
     transaction::Version,
@@ -19,7 +19,7 @@ use bitcoin::{
     TapNodeHash, Transaction, TxIn, TxOut, Txid, Witness,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use reth_primitives::revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
@@ -941,7 +941,8 @@ mod tests {
         taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
         Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
-    use rand::{rngs::OsRng, Rng};
+    use rand::Rng;
+    use rand_core::OsRng;
     use strata_test_utils::ArbitraryGenerator;
 
     use super::{

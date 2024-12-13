@@ -4,14 +4,13 @@ use std::sync::Arc;
 
 use bitcoincore_rpc::{
     bitcoin::{
-        key::rand::{self, Rng},
+        key::rand::{rngs::OsRng, Rng},
         Network, OutPoint,
     },
     json::ScanTxOutRequest,
     Client, RpcApi,
 };
 use common::bridge::{perform_rollup_actions, perform_user_actions, setup, BridgeDuty, User};
-use rand::rngs::OsRng;
 use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, get_aggregated_pubkey, CooperativeWithdrawalInfo, SpendPath,
 };

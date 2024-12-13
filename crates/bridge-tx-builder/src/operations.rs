@@ -240,11 +240,8 @@ pub fn create_tx_outs(
 
 #[cfg(test)]
 mod tests {
-    use bitcoin::{
-        key::Keypair,
-        secp256k1::{rand, SecretKey},
-    };
-    use rand::rngs::OsRng;
+    use bitcoin::{key::Keypair, secp256k1::SecretKey};
+    use rand_core::OsRng;
 
     use super::*;
 

@@ -404,7 +404,8 @@ fn to_bridge_withdrawal_intent(
 #[cfg(test)]
 mod tests {
     use alloy_rpc_types::engine::{ExecutionPayloadV1, ForkchoiceUpdated};
-    use rand::{rngs::OsRng, Rng};
+    use rand::Rng;
+    use rand_core::OsRng;
     use reth_primitives::revm_primitives::{alloy_primitives::Bloom, Bytes, FixedBytes, U256};
     use strata_eectl::{errors::EngineResult, messages::PayloadEnv};
     use strata_primitives::buf::Buf32;

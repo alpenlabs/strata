@@ -125,7 +125,7 @@ pub fn compute_reorg(
 
 #[cfg(test)]
 mod tests {
-    use rand::{rngs::OsRng, RngCore};
+    use rand_core::{OsRng, RngCore};
     use strata_state::id::L2BlockId;
 
     use super::{compute_reorg, Reorg};

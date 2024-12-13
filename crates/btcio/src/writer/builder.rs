@@ -24,7 +24,7 @@ use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
     Witness,
 };
-use rand::{rngs::OsRng, RngCore};
+use rand_core::{OsRng, RngCore};
 use strata_state::tx::InscriptionData;
 use strata_tx_parser::inscription::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
 use thiserror::Error;

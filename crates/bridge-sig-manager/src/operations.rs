@@ -161,13 +161,12 @@ mod tests {
     use bitcoin::{
         absolute::LockTime,
         hashes::sha256d,
-        key::rand::{self, RngCore},
         secp256k1::{PublicKey, SECP256K1},
         transaction::Version,
         Amount, Network, OutPoint, Sequence, Txid, Witness,
     };
     use musig2::{PubNonce, SecNonce};
-    use rand::rngs::OsRng;
+    use rand_core::{OsRng, RngCore};
     use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
     use strata_primitives::bridge::{Musig2PartialSig, OperatorIdx};
     use strata_test_utils::bridge::{

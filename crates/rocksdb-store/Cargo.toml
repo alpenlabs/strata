@@ -24,6 +24,9 @@ tracing.workspace = true
 [dev-dependencies]
 strata-test-utils.workspace = true
 
+rand.workspace = true
+rand_core.workspace = true
+
 [features]
 default = ["test_utils"]
 test_utils = ["tempfile"]

@@ -36,5 +36,6 @@ tracing.workspace = true
 
 [dev-dependencies]
 mockall.workspace = true
+rand_core.workspace = true
 rand.workspace = true
 strata-test-utils.workspace = true

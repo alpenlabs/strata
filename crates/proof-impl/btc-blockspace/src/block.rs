@@ -129,7 +129,8 @@ pub fn check_pow(block: &Header) -> bool {
 #[cfg(test)]
 mod tests {
     use bitcoin::{hashes::Hash, TxMerkleNode, WitnessMerkleNode};
-    use rand::{rngs::OsRng, Rng};
+    use rand::Rng;
+    use rand_core::OsRng;
     use strata_state::{l1::generate_l1_tx, tx::ProtocolOperation};
     use strata_test_utils::{bitcoin::get_btc_mainnet_block, ArbitraryGenerator};
 

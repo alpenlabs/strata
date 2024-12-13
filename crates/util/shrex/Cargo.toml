@@ -17,3 +17,4 @@ axum = ["dep:axum"]
 
 [dev-dependencies]
 rand.workspace = true
+rand_core.workspace = true

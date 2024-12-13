@@ -283,7 +283,8 @@ pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &BtcParams
 #[cfg(test)]
 mod tests {
     use bitcoin::params::MAINNET;
-    use rand::{rngs::OsRng, Rng};
+    use rand::Rng;
+    use rand_core::OsRng;
     use strata_test_utils::bitcoin::get_btc_chain;
 
     use super::*;

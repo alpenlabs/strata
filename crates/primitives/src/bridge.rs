@@ -7,12 +7,12 @@ use std::{
 
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
-    key::{constants::PUBLIC_KEY_SIZE, rand},
+    key::constants::PUBLIC_KEY_SIZE,
     secp256k1::{PublicKey, SecretKey},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use musig2::{errors::KeyAggError, KeyAggContext, NonceSeed, PartialSignature, PubNonce, SecNonce};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 
 use crate::{

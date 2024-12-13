@@ -14,7 +14,8 @@ use bitcoin::{
     Address, Amount, Network, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use musig2::{KeyAggContext, SecNonce};
-use rand::{rngs::OsRng, seq::SliceRandom, RngCore};
+use rand::seq::SliceRandom;
+use rand_core::{OsRng, RngCore};
 use strata_db::stubs::bridge::StubTxStateDb;
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable, TxSigningData},

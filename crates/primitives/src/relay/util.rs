@@ -4,7 +4,7 @@ use bitcoin::secp256k1::{
     schnorr::Signature, Keypair, Message, SecretKey, XOnlyPublicKey, SECP256K1,
 };
 use borsh::BorshSerialize;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use thiserror::Error;
 
 use super::types::{BridgeMessage, Scope};
@@ -131,7 +131,7 @@ pub fn verify_bridge_msg_sig(
 
 #[cfg(test)]
 mod tests {
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;

@@ -22,3 +22,5 @@ thiserror.workspace = true
 
 [dev-dependencies]
 strata-test-utils.workspace = true
+
+rand_core.workspace = true

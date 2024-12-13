@@ -35,7 +35,8 @@ pub fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use rand::{rngs::OsRng, Rng};
+    use rand::Rng;
+    use rand_core::OsRng;
     use secp256k1::{SecretKey, SECP256K1};
     use strata_primitives::buf::Buf32;
 

@@ -20,7 +20,7 @@ bitcoin.workspace = true
 bytes.workspace = true
 hex.workspace = true
 musig2 = { workspace = true, features = ["serde"] }
-rand.workspace = true
+rand_core.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

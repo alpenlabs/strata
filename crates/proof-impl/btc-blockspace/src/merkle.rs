@@ -66,7 +66,8 @@ fn merkle_root_r(hashes: &mut [Buf32]) -> Buf32 {
 #[cfg(test)]
 mod tests {
     use bitcoin::{hashes::Hash, TxMerkleNode};
-    use rand::{rngs::OsRng, Rng};
+    use rand::Rng;
+    use rand_core::OsRng;
     use strata_primitives::buf::Buf32;
 
     use super::calculate_root;

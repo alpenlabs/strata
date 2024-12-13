@@ -91,7 +91,7 @@ mod test {
         Address, Amount, Block, BlockHash, CompactTarget, Network, ScriptBuf, TapNodeHash,
         Transaction, TxMerkleNode, TxOut,
     };
-    use rand::{rngs::OsRng, RngCore};
+    use rand_core::{OsRng, RngCore};
     use strata_btcio::test_utils::{
         build_reveal_transaction_test, generate_inscription_script_test,
     };

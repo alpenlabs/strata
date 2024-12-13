@@ -6,12 +6,11 @@
 use std::sync::Arc;
 
 use bitcoincore_rpc::bitcoin::{
-    key::rand::{self, Rng},
+    key::rand::{rngs::OsRng, Rng},
     Address, Amount, Network, OutPoint, ScriptBuf, Transaction,
 };
 use common::bridge::{setup, BridgeDuty, User, MIN_MINER_REWARD_CONFS};
 use corepc_node::BitcoinD;
-use rand::rngs::OsRng;
 use strata_bridge_tx_builder::prelude::{
     create_taproot_addr, create_tx, create_tx_ins, create_tx_outs, get_aggregated_pubkey,
     CooperativeWithdrawalInfo, SpendPath, BRIDGE_DENOMINATION,

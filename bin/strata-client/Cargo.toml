@@ -56,5 +56,7 @@ zeroize.workspace = true
 
 [dev-dependencies]
 arbitrary.workspace = true
+rand.workspace = true
+rand_core.workspace = true
 strata-mmr.workspace = true
 strata-test-utils.workspace = true
