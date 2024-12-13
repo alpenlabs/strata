@@ -6,7 +6,6 @@ use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use console::Term;
 use indicatif::ProgressBar;
-use rand::{distributions::uniform::SampleRange, rngs::OsRng};
 use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -71,15 +70,17 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         hasher
     };
     let pb = ProgressBar::new_spinner();
+    let mut counter = 0u64;
     while !pow_valid(
         prehash.clone(),
         challenge.difficulty,
         solution.to_le_bytes(),
     ) {
         solution += 1;
-        if (0..100).sample_single(&mut OsRng) == 0 {
+        if counter % 100 == 0 {
             pb.set_message(format!("Trying {solution}"));
         }
+        counter += 1;
     }
     pb.finish_with_message(format!(
         "✔ Solved challenge after {solution} attempts. Claiming now."

@@ -1,5 +1,5 @@
 use arbitrary::{Arbitrary, Unstructured};
-use rand::{rngs::OsRng, CryptoRng, RngCore};
+use rand_core::{CryptoRngCore, OsRng};
 
 pub mod bitcoin;
 pub mod bridge;
@@ -57,7 +57,7 @@ impl ArbitraryGenerator {
     /// # Arguments
     ///
     /// * `rng` - An RNG to be used for generating the arbitrary instance. Provided RNG must
-    ///   implement the [`RngCore`] and [`CryptoRng`] traits.
+    ///   implement the [`CryptoRngCore`] trait.
     ///
     /// # Returns
     ///
@@ -65,7 +65,7 @@ impl ArbitraryGenerator {
     pub fn generate_with_rng<'a, T, R>(&'a mut self, rng: &mut R) -> T
     where
         T: Arbitrary<'a> + Clone,
-        R: RngCore + CryptoRng,
+        R: CryptoRngCore,
     {
         rng.fill_bytes(&mut self.buf);
         let mut u = Unstructured::new(&self.buf);
