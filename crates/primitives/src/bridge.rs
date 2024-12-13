@@ -189,9 +189,10 @@ pub struct TxSigningData {
     pub spend_path: TaprootSpendPath,
 }
 
-/// Information regarding the signature which includes the schnorr signature itself as well as the
-/// pubkey of the signer so that the signature can be verified at the callsite (given a particular
-/// message that was signed).
+/// Information regarding the signature.
+///
+/// It includes the schnorr signature itself as well as the pubkey of the signer so that the
+/// signature can be verified at the callsite (given a particular message that was signed).
 #[derive(Debug, Clone, Copy, Arbitrary, Serialize, Deserialize)]
 pub struct OperatorPartialSig {
     /// The schnorr signature for a given message.
