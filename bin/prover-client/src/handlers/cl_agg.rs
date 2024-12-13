@@ -26,7 +26,7 @@ impl ProvingOp for ClAggHandler {
     type Prover = ClAggProver;
     type Params = (u64, u64);
 
-    async fn fetch_proof_ids(
+    async fn fetch_proof_contexts(
         &self,
         params: (u64, u64),
         task_tracker: Arc<Mutex<TaskTracker>>,

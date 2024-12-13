@@ -61,7 +61,7 @@ impl ProvingOp for ClStfHandler {
     type Prover = ClStfProver;
     type Params = u64;
 
-    async fn fetch_proof_ids(
+    async fn fetch_proof_contexts(
         &self,
         block_num: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
