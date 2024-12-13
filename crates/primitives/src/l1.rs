@@ -276,9 +276,10 @@ pub struct L1Status {
     pub published_inscription_count: u64,
 }
 
-/// A wrapper around the [`bitcoin::Address<NetworkChecked>`] type created in order to implement
-/// some useful traits on it such as [`serde::Deserialize`], [`borsh::BorshSerialize`] and
-/// [`borsh::BorshDeserialize`].
+/// A wrapper around the [`bitcoin::Address<NetworkChecked>`] type.
+///
+/// It's created in order to implement some useful traits on it such as
+/// [`serde::Deserialize`], [`borsh::BorshSerialize`] and [`borsh::BorshDeserialize`].
 // TODO: implement [`arbitrary::Arbitrary`]?
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BitcoinAddress {

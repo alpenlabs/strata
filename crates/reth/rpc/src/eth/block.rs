@@ -40,7 +40,7 @@ where
             return block
                 .body
                 .transactions()
-                .into_iter()
+                .iter()
                 .zip(receipts.iter())
                 .enumerate()
                 .map(|(idx, (tx, receipt))| {
@@ -54,7 +54,7 @@ where
                         timestamp,
                     };
 
-                    EthReceiptBuilder::new(&tx, meta, receipt, &receipts)
+                    EthReceiptBuilder::new(tx, meta, receipt, &receipts)
                         .map(|builder| builder.build())
                 })
                 .collect::<Result<Vec<_>, Self::Error>>()
