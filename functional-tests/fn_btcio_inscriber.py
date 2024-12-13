@@ -4,7 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from setup import TestStrata
+from entry import TestStrata
 from utils import generate_n_blocks, wait_until
 
 

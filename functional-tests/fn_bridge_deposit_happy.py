@@ -5,7 +5,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
 from constants import DEFAULT_ROLLUP_PARAMS
-from setup import TestStrata
+from entry import TestStrata
 from utils import get_bridge_pubkey
 
 

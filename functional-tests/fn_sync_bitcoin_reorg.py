@@ -6,8 +6,7 @@ from flexitest.service import Service
 
 import net_settings
 from constants import FAST_BATCH_ROLLUP_PARAMS
-from entry import BasicEnvConfig
-from setup import TestStrata
+from entry import BasicEnvConfig, TestStrata
 from utils import (
     ManualGenBlocksConfig,
     check_nth_checkpoint_finalized,

@@ -6,7 +6,7 @@ from web3 import Web3
 from web3._utils.events import get_event_data
 
 from constants import PRECOMPILE_BRIDGEOUT_ADDRESS
-from setup import TestStrata
+from entry import TestStrata
 
 withdrawal_intent_event_abi = {
     "anonymous": False,

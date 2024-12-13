@@ -2,7 +2,7 @@ import time
 
 import flexitest
 
-from setup import TestStrata
+from entry import TestStrata
 
 WAIT_TIME = 2
 

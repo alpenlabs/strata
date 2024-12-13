@@ -12,7 +12,7 @@ from constants import (
     DEFAULT_TAKEBACK_TIMEOUT,
     UNSPENDABLE_ADDRESS,
 )
-from setup import TestStrata
+from entry import TestStrata
 from utils import get_bridge_pubkey, wait_until
 
 # Local constants

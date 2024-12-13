@@ -4,8 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import MAX_HORIZON_POLL_INTERVAL_SECS
-from entry import BasicEnvConfig
-from setup import TestStrata
+from entry import BasicEnvConfig, TestStrata
 from utils import generate_n_blocks, wait_until
 
 

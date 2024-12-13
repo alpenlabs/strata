@@ -2,7 +2,7 @@ import time
 
 import flexitest
 
-from setup import TestStrata
+from entry import TestStrata
 
 UNSET_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 MAX_GENESIS_TRIES = 10

@@ -1,7 +1,7 @@
 import flexitest
 from web3 import Web3
 
-from setup import TestStrata
+from entry import TestStrata
 from utils import wait_until
 
 

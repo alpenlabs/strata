@@ -2,7 +2,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from setup import TestStrata
+from entry import TestStrata
 from utils import broadcast_tx, wait_until
 
 

@@ -4,7 +4,7 @@ import flexitest
 from solcx import compile_source, install_solc, set_solc_version
 from web3 import Web3
 
-from setup import TestStrata
+from entry import TestStrata
 
 
 @flexitest.register

@@ -4,8 +4,7 @@ import net_settings
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
 )
-from entry import BasicEnvConfig
-from setup import TestStrata
+from entry import BasicEnvConfig, TestStrata
 from utils import (
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,

@@ -2,7 +2,7 @@ import time
 
 import flexitest
 
-from setup import TestStrata
+from entry import TestStrata
 from utils import wait_until
 
 REORG_DEPTH = 3

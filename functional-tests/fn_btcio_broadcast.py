@@ -1,7 +1,7 @@
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-from setup import TestStrata
+from entry import TestStrata
 from utils import wait_until
 
 

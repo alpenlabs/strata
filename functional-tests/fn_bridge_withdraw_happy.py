@@ -16,7 +16,7 @@ from constants import (
     SATS_TO_WEI,
     UNSPENDABLE_ADDRESS,
 )
-from setup import TestStrata
+from entry import TestStrata
 from utils import get_bridge_pubkey, wait_until
 
 # Local constants

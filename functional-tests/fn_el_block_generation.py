@@ -2,8 +2,7 @@ from functools import partial
 
 import flexitest
 
-from entry import BasicEnvConfig
-from setup import TestStrata
+from entry import BasicEnvConfig, TestStrata
 from utils import wait_until_with_value
 
 

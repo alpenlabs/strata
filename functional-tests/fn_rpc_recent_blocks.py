@@ -2,7 +2,7 @@ import time
 
 import flexitest
 
-from setup import TestStrata
+from entry import TestStrata
 
 NUM_BLOCKS_TO_RECEIVE = 10
 BLOCK_NUMBER = 4

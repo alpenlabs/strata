@@ -1,6 +1,6 @@
 import flexitest
 
-from setup import TestStrata
+from entry import TestStrata
 
 
 @flexitest.register

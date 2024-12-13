@@ -2,7 +2,7 @@ import time
 
 import flexitest
 
-from setup import TestStrata
+from entry import TestStrata
 from utils import wait_for_proof_with_time_out
 
 
