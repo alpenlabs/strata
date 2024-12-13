@@ -4,9 +4,9 @@ pub mod eth;
 mod rpc;
 pub mod sequencer;
 
-pub use eth::StrataEthApi;
+pub use eth::{StrataEthApi, StrataNodeCore};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use reth_primitives::revm_primitives::alloy_primitives::B256;
+use revm_primitives::alloy_primitives::B256;
 pub use rpc::StrataRPC;
 pub use sequencer::SequencerClient;
 use serde::{Deserialize, Serialize};

@@ -5,5 +5,5 @@ version = "0.1.0"
 
 [dependencies]
 alloy-sol-types.workspace = true
-reth-primitives.workspace = true
+revm-primitives.workspace = true
 serde.workspace = true

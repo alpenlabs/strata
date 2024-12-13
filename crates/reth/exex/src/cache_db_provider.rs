@@ -3,12 +3,12 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use reth_primitives::revm_primitives::{
+use reth_provider::{errors::db::DatabaseError, AccountReader, ProviderError, StateProvider};
+use reth_revm::DatabaseRef;
+use revm_primitives::{
     alloy_primitives::{ruint::Uint, Address, Bytes, B256, U256},
     AccountInfo, Bytecode,
 };
-use reth_provider::{errors::db::DatabaseError, AccountReader, ProviderError, StateProvider};
-use reth_revm::DatabaseRef;
 
 /// `CacheDBProvider` implements a provider for the revm `CacheDB`.
 /// In addition it holds accessed account info, storage values, and bytecodes during

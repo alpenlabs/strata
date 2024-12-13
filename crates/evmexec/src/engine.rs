@@ -7,7 +7,7 @@ use alloy_rpc_types::{
     Withdrawal,
 };
 use futures::future::TryFutureExt;
-use reth_primitives::revm_primitives::{Address, B256};
+use revm_primitives::{Address, B256};
 use strata_eectl::{
     engine::{BlockStatus, ExecEngineCtl, PayloadStatus},
     errors::{EngineError, EngineResult},
@@ -131,6 +131,8 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             withdrawals: Some(withdrawals),
             parent_beacon_block_root: None,
             suggested_fee_recipient: COINBASE_ADDRESS,
+            max_blobs_per_block: None,
+            target_blobs_per_block: None,
         });
 
         let mut fcs = *self.fork_choice_state.lock().await;
@@ -405,7 +407,7 @@ fn to_bridge_withdrawal_intent(
 mod tests {
     use alloy_rpc_types::engine::{ExecutionPayloadV1, ForkchoiceUpdated};
     use rand::{rngs::OsRng, Rng};
-    use reth_primitives::revm_primitives::{alloy_primitives::Bloom, Bytes, FixedBytes, U256};
+    use revm_primitives::{alloy_primitives::Bloom, Bytes, FixedBytes, U256};
     use strata_eectl::{errors::EngineResult, messages::PayloadEnv};
     use strata_primitives::buf::Buf32;
     use strata_reth_node::{ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2};
