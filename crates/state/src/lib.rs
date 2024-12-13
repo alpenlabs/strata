@@ -1,5 +1,5 @@
 #![allow(stable_features)] // FIX: this is needed for sp1 toolchain.
-#![feature(is_sorted)]
+#![feature(is_sorted, is_none_or)]
 
 //! Rollup types relating to the consensus-layer state of the rollup.
 //!
