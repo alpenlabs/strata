@@ -12,6 +12,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 bitcoin.workspace = true
 lru.workspace = true
+parking_lot.workspace = true
 paste.workspace = true
 threadpool.workspace = true
 tokio.workspace = true
