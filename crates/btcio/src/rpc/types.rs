@@ -393,7 +393,7 @@ where
 {
     struct SatVisitor;
 
-    impl<'d> Visitor<'d> for SatVisitor {
+    impl Visitor<'_> for SatVisitor {
         type Value = Amount;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -418,7 +418,7 @@ where
 {
     struct SatVisitor;
 
-    impl<'d> Visitor<'d> for SatVisitor {
+    impl Visitor<'_> for SatVisitor {
         type Value = SignedAmount;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -456,7 +456,7 @@ where
 {
     struct TxidVisitor;
 
-    impl<'d> Visitor<'d> for TxidVisitor {
+    impl Visitor<'_> for TxidVisitor {
         type Value = Txid;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -482,7 +482,7 @@ where
 {
     struct TxVisitor;
 
-    impl<'d> Visitor<'d> for TxVisitor {
+    impl Visitor<'_> for TxVisitor {
         type Value = Transaction;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -512,7 +512,7 @@ where
     D: Deserializer<'d>,
 {
     struct AddressVisitor;
-    impl<'d> Visitor<'d> for AddressVisitor {
+    impl Visitor<'_> for AddressVisitor {
         type Value = Address<NetworkUnchecked>;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -539,7 +539,7 @@ where
 {
     struct BlockHashVisitor;
 
-    impl<'d> Visitor<'d> for BlockHashVisitor {
+    impl Visitor<'_> for BlockHashVisitor {
         type Value = BlockHash;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -565,7 +565,7 @@ where
 {
     struct HeightVisitor;
 
-    impl<'d> Visitor<'d> for HeightVisitor {
+    impl Visitor<'_> for HeightVisitor {
         type Value = Height;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

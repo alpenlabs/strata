@@ -4,7 +4,7 @@ use crate::env::NativeMachine;
 
 pub struct NativeMachineInputBuilder(pub NativeMachine);
 
-impl<'a> ZkVmInputBuilder<'a> for NativeMachineInputBuilder {
+impl ZkVmInputBuilder<'_> for NativeMachineInputBuilder {
     type Input = NativeMachine;
 
     fn new() -> NativeMachineInputBuilder {

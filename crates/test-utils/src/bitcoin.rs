@@ -65,7 +65,7 @@ impl BtcChainSegment {
     }
 
     pub fn get_block(&self, height: u32) -> &Block {
-        return self.custom_blocks.get(&height).unwrap();
+        self.custom_blocks.get(&height).unwrap()
     }
 
     /// Retrieves the timestamps of a specified number of blocks from a given height in a
