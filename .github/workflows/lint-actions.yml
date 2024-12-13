@@ -15,12 +15,4 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Download actionlint
-        id: get_actionlint
-        run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-        shell: bash
-      - name: Check workflow files
-        env:
-          ACTIONLINT_VERSION: ${{ steps.get_actionlint.outputs.version }}
-        run: SHELLCHECK_OPTS="-S error" $ACTIONLINT_VERSION -color
-        shell: bash
+      - uses: reviewdog/action-actionlint@v1
