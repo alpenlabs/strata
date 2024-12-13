@@ -30,6 +30,11 @@ macro_rules! define_byte_wrapper {
                 &self.0
             }
 
+            /// Consumes the wrapper and returns the inner `Vec<u8>`.
+            pub fn into_inner(self) -> Vec<u8> {
+                self.0
+            }
+
             /// Checks if the byte vector is empty.
             pub fn is_empty(&self) -> bool {
                 self.0.is_empty()
@@ -45,6 +50,12 @@ macro_rules! define_byte_wrapper {
         impl From<&$name> for Vec<u8> {
             fn from(value: &$name) -> Self {
                 value.0.clone()
+            }
+        }
+
+        impl From<&[u8]> for $name {
+            fn from(value: &[u8]) -> Self {
+                Self(value.to_vec())
             }
         }
     };
