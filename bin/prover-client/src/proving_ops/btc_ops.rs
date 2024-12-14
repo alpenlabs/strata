@@ -13,7 +13,6 @@ use strata_primitives::{
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     proof::RollupVerifyingKey,
 };
-use strata_proofimpl_btc_blockspace::logic::BlockspaceProofInput;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -39,7 +38,6 @@ impl BtcOperations {
 
 #[derive(Debug, Clone)]
 pub struct L1BlockscanInput {
-    pub btc_block_range: (u64, u64),
     pub blocks: Vec<Block>,
     pub rollup_params: RollupParams,
 }
@@ -64,7 +62,6 @@ impl ProvingOperations for BtcOperations {
         debug!("Fetched BTC block {:?}", block_range);
         Ok(L1BlockscanInput {
             blocks,
-            btc_block_range: block_range,
             rollup_params: get_pm_rollup_params(),
         })
     }
