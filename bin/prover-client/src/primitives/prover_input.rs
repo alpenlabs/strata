@@ -1,6 +1,4 @@
-use bitcoin::Block;
 use serde::{Deserialize, Serialize};
-use strata_primitives::params::RollupParams;
 use strata_zkvm::AggregationInput;
 
 use super::vms::ProofVm;

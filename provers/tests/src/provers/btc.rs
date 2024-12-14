@@ -16,11 +16,12 @@ impl<H: ZkVmHost> BtcBlockProofGenerator<H> {
 }
 
 impl<H: ZkVmHost> ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator<H> {
-    fn get_input(&self, block: &Block) -> ZkVmResult<BlockspaceProofInput> {
+    fn get_input(&self, _block: &Block) -> ZkVmResult<BlockspaceProofInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
         let input = BlockspaceProofInput {
-            block: block.clone(),
+            num_blocks: 0,
+            serialized_blocks: vec![],
             rollup_params: rollup_params.clone(),
         };
         Ok(input)
