@@ -1,4 +1,3 @@
-use bitcoin::consensus::serialize;
 use strata_zkvm::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };
@@ -20,13 +19,15 @@ impl ZkVmProver for BtcBlockspaceProver {
     where
         B: ZkVmInputBuilder<'a>,
     {
-        let serialized_block = serialize(&input.block);
-        let zkvm_input = B::new()
-            .write_serde(&input.rollup_params)?
-            .write_buf(&serialized_block)?
-            .build()?;
+        let mut input_builder = B::new();
+        input_builder.write_serde(&input.rollup_params)?;
+        input_builder.write_serde(&input.num_blocks)?;
 
-        Ok(zkvm_input)
+        for ser_block in &input.serialized_blocks {
+            input_builder.write_buf(ser_block)?;
+        }
+
+        input_builder.build()
     }
 
     fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>
