@@ -128,18 +128,22 @@ where
             (input_builder.build()?, ProofType::Compressed)
         }
 
-        ZkVmInput::ClBlock(cl_proof_input) => (
-            Vm::Input::new()
-                .write_serde(&get_pm_rollup_params())?
-                .write_buf(&cl_proof_input.cl_raw_witness)?
-                .write_proof(
-                    &cl_proof_input
-                        .el_proof
-                        .expect("CL Proving was sent without EL proof"),
-                )?
-                .build()?,
-            ProofType::Compressed,
-        ),
+        ZkVmInput::ClBlock(cl_proof_input) => {
+            let mut input_builder = Vm::Input::new();
+            input_builder.write_serde(&get_pm_rollup_params())?;
+            input_builder.write_proof(
+                &cl_proof_input
+                    .ee_proof
+                    .expect("CL Proving was sent without EL proof"),
+            )?;
+
+            input_builder.write_serde(&cl_proof_input.raw_witness.len())?;
+            for cl_stf_input in cl_proof_input.raw_witness {
+                input_builder.write_buf(&cl_stf_input)?;
+            }
+
+            (input_builder.build()?, ProofType::Compressed)
+        }
 
         ZkVmInput::L2Batch(l2_batch_input) => {
             let mut input_builder = Vm::Input::new();

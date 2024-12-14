@@ -118,8 +118,8 @@ fn process_cl_stf(
 
 pub fn batch_process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
     let rollup_params: RollupParams = zkvm.read_serde();
-    let num_blocks: u32 = zkvm.read_serde();
     let exec_updates: Vec<ExecSegment> = zkvm.read_verified_borsh(el_vkey);
+    let num_blocks: u32 = zkvm.read_serde();
 
     assert!(num_blocks > 0, "At least one block is required.");
     assert_eq!(

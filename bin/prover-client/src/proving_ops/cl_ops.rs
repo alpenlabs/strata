@@ -33,33 +33,39 @@ impl ClOperations {
 
 #[derive(Debug, Clone)]
 pub struct CLProverInput {
-    pub block_num: u64,
-    pub cl_raw_witness: Vec<u8>,
-    pub el_proof: Option<ProofWithVkey>,
+    pub blocks: (u64, u64),
+    pub raw_witness: Vec<Vec<u8>>,
+    pub ee_proof: Option<ProofWithVkey>,
 }
 
 #[async_trait]
 impl ProvingOperations for ClOperations {
     type Input = CLProverInput;
-    type Params = u64;
+    type Params = (u64, u64);
 
     fn proving_task_type(&self) -> ProvingTaskType {
         ProvingTaskType::CL
     }
 
-    async fn fetch_input(&self, block_num: Self::Params) -> Result<Self::Input, anyhow::Error> {
-        debug!(%block_num, "Fetching CL block input");
-        let witness: Option<Vec<u8>> = self
-            .cl_client
-            .request("strata_getCLBlockWitness", rpc_params![block_num])
-            .await
-            .unwrap();
-        let cl_raw_witness = witness.context("Failed to get the CL witness")?;
+    async fn fetch_input(&self, block_range: Self::Params) -> Result<Self::Input, anyhow::Error> {
+        let (start_block_num, end_block_num) = block_range;
+        let mut cl_proof_inputs: Vec<Vec<u8>> = Vec::new();
 
+        for block_num in start_block_num..=end_block_num {
+            let witness: Option<Vec<u8>> = self
+                .cl_client
+                .request("strata_getCLBlockWitness", rpc_params![block_num])
+                .await
+                .unwrap();
+            let cl_raw_witness = witness.context("Failed to get the CL witness")?;
+            cl_proof_inputs.push(cl_raw_witness);
+        }
+
+        debug!("Fetched CL block witness for block {:?}", block_range);
         Ok(CLProverInput {
-            block_num,
-            cl_raw_witness,
-            el_proof: None,
+            blocks: block_range,
+            raw_witness: cl_proof_inputs,
+            ee_proof: None,
         })
     }
 
@@ -69,9 +75,7 @@ impl ProvingOperations for ClOperations {
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
         // Create proving task for the corresponding EL block
-        let el_block_range = (input.block_num, input.block_num);
-        let el_task_id = self.el_dispatcher.create_task(el_block_range).await?;
-
+        let el_task_id = self.el_dispatcher.create_task(input.blocks).await?;
         let prover_input = ZkVmInput::ClBlock(input);
 
         let task_id = task_tracker
