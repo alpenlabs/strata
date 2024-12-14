@@ -13,6 +13,7 @@ use strata_primitives::{
     params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     proof::RollupVerifyingKey,
 };
+use strata_proofimpl_btc_blockspace::logic::BlockspaceProofInput;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -36,20 +37,36 @@ impl BtcOperations {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct L1BlockscanInput {
+    pub btc_block_range: (u64, u64),
+    pub blocks: Vec<Block>,
+    pub rollup_params: RollupParams,
+}
+
 #[async_trait]
 impl ProvingOperations for BtcOperations {
-    type Input = (Block, RollupParams);
-    type Params = u64; // params is the block height
+    type Input = L1BlockscanInput;
+    type Params = (u64, u64);
 
     fn proving_task_type(&self) -> ProvingTaskType {
         ProvingTaskType::Btc
     }
 
-    async fn fetch_input(&self, block_num: Self::Params) -> Result<Self::Input, anyhow::Error> {
-        debug!(%block_num, "Fetching BTC block input");
-        let block = self.btc_client.get_block_at(block_num).await?;
-        debug!("Fetched BTC block {}", block_num);
-        Ok((block, get_pm_rollup_params()))
+    async fn fetch_input(&self, block_range: Self::Params) -> Result<Self::Input, anyhow::Error> {
+        let (start_block, end_block) = block_range;
+        let mut blocks = Vec::new();
+
+        for block_num in start_block..end_block {
+            let block = self.btc_client.get_block_at(block_num).await?;
+            blocks.push(block);
+        }
+        debug!("Fetched BTC block {:?}", block_range);
+        Ok(L1BlockscanInput {
+            blocks,
+            btc_block_range: block_range,
+            rollup_params: get_pm_rollup_params(),
+        })
     }
 
     async fn append_task(
@@ -57,8 +74,7 @@ impl ProvingOperations for BtcOperations {
         task_tracker: Arc<TaskTracker>,
         input: Self::Input,
     ) -> Result<Uuid, ProvingTaskError> {
-        let (block, rollup_params) = input;
-        let prover_input = ZkVmInput::BtcBlock(block, rollup_params);
+        let prover_input = ZkVmInput::BtcBlock(input);
         let task_id = task_tracker.create_task(prover_input, vec![]).await;
         Ok(task_id)
     }

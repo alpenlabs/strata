@@ -102,7 +102,7 @@ impl ProvingOperations for L1BatchOperations {
         for btc_block_idx in start..=end {
             let btc_task_id = self
                 .btc_dispatcher
-                .create_task(btc_block_idx)
+                .create_task((btc_block_idx, btc_block_idx))
                 .await
                 .map_err(|e| ProvingTaskError::DependencyTaskCreation(e.to_string()))?;
             dependencies.push(btc_task_id);
