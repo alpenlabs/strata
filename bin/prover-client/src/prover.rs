@@ -105,13 +105,18 @@ where
             )
         }
 
-        ZkVmInput::BtcBlock(block, rollup_params) => (
-            Vm::Input::new()
-                .write_serde(&rollup_params)?
-                .write_buf(&bitcoin::consensus::serialize(&block))?
-                .build()?,
-            ProofType::Compressed,
-        ),
+        ZkVmInput::BtcBlock(l1scan_input) => {
+            let mut input_builder = Vm::Input::new();
+            input_builder.write_serde(&l1scan_input.rollup_params)?;
+            input_builder.write_serde(&l1scan_input.blocks.len())?;
+
+            // Write each proof input
+            for block in l1scan_input.blocks {
+                input_builder.write_buf(&bitcoin::consensus::serialize(&block))?;
+            }
+
+            (input_builder.build()?, ProofType::Compressed)
+        }
 
         ZkVmInput::L1Batch(l1_batch_input) => {
             let mut input_builder = Vm::Input::new();

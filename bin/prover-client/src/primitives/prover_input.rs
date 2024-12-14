@@ -5,15 +5,15 @@ use strata_zkvm::AggregationInput;
 
 use super::vms::ProofVm;
 use crate::proving_ops::{
-    checkpoint_ops::CheckpointInput, cl_ops::CLProverInput, l1_batch_ops::L1BatchInput,
-    l2_batch_ops::L2BatchInput,
+    btc_ops::L1BlockscanInput, checkpoint_ops::CheckpointInput, cl_ops::CLProverInput,
+    l1_batch_ops::L1BatchInput, l2_batch_ops::L2BatchInput,
 };
 
 pub type ProofWithVkey = AggregationInput;
 
 #[derive(Debug, Clone)]
 pub enum ZkVmInput {
-    BtcBlock(Block, RollupParams),
+    BtcBlock(L1BlockscanInput),
     ElBlock(WitnessData),
     ClBlock(CLProverInput),
     L1Batch(L1BatchInput),
@@ -24,7 +24,7 @@ pub enum ZkVmInput {
 impl ZkVmInput {
     pub fn proof_vm_id(&self) -> ProofVm {
         match self {
-            ZkVmInput::BtcBlock(_, _) => ProofVm::BtcProving,
+            ZkVmInput::BtcBlock(_) => ProofVm::BtcProving,
             ZkVmInput::ElBlock(_) => ProofVm::ELProving,
             ZkVmInput::ClBlock(_) => ProofVm::CLProving,
             ZkVmInput::L1Batch(_) => ProofVm::L1Batch,
