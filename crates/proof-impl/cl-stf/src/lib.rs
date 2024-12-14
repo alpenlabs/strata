@@ -84,23 +84,16 @@ fn apply_state_transition(
     state_cache.state().to_owned()
 }
 
-pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
-    let rollup_params: RollupParams = zkvm.read_serde();
-    let (prev_state, block): (Chainstate, L2Block) = zkvm.read_borsh();
-    let el_pp_deserialized: Vec<ExecSegment> = zkvm.read_verified_borsh(el_vkey);
-
-    // The CL block currently includes only a single ExecSegment
-    assert_eq!(
-        el_pp_deserialized.len(),
-        1,
-        "execsegment: expected exactly one"
-    );
-
-    let exec_update = el_pp_deserialized
-        .first()
-        .expect("execsegment: failed to fetch the first");
-
-    let new_state = verify_and_transition(prev_state.clone(), block, exec_update, &rollup_params);
+#[inline]
+fn process_cl_stf(
+    prev_state: Chainstate,
+    new_block: L2Block,
+    exec_update: &ExecSegment,
+    rollup_params: &RollupParams,
+    rollup_params_commitment: &Buf32,
+) -> L2BatchProofOutput {
+    let new_state =
+        verify_and_transition(prev_state.clone(), new_block, exec_update, rollup_params);
 
     let initial_snapshot = ChainStateSnapshot {
         hash: prev_state.compute_state_root(),
@@ -114,13 +107,65 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
         l2_blockid: new_state.chain_tip_blockid(),
     };
 
-    let cl_stf_public_params = L2BatchProofOutput {
+    L2BatchProofOutput {
         // TODO: Accumulate the deposits
         deposits: Vec::new(),
-        final_snapshot,
         initial_snapshot,
-        rollup_params_commitment: rollup_params.compute_hash(),
+        final_snapshot,
+        rollup_params_commitment: *rollup_params_commitment,
+    }
+}
+
+pub fn batch_process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
+    let rollup_params: RollupParams = zkvm.read_serde();
+    let num_blocks: u32 = zkvm.read_serde();
+    let exec_updates: Vec<ExecSegment> = zkvm.read_verified_borsh(el_vkey);
+
+    assert!(num_blocks > 0, "At least one block is required.");
+    assert_eq!(
+        num_blocks as usize,
+        exec_updates.len(),
+        "Number of blocks and execution updates differ."
+    );
+
+    let (prev_state, new_block): (Chainstate, L2Block) = zkvm.read_borsh();
+    let rollup_params_commitment = rollup_params.compute_hash();
+    let initial_cl_update = process_cl_stf(
+        prev_state,
+        new_block,
+        &exec_updates[0],
+        &rollup_params,
+        &rollup_params_commitment,
+    );
+
+    let mut deposits = initial_cl_update.deposits.clone();
+    let mut cl_update_acc = initial_cl_update.clone();
+
+    for exec_update in &exec_updates[1..] {
+        let (prev_state, new_block): (Chainstate, L2Block) = zkvm.read_borsh();
+        let cl_update = process_cl_stf(
+            prev_state,
+            new_block,
+            exec_update,
+            &rollup_params,
+            &rollup_params_commitment,
+        );
+
+        assert_eq!(
+            cl_update.initial_snapshot.hash, cl_update_acc.final_snapshot.hash,
+            "Snapshot hash mismatch between consecutive updates."
+        );
+
+        deposits.extend_from_slice(&cl_update.deposits);
+        cl_update_acc = cl_update;
+    }
+
+    let output = L2BatchProofOutput {
+        deposits,
+        initial_snapshot: initial_cl_update.initial_snapshot,
+        final_snapshot: cl_update_acc.final_snapshot,
+        rollup_params_commitment: cl_update_acc.rollup_params_commitment,
     };
 
-    zkvm.commit_borsh(&cl_stf_public_params);
+    zkvm.commit_borsh(&output);
 }
