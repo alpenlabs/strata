@@ -41,6 +41,20 @@ pub struct Args {
     #[argh(option, description = "bitcoind RPC password")]
     pub bitcoind_password: String,
 
+    #[argh(
+        option,
+        description = "number of prover workers to spawn",
+        default = "64"
+    )]
+    pub workers: usize,
+
+    #[argh(
+        option,
+        description = "wait time in seconds for the prover manager loop",
+        default = "2"
+    )]
+    pub loop_interval: u64,
+
     #[argh(option, description = "enable prover client dev rpc", default = "true")]
     pub enable_dev_rpcs: bool,
 }

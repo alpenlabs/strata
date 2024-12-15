@@ -6,8 +6,7 @@ use tokio::{sync::Mutex, time::sleep};
 use tracing::error;
 
 use crate::{
-    config::PROVER_MANAGER_INTERVAL, errors::ProvingTaskError, handlers::ProofHandler,
-    status::ProvingTaskStatus, task::TaskTracker,
+    errors::ProvingTaskError, handlers::ProofHandler, status::ProvingTaskStatus, task::TaskTracker,
 };
 
 #[derive(Debug, Clone)]
@@ -16,6 +15,7 @@ pub struct ProverManager {
     handler: Arc<ProofHandler>,
     db: Arc<ProofDb>,
     workers: usize,
+    loop_interval: u64,
 }
 
 impl ProverManager {
@@ -24,12 +24,14 @@ impl ProverManager {
         handler: Arc<ProofHandler>,
         db: Arc<ProofDb>,
         workers: usize,
+        loop_interval: u64,
     ) -> Self {
         Self {
             task_tracker,
             handler,
             db,
             workers,
+            loop_interval,
         }
     }
 
@@ -57,7 +59,7 @@ impl ProverManager {
                 tokio::spawn(async move { make_proof(handler, task_tracker, task, db).await });
             }
 
-            sleep(Duration::from_secs(PROVER_MANAGER_INTERVAL)).await;
+            sleep(Duration::from_secs(self.loop_interval)).await;
         }
     }
 }
