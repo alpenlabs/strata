@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use args::Args;
-use config::NUM_PROVER_WORKERS;
 use db::open_rocksdb_database;
 use handlers::ProofHandler;
 use jsonrpsee::http_client::HttpClientBuilder;
@@ -17,7 +16,6 @@ use tokio::sync::Mutex;
 use tracing::{debug, info};
 
 mod args;
-mod config;
 mod db;
 mod errors;
 mod handlers;
@@ -63,7 +61,8 @@ async fn main() {
         task_tracker.clone(),
         handler.clone(),
         db.clone(),
-        NUM_PROVER_WORKERS,
+        args.workers,
+        args.loop_interval,
     );
     debug!("Initialized Prover Manager");
 
