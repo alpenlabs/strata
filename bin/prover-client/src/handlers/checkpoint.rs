@@ -52,12 +52,12 @@ impl ProvingOp for CheckpointHandler {
     type Prover = CheckpointProver;
     type Params = u64;
 
-    async fn fetch_proof_contexts(
+    async fn create_task(
         &self,
         ckp_idx: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let checkpoint_info = self.fetch_info(ckp_idx).await?;
 
         let ckp_proof_id = ProofContext::Checkpoint(ckp_idx);
@@ -79,7 +79,8 @@ impl ProvingOp for CheckpointHandler {
         db.put_proof_deps(ckp_proof_id, deps.clone())
             .map_err(ProvingTaskError::DatabaseError)?;
 
-        Ok((ckp_proof_id, deps))
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.create_tasks(ckp_proof_id, deps)
     }
 
     async fn fetch_input(

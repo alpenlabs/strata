@@ -26,12 +26,12 @@ impl ProvingOp for ClAggHandler {
     type Prover = ClAggProver;
     type Params = (u64, u64);
 
-    async fn fetch_proof_contexts(
+    async fn create_task(
         &self,
         params: (u64, u64),
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let (start_height, end_height) = params;
 
         let len = (end_height - start_height) as usize + 1;
@@ -53,7 +53,8 @@ impl ProvingOp for ClAggHandler {
         db.put_proof_deps(cl_agg_proof_id, cl_stf_deps.clone())
             .map_err(ProvingTaskError::DatabaseError)?;
 
-        Ok((cl_agg_proof_id, cl_stf_deps))
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.create_tasks(cl_agg_proof_id, cl_stf_deps)
     }
 
     async fn fetch_input(

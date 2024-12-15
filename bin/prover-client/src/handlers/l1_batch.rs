@@ -39,12 +39,12 @@ impl ProvingOp for L1BatchHandler {
     type Prover = L1BatchProver;
     type Params = (u64, u64);
 
-    async fn fetch_proof_contexts(
+    async fn create_task(
         &self,
         params: (u64, u64),
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let (start_height, end_height) = params;
 
         let len = (end_height - start_height) as usize + 1;
@@ -66,7 +66,8 @@ impl ProvingOp for L1BatchHandler {
         db.put_proof_deps(l1_batch_proof_id, btc_deps.clone())
             .map_err(ProvingTaskError::DatabaseError)?;
 
-        Ok((l1_batch_proof_id, btc_deps))
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.create_tasks(l1_batch_proof_id, btc_deps)
     }
 
     async fn fetch_input(

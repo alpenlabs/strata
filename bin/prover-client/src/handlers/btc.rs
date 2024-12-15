@@ -36,16 +36,15 @@ impl ProvingOp for BtcBlockspaceHandler {
     type Prover = BtcBlockspaceProver;
     type Params = u64;
 
-    async fn fetch_proof_contexts(
+    async fn create_task(
         &self,
         block_num: u64,
-        _task_tracker: Arc<Mutex<TaskTracker>>,
+        task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
-    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
-        Ok((
-            ProofContext::BtcBlockspace(self.get_id(block_num).await?),
-            vec![],
-        ))
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        let context = ProofContext::BtcBlockspace(self.get_id(block_num).await?);
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.create_tasks(context, vec![])
     }
 
     async fn fetch_input(
