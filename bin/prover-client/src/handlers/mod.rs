@@ -35,9 +35,6 @@ pub mod utils;
 
 pub use handler::ProofHandler;
 
-/// Type alias for the key representing a proof generation task.
-pub type ProvingTask = ProofKey;
-
 /// A trait defining the operations required for proof generation.
 ///
 /// This trait outlines the steps for proof generation tasks, including fetching proof dependencies,
@@ -61,7 +58,6 @@ pub trait ProvingOp {
     /// - `params`: The parameters specific to the operation.
     /// - `task_tracker`: A shared task tracker for managing task dependencies.
     /// - `db`: A reference to the proof database.
-    /// - `hosts`: A list of configured ZkVm hosts.
     ///
     /// # Returns
     /// A tuple containing the primary `ProofContext` and a vector of dependent `ProofContext`s.
@@ -70,7 +66,6 @@ pub trait ProvingOp {
         params: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-        hosts: &[ProofZkVm],
     ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError>;
 
     /// Creates proof generation tasks for the specified parameters.
@@ -79,7 +74,6 @@ pub trait ProvingOp {
     /// - `params`: The parameters specific to the operation.
     /// - `task_tracker`: A shared task tracker for managing task dependencies.
     /// - `db`: A reference to the proof database.
-    /// - `hosts`: A list of configured ZKVM hosts.
     ///
     /// # Returns
     /// A vector of `ProofKey`s representing the created tasks.
@@ -88,29 +82,16 @@ pub trait ProvingOp {
         params: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-        hosts: &[ProofZkVm],
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         // Fetch dependencies for this task
         let (proof_id, deps) = self
-            .fetch_proof_contexts(params, task_tracker.clone(), db, hosts)
+            .fetch_proof_contexts(params, task_tracker.clone(), db)
             .await?;
         info!(?proof_id, "Creating proof task");
         info!(?deps, "With dependencies");
 
         let mut task_tracker = task_tracker.lock().await;
-
-        let mut tasks = Vec::with_capacity(hosts.len());
-
-        // Insert tasks for each configured host
-        for host in hosts {
-            let task = ProvingTask::new(proof_id, *host);
-            let dep_tasks = deps
-                .iter()
-                .map(|&dep| ProvingTask::new(dep, *host))
-                .collect();
-            task_tracker.insert_task(task, dep_tasks)?;
-            tasks.push(task);
-        }
+        let tasks = task_tracker.create_tasks(proof_id, deps)?;
 
         Ok(tasks)
     }

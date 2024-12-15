@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
-use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
+use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_state::l1::L1BlockId;
@@ -41,7 +41,6 @@ impl ProvingOp for BtcBlockspaceHandler {
         block_num: u64,
         _task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
-        _hosts: &[ProofZkVm],
     ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         Ok((
             ProofContext::BtcBlockspace(self.get_id(block_num).await?),

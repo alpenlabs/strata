@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
+use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcCheckpointInfo;
@@ -57,7 +57,6 @@ impl ProvingOp for CheckpointHandler {
         ckp_idx: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-        hosts: &[ProofZkVm],
     ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         let checkpoint_info = self.fetch_info(ckp_idx).await?;
 
@@ -65,13 +64,13 @@ impl ProvingOp for CheckpointHandler {
 
         let l1_batch_keys = self
             .l1_batch_dispatcher
-            .create_task(checkpoint_info.l1_range, task_tracker.clone(), db, hosts)
+            .create_task(checkpoint_info.l1_range, task_tracker.clone(), db)
             .await?;
         let l1_batch_id = l1_batch_keys.first().expect("at least one").context();
 
         let l2_batch_keys = self
             .l2_batch_dispatcher
-            .create_task(checkpoint_info.l2_range, task_tracker.clone(), db, hosts)
+            .create_task(checkpoint_info.l2_range, task_tracker.clone(), db)
             .await?;
         let l2_batch_id = l2_batch_keys.first().expect("at least one").context();
 

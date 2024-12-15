@@ -4,7 +4,7 @@ use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_db::traits::ProofDatabase;
 use strata_primitives::{
     buf::Buf32,
-    proof::{ProofContext, ProofKey, ProofZkVm},
+    proof::{ProofContext, ProofKey},
 };
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_rocksdb::prover::db::ProofDb;
@@ -66,11 +66,10 @@ impl ProvingOp for ClStfHandler {
         block_num: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-        hosts: &[ProofZkVm],
     ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         let evm_ee_tasks = self
             .evm_ee_handler
-            .create_task(block_num, task_tracker.clone(), db, hosts)
+            .create_task(block_num, task_tracker.clone(), db)
             .await?;
         let evm_ee_id = evm_ee_tasks
             .first()
