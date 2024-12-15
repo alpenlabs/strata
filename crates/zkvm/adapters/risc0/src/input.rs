@@ -1,12 +1,15 @@
-use risc0_zkvm::{sha::Digest, ExecutorEnv, ExecutorEnvBuilder, InnerReceipt, Receipt};
+use risc0_zkvm::{sha::Digest, ExecutorEnv, ExecutorEnvBuilder};
 use strata_zkvm::{
     AggregationInput, SerializationErrorSource, ZkVmError, ZkVmInputBuilder, ZkVmResult,
 };
+
+use crate::proof::Risc0ProofReceipt;
 
 pub struct Risc0ProofInputBuilder<'a>(ExecutorEnvBuilder<'a>);
 
 impl<'a> ZkVmInputBuilder<'a> for Risc0ProofInputBuilder<'a> {
     type Input = ExecutorEnv<'a>;
+    type ProofImpl = Risc0ProofReceipt;
 
     fn new() -> Self {
         let env_builder = ExecutorEnv::builder();
@@ -40,8 +43,7 @@ impl<'a> ZkVmInputBuilder<'a> for Risc0ProofInputBuilder<'a> {
 
     fn write_proof(&mut self, item: &AggregationInput) -> ZkVmResult<&mut Self> {
         // Learn more about assumption and proof compositions at https://dev.risczero.com/api/zkvm/composition
-        let journal = item.receipt().public_values().as_bytes().to_vec();
-        let inner: InnerReceipt = bincode::deserialize(item.receipt().public_values().as_bytes())?;
+        let receipt: Risc0ProofReceipt = item.receipt().into();
         let vk: Digest = item
             .vk()
             .as_bytes()
@@ -51,16 +53,14 @@ impl<'a> ZkVmInputBuilder<'a> for Risc0ProofInputBuilder<'a> {
         // Write the verification key of the program that'll be proven in the guest.
         // Note: The vkey is written here so we don't have to hardcode it in guest code.
         // TODO: This should be fixed once the guest code is finalized
-        self.write_buf(&journal)?;
+        self.write_buf(&receipt.as_ref().journal.bytes)?;
         self.0
             .write(&vk)
             .map_err(|e| ZkVmError::SerializationError {
                 source: SerializationErrorSource::Serde(e.to_string()),
             })?;
 
-        // `add_assumption` makes the receipt to be verified available to the prover.
-        let receipt = Receipt::new(inner, journal);
-        self.0.add_assumption(receipt);
+        self.0.add_assumption(receipt.inner());
 
         Ok(self)
     }

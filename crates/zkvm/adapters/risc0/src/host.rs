@@ -1,16 +1,13 @@
 use std::fmt;
 
 use hex::encode;
-use risc0_zkvm::{
-    compute_image_id, default_prover, sha::Digest, InnerReceipt, Journal, ProverOpts, Receipt,
-};
+use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, Journal, ProverOpts};
 use serde::{de::DeserializeOwned, Serialize};
 use strata_zkvm::{
-    Proof, ProofReceipt, ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost,
-    ZkVmInputBuilder, ZkVmResult,
+    ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
 };
 
-use crate::input::Risc0ProofInputBuilder;
+use crate::{input::Risc0ProofInputBuilder, proof::Risc0ProofReceipt};
 
 /// A host for the `Risc0` zkVM that stores the guest program in ELF format
 /// The `Risc0Host` is responsible for program execution and proving
@@ -32,12 +29,13 @@ impl Risc0Host {
 
 impl ZkVmHost for Risc0Host {
     type Input<'a> = Risc0ProofInputBuilder<'a>;
+    type ProofImpl = Risc0ProofReceipt;
 
-    fn prove<'a>(
+    fn prove_inner<'a>(
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> ZkVmResult<ProofReceipt> {
+    ) -> ZkVmResult<Risc0ProofReceipt> {
         #[cfg(feature = "mock")]
         {
             std::env::set_var("RISC0_DEV_MODE", "true");
@@ -57,11 +55,7 @@ impl ZkVmHost for Risc0Host {
             .prove_with_opts(prover_input, &self.elf, &opts)
             .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
 
-        // Proof serialization
-        let proof = Proof::new(bincode::serialize(&proof_info.receipt.inner)?);
-        let public_values = PublicValues::new(proof_info.receipt.journal.bytes);
-
-        Ok(ProofReceipt::new(proof, public_values))
+        Ok(proof_info.receipt.into())
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
@@ -79,11 +73,9 @@ impl ZkVmHost for Risc0Host {
         VerificationKey::new(self.id.as_bytes().to_vec())
     }
 
-    fn verify(&self, proof: &ProofReceipt) -> ZkVmResult<()> {
-        let journal = proof.public_values().as_bytes().to_vec();
-        let inner: InnerReceipt = bincode::deserialize(proof.proof().as_bytes())?;
-        let receipt = Receipt::new(inner, journal);
-        receipt
+    fn verify_inner(&self, proof: &Risc0ProofReceipt) -> ZkVmResult<()> {
+        proof
+            .as_ref()
             .verify(self.id)
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
         Ok(())
