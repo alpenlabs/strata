@@ -40,15 +40,18 @@ impl ProvingOp for EvmEeHandler {
     type Prover = EvmEeProver;
     type Params = u64;
 
-    async fn fetch_proof_contexts(
+    async fn create_task(
         &self,
         block_num: u64,
-        _task_tracker: Arc<Mutex<TaskTracker>>,
+        task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
-    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let block = self.get_block(block_num).await?;
         let blkid: Buf32 = block.header.hash.into();
-        Ok((ProofContext::EvmEeStf(blkid), vec![]))
+        let context = ProofContext::EvmEeStf(blkid);
+
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.create_tasks(context, vec![])
     }
 
     async fn fetch_input(

@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
+use strata_primitives::proof::{ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmProver;
 use tokio::sync::Mutex;
@@ -61,40 +61,12 @@ pub trait ProvingOp {
     ///
     /// # Returns
     /// A tuple containing the primary `ProofContext` and a vector of dependent `ProofContext`s.
-    async fn fetch_proof_contexts(
-        &self,
-        params: Self::Params,
-        task_tracker: Arc<Mutex<TaskTracker>>,
-        db: &ProofDb,
-    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError>;
-
-    /// Creates proof generation tasks for the specified parameters.
-    ///
-    /// # Arguments
-    /// - `params`: The parameters specific to the operation.
-    /// - `task_tracker`: A shared task tracker for managing task dependencies.
-    /// - `db`: A reference to the proof database.
-    ///
-    /// # Returns
-    /// A vector of `ProofKey`s representing the created tasks.
     async fn create_task(
         &self,
         params: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        // Fetch dependencies for this task
-        let (proof_id, deps) = self
-            .fetch_proof_contexts(params, task_tracker.clone(), db)
-            .await?;
-        info!(?proof_id, "Creating proof task");
-        info!(?deps, "With dependencies");
-
-        let mut task_tracker = task_tracker.lock().await;
-        let tasks = task_tracker.create_tasks(proof_id, deps)?;
-
-        Ok(tasks)
-    }
+    ) -> Result<Vec<ProofKey>, ProvingTaskError>;
 
     /// Fetches the input required for the proof computation.
     ///

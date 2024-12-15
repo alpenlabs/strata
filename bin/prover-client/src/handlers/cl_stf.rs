@@ -61,12 +61,12 @@ impl ProvingOp for ClStfHandler {
     type Prover = ClStfProver;
     type Params = u64;
 
-    async fn fetch_proof_contexts(
+    async fn create_task(
         &self,
         block_num: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-    ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let evm_ee_tasks = self
             .evm_ee_handler
             .create_task(block_num, task_tracker.clone(), db)
@@ -81,7 +81,8 @@ impl ProvingOp for ClStfHandler {
         db.put_proof_deps(cl_stf_id, vec![*evm_ee_id])
             .map_err(ProvingTaskError::DatabaseError)?;
 
-        Ok((cl_stf_id, vec![*evm_ee_id]))
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.create_tasks(cl_stf_id, vec![*evm_ee_id])
     }
 
     async fn fetch_input(
