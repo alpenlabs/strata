@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use strata_primitives::proof::ProofKey;
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::{sync::Mutex, time::sleep};
+use tracing::error;
 
 use crate::{
     config::PROVER_MANAGER_INTERVAL, errors::ProvingTaskError, handlers::ProofHandler,
@@ -79,7 +80,10 @@ pub async fn make_proof(
         match res {
             Ok(_) => task_tracker.update_status(task, ProvingTaskStatus::Completed)?,
             // TODO: handle different errors for different failure condition
-            Err(_) => task_tracker.update_status(task, ProvingTaskStatus::Failed)?,
+            Err(e) => {
+                error!(?task, ?e, "proving task failed");
+                task_tracker.update_status(task, ProvingTaskStatus::Failed)?
+            }
         }
     }
 
