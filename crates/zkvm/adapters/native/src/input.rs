@@ -1,4 +1,4 @@
-use strata_zkvm::{AggregationInput, ZkVmInputBuilder, ZkVmResult};
+use strata_zkvm::{AggregationInput, ProofReceipt, ZkVmInputBuilder, ZkVmResult};
 
 use crate::env::NativeMachine;
 
@@ -6,6 +6,7 @@ pub struct NativeMachineInputBuilder(pub NativeMachine);
 
 impl<'a> ZkVmInputBuilder<'a> for NativeMachineInputBuilder {
     type Input = NativeMachine;
+    type ProofImpl = ProofReceipt;
 
     fn new() -> NativeMachineInputBuilder {
         Self(NativeMachine::new())

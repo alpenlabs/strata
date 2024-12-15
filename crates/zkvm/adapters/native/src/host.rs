@@ -15,8 +15,9 @@ pub struct NativeHost {
 
 impl ZkVmHost for NativeHost {
     type Input<'a> = NativeMachineInputBuilder;
+    type ProofImpl = ProofReceipt;
 
-    fn prove<'a>(
+    fn prove_inner<'a>(
         &self,
         native_machine: NativeMachine,
         _proof_type: ProofType,
@@ -44,7 +45,7 @@ impl ZkVmHost for NativeHost {
         bincode::deserialize(public_values_raw.as_bytes()).map_err(|e| e.into())
     }
 
-    fn verify(&self, _proof: &ProofReceipt) -> ZkVmResult<()> {
+    fn verify_inner(&self, _proof: &ProofReceipt) -> ZkVmResult<()> {
         Ok(())
     }
 }
