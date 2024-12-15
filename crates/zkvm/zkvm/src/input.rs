@@ -1,9 +1,10 @@
-use crate::{AggregationInput, ZkVmError, ZkVmResult};
+use crate::{AggregationInput, ProofReceipt, ZkVmError, ZkVmResult};
 
 /// A trait for managing inputs to a ZkVm prover. This trait provides methods for
 /// adding inputs in various formats to be used during the proof generation process.
 pub trait ZkVmInputBuilder<'a> {
     type Input;
+    type ProofImpl: From<ProofReceipt>;
 
     /// Creates a new instance of the `ProverInputs` struct.
     fn new() -> Self;
