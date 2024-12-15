@@ -1,16 +1,12 @@
 use std::fmt;
 
 use serde::{de::DeserializeOwned, Serialize};
-use sp1_sdk::{
-    HashableKey, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1ProvingKey, SP1PublicValues,
-    SP1Stdin, SP1VerifyingKey,
-};
+use sp1_sdk::{HashableKey, ProverClient, SP1ProvingKey, SP1VerifyingKey};
 use strata_zkvm::{
-    Proof, ProofReceipt, ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost,
-    ZkVmInputBuilder, ZkVmResult,
+    ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
 };
 
-use crate::input::SP1ProofInputBuilder;
+use crate::{input::SP1ProofInputBuilder, proof::SP1ProofReceipt};
 
 /// A host for the `SP1` zkVM that stores the guest program in ELF format.
 /// The `SP1Host` is responsible for program execution and proving
@@ -56,11 +52,12 @@ impl SP1Host {
 
 impl ZkVmHost for SP1Host {
     type Input<'a> = SP1ProofInputBuilder;
-    fn prove<'a>(
+    type ProofImpl = SP1ProofReceipt;
+    fn prove_inner<'a>(
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
-    ) -> ZkVmResult<ProofReceipt> {
+    ) -> ZkVmResult<SP1ProofReceipt> {
         #[cfg(feature = "mock")]
         {
             std::env::set_var("SP1_PROVER", "mock");
@@ -81,11 +78,7 @@ impl ZkVmHost for SP1Host {
             .run()
             .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
 
-        // Proof serialization
-        let proof = Proof::new(bincode::serialize(&proof_info.proof)?);
-        let public_values = PublicValues::new(proof_info.public_values.to_vec());
-
-        Ok(ProofReceipt::new(proof, public_values))
+        Ok(proof_info.into())
     }
 
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
@@ -100,24 +93,10 @@ impl ZkVmHost for SP1Host {
         VerificationKey::new(verification_key)
     }
 
-    fn verify(&self, proof: &ProofReceipt) -> ZkVmResult<()> {
-        #[cfg(feature = "mock")]
-        {
-            std::env::set_var("SP1_PROVER", "mock");
-        }
-        let public_values = SP1PublicValues::from(proof.public_values().as_bytes());
-        let proof: SP1Proof = bincode::deserialize(proof.proof().as_bytes())?;
-        let sp1_version = sp1_sdk::SP1_CIRCUIT_VERSION.to_string();
-        let proof_with_public_values = SP1ProofWithPublicValues {
-            proof,
-            public_values,
-            stdin: SP1Stdin::default(),
-            sp1_version,
-        };
-
+    fn verify_inner(&self, proof: &SP1ProofReceipt) -> ZkVmResult<()> {
         let client = ProverClient::new();
         client
-            .verify(&proof_with_public_values, &self.verifying_key)
+            .verify(proof.as_ref(), &self.verifying_key)
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
 
         Ok(())
