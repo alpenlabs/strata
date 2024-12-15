@@ -6,7 +6,7 @@ pub struct NativeMachineInputBuilder(pub NativeMachine);
 
 impl<'a> ZkVmInputBuilder<'a> for NativeMachineInputBuilder {
     type Input = NativeMachine;
-    type ProofImpl = ProofReceipt;
+    type ZkVmProofReceipt = ProofReceipt;
 
     fn new() -> NativeMachineInputBuilder {
         Self(NativeMachine::new())

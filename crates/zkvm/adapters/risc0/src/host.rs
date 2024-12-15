@@ -29,7 +29,7 @@ impl Risc0Host {
 
 impl ZkVmHost for Risc0Host {
     type Input<'a> = Risc0ProofInputBuilder<'a>;
-    type ProofImpl = Risc0ProofReceipt;
+    type ZkVmProofReceipt = Risc0ProofReceipt;
 
     fn prove_inner<'a>(
         &self,

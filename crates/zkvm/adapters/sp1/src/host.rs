@@ -52,7 +52,7 @@ impl SP1Host {
 
 impl ZkVmHost for SP1Host {
     type Input<'a> = SP1ProofInputBuilder;
-    type ProofImpl = SP1ProofReceipt;
+    type ZkVmProofReceipt = SP1ProofReceipt;
     fn prove_inner<'a>(
         &self,
         prover_input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,

@@ -8,7 +8,7 @@ pub struct SP1ProofInputBuilder(SP1Stdin);
 
 impl<'a> ZkVmInputBuilder<'a> for SP1ProofInputBuilder {
     type Input = SP1Stdin;
-    type ProofImpl = SP1ProofReceipt;
+    type ZkVmProofReceipt = SP1ProofReceipt;
 
     fn new() -> SP1ProofInputBuilder {
         SP1ProofInputBuilder(SP1Stdin::new())

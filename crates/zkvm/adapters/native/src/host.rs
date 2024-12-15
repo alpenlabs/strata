@@ -15,7 +15,7 @@ pub struct NativeHost {
 
 impl ZkVmHost for NativeHost {
     type Input<'a> = NativeMachineInputBuilder;
-    type ProofImpl = ProofReceipt;
+    type ZkVmProofReceipt = ProofReceipt;
 
     fn prove_inner<'a>(
         &self,

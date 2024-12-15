@@ -9,7 +9,7 @@ pub struct Risc0ProofInputBuilder<'a>(ExecutorEnvBuilder<'a>);
 
 impl<'a> ZkVmInputBuilder<'a> for Risc0ProofInputBuilder<'a> {
     type Input = ExecutorEnv<'a>;
-    type ProofImpl = Risc0ProofReceipt;
+    type ZkVmProofReceipt = Risc0ProofReceipt;
 
     fn new() -> Self {
         let env_builder = ExecutorEnv::builder();
