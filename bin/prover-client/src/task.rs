@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use strata_primitives::proof::ProofKey;
+use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 
 use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 
@@ -10,15 +10,35 @@ pub struct TaskTracker {
     /// A map of task IDs to their statuses.
     tasks: HashMap<ProofKey, ProvingTaskStatus>,
     /// Count of the tasks that are in progress
-    in_progress_tasks: usize,
+    in_progress_tasks: HashMap<ProofZkVm, usize>,
+
+    vms: Vec<ProofZkVm>,
 }
 
 impl TaskTracker {
     /// Creates a new `TaskTracker` instance.
     pub fn new() -> Self {
+        let mut vms = vec![];
+
+        #[cfg(feature = "sp1")]
+        {
+            vms.push(ProofZkVm::SP1);
+        }
+
+        #[cfg(feature = "risc0")]
+        {
+            vms.push(ProofZkVm::Risc0);
+        }
+
+        #[cfg(all(not(feature = "risc0"), not(feature = "sp1")))]
+        {
+            vms.push(ProofZkVm::Native);
+        }
+
         TaskTracker {
             tasks: HashMap::new(),
-            in_progress_tasks: 0,
+            in_progress_tasks: HashMap::new(),
+            vms,
         }
     }
 
@@ -27,8 +47,26 @@ impl TaskTracker {
         self.tasks.clear();
     }
 
-    pub fn in_progress_tasks_count(&self) -> usize {
-        self.in_progress_tasks
+    pub fn in_progress_tasks_count(&self, host: &ProofZkVm) -> usize {
+        *self.in_progress_tasks.get(host).unwrap()
+    }
+
+    pub fn create_tasks(
+        &mut self,
+        proof_id: ProofContext,
+        deps: Vec<ProofContext>,
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        let mut tasks = Vec::with_capacity(self.vms.len());
+        // Insert tasks for each configured host
+        let vms = &self.vms.clone();
+        for host in vms {
+            let task = ProofKey::new(proof_id, *host);
+            tasks.push(task);
+            let dep_tasks = deps.iter().map(|&dep| ProofKey::new(dep, *host)).collect();
+            self.insert_task(task, dep_tasks)?;
+        }
+
+        Ok(tasks)
     }
 
     /// Inserts a new task with the given dependencies.
@@ -88,11 +126,14 @@ impl TaskTracker {
             status.transition(new_status.clone())?;
 
             if new_status == ProvingTaskStatus::ProvingInProgress {
-                self.in_progress_tasks += 1;
+                // Increment value if key exists, or insert with a default value of 1
+                *self.in_progress_tasks.entry(*id.host()).or_insert(0) += 1;
             }
 
             if new_status == ProvingTaskStatus::Completed {
-                self.in_progress_tasks -= 1;
+                // Decrement value if key exists, or insert with a default value of 1
+                *self.in_progress_tasks.entry(*id.host()).or_insert(0) -= 1;
+
                 // Resolve dependencies if a task is completed
                 for task_status in self.tasks.values_mut() {
                     if let ProvingTaskStatus::WaitingForDependencies(deps) = task_status {

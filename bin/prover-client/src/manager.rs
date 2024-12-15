@@ -48,7 +48,7 @@ impl ProverManager {
             for task in pending_tasks {
                 {
                     let task_tracker = self.task_tracker.lock().await;
-                    if task_tracker.in_progress_tasks_count() >= self.workers {
+                    if task_tracker.in_progress_tasks_count(task.host()) >= self.workers {
                         break; // No need to spawn more
                     }
                 }

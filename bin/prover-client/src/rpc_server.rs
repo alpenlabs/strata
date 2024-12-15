@@ -82,12 +82,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
         Ok(self
             .handler
             .btc_handler()
-            .create_task(
-                btc_block_num,
-                self.task_tracker.clone(),
-                &self.db,
-                self.handler.vms(),
-            )
+            .create_task(btc_block_num, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }
@@ -96,12 +91,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
         Ok(self
             .handler
             .evm_ee_handler()
-            .create_task(
-                el_block_num,
-                self.task_tracker.clone(),
-                &self.db,
-                self.handler.vms(),
-            )
+            .create_task(el_block_num, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }
@@ -110,12 +100,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
         Ok(self
             .handler
             .cl_stf_handler()
-            .create_task(
-                cl_block_num,
-                self.task_tracker.clone(),
-                &self.db,
-                self.handler.vms(),
-            )
+            .create_task(cl_block_num, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }
@@ -124,12 +109,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
         Ok(self
             .handler
             .l1_batch_handler()
-            .create_task(
-                l1_range,
-                self.task_tracker.clone(),
-                &self.db,
-                self.handler.vms(),
-            )
+            .create_task(l1_range, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }
@@ -138,12 +118,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
         Ok(self
             .handler
             .cl_agg_handler()
-            .create_task(
-                l2_range,
-                self.task_tracker.clone(),
-                &self.db,
-                self.handler.vms(),
-            )
+            .create_task(l2_range, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }

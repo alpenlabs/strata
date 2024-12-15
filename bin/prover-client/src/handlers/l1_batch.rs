@@ -9,7 +9,7 @@ use strata_btcio::{
     },
 };
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
+use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
@@ -44,7 +44,6 @@ impl ProvingOp for L1BatchHandler {
         params: (u64, u64),
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
-        hosts: &[ProofZkVm],
     ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         let (start_height, end_height) = params;
 
@@ -59,7 +58,7 @@ impl ProvingOp for L1BatchHandler {
             let blkid = self.btc_blockspace_handler.get_id(height).await?;
             let proof_id = ProofContext::BtcBlockspace(blkid);
             self.btc_blockspace_handler
-                .create_task(height, task_tracker.clone(), db, hosts)
+                .create_task(height, task_tracker.clone(), db)
                 .await?;
             btc_deps.push(proof_id);
         }

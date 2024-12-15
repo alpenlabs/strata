@@ -4,7 +4,7 @@ use alloy_rpc_types::Block;
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_primitives::{
     buf::Buf32,
-    proof::{ProofContext, ProofKey, ProofZkVm},
+    proof::{ProofContext, ProofKey},
 };
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
 use strata_rocksdb::prover::db::ProofDb;
@@ -45,7 +45,6 @@ impl ProvingOp for EvmEeHandler {
         block_num: u64,
         _task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
-        _hosts: &[ProofZkVm],
     ) -> Result<(ProofContext, Vec<ProofContext>), ProvingTaskError> {
         let block = self.get_block(block_num).await?;
         let blkid: Buf32 = block.header.hash.into();

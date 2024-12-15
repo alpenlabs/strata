@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jsonrpsee::http_client::HttpClient;
 use strata_btcio::rpc::BitcoinClient;
-use strata_primitives::proof::{ProofContext, ProofZkVm};
+use strata_primitives::proof::ProofContext;
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
 
@@ -20,7 +20,6 @@ pub struct ProofHandler {
     cl_stf_handler: ClStfHandler,
     cl_agg_handler: ClAggHandler,
     checkpoint_handler: CheckpointHandler,
-    vms: Vec<ProofZkVm>,
 }
 
 impl ProofHandler {
@@ -31,7 +30,6 @@ impl ProofHandler {
         cl_stf_handler: ClStfHandler,
         cl_agg_handler: ClAggHandler,
         checkpoint_handler: CheckpointHandler,
-        vms: Vec<ProofZkVm>,
     ) -> Self {
         Self {
             btc_blockspace_handler,
@@ -40,7 +38,6 @@ impl ProofHandler {
             cl_stf_handler,
             cl_agg_handler,
             checkpoint_handler,
-            vms,
         }
     }
 
@@ -62,23 +59,6 @@ impl ProofHandler {
             Arc::new(cl_agg_handler.clone()),
         );
 
-        let mut vms = vec![];
-
-        #[cfg(feature = "sp1")]
-        {
-            vms.push(ProofZkVm::SP1);
-        }
-
-        #[cfg(feature = "risc0")]
-        {
-            vms.push(ProofZkVm::Risc0);
-        }
-
-        #[cfg(all(not(feature = "risc0"), not(feature = "sp1")))]
-        {
-            vms.push(ProofZkVm::Native);
-        }
-
         ProofHandler::new(
             btc_blockspace_handler,
             l1_batch_handler,
@@ -86,7 +66,6 @@ impl ProofHandler {
             cl_stf_handler,
             cl_agg_handler,
             checkpoint_handler,
-            vms,
         )
     }
 
@@ -125,9 +104,5 @@ impl ProofHandler {
 
     pub fn checkpoint_handler(&self) -> &CheckpointHandler {
         &self.checkpoint_handler
-    }
-
-    pub fn vms(&self) -> &[ProofZkVm] {
-        &self.vms
     }
 }
