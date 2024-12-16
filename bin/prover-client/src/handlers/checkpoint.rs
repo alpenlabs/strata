@@ -8,6 +8,7 @@ use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcCheckpointInfo;
 use strata_zkvm::AggregationInput;
 use tokio::sync::Mutex;
+use tracing::error;
 
 use super::{
     cl_agg::ClAggHandler, l1_batch::L1BatchHandler, utils::get_pm_rollup_params, ProvingOp,
@@ -43,6 +44,7 @@ impl CheckpointHandler {
                 rpc_params![ckp_idx],
             )
             .await
+            .inspect_err(|_| error!(%ckp_idx, "Failed to fetch CheckpointInfo"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
             .ok_or(ProvingTaskError::WitnessNotFound)
     }

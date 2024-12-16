@@ -11,6 +11,7 @@ use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::RpcBlockHeader;
 use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
+use tracing::error;
 
 use super::{evm_ee::EvmEeHandler, utils::get_pm_rollup_params, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
@@ -36,6 +37,7 @@ impl ClStfHandler {
             .cl_client
             .request("strata_getHeadersAtIdx", rpc_params![block_num])
             .await
+            .inspect_err(|_| error!(%block_num, "Failed to fetch l2_headers"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
         let cl_stf_id_buf: Buf32 = l2_headers

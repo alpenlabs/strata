@@ -13,6 +13,7 @@ use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
+use tracing::error;
 
 use super::{btc::BtcBlockspaceHandler, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
@@ -99,6 +100,7 @@ impl ProvingOp for L1BatchHandler {
             .btc_client
             .get_block(&start_blkid.into())
             .await
+            .inspect_err(|_| error!(%start_blkid, "Failed to fetch BTC block"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
         let start_height = self

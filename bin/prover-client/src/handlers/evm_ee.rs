@@ -9,6 +9,7 @@ use strata_primitives::{
 use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
+use tracing::error;
 
 use super::ProvingOp;
 use crate::{errors::ProvingTaskError, task::TaskTracker};
@@ -32,6 +33,7 @@ impl EvmEeHandler {
                 rpc_params![format!("0x{:x}", block_num), false],
             )
             .await
+            .inspect_err(|_| error!(%block_num, "Failed to fetch EVM Block"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))
     }
 }
