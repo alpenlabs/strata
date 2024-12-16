@@ -1,6 +1,5 @@
 use bitcoin::{Block, Transaction};
 use strata_envelope_tx::parser::parse_script_for_envelope;
-use strata_primitives::hash;
 use strata_state::{
     batch::SignedBatchCheckpoint,
     tx::{DepositInfo, DepositRequestInfo, PayloadTypeTag, ProtocolOperation},

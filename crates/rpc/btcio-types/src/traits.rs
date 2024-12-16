@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-/// This is an alias for the result type returned by the [`BitcoinClient`].
+/// This is an alias for the result type returned by the Bitcoin client
 pub type ClientResult<T> = Result<T, ClientError>;
 
 /// Basic functionality that any Bitcoin client that interacts with the
@@ -20,8 +20,7 @@ pub type ClientResult<T> = Result<T, ClientError>;
 /// This is a fully `async` trait. The user should be responsible for
 /// handling the `async` nature of the trait methods. And if implementing
 /// this trait for a specific type that is not `async`, the user should
-/// consider wrapping with [`tokio`](tokio)'s
-/// [`spawn_blocking`](tokio::task::spawn_blocking) or any other method.
+/// consider wrapping with `tokio`, `spawn_blocking` or any other method.
 #[async_trait]
 pub trait Reader {
     /// Estimates the approximate fee per kilobyte needed for a transaction

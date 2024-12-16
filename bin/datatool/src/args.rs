@@ -23,6 +23,7 @@ pub(crate) struct Args {
     pub(crate) subc: Subcommand,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub(crate) enum Subcommand {

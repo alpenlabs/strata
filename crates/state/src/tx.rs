@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::TryFromPrimitive;
 use strata_primitives::l1::{BitcoinAmount, OutputRef};
 
-use crate::{batch::SignedBatchCheckpoint, da_blob::BundledCommitment};
+use crate::batch::SignedBatchCheckpoint;
 
 /// Information related to relevant transactions to be stored in L1Tx
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
