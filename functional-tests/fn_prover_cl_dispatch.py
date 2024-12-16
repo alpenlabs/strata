@@ -16,7 +16,7 @@ class ProverClientTest(testenv.StrataTester):
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the Prover Manager setup
-        time.sleep(60)
+        time.sleep(5)
 
         # Dispatch the prover task
         task_ids = prover_client_rpc.dev_strata_proveCLBlock(1)
