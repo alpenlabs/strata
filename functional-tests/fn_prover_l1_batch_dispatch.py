@@ -16,7 +16,7 @@ class ProverClientTest(testenv.StrataTester):
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the some block building
-        time.sleep(60)
+        time.sleep(5)
 
         task_ids = prover_client_rpc.dev_strata_proveL1Batch((1, 2))
         self.debug(f"got the task ids: {}", task_ids)
