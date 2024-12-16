@@ -13,7 +13,7 @@ use bdk_wallet::{
     miniscript::{descriptor::DescriptorKeyParseError, Descriptor},
     template::DescriptorTemplateOut,
 };
-use rand::{rngs::OsRng, RngCore};
+use rand_core::{OsRng, RngCore};
 use sha2::{Digest, Sha256};
 use sled::IVec;
 use terrors::OneOf;
