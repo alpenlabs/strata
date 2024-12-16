@@ -13,7 +13,7 @@ use strata_btcio_rpc_types::{
         ListTransactions, ListUnspent, SignRawTransactionWithWallet,
     },
 };
-use strata_envelope_tx::builder::{build_reveal_transaction, CommitRevealTxError};
+use strata_reveal_tx::builder::{build_reveal_transaction, CommitRevealTxError};
 
 /// A test implementation of a Bitcoin client.
 #[derive(Debug, Clone)]

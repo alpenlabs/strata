@@ -13,10 +13,10 @@ use strata_state::l1::{
     L1BlockId, TimestampStore,
 };
 use strata_status::StatusChannel;
-use strata_tx_parser::{
-    filter::filter_protocol_op_tx_refs,
-    filter_types::TxFilterConfig,
+use strata_tx_filter::{
+    filter_protocol_op_tx_refs,
     messages::{BlockData, L1Event},
+    types::TxFilterConfig,
 };
 use tokio::sync::mpsc;
 use tracing::*;

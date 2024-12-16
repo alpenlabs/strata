@@ -12876,8 +12876,8 @@ dependencies = [
  "strata-btcio-rpc-types",
  "strata-common",
  "strata-db",
- "strata-envelope-tx",
  "strata-primitives",
+ "strata-reveal-tx",
  "strata-rocksdb",
  "strata-rpc-types",
  "strata-state",
@@ -12885,7 +12885,7 @@ dependencies = [
  "strata-storage",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
+ "strata-tx-filter",
  "thiserror",
  "threadpool",
  "tokio",
@@ -12999,7 +12999,7 @@ dependencies = [
  "strata-sync",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
+ "strata-tx-filter",
  "strata-zkvm",
  "thiserror",
  "threadpool",
@@ -13046,7 +13046,7 @@ dependencies = [
  "strata-storage",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
+ "strata-tx-filter",
  "strata-zkvm",
  "thiserror",
  "threadpool",
@@ -13113,23 +13113,6 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "thiserror",
-]
-
-[[package]]
-name = "strata-envelope-tx"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "bitcoin",
- "rand",
- "serde",
- "strata-btcio-rpc-types",
- "strata-primitives",
- "strata-state",
- "thiserror",
- "threadpool",
- "tokio",
 ]
 
 [[package]]
@@ -13248,7 +13231,7 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "strata-test-utils",
- "strata-tx-parser",
+ "strata-tx-filter",
  "strata-zkvm",
 ]
 
@@ -13377,7 +13360,7 @@ dependencies = [
  "strata-sp1-guest-builder",
  "strata-state",
  "strata-test-utils",
- "strata-tx-parser",
+ "strata-tx-filter",
  "strata-zkvm",
  "thiserror",
  "tokio",
@@ -13584,6 +13567,22 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "strata-reveal-tx"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "rand",
+ "strata-btcio-rpc-types",
+ "strata-primitives",
+ "strata-state",
+ "thiserror",
+ "threadpool",
+ "tokio",
 ]
 
 [[package]]
@@ -13824,12 +13823,12 @@ dependencies = [
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "strata-storage",
- "strata-tx-parser",
+ "strata-tx-filter",
  "threadpool",
 ]
 
 [[package]]
-name = "strata-tx-parser"
+name = "strata-tx-filter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13841,8 +13840,8 @@ dependencies = [
  "rand",
  "strata-bridge-tx-builder",
  "strata-btcio",
- "strata-envelope-tx",
  "strata-primitives",
+ "strata-reveal-tx",
  "strata-state",
  "strata-test-utils",
  "thiserror",

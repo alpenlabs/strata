@@ -1,22 +1,20 @@
 [package]
 edition = "2021"
-name = "strata-envelope-tx"
+name = "strata-reveal-tx"
 version = "0.1.0"
 
 [dependencies]
-strata-btcio-rpc-types = { workspace = true }
+strata-btcio-rpc-types = { workspace = true, optional = true }
 strata-primitives.workspace = true
 strata-state.workspace = true
 
 anyhow.workspace = true
 arbitrary.workspace = true
 bitcoin.workspace = true
-rand.workspace = true
+rand = { workspace = true, optional = true }
 thiserror.workspace = true
-# rand = { workspace = true, optional = true}
-serde = { workspace = true, optional = true }
 threadpool = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 [features]
-build = []
+builder = ["tokio", "threadpool", "rand", "strata-btcio-rpc-types"]

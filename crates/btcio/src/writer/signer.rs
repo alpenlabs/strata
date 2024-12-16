@@ -3,8 +3,8 @@ use std::sync::Arc;
 use bitcoin::{consensus, Transaction};
 use strata_btcio_rpc_types::traits::{Reader, Signer, Wallet};
 use strata_db::types::{CommitRevealEntry, L1TxEntry};
-use strata_envelope_tx::builder::{build_commit_reveal_txs, CommitRevealTxError, EnvelopeTxConfig};
 use strata_primitives::buf::Buf32;
+use strata_reveal_tx::builder::{build_commit_reveal_txs, CommitRevealTxError, EnvelopeTxConfig};
 use tracing::*;
 
 use super::config::WriterConfig;

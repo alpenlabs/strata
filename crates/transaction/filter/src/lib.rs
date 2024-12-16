@@ -1,15 +1,22 @@
+//! Structure for filtering relevant transactions
+
+pub mod deposit;
+pub mod messages;
+pub mod types;
+pub mod utils;
+
 use bitcoin::{Block, Transaction};
-use strata_envelope_tx::parser::parse_script_for_envelope;
+use strata_reveal_tx::parser::parse_script_for_envelope;
 use strata_state::{
     batch::SignedBatchCheckpoint,
     tx::{DepositInfo, DepositRequestInfo, PayloadTypeTag, ProtocolOperation},
 };
 
-use super::messages::ProtocolOpTxRef;
-use crate::deposit::{
-    deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
+pub use crate::types::TxFilterConfig;
+use crate::{
+    deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
+    messages::ProtocolOpTxRef,
 };
-pub use crate::filter_types::TxFilterConfig;
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
 /// [`TxFilterConfig`]s
@@ -94,8 +101,8 @@ mod test {
         Transaction, TxMerkleNode, TxOut,
     };
     use rand::{rngs::OsRng, RngCore};
-    use strata_envelope_tx::builder::{build_reveal_transaction, generate_envelope_script};
     use strata_primitives::l1::BitcoinAmount;
+    use strata_reveal_tx::builder::{build_reveal_transaction, generate_envelope_script};
     use strata_state::tx::{EnvelopePayload, PayloadTypeTag, ProtocolOperation};
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
@@ -105,7 +112,7 @@ mod test {
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
             test_taproot_addr,
         },
-        filter::filter_protocol_op_tx_refs,
+        filter_protocol_op_tx_refs,
         messages::ProtocolOpTxRef,
     };
 
@@ -193,7 +200,7 @@ mod test {
 
     #[test]
     fn test_filter_relevant_txs_with_commit_reveal() {
-        // Test with valid name
+        // Test with valid tags
         let filter_config = create_tx_filter_config();
 
         let da_tag = filter_config.da_tag.clone();
@@ -206,13 +213,13 @@ mod test {
             .map(|op_refs| op_refs.index())
             .collect();
 
-        assert_eq!(txids[0], 0, "Should filter valid rollup name");
+        assert_eq!(txids[0], 0, "Should filter valid tags");
 
         // Test with invalid tag
-        let tx = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
+        let tx = create_commit_reveal_tx("invalid-da-tag", &ckpt_tag, 1);
         let block = create_test_block(vec![tx]);
         let result = filter_protocol_op_tx_refs(&block, filter_config);
-        assert!(result.is_empty(), "Should filter out invalid name");
+        assert!(result.is_empty(), "Should filter out invalid tag");
     }
 
     #[test]
@@ -226,7 +233,7 @@ mod test {
 
         let txids: Vec<ProtocolOpTxRef> = filter_protocol_op_tx_refs(&block, filter_config);
 
-        assert_eq!(txids[0].index(), 0, "Should filter valid rollup name");
+        assert_eq!(txids[0].index(), 0, "Should filter valid tags");
         assert_eq!(
             txids.len(),
             num_envelopes as usize,

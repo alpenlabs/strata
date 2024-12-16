@@ -5,8 +5,8 @@ use strata_db::{
     traits::SequencerDatabase,
     types::{CommitRevealEntry, L1TxStatus, PayloadL1Status},
 };
-use strata_envelope_tx::builder::CommitRevealTxError;
 use strata_primitives::buf::Buf32;
+use strata_reveal_tx::builder::CommitRevealTxError;
 use strata_state::da_blob::{BundledPayloadIntent, DataBundleDest, PayloadIntent};
 use strata_status::StatusChannel;
 use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
