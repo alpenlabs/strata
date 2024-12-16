@@ -1,7 +1,7 @@
 use bitcoin::params::MAINNET;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_test_utils::bitcoin::get_btc_chain;
-use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ZkVmHost, ZkVmResult};
 
 use super::{btc::BtcBlockProofGenerator, ProofGenerator};
 
@@ -41,12 +41,6 @@ impl<H: ZkVmHost> ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGene
         };
         // dbg!(&input.blockspace_vk);
         Ok(input)
-    }
-
-    fn gen_proof(&self, heights: &(u32, u32)) -> ZkVmResult<ProofReceipt> {
-        let input = self.get_input(heights)?;
-        let host = self.get_host();
-        L1BatchProver::prove(&input, &host)
     }
 
     fn get_proof_id(&self, heights: &(u32, u32)) -> String {

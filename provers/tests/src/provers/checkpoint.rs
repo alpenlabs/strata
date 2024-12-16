@@ -1,6 +1,6 @@
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{AggregationInput, ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{AggregationInput, ZkVmHost, ZkVmResult};
 
 use super::{
     btc::BtcBlockProofGenerator, cl::ClProofGenerator, el::ElProofGenerator,
@@ -63,12 +63,6 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointBatchInfo, CheckpointProver>
         };
 
         Ok(input)
-    }
-
-    fn gen_proof(&self, batch_info: &CheckpointBatchInfo) -> ZkVmResult<ProofReceipt> {
-        let host = self.get_host();
-        let input = self.get_input(batch_info)?;
-        CheckpointProver::prove(&input, &host)
     }
 
     fn get_proof_id(&self, info: &CheckpointBatchInfo) -> String {
