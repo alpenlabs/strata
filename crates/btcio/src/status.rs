@@ -25,7 +25,7 @@ pub async fn apply_status_updates(st_updates: &[L1StatusUpdate], st_chan: &Statu
             L1StatusUpdate::CurTip(tip) => l1_status.cur_tip_blkid = tip.clone(),
             L1StatusUpdate::LastPublishedTxid(txid) => l1_status.last_published_txid = Some(*txid),
             L1StatusUpdate::IncrementCommitRevealTxCount => {
-                l1_status.published_commit_reveal_tx_count += 1
+                l1_status.published_reveal_tx_count += 1
             }
         }
     }

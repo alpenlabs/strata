@@ -92,7 +92,7 @@ impl RpcL1Status {
             cur_height: l1s.cur_height,
             cur_tip_blkid: l1s.cur_tip_blkid,
             last_published_txid: l1s.last_published_txid,
-            published_commit_reveal_tx_count: l1s.published_commit_reveal_tx_count,
+            published_commit_reveal_tx_count: l1s.published_reveal_tx_count,
             last_update: l1s.last_update,
             network,
         }

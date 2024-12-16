@@ -135,7 +135,7 @@ pub(crate) struct SubcParams {
 
     #[argh(
         option,
-        description = "network name, used in envelopes (default 'strata-ckpt')"
+        description = "checkpoint tag, used in envelopes (default 'strata-ckpt')"
     )]
     pub(crate) checkpoint_tag: Option<String>,
 
@@ -188,11 +188,11 @@ pub(crate) struct SubcParams {
 
     #[argh(
         switch,
-        description = "written transactions will have estimated smart fee"
+        description = "estimate fee through rpc call for writer transactions"
     )]
     pub(crate) smart_fee: bool,
 
-    #[argh(option, description = "written transactions will have fixed fee")]
+    #[argh(option, description = "fixed fee for writer transcation")]
     pub(crate) fixed_fee: Option<u64>,
 
     #[argh(option, description = "transaction writer poll duration")]
