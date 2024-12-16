@@ -1,18 +1,14 @@
 use std::sync::Arc;
 
 use bitcoin::{consensus, Transaction};
+use strata_btcio_rpc_types::traits::{Reader, Signer, Wallet};
 use strata_db::types::{CommitRevealEntry, L1TxEntry};
+use strata_envelope_tx::builder::{build_commit_reveal_txs, CommitRevealTxError, EnvelopeTxConfig};
 use strata_primitives::buf::Buf32;
 use tracing::*;
 
-use super::{
-    builder::{build_commit_reveal_txs, CommitRevealTxError},
-    config::WriterConfig,
-};
-use crate::{
-    broadcaster::L1BroadcastHandle,
-    rpc::traits::{Reader, Signer, Wallet},
-};
+use super::config::WriterConfig;
+use crate::broadcaster::L1BroadcastHandle;
 
 /// Create commit reveal transactions corresponding to a [`EnvelopeEntry`].
 ///
@@ -27,7 +23,18 @@ pub async fn create_and_sign_commit_reveal_txs(
     config: &WriterConfig,
 ) -> Result<(Buf32, Buf32), CommitRevealTxError> {
     trace!("Creating and signing commit reveal transactions");
-    let (commit, reveal) = build_commit_reveal_txs(&blobentry.envelopes, &client, config).await?;
+
+    let envelope_config = EnvelopeTxConfig {
+        sequencer_address: &config.sequencer_address,
+        da_tag: &config.da_tag,
+        ckpt_tag: &config.ckpt_tag,
+        poll_duration_ms: config.poll_duration_ms,
+        fee_policy: config.fee_policy,
+        amount_for_reveal_txn: config.amount_for_reveal_txn,
+    };
+
+    let (commit, reveal) =
+        build_commit_reveal_txs(&blobentry.envelopes, &client, &envelope_config).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");

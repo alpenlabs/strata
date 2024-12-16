@@ -48,9 +48,28 @@ pub struct DepositRequestInfo {
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct EnvelopePayload {
     /// for tagging purpose to understand what kind of envelope it is
-    data_type: PayloadTypeTag,
+    tag: PayloadTypeTag,
     /// payload present in envelope
     data: Vec<u8>,
+}
+
+impl EnvelopePayload {
+    pub fn new(data_type: PayloadTypeTag, data: Vec<u8>) -> Self {
+        Self {
+            tag: data_type,
+            data,
+        }
+    }
+
+    /// Raw payload bytes
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Envelope type
+    pub fn tag(&self) -> PayloadTypeTag {
+        self.tag
+    }
 }
 
 /// Enum that acts as a tag to separates different types of envelope blobs.
@@ -62,20 +81,4 @@ pub struct EnvelopePayload {
 pub enum PayloadTypeTag {
     Checkpoint = 0,
     DA = 1,
-}
-
-impl EnvelopePayload {
-    pub fn new(data_type: PayloadTypeTag, data: Vec<u8>) -> Self {
-        Self { data_type, data }
-    }
-
-    /// Raw payload bytes
-    pub fn data(&self) -> &[u8] {
-        &self.data
-    }
-
-    /// Envelope type
-    pub fn data_type(&self) -> PayloadTypeTag {
-        self.data_type
-    }
 }

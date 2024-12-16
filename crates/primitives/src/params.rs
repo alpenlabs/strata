@@ -16,6 +16,12 @@ pub struct RollupParams {
     /// Rollup name
     pub rollup_name: String,
 
+    /// DA Envelope tag
+    pub da_tag: String,
+
+    /// checkpoint Envelope tag
+    pub ckpt_tag: String,
+
     /// Block time in milliseconds.
     pub block_time: u64,
 
@@ -64,6 +70,15 @@ pub struct RollupParams {
 
     /// network the l1 is set on
     pub network: bitcoin::Network,
+
+    /// Fee policy
+    pub fee_policy: FeePolicy,
+
+    /// btcio writer poll duration
+    pub writer_poll_dur: u64,
+
+    /// amount for reveal txn
+    pub amt_for_reveal_tx: u64,
 }
 
 impl RollupParams {
@@ -243,4 +258,13 @@ impl OperatorConfig {
             OperatorConfig::Static(op_keys) => op_keys.as_ref(),
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum FeePolicy {
+    /// Use estimatesmartfee.
+    Smart,
+
+    /// Fixed fee in sat/vB.
+    Fixed(u64),
 }

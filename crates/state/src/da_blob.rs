@@ -210,8 +210,8 @@ impl PayloadCommitment {
 pub struct BundledCommitment(pub Buf32);
 
 impl BundledCommitment {
-    pub fn new(commitment: &Buf32) -> Self {
-        Self(*commitment)
+    pub fn new(commitment: Buf32) -> Self {
+        Self(commitment)
     }
 
     pub fn into_inner(&self) -> Buf32 {

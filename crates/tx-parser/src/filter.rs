@@ -1,4 +1,6 @@
 use bitcoin::{Block, Transaction};
+use strata_envelope_tx::parser::parse_script_for_envelope;
+use strata_primitives::hash;
 use strata_state::{
     batch::SignedBatchCheckpoint,
     da_blob::BundledCommitment,
@@ -6,11 +8,10 @@ use strata_state::{
 };
 
 use super::messages::ProtocolOpTxRef;
-pub use crate::filter_types::TxFilterConfig;
-use crate::{
-    deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
-    envelope::parse_envelope_data,
+use crate::deposit::{
+    deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
 };
+pub use crate::filter_types::TxFilterConfig;
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
 /// [`TxFilterConfig`]s
@@ -36,7 +37,7 @@ pub fn filter_protocol_op_tx_refs(
 //  relevant
 fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
     // Currently all we have are commit reveal txs, deposits and deposit requests
-    parse_reveal_transactions(tx, filter_conf)
+    parse_reveal_transactions_for_proof(tx, filter_conf)
         .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
         .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
         .collect()
@@ -58,26 +59,29 @@ fn parse_deposits(
     extract_deposit_info(tx, &filter_conf.deposit_config).into_iter()
 }
 
-/// Parses envelopes from the given transaction. Can check for checkpoint and DA envelopes
-fn parse_reveal_transactions<'a>(
+/// Parses envelopes from the given transaction. Can check for checkpoint and DA envelopes. This is
+/// to be used on proof side. Instead of storing the
+fn parse_reveal_transactions_for_proof<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> impl Iterator<Item = ProtocolOperation> + 'a {
     tx.input
         .iter()
         .filter_map(|inp| {
-            inp.witness
-                .tapscript()
-                .and_then(|scr| parse_envelope_data(&scr.into(), &filter_conf.rollup_name).ok())
+            inp.witness.tapscript().and_then(|scr| {
+                parse_script_for_envelope(scr, &filter_conf.da_tag, &filter_conf.ckpt_tag).ok()
+            })
         })
         .flatten()
-        .filter_map(|insc| match insc.data_type() {
-            PayloadTypeTag::Checkpoint => borsh::from_slice::<SignedBatchCheckpoint>(insc.data())
-                .ok()
-                .map(ProtocolOperation::Checkpoint),
-            PayloadTypeTag::DA => Some(ProtocolOperation::DA(BundledCommitment::from_payload(&[
-                insc,
-            ]))),
+        .filter_map(|insc| match insc.tag {
+            PayloadTypeTag::Checkpoint => {
+                borsh::from_slice::<SignedBatchCheckpoint>(&insc.get_flattened_chunks())
+                    .ok()
+                    .map(ProtocolOperation::Checkpoint)
+            }
+            PayloadTypeTag::DA => Some(ProtocolOperation::DA(BundledCommitment::new(hash::raw(
+                &insc.get_flattened_chunks(),
+            )))),
         })
 }
 
@@ -97,7 +101,7 @@ mod test {
         Transaction, TxMerkleNode, TxOut,
     };
     use rand::{rngs::OsRng, RngCore};
-    use strata_btcio::writer::builder::{build_reveal_transaction, generate_envelope_script};
+    use strata_envelope_tx::builder::{build_reveal_transaction, generate_envelope_script};
     use strata_primitives::l1::BitcoinAmount;
     use strata_state::tx::{EnvelopePayload, PayloadTypeTag, ProtocolOperation};
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
@@ -163,7 +167,7 @@ mod test {
 
     // Create an commit reveal transaction. The focus here is to create a tapscript, rather than a
     // completely valid control block
-    fn create_commit_reveal_tx(rollup_name: String, num_envelopes: u32) -> Transaction {
+    fn create_commit_reveal_tx(da_tag: &str, ckpt_tag: &str, num_envelopes: u32) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
         let signed_checkpoint: Vec<u8> = ArbitraryGenerator::new().generate();
@@ -171,7 +175,7 @@ mod test {
             .map(|_| EnvelopePayload::new(PayloadTypeTag::DA, signed_checkpoint.clone()))
             .collect::<Vec<_>>();
 
-        let script = generate_envelope_script(&envelope_data, &rollup_name).unwrap();
+        let script = generate_envelope_script(&envelope_data, da_tag, ckpt_tag).unwrap();
 
         // Create controlblock
         let mut rand_bytes = [0; 32];
@@ -199,8 +203,9 @@ mod test {
         // Test with valid name
         let filter_config = create_tx_filter_config();
 
-        let rollup_name = filter_config.rollup_name.clone();
-        let tx = create_commit_reveal_tx(rollup_name.clone(), 1);
+        let da_tag = filter_config.da_tag.clone();
+        let ckpt_tag = filter_config.ckpt_tag.clone();
+        let tx = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let block = create_test_block(vec![tx]);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config.clone())
@@ -210,9 +215,8 @@ mod test {
 
         assert_eq!(txids[0], 0, "Should filter valid rollup name");
 
-        // Test with invalid name
-        let rollup_name = "invalidRollupName".to_string();
-        let tx = create_commit_reveal_tx(rollup_name.clone(), 1);
+        // Test with invalid tag
+        let tx = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let block = create_test_block(vec![tx]);
         let result = filter_protocol_op_tx_refs(&block, filter_config);
         assert!(result.is_empty(), "Should filter out invalid name");
@@ -221,12 +225,13 @@ mod test {
     #[test]
     fn test_filter_relevant_txs_of_commit_reveal_tx_with_multiple_envelope() {
         let filter_config = create_tx_filter_config();
-        let rollup_name = filter_config.rollup_name.clone();
         let num_envelopes = 20;
-        let tx = create_commit_reveal_tx(rollup_name.clone(), num_envelopes);
+        let da_tag = filter_config.da_tag.clone();
+        let ckpt_tag = filter_config.ckpt_tag.clone();
+        let tx = create_commit_reveal_tx(&da_tag, &ckpt_tag, num_envelopes);
         let block = create_test_block(vec![tx]);
 
-        let txids: Vec<ProtocolOpTxRef> = filter_protocol_op_tx_refs(&block, filter_config.clone());
+        let txids: Vec<ProtocolOpTxRef> = filter_protocol_op_tx_refs(&block, filter_config);
 
         assert_eq!(txids[0].index(), 0, "Should filter valid rollup name");
         assert_eq!(
@@ -253,10 +258,11 @@ mod test {
     #[test]
     fn test_filter_relevant_txs_multiple_matches() {
         let filter_config = create_tx_filter_config();
-        let rollup_name = filter_config.rollup_name.clone();
-        let tx1 = create_commit_reveal_tx(rollup_name.clone(), 1);
+        let da_tag = filter_config.da_tag.clone();
+        let ckpt_tag = filter_config.ckpt_tag.clone();
+        let tx1 = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_commit_reveal_tx(rollup_name, 1);
+        let tx3 = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config)

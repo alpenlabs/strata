@@ -1,6 +1,4 @@
-pub mod client;
+//! btcio specific types and traits
 pub mod error;
 pub mod traits;
 pub mod types;
-
-pub use client::*;

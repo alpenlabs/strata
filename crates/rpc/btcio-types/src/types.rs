@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use bitcoin::{
     absolute::Height,
     address::{self, NetworkUnchecked},
@@ -10,7 +12,7 @@ use serde::{
 };
 use tracing::*;
 
-use crate::rpc::error::SignRawTransactionWithWalletError;
+use crate::error::SignRawTransactionWithWalletError;
 
 /// The category of a transaction.
 ///

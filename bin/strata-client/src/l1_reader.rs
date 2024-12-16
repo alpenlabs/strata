@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use strata_btcio::{reader::query::bitcoin_data_reader_task, rpc::traits::Reader};
+use strata_btcio::reader::query::bitcoin_data_reader_task;
+use strata_btcio_rpc_types::traits::Reader;
 use strata_consensus_logic::{csm::ctl::CsmController, l1_handler::bitcoin_data_handler_task};
 use strata_db::traits::{Database, L1Database};
 use strata_primitives::params::Params;

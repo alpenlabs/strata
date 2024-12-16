@@ -2,24 +2,22 @@ use std::sync::Arc;
 
 use bitcoin::{Address, Network};
 use strata_db::{traits::BroadcastDatabase, types::L1TxEntry};
+use strata_primitives::params::FeePolicy;
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance,
-    CommitRevealDb, L1BroadcastDb,
+    L1BroadcastDb, WriterDb,
 };
 use strata_storage::ops::{
     envelope::{Context, EnvelopeDataOps},
     l1tx_broadcast::Context as BContext,
 };
 
-use crate::{
-    broadcaster::L1BroadcastHandle,
-    writer::config::{FeePolicy, WriterConfig},
-};
+use crate::{broadcaster::L1BroadcastHandle, writer::config::WriterConfig};
 
 /// Returns `Arc` of `SequencerDB` for testing
-pub fn get_db() -> Arc<SequencerDB<CommitRevealDb>> {
+pub fn get_db() -> Arc<SequencerDB<WriterDb>> {
     let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-    let seqdb = Arc::new(CommitRevealDb::new(db, db_ops));
+    let seqdb = Arc::new(WriterDb::new(db, db_ops));
     Arc::new(SequencerDB::new(seqdb))
 }
 
@@ -57,7 +55,8 @@ pub fn get_config() -> WriterConfig {
         .unwrap();
     WriterConfig {
         sequencer_address: addr,
-        rollup_name: "strata".to_string(),
+        da_tag: "strata-da".to_string(),
+        ckpt_tag: "strata-cpkt".to_string(),
         fee_policy: FeePolicy::Fixed(100),
         poll_duration_ms: 1000,
         amount_for_reveal_txn: 1000,

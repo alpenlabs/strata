@@ -67,6 +67,11 @@ fn get_deprecated_fallback() -> RollupParams {
         proof_publish_mode: ProofPublishMode::Timeout(5),
         max_deposits_in_block: 16,
         network: bitcoin::Network::Regtest,
+        da_tag: "strata-da".to_string(),
+        ckpt_tag: "strata-ckpt".to_string(),
+        fee_policy: FeePolicy::Smart,
+        writer_poll_dur: 1_000,
+        amt_for_reveal_tx: 1_000,
     }
 }
 

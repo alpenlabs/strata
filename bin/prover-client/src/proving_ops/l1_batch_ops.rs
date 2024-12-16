@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use bitcoin::params::MAINNET;
-use strata_btcio::{reader::query::get_verification_state, rpc::BitcoinClient};
+use strata_btcio::{reader::query::get_verification_state, rpc_client::BitcoinClient};
 use strata_state::l1::HeaderVerificationState;
 use uuid::Uuid;
 

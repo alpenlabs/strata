@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
-    traits::{CommitRevealDatabase, SequencerDatabase},
+    traits::{SequencerDatabase, WriterDatabase},
     types::CommitRevealEntry,
     DbResult,
 };
@@ -12,12 +12,12 @@ use strata_primitives::buf::Buf32;
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 use crate::{sequence::get_next_id, DbOpsConfig};
 
-pub struct CommitRevealDb {
+pub struct WriterDb {
     db: Arc<OptimisticTransactionDB>,
     ops: DbOpsConfig,
 }
 
-impl CommitRevealDb {
+impl WriterDb {
     /// Wraps an existing database handle.
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
@@ -27,7 +27,7 @@ impl CommitRevealDb {
     }
 }
 
-impl CommitRevealDatabase for CommitRevealDb {
+impl WriterDatabase for WriterDb {
     fn put_entry(&self, entry_hash: Buf32, entry: CommitRevealEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
@@ -71,7 +71,7 @@ impl<D> SequencerDB<D> {
     }
 }
 
-impl<B: CommitRevealDatabase> SequencerDatabase for SequencerDB<B> {
+impl<B: WriterDatabase> SequencerDatabase for SequencerDB<B> {
     type CommitRevealDB = B;
 
     fn commit_reveal_db(&self) -> &Arc<Self::CommitRevealDB> {
@@ -82,7 +82,7 @@ impl<B: CommitRevealDatabase> SequencerDatabase for SequencerDB<B> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::CommitRevealDatabase;
+    use strata_db::traits::WriterDatabase;
     use strata_primitives::buf::Buf32;
     use strata_test_utils::ArbitraryGenerator;
     use test;
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn test_put_blob_new_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = CommitRevealDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
 
         let envelope_entry: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn test_put_envelope_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = CommitRevealDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
         let envelope_entry: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn test_update_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = CommitRevealDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
 
         let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn test_get_envelope_by_id() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = CommitRevealDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
 
         let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_get_last_envelope_idx() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = CommitRevealDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
 
         let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();

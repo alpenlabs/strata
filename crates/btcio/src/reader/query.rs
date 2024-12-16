@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::bail;
 use bitcoin::{hashes::Hash, BlockHash};
+use strata_btcio_rpc_types::traits::Reader;
 use strata_primitives::buf::Buf32;
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
@@ -22,7 +23,6 @@ use tracing::*;
 
 use crate::{
     reader::{config::ReaderConfig, state::ReaderState},
-    rpc::traits::Reader,
     status::{apply_status_updates, L1StatusUpdate},
 };
 

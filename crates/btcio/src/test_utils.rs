@@ -6,18 +6,14 @@ use bitcoin::{
     taproot::ControlBlock,
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
-
-use crate::{
-    rpc::{
-        traits::{Broadcaster, Reader, Signer, Wallet},
-        types::{
-            GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
-            ListTransactions, ListUnspent, SignRawTransactionWithWallet,
-        },
-        ClientResult,
+use strata_btcio_rpc_types::{
+    traits::{Broadcaster, ClientResult, Reader, Signer, Wallet},
+    types::{
+        GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
+        ListTransactions, ListUnspent, SignRawTransactionWithWallet,
     },
-    writer::builder::{build_reveal_transaction, CommitRevealTxError},
 };
+use strata_envelope_tx::builder::{build_reveal_transaction, CommitRevealTxError};
 
 /// A test implementation of a Bitcoin client.
 #[derive(Debug, Clone)]

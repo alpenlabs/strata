@@ -1,9 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
+use strata_btcio_rpc_types::traits::{Reader, Signer, Wallet};
 use strata_db::{
     traits::SequencerDatabase,
     types::{CommitRevealEntry, L1TxStatus, PayloadL1Status},
 };
+use strata_envelope_tx::builder::CommitRevealTxError;
 use strata_primitives::buf::Buf32;
 use strata_state::da_blob::{BundledPayloadIntent, DataBundleDest, PayloadIntent};
 use strata_status::StatusChannel;
@@ -14,9 +16,8 @@ use tracing::*;
 use super::config::WriterConfig;
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::traits::{Reader, Signer, Wallet},
     status::{apply_status_updates, L1StatusUpdate},
-    writer::{builder::CommitRevealTxError, signer::create_and_sign_commit_reveal_txs},
+    writer::signer::create_and_sign_commit_reveal_txs,
 };
 
 /// A handle to the envelope task which gets published as commit reveal txs.

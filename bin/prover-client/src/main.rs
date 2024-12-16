@@ -12,7 +12,7 @@ use proving_ops::{
     el_ops::ElOperations, l1_batch_ops::L1BatchOperations, l2_batch_ops::L2BatchOperations,
 };
 use rpc_server::{ProverClientRpc, RpcContext};
-use strata_btcio::rpc::BitcoinClient;
+use strata_btcio::rpc_client::BitcoinClient;
 use strata_common::logging;
 use task::TaskTracker;
 use tracing::{debug, info};

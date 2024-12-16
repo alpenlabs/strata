@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use strata_db::{
-    traits::{CommitRevealDatabase, SequencerDatabase},
+    traits::{SequencerDatabase, WriterDatabase},
     types::CommitRevealEntry,
     DbResult,
 };

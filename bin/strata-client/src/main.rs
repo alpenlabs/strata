@@ -7,9 +7,10 @@ use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
-    rpc::{traits::Reader, BitcoinClient},
+    rpc_client::BitcoinClient,
     writer::{config::WriterConfig, start_envelope_task},
 };
+use strata_btcio_rpc_types::traits::Reader;
 use strata_common::logging;
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
@@ -25,7 +26,7 @@ use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, SyncParams};
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, CommitRevealDb, DbOpsConfig,
+    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, WriterDb,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
@@ -393,7 +394,7 @@ fn start_sequencer_tasks(
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
     runtime: &Runtime,
-    seq_db: Arc<SequencerDB<CommitRevealDb>>,
+    seq_db: Arc<SequencerDB<WriterDb>>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     methods: &mut Methods,
@@ -431,7 +432,11 @@ fn start_sequencer_tasks(
     // Spawn up writer
     let writer_config = WriterConfig::new(
         sequencer_bitcoin_address,
-        params.rollup().rollup_name.clone(),
+        params.rollup().da_tag.clone(),
+        params.rollup().ckpt_tag.clone(),
+        params.rollup().writer_poll_dur,
+        params.rollup().fee_policy,
+        params.rollup().amt_for_reveal_tx,
     )?;
 
     // Start envelope inscribing related tasks

@@ -5,8 +5,10 @@ version = "0.1.0"
 
 [dependencies]
 strata-bridge-tx-builder.workspace = true
+strata-envelope-tx.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
+
 
 anyhow.workspace = true
 arbitrary.workspace = true

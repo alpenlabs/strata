@@ -31,6 +31,7 @@ members = [
   "crates/reth/rpc",
   "crates/rpc/api",
   "crates/rpc/bridge-api",
+  "crates/rpc/btcio-types",
   "crates/rpc/prover-client-api",
   "crates/rpc/types",
   "crates/rpc/utils",
@@ -41,6 +42,7 @@ members = [
   "crates/tasks",
   "crates/test-utils",
   "crates/tx-parser",
+  "crates/envelope_tx",
   "crates/util/mmr",
   "crates/util/shrex",
   "crates/vtxjmt",
@@ -78,12 +80,14 @@ strata-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
 strata-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
 strata-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 strata-btcio = { path = "crates/btcio" }
+strata-btcio-rpc-types = { path = "crates/rpc/btcio-types" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }
 strata-consensus-logic = { path = "crates/consensus-logic" }
 strata-crypto = { path = "crates/crypto", default-features = false }
 strata-db = { path = "crates/db" }
 strata-eectl = { path = "crates/eectl" }
+strata-envelope-tx = { path = "crates/envelope_tx" }
 strata-evmexec = { path = "crates/evmexec" }
 strata-key-derivation = { path = "crates/key-derivation" }
 strata-mmr = { path = "crates/util/mmr" }

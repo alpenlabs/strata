@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use strata_btcio_rpc_types::traits::{Broadcaster, Reader, Signer, Wallet};
 use strata_db::{
     types::{L1TxEntry, L1TxStatus},
     DbResult,
@@ -11,7 +12,6 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use super::task::broadcaster_task;
-use crate::rpc::traits::{Broadcaster, Reader, Signer, Wallet};
 
 pub struct L1BroadcastHandle {
     ops: Arc<BroadcastDbOps>,

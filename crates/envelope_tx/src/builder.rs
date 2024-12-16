@@ -25,18 +25,13 @@ use bitcoin::{
     Witness,
 };
 use rand::{rngs::OsRng, RngCore};
+use strata_btcio_rpc_types::{
+    traits::{Reader, Signer, Wallet},
+    types::ListUnspent,
+};
+use strata_primitives::params::FeePolicy;
 use strata_state::tx::EnvelopePayload;
 use thiserror::Error;
-use tracing::trace;
-
-use crate::{
-    rpc::{
-        traits::{Reader, Signer, Wallet},
-        types::ListUnspent,
-    },
-    writer::config::{FeePolicy, WriterConfig},
-};
-
 const BITCOIN_DUST_LIMIT: u64 = 546;
 
 // TODO: these might need to be in rollup params
@@ -52,14 +47,30 @@ pub enum CommitRevealTxError {
     Other(#[from] anyhow::Error),
 }
 
-// This is hacky solution. As `btcio` has `transaction builder` that `tx-parser` depends on. But
-// Btcio depends on `tx-parser`. So this file is behind a feature flag 'test-utils' and on dev
-// dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
-// dependency doesn't happen
+pub struct EnvelopeTxConfig<'a> {
+    /// The sequencer change_address. This is where the reveal txn spends it's utxo to
+    pub sequencer_address: &'a Address,
+
+    /// da envelope tag
+    pub da_tag: &'a str,
+
+    /// checkpoint envelope tag
+    pub ckpt_tag: &'a str,
+
+    /// Time between each processing queue item, in millis
+    pub poll_duration_ms: u64,
+
+    /// How should the transaction fee be determined
+    pub fee_policy: FeePolicy,
+
+    /// How much amount(in sats) to send to reveal address
+    pub amount_for_reveal_txn: u64,
+}
+
 pub async fn build_commit_reveal_txs(
     envelope_data: &[EnvelopePayload],
     rpc_client: &Arc<impl Reader + Wallet + Signer>,
-    config: &WriterConfig,
+    config: &EnvelopeTxConfig<'_>,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     let network = rpc_client.network().await?;
     let utxos = rpc_client.get_utxos().await?;
@@ -69,7 +80,8 @@ pub async fn build_commit_reveal_txs(
         FeePolicy::Fixed(val) => val,
     };
     build_commit_reveal_transactions_inner(
-        &config.rollup_name,
+        config.da_tag,
+        config.ckpt_tag,
         envelope_data,
         utxos,
         config.sequencer_address.clone(),
@@ -82,7 +94,8 @@ pub async fn build_commit_reveal_txs(
 
 #[allow(clippy::too_many_arguments)]
 pub fn build_commit_reveal_transactions_inner(
-    rollup_name: &str,
+    da_tag: &str,
+    ckpt_tag: &str,
     envelope_data: &[EnvelopePayload],
     utxos: Vec<ListUnspent>,
     recipient: Address,
@@ -95,7 +108,7 @@ pub fn build_commit_reveal_transactions_inner(
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     // Start creating envelope content
-    let reveal_script = build_reveal_script(rollup_name, &public_key, envelope_data)?;
+    let reveal_script = build_reveal_script(da_tag, ckpt_tag, &public_key, envelope_data)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -394,7 +407,8 @@ pub fn generate_key_pair() -> Result<UntweakedKeypair, anyhow::Error> {
 /// Builds reveal script such that it contains opcodes for verifying the internal key as well as the
 /// envelope block
 fn build_reveal_script(
-    rollup_name: &str,
+    da_tag: &str,
+    ckpt_tag: &str,
     taproot_public_key: &XOnlyPublicKey,
     envelopes: &[EnvelopePayload],
 ) -> Result<ScriptBuf, anyhow::Error> {
@@ -403,7 +417,7 @@ fn build_reveal_script(
         .push_opcode(OP_CHECKSIG)
         .into_script()
         .into_bytes();
-    let script = generate_envelope_script(envelopes, rollup_name)?;
+    let script = generate_envelope_script(envelopes, da_tag, ckpt_tag)?;
     script_bytes.extend(script.into_bytes());
     Ok(ScriptBuf::from(script_bytes))
 }
@@ -489,19 +503,20 @@ fn assert_correct_address(
 // Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
 pub fn generate_envelope_script(
     envelopes: &[EnvelopePayload],
-    rollup_name: &str,
+    da_tag: &str,
+    ckpt_tag: &str,
 ) -> anyhow::Result<ScriptBuf> {
     let mut builder = script::Builder::new();
-    for (index, envelope) in envelopes.iter().enumerate() {
+    for envelope in envelopes.iter() {
         builder = builder.push_opcode(OP_FALSE).push_opcode(OP_IF);
 
-        if index == 0 {
-            builder = builder.push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?);
-        }
+        let tag_bytes = match envelope.tag() {
+            strata_state::tx::PayloadTypeTag::Checkpoint => ckpt_tag.as_bytes(),
+            strata_state::tx::PayloadTypeTag::DA => da_tag.as_bytes(),
+        };
 
-        builder = builder.push_int(envelope.data_type() as i64); // Batch Tag
+        builder = builder.push_slice(PushBytesBuf::try_from(tag_bytes.to_vec())?);
 
-        trace!(batchdata_size = %envelope.data().len(), "Inserting batch data");
         for chunk in envelope.data().chunks(520) {
             builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
         }
@@ -520,16 +535,18 @@ mod tests {
         taproot::ControlBlock, Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn,
         TxOut, Witness,
     };
+    use strata_btcio_rpc_types::types::ListUnspent;
     use strata_state::tx::PayloadTypeTag;
 
     use super::*;
-    use crate::{rpc::types::ListUnspent, writer::builder::CommitRevealTxError};
 
-    const BTC_TO_SATS: u64 = 100_000_000;
+    // use strata_::builder::CommitRevealTxError};
+
     const REVEAL_OUTPUT_AMOUNT: u64 = BITCOIN_DUST_LIMIT;
 
     #[allow(clippy::type_complexity)]
     fn get_mock_data() -> (
+        &'static str,
         &'static str,
         Vec<u8>,
         Vec<u8>,
@@ -537,7 +554,8 @@ mod tests {
         Address,
         Vec<ListUnspent>,
     ) {
-        let rollup_name = "test_rollup";
+        let da_tag = "strata-da";
+        let ckpt_tag = "strata-ckpt";
         let body = vec![100; 1000];
         let signature = vec![100; 64];
         let sequencer_public_key = vec![100; 33];
@@ -591,7 +609,8 @@ mod tests {
         ];
 
         (
-            rollup_name,
+            da_tag,
+            ckpt_tag,
             body,
             signature,
             sequencer_public_key,
@@ -602,7 +621,7 @@ mod tests {
 
     #[test]
     fn choose_utxos() {
-        let (_, _, _, _, _, utxos) = get_mock_data();
+        let (_, _, _, _, _, _, utxos) = get_mock_data();
 
         let (chosen_utxos, sum) = super::choose_utxos(&utxos, 500_000_000).unwrap();
 
@@ -664,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_build_reveal_transaction() {
-        let (_, _, _, _, address, utxos) = get_mock_data();
+        let (_, _, _, _, _, address, utxos) = get_mock_data();
 
         let utxo = utxos.first().unwrap();
         let _script = ScriptBuf::from_hex("62a58f2674fd840b6144bea2e63ebd35c16d7fd40252a2f28b2a01a648df356343e47976d7906a0e688bf5e134b6fd21bd365c016b57b1ace85cf30bf1206e27").unwrap();
@@ -715,11 +734,12 @@ mod tests {
 
     #[test]
     fn test_create_commit_reveal_txs() {
-        let (rollup_name, _, _, _, address, utxos) = get_mock_data();
+        let (da_tag, ckpt_tag, _, _, _, address, utxos) = get_mock_data();
 
         let write_intent = [EnvelopePayload::new(PayloadTypeTag::DA, vec![0u8; 100])];
         let (commit, reveal) = super::build_commit_reveal_transactions_inner(
-            rollup_name,
+            da_tag,
+            ckpt_tag,
             &write_intent,
             utxos.to_vec(),
             address.clone(),

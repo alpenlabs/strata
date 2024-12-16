@@ -247,7 +247,7 @@ pub trait CheckpointDatabase {
 /// A trait encapsulating provider and store traits to interact with the underlying database for
 /// [`CommitRevealEntry`]
 pub trait SequencerDatabase {
-    type CommitRevealDB: CommitRevealDatabase;
+    type CommitRevealDB: WriterDatabase;
 
     fn commit_reveal_db(&self) -> &Arc<Self::CommitRevealDB>;
 }
@@ -255,7 +255,7 @@ pub trait SequencerDatabase {
 /// Commit Reveal Transaction Entry Database
 /// A trait encapsulating provider and store traits to create/update [`CommitRevealEntry`]
 /// in the database and to fetch [`CommitRevealEntry`] and indices from the database
-pub trait CommitRevealDatabase {
+pub trait WriterDatabase {
     /// Store the [`CommitRevealEntry`].
     fn put_entry(&self, entryid: Buf32, entry: CommitRevealEntry) -> DbResult<()>;
 

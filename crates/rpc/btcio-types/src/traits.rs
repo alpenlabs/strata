@@ -1,13 +1,16 @@
 use async_trait::async_trait;
 use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txid};
 
-use crate::rpc::{
-    client::ClientResult,
+use crate::{
+    error::ClientError,
     types::{
         GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
         ListTransactions, ListUnspent, SignRawTransactionWithWallet,
     },
 };
+
+/// This is an alias for the result type returned by the [`BitcoinClient`].
+pub type ClientResult<T> = Result<T, ClientError>;
 
 /// Basic functionality that any Bitcoin client that interacts with the
 /// Bitcoin network should provide.

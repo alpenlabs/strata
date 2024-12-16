@@ -5,7 +5,8 @@ use anyhow::Context;
 use bitcoin::{base58, bip32::Xpriv, Address, Network};
 use format_serde_error::SerdeError;
 use rockbound::{rocksdb, OptimisticTransactionDB};
-use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
+use strata_btcio::rpc_client::BitcoinClient;
+use strata_btcio_rpc_types::traits::Wallet;
 use strata_consensus_logic::{
     csm::state_tracker,
     duty::types::{Identity, IdentityData, IdentityKey},
@@ -21,7 +22,7 @@ use strata_primitives::{
 };
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainstateDb,
-    ClientStateDb, CommitRevealDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, SyncEventDb,
+    ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, SyncEventDb, WriterDb,
 };
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
@@ -66,8 +67,8 @@ pub fn init_broadcaster_database(
 pub fn init_sequencer_database(
     rbdb: Arc<OptimisticTransactionDB>,
     ops_config: DbOpsConfig,
-) -> Arc<SequencerDB<CommitRevealDb>> {
-    let seqdb = CommitRevealDb::new(rbdb, ops_config).into();
+) -> Arc<SequencerDB<WriterDb>> {
+    let seqdb = WriterDb::new(rbdb, ops_config).into();
     SequencerDB::new(seqdb).into()
 }
 
