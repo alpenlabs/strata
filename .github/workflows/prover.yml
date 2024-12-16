@@ -41,6 +41,8 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Build prover guest code
         run: cargo build --profile prover-ci -F "prover"

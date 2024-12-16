@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -30,6 +32,8 @@ jobs:
     timeout-minutes: 90 # cold run takes a lot of time as each crate is compiled separately
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Cleanup space
         uses: ./.github/actions/cleanup
@@ -43,8 +47,8 @@ jobs:
           cache-on-failure: true
       - name: Configure sccache
         run: |
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-          echo  "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+          echo  "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.6
         with:
@@ -58,6 +62,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
@@ -70,6 +76,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: codespell-project/actions-codespell@v2
 
   taplo:
@@ -78,6 +86,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Install taplo
         run: |
           curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz \
