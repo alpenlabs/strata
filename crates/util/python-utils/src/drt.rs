@@ -466,7 +466,8 @@ mod tests {
 
     use bdk_wallet::{bitcoin::Amount, KeychainKind, LocalOutput};
     use corepc_node::BitcoinD;
-    use strata_btcio::rpc::{traits::Broadcaster, BitcoinClient};
+    use strata_btcio::rpc_client::BitcoinClient;
+    use strata_btcio_rpc_types::traits::Broadcaster;
     use strata_common::logging;
     use tokio::time::{sleep, Duration};
     use tracing::{debug, info, trace};

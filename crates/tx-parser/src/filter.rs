@@ -3,7 +3,6 @@ use strata_envelope_tx::parser::parse_script_for_envelope;
 use strata_primitives::hash;
 use strata_state::{
     batch::SignedBatchCheckpoint,
-    da_blob::BundledCommitment,
     tx::{DepositInfo, DepositRequestInfo, PayloadTypeTag, ProtocolOperation},
 };
 
@@ -33,11 +32,9 @@ pub fn filter_protocol_op_tx_refs(
 
 /// If a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
 /// info.
-//  TODO: make this function return multiple ops as a single tx can have multiple outpoints that's
-//  relevant
 fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
     // Currently all we have are commit reveal txs, deposits and deposit requests
-    parse_reveal_transactions_for_proof(tx, filter_conf)
+    parse_reveal_transactions(tx, filter_conf)
         .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
         .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
         .collect()
@@ -59,9 +56,8 @@ fn parse_deposits(
     extract_deposit_info(tx, &filter_conf.deposit_config).into_iter()
 }
 
-/// Parses envelopes from the given transaction. Can check for checkpoint and DA envelopes. This is
-/// to be used on proof side. Instead of storing the
-fn parse_reveal_transactions_for_proof<'a>(
+/// Parses envelopes from the given transaction. Can check for checkpoint and DA envelopes.
+fn parse_reveal_transactions<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> impl Iterator<Item = ProtocolOperation> + 'a {
@@ -79,9 +75,7 @@ fn parse_reveal_transactions_for_proof<'a>(
                     .ok()
                     .map(ProtocolOperation::Checkpoint)
             }
-            PayloadTypeTag::DA => Some(ProtocolOperation::DA(BundledCommitment::new(hash::raw(
-                &insc.get_flattened_chunks(),
-            )))),
+            PayloadTypeTag::DA => Some(ProtocolOperation::DA(insc.get_flattened_chunks())),
         })
 }
 

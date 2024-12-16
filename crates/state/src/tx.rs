@@ -16,7 +16,7 @@ pub enum ProtocolOperation {
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
     /// DA data. can be made through `submit_da_blob` RPC.
-    DA(BundledCommitment),
+    DA(Vec<u8>),
     // TODO: add other kinds like statediffs
 }
 
