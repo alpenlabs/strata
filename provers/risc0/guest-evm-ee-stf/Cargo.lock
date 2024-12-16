@@ -3596,6 +3596,7 @@ dependencies = [
  "borsh",
  "serde",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

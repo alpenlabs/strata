@@ -2638,6 +2638,7 @@ dependencies = [
  "sha2",
  "thiserror",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -2753,6 +2754,7 @@ dependencies = [
  "borsh",
  "serde",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

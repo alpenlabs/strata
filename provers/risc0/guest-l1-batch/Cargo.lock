@@ -3245,7 +3245,6 @@ name = "strata-bridge-tx-builder"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "lazy_static",
  "musig2",
  "serde",
  "strata-primitives",
@@ -3256,7 +3255,6 @@ dependencies = [
 name = "strata-crypto"
 version = "0.1.0"
 dependencies = [
- "borsh",
  "secp256k1",
  "sha2",
  "strata-primitives",
@@ -3282,6 +3280,7 @@ dependencies = [
  "sha2",
  "thiserror",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -3373,6 +3372,7 @@ dependencies = [
  "borsh",
  "serde",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
