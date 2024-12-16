@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofReceipt, ProofReport, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
 
 pub mod btc;
 mod checkpoint;
@@ -10,13 +10,11 @@ pub mod l1_batch;
 pub mod l2_batch;
 
 pub trait ProofGenerator<T, P: ZkVmProver> {
-    /// Generates a proof based on the input.
+    /// An input required to generate a proof.
     fn get_input(&self, input: &T) -> ZkVmResult<P::Input>;
 
+    // A host to generate the proof against.
     fn get_host(&self) -> impl ZkVmHost;
-
-    /// Generates a proof based on the input.
-    fn gen_proof(&self, input: &T) -> ZkVmResult<ProofReceipt>;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
@@ -51,8 +49,19 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         Ok(proof)
     }
 
-    // Simulate the proof. This is different than running the in the MOCK_PROVER mode
-    // fn simulate(&self, input: T) -> U
+    /// Generates a proof based on the input.
+    fn gen_proof(&self, input: &T) -> ZkVmResult<ProofReceipt> {
+        let input = self.get_input(input)?;
+        let host = self.get_host();
+        <P as ZkVmProver>::prove(&input, &host)
+    }
+
+    /// Generates a proof report based on the input.
+    fn gen_perf_report(&self, input: &T) -> ZkVmResult<ProofReport> {
+        let input = self.get_input(input)?;
+        let host = self.get_host();
+        <P as ZkVmProver>::perf_stats(&input, &host)
+    }
 }
 
 /// Returns the cache directory for proofs.

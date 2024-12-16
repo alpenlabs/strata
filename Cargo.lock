@@ -13663,6 +13663,7 @@ dependencies = [
  "serde",
  "sha2 0.10.8",
  "sp1-primitives",
+ "sp1-prover",
  "sp1-sdk",
  "sp1-verifier",
  "sp1-zkvm",

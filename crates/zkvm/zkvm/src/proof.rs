@@ -77,6 +77,12 @@ pub struct ProofReceipt {
     public_values: PublicValues,
 }
 
+/// A proof report containing a performance stats about proof generation.
+#[derive(Debug, Clone)]
+pub struct ProofReport {
+    pub cycles: u64,
+}
+
 impl ProofReceipt {
     /// Creates a new `ProofReceipt` from proof and it's associated public values
     pub fn new(proof: Proof, public_values: PublicValues) -> Self {

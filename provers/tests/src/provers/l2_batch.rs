@@ -1,5 +1,5 @@
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
-use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ZkVmHost, ZkVmResult};
 
 use super::{cl::ClProofGenerator, ProofGenerator};
 
@@ -29,12 +29,6 @@ impl<H: ZkVmHost> ProofGenerator<(u64, u64), ClAggProver> for L2BatchProofGenera
 
         let cl_stf_vk = self.cl_proof_generator.get_host().get_verification_key();
         Ok(ClAggInput { batch, cl_stf_vk })
-    }
-
-    fn gen_proof(&self, heights: &(u64, u64)) -> ZkVmResult<ProofReceipt> {
-        let input = self.get_input(heights)?;
-        let host = self.get_host();
-        ClAggProver::prove(&input, &host)
     }
 
     fn get_proof_id(&self, heights: &(u64, u64)) -> String {
