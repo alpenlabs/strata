@@ -20,7 +20,7 @@ use strata_primitives::proof::{ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_zkvm::ZkVmProver;
 use tokio::sync::Mutex;
-use tracing::{debug, info, instrument};
+use tracing::{error, info, instrument};
 
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
@@ -94,17 +94,17 @@ pub trait ProvingOp {
     async fn prove(&self, task_id: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
         info!("Starting proof generation");
 
-        let input = self.fetch_input(task_id, db).await?;
-        debug!("Successfully fetched input");
+        let input = self
+            .fetch_input(task_id, db)
+            .await
+            .inspect_err(|e| error!(?e, "Failed to fetch input"))?;
 
         let proof_res = match task_id.host() {
             ProofZkVm::Native => {
-                debug!("Using NativeHost");
                 let host = hosts::native::get_host(task_id.context());
                 <Self::Prover as ZkVmProver>::prove(&input, &host)
             }
             ProofZkVm::SP1 => {
-                debug!("Using SP1");
                 #[cfg(feature = "sp1")]
                 {
                     let host = hosts::sp1::get_host(task_id.context());
@@ -116,7 +116,6 @@ pub trait ProvingOp {
                 }
             }
             ProofZkVm::Risc0 => {
-                debug!("Using Risc0");
                 #[cfg(feature = "risc0")]
                 {
                     let host = hosts::risc0::get_host(task_id.context());
@@ -129,13 +128,19 @@ pub trait ProvingOp {
             }
         };
 
+        match &proof_res {
+            Ok(_) => {
+                info!("Proof generated successfully")
+            }
+            Err(e) => {
+                error!(?e, "Failed to generate proof")
+            }
+        }
+
         let proof = proof_res.map_err(ProvingTaskError::ZkVmError)?;
-        debug!("Proof successfully generated");
 
         db.put_proof(*task_id, proof)
             .map_err(ProvingTaskError::DatabaseError)?;
-
-        info!("Proof generated and saved");
 
         Ok(())
     }
