@@ -1,5 +1,4 @@
 use core::panic;
-// A container enum for all the test prover generators.
 use std::{collections::HashMap, sync::LazyLock};
 
 use btc::BtcBlockProofGenerator;
@@ -54,7 +53,7 @@ pub struct TestProverGenerators<H: ZkVmHost> {
 }
 
 impl<H: ZkVmHost> TestProverGenerators<H> {
-    fn init<F>(host_provider: F) -> Self
+    pub fn init<F>(host_provider: F) -> Self
     where
         F: Fn(ProofVm) -> H,
     {

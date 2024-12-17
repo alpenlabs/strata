@@ -40,7 +40,7 @@ strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
 ] }
 
 #TODO: specify features accordingly.
-strata-zkvm-hosts = { workspace = true, features = ["sp1", "native"] }
+strata-zkvm-hosts = { workspace = true, features = ["sp1", "native", "risc0"] }
 
 [features]
 default = []

@@ -31,8 +31,11 @@ pub struct CheckpointBatchInfo {
     pub l2_range: (u64, u64),
 }
 
-impl<H: ZkVmHost> ProofGenerator<CheckpointProver> for CheckpointProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
     type Input = CheckpointBatchInfo;
+    type P = CheckpointProver;
+    type H = H;
+
     fn get_input(&self, batch_info: &CheckpointBatchInfo) -> ZkVmResult<CheckpointProverInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
@@ -72,7 +75,7 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointProver> for CheckpointProofGenerator<
         )
     }
 
-    fn get_host(&self) -> impl ZkVmHost {
+    fn get_host(&self) -> H {
         self.host.clone()
     }
 }

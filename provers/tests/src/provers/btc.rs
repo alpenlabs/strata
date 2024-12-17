@@ -16,8 +16,11 @@ impl<H: ZkVmHost> BtcBlockProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<BtcBlockspaceProver> for BtcBlockProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
     type Input = Block;
+    type P = BtcBlockspaceProver;
+    type H = H;
+
     fn get_input(&self, block: &Block) -> ZkVmResult<BlockspaceProofInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
@@ -32,7 +35,7 @@ impl<H: ZkVmHost> ProofGenerator<BtcBlockspaceProver> for BtcBlockProofGenerator
         format!("btc_block_{}", block.block_hash())
     }
 
-    fn get_host(&self) -> impl ZkVmHost {
+    fn get_host(&self) -> H {
         self.host.clone()
     }
 }

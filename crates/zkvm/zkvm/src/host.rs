@@ -4,8 +4,8 @@ use borsh::BorshDeserialize;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    input::ZkVmInputBuilder, ProofReceipt, ProofReport, ProofType, PublicValues, VerificationKey,
-    ZkVmError, ZkVmProofError, ZkVmResult,
+    input::ZkVmInputBuilder, ProofReceipt, ProofType, PublicValues, VerificationKey, ZkVmError,
+    ZkVmProofError, ZkVmResult,
 };
 
 /// A trait implemented by the prover ("host") of a zkVM program.
@@ -58,11 +58,4 @@ pub trait ZkVmHost: Send + Sync + Clone + Display + 'static {
     fn verify(&self, proof: &ProofReceipt) -> ZkVmResult<()> {
         self.verify_inner(&proof.clone().try_into()?)
     }
-
-    /// Generates a performance report for the given input and proof type.
-    fn perf_report<'a>(
-        &self,
-        input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
-        proof_type: ProofType,
-    ) -> ZkVmResult<ProofReport>;
 }

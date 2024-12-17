@@ -19,8 +19,10 @@ impl<H: ZkVmHost> ClProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<ClStfProver> for ClProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
     type Input = u64;
+    type P = ClStfProver;
+    type H = H;
 
     fn get_input(&self, block_num: &u64) -> ZkVmResult<ClStfInput> {
         // Generate EL proof required for aggregation
@@ -47,7 +49,7 @@ impl<H: ZkVmHost> ProofGenerator<ClStfProver> for ClProofGenerator<H> {
         format!("cl_block_{}", block_num)
     }
 
-    fn get_host(&self) -> impl ZkVmHost {
+    fn get_host(&self) -> H {
         self.host.clone()
     }
 }
