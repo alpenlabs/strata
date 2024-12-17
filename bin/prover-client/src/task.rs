@@ -47,8 +47,8 @@ impl TaskTracker {
         self.tasks.clear();
     }
 
-    pub fn total_in_progress_tasks(&self) -> usize {
-        self.in_progress_tasks.values().copied().sum()
+    pub fn get_in_progress_tasks(&self) -> &HashMap<ProofZkVm, usize> {
+        &self.in_progress_tasks
     }
 
     pub fn create_tasks(

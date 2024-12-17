@@ -1,6 +1,7 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use argh::FromArgs;
+use strata_primitives::proof::ProofZkVm;
 
 pub(super) const DEV_RPC_PORT: usize = 4844;
 pub(super) const DEV_RPC_URL: &str = "0.0.0.0";
@@ -50,12 +51,28 @@ pub struct Args {
     #[argh(option, description = "bitcoind RPC password")]
     pub bitcoind_password: String,
 
+    #[cfg(feature = "risc0")]
     #[argh(
         option,
-        description = "number of prover workers to spawn",
+        description = "number of risc0 prover workers to spawn",
         default = "20"
     )]
-    pub workers: usize,
+    pub risc0_workers: usize,
+
+    #[cfg(feature = "sp1")]
+    #[argh(
+        option,
+        description = "number of sp1 prover workers to spawn",
+        default = "20"
+    )]
+    pub sp1_workers: usize,
+
+    #[argh(
+        option,
+        description = "number of native prover workers to spawn",
+        default = "20"
+    )]
+    pub native_workers: usize,
 
     #[argh(
         option,
@@ -88,5 +105,23 @@ impl Args {
 
     pub fn get_btc_rpc_url(&self) -> String {
         format!("http://{}", self.bitcoind_url)
+    }
+
+    pub fn get_workers(&self) -> HashMap<ProofZkVm, usize> {
+        let mut workers = HashMap::new();
+
+        workers.insert(ProofZkVm::Native, self.native_workers);
+
+        #[cfg(feature = "sp1")]
+        {
+            workers.insert(ProofZkVm::SP1, self.sp1_workers);
+        }
+
+        #[cfg(feature = "risc0")]
+        {
+            workers.insert(ProofZkVm::Risc0, self.risc0_workers);
+        }
+
+        workers
     }
 }
