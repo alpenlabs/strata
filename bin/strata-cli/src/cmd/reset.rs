@@ -1,5 +1,5 @@
 use argh::FromArgs;
-use console::{style, Term};
+use colored::Colorize;
 use dialoguer::Confirm;
 
 use crate::{seed::EncryptedSeedPersister, settings::Settings};
@@ -15,16 +15,10 @@ pub struct ResetArgs {
 }
 
 pub async fn reset(args: ResetArgs, persister: impl EncryptedSeedPersister, settings: Settings) {
-    let term = Term::stdout();
     let confirm = if args.assume_yes {
         true
     } else {
-        let _ = term.write_line(
-            &style("This will DESTROY ALL DATA.")
-                .red()
-                .bold()
-                .to_string(),
-        );
+        println!("{}", "This will DESTROY ALL DATA.".to_string().red().bold());
         Confirm::new()
             .with_prompt("Do you REALLY want to continue?")
             .interact()
@@ -33,8 +27,8 @@ pub async fn reset(args: ResetArgs, persister: impl EncryptedSeedPersister, sett
 
     if confirm {
         persister.delete().unwrap();
-        let _ = term.write_line("Wiped seed");
+        println!("Wiped seed");
         std::fs::remove_dir_all(settings.data_dir.clone()).unwrap();
-        let _ = term.write_line("Wiped data directory");
+        println!("Wiped data directory");
     }
 }

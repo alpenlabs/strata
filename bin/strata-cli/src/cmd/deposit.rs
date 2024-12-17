@@ -10,7 +10,7 @@ use bdk_wallet::{
     template::DescriptorTemplateOut,
     KeychainKind, TxOrdering, Wallet,
 };
-use console::{style, Term};
+use colored::Colorize;
 use indicatif::ProgressBar;
 use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
@@ -47,7 +47,6 @@ pub async fn deposit(
     seed: Seed,
     settings: Settings,
 ) {
-    let term = Term::stdout();
     let requested_strata_address =
         strata_address.map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
     let mut l1w =
@@ -59,16 +58,16 @@ pub async fn deposit(
     l1w.persist().unwrap();
 
     let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
-    let _ = term.write_line(&format!(
+    println!(
         "Bridging {} to Strata address {}",
-        style(BRIDGE_IN_AMOUNT.to_string()).green(),
-        style(strata_address).cyan(),
-    ));
+        BRIDGE_IN_AMOUNT.to_string().green(),
+        strata_address.to_string().cyan(),
+    );
 
-    let _ = term.write_line(&format!(
+    println!(
         "Recovery address: {}",
-        style(recovery_address.to_string()).yellow()
-    ));
+        recovery_address.to_string().yellow()
+    );
 
     let (bridge_in_desc, recovery_script_hash) =
         bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
@@ -96,13 +95,13 @@ pub async fn deposit(
         .reveal_next_address(KeychainKind::External)
         .address;
 
-    let _ = term.write_line(&format!(
+    println!(
         "Using {} as bridge in address",
-        style(bridge_in_address.to_string()).yellow()
-    ));
+        bridge_in_address.to_string().yellow()
+    );
 
     let fee_rate = get_fee_rate(fee_rate, settings.signet_backend.as_ref()).await;
-    log_fee_rate(&term, &fee_rate);
+    log_fee_rate(&fee_rate);
 
     const MBL: usize = MAGIC_BYTES.len();
     const TNHL: usize = TapNodeHash::LEN;
@@ -123,7 +122,7 @@ pub async fn deposit(
         .finish()
         .expect("valid psbt");
     l1w.sign(&mut psbt, Default::default()).unwrap();
-    let _ = term.write_line("Built transaction");
+    println!("Built transaction");
 
     let tx = psbt.extract_tx().expect("valid tx");
 
@@ -152,10 +151,7 @@ pub async fn deposit(
             .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
             .pretty(),
     );
-    let _ = term.write_line(&format!(
-        "Expect transaction confirmation in ~{:?}. Funds will take longer than this to be available on Strata.",
-        SIGNET_BLOCK_TIME
-    ));
+    println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Strata.");
 }
 
 fn bridge_in_descriptor(

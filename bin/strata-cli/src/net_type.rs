@@ -1,7 +1,5 @@
 use std::str::FromStr;
 
-use console::Term;
-
 /// Represents a type of network, either Alpen's signet or Strata
 #[derive(PartialEq, Eq)]
 pub enum NetworkType {
@@ -25,11 +23,11 @@ impl FromStr for NetworkType {
 }
 
 /// Parses `val` as a [`NetworkType`]. Prints error message and exits if invalid.
-pub fn net_type_or_exit(val: &str, term: &Term) -> NetworkType {
+pub fn net_type_or_exit(val: &str) -> NetworkType {
     match NetworkType::from_str(val) {
         Ok(t) => t,
         Err(InvalidNetworkType) => {
-            let _ = term.write_line("Invalid network type. Must be signet or strata");
+            println!("Invalid network type. Must be signet or strata");
             std::process::exit(1)
         }
     }

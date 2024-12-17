@@ -1,3 +1,4 @@
+use colored::Colorize;
 pub mod backend;
 pub mod persist;
 
@@ -16,18 +17,17 @@ use bdk_wallet::{
     rusqlite::{self, Connection},
     PersistedWallet, Wallet,
 };
-use console::{style, Term};
 use persist::Persister;
 use terrors::OneOf;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
 use crate::seed::Seed;
 
-pub fn log_fee_rate(term: &Term, fr: &FeeRate) {
-    let _ = term.write_line(&format!(
+pub fn log_fee_rate(fr: &FeeRate) {
+    println!(
         "Using {} as feerate",
-        style(format!("{} sat/vb", fr.to_sat_per_vb_ceil())).green(),
-    ));
+        format!("{} sat/vb", fr.to_sat_per_vb_ceil()).green(),
+    )
 }
 
 pub async fn get_fee_rate(

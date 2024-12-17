@@ -132,7 +132,6 @@ alloy-rpc-types = { version = "0.4.2", features = [
 alloy-rpc-types-eth = { version = "0.4.2", default-features = false, features = [
   "serde",
 ] }
-alloy-serde = { version = "0.4.2", default-features = false }
 alloy-sol-types = "0.8.0"
 revm = { version = "14.0.3", features = ["std"], default-features = false }
 revm-primitives = { version = "10.0.0", features = [
@@ -163,7 +162,6 @@ reth-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = 
 reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0", default-features = false, features = [
   "std",
 ] }
-reth-primitives-traits = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0", default-features = false }
 reth-provider = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
 reth-revm = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
 reth-rpc = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
@@ -198,12 +196,9 @@ futures-util = "0.3"
 hex = { version = "0.4", features = ["serde"] }
 http = "1.0.0"
 hyper = "0.14.25"
-jmt = "0.10.0"
 jsonrpsee = "0.24"
-jsonrpsee-http-client = "0.24"
 jsonrpsee-types = "0.24"
 lru = "0.12"
-miniscript = "12.2.0"
 mockall = "0.11"
 musig2 = { version = "0.1.0", features = ["serde"] }
 num_enum = "0.7"
@@ -225,7 +220,6 @@ reqwest = { version = "0.12.7", default-features = false, features = [
 rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "v2.0.1-alpen.2" }
 secp256k1 = { version = "0.29.1", features = ["global-context", "std"] }
 serde = { version = "1.0", features = ["derive"] }
-serde-hex = "0.1.0"
 serde_json = "1.0.94"
 serde_with = "3.3.0"
 sha2 = "0.10"

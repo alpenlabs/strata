@@ -4,7 +4,6 @@ use std::str::FromStr;
 use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
-use console::Term;
 use indicatif::ProgressBar;
 use rand::{distributions::uniform::SampleRange, rngs::OsRng};
 use reqwest::{StatusCode, Url};
@@ -42,8 +41,7 @@ pub struct PowChallenge {
 }
 
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
-    let term = Term::stdout();
-    let _ = term.write_line("Fetching challenge from faucet");
+    println!("Fetching challenge from faucet");
 
     #[cfg(feature = "strata_faucet")]
     let network_type = net_type_or_exit(&args.network_type, &term);
@@ -58,10 +56,10 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         .json::<PowChallenge>()
         .await
         .expect("invalid response");
-    let _ = term.write_line(&format!(
+    println!(
         "Received POW challenge with difficulty 2^{} from faucet: {:?}. Solving...",
         challenge.difficulty, challenge.nonce
-    ));
+    );
 
     let mut solution = 0u64;
     let prehash = {
@@ -105,7 +103,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
                 }
             };
 
-            let _ = term.write_line(&format!("Claiming to signet address {}", address));
+            println!("Claiming to signet address {}", address);
 
             format!(
                 "{base}claim_l1/{}/{}",
@@ -120,7 +118,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
                 Some(address) => StrataAddress::from_str(&address).expect("bad address"),
                 None => l2w.default_signer_address(),
             };
-            let _ = term.write_line(&format!("Claiming to Strata address {}", address));
+            println!("Claiming to Strata address {}", address);
             format!(
                 "{base}claim_l2/{}/{}",
                 encode(&solution.to_le_bytes()),
@@ -147,7 +145,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
             }
         };
 
-        let _ = term.write_line(&format!("Claiming to signet address {}", address));
+        println!("Claiming to signet address {}", address);
 
         format!(
             "{base}claim_l1/{}/{}",
@@ -161,11 +159,11 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let status = res.status();
     let body = res.text().await.expect("invalid response");
     if status == StatusCode::OK {
-        let _ = term.write_line(
+        println!(
             "Successful queued request for signet bitcoin. It should arrive in your wallet soon.",
         );
     } else {
-        let _ = term.write_line(&format!("Failed: faucet responded with {status}: {body}"));
+        println!("Failed: faucet responded with {status}: {body}");
     }
 }
 
