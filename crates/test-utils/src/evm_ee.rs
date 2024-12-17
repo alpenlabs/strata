@@ -4,7 +4,7 @@ use strata_consensus_logic::genesis::make_genesis_block;
 use strata_primitives::buf::{Buf32, Buf64};
 use strata_proofimpl_cl_stf::{Chainstate, StateCache};
 use strata_proofimpl_evm_ee_stf::{
-    generate_exec_update, process_block_transaction, processor::EvmConfig, EvmBlockStfInput,
+    process_block_transaction, processor::EvmConfig, utils::generate_exec_update, EvmBlockStfInput,
     EvmBlockStfOutput,
 };
 use strata_state::{

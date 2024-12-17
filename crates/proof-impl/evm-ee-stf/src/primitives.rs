@@ -27,7 +27,7 @@ pub struct EvmBlockStfOutput {
     pub new_state_root: FixedBytes<32>,
     pub txn_root: FixedBytes<32>,
     pub withdrawal_intents: Vec<WithdrawalIntent>,
-    pub deposits_txns_root: FixedBytes<32>,
+    pub deposit_requests: Vec<Withdrawal>,
 }
 
 /// Necessary information to prove the execution of a Evm block.

@@ -20,19 +20,16 @@ pub mod mpt;
 pub mod primitives;
 pub mod processor;
 pub mod prover;
+pub mod utils;
 use db::InMemoryDBHelper;
 use mpt::keccak;
 pub use primitives::{EvmBlockStfInput, EvmBlockStfOutput};
 use processor::{EvmConfig, EvmProcessor};
 use reth_primitives::revm_primitives::alloy_primitives::B256;
 use revm::{primitives::SpecId, InMemoryDB};
-use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 use strata_reth_evm::collect_withdrawal_intents;
-use strata_state::{
-    block::ExecSegment,
-    exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
-};
 use strata_zkvm::ZkVmEnv;
+use utils::generate_exec_update;
 
 // TODO: Read the evm config from the genesis config. This should be done in compile time.
 const EVM_CONFIG: EvmConfig = EvmConfig {
@@ -46,6 +43,9 @@ pub fn process_block_transaction(
 ) -> EvmBlockStfOutput {
     // Calculate the previous block hash
     let previous_block_hash = B256::from(keccak(alloy_rlp::encode(input.parent_header.clone())));
+
+    // Deposit requests are processed and forwarded as public parameters for verification on the CL
+    let deposit_requests = input.withdrawals.clone();
 
     // Initialize the in-memory database
     let db = match InMemoryDB::initialize(&mut input) {
@@ -82,7 +82,7 @@ pub fn process_block_transaction(
         new_state_root: block_header.state_root,
         prev_blockhash: previous_block_hash,
         txn_root: block_header.transactions_root,
-        deposits_txns_root: block_header.withdrawals_root.unwrap_or_default(),
+        deposit_requests,
         withdrawal_intents,
     }
 }
@@ -109,22 +109,6 @@ pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
     }
 
     zkvm.commit_borsh(&exec_updates);
-}
-
-/// Generates an execution segment from the given ELProof public parameters.
-pub fn generate_exec_update(el_proof_pp: &EvmBlockStfOutput) -> ExecSegment {
-    // create_evm_extra_payload
-    let update_input = UpdateInput::new(
-        el_proof_pp.block_idx,
-        Vec::new(),
-        Buf32(*el_proof_pp.txn_root),
-        create_evm_extra_payload(Buf32(*el_proof_pp.new_blockhash)),
-    );
-
-    let update_output = UpdateOutput::new_from_state(Buf32(*el_proof_pp.new_state_root));
-    let exec_update = ExecUpdate::new(update_input, update_output);
-
-    ExecSegment::new(exec_update)
 }
 
 #[cfg(test)]
