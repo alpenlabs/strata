@@ -8,6 +8,7 @@ use strata_primitives::{
 };
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_rocksdb::prover::db::ProofDb;
+use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcBlockHeader;
 use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
@@ -35,7 +36,7 @@ impl ClStfOperator {
     pub async fn get_id(&self, block_num: u64) -> Result<L2BlockId, ProvingTaskError> {
         let l2_headers: Option<Vec<RpcBlockHeader>> = self
             .cl_client
-            .request("strata_getHeadersAtIdx", rpc_params![block_num])
+            .get_headers_at_idx(block_num)
             .await
             .inspect_err(|_| error!(%block_num, "Failed to fetch l2_headers"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
@@ -99,7 +100,7 @@ impl ProvingOp for ClStfOperator {
         let block_num = self.get_slot(*block_id).await?;
         let raw_witness: Option<Vec<u8>> = self
             .cl_client
-            .request("strata_getCLBlockWitness", rpc_params![block_num])
+            .get_cl_block_witness_raw(block_num)
             .await
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
         let witness = raw_witness.ok_or(ProvingTaskError::WitnessNotFound)?;

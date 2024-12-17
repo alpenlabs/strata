@@ -13334,6 +13334,7 @@ dependencies = [
  "strata-risc0-adapter",
  "strata-risc0-guest-builder",
  "strata-rocksdb",
+ "strata-rpc-api",
  "strata-rpc-types",
  "strata-sp1-adapter",
  "strata-sp1-guest-builder",
