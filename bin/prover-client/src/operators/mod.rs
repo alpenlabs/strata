@@ -29,8 +29,8 @@ pub mod checkpoint;
 pub mod cl_agg;
 pub mod cl_stf;
 pub mod evm_ee;
-pub mod operator;
 pub mod l1_batch;
+pub mod operator;
 pub mod utils;
 
 pub use operator::ProofOperator;
