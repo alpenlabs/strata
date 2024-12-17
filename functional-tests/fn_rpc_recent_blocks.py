@@ -2,14 +2,14 @@ import time
 
 import flexitest
 
-from entry import TestStrata
+import testenv
 
 NUM_BLOCKS_TO_RECEIVE = 10
 BLOCK_NUMBER = 4
 
 
 @flexitest.register
-class RecentBlocksTest(TestStrata):
+class RecentBlocksTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

@@ -1,12 +1,12 @@
 import flexitest
 from web3 import Web3
 
-from entry import TestStrata
+import testenv
 from utils import wait_until
 
 
 @flexitest.register
-class FullnodeElBlockGenerationTest(TestStrata):
+class FullnodeElBlockGenerationTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("hub1")
 

@@ -4,13 +4,13 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
+import testenv
 from constants import DEFAULT_ROLLUP_PARAMS
-from entry import TestStrata
 from utils import get_bridge_pubkey
 
 
 @flexitest.register
-class BridgeDepositHappyTest(TestStrata):
+class BridgeDepositHappyTest(testenv.StrataTester):
     """
     A test class for happy path scenarios of bridge deposits.
 

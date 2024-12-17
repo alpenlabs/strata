@@ -2,14 +2,14 @@ import time
 
 import flexitest
 
-from entry import TestStrata
+import testenv
 from utils import wait_until
 
 REORG_DEPTH = 3
 
 
 @flexitest.register
-class CLBlockWitnessDataGenerationTest(TestStrata):
+class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

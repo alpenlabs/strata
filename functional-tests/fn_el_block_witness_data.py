@@ -4,11 +4,11 @@ import flexitest
 from solcx import compile_source, install_solc, set_solc_version
 from web3 import Web3
 
-from entry import TestStrata
+import testenv
 
 
 @flexitest.register
-class ElBlockWitnessDataGenerationTest(TestStrata):
+class ElBlockWitnessDataGenerationTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         install_solc(version="0.8.16")
         set_solc_version("0.8.16")

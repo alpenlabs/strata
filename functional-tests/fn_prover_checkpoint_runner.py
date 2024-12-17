@@ -2,11 +2,11 @@ import time
 
 import flexitest
 
-from entry import TestStrata
+import testenv
 
 
 @flexitest.register
-class ProverClientTest(TestStrata):
+class ProverClientTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
 

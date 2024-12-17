@@ -451,9 +451,6 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     )
     # Set up individual loggers for each test
     logger = logging.getLogger(test_name)
-    # Avoid duplicate handlers
-    if logger.hasHandlers():
-        return logger
     # File handler
     log_path = os.path.join(log_dir, f"{test_name}.log")
     file_handler = logging.FileHandler(log_path)

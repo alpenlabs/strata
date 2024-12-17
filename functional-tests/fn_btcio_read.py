@@ -3,15 +3,15 @@ import time
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
+import testenv
 from constants import MAX_HORIZON_POLL_INTERVAL_SECS
-from entry import BasicEnvConfig, TestStrata
 from utils import generate_n_blocks, wait_until
 
 
 @flexitest.register
-class L1StatusTest(TestStrata):
+class L1StatusTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(auto_generate_blocks=False))
+        ctx.set_env(testenv.BasicEnvConfig(auto_generate_blocks=False))
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

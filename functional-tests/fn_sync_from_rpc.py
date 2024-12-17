@@ -2,11 +2,11 @@ import time
 
 import flexitest
 
-from entry import TestStrata
+import testenv
 
 
 @flexitest.register
-class FullnodeElBlockGenerationTest(TestStrata):
+class FullnodeElBlockGenerationTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("hub1")
 

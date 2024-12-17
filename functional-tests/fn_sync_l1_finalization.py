@@ -1,10 +1,10 @@
 import flexitest
 
 import net_settings
+import testenv
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
 )
-from entry import BasicEnvConfig, TestStrata
 from utils import (
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,
@@ -12,7 +12,7 @@ from utils import (
 
 
 @flexitest.register
-class BlockFinalizationTest(TestStrata):
+class BlockFinalizationTest(testenv.StrataTester):
     """ """
 
     def __init__(self, ctx: flexitest.InitContext):
@@ -28,7 +28,7 @@ class BlockFinalizationTest(TestStrata):
         #    "proof_publish_mode": {
         #        "timeout": self.timeout,
 
-        ctx.set_env(BasicEnvConfig(premine_blocks, rollup_settings=settings))
+        ctx.set_env(testenv.BasicEnvConfig(premine_blocks, rollup_settings=settings))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")

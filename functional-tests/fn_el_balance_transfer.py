@@ -3,11 +3,11 @@ import time
 import flexitest
 from web3 import Web3
 
-from entry import TestStrata
+import testenv
 
 
 @flexitest.register
-class ElBalanceTransferTest(TestStrata):
+class ElBalanceTransferTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

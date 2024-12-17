@@ -5,8 +5,8 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from flexitest.service import Service
 
 import net_settings
+import testenv
 from constants import FAST_BATCH_ROLLUP_PARAMS
-from entry import BasicEnvConfig, TestStrata
 from utils import (
     ManualGenBlocksConfig,
     check_nth_checkpoint_finalized,
@@ -17,12 +17,12 @@ from utils import (
 
 
 @flexitest.register
-class BitcoinReorgChecksTest(TestStrata):
+class BitcoinReorgChecksTest(testenv.StrataTester):
     """This tests finalization when there is reorg on L1"""
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(
-            BasicEnvConfig(
+            testenv.BasicEnvConfig(
                 # TODO: Need to generate at least horizon height blocks, can't
                 # get rollup params from here
                 2,

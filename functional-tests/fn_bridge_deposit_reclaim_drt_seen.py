@@ -7,12 +7,12 @@ from strata_utils import (
     take_back_transaction,
 )
 
+import testenv
 from constants import (
     DEFAULT_ROLLUP_PARAMS,
     DEFAULT_TAKEBACK_TIMEOUT,
     UNSPENDABLE_ADDRESS,
 )
-from entry import TestStrata
 from utils import get_bridge_pubkey, wait_until
 
 # Local constants
@@ -23,7 +23,7 @@ TAKE_BACK_FEE = 17_243
 
 
 @flexitest.register
-class BridgeDepositReclaimDrtSeenTest(TestStrata):
+class BridgeDepositReclaimDrtSeenTest(testenv.StrataTester):
     """
     Tests the functionality of broadcasting a deposit request transaction (DRT) for the bridge
     and verifying that the reclaim path works as expected.

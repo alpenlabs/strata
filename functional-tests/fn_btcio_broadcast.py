@@ -1,12 +1,12 @@
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-from entry import TestStrata
+import testenv
 from utils import wait_until
 
 
 @flexitest.register
-class BroadcastTest(TestStrata):
+class BroadcastTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

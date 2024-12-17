@@ -1,10 +1,10 @@
 import flexitest
 
-from entry import TestStrata
+import testenv
 
 
 @flexitest.register
-class L1ConnectTest(TestStrata):
+class L1ConnectTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

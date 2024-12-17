@@ -2,11 +2,11 @@ import time
 
 import flexitest
 
-from entry import TestStrata
+import testenv
 
 
 @flexitest.register
-class ExecUpdateTest(TestStrata):
+class ExecUpdateTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

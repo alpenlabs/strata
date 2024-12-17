@@ -3,13 +3,13 @@ import time
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
+import testenv
 from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from entry import TestStrata
 from utils import generate_n_blocks, wait_until
 
 
 @flexitest.register
-class L1WriterTest(TestStrata):
+class L1WriterTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

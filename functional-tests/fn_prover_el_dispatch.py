@@ -2,12 +2,12 @@ import time
 
 import flexitest
 
-from entry import TestStrata
+import testenv
 from utils import wait_for_proof_with_time_out
 
 
 @flexitest.register
-class ProverClientTest(TestStrata):
+class ProverClientTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
 

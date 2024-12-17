@@ -2,13 +2,13 @@ import time
 
 import flexitest
 
-from entry import TestStrata
+import testenv
 
 WAIT_TIME = 2
 
 
 @flexitest.register
-class BridgeMsgTest(TestStrata):
+class BridgeMsgTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

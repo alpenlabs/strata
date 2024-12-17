@@ -1,10 +1,10 @@
 import flexitest
 
-from entry import TestStrata
+import testenv
 
 
 @flexitest.register
-class ElGenesisTest(TestStrata):
+class ElGenesisTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

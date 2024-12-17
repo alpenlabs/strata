@@ -2,14 +2,14 @@ import time
 
 import flexitest
 
-from entry import TestStrata
+import testenv
 
 UNSET_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 MAX_GENESIS_TRIES = 10
 
 
 @flexitest.register
-class SyncGenesisTest(TestStrata):
+class SyncGenesisTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 

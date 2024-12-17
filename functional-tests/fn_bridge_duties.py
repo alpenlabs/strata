@@ -1,13 +1,13 @@
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
+import testenv
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from entry import TestStrata
 from utils import broadcast_tx, wait_until
 
 
 @flexitest.register
-class BridgeDutiesTest(TestStrata):
+class BridgeDutiesTest(testenv.StrataTester):
     """
     Test that the bridge client can fetch bridge duties correctly.
     """

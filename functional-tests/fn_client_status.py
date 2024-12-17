@@ -1,11 +1,11 @@
 import flexitest
 
-from entry import TestStrata
+import testenv
 from utils import wait_until
 
 
 @flexitest.register
-class L1ClientStatusTest(TestStrata):
+class L1ClientStatusTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
