@@ -1,12 +1,12 @@
 use strata_zkvm::{ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult};
 
-use crate::logic::{BlockspaceProofInput, BlockspaceProofOutput};
+use crate::logic::{BlockScanProofInput, BlockScanProofOutput};
 
 pub struct BtcBlockspaceProver;
 
 impl ZkVmProver for BtcBlockspaceProver {
-    type Input = BlockspaceProofInput;
-    type Output = BlockspaceProofOutput;
+    type Input = BlockScanProofInput;
+    type Output = BlockScanProofOutput;
 
     fn proof_type() -> ProofType {
         ProofType::Compressed
@@ -19,10 +19,10 @@ impl ZkVmProver for BtcBlockspaceProver {
     {
         let mut input_builder = B::new();
         input_builder.write_serde(&input.rollup_params)?;
-        input_builder.write_serde(&input.num_blocks)?;
+        input_builder.write_serde(&input.blocks.len())?;
 
-        for ser_block in &input.serialized_blocks {
-            input_builder.write_buf(ser_block)?;
+        for block in &input.blocks {
+            input_builder.write_buf(&bitcoin::consensus::serialize(&block))?;
         }
 
         input_builder.build()
