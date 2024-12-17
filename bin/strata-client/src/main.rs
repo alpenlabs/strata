@@ -25,9 +25,7 @@ use strata_db::{
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, SyncParams};
-use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, WriterDb,
-};
+use strata_rocksdb::{broadcaster::db::BroadcastDb, DbOpsConfig, WriterDb};
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
@@ -158,7 +156,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 ctx.bitcoin_client.clone(),
                 params.clone(),
             );
-            let seq_db = init_sequencer_database(rbdb.clone(), ops_config);
+            let writer_db = init_writer_database(rbdb.clone(), ops_config);
 
             start_sequencer_tasks(
                 ctx.clone(),
@@ -166,7 +164,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 sequencer_config,
                 &executor,
                 &runtime,
-                seq_db,
+                writer_db,
                 checkpoint_handle.clone(),
                 broadcast_handle,
                 &mut methods,
@@ -394,7 +392,7 @@ fn start_sequencer_tasks(
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
     runtime: &Runtime,
-    seq_db: Arc<SequencerDB<WriterDb>>,
+    writer_db: Arc<WriterDb>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     methods: &mut Methods,
@@ -444,7 +442,7 @@ fn start_sequencer_tasks(
         executor,
         bitcoin_client,
         writer_config,
-        seq_db,
+        writer_db,
         status_channel.clone(),
         pool.clone(),
         broadcast_handle.clone(),

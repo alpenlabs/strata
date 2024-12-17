@@ -113,7 +113,7 @@ impl Config {
                         ClientMode::FullNode(FullNodeConfig { sequencer_rpc })
                     } else {
                         return Err(
-                            "args: no client --sequencer-key or --sequencer-bitcion-address provided or --sequencer-rpc provided"
+                            "args: no client --sequencer-key or --sequencer-bitcoin-address provided or --sequencer-rpc provided"
                                 .to_string(),
                         );
                     }

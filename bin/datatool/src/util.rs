@@ -206,12 +206,10 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         .expect("invalid checkpoint verifier key hash");
 
     // Determine the fee policy
-    let fee_policy = if cmd.smart_fee {
-        FeePolicy::Smart
-    } else if let Some(fixed) = cmd.fixed_fee {
+    let fee_policy = if let Some(fixed) = cmd.fixed_fee {
         FeePolicy::Fixed(fixed)
     } else {
-        bail!("Error: You must specify either --smart-fee or --fixed-fee.");
+        FeePolicy::Smart
     };
 
     let config = ParamsConfig {
@@ -227,8 +225,10 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         // TODO make a const
         deposit_sats,
         proof_timeout: cmd.proof_timeout,
-        da_tag: cmd.da_tag.unwrap_or("strata-da".to_string()),
-        ckpt_tag: cmd.checkpoint_tag.unwrap_or("strata-ckpt".to_string()),
+        da_tag: cmd.da_tag.unwrap_or_else(|| "strata-da".to_string()),
+        ckpt_tag: cmd
+            .checkpoint_tag
+            .unwrap_or_else(|| "strata-ckpt".to_string()),
         fee_policy,
         writer_poll_dur: cmd.writer_poll_duration.unwrap_or(1_000),
         amt_for_reveal_tx: cmd.amount_for_reveal_tx.unwrap_or(1_000),

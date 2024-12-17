@@ -2,8 +2,8 @@ use std::{sync::Arc, time::Duration};
 
 use strata_btcio_rpc_types::traits::{Reader, Signer, Wallet};
 use strata_db::{
-    traits::SequencerDatabase,
-    types::{CommitRevealEntry, L1TxStatus, PayloadL1Status},
+    traits::WriterDatabase,
+    types::{BundleL1Status, DataBundleIntentEntry, L1TxStatus},
 };
 use strata_primitives::buf::Buf32;
 use strata_reveal_tx::builder::CommitRevealTxError;
@@ -36,7 +36,7 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = CommitRevealEntry::new_unsigned(vec![intent.payload().clone()]);
+        let entry = DataBundleIntentEntry::new_unsigned(vec![intent.payload().clone()]);
         self.submit_entry_sync(intent.commitment().into_inner(), entry)
     }
 
@@ -46,7 +46,7 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = CommitRevealEntry::new_unsigned(vec![intent.payload().clone()]);
+        let entry = DataBundleIntentEntry::new_unsigned(vec![intent.payload().clone()]);
         self.submit_entry_async(intent.commitment().into_inner(), entry)
             .await
     }
@@ -57,7 +57,7 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = CommitRevealEntry::new_unsigned(intent.payload().to_vec());
+        let entry = DataBundleIntentEntry::new_unsigned(intent.payload().to_vec());
         self.submit_entry_sync(intent.commitment().into_inner(), entry)
     }
 
@@ -70,12 +70,16 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = CommitRevealEntry::new_unsigned(intent.payload().to_vec());
+        let entry = DataBundleIntentEntry::new_unsigned(intent.payload().to_vec());
         self.submit_entry_async(intent.commitment().into_inner(), entry)
             .await
     }
 
-    fn submit_entry_sync(&self, commitment: Buf32, entry: CommitRevealEntry) -> anyhow::Result<()> {
+    fn submit_entry_sync(
+        &self,
+        commitment: Buf32,
+        entry: DataBundleIntentEntry,
+    ) -> anyhow::Result<()> {
         debug!(?commitment, "Received intent");
         if self.ops.get_entry_blocking(commitment)?.is_some() {
             warn!(?commitment, "Received duplicate intent");
@@ -88,7 +92,7 @@ impl EnvelopeHandle {
     async fn submit_entry_async(
         &self,
         commitment: Buf32,
-        entry: CommitRevealEntry,
+        entry: DataBundleIntentEntry,
     ) -> anyhow::Result<()> {
         debug!(?commitment, "Received intent");
         if self.ops.get_entry_async(commitment).await?.is_some() {
@@ -108,7 +112,7 @@ impl EnvelopeHandle {
 /// # Returns
 ///
 /// [`Result<EnvelopeHandle>`](anyhow::Result)
-pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
+pub fn start_envelope_task<D: WriterDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<impl Reader + Wallet + Signer + Send + Sync + 'static>,
     config: WriterConfig,
@@ -138,7 +142,8 @@ pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
 }
 
 /// Looks into the database from descending index order till it reaches 0 or `Finalized`
-/// [`CommitRevealEntry`] from which the rest of the [`CommitRevealEntry`]s should be watched.
+/// [`DataBundleIntentEntry`] from which the rest of the [`DataBundleIntentEntry`]s should be
+/// watched.
 fn get_next_entry_idx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u64> {
     let mut next_idx = insc_ops.get_next_entry_idx_blocking()?;
 
@@ -146,7 +151,7 @@ fn get_next_entry_idx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u64
         let Some(entry) = insc_ops.get_entry_by_idx_blocking(next_idx - 1)? else {
             break;
         };
-        if entry.status == PayloadL1Status::Finalized {
+        if entry.status == BundleL1Status::Finalized {
             break;
         };
         next_idx -= 1;
@@ -176,7 +181,7 @@ pub async fn watcher_task(
             match entry.status {
                 // If unsigned or needs resign, create new signed commit/reveal txs and update the
                 // entry
-                PayloadL1Status::Unsigned | PayloadL1Status::NeedsResign => {
+                BundleL1Status::Unsigned | BundleL1Status::NeedsResign => {
                     debug!(?entry.status, %curr_entry_idx, "Processing unsigned entry");
                     match create_and_sign_commit_reveal_txs(
                         &entry,
@@ -188,7 +193,7 @@ pub async fn watcher_task(
                     {
                         Ok((cid, rid)) => {
                             let mut updated_entry = entry.clone();
-                            updated_entry.status = PayloadL1Status::Unpublished;
+                            updated_entry.status = BundleL1Status::Unpublished;
                             updated_entry.commit_txid = cid;
                             updated_entry.reveal_txid = rid;
                             update_existing_entry(curr_entry_idx, updated_entry, &envelope_ops)
@@ -208,13 +213,13 @@ pub async fn watcher_task(
                     }
                 }
                 // If finalized, nothing to do, move on to process next entry
-                PayloadL1Status::Finalized => {
+                BundleL1Status::Finalized => {
                     curr_entry_idx += 1;
                 }
                 // If entry is signed but not finalized or excluded yet, check broadcast txs status
-                PayloadL1Status::Published
-                | PayloadL1Status::Confirmed
-                | PayloadL1Status::Unpublished => {
+                BundleL1Status::Published
+                | BundleL1Status::Confirmed
+                | BundleL1Status::Unpublished => {
                     debug!(%curr_entry_idx, "Checking entry's broadcast status");
                     let commit_tx = broadcast_handle
                         .get_tx_entry_by_id_async(entry.commit_txid)
@@ -237,14 +242,14 @@ pub async fn watcher_task(
                             update_existing_entry(curr_entry_idx, updated_entry, &envelope_ops)
                                 .await?;
 
-                            if new_status == PayloadL1Status::Finalized {
+                            if new_status == BundleL1Status::Finalized {
                                 curr_entry_idx += 1;
                             }
                         }
                         _ => {
                             warn!(%curr_entry_idx, "Corresponding commit/reveal entry for entry not found in broadcast db. Sign and create transactions again.");
                             let mut updated_entry = entry.clone();
-                            updated_entry.status = PayloadL1Status::Unsigned;
+                            updated_entry.status = BundleL1Status::Unsigned;
                             update_existing_entry(curr_entry_idx, updated_entry, &envelope_ops)
                                 .await?;
                         }
@@ -259,15 +264,15 @@ pub async fn watcher_task(
 }
 
 async fn update_l1_status(
-    entry: &CommitRevealEntry,
-    new_status: &PayloadL1Status,
+    entry: &DataBundleIntentEntry,
+    new_status: &BundleL1Status,
     status_channel: &StatusChannel,
 ) {
     // Update L1 status. Since we are processing one entry at a time, if the entry is
     // finalized/confirmed, then it means it is published as well
-    if *new_status == PayloadL1Status::Published
-        || *new_status == PayloadL1Status::Confirmed
-        || *new_status == PayloadL1Status::Finalized
+    if *new_status == BundleL1Status::Published
+        || *new_status == BundleL1Status::Confirmed
+        || *new_status == BundleL1Status::Finalized
     {
         let status_updates = [
             L1StatusUpdate::LastPublishedTxid(entry.reveal_txid.into()),
@@ -279,7 +284,7 @@ async fn update_l1_status(
 
 async fn update_existing_entry(
     idx: u64,
-    updated_entry: CommitRevealEntry,
+    updated_entry: DataBundleIntentEntry,
     envelope_ops: &EnvelopeDataOps,
 ) -> anyhow::Result<()> {
     let msg = format!("Expect to find entry {idx} in db");
@@ -287,28 +292,28 @@ async fn update_existing_entry(
     Ok(envelope_ops.put_entry_async(id, updated_entry).await?)
 }
 
-/// Determine the status of the [`CommitRevealEntry`] based on the status of its commit and reveal
-/// transactions in bitcoin.
+/// Determine the status of the [`DataBundleIntentEntry`] based on the status of its commit and
+/// reveal transactions in bitcoin.
 fn determine_envelope_entry_next_status(
     commit_status: &L1TxStatus,
     reveal_status: &L1TxStatus,
-) -> PayloadL1Status {
+) -> BundleL1Status {
     match (&commit_status, &reveal_status) {
         // If reveal is finalized, both are finalized
-        (_, L1TxStatus::Finalized { .. }) => PayloadL1Status::Finalized,
+        (_, L1TxStatus::Finalized { .. }) => BundleL1Status::Finalized,
         // If reveal is confirmed, both are confirmed
-        (_, L1TxStatus::Confirmed { .. }) => PayloadL1Status::Confirmed,
+        (_, L1TxStatus::Confirmed { .. }) => BundleL1Status::Confirmed,
         // If reveal is published regardless of commit, the envelope is published
-        (_, L1TxStatus::Published) => PayloadL1Status::Published,
+        (_, L1TxStatus::Published) => BundleL1Status::Published,
         // if commit has invalid inputs, needs resign
-        (L1TxStatus::InvalidInputs, _) => PayloadL1Status::NeedsResign,
+        (L1TxStatus::InvalidInputs, _) => BundleL1Status::NeedsResign,
         // If commit is unpublished, both are upublished
-        (L1TxStatus::Unpublished, _) => PayloadL1Status::Unpublished,
+        (L1TxStatus::Unpublished, _) => BundleL1Status::Unpublished,
         // If commit is published but not reveal, the entry is unpublished
-        (_, L1TxStatus::Unpublished) => PayloadL1Status::Unpublished,
+        (_, L1TxStatus::Unpublished) => BundleL1Status::Unpublished,
         // If reveal has invalid inputs, these need resign because we can do nothing with just
         // commit tx confirmed. This should not occur in practice
-        (_, L1TxStatus::InvalidInputs) => PayloadL1Status::NeedsResign,
+        (_, L1TxStatus::InvalidInputs) => BundleL1Status::NeedsResign,
     }
 }
 
@@ -336,24 +341,24 @@ mod test {
     fn test_initialize_writer_state_with_existing_envelopes() {
         let iops = get_envelope_ops();
 
-        let mut e1: CommitRevealEntry = ArbitraryGenerator::new().generate();
-        e1.status = PayloadL1Status::Finalized;
+        let mut e1: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        e1.status = BundleL1Status::Finalized;
         let hash: Buf32 = [1; 32].into();
         iops.put_entry_blocking(hash, e1).unwrap();
         let expected_idx = iops.get_next_entry_idx_blocking().unwrap();
 
-        let mut e2: CommitRevealEntry = ArbitraryGenerator::new().generate();
-        e2.status = PayloadL1Status::Published;
+        let mut e2: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        e2.status = BundleL1Status::Published;
         let hash: Buf32 = [2; 32].into();
         iops.put_entry_blocking(hash, e2).unwrap();
 
-        let mut e3: CommitRevealEntry = ArbitraryGenerator::new().generate();
-        e3.status = PayloadL1Status::Unsigned;
+        let mut e3: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        e3.status = BundleL1Status::Unsigned;
         let hash: Buf32 = [3; 32].into();
         iops.put_entry_blocking(hash, e3).unwrap();
 
-        let mut e4: CommitRevealEntry = ArbitraryGenerator::new().generate();
-        e4.status = PayloadL1Status::Unsigned;
+        let mut e4: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        e4.status = BundleL1Status::Unsigned;
         let hash: Buf32 = [4; 32].into();
         iops.put_entry_blocking(hash, e4).unwrap();
 
@@ -367,30 +372,30 @@ mod test {
         // When both are unpublished
         let (commit_status, reveal_status) = (L1TxStatus::Unpublished, L1TxStatus::Unpublished);
         let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Unpublished);
+        assert_eq!(next, BundleL1Status::Unpublished);
 
         // When both are Finalized
         let fin = L1TxStatus::Finalized { confirmations: 5 };
         let (commit_status, reveal_status) = (fin.clone(), fin);
         let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Finalized);
+        assert_eq!(next, BundleL1Status::Finalized);
 
         // When both are Confirmed
         let conf = L1TxStatus::Confirmed { confirmations: 5 };
         let (commit_status, reveal_status) = (conf.clone(), conf.clone());
         let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Confirmed);
+        assert_eq!(next, BundleL1Status::Confirmed);
 
         // When both are Published
         let publ = L1TxStatus::Published;
         let (commit_status, reveal_status) = (publ.clone(), publ.clone());
         let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Published);
+        assert_eq!(next, BundleL1Status::Published);
 
         // When both have invalid
         let (commit_status, reveal_status) = (L1TxStatus::InvalidInputs, L1TxStatus::InvalidInputs);
         let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::NeedsResign);
+        assert_eq!(next, BundleL1Status::NeedsResign);
 
         // When reveal has invalid inputs but commit is confirmed. I doubt this would happen in
         // practice for our case.
@@ -398,6 +403,6 @@ mod test {
         // and published.
         let (commit_status, reveal_status) = (conf.clone(), L1TxStatus::InvalidInputs);
         let next = determine_envelope_entry_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::NeedsResign);
+        assert_eq!(next, BundleL1Status::NeedsResign);
     }
 }

@@ -21,8 +21,8 @@ use strata_primitives::{
     params::{Params, RollupParams},
 };
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainstateDb,
-    ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, SyncEventDb, WriterDb,
+    broadcaster::db::BroadcastDb, l2::db::L2Db, ChainstateDb, ClientStateDb, DbOpsConfig,
+    L1BroadcastDb, L1Db, RBCheckpointDB, SyncEventDb, WriterDb,
 };
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
@@ -64,12 +64,11 @@ pub fn init_broadcaster_database(
     BroadcastDb::new(l1_broadcast_db.into()).into()
 }
 
-pub fn init_sequencer_database(
+pub fn init_writer_database(
     rbdb: Arc<OptimisticTransactionDB>,
     ops_config: DbOpsConfig,
-) -> Arc<SequencerDB<WriterDb>> {
-    let seqdb = WriterDb::new(rbdb, ops_config).into();
-    SequencerDB::new(seqdb).into()
+) -> Arc<WriterDb> {
+    WriterDb::new(rbdb, ops_config).into()
 }
 
 pub fn get_config(args: Args) -> Result<Config, InitError> {

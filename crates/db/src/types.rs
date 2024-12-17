@@ -17,19 +17,19 @@ use strata_zkvm::Proof;
 /// Represents data for a payloads we're still planning to inscribe into commit reveal transaction.
 /// Multiple Envelopes can exist in same transaction
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct CommitRevealEntry {
+pub struct DataBundleIntentEntry {
     pub envelopes: Vec<EnvelopePayload>,
     pub commit_txid: Buf32,
     pub reveal_txid: Buf32,
-    pub status: PayloadL1Status,
+    pub status: BundleL1Status,
 }
 
-impl CommitRevealEntry {
+impl DataBundleIntentEntry {
     pub fn new(
         blobs: Vec<EnvelopePayload>,
         commit_txid: Buf32,
         reveal_txid: Buf32,
-        status: PayloadL1Status,
+        status: BundleL1Status,
     ) -> Self {
         Self {
             envelopes: blobs,
@@ -47,13 +47,13 @@ impl CommitRevealEntry {
     pub fn new_unsigned(blobs: Vec<EnvelopePayload>) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();
-        Self::new(blobs, cid, rid, PayloadL1Status::Unsigned)
+        Self::new(blobs, cid, rid, BundleL1Status::Unsigned)
     }
 }
 
 /// Various status that transactions corresponding to a blob can be in L1
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum PayloadL1Status {
+pub enum BundleL1Status {
     /// The blob has not been signed yet, i.e commit-reveal transactions have not been created yet.
     Unsigned,
 

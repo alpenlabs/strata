@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bitcoin::{consensus, Transaction};
 use strata_btcio_rpc_types::traits::{Reader, Signer, Wallet};
-use strata_db::types::{CommitRevealEntry, L1TxEntry};
+use strata_db::types::{DataBundleIntentEntry, L1TxEntry};
 use strata_primitives::buf::Buf32;
 use strata_reveal_tx::builder::{build_commit_reveal_txs, CommitRevealTxError, EnvelopeTxConfig};
 use tracing::*;
@@ -17,7 +17,7 @@ use crate::broadcaster::L1BroadcastHandle;
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
 pub async fn create_and_sign_commit_reveal_txs(
-    blobentry: &CommitRevealEntry,
+    blobentry: &DataBundleIntentEntry,
     broadcast_handle: &L1BroadcastHandle,
     client: Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
@@ -69,7 +69,7 @@ pub async fn create_and_sign_commit_reveal_txs(
 mod test {
     use std::sync::Arc;
 
-    use strata_db::types::{CommitRevealEntry, PayloadL1Status};
+    use strata_db::types::{BundleL1Status, DataBundleIntentEntry};
     use strata_state::{
         da_blob::BundledCommitment,
         tx::{EnvelopePayload, PayloadTypeTag},
@@ -90,9 +90,9 @@ mod test {
 
         // First insert an unsigned blob
         let envelopes = vec![EnvelopePayload::new(PayloadTypeTag::DA, vec![1; 100])];
-        let entry = CommitRevealEntry::new_unsigned(envelopes);
+        let entry = DataBundleIntentEntry::new_unsigned(envelopes);
 
-        assert_eq!(entry.status, PayloadL1Status::Unsigned);
+        assert_eq!(entry.status, BundleL1Status::Unsigned);
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 

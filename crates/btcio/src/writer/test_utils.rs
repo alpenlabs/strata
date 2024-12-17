@@ -4,8 +4,7 @@ use bitcoin::{Address, Network};
 use strata_db::{traits::BroadcastDatabase, types::L1TxEntry};
 use strata_primitives::params::FeePolicy;
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance,
-    L1BroadcastDb, WriterDb,
+    broadcaster::db::BroadcastDb, test_utils::get_rocksdb_tmp_instance, L1BroadcastDb, WriterDb,
 };
 use strata_storage::ops::{
     envelope::{Context, EnvelopeDataOps},
@@ -15,10 +14,9 @@ use strata_storage::ops::{
 use crate::{broadcaster::L1BroadcastHandle, writer::config::WriterConfig};
 
 /// Returns `Arc` of `SequencerDB` for testing
-pub fn get_db() -> Arc<SequencerDB<WriterDb>> {
+pub fn get_db() -> Arc<WriterDb> {
     let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-    let seqdb = Arc::new(WriterDb::new(db, db_ops));
-    Arc::new(SequencerDB::new(seqdb))
+    Arc::new(WriterDb::new(db, db_ops))
 }
 
 /// Returns `Arc` of [`EnvelopeDataOps`] for testing

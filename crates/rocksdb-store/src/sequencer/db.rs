@@ -4,7 +4,7 @@ use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
     traits::{SequencerDatabase, WriterDatabase},
-    types::CommitRevealEntry,
+    types::DataBundleIntentEntry,
     DbResult,
 };
 use strata_primitives::buf::Buf32;
@@ -28,7 +28,7 @@ impl WriterDb {
 }
 
 impl WriterDatabase for WriterDb {
-    fn put_entry(&self, entry_hash: Buf32, entry: CommitRevealEntry) -> DbResult<()> {
+    fn put_entry(&self, entry_hash: Buf32, entry: DataBundleIntentEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
@@ -48,7 +48,7 @@ impl WriterDatabase for WriterDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<CommitRevealEntry>> {
+    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<DataBundleIntentEntry>> {
         Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
 
@@ -72,9 +72,9 @@ impl<D> SequencerDB<D> {
 }
 
 impl<B: WriterDatabase> SequencerDatabase for SequencerDB<B> {
-    type CommitRevealDB = B;
+    type DataBundleDB = B;
 
-    fn commit_reveal_db(&self) -> &Arc<Self::CommitRevealDB> {
+    fn data_bundle_db(&self) -> &Arc<Self::DataBundleDB> {
         &self.db
     }
 }
@@ -95,7 +95,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = WriterDb::new(db, db_ops);
 
-        let envelope_entry: CommitRevealEntry = ArbitraryGenerator::new().generate();
+        let envelope_entry: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         seq_db
@@ -113,7 +113,7 @@ mod tests {
     fn test_put_envelope_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = WriterDb::new(db, db_ops);
-        let envelope_entry: CommitRevealEntry = ArbitraryGenerator::new().generate();
+        let envelope_entry: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         seq_db
@@ -131,13 +131,13 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = WriterDb::new(db, db_ops);
 
-        let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
+        let envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         // Insert
         seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
 
-        let updated_envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
+        let updated_envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
         seq_db
@@ -152,7 +152,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = WriterDb::new(db, db_ops);
 
-        let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
+        let envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
@@ -166,7 +166,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = WriterDb::new(db, db_ops);
 
-        let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
+        let envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [0; 32].into();
 
         let last_envelope_idx = seq_db.get_last_idx().unwrap();
@@ -178,7 +178,7 @@ mod tests {
         seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
         // Now the last idx is 0
 
-        let envelope: CommitRevealEntry = ArbitraryGenerator::new().generate();
+        let envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
         let envelope_hash: Buf32 = [1; 32].into();
 
         seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();

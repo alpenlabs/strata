@@ -2,22 +2,18 @@
 
 use std::sync::Arc;
 
-use strata_db::{
-    traits::{SequencerDatabase, WriterDatabase},
-    types::CommitRevealEntry,
-    DbResult,
-};
+use strata_db::{traits::WriterDatabase, types::DataBundleIntentEntry, DbResult};
 use strata_primitives::buf::Buf32;
 use threadpool::ThreadPool;
 
 use crate::exec::*;
 
 /// Database context for an database operation interface.
-pub struct Context<D: SequencerDatabase> {
+pub struct Context<D: WriterDatabase + Sync + Send + 'static> {
     db: Arc<D>,
 }
 
-impl<D: SequencerDatabase + Sync + Send + 'static> Context<D> {
+impl<D: WriterDatabase + Sync + Send + 'static> Context<D> {
     /// Create a `Context` for [`EnvelopeDataOps`]
     pub fn new(db: Arc<D>) -> Self {
         Self { db }
@@ -30,52 +26,52 @@ impl<D: SequencerDatabase + Sync + Send + 'static> Context<D> {
 }
 
 inst_ops! {
-    (EnvelopeDataOps, Context<D: SequencerDatabase>) {
-        get_entry(id: Buf32) => Option<CommitRevealEntry>;
-        get_entry_by_idx(idx: u64) => Option<CommitRevealEntry>;
+    (EnvelopeDataOps, Context<D: WriterDatabase>) {
+        get_entry(id: Buf32) => Option<DataBundleIntentEntry>;
+        get_entry_by_idx(idx: u64) => Option<DataBundleIntentEntry>;
         get_entry_id(idx: u64) => Option<Buf32>;
         get_next_entry_idx() => u64;
-        put_entry(id: Buf32, entry: CommitRevealEntry) => ();
+        put_entry(id: Buf32, entry: DataBundleIntentEntry) => ();
     }
 }
 
-fn get_entry<D: SequencerDatabase>(
+fn get_entry<D: WriterDatabase + Sync + Send + 'static>(
     ctx: &Context<D>,
     id: Buf32,
-) -> DbResult<Option<CommitRevealEntry>> {
-    let blob_db = ctx.db.commit_reveal_db();
-    blob_db.get_entry_by_id(id)
+) -> DbResult<Option<DataBundleIntentEntry>> {
+    ctx.db.get_entry_by_id(id)
 }
 
-fn get_entry_id<D: SequencerDatabase>(ctx: &Context<D>, idx: u64) -> DbResult<Option<Buf32>> {
-    let blob_db = ctx.db.commit_reveal_db();
-    blob_db.get_id(idx)
-}
-
-fn get_entry_by_idx<D: SequencerDatabase>(
+fn get_entry_id<D: WriterDatabase + Sync + Send + 'static>(
     ctx: &Context<D>,
     idx: u64,
-) -> DbResult<Option<CommitRevealEntry>> {
-    let blob_db = ctx.db.commit_reveal_db();
-    let id_res = blob_db.get_id(idx)?;
+) -> DbResult<Option<Buf32>> {
+    ctx.db.get_id(idx)
+}
+
+fn get_entry_by_idx<D: WriterDatabase + Sync + Send + 'static>(
+    ctx: &Context<D>,
+    idx: u64,
+) -> DbResult<Option<DataBundleIntentEntry>> {
+    let id_res = ctx.db.get_id(idx)?;
     match id_res {
-        Some(id) => blob_db.get_entry_by_id(id),
+        Some(id) => ctx.db.get_entry_by_id(id),
         None => Ok(None),
     }
 }
 
-fn get_next_entry_idx<D: SequencerDatabase>(ctx: &Context<D>) -> DbResult<u64> {
-    let blob_db = ctx.db.commit_reveal_db();
-    blob_db
+fn get_next_entry_idx<D: WriterDatabase + Sync + Send + 'static>(
+    ctx: &Context<D>,
+) -> DbResult<u64> {
+    ctx.db
         .get_last_idx()
         .map(|x| x.map(|i| i + 1).unwrap_or_default())
 }
 
-fn put_entry<D: SequencerDatabase>(
+fn put_entry<D: WriterDatabase + Sync + Send + 'static>(
     ctx: &Context<D>,
     id: Buf32,
-    entry: CommitRevealEntry,
+    entry: DataBundleIntentEntry,
 ) -> DbResult<()> {
-    let blob_db = ctx.db.commit_reveal_db();
-    blob_db.put_entry(id, entry)
+    ctx.db.put_entry(id, entry)
 }

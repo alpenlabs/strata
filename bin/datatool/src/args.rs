@@ -186,13 +186,7 @@ pub(crate) struct SubcParams {
     )]
     pub(crate) proof_timeout: Option<u32>,
 
-    #[argh(
-        switch,
-        description = "estimate fee through rpc call for writer transactions"
-    )]
-    pub(crate) smart_fee: bool,
-
-    #[argh(option, description = "fixed fee for writer transcation")]
+    #[argh(option, description = "fixed fee for writer transaction")]
     pub(crate) fixed_fee: Option<u64>,
 
     #[argh(option, description = "transaction writer poll duration")]
