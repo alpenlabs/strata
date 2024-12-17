@@ -2,8 +2,8 @@ use bitcoin::Block;
 use serde::{Deserialize, Serialize};
 use strata_primitives::params::RollupParams;
 use strata_zkvm::AggregationInput;
+use strata_zkvm_hosts::ProofVm;
 
-use super::vms::ProofVm;
 use crate::proving_ops::{
     checkpoint_ops::CheckpointInput, cl_ops::CLProverInput, l1_batch_ops::L1BatchInput,
     l2_batch_ops::L2BatchInput,

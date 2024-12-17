@@ -24,6 +24,7 @@ members = [
   "crates/proof-impl/evm-ee-stf",
   "crates/proof-impl/l1-batch",
   "crates/zkvm/zkvm",
+  "crates/zkvm/hosts",
   "crates/reth/db",
   "crates/reth/evm",
   "crates/reth/exex",
@@ -116,6 +117,7 @@ strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
 strata-tx-parser = { path = "crates/tx-parser" }
 strata-zkvm = { path = "crates/zkvm/zkvm" }
+strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 # reth dependencies:

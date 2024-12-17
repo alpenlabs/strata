@@ -5,6 +5,7 @@ use strata_zkvm::{ZkVmHost, ZkVmResult};
 
 use super::{btc::BtcBlockProofGenerator, ProofGenerator};
 
+#[derive(Clone)]
 pub struct L1BatchProofGenerator<H: ZkVmHost> {
     btc_proof_generator: BtcBlockProofGenerator<H>,
     host: H,
@@ -19,7 +20,8 @@ impl<H: ZkVmHost> L1BatchProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<(u32, u32), L1BatchProver> for L1BatchProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator<L1BatchProver> for L1BatchProofGenerator<H> {
+    type Input = (u32, u32);
     fn get_input(&self, heights: &(u32, u32)) -> ZkVmResult<L1BatchProofInput> {
         let (start_height, end_height) = *heights;
 
@@ -60,15 +62,12 @@ mod test {
 
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(l1_batch_host: H, btc_blockspace_host: H) {
+    fn test_proof<H: ZkVmHost>(l1_batch_proof_generator: L1BatchProofGenerator<H>) {
         let params = gen_params();
         let rollup_params = params.rollup();
         let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
         let l1_end_height = l1_start_height + 1;
 
-        let btc_proof_generator = BtcBlockProofGenerator::new(btc_blockspace_host);
-        let l1_batch_proof_generator =
-            L1BatchProofGenerator::new(btc_proof_generator, l1_batch_host);
         let _ = l1_batch_proof_generator
             .get_proof(&(l1_start_height, l1_end_height))
             .unwrap();
@@ -77,21 +76,21 @@ mod test {
     #[test]
     #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
-        use crate::hosts::native::{btc_blockspace, l1_batch};
-        test_proof(l1_batch(), btc_blockspace());
+        use crate::provers::TEST_NATIVE_GENERATORS;
+        test_proof(TEST_NATIVE_GENERATORS.l1_batch());
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        use crate::hosts::risc0::{btc_blockspace, l1_batch};
-        test_proof(l1_batch(), btc_blockspace());
+        use crate::provers::TEST_RISC0_GENERATORS;
+        test_proof(TEST_RISC0_GENERATORS.l1_batch());
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
-        use crate::hosts::sp1::{btc_blockspace, l1_batch};
-        test_proof(l1_batch(), btc_blockspace());
+        use crate::provers::TEST_SP1_GENERATORS;
+        test_proof(TEST_SP1_GENERATORS.l1_batch());
     }
 }

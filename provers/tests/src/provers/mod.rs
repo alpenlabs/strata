@@ -1,27 +1,29 @@
 use std::{fs, path::PathBuf};
 
 use strata_zkvm::{ProofReceipt, ProofReport, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
-
 pub mod btc;
 mod checkpoint;
 pub mod cl;
 pub mod el;
+mod generators;
 pub mod l1_batch;
 pub mod l2_batch;
 
-pub trait ProofGenerator<T, P: ZkVmProver> {
+pub trait ProofGenerator<P: ZkVmProver> {
+    type Input;
+
     /// An input required to generate a proof.
-    fn get_input(&self, input: &T) -> ZkVmResult<P::Input>;
+    fn get_input(&self, input: &Self::Input) -> ZkVmResult<P::Input>;
 
     // A host to generate the proof against.
     fn get_host(&self) -> impl ZkVmHost;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
-    fn get_proof_id(&self, input: &T) -> String;
+    fn get_proof_id(&self, input: &Self::Input) -> String;
 
     /// Retrieves a proof from cache or generates it if not found.
-    fn get_proof(&self, input: &T) -> ZkVmResult<ProofReceipt> {
+    fn get_proof(&self, input: &Self::Input) -> ZkVmResult<ProofReceipt> {
         // 1. Create the unique proof ID
         let proof_id = format!("{}_{}.proof", self.get_proof_id(input), self.get_host());
         println!("Getting proof for {}", proof_id);
@@ -50,14 +52,14 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
     }
 
     /// Generates a proof based on the input.
-    fn gen_proof(&self, input: &T) -> ZkVmResult<ProofReceipt> {
+    fn gen_proof(&self, input: &Self::Input) -> ZkVmResult<ProofReceipt> {
         let input = self.get_input(input)?;
         let host = self.get_host();
         <P as ZkVmProver>::prove(&input, &host)
     }
 
     /// Generates a proof report based on the input.
-    fn gen_perf_report(&self, input: &T) -> ZkVmResult<ProofReport> {
+    fn gen_perf_report(&self, input: &Self::Input) -> ZkVmResult<ProofReport> {
         let input = self.get_input(input)?;
         let host = self.get_host();
         <P as ZkVmProver>::perf_stats(&input, &host)
@@ -105,3 +107,9 @@ fn write_proof_to_file(proof: &ProofReceipt, proof_file: &std::path::Path) -> Re
 fn verify_proof(proof: &ProofReceipt, host: &impl ZkVmHost) -> ZkVmResult<()> {
     host.verify(proof)
 }
+
+pub use generators::TEST_NATIVE_GENERATORS;
+#[cfg(feature = "risc0")]
+pub use generators::TEST_RISC0_GENERATORS;
+#[cfg(feature = "sp1")]
+pub use generators::TEST_SP1_GENERATORS;

@@ -39,6 +39,9 @@ strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
   "prover",
 ] }
 
+#TODO: specify features accordingly.
+strata-zkvm-hosts = { workspace = true, features = ["sp1", "native"] }
+
 [features]
 default = []
 mock = [
