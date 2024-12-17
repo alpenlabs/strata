@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
+use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
+use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcCheckpointInfo;
 use strata_zkvm::AggregationInput;
 use tokio::sync::Mutex;
@@ -39,10 +40,7 @@ impl CheckpointOperator {
 
     async fn fetch_info(&self, ckp_idx: u64) -> Result<RpcCheckpointInfo, ProvingTaskError> {
         self.cl_client
-            .request::<Option<RpcCheckpointInfo>, _>(
-                "strata_getCheckpointInfo",
-                rpc_params![ckp_idx],
-            )
+            .get_checkpoint_info(ckp_idx)
             .await
             .inspect_err(|_| error!(%ckp_idx, "Failed to fetch CheckpointInfo"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
@@ -51,7 +49,7 @@ impl CheckpointOperator {
 
     pub async fn fetch_latest_ckp_idx(&self) -> Result<u64, ProvingTaskError> {
         self.cl_client
-            .request::<Option<u64>, _>("strata_getLatestCheckpointIndex", rpc_params![])
+            .get_latest_checkpoint_index()
             .await
             .inspect_err(|_| error!("Failed to fetch latest checkpoint"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?

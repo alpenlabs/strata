@@ -22,6 +22,7 @@ strata-proofimpl-l1-batch.workspace = true
 strata-prover-client-rpc-api.workspace = true
 strata-rocksdb.workspace = true
 strata-rpc-types.workspace = true
+strata-rpc-api = { workspace = true, features = ["client"] }
 strata-state.workspace = true
 strata-zkvm.workspace = true
 
