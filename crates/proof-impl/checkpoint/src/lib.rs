@@ -153,11 +153,7 @@ pub fn process_checkpoint_proof_outer(
 
     if let Some(prev_checkpoint) = prev_checkpoint {
         let (checkpoint, proof) = prev_checkpoint;
-        zkvm.verify_groth16_proof(
-            &proof,
-            rollup_vk.as_bytes(),
-            &borsh::to_vec(&checkpoint).unwrap(),
-        );
+        zkvm.verify_groth16_proof(&proof, &rollup_vk.0, &borsh::to_vec(&checkpoint).unwrap());
     }
 
     zkvm.commit_borsh(&output);

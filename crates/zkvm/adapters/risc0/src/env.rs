@@ -34,7 +34,7 @@ impl ZkVmEnv for Risc0ZkVmEnv {
     fn verify_groth16_proof(
         &self,
         proof: &Proof,
-        verification_key: &[u8],
+        verification_key: &[u8; 32],
         public_params_raw: &[u8],
     ) {
         verify_groth16(proof, verification_key, public_params_raw).unwrap();
