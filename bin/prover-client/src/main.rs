@@ -61,7 +61,7 @@ async fn main() {
         task_tracker.clone(),
         handler.clone(),
         db.clone(),
-        args.workers,
+        args.get_workers(),
         args.loop_interval,
     );
     debug!("Initialized Prover Manager");
