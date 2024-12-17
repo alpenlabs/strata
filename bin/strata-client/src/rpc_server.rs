@@ -686,8 +686,8 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         self.submit_blobs(blob_vec).await
     }
 
-    async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
-        let blob = vec![EnvelopePayload::new(PayloadTypeTag::DA, blob.into_inner())];
+    async fn submit_envelope_blob(&self, blob: HexBytes, tag: PayloadTypeTag) -> RpcResult<()> {
+        let blob = vec![EnvelopePayload::new(tag, blob.into_inner())];
 
         self.submit_blobs(blob).await
     }

@@ -1,12 +1,7 @@
 use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
-use strata_db::{
-    errors::DbError,
-    traits::{SequencerDatabase, WriterDatabase},
-    types::DataBundleIntentEntry,
-    DbResult,
-};
+use strata_db::{errors::DbError, traits::WriterDatabase, types::DataBundleIntentEntry, DbResult};
 use strata_primitives::buf::Buf32;
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
@@ -58,24 +53,6 @@ impl WriterDatabase for WriterDb {
 
     fn get_id(&self, entryidx: u64) -> DbResult<Option<Buf32>> {
         Ok(self.db.get::<SeqBlobIdSchema>(&entryidx)?)
-    }
-}
-
-pub struct SequencerDB<D> {
-    db: Arc<D>,
-}
-
-impl<D> SequencerDB<D> {
-    pub fn new(db: Arc<D>) -> Self {
-        Self { db }
-    }
-}
-
-impl<B: WriterDatabase> SequencerDatabase for SequencerDB<B> {
-    type DataBundleDB = B;
-
-    fn data_bundle_db(&self) -> &Arc<Self::DataBundleDB> {
-        &self.db
     }
 }
 

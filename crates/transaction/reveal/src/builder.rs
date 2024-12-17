@@ -29,7 +29,7 @@ use strata_btcio_rpc_types::{
     traits::{Reader, Signer, Wallet},
     types::ListUnspent,
 };
-use strata_primitives::params::FeePolicy;
+use strata_primitives::params::{EnvelopeTxConfig, FeePolicy};
 use strata_state::tx::EnvelopePayload;
 use thiserror::Error;
 const BITCOIN_DUST_LIMIT: u64 = 546;
@@ -47,30 +47,10 @@ pub enum CommitRevealTxError {
     Other(#[from] anyhow::Error),
 }
 
-pub struct EnvelopeTxConfig<'a> {
-    /// The sequencer change_address. This is where the reveal txn spends it's utxo to
-    pub sequencer_address: &'a Address,
-
-    /// da envelope tag
-    pub da_tag: &'a str,
-
-    /// checkpoint envelope tag
-    pub ckpt_tag: &'a str,
-
-    /// Time between each processing queue item, in millis
-    pub poll_duration_ms: u64,
-
-    /// How should the transaction fee be determined
-    pub fee_policy: FeePolicy,
-
-    /// How much amount(in sats) to send to reveal address
-    pub amount_for_reveal_txn: u64,
-}
-
 pub async fn build_commit_reveal_txs(
     envelope_data: &[EnvelopePayload],
     rpc_client: &Arc<impl Reader + Wallet + Signer>,
-    config: &EnvelopeTxConfig<'_>,
+    config: &EnvelopeTxConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     let network = rpc_client.network().await?;
     let utxos = rpc_client.get_utxos().await?;
@@ -80,8 +60,8 @@ pub async fn build_commit_reveal_txs(
         FeePolicy::Fixed(val) => val,
     };
     build_commit_reveal_transactions_inner(
-        config.da_tag,
-        config.ckpt_tag,
+        &config.da_tag,
+        &config.ckpt_tag,
         envelope_data,
         utxos,
         config.sequencer_address.clone(),

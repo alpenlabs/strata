@@ -8,6 +8,15 @@ use strata_primitives::{
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 
+/// DA filter mode to be used for Protocol Operation
+#[derive(Clone, Copy)]
+pub enum DaFilterMode {
+    /// Includes whole DA data
+    Full,
+    /// Commitment of the data only
+    Partial,
+}
+
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub struct TxFilterConfig {

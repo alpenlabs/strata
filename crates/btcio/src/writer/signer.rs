@@ -4,7 +4,7 @@ use bitcoin::{consensus, Transaction};
 use strata_btcio_rpc_types::traits::{Reader, Signer, Wallet};
 use strata_db::types::{DataBundleIntentEntry, L1TxEntry};
 use strata_primitives::buf::Buf32;
-use strata_reveal_tx::builder::{build_commit_reveal_txs, CommitRevealTxError, EnvelopeTxConfig};
+use strata_reveal_tx::builder::{build_commit_reveal_txs, CommitRevealTxError};
 use tracing::*;
 
 use super::config::WriterConfig;
@@ -23,18 +23,8 @@ pub async fn create_and_sign_commit_reveal_txs(
     config: &WriterConfig,
 ) -> Result<(Buf32, Buf32), CommitRevealTxError> {
     trace!("Creating and signing commit reveal transactions");
-
-    let envelope_config = EnvelopeTxConfig {
-        sequencer_address: &config.sequencer_address,
-        da_tag: &config.da_tag,
-        ckpt_tag: &config.ckpt_tag,
-        poll_duration_ms: config.poll_duration_ms,
-        fee_policy: config.fee_policy,
-        amount_for_reveal_txn: config.amount_for_reveal_txn,
-    };
-
     let (commit, reveal) =
-        build_commit_reveal_txs(&blobentry.envelopes, &client, &envelope_config).await?;
+        build_commit_reveal_txs(&blobentry.envelopes, &client, &config.envelope_tx_config).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");

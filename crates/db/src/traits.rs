@@ -243,15 +243,6 @@ pub trait CheckpointDatabase {
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
 
-/// NOTE: We might have to merge this with the [`Database`]
-/// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`DataBundleIntentEntry`]
-pub trait SequencerDatabase {
-    type DataBundleDB: WriterDatabase;
-
-    fn data_bundle_db(&self) -> &Arc<Self::DataBundleDB>;
-}
-
 /// Commit Reveal Transaction Entry Database
 /// A trait encapsulating provider and store traits to create/update [`DataBundleIntentEntry`]
 /// in the database and to fetch [`DataBundleIntentEntry`] and indices from the database

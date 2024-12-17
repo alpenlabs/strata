@@ -9,7 +9,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::bail;
 use bitcoin::{
     base58,
     bip32::{Xpriv, Xpub},

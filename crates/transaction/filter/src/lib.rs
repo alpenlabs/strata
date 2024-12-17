@@ -6,11 +6,14 @@ pub mod types;
 pub mod utils;
 
 use bitcoin::{Block, Transaction};
+use strata_primitives::hash;
 use strata_reveal_tx::parser::parse_script_for_envelope;
 use strata_state::{
     batch::SignedBatchCheckpoint,
-    tx::{DepositInfo, DepositRequestInfo, PayloadTypeTag, ProtocolOperation},
+    da_blob::BundledCommitment,
+    tx::{DAInfo, DepositInfo, DepositRequestInfo, PayloadTypeTag, ProtocolOperation},
 };
+use types::DaFilterMode;
 
 pub use crate::types::TxFilterConfig;
 use crate::{
@@ -23,13 +26,14 @@ use crate::{
 pub fn filter_protocol_op_tx_refs(
     block: &Block,
     filter_config: TxFilterConfig,
+    da_mode: DaFilterMode,
 ) -> Vec<ProtocolOpTxRef> {
     block
         .txdata
         .iter()
         .enumerate()
         .flat_map(|(i, tx)| {
-            extract_protocol_ops(tx, &filter_config)
+            extract_protocol_ops(tx, &filter_config, da_mode)
                 .into_iter()
                 .map(move |relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
         })
@@ -38,9 +42,13 @@ pub fn filter_protocol_op_tx_refs(
 
 /// If a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
 /// info.
-fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
+fn extract_protocol_ops(
+    tx: &Transaction,
+    filter_conf: &TxFilterConfig,
+    da_mode: DaFilterMode,
+) -> Vec<ProtocolOperation> {
     // Currently all we have are commit reveal txs, deposits and deposit requests
-    parse_reveal_transactions(tx, filter_conf)
+    parse_reveal_transactions(tx, filter_conf, da_mode)
         .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
         .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
         .collect()
@@ -66,6 +74,7 @@ fn parse_deposits(
 fn parse_reveal_transactions<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
+    da_mode: DaFilterMode,
 ) -> impl Iterator<Item = ProtocolOperation> + 'a {
     tx.input
         .iter()
@@ -75,13 +84,22 @@ fn parse_reveal_transactions<'a>(
             })
         })
         .flatten()
-        .filter_map(|insc| match insc.tag {
+        .filter_map(move |insc| match insc.tag {
             PayloadTypeTag::Checkpoint => {
                 borsh::from_slice::<SignedBatchCheckpoint>(&insc.get_flattened_chunks())
                     .ok()
                     .map(ProtocolOperation::Checkpoint)
             }
-            PayloadTypeTag::DA => Some(ProtocolOperation::DA(insc.get_flattened_chunks())),
+            PayloadTypeTag::DA => {
+                let da_info = match da_mode {
+                    DaFilterMode::Full => DAInfo::Data(insc.get_flattened_chunks()),
+                    DaFilterMode::Partial => DAInfo::Commitment(BundledCommitment::new(hash::raw(
+                        &insc.get_flattened_chunks(),
+                    ))),
+                };
+
+                Some(ProtocolOperation::DA(da_info))
+            }
         })
 }
 

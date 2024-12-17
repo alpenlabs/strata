@@ -16,7 +16,7 @@ use strata_status::StatusChannel;
 use strata_tx_filter::{
     filter_protocol_op_tx_refs,
     messages::{BlockData, L1Event},
-    types::TxFilterConfig,
+    types::{DaFilterMode, TxFilterConfig},
 };
 use tokio::sync::mpsc;
 use tracing::*;
@@ -233,7 +233,7 @@ async fn fetch_and_process_block<R: Reader>(
 
     let params = ctx.config.params.clone();
     let filter_config = TxFilterConfig::derive_from(params.rollup())?;
-    let filtered_txs = filter_protocol_op_tx_refs(&block, filter_config);
+    let filtered_txs = filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Full);
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");

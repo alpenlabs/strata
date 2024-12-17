@@ -1,25 +1,12 @@
 use bitcoin::Address;
-use strata_primitives::params::FeePolicy;
+use strata_primitives::params::{EnvelopeTxConfig, FeePolicy};
 
 #[derive(Debug, Clone)]
 pub struct WriterConfig {
-    /// The sequencer change_address. This is where the reveal txn spends it's utxo to
-    pub(super) sequencer_address: Address,
-
-    /// da envelope tag
-    pub(super) da_tag: String,
-
-    /// checkpoint envelope tag
-    pub(super) ckpt_tag: String,
-
     /// Time between each processing queue item, in millis
-    pub(super) poll_duration_ms: u64,
-
-    /// How should the transaction fee be determined
-    pub(super) fee_policy: FeePolicy,
-
-    /// How much amount(in sats) to send to reveal address
-    pub(super) amount_for_reveal_txn: u64,
+    pub poll_duration_ms: u64,
+    /// Configuration for commit reveal transaction
+    pub envelope_tx_config: EnvelopeTxConfig,
 }
 
 impl WriterConfig {
@@ -32,13 +19,14 @@ impl WriterConfig {
         amount_for_reveal_txn: u64,
     ) -> anyhow::Result<Self> {
         Ok(Self {
-            sequencer_address,
-            da_tag,
-            ckpt_tag,
-            // TODO: get these from config as well
-            fee_policy,
             poll_duration_ms,
-            amount_for_reveal_txn,
+            envelope_tx_config: EnvelopeTxConfig {
+                sequencer_address,
+                da_tag,
+                ckpt_tag,
+                fee_policy,
+                amount_for_reveal_txn,
+            },
         })
     }
 }

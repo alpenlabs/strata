@@ -8,7 +8,9 @@ use strata_rpc_types::{
     HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcCheckpointInfo, RpcDepositEntry,
     RpcExecUpdate, RpcSyncStatus,
 };
-use strata_state::{id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent};
+use strata_state::{
+    id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent, tx::PayloadTypeTag,
+};
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
@@ -138,8 +140,8 @@ pub trait StrataSequencerApi {
     async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()>;
 
     /// Adds L1Write sequencer duty which will be executed by sequencer
-    #[method(name = "strataadmin_submitDABlob")]
-    async fn submit_da_blob(&self, blobs: HexBytes) -> RpcResult<()>;
+    #[method(name = "strataadmin_submitEnvelopeBlob")]
+    async fn submit_envelope_blob(&self, blob: HexBytes, tag: PayloadTypeTag) -> RpcResult<()>;
 
     /// Verifies and adds the submitted proof to the checkpoint database
     #[method(name = "strataadmin_submitCheckpointProof")]
