@@ -53,7 +53,7 @@ async fn main() {
     let handler = Arc::new(ProofHandler::init(btc_client, el_client, cl_client));
     let task_tracker = Arc::new(Mutex::new(TaskTracker::new()));
 
-    let rbdb = open_rocksdb_database().unwrap();
+    let rbdb = open_rocksdb_database(&args.datadir).expect("failed to open DB");
     let db_ops = DbOpsConfig { retry_count: 3 };
     let db = Arc::new(ProofDb::new(rbdb, db_ops));
 

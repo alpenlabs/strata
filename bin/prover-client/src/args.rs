@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use argh::FromArgs;
 
 pub(super) const DEV_RPC_PORT: usize = 4844;
@@ -26,6 +28,13 @@ pub struct Args {
     )]
     pub rpc_url: String,
 
+    #[argh(
+        option,
+        short = 'd',
+        description = "datadir path that will contain databases"
+    )]
+    pub datadir: PathBuf,
+
     #[argh(option, description = "sequencer rpc host:port")]
     pub sequencer_rpc: String,
 
@@ -44,7 +53,7 @@ pub struct Args {
     #[argh(
         option,
         description = "number of prover workers to spawn",
-        default = "64"
+        default = "20"
     )]
     pub workers: usize,
 
