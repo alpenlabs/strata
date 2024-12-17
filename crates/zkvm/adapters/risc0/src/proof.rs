@@ -1,5 +1,5 @@
 use risc0_zkvm::{InnerReceipt, Receipt};
-use strata_zkvm::{Proof, ProofReceipt, PublicValues};
+use strata_zkvm::{Proof, ProofReceipt, PublicValues, ZkVmProofError};
 
 #[derive(Debug, Clone)]
 pub struct Risc0ProofReceipt(Receipt);
@@ -22,27 +22,29 @@ impl AsRef<Receipt> for Risc0ProofReceipt {
     }
 }
 
-impl From<ProofReceipt> for Risc0ProofReceipt {
-    fn from(value: ProofReceipt) -> Self {
-        Risc0ProofReceipt::from(&value)
+impl TryFrom<ProofReceipt> for Risc0ProofReceipt {
+    type Error = ZkVmProofError;
+    fn try_from(value: ProofReceipt) -> Result<Self, Self::Error> {
+        Risc0ProofReceipt::try_from(&value)
     }
 }
 
-impl From<&ProofReceipt> for Risc0ProofReceipt {
-    fn from(value: &ProofReceipt) -> Self {
+impl TryFrom<&ProofReceipt> for Risc0ProofReceipt {
+    type Error = ZkVmProofError;
+    fn try_from(value: &ProofReceipt) -> Result<Self, Self::Error> {
         let journal = value.public_values().as_bytes().to_vec();
         let inner: InnerReceipt = bincode::deserialize(value.proof().as_bytes())
-            .expect("bincode deserialization of Risc0 InnerReceipt failed");
-        Receipt::new(inner, journal).into()
+            .map_err(|e| ZkVmProofError::DataFormat(e.into()))?;
+        Ok(Receipt::new(inner, journal).into())
     }
 }
-impl From<Risc0ProofReceipt> for ProofReceipt {
-    fn from(value: Risc0ProofReceipt) -> Self {
+impl TryFrom<Risc0ProofReceipt> for ProofReceipt {
+    type Error = ZkVmProofError;
+    fn try_from(value: Risc0ProofReceipt) -> Result<Self, Self::Error> {
         let proof = Proof::new(
-            bincode::serialize(&value.0.inner)
-                .expect("bincode serialization for Risc0 InnerReceipt failed"),
+            bincode::serialize(&value.0.inner).map_err(|e| ZkVmProofError::DataFormat(e.into()))?,
         );
         let public_values = PublicValues::new(value.0.journal.bytes.to_vec());
-        ProofReceipt::new(proof, public_values)
+        Ok(ProofReceipt::new(proof, public_values))
     }
 }

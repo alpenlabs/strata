@@ -84,7 +84,8 @@ impl ZkVmHost for SP1Host {
     fn extract_serde_public_output<T: Serialize + DeserializeOwned>(
         public_values: &PublicValues,
     ) -> ZkVmResult<T> {
-        let public_params: T = bincode::deserialize(public_values.as_bytes())?;
+        let public_params: T = bincode::deserialize(public_values.as_bytes())
+            .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
         Ok(public_params)
     }
 

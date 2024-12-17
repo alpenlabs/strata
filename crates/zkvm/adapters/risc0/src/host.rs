@@ -64,8 +64,8 @@ impl ZkVmHost for Risc0Host {
         let journal = Journal::new(proof.as_bytes().to_vec());
         journal
             .decode()
-            .map_err(|e| ZkVmError::DeserializationError {
-                source: strata_zkvm::DeserializationErrorSource::Serde(e.to_string()),
+            .map_err(|e| ZkVmError::OutputExtractionError {
+                source: strata_zkvm::DataFormatError::Serde(e.to_string()),
             })
     }
 

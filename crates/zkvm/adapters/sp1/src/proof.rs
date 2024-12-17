@@ -1,5 +1,5 @@
 use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1PublicValues, SP1Stdin};
-use strata_zkvm::{Proof, ProofReceipt, PublicValues};
+use strata_zkvm::{Proof, ProofReceipt, PublicValues, ZkVmProofError};
 
 #[derive(Debug, Clone)]
 pub struct SP1ProofReceipt(SP1ProofWithPublicValues);
@@ -22,17 +22,19 @@ impl AsRef<SP1ProofWithPublicValues> for SP1ProofReceipt {
     }
 }
 
-impl From<ProofReceipt> for SP1ProofReceipt {
-    fn from(value: ProofReceipt) -> Self {
-        SP1ProofReceipt::from(&value)
+impl TryFrom<ProofReceipt> for SP1ProofReceipt {
+    type Error = ZkVmProofError;
+    fn try_from(value: ProofReceipt) -> Result<Self, Self::Error> {
+        SP1ProofReceipt::try_from(&value)
     }
 }
 
-impl From<&ProofReceipt> for SP1ProofReceipt {
-    fn from(value: &ProofReceipt) -> Self {
+impl TryFrom<&ProofReceipt> for SP1ProofReceipt {
+    type Error = ZkVmProofError;
+    fn try_from(value: &ProofReceipt) -> Result<Self, Self::Error> {
         let public_values = SP1PublicValues::from(value.public_values().as_bytes());
         let proof: SP1Proof = bincode::deserialize(value.proof().as_bytes())
-            .expect("bincode deserialization of SP1Proof failed");
+            .map_err(|e| ZkVmProofError::DataFormat(e.into()))?;
         let sp1_version = sp1_sdk::SP1_CIRCUIT_VERSION.to_string();
         let proof_receipt = SP1ProofWithPublicValues {
             proof,
@@ -40,15 +42,17 @@ impl From<&ProofReceipt> for SP1ProofReceipt {
             stdin: SP1Stdin::default(),
             sp1_version,
         };
-        SP1ProofReceipt(proof_receipt)
+        Ok(SP1ProofReceipt(proof_receipt))
     }
 }
-impl From<SP1ProofReceipt> for ProofReceipt {
-    fn from(value: SP1ProofReceipt) -> Self {
+
+impl TryFrom<SP1ProofReceipt> for ProofReceipt {
+    type Error = ZkVmProofError;
+    fn try_from(value: SP1ProofReceipt) -> Result<Self, Self::Error> {
         let proof = Proof::new(
-            bincode::serialize(&value.0.proof).expect("bincode serialization of SP1Proof failed"),
+            bincode::serialize(&value.0.proof).map_err(|e| ZkVmProofError::DataFormat(e.into()))?,
         );
         let public_values = PublicValues::new(value.0.public_values.to_vec());
-        ProofReceipt::new(proof, public_values)
+        Ok(ProofReceipt::new(proof, public_values))
     }
 }
