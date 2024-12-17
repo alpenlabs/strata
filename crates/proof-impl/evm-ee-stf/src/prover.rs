@@ -1,4 +1,4 @@
-use strata_zkvm::{ProofType, PublicValues, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofType, PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
 
 use crate::{ELProofInput, ELProofPublicParams};
 
@@ -12,7 +12,7 @@ impl ZkVmProver for EvmEeProver {
         ProofType::Compressed
     }
 
-    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmResult<B::Input>
+    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,
     {

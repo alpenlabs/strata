@@ -83,7 +83,7 @@ pub enum ZkVmVerificationKeyError {
 #[derive(Debug, Error)]
 pub enum ZkVmProofError {
     #[error("Input data format error")]
-    DataFormat(#[from] DataFormatError),
+    DataFormat(#[source] DataFormatError),
 
     #[error("Invalid ProofType: expected {0:?}")]
     InvalidProofType(ProofType),
