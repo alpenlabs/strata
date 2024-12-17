@@ -13365,6 +13365,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-provers-perf"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "clap",
+ "reqwest 0.12.7",
+ "serde",
+ "serde_json",
+ "sp1-prover",
+ "sp1-sdk",
+ "sp1-stark",
+ "strata-native-zkvm-adapter",
+ "strata-risc0-adapter",
+ "strata-sp1-adapter",
+ "strata-sp1-guest-builder",
+ "strata-test-utils",
+ "strata-zkvm",
+ "strata-zkvm-tests",
+ "time",
+ "tokio",
+]
+
+[[package]]
 name = "strata-python-utils"
 version = "0.5.0"
 dependencies = [

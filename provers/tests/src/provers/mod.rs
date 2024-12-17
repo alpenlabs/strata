@@ -1,28 +1,30 @@
 use std::{fs, path::PathBuf};
 
-use strata_zkvm::{ProofReceipt, ProofReport, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
 pub mod btc;
-mod checkpoint;
+pub mod checkpoint;
 pub mod cl;
 pub mod el;
 mod generators;
 pub mod l1_batch;
 pub mod l2_batch;
 
-pub use generators::TEST_NATIVE_GENERATORS;
 #[cfg(feature = "risc0")]
 pub use generators::TEST_RISC0_GENERATORS;
 #[cfg(feature = "sp1")]
 pub use generators::TEST_SP1_GENERATORS;
+pub use generators::{TestProverGenerators, TEST_NATIVE_GENERATORS};
 
-pub trait ProofGenerator<P: ZkVmProver> {
+pub trait ProofGenerator {
     type Input;
+    type P: ZkVmProver;
+    type H: ZkVmHost;
 
     /// An input required to generate a proof.
-    fn get_input(&self, input: &Self::Input) -> ZkVmResult<P::Input>;
+    fn get_input(&self, input: &Self::Input) -> ZkVmResult<<Self::P as ZkVmProver>::Input>;
 
     // A host to generate the proof against.
-    fn get_host(&self) -> impl ZkVmHost;
+    fn get_host(&self) -> Self::H;
 
     /// Generates a unique proof ID based on the input.
     /// The proof ID will be the hash of the input and potentially other unique identifiers.
@@ -61,14 +63,7 @@ pub trait ProofGenerator<P: ZkVmProver> {
     fn gen_proof(&self, input: &Self::Input) -> ZkVmResult<ProofReceipt> {
         let input = self.get_input(input)?;
         let host = self.get_host();
-        <P as ZkVmProver>::prove(&input, &host)
-    }
-
-    /// Generates a proof report based on the input.
-    fn gen_perf_report(&self, input: &Self::Input) -> ZkVmResult<ProofReport> {
-        let input = self.get_input(input)?;
-        let host = self.get_host();
-        <P as ZkVmProver>::perf_stats(&input, &host)
+        <Self::P as ZkVmProver>::prove(&input, &host)
     }
 }
 

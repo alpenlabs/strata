@@ -20,8 +20,11 @@ impl<H: ZkVmHost> L1BatchProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<L1BatchProver> for L1BatchProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
     type Input = (u32, u32);
+    type P = L1BatchProver;
+    type H = H;
+
     fn get_input(&self, heights: &(u32, u32)) -> ZkVmResult<L1BatchProofInput> {
         let (start_height, end_height) = *heights;
 
@@ -50,7 +53,7 @@ impl<H: ZkVmHost> ProofGenerator<L1BatchProver> for L1BatchProofGenerator<H> {
         format!("l1_batch_{}_{}", start_height, end_height)
     }
 
-    fn get_host(&self) -> impl ZkVmHost {
+    fn get_host(&self) -> H {
         self.host.clone()
     }
 }
@@ -58,7 +61,6 @@ impl<H: ZkVmHost> ProofGenerator<L1BatchProver> for L1BatchProofGenerator<H> {
 #[cfg(test)]
 mod test {
     use strata_test_utils::l2::gen_params;
-    use strata_zkvm::ZkVmHost;
 
     use super::*;
 
