@@ -48,6 +48,15 @@ impl CheckpointHandler {
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
             .ok_or(ProvingTaskError::WitnessNotFound)
     }
+
+    pub async fn fetch_latest_ckp_idx(&self) -> Result<u64, ProvingTaskError> {
+        self.cl_client
+            .request::<Option<u64>, _>("strata_getLatestCheckpointIndex", rpc_params![])
+            .await
+            .inspect_err(|_| error!("Failed to fetch latest checkpoint"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
+            .ok_or(ProvingTaskError::WitnessNotFound)
+    }
 }
 
 impl ProvingOp for CheckpointHandler {

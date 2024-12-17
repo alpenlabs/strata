@@ -16,10 +16,11 @@ class ProverClientTest(testenv.StrataTester):
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the Prover Manager setup
-        time.sleep(60)
+        time.sleep(5)
 
         # Test on with the latest checkpoint
-        task_id = prover_client_rpc.dev_strata_proveLatestCheckPoint()
+        task_ids = prover_client_rpc.dev_strata_proveLatestCheckPoint()
+        task_id = task_ids[0]
         self.debug(f"got the task id: {task_id}")
         assert task_id is not None
 
