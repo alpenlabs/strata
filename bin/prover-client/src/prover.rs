@@ -9,6 +9,7 @@ use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use strata_state::l1::L1BlockId;
 use strata_zkvm::{ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
+use strata_zkvm_hosts::ProofVm;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -18,7 +19,7 @@ use crate::{
     primitives::{
         prover_input::{ProofWithVkey, ZkVmInput},
         tasks_scheduler::{ProofProcessingStatus, ProofSubmissionStatus, WitnessSubmissionStatus},
-        vms::{ProofVm, ZkVMManager},
+        vms::ZkVMManager,
     },
     proving_ops::btc_ops::get_pm_rollup_params,
 };

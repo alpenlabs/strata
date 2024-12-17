@@ -1,7 +1,6 @@
 use std::fmt;
 
 use serde::{de::DeserializeOwned, Serialize};
-use sp1_prover::utils::get_cycles;
 use sp1_sdk::{HashableKey, ProverClient, SP1ProvingKey, SP1VerifyingKey};
 use strata_zkvm::{
     ProofReport, ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder,
@@ -106,12 +105,10 @@ impl ZkVmHost for SP1Host {
 
     fn perf_report<'a>(
         &self,
-        input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
+        _input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         _proof_type: ProofType,
     ) -> ZkVmResult<ProofReport> {
-        Ok(ProofReport {
-            cycles: get_cycles(&self.elf, &input),
-        })
+        Ok(ProofReport { cycles: 0 })
     }
 }
 

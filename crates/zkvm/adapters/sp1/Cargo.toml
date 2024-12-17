@@ -14,8 +14,6 @@ serde.workspace = true
 sha2 = { workspace = true }
 sp1-primitives = "3.0.0"
 sp1-sdk = { version = "3.0.0", optional = true }
-# TODO: make it optional, via features.
-sp1-prover = "3.0.0"
 sp1-verifier = { git = "https://github.com/succinctlabs/sp1", rev = "2c7868364cb832531e8cafd258aa06fbab079459" } # Note: On new SP1 version, this will be available via SDK 
 sp1-zkvm = { version = "3.0.0", features = ["verify"], optional = true }
 tracing.workspace = true

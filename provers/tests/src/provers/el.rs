@@ -4,6 +4,7 @@ use strata_zkvm::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
 
+#[derive(Clone)]
 pub struct ElProofGenerator<H: ZkVmHost> {
     host: H,
 }
@@ -14,7 +15,8 @@ impl<H: ZkVmHost> ElProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<u64, EvmEeProver> for ElProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator<EvmEeProver> for ElProofGenerator<H> {
+    type Input = u64;
     fn get_input(&self, block_num: &u64) -> ZkVmResult<EvmEeProofInput> {
         let input = EvmSegment::initialize_from_saved_ee_data(*block_num, *block_num)
             .get_input(block_num)
@@ -33,32 +35,32 @@ impl<H: ZkVmHost> ProofGenerator<u64, EvmEeProver> for ElProofGenerator<H> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
-    fn test_proof(host: impl ZkVmHost) {
+    fn test_proof<H: ZkVmHost>(el_prover: ElProofGenerator<H>) {
         let height = 1;
-        let el_prover = ElProofGenerator::new(host);
         let _ = el_prover.get_proof(&height).unwrap();
     }
 
     #[test]
     #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
-        use crate::hosts::native::evm_ee_stf;
-        test_proof(evm_ee_stf());
+        use crate::provers::TEST_NATIVE_GENERATORS;
+        test_proof(TEST_NATIVE_GENERATORS.el_block());
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        use crate::hosts::risc0::evm_ee_stf;
-        test_proof(evm_ee_stf());
+        use crate::provers::TEST_RISC0_GENERATORS;
+        test_proof(TEST_RISC0_GENERATORS.el_block());
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
-        use crate::hosts::sp1::evm_ee_stf;
-        test_proof(evm_ee_stf());
+        use crate::provers::TEST_SP1_GENERATORS;
+        test_proof(TEST_SP1_GENERATORS.el_block());
     }
 }
