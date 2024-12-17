@@ -6,13 +6,14 @@ use tokio::{sync::Mutex, time::sleep};
 use tracing::{error, info};
 
 use crate::{
-    errors::ProvingTaskError, handlers::ProofHandler, status::ProvingTaskStatus, task::TaskTracker,
+    errors::ProvingTaskError, operators::ProofOperator, status::ProvingTaskStatus,
+    task::TaskTracker,
 };
 
 #[derive(Debug, Clone)]
 pub struct ProverManager {
     task_tracker: Arc<Mutex<TaskTracker>>,
-    handler: Arc<ProofHandler>,
+    operator: Arc<ProofOperator>,
     db: Arc<ProofDb>,
     workers: HashMap<ProofZkVm, usize>,
     loop_interval: u64,
@@ -21,14 +22,14 @@ pub struct ProverManager {
 impl ProverManager {
     pub fn new(
         task_tracker: Arc<Mutex<TaskTracker>>,
-        handler: Arc<ProofHandler>,
+        operator: Arc<ProofOperator>,
         db: Arc<ProofDb>,
         workers: HashMap<ProofZkVm, usize>,
         loop_interval: u64,
     ) -> Self {
         Self {
             task_tracker,
-            handler,
+            operator,
             db,
             workers,
             loop_interval,
@@ -60,13 +61,13 @@ impl ProverManager {
                 }
 
                 // Clone resources for async task
-                let handler = self.handler.clone();
+                let operator = self.operator.clone();
                 let db = self.db.clone();
                 let task_tracker = self.task_tracker.clone();
 
                 // Spawn a new task
                 tokio::spawn(async move {
-                    if let Err(err) = make_proof(handler, task_tracker, task, db).await {
+                    if let Err(err) = make_proof(operator, task_tracker, task, db).await {
                         error!(?err, "Failed to process task");
                     }
                 });
@@ -79,7 +80,7 @@ impl ProverManager {
 }
 
 pub async fn make_proof(
-    handler: Arc<ProofHandler>,
+    operator: Arc<ProofOperator>,
     task_tracker: Arc<Mutex<TaskTracker>>,
     task: ProofKey,
     db: Arc<ProofDb>,
@@ -89,7 +90,7 @@ pub async fn make_proof(
         task_tracker.update_status(task, ProvingTaskStatus::ProvingInProgress)?;
     }
 
-    let res = handler.prove(&task, &db).await;
+    let res = operator.prove(&task, &db).await;
 
     {
         let mut task_tracker = task_tracker.lock().await;

@@ -11,24 +11,24 @@ use tokio::sync::Mutex;
 use tracing::error;
 
 use super::{
-    cl_agg::ClAggHandler, l1_batch::L1BatchHandler, utils::get_pm_rollup_params, ProvingOp,
+    cl_agg::ClAggOperator, l1_batch::L1BatchController, utils::get_pm_rollup_params, ProvingOp,
 };
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
-pub struct CheckpointHandler {
+pub struct CheckpointOperator {
     cl_client: HttpClient,
-    l1_batch_dispatcher: Arc<L1BatchHandler>,
-    l2_batch_dispatcher: Arc<ClAggHandler>,
+    l1_batch_dispatcher: Arc<L1BatchController>,
+    l2_batch_dispatcher: Arc<ClAggOperator>,
 }
 
-impl CheckpointHandler {
+impl CheckpointOperator {
     /// Creates a new BTC operations instance.
     pub fn new(
         cl_client: HttpClient,
-        l1_batch_dispatcher: Arc<L1BatchHandler>,
-        l2_batch_dispatcher: Arc<ClAggHandler>,
+        l1_batch_dispatcher: Arc<L1BatchController>,
+        l2_batch_dispatcher: Arc<ClAggOperator>,
     ) -> Self {
         Self {
             cl_client,
@@ -59,7 +59,7 @@ impl CheckpointHandler {
     }
 }
 
-impl ProvingOp for CheckpointHandler {
+impl ProvingOp for CheckpointOperator {
     type Prover = CheckpointProver;
     type Params = u64;
 

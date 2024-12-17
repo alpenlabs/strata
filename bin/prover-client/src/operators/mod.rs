@@ -29,11 +29,11 @@ pub mod checkpoint;
 pub mod cl_agg;
 pub mod cl_stf;
 pub mod evm_ee;
-pub mod handler;
+pub mod operator;
 pub mod l1_batch;
 pub mod utils;
 
-pub use handler::ProofHandler;
+pub use operator::ProofOperator;
 
 /// A trait defining the operations required for proof generation.
 ///

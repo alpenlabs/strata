@@ -16,11 +16,11 @@ use crate::{errors::ProvingTaskError, task::TaskTracker};
 
 /// Operations required for EL block proving tasks.
 #[derive(Debug, Clone)]
-pub struct EvmEeHandler {
+pub struct EvmEeOperator {
     el_client: HttpClient,
 }
 
-impl EvmEeHandler {
+impl EvmEeOperator {
     /// Creates a new EL operations instance.
     pub fn new(el_client: HttpClient) -> Self {
         Self { el_client }
@@ -38,7 +38,7 @@ impl EvmEeHandler {
     }
 }
 
-impl ProvingOp for EvmEeHandler {
+impl ProvingOp for EvmEeOperator {
     type Prover = EvmEeProver;
     type Params = u64;
 

@@ -13,22 +13,22 @@ use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{evm_ee::EvmEeHandler, utils::get_pm_rollup_params, ProvingOp};
+use super::{evm_ee::EvmEeOperator, utils::get_pm_rollup_params, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
-pub struct ClStfHandler {
+pub struct ClStfOperator {
     cl_client: HttpClient,
-    evm_ee_handler: Arc<EvmEeHandler>,
+    evm_ee_operator: Arc<EvmEeOperator>,
 }
 
-impl ClStfHandler {
+impl ClStfOperator {
     /// Creates a new CL operations instance.
-    pub fn new(cl_client: HttpClient, evm_ee_handler: Arc<EvmEeHandler>) -> Self {
+    pub fn new(cl_client: HttpClient, evm_ee_operator: Arc<EvmEeOperator>) -> Self {
         Self {
             cl_client,
-            evm_ee_handler,
+            evm_ee_operator,
         }
     }
 
@@ -59,7 +59,7 @@ impl ClStfHandler {
     }
 }
 
-impl ProvingOp for ClStfHandler {
+impl ProvingOp for ClStfOperator {
     type Prover = ClStfProver;
     type Params = u64;
 
@@ -70,7 +70,7 @@ impl ProvingOp for ClStfHandler {
         db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let evm_ee_tasks = self
-            .evm_ee_handler
+            .evm_ee_operator
             .create_task(block_num, task_tracker.clone(), db)
             .await?;
         let evm_ee_id = evm_ee_tasks
