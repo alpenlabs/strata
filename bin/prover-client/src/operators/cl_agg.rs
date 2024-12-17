@@ -6,23 +6,23 @@ use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
 
-use super::{cl_stf::ClStfHandler, ProvingOp};
+use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]
-pub struct ClAggHandler {
-    cl_stf_handler: Arc<ClStfHandler>,
+pub struct ClAggOperator {
+    cl_stf_operator: Arc<ClStfOperator>,
 }
 
-impl ClAggHandler {
+impl ClAggOperator {
     /// Creates a new CL operations instance.
-    pub fn new(cl_stf_handler: Arc<ClStfHandler>) -> Self {
-        Self { cl_stf_handler }
+    pub fn new(cl_stf_operator: Arc<ClStfOperator>) -> Self {
+        Self { cl_stf_operator }
     }
 }
 
-impl ProvingOp for ClAggHandler {
+impl ProvingOp for ClAggOperator {
     type Prover = ClAggProver;
     type Params = (u64, u64);
 
@@ -37,14 +37,14 @@ impl ProvingOp for ClAggHandler {
         let len = (end_height - start_height) as usize + 1;
         let mut cl_stf_deps = Vec::with_capacity(len);
 
-        let start_blkid = self.cl_stf_handler.get_id(start_height).await?;
-        let end_blkid = self.cl_stf_handler.get_id(end_height).await?;
+        let start_blkid = self.cl_stf_operator.get_id(start_height).await?;
+        let end_blkid = self.cl_stf_operator.get_id(end_height).await?;
         let cl_agg_proof_id = ProofContext::ClAgg(start_blkid, end_blkid);
 
         for height in start_height..=end_height {
-            let blkid = self.cl_stf_handler.get_id(height).await?;
+            let blkid = self.cl_stf_operator.get_id(height).await?;
             let proof_id = ProofContext::ClStf(blkid);
-            self.cl_stf_handler
+            self.cl_stf_operator
                 .create_task(height, task_tracker.clone(), db)
                 .await?;
             cl_stf_deps.push(proof_id);

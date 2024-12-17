@@ -15,28 +15,28 @@ use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{btc::BtcBlockspaceHandler, ProvingOp};
+use super::{btc::BtcBlockspaceOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
 
 #[derive(Debug, Clone)]
-pub struct L1BatchHandler {
+pub struct L1BatchController {
     btc_client: Arc<BitcoinClient>,
-    btc_blockspace_handler: Arc<BtcBlockspaceHandler>,
+    btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
 }
 
-impl L1BatchHandler {
+impl L1BatchController {
     pub fn new(
         btc_client: Arc<BitcoinClient>,
-        btc_blockspace_handler: Arc<BtcBlockspaceHandler>,
+        btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
     ) -> Self {
         Self {
             btc_client,
-            btc_blockspace_handler,
+            btc_blockspace_operator,
         }
     }
 }
 
-impl ProvingOp for L1BatchHandler {
+impl ProvingOp for L1BatchController {
     type Prover = L1BatchProver;
     type Params = (u64, u64);
 
@@ -51,14 +51,14 @@ impl ProvingOp for L1BatchHandler {
         let len = (end_height - start_height) as usize + 1;
         let mut btc_deps = Vec::with_capacity(len);
 
-        let start_blkid = self.btc_blockspace_handler.get_id(start_height).await?;
-        let end_blkid = self.btc_blockspace_handler.get_id(end_height).await?;
+        let start_blkid = self.btc_blockspace_operator.get_id(start_height).await?;
+        let end_blkid = self.btc_blockspace_operator.get_id(end_height).await?;
         let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
 
         for height in start_height..=end_height {
-            let blkid = self.btc_blockspace_handler.get_id(height).await?;
+            let blkid = self.btc_blockspace_operator.get_id(height).await?;
             let proof_id = ProofContext::BtcBlockspace(blkid);
-            self.btc_blockspace_handler
+            self.btc_blockspace_operator
                 .create_task(height, task_tracker.clone(), db)
                 .await?;
             btc_deps.push(proof_id);

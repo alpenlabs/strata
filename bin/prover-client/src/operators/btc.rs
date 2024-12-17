@@ -13,11 +13,11 @@ use crate::{errors::ProvingTaskError, task::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]
-pub struct BtcBlockspaceHandler {
+pub struct BtcBlockspaceOperator {
     btc_client: Arc<BitcoinClient>,
 }
 
-impl BtcBlockspaceHandler {
+impl BtcBlockspaceOperator {
     /// Creates a new BTC operations instance.
     pub fn new(btc_client: Arc<BitcoinClient>) -> Self {
         Self { btc_client }
@@ -34,7 +34,7 @@ impl BtcBlockspaceHandler {
     }
 }
 
-impl ProvingOp for BtcBlockspaceHandler {
+impl ProvingOp for BtcBlockspaceOperator {
     type Prover = BtcBlockspaceProver;
     type Params = u64;
 

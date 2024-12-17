@@ -12,7 +12,7 @@ use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
 
 use crate::{
-    handlers::{ProofHandler, ProvingOp},
+    operators::{ProofOperator, ProvingOp},
     task::TaskTracker,
 };
 
@@ -58,19 +58,19 @@ where
 #[derive(Clone)]
 pub(crate) struct ProverClientRpc {
     task_tracker: Arc<Mutex<TaskTracker>>,
-    handler: Arc<ProofHandler>,
+    operator: Arc<ProofOperator>,
     db: Arc<ProofDb>,
 }
 
 impl ProverClientRpc {
     pub fn new(
         task_tracker: Arc<Mutex<TaskTracker>>,
-        handler: Arc<ProofHandler>,
+        operator: Arc<ProofOperator>,
         db: Arc<ProofDb>,
     ) -> Self {
         Self {
             task_tracker,
-            handler,
+            operator,
             db,
         }
     }
@@ -80,8 +80,8 @@ impl ProverClientRpc {
 impl StrataProverClientApiServer for ProverClientRpc {
     async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<Vec<ProofKey>> {
         Ok(self
-            .handler
-            .btc_handler()
+            .operator
+            .btc_operator()
             .create_task(btc_block_num, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
@@ -89,8 +89,8 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>> {
         Ok(self
-            .handler
-            .evm_ee_handler()
+            .operator
+            .evm_ee_operator()
             .create_task(el_block_num, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
@@ -98,8 +98,8 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<Vec<ProofKey>> {
         Ok(self
-            .handler
-            .cl_stf_handler()
+            .operator
+            .cl_stf_operator()
             .create_task(cl_block_num, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
@@ -107,8 +107,8 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
         Ok(self
-            .handler
-            .l1_batch_handler()
+            .operator
+            .l1_batch_operator()
             .create_task(l1_range, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
@@ -116,8 +116,8 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
         Ok(self
-            .handler
-            .cl_agg_handler()
+            .operator
+            .cl_agg_operator()
             .create_task(l2_range, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
@@ -125,15 +125,15 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn prove_latest_checkpoint(&self) -> RpcResult<Vec<ProofKey>> {
         let latest_ckp_idx = self
-            .handler
-            .checkpoint_handler()
+            .operator
+            .checkpoint_operator()
             .fetch_latest_ckp_idx()
             .await
             .expect("failed to fetch latest ckp idx");
         info!(%latest_ckp_idx);
         Ok(self
-            .handler
-            .checkpoint_handler()
+            .operator
+            .checkpoint_operator()
             .create_task(latest_ckp_idx, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))

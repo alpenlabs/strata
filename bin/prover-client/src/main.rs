@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use args::Args;
 use db::open_rocksdb_database;
-use handlers::ProofHandler;
 use jsonrpsee::http_client::HttpClientBuilder;
 use manager::ProverManager;
+use operators::ProofOperator;
 use rpc_server::ProverClientRpc;
 use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
@@ -18,9 +18,9 @@ use tracing::{debug, info};
 mod args;
 mod db;
 mod errors;
-mod handlers;
 mod hosts;
 mod manager;
+mod operators;
 mod rpc_server;
 mod status;
 mod task;
@@ -50,7 +50,7 @@ async fn main() {
     )
     .expect("failed to connect to the btc client");
 
-    let handler = Arc::new(ProofHandler::init(btc_client, el_client, cl_client));
+    let operator = Arc::new(ProofOperator::init(btc_client, el_client, cl_client));
     let task_tracker = Arc::new(Mutex::new(TaskTracker::new()));
 
     let rbdb = open_rocksdb_database(&args.datadir).expect("failed to open DB");
@@ -59,7 +59,7 @@ async fn main() {
 
     let manager = ProverManager::new(
         task_tracker.clone(),
-        handler.clone(),
+        operator.clone(),
         db.clone(),
         args.get_workers(),
         args.loop_interval,
@@ -76,7 +76,7 @@ async fn main() {
         let rpc_url = args.get_dev_rpc_url();
         run_rpc_server(
             task_tracker.clone(),
-            handler.clone(),
+            operator.clone(),
             db.clone(),
             rpc_url,
             args.enable_dev_rpcs,
@@ -88,12 +88,12 @@ async fn main() {
 
 async fn run_rpc_server(
     task_tracker: Arc<Mutex<TaskTracker>>,
-    handler: Arc<ProofHandler>,
+    operator: Arc<ProofOperator>,
     db: Arc<ProofDb>,
     rpc_url: String,
     enable_dev_rpc: bool,
 ) -> anyhow::Result<()> {
-    let rpc_impl = ProverClientRpc::new(task_tracker, handler, db);
+    let rpc_impl = ProverClientRpc::new(task_tracker, operator, db);
     rpc_server::start(&rpc_impl, rpc_url, enable_dev_rpc).await?;
     anyhow::Ok(())
 }
