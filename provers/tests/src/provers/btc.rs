@@ -1,5 +1,5 @@
 use bitcoin::Block;
-use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
+use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
 use strata_test_utils::l2::gen_params;
 use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
 
@@ -15,26 +15,32 @@ impl<H: ZkVmHost> BtcBlockProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator<H> {
-    fn get_input(&self, _block: &Block) -> ZkVmResult<BlockspaceProofInput> {
+pub type Blocks = Vec<Block>;
+
+impl<H: ZkVmHost> ProofGenerator<Blocks, BtcBlockspaceProver> for BtcBlockProofGenerator<H> {
+    fn get_input(&self, blocks: &Blocks) -> ZkVmResult<BlockScanProofInput> {
         let params = gen_params();
-        let rollup_params = params.rollup();
-        let input = BlockspaceProofInput {
-            num_blocks: 0,
-            serialized_blocks: vec![],
-            rollup_params: rollup_params.clone(),
+        let rollup_params = params.rollup().clone();
+
+        let input = BlockScanProofInput {
+            blocks: blocks.to_vec(),
+            rollup_params,
         };
         Ok(input)
     }
 
-    fn gen_proof(&self, block: &Block) -> ZkVmResult<ProofReceipt> {
+    fn gen_proof(&self, blocks: &Blocks) -> ZkVmResult<ProofReceipt> {
         let host = self.get_host();
-        let input = self.get_input(block)?;
+        let input = self.get_input(blocks)?;
         BtcBlockspaceProver::prove(&input, &host)
     }
 
-    fn get_proof_id(&self, block: &Block) -> String {
-        format!("btc_block_{}", block.block_hash())
+    fn get_proof_id(&self, blocks: &Blocks) -> String {
+        if let (Some(first), Some(last)) = (blocks.first(), blocks.last()) {
+            format!("btc_block_{}_{}", first.block_hash(), last.block_hash())
+        } else {
+            "btc_block_empty".to_string()
+        }
     }
 
     fn get_host(&self) -> impl ZkVmHost {
@@ -53,9 +59,9 @@ mod test {
         let generator = BtcBlockProofGenerator::new(host);
 
         let btc_chain = get_btc_chain();
-        let block = btc_chain.get_block(40321);
+        let blocks = vec![btc_chain.get_block(40321).clone()];
 
-        let _ = generator.get_proof(block).unwrap();
+        let _ = generator.get_proof(&blocks).unwrap();
     }
 
     #[test]
