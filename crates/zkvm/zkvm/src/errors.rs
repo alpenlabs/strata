@@ -31,25 +31,25 @@ pub enum ZkVmError {
         source: DataFormatError,
     },
 
-    #[error("An unexpected error occurred: {0}")]
+    #[error("{0}")]
     Other(String),
 }
 
 #[derive(Debug, Error)]
 pub enum DataFormatError {
-    #[error("error using bincode: {source}")]
+    #[error("{source}")]
     Bincode {
         #[source]
         source: bincode::Error,
     },
 
-    #[error("error using borsh: {source}")]
+    #[error("{source}")]
     Borsh {
         #[source]
         source: borsh::io::Error,
     },
 
-    #[error("error using serde: {0}")]
+    #[error("{0}")]
     Serde(String),
 
     #[error("error: {0}")]

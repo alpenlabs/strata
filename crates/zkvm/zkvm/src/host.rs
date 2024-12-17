@@ -4,8 +4,8 @@ use borsh::BorshDeserialize;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    input::ZkVmInputBuilder, ProofReceipt, ZkVmProofError, ProofType, PublicValues,
-    VerificationKey, ZkVmError, ZkVmResult,
+    input::ZkVmInputBuilder, ProofReceipt, ProofType, PublicValues, VerificationKey, ZkVmError,
+    ZkVmProofError, ZkVmResult,
 };
 
 /// A trait implemented by the prover ("host") of a zkVM program.

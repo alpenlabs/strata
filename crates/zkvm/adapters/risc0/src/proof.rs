@@ -38,6 +38,7 @@ impl TryFrom<&ProofReceipt> for Risc0ProofReceipt {
         Ok(Receipt::new(inner, journal).into())
     }
 }
+
 impl TryFrom<Risc0ProofReceipt> for ProofReceipt {
     type Error = ZkVmProofError;
     fn try_from(value: Risc0ProofReceipt) -> Result<Self, Self::Error> {
