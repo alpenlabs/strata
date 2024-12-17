@@ -124,7 +124,19 @@ impl StrataProverClientApiServer for ProverClientRpc {
     }
 
     async fn prove_latest_checkpoint(&self) -> RpcResult<Vec<ProofKey>> {
-        unimplemented!()
+        let latest_ckp_idx = self
+            .handler
+            .checkpoint_handler()
+            .fetch_latest_ckp_idx()
+            .await
+            .expect("failed to fetch latest ckp idx");
+        info!(%latest_ckp_idx);
+        Ok(self
+            .handler
+            .checkpoint_handler()
+            .create_task(latest_ckp_idx, self.task_tracker.clone(), &self.db)
+            .await
+            .expect("failed to create task"))
     }
 
     async fn prove_checkpoint_raw(
