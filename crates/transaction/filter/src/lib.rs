@@ -132,6 +132,7 @@ mod test {
         },
         filter_protocol_op_tx_refs,
         messages::ProtocolOpTxRef,
+        types::DaFilterMode,
     };
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
@@ -226,17 +227,18 @@ mod test {
         let tx = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let block = create_test_block(vec![tx]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config.clone())
-            .iter()
-            .map(|op_refs| op_refs.index())
-            .collect();
+        let txids: Vec<u32> =
+            filter_protocol_op_tx_refs(&block, filter_config.clone(), DaFilterMode::Partial)
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
 
         assert_eq!(txids[0], 0, "Should filter valid tags");
 
         // Test with invalid tag
         let tx = create_commit_reveal_tx("invalid-da-tag", &ckpt_tag, 1);
         let block = create_test_block(vec![tx]);
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Partial);
         assert!(result.is_empty(), "Should filter out invalid tag");
     }
 
@@ -249,7 +251,8 @@ mod test {
         let tx = create_commit_reveal_tx(&da_tag, &ckpt_tag, num_envelopes);
         let block = create_test_block(vec![tx]);
 
-        let txids: Vec<ProtocolOpTxRef> = filter_protocol_op_tx_refs(&block, filter_config);
+        let txids: Vec<ProtocolOpTxRef> =
+            filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Partial);
 
         assert_eq!(txids[0].index(), 0, "Should filter valid tags");
         assert_eq!(
@@ -266,10 +269,11 @@ mod test {
         let block = create_test_block(vec![tx1, tx2]);
         let filter_config = create_tx_filter_config();
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config)
-            .iter()
-            .map(|op_refs| op_refs.index())
-            .collect();
+        let txids: Vec<u32> =
+            filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Partial)
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
         assert!(txids.is_empty()); // No transactions match
     }
 
@@ -283,10 +287,11 @@ mod test {
         let tx3 = create_commit_reveal_tx(&da_tag, &ckpt_tag, 1);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, filter_config)
-            .iter()
-            .map(|op_refs| op_refs.index())
-            .collect();
+        let txids: Vec<u32> =
+            filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Partial)
+                .iter()
+                .map(|op_refs| op_refs.index())
+                .collect();
         // First and third txs match
         assert_eq!(txids[0], 0);
         assert_eq!(txids[1], 2);
@@ -308,7 +313,7 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Partial);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -351,7 +356,7 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Partial);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -386,7 +391,7 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Partial);
 
         assert!(
             result.is_empty(),
@@ -419,7 +424,7 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let result = filter_protocol_op_tx_refs(&block, filter_config);
+        let result = filter_protocol_op_tx_refs(&block, filter_config, DaFilterMode::Partial);
 
         assert_eq!(result.len(), 2, "Should find two relevant transactions");
         assert_eq!(

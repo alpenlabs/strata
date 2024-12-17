@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bitcoin::{Address, Network};
 use strata_db::{traits::BroadcastDatabase, types::L1TxEntry};
-use strata_primitives::params::FeePolicy;
+use strata_primitives::params::{EnvelopeTxConfig, FeePolicy};
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, test_utils::get_rocksdb_tmp_instance, L1BroadcastDb, WriterDb,
 };
@@ -52,11 +52,13 @@ pub fn get_config() -> WriterConfig {
         .require_network(Network::Regtest)
         .unwrap();
     WriterConfig {
-        sequencer_address: addr,
-        da_tag: "strata-da".to_string(),
-        ckpt_tag: "strata-cpkt".to_string(),
-        fee_policy: FeePolicy::Fixed(100),
         poll_duration_ms: 1000,
-        amount_for_reveal_txn: 1000,
+        envelope_tx_config: EnvelopeTxConfig {
+            sequencer_address: addr,
+            da_tag: "strata-da".to_string(),
+            ckpt_tag: "strata-cpkt".to_string(),
+            fee_policy: FeePolicy::Fixed(100),
+            amount_for_reveal_txn: 1000,
+        },
     }
 }
