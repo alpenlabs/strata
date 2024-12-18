@@ -100,9 +100,11 @@ impl ProvingOperations for L1BatchOperations {
         // Create btc tasks for each block in the range
         let (start, end) = input.btc_block_range;
         for btc_block_idx in start..=end {
+            // Create an L1-scan proving task spanning a single block
+            let block_range = (btc_block_idx, btc_block_idx);
             let btc_task_id = self
                 .btc_dispatcher
-                .create_task(btc_block_idx)
+                .create_task(block_range)
                 .await
                 .map_err(|e| ProvingTaskError::DependencyTaskCreation(e.to_string()))?;
             dependencies.push(btc_task_id);
