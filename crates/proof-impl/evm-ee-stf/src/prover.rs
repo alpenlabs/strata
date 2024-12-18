@@ -12,7 +12,7 @@ impl ZkVmProver for EvmEeProver {
         ProofType::Compressed
     }
 
-    fn prepare_input<'a, B>(el_inputs: &'a Self::Input) -> ZkVmResult<B::Input>
+    fn prepare_input<'a, B>(el_inputs: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,
     {
