@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tracing::error;
 
 use super::ProvingOp;
-use crate::{errors::ProvingTaskError, task::TaskTracker};
+use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
 /// Operations required for EL block proving tasks.
 #[derive(Debug, Clone)]

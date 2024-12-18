@@ -7,7 +7,7 @@ use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
 
 use super::{cl_stf::ClStfOperator, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]

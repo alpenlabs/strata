@@ -5,13 +5,13 @@ use std::sync::Arc;
 use args::Args;
 use db::open_rocksdb_database;
 use jsonrpsee::http_client::HttpClientBuilder;
-use manager::ProverManager;
+use prover_manager::ProverManager;
 use operators::ProofOperator;
 use rpc_server::ProverClientRpc;
 use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
 use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
-use task::TaskTracker;
+use task_tracker::TaskTracker;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
 
@@ -19,11 +19,11 @@ mod args;
 mod db;
 mod errors;
 mod hosts;
-mod manager;
+mod prover_manager;
 mod operators;
 mod rpc_server;
 mod status;
-mod task;
+mod task_tracker;
 
 #[tokio::main]
 async fn main() {

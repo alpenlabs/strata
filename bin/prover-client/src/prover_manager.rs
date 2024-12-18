@@ -7,7 +7,7 @@ use tracing::{error, info};
 
 use crate::{
     errors::ProvingTaskError, operators::ProofOperator, status::ProvingTaskStatus,
-    task::TaskTracker,
+    task_tracker::TaskTracker,
 };
 
 #[derive(Debug, Clone)]
