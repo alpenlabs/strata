@@ -58,11 +58,13 @@ pub struct EvmBlockStfInput {
     /// computation has been carried out on this block.
     pub mix_hash: B256,
 
-    /// The state trie of the parent block.
-    pub parent_state_trie: MptNode,
+    /// Represents the pre-state trie containing account states
+    /// expected to be accessed or modified during execution.
+    pub pre_state_trie: MptNode,
 
-    /// The storage of the parent block.
-    pub parent_storage: HashMap<Address, StorageEntry>,
+    /// Represents the pre-state storage containing entries
+    /// expected to be accessed or modified during execution.
+    pub pre_state_storage: HashMap<Address, StorageEntry>,
 
     /// The relevant contracts for the block.
     pub contracts: Vec<Bytes>,

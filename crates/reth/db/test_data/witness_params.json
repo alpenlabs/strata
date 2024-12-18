@@ -28,7 +28,7 @@
         "timestamp": 1727003743,
         "extra_data": "0x726574682f76312e302e332f6d61636f73",
         "mix_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-        "parent_state_trie": {
+        "pre_state_trie": {
             "data": {
                 "Leaf": [
                     [
@@ -151,7 +151,7 @@
                 ]
             }
         },
-        "parent_storage": {
+        "pre_state_storage": {
             "0x0000000000000000000000000000000000000000": [
                 {
                     "data": "Null"

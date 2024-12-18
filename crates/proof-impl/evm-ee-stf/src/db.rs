@@ -63,12 +63,12 @@ impl InMemoryDBHelper for InMemoryDB {
 
         // For each account, load the information into the database.
         let mut accounts = HashMap::with_capacity_and_hasher(
-            input.parent_storage.len(),
+            input.pre_state_storage.len(),
             DefaultHashBuilder::default(),
         );
-        for (address, (storage_trie, slots)) in &mut input.parent_storage {
+        for (address, (storage_trie, slots)) in &mut input.pre_state_storage {
             let state_account = input
-                .parent_state_trie
+                .pre_state_trie
                 .get_rlp::<StateAccount>(&keccak(address))?
                 .unwrap_or_default();
 

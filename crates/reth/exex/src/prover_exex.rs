@@ -197,8 +197,8 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         mix_hash: current_block.header.mix_hash,
         transactions: current_block_txns,
         withdrawals,
-        parent_state_trie: state_trie,
-        parent_storage: storage,
+        pre_state_trie: state_trie,
+        pre_state_storage: storage,
         contracts,
         parent_header: prev_block.header,
         // NOTE: using default to save prover cost.
