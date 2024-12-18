@@ -46,16 +46,15 @@ impl ReaderState {
         self.next_height
     }
 
-    pub fn recent_blocks(&self) -> &[BlockHash] {
-        // TODO: is this correct?
-        self.recent_blocks.as_slices().0
+    pub fn recent_blocks(&self) -> impl Iterator<Item = &BlockHash> {
+        self.recent_blocks.iter()
     }
 
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
 
-    pub fn set_epoch(&mut self, epoch: u64) {
+    pub(crate) fn set_epoch(&mut self, epoch: u64) {
         self.epoch = epoch;
     }
 
@@ -71,7 +70,7 @@ impl ReaderState {
         &self.filter_config
     }
 
-    pub fn set_filter_config(&mut self, filter_config: TxFilterConfig) {
+    pub(crate) fn set_filter_config(&mut self, filter_config: TxFilterConfig) {
         self.filter_config = filter_config;
     }
 

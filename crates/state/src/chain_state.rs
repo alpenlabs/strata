@@ -131,6 +131,9 @@ impl Chainstate {
     }
 }
 
+// NOTE: This is a helper setter that is supposed to be used only in tests.
+// This is being used in `strata_btcio::reader` to test the reader's behaviour when the epoch
+// changes.
 #[cfg(any(test, feature = "test_utils"))]
 impl Chainstate {
     pub fn set_epoch(&mut self, ep: u64) {

@@ -133,7 +133,7 @@ impl L1TxProof {
 pub struct L1BlockManifest {
     /// The actual l1 record
     record: L1BlockRecord,
-    /// Epoch, whose scan rules are applied to this manifest
+    /// Epoch, which was used to generate this manifest
     epoch: u64,
 }
 
@@ -152,6 +152,10 @@ impl L1BlockManifest {
 
     pub fn txs_root(&self) -> Buf32 {
         self.record.txs_root()
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn into_record(self) -> L1BlockRecord {

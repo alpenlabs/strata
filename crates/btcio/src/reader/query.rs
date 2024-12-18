@@ -73,9 +73,9 @@ async fn do_reader_task<R: Reader>(
         let cur_best_height = state.best_block_idx();
 
         // See if epoch/filter rules have changed
-        if let Some(new_config) = check_filter_rule_changed(&ctx, &mut state).await? {
+        if let Some(new_config) = update_epoch_and_filter_config(&ctx, &mut state).await? {
             let epoch = state.epoch();
-            info!(%epoch, ?new_config, "New filter rule received, will revert to the last checkpoint's height");
+            debug!(%epoch, ?new_config, "New filter rule received, will revert to the last checkpoint's height");
             handle_new_filter_rule(&ctx, &mut state).await?;
         }
 
@@ -137,20 +137,19 @@ async fn handle_new_filter_rule<R: Reader>(
     Ok(())
 }
 
-/// Checks for epoch and scan rule update. If so, updates the reader state's epoch and filter_config
-/// and returns new filter config if changed.
-/// missed relevant txs.
-async fn check_filter_rule_changed<R: Reader>(
+/// Checks and updates epoch and filter config changes. Returns the new filter config if changed
+/// else returns None.
+async fn update_epoch_and_filter_config<R: Reader>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
 ) -> anyhow::Result<Option<TxFilterConfig>> {
-    let last_epoch = ctx.status_channel.epoch().unwrap_or(0);
-    // TODO: check if latest_epoch < current epoch. should panic if so?
+    let new_epoch = ctx.status_channel.epoch().unwrap_or(0);
+    // TODO: check if new_epoch < current epoch. should panic if so?
     let curr_epoch = state.epoch();
 
     // if new epoch
-    if curr_epoch != last_epoch {
-        state.set_epoch(last_epoch);
+    if curr_epoch != new_epoch {
+        state.set_epoch(new_epoch);
         // TODO: pass in chainstate to `derive_from`
         let new_config = TxFilterConfig::derive_from(ctx.config.params.rollup())?;
         let curr_filter_config = state.filter_config().clone();
@@ -488,7 +487,9 @@ mod test {
         ctx.status_channel.update_chainstate(chstate);
 
         // Now If we check for filter rule changes
-        let new_config = check_filter_rule_changed(&ctx, &mut state).await.unwrap();
+        let new_config = update_epoch_and_filter_config(&ctx, &mut state)
+            .await
+            .unwrap();
 
         // The state's epoch should be updated
         assert_eq!(state.epoch(), curr_epoch + 1);
