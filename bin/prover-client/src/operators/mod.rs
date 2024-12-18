@@ -126,6 +126,9 @@ pub trait ProvingOp {
                     panic!("The `risc0` feature is not enabled. Enable the feature to use Risc0 functionality.");
                 }
             }
+            _ => {
+                panic!("Unsupported ZkVm");
+            }
         };
 
         match &proof_res {

@@ -31,5 +31,6 @@ pub fn get_verification_key(key: &ProofKey) -> VerificationKey {
             }
         }
         ProofZkVm::Native => native::get_host(key.context()).get_verification_key(),
+        _ => panic!("Unsupported ZkVm"),
     }
 }
