@@ -135,6 +135,6 @@ impl DatabaseRef for CacheDBProvider {
     fn block_hash_ref(&self, number: u64) -> Result<B256, Self::Error> {
         self.provider
             .block_hash(number)?
-            .ok_or_else(|| ProviderError::BlockBodyIndicesNotFound(number))
+            .ok_or(ProviderError::BlockBodyIndicesNotFound(number))
     }
 }

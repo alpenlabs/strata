@@ -4,7 +4,7 @@ use strata_zkvm::{AggregationInput, ZkVmError, ZkVmInputBuilder, ZkVmResult};
 // A wrapper around SP1Stdin
 pub struct SP1ProofInputBuilder(SP1Stdin);
 
-impl<'a> ZkVmInputBuilder<'a> for SP1ProofInputBuilder {
+impl ZkVmInputBuilder<'_> for SP1ProofInputBuilder {
     type Input = SP1Stdin;
     fn new() -> SP1ProofInputBuilder {
         SP1ProofInputBuilder(SP1Stdin::new())
