@@ -20,8 +20,25 @@ use strata_zkvm_hosts::get_risc0_host;
 use strata_zkvm_hosts::get_sp1_host;
 use strata_zkvm_hosts::{get_native_host, ProofVm};
 
+/// Test prover generator for the SP1 Host.
+#[cfg(feature = "sp1")]
+pub static TEST_SP1_GENERATORS: LazyLock<TestProverGenerators<SP1Host>> =
+    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_sp1_host(vm).clone()));
+
+/// Test prover generator for the RISC0 Host.
+#[cfg(feature = "risc0")]
+pub static TEST_RISC0_GENERATORS: LazyLock<TestProverGenerators<Risc0Host>> =
+    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_risc0_host(vm).clone()));
+
+/// Test prover generator for the Native Host.
+pub static TEST_NATIVE_GENERATORS: LazyLock<TestProverGenerators<NativeHost>> =
+    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_native_host(vm).clone()));
+
 use super::{btc, checkpoint, cl, el, l1_batch, l2_batch};
 
+/// A container for the test prover generators for all types, parametrized by the host.
+///
+/// Corresponds to [`ProofVm`] enum.
 #[derive(Clone)]
 enum TestGenerator<H: ZkVmHost> {
     BtcBlock(BtcBlockProofGenerator<H>),
@@ -128,14 +145,3 @@ impl<H: ZkVmHost> TestProverGenerators<H> {
         }
     }
 }
-
-#[cfg(feature = "sp1")]
-pub static TEST_SP1_GENERATORS: LazyLock<TestProverGenerators<SP1Host>> =
-    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_sp1_host(vm).clone()));
-
-#[cfg(feature = "risc0")]
-pub static TEST_RISC0_GENERATORS: LazyLock<TestProverGenerators<Risc0Host>> =
-    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_risc0_host(vm).clone()));
-
-pub static TEST_NATIVE_GENERATORS: LazyLock<TestProverGenerators<NativeHost>> =
-    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_native_host(vm).clone()));

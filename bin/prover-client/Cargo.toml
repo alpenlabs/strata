@@ -19,6 +19,7 @@ strata-rocksdb.workspace = true
 strata-rpc-types.workspace = true
 strata-state.workspace = true
 strata-zkvm.workspace = true
+strata-zkvm-hosts = { workspace = true, features = ["sp1"] }
 
 alloy-rpc-types.workspace = true
 anyhow.workspace = true
@@ -44,8 +45,6 @@ uuid.workspace = true
 # sp1
 strata-sp1-adapter = { workspace = true, optional = true }
 strata-sp1-guest-builder = { path = "../../provers/sp1", optional = true }
-
-strata-zkvm-hosts = { workspace = true, features = ["sp1"] }
 
 # risc0
 strata-risc0-adapter = { workspace = true, optional = true }

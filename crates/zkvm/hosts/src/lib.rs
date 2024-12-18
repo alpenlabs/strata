@@ -27,6 +27,7 @@ pub fn get_sp1_host(vm: ProofVm) -> &'static SP1Host {
     sp1::get_host(vm)
 }
 
+/// An identifier of different prover types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProofVm {
     BtcProving,

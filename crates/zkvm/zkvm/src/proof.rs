@@ -84,7 +84,7 @@ pub struct ProofReport {
 }
 
 impl ProofReceipt {
-    /// Creates a new `ProofReceipt` from proof and it's associated public values
+    /// Creates a new [`ProofReceipt`] from proof and it's associated public values
     pub fn new(proof: Proof, public_values: PublicValues) -> Self {
         Self {
             proof,

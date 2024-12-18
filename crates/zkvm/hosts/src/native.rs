@@ -16,6 +16,7 @@ use crate::ProofVm;
 /// required by a function signature, but actual verification is skipped.
 const MOCK_VK: [u32; 8] = [0u32; 8];
 
+/// A native host for [`ProofVm::BtcProving`] prover.
 static BTC_BLOCKSPACE_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
         process_blockspace_proof_outer(zkvm);
@@ -23,6 +24,7 @@ static BTC_BLOCKSPACE_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| N
     })),
 });
 
+/// A native host for [`ProofVm::L1Batch`] prover.
 static L1_BATCH_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
         process_l1_batch_proof(zkvm, &MOCK_VK);
@@ -30,6 +32,7 @@ static L1_BATCH_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeH
     })),
 });
 
+/// A native host for [`ProofVm::ELProving`] prover.
 static EVM_EE_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
         process_block_transaction_outer(zkvm);
@@ -37,6 +40,7 @@ static EVM_EE_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| Nativ
     })),
 });
 
+/// A native host for [`ProofVm::CLProving`] prover.
 static CL_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
         process_cl_stf(zkvm, &MOCK_VK);
@@ -44,6 +48,7 @@ static CL_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHos
     })),
 });
 
+/// A native host for [`ProofVm::CLAggregation`] prover.
 static CL_AGG_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
         process_cl_agg(zkvm, &MOCK_VK);
@@ -51,6 +56,7 @@ static CL_AGG_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHos
     })),
 });
 
+/// A native host for [`ProofVm::Checkpoint`] prover.
 static CHECKPOINT_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
         process_checkpoint_proof_outer(zkvm, &MOCK_VK, &MOCK_VK);
@@ -58,6 +64,7 @@ static CHECKPOINT_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| Nativ
     })),
 });
 
+/// Maps the [`ProofVm`] onto the corresponding Native Host.
 pub fn get_host(vm: ProofVm) -> &'static NativeHost {
     match vm {
         ProofVm::BtcProving => &BTC_BLOCKSPACE_HOST,

@@ -9,6 +9,12 @@ mod generators;
 pub mod l1_batch;
 pub mod l2_batch;
 
+pub use generators::TEST_NATIVE_GENERATORS;
+#[cfg(feature = "risc0")]
+pub use generators::TEST_RISC0_GENERATORS;
+#[cfg(feature = "sp1")]
+pub use generators::TEST_SP1_GENERATORS;
+
 pub trait ProofGenerator<P: ZkVmProver> {
     type Input;
 
@@ -107,9 +113,3 @@ fn write_proof_to_file(proof: &ProofReceipt, proof_file: &std::path::Path) -> Re
 fn verify_proof(proof: &ProofReceipt, host: &impl ZkVmHost) -> ZkVmResult<()> {
     host.verify(proof)
 }
-
-pub use generators::TEST_NATIVE_GENERATORS;
-#[cfg(feature = "risc0")]
-pub use generators::TEST_RISC0_GENERATORS;
-#[cfg(feature = "sp1")]
-pub use generators::TEST_SP1_GENERATORS;
