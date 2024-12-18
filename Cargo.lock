@@ -13723,6 +13723,7 @@ dependencies = [
  "async-trait",
  "bitcoin",
  "lru",
+ "parking_lot 0.12.3",
  "paste",
  "strata-db",
  "strata-primitives",
