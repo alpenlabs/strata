@@ -1,13 +1,16 @@
 use async_trait::async_trait;
 use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txid};
 
-use crate::rpc::{
-    client::ClientResult,
+use crate::{
+    error::ClientError,
     types::{
         GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
         ListTransactions, ListUnspent, SignRawTransactionWithWallet,
     },
 };
+
+/// This is an alias for the result type returned by the Bitcoin client
+pub type ClientResult<T> = Result<T, ClientError>;
 
 /// Basic functionality that any Bitcoin client that interacts with the
 /// Bitcoin network should provide.
@@ -17,8 +20,7 @@ use crate::rpc::{
 /// This is a fully `async` trait. The user should be responsible for
 /// handling the `async` nature of the trait methods. And if implementing
 /// this trait for a specific type that is not `async`, the user should
-/// consider wrapping with [`tokio`](tokio)'s
-/// [`spawn_blocking`](tokio::task::spawn_blocking) or any other method.
+/// consider wrapping with `tokio`, `spawn_blocking` or any other method.
 #[async_trait]
 pub trait Reader {
     /// Estimates the approximate fee per kilobyte needed for a transaction

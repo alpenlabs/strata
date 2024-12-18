@@ -6,11 +6,12 @@ use bitcoin::{
     Block,
 };
 use rand::{rngs::StdRng, SeedableRng};
-use strata_btcio::rpc::{traits::Reader, BitcoinClient};
+use strata_btcio::rpc_client::BitcoinClient;
+use strata_btcio_rpc_types::traits::Reader;
 use strata_primitives::{
     block_credential,
     operator::OperatorPubkeys,
-    params::{OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
+    params::{FeePolicy, OperatorConfig, Params, ProofPublishMode, RollupParams, SyncParams},
     proof::RollupVerifyingKey,
 };
 use tracing::debug;
@@ -101,6 +102,11 @@ fn gen_params_with_seed(seed: u64) -> Params {
             proof_publish_mode: ProofPublishMode::Strict,
             max_deposits_in_block: 16,
             network: bitcoin::Network::Regtest,
+            da_tag: "strata-da".to_string(),
+            ckpt_tag: "strata-ckpt".to_string(),
+            fee_policy: FeePolicy::Smart,
+            writer_poll_dur: 1_000,
+            amt_for_reveal_tx: 1_000,
         },
         run: SyncParams {
             l2_blocks_fetch_limit: 1000,

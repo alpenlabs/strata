@@ -1,18 +1,16 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Txid};
+use strata_btcio_rpc_types::traits::{Broadcaster, Wallet};
 use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::params::Params;
 use strata_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
 
-use crate::{
-    broadcaster::{
-        error::{BroadcasterError, BroadcasterResult},
-        state::BroadcasterState,
-    },
-    rpc::traits::{Broadcaster, Wallet},
+use crate::broadcaster::{
+    error::{BroadcasterError, BroadcasterResult},
+    state::BroadcasterState,
 };
 
 const BROADCAST_POLL_INTERVAL: u64 = 1_000; // millis

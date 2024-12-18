@@ -31,6 +31,7 @@ members = [
   "crates/reth/rpc",
   "crates/rpc/api",
   "crates/rpc/bridge-api",
+  "crates/rpc/btcio-types",
   "crates/rpc/prover-client-api",
   "crates/rpc/types",
   "crates/rpc/utils",
@@ -40,7 +41,8 @@ members = [
   "crates/sync",
   "crates/tasks",
   "crates/test-utils",
-  "crates/tx-parser",
+  "crates/transaction/filter",
+  "crates/transaction/reveal",
   "crates/util/mmr",
   "crates/util/shrex",
   "crates/vtxjmt",
@@ -78,6 +80,7 @@ strata-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
 strata-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
 strata-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 strata-btcio = { path = "crates/btcio" }
+strata-btcio-rpc-types = { path = "crates/rpc/btcio-types" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }
 strata-consensus-logic = { path = "crates/consensus-logic" }
@@ -102,6 +105,7 @@ strata-reth-exex = { path = "crates/reth/exex" }
 strata-reth-node = { path = "crates/reth/node" }
 strata-reth-primitives = { path = "crates/reth/primitives" }
 strata-reth-rpc = { path = "crates/reth/rpc" }
+strata-reveal-tx = { path = "crates/transaction/reveal" }
 strata-risc0-adapter = { path = "crates/zkvm/adapters/risc0" }
 strata-rocksdb = { path = "crates/rocksdb-store" }
 strata-rpc-api = { path = "crates/rpc/api" }
@@ -114,7 +118,7 @@ strata-storage = { path = "crates/storage" }
 strata-sync = { path = "crates/sync" }
 strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
-strata-tx-parser = { path = "crates/tx-parser" }
+strata-tx-filter = { path = "crates/transaction/filter" }
 strata-zkvm = { path = "crates/zkvm/zkvm" }
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
@@ -249,6 +253,6 @@ opt-level = 3
 # This shall be used only in the CI for the prover to optimize the build time.
 [profile.prover-ci]
 inherits = "release"
-opt-level = 0
 lto = "off"
+opt-level = 0
 strip = true

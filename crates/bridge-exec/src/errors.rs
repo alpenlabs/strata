@@ -2,7 +2,7 @@
 
 use jsonrpsee::core::ClientError as L2ClientError;
 use strata_bridge_tx_builder::errors::BridgeTxBuilderError;
-use strata_btcio::rpc::error::ClientError as L1ClientError;
+use strata_btcio_rpc_types::error::ClientError as L1ClientError;
 use thiserror::Error;
 
 /// Error during execution of the duty.

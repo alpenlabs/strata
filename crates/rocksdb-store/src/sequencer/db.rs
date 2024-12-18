@@ -1,23 +1,18 @@
 use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
-use strata_db::{
-    errors::DbError,
-    traits::{BlobDatabase, SequencerDatabase},
-    types::BlobEntry,
-    DbResult,
-};
+use strata_db::{errors::DbError, traits::WriterDatabase, types::DataBundleIntentEntry, DbResult};
 use strata_primitives::buf::Buf32;
 
 use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
 use crate::{sequence::get_next_id, DbOpsConfig};
 
-pub struct RBSeqBlobDb {
+pub struct WriterDb {
     db: Arc<OptimisticTransactionDB>,
     ops: DbOpsConfig,
 }
 
-impl RBSeqBlobDb {
+impl WriterDb {
     /// Wraps an existing database handle.
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
@@ -27,20 +22,20 @@ impl RBSeqBlobDb {
     }
 }
 
-impl BlobDatabase for RBSeqBlobDb {
-    fn put_blob_entry(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<()> {
+impl WriterDatabase for WriterDb {
+    fn put_entry(&self, entry_hash: Buf32, entry: DataBundleIntentEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |tx| -> Result<(), DbError> {
                     // If new, increment idx
-                    if tx.get::<SeqBlobSchema>(&blob_hash)?.is_none() {
+                    if tx.get::<SeqBlobSchema>(&entry_hash)?.is_none() {
                         let idx = get_next_id::<SeqBlobIdSchema, OptimisticTransactionDB>(tx)?;
 
-                        tx.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
+                        tx.put::<SeqBlobIdSchema>(&idx, &entry_hash)?;
                     }
 
-                    tx.put::<SeqBlobSchema>(&blob_hash, &blob)?;
+                    tx.put::<SeqBlobSchema>(&entry_hash, &entry)?;
 
                     Ok(())
                 },
@@ -48,41 +43,23 @@ impl BlobDatabase for RBSeqBlobDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>> {
+    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<DataBundleIntentEntry>> {
         Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
 
-    fn get_last_blob_idx(&self) -> DbResult<Option<u64>> {
+    fn get_last_idx(&self) -> DbResult<Option<u64>> {
         Ok(rockbound::utils::get_last::<SeqBlobIdSchema>(&*self.db)?.map(|(x, _)| x))
     }
 
-    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
-        Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
-    }
-}
-
-pub struct SequencerDB<D> {
-    db: Arc<D>,
-}
-
-impl<D> SequencerDB<D> {
-    pub fn new(db: Arc<D>) -> Self {
-        Self { db }
-    }
-}
-
-impl<B: BlobDatabase> SequencerDatabase for SequencerDB<B> {
-    type BlobDB = B;
-
-    fn blob_db(&self) -> &Arc<Self::BlobDB> {
-        &self.db
+    fn get_id(&self, entryidx: u64) -> DbResult<Option<Buf32>> {
+        Ok(self.db.get::<SeqBlobIdSchema>(&entryidx)?)
     }
 }
 
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::BlobDatabase;
+    use strata_db::traits::WriterDatabase;
     use strata_primitives::buf::Buf32;
     use strata_test_utils::ArbitraryGenerator;
     use test;
@@ -93,94 +70,98 @@ mod tests {
     #[test]
     fn test_put_blob_new_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBSeqBlobDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
+        let envelope_entry: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        let envelope_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
-        let idx = seq_db.get_last_blob_idx().unwrap().unwrap();
+        seq_db
+            .put_entry(envelope_hash, envelope_entry.clone())
+            .unwrap();
+        let idx = seq_db.get_last_idx().unwrap().unwrap();
 
-        assert_eq!(seq_db.get_blob_id(idx).unwrap(), Some(blob_hash));
+        assert_eq!(seq_db.get_id(idx).unwrap(), Some(envelope_hash));
 
-        let stored_blob = seq_db.get_blob_by_id(blob_hash).unwrap();
-        assert_eq!(stored_blob, Some(blob));
+        let stored_entry = seq_db.get_entry_by_id(envelope_hash).unwrap();
+        assert_eq!(stored_entry, Some(envelope_entry));
     }
 
     #[test]
-    fn test_put_blob_existing_entry() {
+    fn test_put_envelope_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBSeqBlobDb::new(db, db_ops);
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
+        let seq_db = WriterDb::new(db, db_ops);
+        let envelope_entry: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        let envelope_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db
+            .put_entry(envelope_hash, envelope_entry.clone())
+            .unwrap();
 
-        let result = seq_db.put_blob_entry(blob_hash, blob);
+        let result = seq_db.put_entry(envelope_hash, envelope_entry);
 
         // Should be ok to put to existing key
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_update_blob_() {
+    fn test_update_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBSeqBlobDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
+        let envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        let envelope_hash: Buf32 = [0; 32].into();
 
         // Insert
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
 
-        let updated_blob: BlobEntry = ArbitraryGenerator::new().generate();
+        let updated_envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
         seq_db
-            .put_blob_entry(blob_hash, updated_blob.clone())
+            .put_entry(envelope_hash, updated_envelope.clone())
             .unwrap();
-        let retrieved_blob = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
-        assert_eq!(updated_blob, retrieved_blob);
+        let retrieved_envelope = seq_db.get_entry_by_id(envelope_hash).unwrap().unwrap();
+        assert_eq!(updated_envelope, retrieved_envelope);
     }
 
     #[test]
-    fn test_get_blob_by_id() {
+    fn test_get_envelope_by_id() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBSeqBlobDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
+        let envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        let envelope_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
 
-        let retrieved = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
-        assert_eq!(retrieved, blob);
+        let retrieved = seq_db.get_entry_by_id(envelope_hash).unwrap().unwrap();
+        assert_eq!(retrieved, envelope);
     }
 
     #[test]
-    fn test_get_last_blob_idx() {
+    fn test_get_last_envelope_idx() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBSeqBlobDb::new(db, db_ops);
+        let seq_db = WriterDb::new(db, db_ops);
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
+        let envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        let envelope_hash: Buf32 = [0; 32].into();
 
-        let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
+        let last_envelope_idx = seq_db.get_last_idx().unwrap();
         assert_eq!(
-            last_blob_idx, None,
-            "There is no last blobidx in the beginning"
+            last_envelope_idx, None,
+            "There is no last envelopeidx in the beginning"
         );
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
         // Now the last idx is 0
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [1; 32].into();
+        let envelope: DataBundleIntentEntry = ArbitraryGenerator::new().generate();
+        let envelope_hash: Buf32 = [1; 32].into();
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_entry(envelope_hash, envelope.clone()).unwrap();
         // Now the last idx is 1
 
-        let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
-        assert_eq!(last_blob_idx, Some(1));
+        let last_envelope_idx = seq_db.get_last_idx().unwrap();
+        assert_eq!(last_envelope_idx, Some(1));
     }
 }

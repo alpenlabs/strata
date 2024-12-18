@@ -19,7 +19,7 @@ use strata_zkvm::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{BlobEntry, CheckpointEntry, L1TxEntry},
+    types::{CheckpointEntry, DataBundleIntentEntry, L1TxEntry},
     DbResult,
 };
 
@@ -243,29 +243,21 @@ pub trait CheckpointDatabase {
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
 
-/// NOTE: We might have to merge this with the [`Database`]
-/// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`BlobEntry`]
-pub trait SequencerDatabase {
-    type BlobDB: BlobDatabase;
+/// Commit Reveal Transaction Entry Database
+/// A trait encapsulating provider and store traits to create/update [`DataBundleIntentEntry`]
+/// in the database and to fetch [`DataBundleIntentEntry`] and indices from the database
+pub trait WriterDatabase {
+    /// Store the [`DataBundleIntentEntry`].
+    fn put_entry(&self, entryid: Buf32, entry: DataBundleIntentEntry) -> DbResult<()>;
 
-    fn blob_db(&self) -> &Arc<Self::BlobDB>;
-}
-
-/// A trait encapsulating provider and store traits to create/update [`BlobEntry`] in the database
-/// and to fetch [`BlobEntry`] and indices from the database
-pub trait BlobDatabase {
-    /// Store the [`BlobEntry`].
-    fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
-
-    /// Get a [`BlobEntry`] by its hash
-    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
+    /// Get a [`DataBundleIntentEntry`] by its hash
+    fn get_entry_by_id(&self, id: Buf32) -> DbResult<Option<DataBundleIntentEntry>>;
 
     /// Get the blob ID corresponding to the index
-    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>>;
+    fn get_id(&self, entryidx: u64) -> DbResult<Option<Buf32>>;
 
     /// Get the last blob index
-    fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
+    fn get_last_idx(&self) -> DbResult<Option<u64>>;
 }
 
 pub trait ProofDatabase {
@@ -282,7 +274,7 @@ pub trait ProofDatabase {
     /// Deletes a proof by its key.
     ///
     /// Tries to delete a proof by its key, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool>;
 
     /// Inserts dependencies for a given [`ProofContext`] into the database.
@@ -298,7 +290,7 @@ pub trait ProofDatabase {
     /// Deletes dependencies for a given [`ProofContext`].
     ///
     /// Tries to delete dependencies of by its context, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool>;
 }
 
