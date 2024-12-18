@@ -153,6 +153,7 @@ pub trait ClientStateDatabase {
 
     fn get_last_client_state_idx(&self) -> DbResult<u64>;
 
+    /// Get client state at idx
     fn get_state_at(&self, idx: u64) -> DbResult<Option<ClientState>>;
 }
 

@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::prelude::*;
 
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
 };
 
 /// Full contents of the bare L2 block.
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct L2Block {
     /// Header that links the block into the L2 block chain and carries the
     /// block's credential from a sequencer.
@@ -60,7 +61,9 @@ impl<'a> Arbitrary<'a> for L2Block {
 }
 
 /// Contains the additional payloads within the L2 block.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct L2BlockBody {
     l1_segment: L1Segment,
     exec_segment: ExecSegment,
@@ -85,7 +88,9 @@ impl L2BlockBody {
 
 /// Container for additional messages that we've observed from the L1, if there
 /// are any.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct L1Segment {
     /// New headers that we've seen from L1 that we didn't see in the previous
     /// L2 block.
@@ -110,7 +115,9 @@ impl L1Segment {
 ///
 /// Right now this just contains a single execution update since we only have a
 /// single execution environment in our execution layer.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct ExecSegment {
     /// Update payload for the single execution environment.
     update: exec_update::ExecUpdate,

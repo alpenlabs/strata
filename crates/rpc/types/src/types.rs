@@ -328,10 +328,10 @@ pub enum L2BlockStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcChainState {
     /// Most recent seen block.
-    pub last_block: L2BlockId,
+    pub tip_blkid: L2BlockId,
 
     /// The slot of the last produced block.
-    pub slot: u64,
+    pub tip_slot: u64,
 
-    pub epoch: u64,
+    pub cur_epoch: u64,
 }
