@@ -431,11 +431,11 @@ pub fn filter_verified_checkpoints(
             let l1_tsn = checkpoint.batch_info().l1_transition;
             let l2_tsn = checkpoint.batch_info().l2_transition;
 
-            if l1_tsn.0 == last_l1_tsn.1 {
+            if l1_tsn.0 != last_l1_tsn.1 {
                 warn!(obtained = ?l1_tsn.0, expected = ?last_l1_tsn.1, "Received invalid checkpoint l1 transition, ignoring.");
                 continue;
             }
-            if l2_tsn.0 == last_l2_tsn.1 {
+            if l2_tsn.0 != last_l2_tsn.1 {
                 warn!(obtained = ?l2_tsn.0, expected = ?last_l2_tsn.1, "Received invalid checkpoint l2 transition, ignoring.");
                 continue;
             }
