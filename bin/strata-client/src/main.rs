@@ -27,7 +27,7 @@ use strata_primitives::params::{Params, SyncParams};
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
 };
-use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
+use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer, StrataDebugApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
     managers::checkpoint::CheckpointDbManager, ops::bridge_relay::BridgeMsgOps, L2BlockManager,
@@ -530,7 +530,7 @@ async fn start_rpc(
         status_channel.clone(),
         database,
         sync_manager,
-        l2_block_manager,
+        l2_block_manager.clone(),
         checkpoint_handle,
         relayer_handle,
     );
@@ -538,6 +538,9 @@ async fn start_rpc(
 
     let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
     methods.merge(admin_rpc.into_rpc())?;
+
+    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(l2_block_manager);
+    methods.merge(debug_rpc.into_rpc())?;
 
     let rpc_host = config.client.rpc_host;
     let rpc_port = config.client.rpc_port;

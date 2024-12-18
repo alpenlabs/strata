@@ -10,34 +10,20 @@ use strata_rpc_types::{
 };
 use strata_state::{
     client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent,
+    block::L2Block,
 };
 use strata_zkvm::ProofReceipt;
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
 pub trait StrataApi {
-    /// Get the block by its id
-    #[method(name = "getBlockById")]
-    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcL2Block>>;
 
     /// Get blocks at a certain height
     #[method(name = "getBlocksAtIdx")]
     async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>>;
 
-    /// Get chain tip block id
-    #[method(name = "blockNumber")]
-    async fn block_number(&self) -> RpcResult<u64>;
-
-    /// Get the last ChainState index
-    #[method(name = "getLastChainstateIdx")]
-    async fn get_last_chainstate_idx(&self) -> RpcResult<u64>;
-
     /// Get the ChainState at a certain index
     #[method(name = "getChainstateAtIdx")]
     async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>>;
-
-    /// Get the last ClientState index
-    #[method(name = "getLastClientStateIdx")]
-    async fn get_last_clientstate_idx(&self) -> RpcResult<u64>;
 
     /// Get the ClientState at a certain index
     #[method(name = "getClientStateAtIdx")]
@@ -189,4 +175,14 @@ pub trait StrataSequencerApi {
 
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
+}
+
+
+/// rpc endpoints that are only available for debugging purpose and subject to change.
+#[cfg_attr(not(feature = "client"), rpc(server))]
+#[cfg_attr(feature = "client", rpc(server, client))]
+pub trait StrataDebugApi {
+    /// Get the block by its id
+    #[method(name = "debug_getBlockById")]
+    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>>;
 }

@@ -25,7 +25,7 @@ use strata_primitives::{
     hash,
     params::Params,
 };
-use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
+use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer, StrataDebugApiServer};
 use strata_rpc_types::{
     errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockBody,
     RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointInfo, RpcClientStatus,
@@ -34,7 +34,7 @@ use strata_rpc_types::{
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
     batch::BatchCheckpoint,
-    block::L2BlockBundle,
+    block::{L2BlockBundle, L2Block},
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     client_state::ClientState,
@@ -120,40 +120,6 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         Ok(block_ids)
     }
 
-    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcL2Block>> {
-        let l2_block_manager = self.l2_block_manager.clone();
-        let l2_block = l2_block_manager
-            .get_block_async(&block_id)
-            .await
-            .map_err(Error::Db)?;
-
-        let header = l2_block
-            .as_ref()
-            .ok_or(Error::MissingL2Block(block_id))?
-            .header();
-        Ok(Some(RpcL2Block {
-            header: conv_blk_header_to_rpc(header),
-            body: RpcBlockBody { todo: 0 },
-        }))
-    }
-    async fn block_number(&self) -> RpcResult<u64> {
-        let sync = self
-            .status_channel
-            .sync_state()
-            .ok_or(Error::ClientNotStarted)?
-            .clone();
-        Ok(sync.chain_tip_height())
-    }
-
-    async fn get_last_chainstate_idx(&self) -> RpcResult<u64> {
-        let db = self.database.clone();
-        let last_idx = wait_blocking("last_chain_state_idx", move || {
-            db.chain_state_db().get_last_state_idx().map_err(Error::Db)
-        })
-        .await?;
-        Ok(last_idx)
-    }
-
     async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
         let db = self.database.clone();
         let chain_state = wait_blocking("chain_state_at_idx", move || {
@@ -162,23 +128,12 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         .await?;
         match chain_state {
             Some(cs) => Ok(Some(RpcChainState {
-                last_block: cs.chain_tip_blockid(),
-                slot: cs.chain_tip_slot(),
-                epoch: cs.epoch(),
+                tip_blkid: cs.chain_tip_blockid(),
+                tip_slot: cs.chain_tip_slot(),
+                cur_epoch: cs.epoch(),
             })),
             None => Ok(None),
         }
-    }
-
-    async fn get_last_clientstate_idx(&self) -> RpcResult<u64> {
-        let db = self.database.clone();
-        let last_idx = wait_blocking("last_client_state_idx", move || {
-            db.client_state_db()
-                .get_last_client_state_idx()
-                .map_err(Error::Db)
-        })
-        .await?;
-        Ok(last_idx)
     }
 
     async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
@@ -836,5 +791,28 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .get_tx_status(id)
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
+    }
+}
+
+pub struct StrataDebugRpcImpl {
+    l2_block_manager: Arc<L2BlockManager>,
+}
+
+impl StrataDebugRpcImpl {
+    pub fn new(l2_block_manager: Arc<L2BlockManager>) -> Self {
+        Self {l2_block_manager}
+    }
+}
+
+#[async_trait]
+impl StrataDebugApiServer for StrataDebugRpcImpl {
+    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>> {
+        let l2_block_manager = self.l2_block_manager.clone();
+        let l2_block = l2_block_manager
+            .get_block_async(&block_id)
+            .await
+            .map_err(Error::Db)?
+            .map(|b| b.block().clone());
+        Ok(l2_block)
     }
 }
