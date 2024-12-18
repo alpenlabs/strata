@@ -6,12 +6,11 @@ on:
   schedule:
     # Run at the first of every month
     - cron: "0 0 1 * *"
-  workflow_dispatch:
-    # Needed so we can run it manually
+  workflow_dispatch: # Needed so we can run it manually
 
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  BRANCH: cargo-update
+  AUTHOR: Update Cargo.lock Bot <no-reply@alpenlabs.io>
+  BRANCH: create-pull-request/automated-cargo-update
   TITLE: "chore(deps): monthly `cargo update`"
   BODY: |
     Automation to keep dependencies in `Cargo.lock` current.
@@ -30,6 +29,9 @@ jobs:
   update:
     name: Update
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create commits
+      pull-requests: write # Needed to create a PR
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,6 +70,7 @@ jobs:
         with:
           add-paths: ./Cargo.lock
           commit-message: ${{ steps.msg.outputs.commit_message }}
+          author: ${{ env.AUTHOR }}
           title: ${{ env.TITLE }}
           body: ${{ steps.msg.outputs.body }}
           branch: ${{ env.BRANCH }}
