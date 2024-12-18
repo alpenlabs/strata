@@ -6,17 +6,16 @@ use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
     HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcChainState, RpcCheckpointInfo,
-    RpcDepositEntry, RpcExecUpdate, RpcL2Block, RpcSyncStatus,
+    RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
 };
 use strata_state::{
-    client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent,
-    block::L2Block,
+    block::L2Block, client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput,
+    sync_event::SyncEvent,
 };
 use strata_zkvm::ProofReceipt;
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
 pub trait StrataApi {
-
     /// Get blocks at a certain height
     #[method(name = "getBlocksAtIdx")]
     async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>>;
@@ -176,7 +175,6 @@ pub trait StrataSequencerApi {
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
 }
-
 
 /// rpc endpoints that are only available for debugging purpose and subject to change.
 #[cfg_attr(not(feature = "client"), rpc(server))]

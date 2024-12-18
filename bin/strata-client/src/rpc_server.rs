@@ -25,16 +25,18 @@ use strata_primitives::{
     hash,
     params::Params,
 };
-use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer, StrataDebugApiServer};
+use strata_rpc_api::{
+    StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
+};
 use strata_rpc_types::{
-    errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockBody,
-    RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointInfo, RpcClientStatus,
-    RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcL2Block, RpcSyncStatus,
+    errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockHeader,
+    RpcBridgeDuties, RpcChainState, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry,
+    RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
     batch::BatchCheckpoint,
-    block::{L2BlockBundle, L2Block},
+    block::{L2Block, L2BlockBundle},
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     client_state::ClientState,
@@ -800,7 +802,7 @@ pub struct StrataDebugRpcImpl {
 
 impl StrataDebugRpcImpl {
     pub fn new(l2_block_manager: Arc<L2BlockManager>) -> Self {
-        Self {l2_block_manager}
+        Self { l2_block_manager }
     }
 }
 
