@@ -1,6 +1,9 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use bitcoin::{consensus::deserialize, Block};
+use bitcoin::{
+    consensus::{deserialize, serialize},
+    Block,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{batch::BatchCheckpoint, tx::DepositInfo};
@@ -20,6 +23,7 @@ pub struct BlockScanResult {
     pub deposits: Vec<DepositInfo>,
     pub prev_checkpoint: Option<BatchCheckpoint>,
 }
+
 #[derive(Debug)]
 pub struct BlockScanProofInput {
     pub blocks: Vec<Block>,
@@ -33,7 +37,7 @@ pub fn process_blockscan(block: &Block, rollup_params: &RollupParams) -> BlockSc
     let (deposits, prev_checkpoint) = extract_relevant_info(block, rollup_params);
 
     BlockScanResult {
-        header_raw: bitcoin::consensus::serialize(&block.header),
+        header_raw: serialize(&block.header),
         deposits,
         prev_checkpoint,
     }

@@ -1,3 +1,4 @@
+use bitcoin::consensus::serialize;
 use strata_zkvm::{ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult};
 
 use crate::logic::{BlockScanProofInput, BlockScanProofOutput};
@@ -22,7 +23,7 @@ impl ZkVmProver for BtcBlockspaceProver {
         input_builder.write_serde(&input.blocks.len())?;
 
         for block in &input.blocks {
-            input_builder.write_buf(&bitcoin::consensus::serialize(&block))?;
+            input_builder.write_buf(&serialize(block))?;
         }
 
         input_builder.build()
