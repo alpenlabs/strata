@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use strata_primitives::proof::{ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
-use tokio::{sync::Mutex, time::sleep};
+use tokio::{spawn, sync::Mutex, time::sleep};
 use tracing::{error, info};
 
 use crate::{
@@ -66,7 +66,7 @@ impl ProverManager {
                 let task_tracker = self.task_tracker.clone();
 
                 // Spawn a new task
-                tokio::spawn(async move {
+                spawn(async move {
                     if let Err(err) = make_proof(operator, task_tracker, task, db).await {
                         error!(?err, "Failed to process task");
                     }
