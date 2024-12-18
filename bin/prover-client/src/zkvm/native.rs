@@ -11,8 +11,6 @@ use strata_zkvm::ZkVmHost;
 
 use crate::primitives::vms::ProofVm;
 
-use crate::primitives::vms::ProofVm;
-
 /// A mock verification key used in native mode when proof verification is not performed.
 ///
 /// This constant provides a placeholder value for scenarios where a verification key is
