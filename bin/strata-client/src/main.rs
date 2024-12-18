@@ -27,7 +27,9 @@ use strata_primitives::params::{Params, SyncParams};
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
 };
-use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer, StrataDebugApiServer};
+use strata_rpc_api::{
+    StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
+};
 use strata_status::StatusChannel;
 use strata_storage::{
     managers::checkpoint::CheckpointDbManager, ops::bridge_relay::BridgeMsgOps, L2BlockManager,

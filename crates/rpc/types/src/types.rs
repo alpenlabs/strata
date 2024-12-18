@@ -164,17 +164,6 @@ pub struct RpcBlockHeader {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RpcBlockBody {
-    /// The fields of block body is to be decided.
-    pub todo: u64,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RpcL2Block {
-    pub header: RpcBlockHeader,
-    pub body: RpcBlockBody,
-}
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DaBlob {
     /// The destination or identifier for the blob.
     pub dest: u8,
