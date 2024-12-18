@@ -81,7 +81,7 @@ pub(super) async fn extract_deposit_requests<Provider: L1DataProvider>(
 
         let network_params = match network {
             Network::Bitcoin => Params::MAINNET,
-            Network::Testnet => Params::TESTNET,
+            Network::Testnet => Params::TESTNET4,
             Network::Signet => Params::SIGNET,
             Network::Regtest => Params::REGTEST,
             _ => unimplemented!("{} network not handled", network),
