@@ -1,5 +1,3 @@
-from os import wait
-from socket import timeout
 import time
 
 import flexitest
@@ -34,17 +32,18 @@ class ResubmitCheckpointTest(flexitest.Test):
 
         verified_on = wait_until_with_value(
             lambda: seqrpc.strata_getL2BlockStatus(1),
-            predicate=lambda val: isinstance(val,dict) and "Finalized" in val,
-            error_with=f"transactions are not being Finalized",
-            timeout=10
+            predicate=lambda val: isinstance(val, dict) and "Finalized" in val,
+            error_with="transactions are not being Finalized",
+            timeout=10,
         )
         verified_block_hash = btcrpc.proxy.getblockhash(verified_on["Finalized"])
         block_data = btcrpc.getblock(verified_block_hash)
         envelope_data = ""
-        for tx in block_data['txs']:
+        for tx in block_data["txs"]:
             try:
                 envelope_data = get_envelope_pushdata(tx.witness_data().hex())
-            except:
+            except ValueError:
+                print("NOt a envelope transaction")
                 continue
 
         # submit envelope data
@@ -71,19 +70,16 @@ class ResubmitCheckpointTest(flexitest.Test):
 
         return True
 
+
 def get_envelope_pushdata(inp: str):
     op_if = "63"
     op_endif = "68"
     op_pushbytes_33 = "21"
     op_false = "00"
     start_position = inp.index(f"{op_false}{op_if}")
-    end_position = inp.index(f"{op_endif}{op_pushbytes_33}",start_position)
-    op_if_block = inp[start_position+3:end_position]
+    end_position = inp.index(f"{op_endif}{op_pushbytes_33}", start_position)
+    op_if_block = inp[start_position + 3 : end_position]
     op_pushdata = "4d"
     pushdata_position = op_if_block.index(f"{op_pushdata}")
     # we don't want PUSHDATA + num bytes b401
-    return op_if_block[pushdata_position+2+4:]
-
-
-
-
+    return op_if_block[pushdata_position + 2 + 4 :]

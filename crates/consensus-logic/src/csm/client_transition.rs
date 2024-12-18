@@ -162,24 +162,26 @@ pub fn process_event<D: Database>(
 
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
-                writes.push(ClientStateWrite::CheckpointsReceived(
-                    checkpoints
-                        .iter()
-                        .map(|x| {
-                            L1Checkpoint::new(
-                                x.batch_info().clone(),
-                                x.bootstrap_state().clone(),
-                                !x.proof().is_empty(),
-                                *height,
-                            )
-                        })
-                        .collect(),
-                ));
+                if !proof_verified_checkpoints.is_empty() {
+                    writes.push(ClientStateWrite::CheckpointsReceived(
+                        proof_verified_checkpoints
+                            .iter()
+                            .map(|x| {
+                                L1Checkpoint::new(
+                                    x.batch_info().clone(),
+                                    x.bootstrap_state().clone(),
+                                    !x.proof().is_empty(),
+                                    *height,
+                                )
+                            })
+                            .collect(),
+                    ));
 
-                actions.push(SyncAction::WriteCheckpoints(
-                    *height,
-                    proof_verified_checkpoints,
-                ));
+                    actions.push(SyncAction::WriteCheckpoints(
+                        *height,
+                        proof_verified_checkpoints,
+                    ));
+                }
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
