@@ -7,8 +7,9 @@ from strata_utils import (
     take_back_transaction,
 )
 
+import testenv
 from constants import DEFAULT_ROLLUP_PARAMS, DEFAULT_TAKEBACK_TIMEOUT, UNSPENDABLE_ADDRESS
-from utils import get_bridge_pubkey, get_logger, wait_until
+from utils import get_bridge_pubkey, wait_until
 
 # Local constants
 # D BTC
@@ -18,7 +19,7 @@ TAKE_BACK_FEE = 17_243
 
 
 @flexitest.register
-class BridgeDepositReclaimTest(flexitest.Test):
+class BridgeDepositReclaimTest(testenv.StrataTester):
     """
     A test class for reclaim path scenarios of bridge deposits.
 
@@ -30,7 +31,6 @@ class BridgeDepositReclaimTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = get_logger("BridgeDepositReclaimTest")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
@@ -40,7 +40,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
         bridge_operator = ctx.get_service("bridge.0")
         # Kill the operator so the bridge does not process the DRT transaction
         bridge_operator.stop()
-        self.logger.debug("Bridge operators stopped")
+        self.debug("Bridge operators stopped")
 
         btcrpc: BitcoindClient = btc.create_rpc()
         btc_url = btcrpc.base_url
@@ -51,19 +51,19 @@ class BridgeDepositReclaimTest(flexitest.Test):
 
         seqrpc = seq.create_rpc()
 
-        self.logger.debug(f"BTC URL: {btc_url}")
-        self.logger.debug(f"BTC user: {btc_user}")
-        self.logger.debug(f"BTC password: {btc_password}")
+        self.debug(f"BTC URL: {btc_url}")
+        self.debug(f"BTC user: {btc_user}")
+        self.debug(f"BTC password: {btc_password}")
 
         bridge_pk = get_bridge_pubkey(seqrpc)
         el_address = ctx.env.gen_el_address()
         user_addr = ctx.env.gen_ext_btc_address()
         refund_addr = ctx.env.gen_ext_btc_address()
         recovery_addr = ctx.env.gen_rec_btc_address()
-        self.logger.debug(f"El address: {el_address}")
-        self.logger.debug(f"User address: {user_addr}")
-        self.logger.debug(f"Refund address: {refund_addr}")
-        self.logger.debug(f"Recovery address: {recovery_addr}")
+        self.debug(f"El address: {el_address}")
+        self.debug(f"User address: {user_addr}")
+        self.debug(f"Refund address: {refund_addr}")
+        self.debug(f"Recovery address: {recovery_addr}")
 
         # First let's see if the EVM side has no funds
         # Make sure that the el_address has zero balance
@@ -77,11 +77,11 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btc_user,
             btc_password,
         )
-        self.logger.debug(f"Initial refund BTC balance: {initial_refund_btc_balance}")
+        self.debug(f"Initial refund BTC balance: {initial_refund_btc_balance}")
 
         # DRT same block
         txid_drt = self.make_drt(ctx, el_address, bridge_pk)
-        self.logger.debug(f"Deposit Request Transaction: {txid_drt}")
+        self.debug(f"Deposit Request Transaction: {txid_drt}")
 
         # Now we need to generate a bunch of blocks
         # since they will be able to spend the DRT output.
@@ -90,9 +90,9 @@ class BridgeDepositReclaimTest(flexitest.Test):
         # Breaking by chunks
         chunks = 8
         blocks_to_generate = DEFAULT_TAKEBACK_TIMEOUT // chunks
-        self.logger.debug(f"Generating {DEFAULT_TAKEBACK_TIMEOUT} blocks in {chunks} chunks")
+        self.debug(f"Generating {DEFAULT_TAKEBACK_TIMEOUT} blocks in {chunks} chunks")
         for i in range(chunks):
-            self.logger.debug(f"Generating {blocks_to_generate} blocks in chunk {i+1}/{chunks}")
+            self.debug(f"Generating {blocks_to_generate} blocks in chunk {i+1}/{chunks}")
             btcrpc.proxy.generatetoaddress(blocks_to_generate, UNSPENDABLE_ADDRESS)
 
         # Make sure that the BTC refund address has the expected balance
@@ -106,14 +106,14 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btc_user,
             btc_password,
         )
-        self.logger.debug(f"User BTC balance (before takeback): {refund_btc_balance}")
+        self.debug(f"User BTC balance (before takeback): {refund_btc_balance}")
         assert refund_btc_balance == initial_refund_btc_balance, "BTC balance has changed"
 
         # Spend the take back path
         take_back_tx = bytes(
             take_back_transaction(refund_addr, bridge_pk, btc_url, btc_user, btc_password)
         ).hex()
-        self.logger.debug("Take back tx generated")
+        self.debug("Take back tx generated")
 
         # Send the transaction to the Bitcoin network
         original_recovery_balance = get_balance_recovery(
@@ -124,7 +124,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btc_password,
         )
         txid = btcrpc.proxy.sendrawtransaction(take_back_tx)
-        self.logger.debug(f"sent take back tx with txid = {txid} for address {el_address}")
+        self.debug(f"sent take back tx with txid = {txid} for address {el_address}")
         btcrpc.proxy.generatetoaddress(2, UNSPENDABLE_ADDRESS)
         wait_until(
             lambda: get_balance_recovery(recovery_addr, bridge_pk, btc_url, btc_user, btc_password)
@@ -139,7 +139,7 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btc_user,
             btc_password,
         )
-        self.logger.debug(f"DRT BTC balance (after takeback): {btc_balance}")
+        self.debug(f"DRT BTC balance (after takeback): {btc_balance}")
         assert btc_balance == 0, "BTC balance is not zero"
 
         # Make sure that the BTC refund address has the expected balance
@@ -149,14 +149,14 @@ class BridgeDepositReclaimTest(flexitest.Test):
             btc_user,
             btc_password,
         )
-        self.logger.debug(f"User BTC balance (after takeback): {refund_btc_balance}")
+        self.debug(f"User BTC balance (after takeback): {refund_btc_balance}")
         expected_balance = 5 * DEPOSIT_AMOUNT - TAKE_BACK_FEE
         assert refund_btc_balance >= expected_balance, "BTC balance is not as expected"
 
         # Now let's see if the EVM side has no funds
         # Make sure that the el_address has zero balance
         balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
-        self.logger.debug(f"EVM balance (after takeback): {balance}")
+        self.debug(f"EVM balance (after takeback): {balance}")
         assert balance == 0, "EVM balance is not zero"
 
         # Restart the bridge operator
@@ -181,10 +181,10 @@ class BridgeDepositReclaimTest(flexitest.Test):
                 el_address, musig_bridge_pk, btc_url, btc_user, btc_password
             )
         ).hex()
-        self.logger.debug(f"Deposit request tx: {tx}")
+        self.debug(f"Deposit request tx: {tx}")
 
         # Send the transaction to the Bitcoin network
         txid = btcrpc.proxy.sendrawtransaction(tx)
-        self.logger.debug(f"sent deposit request with txid = {txid} for address {el_address}")
+        self.debug(f"sent deposit request with txid = {txid} for address {el_address}")
 
         return txid

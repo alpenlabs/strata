@@ -1,10 +1,10 @@
 import flexitest
 
 import net_settings
+import testenv
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
 )
-from entry import BasicEnvConfig
 from utils import (
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,
@@ -12,7 +12,7 @@ from utils import (
 
 
 @flexitest.register
-class BlockFinalizationTimeoutTest(flexitest.Test):
+class BlockFinalizationTimeoutTest(testenv.StrataTester):
     """
     This checks for finalization if proof is not submitted within a timeout period
     """
@@ -24,7 +24,7 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
         settings.genesis_trigger = premine_blocks + 5
         settings.proof_timeout = self.proof_timeout
 
-        ctx.set_env(BasicEnvConfig(premine_blocks, rollup_settings=settings))
+        ctx.set_env(testenv.BasicEnvConfig(premine_blocks, rollup_settings=settings))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -36,7 +36,7 @@ class BlockFinalizationTimeoutTest(flexitest.Test):
         # Check for first 4 checkpoints
         for n in range(4):
             check_nth_checkpoint_finalized(n, seqrpc, None, proof_timeout=self.proof_timeout)
-            print(f"Pass checkpoint finalization for checkpoint {n}")
+            self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)
 

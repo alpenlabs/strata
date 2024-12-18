@@ -2,9 +2,11 @@ import time
 
 import flexitest
 
+import testenv
+
 
 @flexitest.register
-class ExecUpdateTest(flexitest.Test):
+class ExecUpdateTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
@@ -17,5 +19,5 @@ class ExecUpdateTest(flexitest.Test):
 
         recent_blks = seqrpc.strata_getRecentBlockHeaders(1)
         exec_update = seqrpc.strata_getExecUpdateById(recent_blks[0]["block_id"])
-        print(exec_update)
+        self.debug(exec_update)
         assert exec_update["update_idx"] == recent_blks[0]["block_idx"]

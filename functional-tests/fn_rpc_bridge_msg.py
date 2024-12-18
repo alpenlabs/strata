@@ -2,11 +2,13 @@ import time
 
 import flexitest
 
+import testenv
+
 WAIT_TIME = 2
 
 
 @flexitest.register
-class BridgeMsgTest(flexitest.Test):
+class BridgeMsgTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
@@ -34,10 +36,10 @@ class BridgeMsgTest(flexitest.Test):
 
         # VODepositSig(10)
         scope = "00"
-        print(scope)
+        self.debug(scope)
 
         msgs = seqrpc.strata_getBridgeMsgsByScope(scope)
-        print(msgs)
+        self.debug(msgs)
 
         # check if received blobdata and sent blobdata are same or not
         assert len(msgs) == 1, "wrong number of messages in response"

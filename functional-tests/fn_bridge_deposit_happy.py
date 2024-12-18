@@ -4,12 +4,13 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
+import testenv
 from constants import DEFAULT_ROLLUP_PARAMS
-from utils import get_bridge_pubkey, get_logger
+from utils import get_bridge_pubkey
 
 
 @flexitest.register
-class BridgeDepositHappyTest(flexitest.Test):
+class BridgeDepositHappyTest(testenv.StrataTester):
     """
     A test class for happy path scenarios of bridge deposits.
 
@@ -22,7 +23,6 @@ class BridgeDepositHappyTest(flexitest.Test):
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = get_logger("BridgeDepositHappyTest")
 
     def main(self, ctx: flexitest.RunContext):
         el_address_1 = ctx.env.gen_el_address()
@@ -65,11 +65,11 @@ class BridgeDepositHappyTest(flexitest.Test):
                 el_address, musig_bridge_pk, btc_url, btc_user, btc_password
             )
         ).hex()
-        self.logger.debug(f"Deposit request tx: {tx}")
+        self.debug(f"Deposit request tx: {tx}")
 
         # Send the transaction to the Bitcoin network
         txid = btcrpc.proxy.sendrawtransaction(tx)
-        self.logger.debug(f"sent deposit request with txid = {txid} for address {el_address}")
+        self.debug(f"sent deposit request with txid = {txid} for address {el_address}")
         # this transaction is not in the bitcoind wallet, so we cannot use gettransaction
         time.sleep(1)
 
@@ -98,7 +98,7 @@ class BridgeDepositHappyTest(flexitest.Test):
         txid = btcrpc.proxy.sendrawtransaction(tx)
         # this transaction is not in the bitcoind wallet, so we cannot use gettransaction
         time.sleep(1)
-        self.logger.debug(f"drained wallet back to sequencer, txid: {txid}")
+        self.debug(f"drained wallet back to sequencer, txid: {txid}")
 
         return txid
 
@@ -115,7 +115,7 @@ class BridgeDepositHappyTest(flexitest.Test):
         seq = ctx.get_service("sequencer")
         reth = ctx.get_service("reth")
 
-        self.logger.debug(f"EL address: {el_address}")
+        self.debug(f"EL address: {el_address}")
 
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
@@ -125,24 +125,24 @@ class BridgeDepositHappyTest(flexitest.Test):
         btc_user = btc.props["rpc_user"]
         btc_password = btc.props["rpc_password"]
 
-        self.logger.debug(f"BTC URL: {btc_url}")
-        self.logger.debug(f"BTC user: {btc_user}")
-        self.logger.debug(f"BTC password: {btc_password}")
+        self.debug(f"BTC URL: {btc_url}")
+        self.debug(f"BTC user: {btc_user}")
+        self.debug(f"BTC password: {btc_password}")
 
         # Get operators pubkey and musig2 aggregates it
         bridge_pk = get_bridge_pubkey(seqrpc)
-        self.logger.debug(f"Bridge pubkey: {bridge_pk}")
+        self.debug(f"Bridge pubkey: {bridge_pk}")
 
         seq_addr = seq.get_prop("address")
-        self.logger.debug(f"Sequencer Address: {seq_addr}")
-        self.logger.debug(f"Address: {address}")
+        self.debug(f"Sequencer Address: {seq_addr}")
+        self.debug(f"Address: {address}")
 
         n_deposits_pre = len(seqrpc.strata_getCurrentDeposits())
-        self.logger.debug(f"Current deposits: {n_deposits_pre}")
+        self.debug(f"Current deposits: {n_deposits_pre}")
 
         # Make sure that the el_address has zero balance
         original_balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
-        self.logger.debug(f"Balance before deposit (EL address): {original_balance}")
+        self.debug(f"Balance before deposit (EL address): {original_balance}")
 
         if new_address:
             assert original_balance == 0, "balance is not zero"
@@ -154,13 +154,13 @@ class BridgeDepositHappyTest(flexitest.Test):
         # Make sure that the n_deposits is correct
 
         n_deposits_post = len(seqrpc.strata_getCurrentDeposits())
-        self.logger.debug(f"Current deposits: {n_deposits_post}")
+        self.debug(f"Current deposits: {n_deposits_post}")
         assert n_deposits_post == n_deposits_pre + 1, "deposit was not registered"
 
         # Make sure that the balance has increased
         time.sleep(0.5)
         new_balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
-        self.logger.debug(f"Balance after deposit (EL address): {new_balance}")
+        self.debug(f"Balance after deposit (EL address): {new_balance}")
         assert new_balance > original_balance, "balance did not increase"
 
         # Make sure that the balance is the default deposit amount of BTC in Strata "wei"

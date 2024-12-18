@@ -2,11 +2,12 @@ import time
 
 import flexitest
 
+import testenv
 from utils import wait_for_proof_with_time_out
 
 
 @flexitest.register
-class ProverClientTest(flexitest.Test):
+class ProverClientTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
 
@@ -24,7 +25,7 @@ class ProverClientTest(flexitest.Test):
         task_id = prover_client_rpc.dev_strata_proveCheckpointRaw(
             checkpoint_idx, l1_range, l2_range
         )
-        print("got the task id: {}", task_id)
+        self.debug(f"got the task id: {task_id}")
         assert task_id is not None
 
         time_out = 10 * 60

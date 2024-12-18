@@ -869,7 +869,7 @@ develop = false
 type = "git"
 url = "https://codeberg.org/treyd/flexitest.git"
 reference = "HEAD"
-resolved_reference = "d841234856e4d128be6113424ff384bc7c84ab4b"
+resolved_reference = "216e87270994ebb023ba9b0c1a38134cc59da1f7"
 
 [[package]]
 name = "frozenlist"

@@ -2,14 +2,14 @@ from functools import partial
 
 import flexitest
 
-from entry import BasicEnvConfig
+import testenv
 from utils import wait_until_with_value
 
 
 @flexitest.register
-class ElBlockGenerationTest(flexitest.Test):
+class ElBlockGenerationTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(1000))
+        ctx.set_env(testenv.BasicEnvConfig(1000))
 
     def main(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")

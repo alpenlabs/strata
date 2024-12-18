@@ -1,10 +1,10 @@
 import flexitest
 
 import net_settings
+import testenv
 from constants import (
     ERROR_PROOF_ALREADY_CREATED,
 )
-from entry import BasicEnvConfig
 from utils import (
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,
@@ -13,15 +13,16 @@ from utils import (
 
 
 @flexitest.register
-class BlockFinalizationSeqRestartTest(flexitest.Test):
+class BlockFinalizationSeqRestartTest(testenv.StrataTester):
     """This tests finalization when sequencer client restarts"""
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings()))
+        ctx.set_env(
+            testenv.BasicEnvConfig(101, rollup_settings=net_settings.get_fast_batch_settings())
+        )
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
-
         seqrpc = seq.create_rpc()
 
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
@@ -29,7 +30,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         # Check for first 2 checkpoints
         for n in range(2):
             check_nth_checkpoint_finalized(n, seqrpc)
-            print(f"Pass checkpoint finalization for checkpoint {n}")
+            self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         # Stop sequencer
         seq.stop()
@@ -43,7 +44,7 @@ class BlockFinalizationSeqRestartTest(flexitest.Test):
         # Check for next 2 checkpoints
         for n in range(2, 4):
             check_nth_checkpoint_finalized(n, seqrpc)
-            print(f"Pass checkpoint finalization for checkpoint {n}")
+            self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc)
 

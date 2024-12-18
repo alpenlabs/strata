@@ -3,20 +3,19 @@ import time
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
+import testenv
 from constants import MAX_HORIZON_POLL_INTERVAL_SECS
-from entry import BasicEnvConfig
 from utils import generate_n_blocks, wait_until
 
 
 @flexitest.register
-class L1StatusTest(flexitest.Test):
+class L1StatusTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(BasicEnvConfig(auto_generate_blocks=False))
+        ctx.set_env(testenv.BasicEnvConfig(auto_generate_blocks=False))
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")
-
         # create both btc and sequencer RPC
         btcrpc: BitcoindClient = btc.create_rpc()
         seqrpc = seq.create_rpc()
@@ -36,12 +35,8 @@ class L1StatusTest(flexitest.Test):
         cur_time = l1stat["last_update"] // 1000
 
         # check if height on bitcoin is same as, it is seen in sequencer
-        print(
-            "L1 stat curr height:",
-            l1stat["cur_height"],
-            "Received from bitcoin:",
-            received_block["height"],
-        )
+        self.debug(f"L1 stat curr height: {l1stat["cur_height"]}")
+        self.debug(f"Received from bitcoin: {received_block["height"]}")
         assert (
             l1stat["cur_height"] == received_block["height"]
         ), "sequencer height doesn't match the bitcoin node height"

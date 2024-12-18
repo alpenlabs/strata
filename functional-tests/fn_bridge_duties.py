@@ -1,19 +1,19 @@
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
+import testenv
 from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from utils import broadcast_tx, get_logger, wait_until
+from utils import broadcast_tx, wait_until
 
 
 @flexitest.register
-class BridgeDutiesTest(flexitest.Test):
+class BridgeDutiesTest(testenv.StrataTester):
     """
     Test that the bridge client can fetch bridge duties correctly.
     """
 
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
-        self.logger = get_logger("getBridgeDuties")
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")
@@ -48,7 +48,7 @@ class BridgeDutiesTest(flexitest.Test):
                 txids.append(txid)
 
                 # add robustness by spreading out requests across blocks
-                self.logger.debug(f"sent deposit request #{j} with txid = {txid} to block #{i}")
+                self.debug(f"sent deposit request #{j} with txid = {txid} to block #{i}")
 
         # wait for the transactions to have at least 2 confirmations
         wait_until(
@@ -58,16 +58,16 @@ class BridgeDutiesTest(flexitest.Test):
 
         operator_idx = 0
         start_index = 0
-        self.logger.debug(
+        self.debug(
             f"getting bridge duties for operator_idx: {operator_idx} from index: {start_index}"
         )
         duties_resp = seqrpc.strata_getBridgeDuties(operator_idx, start_index)
         duties: list = duties_resp["duties"]
         # Filter out the duties unrelated to other than the el_address.
         for duty in duties:
-            self.logger.debug(f"duty: {duty}")
+            self.debug(f"duty: {duty}")
             if "el_address" in duty["payload"]:
-                self.logger.debug(f"duty['payload']['el_address']: {duty['payload']['el_address']}")
+                self.debug(f"duty['payload']['el_address']: {duty['payload']['el_address']}")
         duties = [
             d
             for d in duties
