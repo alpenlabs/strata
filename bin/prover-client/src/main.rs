@@ -5,22 +5,22 @@ use std::sync::Arc;
 use args::Args;
 use db::open_rocksdb_database;
 use jsonrpsee::http_client::HttpClientBuilder;
-use prover_manager::ProverManager;
 use operators::ProofOperator;
+use prover_manager::ProverManager;
 use rpc_server::ProverClientRpc;
 use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
 use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use task_tracker::TaskTracker;
-use tokio::sync::Mutex;
+use tokio::{spawn, sync::Mutex};
 use tracing::{debug, info};
 
 mod args;
 mod db;
 mod errors;
 mod hosts;
-mod prover_manager;
 mod operators;
+mod prover_manager;
 mod rpc_server;
 mod status;
 mod task_tracker;
@@ -67,7 +67,7 @@ async fn main() {
     debug!("Initialized Prover Manager");
 
     // run prover manager in background
-    tokio::spawn(async move { manager.process_pending_tasks().await });
+    spawn(async move { manager.process_pending_tasks().await });
     debug!("Spawn process pending tasks");
 
     // Run prover manager in dev mode or runner mode

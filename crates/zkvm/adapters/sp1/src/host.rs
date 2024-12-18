@@ -64,7 +64,6 @@ impl ZkVmHost for SP1Host {
             std::env::set_var("SP1_PROVER", "mock");
         }
 
-        // sp1_sdk::utils::setup_logger();
         let client = ProverClient::new();
 
         // Start proving
