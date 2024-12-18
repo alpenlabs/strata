@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 use tracing::error;
 
 use super::{utils::get_pm_rollup_params, ProvingOp};
-use crate::{errors::ProvingTaskError, task::TaskTracker};
+use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]

@@ -15,7 +15,7 @@ use tokio::sync::Mutex;
 use tracing::error;
 
 use super::{evm_ee::EvmEeOperator, utils::get_pm_rollup_params, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 /// Operations required for CL block proving tasks.
 #[derive(Debug, Clone)]

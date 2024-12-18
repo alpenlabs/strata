@@ -14,7 +14,7 @@ use tracing::error;
 use super::{
     cl_agg::ClAggOperator, l1_batch::L1BatchController, utils::get_pm_rollup_params, ProvingOp,
 };
-use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 /// Operations required for BTC block proving tasks.
 #[derive(Debug, Clone)]

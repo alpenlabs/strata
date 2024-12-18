@@ -16,7 +16,7 @@ use tokio::sync::Mutex;
 use tracing::error;
 
 use super::{btc::BtcBlockspaceOperator, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 #[derive(Debug, Clone)]
 pub struct L1BatchController {

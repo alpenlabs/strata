@@ -22,7 +22,7 @@ use strata_zkvm::ZkVmProver;
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument};
 
-use crate::{errors::ProvingTaskError, hosts, task::TaskTracker};
+use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 pub mod btc;
 pub mod checkpoint;

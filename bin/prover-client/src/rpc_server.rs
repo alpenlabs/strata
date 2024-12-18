@@ -13,7 +13,7 @@ use tracing::{info, warn};
 
 use crate::{
     operators::{ProofOperator, ProvingOp},
-    task::TaskTracker,
+    task_tracker::TaskTracker,
 };
 
 pub(crate) async fn start<T>(
