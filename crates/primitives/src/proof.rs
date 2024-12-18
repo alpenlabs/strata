@@ -68,6 +68,7 @@ pub enum ProofContext {
 /// - `SP1`: SP1 ZKVM.
 /// - `Risc0`: Risc0 ZKVM.
 /// - `Native`: Native ZKVM.
+#[non_exhaustive]
 #[derive(
     Debug,
     Clone,
