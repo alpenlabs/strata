@@ -5,7 +5,7 @@ use std::{
 
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
-use strata_proofimpl_evm_ee_stf::ELProofInput;
+use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use strata_state::l1::L1BlockId;
 use strata_zkvm::{ProofReceipt, ProofType, ZkVmHost, ZkVmInputBuilder};
@@ -22,7 +22,6 @@ use crate::{
     },
     proving_ops::btc_ops::get_pm_rollup_params,
 };
-
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 enum ProvingTaskState {
@@ -98,11 +97,15 @@ where
 {
     let (zkvm_input, proof_type) = match zkvm_input {
         ZkVmInput::ElBlock(el_input) => {
-            let el_input: ELProofInput = bincode::deserialize(&el_input.data)?;
-            (
-                Vm::Input::new().write_serde(&el_input)?.build()?,
-                ProofType::Compressed,
-            )
+            let el_inputs: Vec<EvmBlockStfInput> = bincode::deserialize(&el_input.data)?;
+            let mut input_builder = Vm::Input::new();
+
+            input_builder.write_serde(&el_inputs.len())?;
+            for el_input in el_inputs {
+                input_builder.write_serde(&el_input)?;
+            }
+
+            (input_builder.build()?, ProofType::Compressed)
         }
 
         ZkVmInput::BtcBlock(block, rollup_params) => (
@@ -125,18 +128,22 @@ where
             (input_builder.build()?, ProofType::Compressed)
         }
 
-        ZkVmInput::ClBlock(cl_proof_input) => (
-            Vm::Input::new()
-                .write_serde(&get_pm_rollup_params())?
-                .write_buf(&cl_proof_input.cl_raw_witness)?
-                .write_proof(
-                    &cl_proof_input
-                        .el_proof
-                        .expect("CL Proving was sent without EL proof"),
-                )?
-                .build()?,
-            ProofType::Compressed,
-        ),
+        ZkVmInput::ClBlock(cl_proof_input) => {
+            let mut input_builder = Vm::Input::new();
+            input_builder.write_serde(&get_pm_rollup_params())?;
+            input_builder.write_proof(
+                &cl_proof_input
+                    .ee_proof
+                    .expect("CL Proving was sent without EL proof"),
+            )?;
+
+            input_builder.write_serde(&cl_proof_input.raw_witness.len())?;
+            for cl_stf_input in cl_proof_input.raw_witness {
+                input_builder.write_buf(&cl_stf_input)?;
+            }
+
+            (input_builder.build()?, ProofType::Compressed)
+        }
 
         ZkVmInput::L2Batch(l2_batch_input) => {
             let mut input_builder = Vm::Input::new();

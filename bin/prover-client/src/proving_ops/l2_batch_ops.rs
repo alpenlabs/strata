@@ -89,7 +89,7 @@ impl ProvingOperations for L2BatchOperations {
         for cl_block_idx in start..=end {
             let cl_task_id = self
                 .cl_dispatcher
-                .create_task(cl_block_idx)
+                .create_task((cl_block_idx, cl_block_idx))
                 .await
                 .map_err(|e| ProvingTaskError::DependencyTaskCreation(e.to_string()))?;
             dependencies.push(cl_task_id);

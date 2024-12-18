@@ -171,7 +171,7 @@ fn update_prover_input_with_proof(
             }
         }
         ZkVmInput::ClBlock(ref mut input) => {
-            input.el_proof = Some(proof);
+            input.ee_proof = Some(proof);
         }
         _ => {}
     }

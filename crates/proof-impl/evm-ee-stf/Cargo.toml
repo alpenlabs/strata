@@ -4,8 +4,10 @@ name = "strata-proofimpl-evm-ee-stf"
 version = "0.1.0"
 
 [dependencies]
+strata-primitives.workspace = true
 strata-reth-evm.workspace = true
 strata-reth-primitives.workspace = true
+strata-state.workspace = true
 strata-zkvm.workspace = true
 
 alloy-consensus = { workspace = true, features = ["serde-bincode-compat"] }
@@ -27,6 +29,7 @@ rlp = "0.5.2"
 serde.workspace = true
 serde_with.workspace = true
 thiserror = "1.0"
+
 
 [dev-dependencies]
 bincode.workspace = true
