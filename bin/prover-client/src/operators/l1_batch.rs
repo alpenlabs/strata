@@ -21,7 +21,7 @@ use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 /// A struct that implements the [`ProvingOp`] trait for L1 Batch Proof generation.
 ///
 /// It is responsible for managing the data and tasks required to generate proofs for L1 Batch. It
-/// fetches the necessary inputs for the [`ClStfProver`] by:
+/// fetches the necessary inputs for the [`L1BatchProver`] by:
 ///
 /// - Utilizing the [`BtcBlockspaceOperator`] to create and manage proving tasks for BTC Blockspace.
 ///   The resulting BTC Blockspace proofs are incorporated as part of the input for the CL STF

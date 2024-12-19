@@ -20,8 +20,9 @@ class ProverClientTest(testenv.StrataTester):
 
         # Dispatch the prover task
         task_ids = prover_client_rpc.dev_strata_proveCLBlock(1)
+        self.debug(f"got task ids: {task_ids}")
         task_id = task_ids[0]
-        self.debug(f"got the task id: {task_id}")
+        self.debug(f"using task id: {task_id}")
         assert task_id is not None
 
         time_out = 10 * 60

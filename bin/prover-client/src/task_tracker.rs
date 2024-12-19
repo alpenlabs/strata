@@ -11,7 +11,7 @@ pub struct TaskTracker {
     tasks: HashMap<ProofKey, ProvingTaskStatus>,
     /// Count of the tasks that are in progress
     in_progress_tasks: HashMap<ProofZkVm, usize>,
-
+    /// List of ZkVm for which the task is created
     vms: Vec<ProofZkVm>,
 }
 
@@ -40,11 +40,6 @@ impl TaskTracker {
             in_progress_tasks: HashMap::new(),
             vms,
         }
-    }
-
-    /// Clears all tasks from the tracker.
-    pub fn clear_tasks(&mut self) {
-        self.tasks.clear();
     }
 
     pub fn get_in_progress_tasks(&self) -> &HashMap<ProofZkVm, usize> {
