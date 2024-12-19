@@ -5,6 +5,12 @@ import flexitest
 import testenv
 from utils import wait_for_proof_with_time_out
 
+# Parameters defining the range of L1 blocks to be proven.
+L1_SCAN_PROVER_PARAMS = {
+    "start_block": 1,
+    "end_block": 3,
+}
+
 
 @flexitest.register
 class ProverClientTest(testenv.StrataTester):
@@ -16,11 +22,13 @@ class ProverClientTest(testenv.StrataTester):
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the Prover Manager setup
-        time.sleep(60)
+        time.sleep(5)
 
-        # Dispatch the prover task
-        task_id = prover_client_rpc.dev_strata_proveBtcBlock(1)
-        self.debug(f"got the task id: {task_id}")
+        # Prove L1 blocks from START_BLOCK to END_BLOCK
+        task_id = prover_client_rpc.dev_strata_proveBtcBlocks(
+            (L1_SCAN_PROVER_PARAMS["start_block"], L1_SCAN_PROVER_PARAMS["end_block"])
+        )
+        print("got the task id: {}", task_id)
         assert task_id is not None
 
         time_out = 10 * 60
