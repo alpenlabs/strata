@@ -36,6 +36,7 @@ impl BtcOperations {
     }
 }
 
+/// Represents the inputs required for the L1BlockScan prover.
 #[derive(Debug, Clone)]
 pub struct L1BlockscanInput {
     pub blocks: Vec<Block>,

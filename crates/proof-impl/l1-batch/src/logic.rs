@@ -9,6 +9,7 @@ use strata_state::{
 };
 use strata_zkvm::ZkVmEnv;
 
+/// Represents the public parameters of the L1BlockScan batch proof.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositInfo>,

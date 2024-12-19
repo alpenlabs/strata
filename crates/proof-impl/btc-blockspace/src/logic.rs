@@ -11,12 +11,15 @@ use strata_zkvm::ZkVmEnv;
 
 use crate::{block::check_merkle_root, filter::extract_relevant_info};
 
+/// Defines the public parameters required for the L1BlockScan proof.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct BlockScanProofOutput {
     pub blockscan_results: Vec<BlockScanResult>,
     pub rollup_params_commitment: Buf32,
 }
 
+/// Defines the result of scanning an L1 block.
+/// Includes protocol-relevant data posted on L1 block.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct BlockScanResult {
     pub header_raw: Vec<u8>,
@@ -24,6 +27,7 @@ pub struct BlockScanResult {
     pub prev_checkpoint: Option<BatchCheckpoint>,
 }
 
+/// Represents the input data required for generating an L1Scan proof.
 #[derive(Debug)]
 pub struct BlockScanProofInput {
     pub blocks: Vec<Block>,
