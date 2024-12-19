@@ -1,5 +1,5 @@
 use strata_primitives::params::RollupParams;
-use strata_zkvm::{AggregationInput, PublicValues, ZkVmProver, ZkVmResult};
+use strata_zkvm::{AggregationInput, PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
 
 use crate::CheckpointProofOutput;
 
@@ -19,7 +19,7 @@ impl ZkVmProver for CheckpointProver {
         strata_zkvm::ProofType::Groth16
     }
 
-    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmResult<B::Input>
+    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,
     {

@@ -1,7 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use anyhow::Result;
-use strata_zkvm::{ProofReceipt, ZkVmError, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
 
 pub mod btc;
 mod checkpoint;
@@ -33,8 +32,7 @@ pub trait ProofGenerator<T, P: ZkVmProver> {
         // 2. Check if the proof file exists
         if proof_file.exists() {
             println!("Proof found in cache, returning the cached proof...",);
-            let proof = read_proof_from_file(&proof_file)
-                .map_err(|e| ZkVmError::InputError(e.to_string()))?;
+            let proof = read_proof_from_file(&proof_file)?;
             let host = self.get_host();
             verify_proof(&proof, &host)?;
             return Ok(proof);
@@ -64,38 +62,32 @@ fn get_cache_dir() -> std::path::PathBuf {
 }
 
 /// Reads a proof from a file.
-fn read_proof_from_file(proof_file: &std::path::Path) -> Result<ProofReceipt> {
+fn read_proof_from_file(proof_file: &std::path::Path) -> Result<ProofReceipt, ZkVmProofError> {
     use std::{fs::File, io::Read};
 
-    use anyhow::Context;
-
-    let mut file = File::open(proof_file)
-        .with_context(|| format!("Failed to open proof file {:?}", proof_file))?;
+    let mut file = File::open(proof_file).expect("Failed to open proof file");
 
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)
-        .context("Failed to read proof file")?;
+        .expect("Failed to read proof file");
     let proof_receipt: ProofReceipt = bincode::deserialize(&buffer)?;
 
     Ok(proof_receipt)
 }
 
 /// Writes a proof to a file.
-fn write_proof_to_file(proof: &ProofReceipt, proof_file: &std::path::Path) -> Result<()> {
+fn write_proof_to_file(proof: &ProofReceipt, proof_file: &std::path::Path) -> Result<(), String> {
     use std::{fs::File, io::Write};
-
-    use anyhow::Context;
 
     let cache_dir = get_cache_dir();
     if !cache_dir.exists() {
-        fs::create_dir(&cache_dir).context("Failed to create 'proofs' directory")?;
+        fs::create_dir(&cache_dir).expect("Failed to create 'proofs' directory");
     }
 
-    let mut file = File::create(proof_file)
-        .with_context(|| format!("Failed to create proof file {:?}", proof_file))?;
+    let mut file = File::create(proof_file).expect("Failed to create proof file");
 
-    file.write_all(&bincode::serialize(&proof)?)
-        .context("Failed to write proof to file")?;
+    file.write_all(&bincode::serialize(&proof).expect("serialization of proof failed"))
+        .expect("Failed to write proof to file");
 
     Ok(())
 }

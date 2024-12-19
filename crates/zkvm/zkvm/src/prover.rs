@@ -1,5 +1,6 @@
 use crate::{
-    host::ZkVmHost, input::ZkVmInputBuilder, ProofReceipt, ProofType, PublicValues, ZkVmResult,
+    host::ZkVmHost, input::ZkVmInputBuilder, ProofReceipt, ProofType, PublicValues,
+    ZkVmInputResult, ZkVmResult,
 };
 
 pub trait ZkVmProver {
@@ -9,7 +10,7 @@ pub trait ZkVmProver {
     fn proof_type() -> ProofType;
 
     /// Prepares the input for the zkVM.
-    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmResult<B::Input>
+    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
         B: ZkVmInputBuilder<'a>;
 
