@@ -61,7 +61,7 @@ mod test {
 
     use strata_db::types::{BundleL1Status, DataBundleIntentEntry};
     use strata_state::{
-        da_blob::BundledCommitment,
+        da_blob::BundleCommitment,
         tx::{EnvelopePayload, PayloadTypeTag},
     };
 
@@ -86,7 +86,7 @@ mod test {
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
-        let intent_hash = BundledCommitment::from_payload(&entry.envelopes);
+        let intent_hash = BundleCommitment::from_payload(&entry.envelopes);
         // let intent_hash =
         iops.put_entry_async(intent_hash.into_inner(), entry.clone())
             .await

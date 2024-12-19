@@ -10,7 +10,7 @@ use strata_primitives::hash;
 use strata_reveal_tx::parser::parse_script_for_envelope;
 use strata_state::{
     batch::SignedBatchCheckpoint,
-    da_blob::BundledCommitment,
+    da_blob::BundleCommitment,
     tx::{DAInfo, DepositInfo, DepositRequestInfo, PayloadTypeTag, ProtocolOperation},
 };
 use types::DaFilterMode;
@@ -93,7 +93,7 @@ fn parse_reveal_transactions<'a>(
             PayloadTypeTag::DA => {
                 let da_info = match da_mode {
                     DaFilterMode::Full => DAInfo::Data(insc.get_flattened_chunks()),
-                    DaFilterMode::Partial => DAInfo::Commitment(BundledCommitment::new(hash::raw(
+                    DaFilterMode::Partial => DAInfo::Commitment(BundleCommitment::new(hash::raw(
                         &insc.get_flattened_chunks(),
                     ))),
                 };

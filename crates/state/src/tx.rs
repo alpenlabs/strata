@@ -1,9 +1,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 use strata_primitives::l1::{BitcoinAmount, OutputRef};
 
-use crate::{batch::SignedBatchCheckpoint, da_blob::BundledCommitment};
+use crate::{batch::SignedBatchCheckpoint, da_blob::BundleCommitment};
 
 /// Information related to relevant transactions to be stored in L1Tx
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -25,7 +24,7 @@ pub enum ProtocolOperation {
 #[allow(clippy::large_enum_variant)]
 pub enum DAInfo {
     /// Hash of DA data to be used elsewhere
-    Commitment(BundledCommitment),
+    Commitment(BundleCommitment),
     /// Whole data chunk flattened, for reconstruction purpose
     Data(Vec<u8>),
 }
@@ -83,18 +82,7 @@ impl EnvelopePayload {
 }
 
 /// Enum that acts as a tag to separates different types of envelope blobs.
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    BorshSerialize,
-    BorshDeserialize,
-    Deserialize,
-    Serialize,
-    Arbitrary,
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum PayloadTypeTag {
     Checkpoint,
     DA,

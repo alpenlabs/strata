@@ -6,6 +6,7 @@
 
 use bitcoin::{Network, Txid};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use strata_primitives::{
     bridge::OperatorIdx,
     l1::{BitcoinAmount, L1TxRef, OutputRef},
@@ -17,6 +18,7 @@ use strata_state::{
     bridge_ops::WithdrawalIntent,
     bridge_state::{DepositEntry, DepositState},
     id::L2BlockId,
+    tx::{EnvelopePayload, PayloadTypeTag},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -313,4 +315,35 @@ pub enum L2BlockStatus {
     Verified(u64),
     /// Block is now finalized, certain depth has been reached in L1
     Finalized(u64),
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RpcEnvelopePayload {
+    /// type of payload
+    tag: RpcPayloadTypeTag,
+    /// payload present in envelope
+    #[serde_as(as = "serde_with::hex::Hex")]
+    data: Vec<u8>,
+}
+
+impl From<RpcEnvelopePayload> for EnvelopePayload {
+    fn from(value: RpcEnvelopePayload) -> Self {
+        EnvelopePayload::new(value.tag.into(), value.data)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum RpcPayloadTypeTag {
+    Checkpoint,
+    DA,
+}
+
+impl From<RpcPayloadTypeTag> for PayloadTypeTag {
+    fn from(value: RpcPayloadTypeTag) -> Self {
+        match value {
+            RpcPayloadTypeTag::Checkpoint => PayloadTypeTag::Checkpoint,
+            RpcPayloadTypeTag::DA => PayloadTypeTag::DA,
+        }
+    }
 }

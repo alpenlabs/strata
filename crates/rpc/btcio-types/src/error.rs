@@ -149,7 +149,7 @@ impl fmt::Display for UnexpectedServerVersionError {
         }
         write!(
             f,
-            "unexpected bitcoind version, got: {} expected one of: {}",
+            "unexpected bitcoind version, (got: {} expected one of: {})",
             self.got, expected
         )
     }

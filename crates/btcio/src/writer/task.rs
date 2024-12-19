@@ -7,7 +7,7 @@ use strata_db::{
 };
 use strata_primitives::buf::Buf32;
 use strata_reveal_tx::builder::CommitRevealTxError;
-use strata_state::da_blob::{BundledPayloadIntent, DataBundleDest, PayloadIntent};
+use strata_state::da_blob::{BundlePayloadIntent, DataBundleDest, PayloadIntent};
 use strata_status::StatusChannel;
 use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;
@@ -51,7 +51,7 @@ impl EnvelopeHandle {
             .await
     }
 
-    pub fn submit_bundled_intent(&self, intent: BundledPayloadIntent) -> anyhow::Result<()> {
+    pub fn submit_bundled_intent(&self, intent: BundlePayloadIntent) -> anyhow::Result<()> {
         if intent.dest() != DataBundleDest::L1 {
             warn!(commitment = ?intent.commitment(), "Received intent not meant for L1");
             return Ok(());
@@ -63,7 +63,7 @@ impl EnvelopeHandle {
 
     pub async fn submit_bundled_intent_async(
         &self,
-        intent: BundledPayloadIntent,
+        intent: BundlePayloadIntent,
     ) -> anyhow::Result<()> {
         if intent.dest() != DataBundleDest::L1 {
             warn!(commitment = ?intent.commitment(), "Received intent not meant for L1");

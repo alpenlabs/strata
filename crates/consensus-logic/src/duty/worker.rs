@@ -430,17 +430,17 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
                 PayloadTypeTag::Checkpoint,
                 borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?,
             );
-            let blob_intent = PayloadIntent::new(
+            let payload_intent = PayloadIntent::new(
                 DataBundleDest::L1,
                 PayloadCommitment::new(&checkpoint_sighash),
                 payload,
             );
 
             info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
-            info!(blob_intent = ?blob_intent, "sending blob intent");
+            info!(blob_intent = ?payload_intent, "sending blob intent");
 
             envelope_handle
-                .submit_intent(blob_intent)
+                .submit_intent(payload_intent)
                 // add type for DA related errors ?
                 .map_err(|err| Error::Other(err.to_string()))?;
 

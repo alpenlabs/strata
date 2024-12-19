@@ -27,8 +27,8 @@ use strata_primitives::{
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_rpc_types::{
     errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockHeader,
-    RpcBridgeDuties, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcExecUpdate,
-    RpcL1Status, RpcSyncStatus,
+    RpcBridgeDuties, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcEnvelopePayload,
+    RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
@@ -36,13 +36,13 @@ use strata_state::{
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
-    da_blob::{BundledCommitment, BundledPayloadIntent, DataBundleDest},
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
     operation::ClientUpdateOutput,
+    da_blob::{BundleCommitment, BundlePayloadIntent, DataBundleDest},
     sync_event::SyncEvent,
-    tx::{EnvelopePayload, PayloadTypeTag},
+    tx::EnvelopePayload,
 };
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
@@ -656,12 +656,17 @@ impl SequencerServerImpl {
             checkpoint_handle,
         }
     }
+}
 
-    /// Submit DA payload entries to be placed in commit reveal Envelope
-    /// multiple Envelopes can exist in same transaction
-    async fn submit_blobs(&self, blob_vec: Vec<EnvelopePayload>) -> RpcResult<()> {
-        let blob_commitment = BundledCommitment::from_payload(&blob_vec);
-        let blobintent = BundledPayloadIntent::new(DataBundleDest::L1, blob_commitment, blob_vec);
+#[async_trait]
+impl StrataSequencerApiServer for SequencerServerImpl {
+    async fn submit_envelope_payloads(&self, bundle: Vec<RpcEnvelopePayload>) -> RpcResult<()> {
+        let payload_vec: Vec<EnvelopePayload> =
+            bundle.into_iter().map(|payload| payload.into()).collect();
+
+        let bundle_commitment = BundleCommitment::from_payload(&payload_vec);
+        let blobintent =
+            BundlePayloadIntent::new(DataBundleDest::L1, bundle_commitment, payload_vec);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
         if let Err(e) = self
@@ -672,24 +677,6 @@ impl SequencerServerImpl {
             return Err(Error::Other(e.to_string()).into());
         }
         Ok(())
-    }
-}
-
-#[async_trait]
-impl StrataSequencerApiServer for SequencerServerImpl {
-    async fn submit_da_blobs(&self, blobs: Vec<HexBytes>) -> RpcResult<()> {
-        let blob_vec: Vec<EnvelopePayload> = blobs
-            .into_iter()
-            .map(|blob| EnvelopePayload::new(PayloadTypeTag::DA, blob.into_inner()))
-            .collect();
-
-        self.submit_blobs(blob_vec).await
-    }
-
-    async fn submit_envelope_blob(&self, blob: HexBytes, tag: PayloadTypeTag) -> RpcResult<()> {
-        let blob = vec![EnvelopePayload::new(tag, blob.into_inner())];
-
-        self.submit_blobs(blob).await
     }
 
     async fn broadcast_raw_tx(&self, rawtx: HexBytes) -> RpcResult<Txid> {

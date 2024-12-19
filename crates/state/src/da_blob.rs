@@ -1,6 +1,7 @@
-//! Types relating to blobs.
+//! Types relating to payloads. These payloads get on a certain settlement layer.
 //!
-//! These types don't care about the *purpose* of the blobs, we only care about what's in them.
+//! These types don't care about the *purpose* of the payloads, but tracks the type and the data
+//! inside it.
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -41,61 +42,61 @@ impl<'a> Arbitrary<'a> for DataBundleDest {
     }
 }
 
-/// Summary of a DA blob to be included on a DA layer. Specifies the target and
-/// a commitment to the blob.
+/// Summary of a payload to be included on some settlement layer. Specifies the target and
+/// a commitment to the payload.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct PayloadSpec {
     /// Target settlement layer we're expecting the DA on.
     dest: DataBundleDest,
 
-    /// Commitment to the blob (probably just a hash or a
+    /// Commitment to the payload (probably just a hash or a
     /// merkle root) that we expect to see committed to DA.
-    blob_commitment: PayloadCommitment,
+    payload_commitment: PayloadCommitment,
 }
 
 impl PayloadSpec {
-    pub fn new(dest: DataBundleDest, blob_commitment: PayloadCommitment) -> Self {
+    pub fn new(dest: DataBundleDest, payload_commitment: PayloadCommitment) -> Self {
         Self {
             dest,
-            blob_commitment,
+            payload_commitment,
         }
     }
-    /// The target we expect the DA blob to be stored on.
+    /// The settlment layer, we expect the payload to be stored on.
     pub fn dest(&self) -> DataBundleDest {
         self.dest
     }
 
-    /// Commitment to the blob payload.
+    /// Hash Commitment of the Payload
     pub fn commitment(&self) -> &PayloadCommitment {
-        &self.blob_commitment
+        &self.payload_commitment
     }
 }
 
 /// Similar to [`PayloadSpec`] but for including multiple payloads in a single Bundle
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct BundledSpec {
-    /// Target settlement layer we're expecting the DA on.
+pub struct BundleSpec {
+    /// Target settlement layer we're expecting the bundle on.
     dest: DataBundleDest,
 
-    /// Hash commitment to the multiple DA envelopes.
-    blob_commitment: BundledCommitment,
+    /// Hash commitment of the bundle
+    bundle_commitment: BundleCommitment,
 }
 
-impl BundledSpec {
-    pub fn new(dest: DataBundleDest, blob_commitment: BundledCommitment) -> Self {
+impl BundleSpec {
+    pub fn new(dest: DataBundleDest, bundle_commitment: BundleCommitment) -> Self {
         Self {
             dest,
-            blob_commitment,
+            bundle_commitment,
         }
     }
-    /// The target we expect the DA blob to be stored on.
+    /// The target we expect the bundle to be stored on.
     pub fn dest(&self) -> DataBundleDest {
         self.dest
     }
 
-    /// Commitment to the blob payload.
-    pub fn commitment(&self) -> &BundledCommitment {
-        &self.blob_commitment
+    /// Commitment to the bundle payload.
+    pub fn commitment(&self) -> &BundleCommitment {
+        &self.bundle_commitment
     }
 }
 
@@ -124,25 +125,24 @@ impl PayloadIntent {
         }
     }
 
-    /// The target we expect the DA blob to be stored on.
+    /// The target we expect the payload to be stored on.
     pub fn dest(&self) -> DataBundleDest {
         self.spec.dest()
     }
 
-    /// Commitment to the blob payload, which might be context-specific.  This
+    /// Commitment to the payload, which might be context-specific. This
     /// is conceptually unrelated to the blob ID that we use for tracking which
     /// blobs we've written in the L1 writer bookkeeping.
     pub fn commitment(&self) -> &PayloadCommitment {
         self.spec.commitment()
     }
 
-    /// The blob payload that matches the commitment.
+    /// Payload relating to the intent. The commitment for this is stored in PayloadSpec
     pub fn payload(&self) -> &EnvelopePayload {
         &self.payload
     }
 
-    /// Generates the spec from the relevant parts of the blob intent that
-    /// uniquely refers to the blob data.
+    /// spec of the payload data. Contains settlement layer and its commitment hash
     pub fn spec(&self) -> PayloadSpec {
         self.spec
     }
@@ -150,21 +150,21 @@ impl PayloadIntent {
 
 /// Same as [`PayloadIntent`] but can include multiple payload
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct BundledPayloadIntent {
+pub struct BundlePayloadIntent {
     /// Summary of payload to be included in DA layer. contains destination and commitment
-    spec: BundledSpec,
+    spec: BundleSpec,
     /// Envelope payload.
     payload: Vec<EnvelopePayload>,
 }
 
-impl BundledPayloadIntent {
+impl BundlePayloadIntent {
     pub fn new(
         dest: DataBundleDest,
-        commitment: BundledCommitment,
+        commitment: BundleCommitment,
         payload: Vec<EnvelopePayload>,
     ) -> Self {
         Self {
-            spec: BundledSpec::new(dest, commitment),
+            spec: BundleSpec::new(dest, commitment),
             payload,
         }
     }
@@ -177,7 +177,7 @@ impl BundledPayloadIntent {
     /// Commitment to the blob payload, which might be context-specific.  This
     /// is conceptually unrelated to the blob ID that we use for tracking which
     /// blobs we've written in the L1 writer bookkeeping.
-    pub fn commitment(&self) -> &BundledCommitment {
+    pub fn commitment(&self) -> &BundleCommitment {
         self.spec.commitment()
     }
 
@@ -188,7 +188,7 @@ impl BundledPayloadIntent {
 
     /// Generates the spec from the relevant parts of the blob intent that
     /// uniquely refers to the blob data.
-    pub fn spec(&self) -> BundledSpec {
+    pub fn spec(&self) -> BundleSpec {
         self.spec
     }
 }
@@ -207,9 +207,9 @@ impl PayloadCommitment {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Arbitrary, BorshDeserialize, BorshSerialize)]
-pub struct BundledCommitment(pub Buf32);
+pub struct BundleCommitment(pub Buf32);
 
-impl BundledCommitment {
+impl BundleCommitment {
     pub fn new(commitment: Buf32) -> Self {
         Self(commitment)
     }

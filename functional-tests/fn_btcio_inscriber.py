@@ -31,9 +31,11 @@ class L1WriterTest(flexitest.Test):
         )
 
         # Submit blob
-        blobdata = "2c4253d512da5bb4223f10e8e6017ede69cc63d6e6126916f4b68a1830b7f805"
-        tag = "DA"
-        _ = seqrpc.strataadmin_submitEnvelopeBlob(blobdata, tag)
+        payload_data = {
+            "tag": "DA",
+            "data": "2c4253d512da5bb4223f10e8e6017ede69cc63d6e6126916f4b68a1830b7f805",
+        }
+        _ = seqrpc.strataadmin_submitEnvelopePayloads([payload_data])
 
         # Allow some time for sequencer to publish blob
         time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
