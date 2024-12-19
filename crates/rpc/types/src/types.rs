@@ -51,7 +51,6 @@ impl From<HexBytes> for Vec<u8> {
         value.0
     }
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
 
@@ -313,4 +312,15 @@ pub enum L2BlockStatus {
     Verified(u64),
     /// Block is now finalized, certain depth has been reached in L1
     Finalized(u64),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RpcChainState {
+    /// Most recent seen block.
+    pub tip_blkid: L2BlockId,
+
+    /// The slot of the last produced block.
+    pub tip_slot: u64,
+
+    pub cur_epoch: u64,
 }

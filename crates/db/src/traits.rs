@@ -150,6 +150,11 @@ pub trait ClientStateDatabase {
 
     /// Gets a state checkpoint at a previously written index, if it exists.
     fn get_state_checkpoint(&self, idx: u64) -> DbResult<Option<ClientState>>;
+
+    fn get_last_client_state_idx(&self) -> DbResult<u64>;
+
+    /// Get client state at idx
+    fn get_state_at(&self, idx: u64) -> DbResult<Option<ClientState>>;
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think
@@ -226,6 +231,8 @@ pub trait ChainstateDatabase {
 
     /// Gets the toplevel chain state at a particular block index (height).
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<Chainstate>>;
+
+    fn get_state_at(&self, idx: u64) -> DbResult<Option<Chainstate>>;
 }
 
 /// Db trait for Checkpoint data
@@ -282,7 +289,7 @@ pub trait ProofDatabase {
     /// Deletes a proof by its key.
     ///
     /// Tries to delete a proof by its key, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool>;
 
     /// Inserts dependencies for a given [`ProofContext`] into the database.
@@ -298,7 +305,7 @@ pub trait ProofDatabase {
     /// Deletes dependencies for a given [`ProofContext`].
     ///
     /// Tries to delete dependencies of by its context, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool>;
 }
 
@@ -331,6 +338,9 @@ pub trait L1BroadcastDatabase {
 
     /// get txentry by idx
     fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;
+
+    /// Get last broadcast entry
+    fn get_last_broadcast_entry(&self) -> DbResult<Option<L1TxEntry>>;
 }
 
 /// Provides access to the implementers of provider and store traits for interacting with the

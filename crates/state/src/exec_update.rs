@@ -3,6 +3,7 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload};
 
 use crate::{
@@ -12,7 +13,9 @@ use crate::{
 };
 
 /// Full update payload containing inputs and outputs to an EE state update.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Serialize, Deserialize,
+)]
 pub struct ExecUpdate {
     /// Inputs used to construct the call to the EL executor, or provided to the
     /// proof.
@@ -39,7 +42,7 @@ impl ExecUpdate {
 
 /// Contains the explicit inputs to the STF.  Implicit inputs are determined
 /// from the CL's exec env state.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct UpdateInput {
     /// Update index.  This is incremented exactly 1.  This is to handle the
     /// future possible cases where we skip CL blocks and provide a monotonic
@@ -109,7 +112,7 @@ impl UpdateInput {
 
 /// Conceptual "outputs" from the state transition.  This isn't stored in the
 /// state, but it's stored in the block.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct UpdateOutput {
     /// New state root for the update.  This is not just the inner EL payload,
     /// but also any extra bookkeeping we need across multiple.
@@ -154,7 +157,9 @@ impl UpdateOutput {
 /// Operation the CL pushes into the EL to perform as part of the block it's
 /// producing.
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub enum Op {
     /// Deposit some amount.
     Deposit(ELDepositData),
@@ -182,7 +187,9 @@ pub fn construct_ops_from_deposit_intents(
     el_ops
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct ELDepositData {
     /// base index of applied deposit intent.
     intent_idx: u64,
