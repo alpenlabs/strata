@@ -24,7 +24,7 @@ impl PendingTasks {
         }
     }
 
-    #[allow(dead_code)] // FIXME: remove this
+    #[allow(dead_code)] // #FIXME: remove this.
     pub fn current(&self) -> usize {
         self.counter.load(Ordering::SeqCst)
     }
