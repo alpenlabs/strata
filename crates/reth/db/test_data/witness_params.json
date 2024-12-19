@@ -184,7 +184,7 @@
                 "signature": {
                     "r": "0x33f5f25dc6d620f41ac2fb5e5ef1c61888912c9261644dc757a8ef8cb043144b",
                     "s": "0x72059e24750f63a500907d0f5b7e436f5b678379d557d96e9aff9ee2b787f9e2",
-                    "v": "0x1c"
+                    "v": "0x0000000000000001"
                 },
                 "transaction": {
                     "Eip1559": {
@@ -206,9 +206,9 @@
     "params": {
         "block_idx": 2,
         "prev_blockhash": "0x4648c427c6c7ffa89ce722b936b16c7538f57ad0494e6473a114374b94f46a99",
-        "new_blockhash": "0x65ff74b3f27fd55bd5d70efdf0f521482a94f72cab2ebdad820cbe06665d5716",
+        "new_blockhash": "0xc8d686a007f62f618ce0204339fd7a9c4dd5abb4365a7ae0ce8478d6bf82c2dc",
         "new_state_root": "0xcf4cc4f5e65dda69ee3a27a16628fca82da737f878e8b48d86757b22ec7f361e",
-        "txn_root": "0xb1858cea0ff214647e944eca3a3aaae3c6336117cde810b4c86c81d5521d7e25",
+        "txn_root": "0x37739b0921c22213f67943f480a8860575c6eb567bd110436237fe9a0e0db57a",
         "withdrawal_intents": [
             {
                 "amt": 1000000000,

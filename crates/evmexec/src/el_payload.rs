@@ -1,8 +1,8 @@
 use alloy_rpc_types::engine::ExecutionPayloadV1;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use reth_primitives::revm_primitives::{FixedBytes, B256};
 use reth_rpc_types_compat::engine::try_payload_v1_to_block;
+use revm_primitives::{FixedBytes, B256};
 use strata_primitives::{
     buf::{Buf20, Buf32},
     evm_exec::create_evm_extra_payload,

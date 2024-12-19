@@ -3,13 +3,11 @@ use std::sync::Arc;
 use reth_chainspec::ChainSpec;
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv, NextBlockEnvAttributes};
 use reth_node_ethereum::EthEvmConfig;
-use reth_primitives::{
-    revm_primitives::{
-        Address, AnalysisKind, BlockEnv, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, U256,
-    },
-    Header, TransactionSigned,
-};
+use reth_primitives::{Header, TransactionSigned};
 use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
+use revm_primitives::{
+    Address, AnalysisKind, BlockEnv, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, U256,
+};
 use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
@@ -29,11 +27,13 @@ impl StrataEvmConfig {
 
 impl ConfigureEvmEnv for StrataEvmConfig {
     type Header = Header;
+    type Transaction = TransactionSigned;
+    type Error = core::convert::Infallible;
 
     fn fill_cfg_env(
         &self,
         cfg_env: &mut CfgEnvWithHandlerCfg,
-        header: &Header,
+        header: &Self::Header,
         total_difficulty: U256,
     ) {
         self.inner.fill_cfg_env(cfg_env, header, total_difficulty);
@@ -60,7 +60,7 @@ impl ConfigureEvmEnv for StrataEvmConfig {
         &self,
         parent: &Self::Header,
         attributes: NextBlockEnvAttributes,
-    ) -> (CfgEnvWithHandlerCfg, BlockEnv) {
+    ) -> Result<(CfgEnvWithHandlerCfg, BlockEnv), Self::Error> {
         self.inner.next_cfg_and_block_env(parent, attributes)
     }
 }
@@ -91,5 +91,7 @@ impl ConfigureEvm for StrataEvmConfig {
     }
 
     #[doc = " Provides the default external context."]
-    fn default_external_context<'a>(&self) -> Self::DefaultExternalContext<'a> {}
+    fn default_external_context<'a>(&self) -> Self::DefaultExternalContext<'a> {
+        self.inner.default_external_context()
+    }
 }

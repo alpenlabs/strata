@@ -28,10 +28,12 @@ use crate::{
     slot_rng::{self, SlotRng},
 };
 
-/// Processes a block, making writes into the provided state cache that will
-/// then be written to disk.  This does not check the block's credentials, it
-/// plays out all the updates a block makes to the chain, but it will abort if
-/// there are any semantic issues that don't make sense.
+/// Processes a block, making writes into the provided state cache.
+///
+/// The cache will eventually be written to disk.  This does not check the
+/// block's credentials, it plays out all the updates a block makes to the
+/// chain, but it will abort if there are any semantic issues that
+/// don't make sense.
 ///
 /// This operates on a state cache that's expected to be empty, panics
 /// otherwise.  Does not check the `state_root` in the header for correctness,

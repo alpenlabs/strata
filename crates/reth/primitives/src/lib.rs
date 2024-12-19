@@ -1,7 +1,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 
 use alloy_sol_types::sol;
-use reth_primitives::revm_primitives::alloy_primitives::B256;
+use revm_primitives::alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 
 /// Type for withdrawal_intents in rpc.

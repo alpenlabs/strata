@@ -316,8 +316,9 @@ pub enum IdentityKey {
     Sequencer(Buf32),
 }
 
-/// Contains both the identity key used for signing and the identity used for
-/// verifying signatures.  This is really just a stub that we should replace
+/// Container for signing identity key and verification identity key.
+///
+/// This is really just a stub that we should replace
 /// with real cryptographic signatures and putting keys in the rollup params.
 #[derive(Clone, Debug)]
 pub struct IdentityData {

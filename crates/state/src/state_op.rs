@@ -1,5 +1,6 @@
-//! Low-level operations we can make to write to chain state.  This currently
-//! only can manipulate the manipulate the toplevel chain state, but we might
+//! Low-level operations we can make to write to chain state.
+//!
+//! This currently only can manipulate the toplevel chain state, but we might
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 

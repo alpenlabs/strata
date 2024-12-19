@@ -23,14 +23,13 @@ pub mod prover;
 use std::collections::HashMap;
 
 use alloy_consensus::{serde_bincode_compat, Header};
+use alloy_eips::eip4895::Withdrawal;
 use db::InMemoryDBHelper;
 use mpt::keccak;
 use processor::{EvmConfig, EvmProcessor};
-use reth_primitives::{
-    revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256},
-    TransactionSignedNoHash, Withdrawal,
-};
+use reth_primitives::TransactionSigned;
 use revm::{primitives::SpecId, InMemoryDB};
+use revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use strata_reth_evm::collect_withdrawal_intents;
@@ -98,7 +97,7 @@ pub struct ELProofInput {
     pub ancestor_headers: Vec<Header>,
 
     /// A list of transactions to process.
-    pub transactions: Vec<TransactionSignedNoHash>,
+    pub transactions: Vec<TransactionSigned>,
 
     /// A list of withdrawals to process.
     pub withdrawals: Vec<Withdrawal>,
