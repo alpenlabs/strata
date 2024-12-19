@@ -28,7 +28,7 @@
         "timestamp": 1727003743,
         "extra_data": "0x726574682f76312e302e332f6d61636f73",
         "mix_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-        "parent_state_trie": {
+        "pre_state_trie": {
             "data": {
                 "Leaf": [
                     [
@@ -151,7 +151,7 @@
                 ]
             }
         },
-        "parent_storage": {
+        "pre_state_storage": {
             "0x0000000000000000000000000000000000000000": [
                 {
                     "data": "Null"
@@ -215,6 +215,6 @@
                 "dest_pk": "0xffab0d5c1a6a719fb807387792d63c7f30f6c8205e4150e0267ec95774106d53"
             }
         ],
-        "deposits_txns_root": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+        "deposit_requests": []
     }
 }

@@ -40,7 +40,7 @@ use strata_reth_evm::set_evm_handles;
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},
-    ELProofInput,
+    EvmBlockStfInput,
 };
 
 /// The divisor for the gas limit bound.
@@ -56,7 +56,7 @@ pub struct EvmConfig {
 #[derive(Clone)]
 pub struct EvmProcessor<D> {
     /// An input containing all necessary data to execute the block.
-    pub input: ELProofInput,
+    pub input: EvmBlockStfInput,
 
     /// A database to store all state changes.
     pub db: Option<D>,
@@ -273,7 +273,7 @@ impl EvmProcessor<InMemoryDB> {
     pub fn finalize(&mut self) {
         let db = self.db.take().expect("DB not initialized");
 
-        let mut state_trie = mem::take(&mut self.input.parent_state_trie);
+        let mut state_trie = mem::take(&mut self.input.pre_state_trie);
         for (address, account) in &db.accounts {
             // Ignore untouched accounts.
             if account.account_state == AccountState::None {
@@ -291,7 +291,7 @@ impl EvmProcessor<InMemoryDB> {
             // Update storage root for account.
             let state_storage = &account.storage;
             let storage_root = {
-                let (storage_trie, _) = self.input.parent_storage.get_mut(address).unwrap();
+                let (storage_trie, _) = self.input.pre_state_storage.get_mut(address).unwrap();
                 // If the account has been cleared, clear the storage trie.
                 if account.account_state == AccountState::StorageCleared {
                     storage_trie.clear();
