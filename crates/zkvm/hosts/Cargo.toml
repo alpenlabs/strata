@@ -1,0 +1,35 @@
+[package]
+edition = "2021"
+name = "strata-zkvm-hosts"
+version = "0.1.0"
+
+[dependencies]
+# sp1
+strata-sp1-adapter = { workspace = true, optional = true }
+strata-sp1-guest-builder = { path = "../../../provers/sp1", optional = true }
+
+# risc0
+strata-risc0-adapter = { workspace = true, optional = true }
+strata-risc0-guest-builder = { path = "../../../provers/risc0", optional = true }
+
+strata-primitives.workspace = true
+
+# TODO: make it optional, via the native feature.
+strata-native-zkvm-adapter.workspace = true
+strata-proofimpl-btc-blockspace.workspace = true
+strata-proofimpl-checkpoint.workspace = true
+strata-proofimpl-cl-agg.workspace = true
+strata-proofimpl-cl-stf.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
+strata-proofimpl-l1-batch.workspace = true
+
+bincode.workspace = true
+borsh.workspace = true
+cfg-if = "1.0.0"
+serde.workspace = true
+thiserror.workspace = true
+
+[features]
+native = []
+risc0 = ["strata-risc0-adapter/prover", "strata-risc0-guest-builder/prover"]
+sp1 = ["strata-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]

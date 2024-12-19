@@ -1,10 +1,11 @@
 use bitcoin::Block;
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
 
+#[derive(Clone)]
 pub struct BtcBlockProofGenerator<H: ZkVmHost> {
     host: H,
 }
@@ -15,7 +16,8 @@ impl<H: ZkVmHost> BtcBlockProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator<BtcBlockspaceProver> for BtcBlockProofGenerator<H> {
+    type Input = Block;
     fn get_input(&self, block: &Block) -> ZkVmResult<BlockspaceProofInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
@@ -24,12 +26,6 @@ impl<H: ZkVmHost> ProofGenerator<Block, BtcBlockspaceProver> for BtcBlockProofGe
             rollup_params: rollup_params.clone(),
         };
         Ok(input)
-    }
-
-    fn gen_proof(&self, block: &Block) -> ZkVmResult<ProofReceipt> {
-        let host = self.get_host();
-        let input = self.get_input(block)?;
-        BtcBlockspaceProver::prove(&input, &host)
     }
 
     fn get_proof_id(&self, block: &Block) -> String {
@@ -46,11 +42,8 @@ mod test {
     use strata_test_utils::bitcoin::get_btc_chain;
 
     use super::*;
-    use crate::hosts;
 
-    fn test_proof(host: impl ZkVmHost) {
-        let generator = BtcBlockProofGenerator::new(host);
-
+    fn test_proof<H: ZkVmHost>(generator: BtcBlockProofGenerator<H>) {
         let btc_chain = get_btc_chain();
         let block = btc_chain.get_block(40321);
 
@@ -60,18 +53,21 @@ mod test {
     #[test]
     #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
-        test_proof(hosts::native::btc_blockspace());
+        use crate::provers::TEST_NATIVE_GENERATORS;
+        test_proof(TEST_NATIVE_GENERATORS.btc_blockspace());
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        test_proof(hosts::risc0::btc_blockspace());
+        use crate::provers::TEST_RISC0_GENERATORS;
+        test_proof(TEST_RISC0_GENERATORS.btc_blockspace());
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
-        test_proof(hosts::sp1::btc_blockspace());
+        use crate::provers::TEST_SP1_GENERATORS;
+        test_proof(TEST_SP1_GENERATORS.btc_blockspace());
     }
 }

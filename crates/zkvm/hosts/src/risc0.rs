@@ -6,7 +6,7 @@ use strata_risc0_guest_builder::{
     GUEST_RISC0_CL_STF_ELF, GUEST_RISC0_EVM_EE_STF_ELF, GUEST_RISC0_L1_BATCH_ELF,
 };
 
-use crate::primitives::vms::ProofVm;
+use crate::ProofVm;
 
 static BTC_BLOCKSPACE_HOST: LazyLock<Risc0Host> =
     std::sync::LazyLock::new(|| Risc0Host::init(GUEST_RISC0_BTC_BLOCKSPACE_ELF));
