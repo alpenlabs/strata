@@ -10,6 +10,7 @@ use strata_primitives::buf::Buf32;
 
 use crate::{
     batch::{BatchInfo, BootstrapState},
+    epoch::EpochCommitment,
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
 };
@@ -128,18 +129,30 @@ impl ClientState {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct SyncState {
+    /// Current epoch that we believe that we're in.
+    // TODO remove this
+    pub(super) cur_epoch: u64,
+
     /// Height of last L2 block we've chosen as the current tip.
-    pub(super) tip_height: u64,
+    // TODO remove this
+    pub(super) tip_slot: u64,
 
     /// Last L2 block we've chosen as the current tip.
+    // TODO remove this
     pub(super) tip_blkid: L2BlockId,
+
+    /// L2 epoch that's been finalized on L1 and proven.
+    pub(super) finalized_epoch: u64,
+
+    /// Final L2 slot that's been finalized on L1 and proven.
+    pub(super) finalized_slot: u64,
+
+    /// Final L2 block that's been finalized on L1 and proven.
+    pub(super) finalized_blkid: L2BlockId,
 
     /// L2 checkpoint blocks that have been confirmed on L1 and proven along with L1 block height.
     /// These are ordered by height
     pub(super) confirmed_checkpoint_blocks: Vec<(L1BlockHeight, L2BlockId)>,
-
-    /// L2 block that's been finalized on L1 and proven
-    pub(super) finalized_blkid: L2BlockId,
 }
 
 type L1BlockHeight = u64;
@@ -147,15 +160,32 @@ type L1BlockHeight = u64;
 impl SyncState {
     pub fn from_genesis_blkid(gblkid: L2BlockId) -> Self {
         Self {
-            tip_height: 0,
+            cur_epoch: 0,
+            tip_slot: 0,
             tip_blkid: gblkid,
-            confirmed_checkpoint_blocks: Vec::new(),
+            finalized_epoch: 0,
+            finalized_slot: 0,
             finalized_blkid: gblkid,
+            confirmed_checkpoint_blocks: Vec::new(),
         }
     }
 
+    #[deprecated(note = "getting rid of CSM awareness of tip soon (STR-696)")]
+    pub fn tip_height(&self) -> u64 {
+        self.tip_slot
+    }
+
+    #[deprecated(note = "getting rid of CSM awareness of tip soon (STR-696)")]
     pub fn chain_tip_blkid(&self) -> &L2BlockId {
         &self.tip_blkid
+    }
+
+    pub fn finalized_epoch(&self) -> u64 {
+        self.finalized_epoch
+    }
+
+    pub fn finalized_slot(&self) -> u64 {
+        self.finalized_slot
     }
 
     pub fn finalized_blkid(&self) -> &L2BlockId {
@@ -172,10 +202,6 @@ impl SyncState {
             .iter()
             .find(|(h, _)| *h == l1_height)
             .map(|e| e.1)
-    }
-
-    pub fn chain_tip_height(&self) -> u64 {
-        self.tip_height
     }
 }
 

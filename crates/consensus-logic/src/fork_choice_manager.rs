@@ -116,7 +116,7 @@ pub fn init_forkchoice_manager<D: Database>(
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
     let sync_state = init_csm_state.sync().expect("csm state should be init");
-    let chain_tip_height = sync_state.chain_tip_height();
+    let chain_tip_height = sync_state.tip_height();
 
     let finalized_blockid = *sync_state.finalized_blkid();
     let finalized_block = l2_block_manager
@@ -429,14 +429,23 @@ fn handle_new_state<D: Database>(
     let csm_tip = sync.chain_tip_blkid();
     debug!(?csm_tip, "got new CSM state");
 
+    // Decide if we're going to update the finalized tip first.  If it didn't
+    // change then there's no point.
+    let new_fin_tip = sync.finalized_blkid();
+    let should_update_fin_tip = match fcm_state.cur_csm_state.sync() {
+        Some(ss) => ss.finalized_blkid() != new_fin_tip,
+        None => true,
+    };
+
     // Update the new state.
     fcm_state.cur_csm_state = Arc::new(cs);
 
-    let blkid = sync.finalized_blkid();
-    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
-    info!(?blkid, "updated finalized tip");
-    trace!(?fin_report, "finalization report");
-    // TODO do something with the finalization report
+    if should_update_fin_tip {
+        let fin_report = fcm_state.chain_tracker.update_finalized_tip(new_fin_tip)?;
+        info!(blkid = ?new_fin_tip, "updated finalized tip");
+        trace!(?fin_report, "finalization report");
+        // TODO do something with the finalization report?
+    }
 
     // TODO recheck every remaining block's validity using the new state
     // starting from the bottom up, putting into a new chain tracker
@@ -551,8 +560,10 @@ fn apply_tip_update<D: Database>(
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
+        // FIXME epoch state bookkeeping
         let rparams = fc_manager.params.rollup();
-        let mut prestate_cache = StateCache::new(pre_state);
+        let epoch_state = pre_state.epoch_state().clone();
+        let mut prestate_cache = StateCache::new(pre_state, epoch_state);
         debug!("processing block");
         process_block(&mut prestate_cache, header, body, rparams)
             .map_err(|e| Error::InvalidStateTsn(*blkid, e))?;

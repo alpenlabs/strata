@@ -114,13 +114,10 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
         UpdateOutput::new_from_state(params.rollup.evm_genesis_block_state_root),
     );
 
-    // This has to be empty since everyone should have an unambiguous view of the genesis block.
-    let l1_seg = L1Segment::new_empty();
-
     // TODO this is a total stub, we have to fill it in with something
     let exec_seg = ExecSegment::new(genesis_update);
 
-    let body = L2BlockBody::new(l1_seg, exec_seg);
+    let body = L2BlockBody::new(None, exec_seg);
 
     // TODO stub
     let exec_payload = vec![];

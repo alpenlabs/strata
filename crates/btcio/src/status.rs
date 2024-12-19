@@ -12,8 +12,11 @@ pub enum L1StatusUpdate {
     IncrementInscriptionCount,
 }
 
+#[deprecated(note = "TODO: refactor this to just directly update the fields")]
 pub async fn apply_status_updates(st_updates: &[L1StatusUpdate], st_chan: &StatusChannel) {
-    let mut l1_status = st_chan.l1_status();
+    // FIXME this should be maintaining the authoritative state internally, updating it, and writing
+    // it, *not* just reading what we previously wrote from the channel and modifying that
+    let mut l1_status = st_chan.get_l1_reader_status();
     for event in st_updates {
         match event {
             L1StatusUpdate::CurHeight(height) => l1_status.cur_height = *height,

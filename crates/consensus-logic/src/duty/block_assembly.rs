@@ -4,6 +4,7 @@
 use std::{sync::Arc, thread, time};
 
 use bitcoin::Transaction;
+use strata_chaintsn::clock;
 use strata_crypto::sign_schnorr_sig;
 use strata_db::traits::{
     ChainstateDatabase, ClientStateDatabase, Database, L1Database, L2BlockDatabase,
@@ -54,6 +55,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     params: &Arc<Params>,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
     debug!("preparing block");
+    let rollup_params = params.rollup();
     let l1_db = database.l1_db();
     let l2_db = database.l2_db();
     let cs_db = database.client_state_db();
@@ -68,6 +70,9 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         warn!(%slot, "was turn to propose block, but found block in database already");
         return Ok(None);
     }
+
+    let epoch = clock::get_slot_expected_epoch(slot, rollup_params);
+    let is_epoch_final_slot = clock::is_epoch_final_slot(slot, rollup_params);
 
     // Figure out some general data about the slot and the previous state.
     let ts = now_millis();
@@ -100,30 +105,29 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
         .get_toplevel_state(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_block_id))?;
 
-    // Figure out the save L1 blkid.
-    // FIXME this is somewhat janky, should get it from the MMR
-    let safe_l1_block_rec = prev_chstate.l1_view().safe_block();
-    let safe_l1_blkid = strata_primitives::hash::sha256d(safe_l1_block_rec.buf());
-
-    // TODO Pull data from CSM state that we've observed from L1, including new
-    // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = prepare_l1_segment(
-        l1_state,
-        &prev_chstate,
-        l1_db.as_ref(),
-        MAX_L1_ENTRIES_PER_BLOCK,
-        params.rollup(),
-    )?;
+    // Pull data from CSM state that we've observed from L1, like new headers.
+    let l1_seg = if is_epoch_final_slot {
+        Some(prepare_l1_segment(
+            l1_state,
+            &prev_chstate,
+            l1_db.as_ref(),
+            MAX_L1_ENTRIES_PER_BLOCK,
+            rollup_params,
+        )?)
+    } else {
+        None
+    };
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
+    let safe_l1_blkid = prev_chstate.epoch_state().safe_l1_blkid();
     let (exec_seg, block_acc) = prepare_exec_data(
         slot,
         ts,
         prev_block_id,
         prev_global_sr,
         &prev_chstate,
-        safe_l1_blkid,
+        *safe_l1_blkid,
         engine,
         params.rollup(),
     )?;
@@ -164,58 +168,19 @@ fn prepare_l1_segment(
     params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     let unacc_blocks = local_l1_state.unacc_blocks_iter().collect::<Vec<_>>();
-    trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
+    let state_l1_height = prev_chstate.epoch_state().safe_l1_height();
+    trace!(unacc_blocks = %unacc_blocks.len(), %state_l1_height, "figuring out which blocks to include in L1 segment");
 
-    // Check to see if there's actually no blocks in the queue.  In that case we can just give
-    // everything we know about.
-    let maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
-    if maturation_queue_size == 0 {
-        let mut payloads = Vec::new();
-        for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
-            let rec = load_header_record(*h, l1_db)?;
-            let deposit_update_tx = fetch_deposit_update_txs(*h, l1_db)?;
-            payloads.push(
-                L1HeaderPayload::new(*h, rec)
-                    .with_deposit_update_txs(deposit_update_tx)
-                    .build(),
-            );
-        }
-
-        debug!(n = %payloads.len(), "filling in empty queue with fresh L1 payloads");
-        return Ok(L1Segment::new(payloads));
-    }
-
-    let maturing_blocks = prev_chstate
-        .l1_view()
-        .maturation_queue()
-        .iter_entries()
-        .map(|(h, e)| (h, e.blkid()))
-        .collect::<Vec<_>>();
-
-    // FIXME this is not comparing the proof of work, it's just looking at the chain lengths, this
-    // is almost the same thing, but might break in the case of a difficulty adjustment taking place
-    // at a reorg exactly on the transition block
-    trace!("computing pivot");
-
-    let Some((pivot_h, _pivot_id)) = find_pivot_block_height(&unacc_blocks, &maturing_blocks)
-    else {
-        // Then we're really screwed.
-        error!("can't determine shared block to insert new maturing blocks");
-        return Err(Error::BlockAssemblyL1SegmentUndetermined);
-    };
-
-    // Compute the offset in the unaccepted list for the blocks we want to use.
-    let unacc_fresh_offset = (pivot_h - local_l1_state.buried_l1_height()) as usize + 1;
-
-    let fresh_blocks = &unacc_blocks
-        .iter()
-        .skip(unacc_fresh_offset)
-        .take(max_l1_entries)
-        .collect::<Vec<_>>();
-
-    // Load the blocks.
+    // We don't have to worry about reorgs now, just shove all the ones above
+    // the current height in.
+    //
+    // TODO only put ones that are buryable
     let mut payloads = Vec::new();
-    for (h, _b) in fresh_blocks {
+    for (h, _b) in unacc_blocks
+        .iter()
+        .filter(|(h, _)| *h > state_l1_height)
+        .take(max_l1_entries)
+    {
         let rec = load_header_record(*h, l1_db)?;
         let deposit_update_tx = fetch_deposit_update_txs(*h, l1_db)?;
         payloads.push(
@@ -339,7 +304,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     prev_l2_blkid: L2BlockId,
     prev_global_sr: Buf32,
     prev_chstate: &Chainstate,
-    safe_l1_block: Buf32,
+    safe_l1_block: L1BlockId,
     engine: &E,
     params: &RollupParams,
 ) -> Result<(ExecSegment, L2BlockAccessory), Error> {
@@ -350,7 +315,9 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     // construct el_ops by looking at chainstate
     let pending_deposits = prev_chstate.exec_env_state().pending_deposits();
     let el_ops = construct_ops_from_deposit_intents(pending_deposits, params.max_deposits_in_block);
-    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, el_ops);
+    // FIXME the conversion here
+    let l1blkid = Buf32::from(*safe_l1_block.as_ref());
+    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, l1blkid, el_ops);
 
     let key = engine.prepare_payload(payload_env)?;
     trace!("submitted EL payload job, waiting for completion");
@@ -412,7 +379,9 @@ fn compute_post_state(
     body: &L2BlockBody,
     params: &Arc<Params>,
 ) -> Result<(Chainstate, WriteBatch), Error> {
-    let mut state_cache = StateCache::new(prev_chstate);
+    // FIXME epoch state bookkeeping
+    let epoch_state = prev_chstate.epoch_state().clone();
+    let mut state_cache = StateCache::new(prev_chstate, epoch_state);
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
     let (post_state, wb) = state_cache.finalize();
     Ok((post_state, wb))
