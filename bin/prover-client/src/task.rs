@@ -82,7 +82,7 @@ impl TaskTracker {
                 let all_dependencies_completed = dependent_task.dependencies.iter().all(|dep_id| {
                     tasks
                         .get(dep_id)
-                        .map_or(false, |t| t.status == ProvingTaskStatus::Completed)
+                        .is_some_and(|t| t.status == ProvingTaskStatus::Completed)
                 });
                 // Return the task ID and completion status of dependencies
                 (*id, all_dependencies_completed)

@@ -49,9 +49,9 @@ impl DescriptorRecovery {
             .map(|(pubk, privk)| [pubk.to_string(), privk.to_string()])
             .map(|[pubk, privk]| {
                 (
-                    (pubk.as_bytes().len() as u32).to_le_bytes(),
+                    (pubk.len() as u32).to_le_bytes(),
                     pubk,
-                    (privk.as_bytes().len() as u32).to_le_bytes(),
+                    (privk.len() as u32).to_le_bytes(),
                     privk,
                 )
             });
@@ -78,7 +78,7 @@ impl DescriptorRecovery {
         let keymap_len = keymap_iter
             .clone()
             .map(|(pubk_len, pubk, privk_len, privk)| {
-                pubk_len.len() + pubk.as_bytes().len() + privk_len.len() + privk.as_bytes().len()
+                pubk_len.len() + pubk.len() + privk_len.len() + privk.len()
             })
             .sum::<usize>();
 

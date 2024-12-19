@@ -20,6 +20,7 @@ pub struct ClProofGenerator {
 }
 
 impl ClProofGenerator {
+    #[allow(dead_code)] // #FIXME: remove this.
     pub fn new(el_proof_generator: ElProofGenerator) -> Self {
         Self { el_proof_generator }
     }

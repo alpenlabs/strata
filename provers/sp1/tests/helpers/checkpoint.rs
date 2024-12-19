@@ -21,6 +21,7 @@ pub struct CheckpointProofGenerator {
 }
 
 impl CheckpointProofGenerator {
+    #[allow(dead_code)] // #FIXME: remove this.
     pub fn new(
         l1_batch_proof_generator: L1BatchProofGenerator,
         l2_batch_proof_generator: L2BatchProofGenerator,
