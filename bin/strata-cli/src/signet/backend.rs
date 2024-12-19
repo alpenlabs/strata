@@ -15,7 +15,7 @@ use bdk_esplora::EsploraAsyncExt;
 use bdk_wallet::{
     bitcoin::{consensus::encode, Block, FeeRate, Transaction},
     chain::{
-        spk_client::{FullScanRequestBuilder, FullScanResult, SyncRequestBuilder, SyncResult},
+        spk_client::{FullScanRequestBuilder, FullScanResponse, SyncRequestBuilder, SyncResponse},
         CheckPoint,
     },
     KeychainKind,
@@ -64,8 +64,8 @@ pub struct GetFeeRateError(BoxedErr);
 boxed_err!(GetFeeRateError);
 
 pub enum WalletUpdate {
-    SpkSync(SyncResult),
-    SpkScan(FullScanResult<KeychainKind>),
+    SpkSync(SyncResponse),
+    SpkScan(FullScanResponse<KeychainKind>),
     NewBlock(BlockEvent<Block>),
     MempoolTxs(Vec<(Transaction, u64)>),
 }
