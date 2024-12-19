@@ -1,6 +1,9 @@
 use argh::FromArgs;
 use bdk_wallet::{
-    bitcoin::Amount, chain::ChainOracle, descriptor::IntoWalletDescriptor, KeychainKind, Wallet,
+    bitcoin::Amount,
+    chain::{ChainOracle, TxUpdate},
+    descriptor::IntoWalletDescriptor,
+    KeychainKind, Update, Wallet,
 };
 use console::{style, Term};
 
@@ -76,8 +79,17 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
             continue;
         }
 
+        // F***! BDK 1.0 removed the `insert_tx` method, so we have to do this the hard way
+        // Taken from https://github.com/bitcoindevkit/bdk/pull/1658/commits/3135e291d777d474ab4b76de36d43a96ff104a3c
         recovery_wallet.transactions().for_each(|tx| {
-            l1w.insert_tx(tx.tx_node.tx);
+            l1w.apply_update(Update {
+                tx_update: TxUpdate {
+                    txs: vec![tx.tx_node.tx],
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .expect("could not insert transaction");
         });
 
         let recover_to = l1w.reveal_next_address(KeychainKind::External).address;
@@ -88,13 +100,12 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
         ));
 
         // we want to drain the recovery path to the l1 wallet
-        let mut psbt = recovery_wallet
-            .build_tx()
-            .drain_to(recover_to.script_pubkey())
-            .fee_rate(fee_rate)
-            .clone()
-            .finish()
-            .expect("valid tx");
+        let mut psbt = {
+            let mut builder = recovery_wallet.build_tx();
+            builder.drain_to(recover_to.script_pubkey());
+            builder.fee_rate(fee_rate);
+            builder.finish().expect("valid tx")
+        };
 
         recovery_wallet
             .sign(&mut psbt, Default::default())
