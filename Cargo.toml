@@ -37,6 +37,7 @@ members = [
   "crates/state",
   "crates/status",
   "crates/storage",
+  "crates/macros",
   "crates/sync",
   "crates/tasks",
   "crates/test-utils",
@@ -134,10 +135,13 @@ alloy-rpc-types-eth = { version = "0.4.2", default-features = false, features = 
 ] }
 alloy-serde = { version = "0.4.2", default-features = false }
 alloy-sol-types = "0.8.0"
+proc-macro2 = "1.0"
+quote = "1.0"
 revm = { version = "14.0.3", features = ["std"], default-features = false }
 revm-primitives = { version = "10.0.0", features = [
   "std",
 ], default-features = false }
+syn = "2.0"
 
 # reth itself:
 reth = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.1.0" }
