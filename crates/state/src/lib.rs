@@ -1,5 +1,5 @@
-#![allow(dead_code)] // TODO: remove once the bridge state `sanity_check` fn is used.
-#![feature(is_sorted)] // TODO: switch to using crate
+#![allow(stable_features)] // FIX: this is needed for sp1 toolchain.
+#![feature(is_sorted, is_none_or)]
 
 //! Rollup types relating to the consensus-layer state of the rollup.
 //!

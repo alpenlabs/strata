@@ -16,6 +16,7 @@ use crate::helpers::proof_generator::ProofGenerator;
 pub struct BtcBlockProofGenerator;
 
 impl BtcBlockProofGenerator {
+    #[allow(dead_code)] // #FIXME: remove this.
     pub fn new() -> Self {
         Self
     }

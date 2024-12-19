@@ -16,6 +16,7 @@ pub struct L2BatchProofGenerator {
 }
 
 impl L2BatchProofGenerator {
+    #[allow(dead_code)] // #FIXME: remove this.
     pub fn new(cl_proof_generator: ClProofGenerator) -> Self {
         Self { cl_proof_generator }
     }

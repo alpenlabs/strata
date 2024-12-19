@@ -19,6 +19,7 @@ pub struct L1BatchProofGenerator {
 }
 
 impl L1BatchProofGenerator {
+    #[allow(dead_code)] // #FIXME: remove this.
     pub fn new(btc_proof_generator: BtcBlockProofGenerator) -> Self {
         Self {
             btc_proof_generator,
