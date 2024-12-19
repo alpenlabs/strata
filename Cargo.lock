@@ -13337,6 +13337,7 @@ dependencies = [
  "strata-risc0-adapter",
  "strata-risc0-guest-builder",
  "strata-rocksdb",
+ "strata-rpc-api",
  "strata-rpc-types",
  "strata-sp1-adapter",
  "strata-sp1-guest-builder",
@@ -13357,7 +13358,6 @@ version = "0.1.0"
 dependencies = [
  "jsonrpsee",
  "strata-rpc-types",
- "uuid 1.10.0",
 ]
 
 [[package]]
@@ -13823,6 +13823,7 @@ dependencies = [
  "borsh",
  "serde",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
