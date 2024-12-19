@@ -85,6 +85,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
 
     /// Gets the number of elements in the cache.
     // TODO replace this with an atomic we update after every op
+    #[allow(dead_code)] // #FIXME: remove this.
     pub async fn get_len_async(&self) -> usize {
         let cache = self.cache.lock().await;
         cache.len()
@@ -92,6 +93,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
 
     /// Gets the number of elements in the cache.
     // TODO replace this with an atomic we update after every op
+    #[allow(dead_code)] // #FIXME: remove this.
     pub fn get_len_blocking(&self) -> usize {
         let cache = self.cache.blocking_lock();
         cache.len()
@@ -110,6 +112,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
     }
 
     /// Inserts an entry into the table, dropping the previous value.
+    #[allow(dead_code)] // #FIXME: remove this.
     pub async fn insert_async(&self, k: K, v: V) {
         let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
         let mut cache = self.cache.lock().await;
@@ -117,6 +120,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
     }
 
     /// Inserts an entry into the table, dropping the previous value.
+    #[allow(dead_code)] // #FIXME: remove this.
     pub fn insert_blocking(&self, k: K, v: V) {
         let slot = Arc::new(RwLock::new(SlotState::Ready(v)));
         let mut cache = self.cache.blocking_lock();
