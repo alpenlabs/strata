@@ -5,8 +5,9 @@ use strata_state::{l1::HeaderVerificationState, tx::ProtocolOperation};
 /// L1 events that we observe and want the persistence task to work on.
 #[derive(Clone, Debug)]
 pub enum L1Event {
-    /// Data that contains block number, block and relevant transactions
-    BlockData(BlockData),
+    /// Data that contains block number, block and relevant transactions, and also the epoch whose
+    /// rules are applied to
+    BlockData(BlockData, u64),
 
     /// Revert to the provided block height
     RevertTo(u64),

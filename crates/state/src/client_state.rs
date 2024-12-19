@@ -115,6 +115,13 @@ impl ClientState {
     }
 }
 
+#[cfg(feature = "test_utils")]
+impl ClientState {
+    pub fn set_last_finalized_checkpoint(&mut self, chp: L1Checkpoint) {
+        self.local_l1_view.last_finalized_checkpoint = Some(chp);
+    }
+}
+
 /// Relates to our view of the L2 chain, does not exist before genesis.
 // TODO maybe include tip height and finalized height?  or their headers?
 #[derive(

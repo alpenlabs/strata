@@ -249,6 +249,6 @@ opt-level = 3
 # This shall be used only in the CI for the prover to optimize the build time.
 [profile.prover-ci]
 inherits = "release"
-opt-level = 0
 lto = "off"
+opt-level = 0
 strip = true

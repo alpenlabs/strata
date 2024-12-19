@@ -5,7 +5,7 @@ use strata_primitives::l1::L1Status;
 use strata_state::{
     bridge_state::{DepositsTable, OperatorTable},
     chain_state::Chainstate,
-    client_state::{ClientState, LocalL1State, SyncState},
+    client_state::{ClientState, L1Checkpoint, LocalL1State, SyncState},
 };
 use thiserror::Error;
 use tokio::sync::watch::{self, error::RecvError};
@@ -70,6 +70,16 @@ impl StatusChannel {
         self.receiver.cl.borrow().l1_view().clone()
     }
 
+    /// Gets the last finalized [`L1Checkpoint`] from the current client state.
+    pub fn get_last_checkpoint(&self) -> Option<L1Checkpoint> {
+        self.receiver
+            .cl
+            .borrow()
+            .l1_view()
+            .last_finalized_checkpoint()
+            .cloned()
+    }
+
     /// Gets the latest [`SyncState`].
     pub fn sync_state(&self) -> Option<SyncState> {
         self.receiver.cl.borrow().sync().cloned()
@@ -96,6 +106,15 @@ impl StatusChannel {
     /// Gets the latest [`L1Status`].
     pub fn l1_status(&self) -> L1Status {
         self.receiver.l1.borrow().clone()
+    }
+
+    /// Gets the latest epoch
+    pub fn epoch(&self) -> Option<u64> {
+        self.receiver.chs.borrow().to_owned().map(|ch| ch.epoch())
+    }
+
+    pub fn chain_state(&self) -> Option<Chainstate> {
+        self.receiver.chs.borrow().clone()
     }
 
     /// Waits until there's a new client state and returns the client state.

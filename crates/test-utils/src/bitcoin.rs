@@ -6,7 +6,7 @@ use bitcoin::{
     hashes::Hash,
     Block, Transaction,
 };
-use strata_primitives::{buf::Buf32, l1::L1BlockManifest};
+use strata_primitives::{buf::Buf32, l1::L1BlockRecord};
 use strata_state::l1::{
     get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
 };
@@ -26,11 +26,11 @@ pub fn get_test_bitcoin_txs() -> Vec<Transaction> {
         .collect()
 }
 
-pub fn gen_l1_chain(len: usize) -> Vec<L1BlockManifest> {
+pub fn gen_l1_chain(len: usize) -> Vec<L1BlockRecord> {
     // FIXME this is bad, the blocks generated are nonsensical
     let mut blocks = vec![];
     for _ in 0..len {
-        let block: L1BlockManifest = ArbitraryGenerator::new().generate();
+        let block: L1BlockRecord = ArbitraryGenerator::new().generate();
         blocks.push(block);
     }
     blocks
@@ -117,16 +117,16 @@ impl BtcChainSegment {
         }
     }
 
-    pub fn get_block_manifest(&self, height: u32) -> L1BlockManifest {
+    pub fn get_block_manifest(&self, height: u32) -> L1BlockRecord {
         let header = self.get_header(height);
-        L1BlockManifest::new(
+        L1BlockRecord::new(
             Buf32::from(header.block_hash().as_raw_hash().to_byte_array()),
             serialize(&header),
             Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
         )
     }
 
-    pub fn get_block_manifests(&self, from_height: u32, len: usize) -> Vec<L1BlockManifest> {
+    pub fn get_block_manifests(&self, from_height: u32, len: usize) -> Vec<L1BlockRecord> {
         let mut blocks = Vec::with_capacity(len);
         for i in 0..len {
             let block = self.get_block_manifest(from_height + i as u32);
