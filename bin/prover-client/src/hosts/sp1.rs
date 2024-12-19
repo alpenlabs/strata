@@ -1,9 +1,6 @@
 use std::sync::LazyLock;
 
-<<<<<<< HEAD
-=======
 use strata_primitives::proof::ProofContext;
->>>>>>> 54eac344 (fixes)
 use strata_sp1_adapter::SP1Host;
 use strata_sp1_guest_builder::*;
 
@@ -58,6 +55,7 @@ pub static CHECKPOINT_HOST: LazyLock<SP1Host> = std::sync::LazyLock::new(|| {
 });
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 pub fn get_host(vm: ProofVm) -> &'static SP1Host {
     match vm {
         ProofVm::BtcProving => &BTC_BLOCKSPACE_HOST,
@@ -67,6 +65,12 @@ pub fn get_host(vm: ProofVm) -> &'static SP1Host {
         ProofVm::CLAggregation => &CL_AGG_HOST,
         ProofVm::Checkpoint => &CHECKPOINT_HOST,
 =======
+=======
+/// Returns a reference to the appropriate `SP1Host` instance based on the given `ProofContext`.
+///
+/// This function maps the `ProofContext` variant to its corresponding static `SP1Host`
+/// instance, allowing for efficient host selection for different proof types.
+>>>>>>> cc928b9d (docs: add docstrings)
 pub fn get_host(id: &ProofContext) -> &'static SP1Host {
     match id {
         ProofContext::BtcBlockspace(_) => &BTC_BLOCKSPACE_HOST,

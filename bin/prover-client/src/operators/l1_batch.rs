@@ -18,13 +18,22 @@ use tracing::error;
 use super::{btc::BtcBlockspaceOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
+/// A struct that implements the [`ProvingOp`] trait for L1 Batch Proof generation.
+///
+/// It is responsible for managing the data and tasks required to generate proofs for L1 Batch. It
+/// fetches the necessary inputs for the [`ClStfProver`] by:
+///
+/// - Utilizing the [`BtcBlockspaceOperator`] to create and manage proving tasks for BTC Blockspace.
+///   The resulting BTC Blockspace proofs are incorporated as part of the input for the CL STF
+///   proof.
+/// - Interfacing with the Bitcoin Client to fetch additional required information for batch proofs.
 #[derive(Debug, Clone)]
-pub struct L1BatchController {
+pub struct L1BatchOperator {
     btc_client: Arc<BitcoinClient>,
     btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
 }
 
-impl L1BatchController {
+impl L1BatchOperator {
     pub fn new(
         btc_client: Arc<BitcoinClient>,
         btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
@@ -36,7 +45,7 @@ impl L1BatchController {
     }
 }
 
-impl ProvingOp for L1BatchController {
+impl ProvingOp for L1BatchOperator {
     type Prover = L1BatchProver;
     type Params = (u64, u64);
 

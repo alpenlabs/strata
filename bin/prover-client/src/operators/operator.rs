@@ -8,14 +8,14 @@ use strata_rpc_types::ProofKey;
 
 use super::{
     btc::BtcBlockspaceOperator, checkpoint::CheckpointOperator, cl_agg::ClAggOperator,
-    cl_stf::ClStfOperator, evm_ee::EvmEeOperator, l1_batch::L1BatchController, ProvingOp,
+    cl_stf::ClStfOperator, evm_ee::EvmEeOperator, l1_batch::L1BatchOperator, ProvingOp,
 };
 use crate::errors::ProvingTaskError;
 
 #[derive(Debug, Clone)]
 pub struct ProofOperator {
     btc_blockspace_operator: BtcBlockspaceOperator,
-    l1_batch_operator: L1BatchController,
+    l1_batch_operator: L1BatchOperator,
     evm_ee_operator: EvmEeOperator,
     cl_stf_operator: ClStfOperator,
     cl_agg_operator: ClAggOperator,
@@ -25,7 +25,7 @@ pub struct ProofOperator {
 impl ProofOperator {
     pub fn new(
         btc_blockspace_operator: BtcBlockspaceOperator,
-        l1_batch_operator: L1BatchController,
+        l1_batch_operator: L1BatchOperator,
         evm_ee_operator: EvmEeOperator,
         cl_stf_operator: ClStfOperator,
         cl_agg_operator: ClAggOperator,
@@ -48,7 +48,7 @@ impl ProofOperator {
     ) -> Self {
         let btc_client = Arc::new(btc_client);
         let btc_blockspace_operator = BtcBlockspaceOperator::new(btc_client.clone());
-        let l1_batch_operator = L1BatchController::new(
+        let l1_batch_operator = L1BatchOperator::new(
             btc_client.clone(),
             Arc::new(btc_blockspace_operator.clone()),
         );
@@ -89,7 +89,7 @@ impl ProofOperator {
         &self.btc_blockspace_operator
     }
 
-    pub fn l1_batch_operator(&self) -> &L1BatchController {
+    pub fn l1_batch_operator(&self) -> &L1BatchOperator {
         &self.l1_batch_operator
     }
 

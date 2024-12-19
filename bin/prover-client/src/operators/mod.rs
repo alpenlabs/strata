@@ -1,14 +1,16 @@
 //! A module defining traits and operations for proof generation using ZKVMs.
 //!
-//! This module provides the `ProvingOp` trait, which encapsulates the lifecycle of proof generation
-//! tasks. Each proof generation task includes fetching necessary proof dependencies, creating
-//! tasks, fetching inputs, and performing the proof computation using various supported ZKVMs.
+//! This module provides the [`ProvingOp`] trait, which encapsulates the lifecycle of proof
+//! generation tasks. Each proof generation task includes fetching necessary proof dependencies,
+//! creating tasks, fetching inputs, and performing the proof computation using various supported
+//! ZKVMs.
 //!
-//! The operations are designed to interact with a `ProofDb` for storing and retrieving proofs,
-//! a `TaskTracker` for managing task dependencies, and `ProofZkVm` hosts for ZKVM-specific
+//! The operations are designed to interact with a [`ProofDb`] for storing and retrieving proofs,
+//! a [`TaskTracker`] for managing task dependencies, and [`ProofZkVm`] hosts for ZKVM-specific
 //! computations.
 //!
 //! Supported ZKVMs:
+//!
 //! - Native
 //! - SP1 (requires `sp1` feature enabled)
 //! - Risc0 (requires `risc0` feature enabled)
@@ -41,7 +43,7 @@ pub use operator::ProofOperator;
 /// creating tasks, fetching inputs for the prover, and executing the proof computation using
 /// supported ZKVMs.
 pub trait ProvingOp {
-    /// The prover type associated with this operation, implementing the `ZkVmProver` trait.
+    /// The prover type associated with this operation, implementing the [`ZkVmProver`] trait.
     type Prover: ZkVmProver;
 
     /// Parameters required for this operation.

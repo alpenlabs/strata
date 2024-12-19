@@ -14,7 +14,11 @@ use tracing::error;
 use super::ProvingOp;
 use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
-/// Operations required for EL block proving tasks.
+/// A struct that implements the [`ProvingOp`] trait for EVM Execution Environment (EE) State
+/// Transition Function (STF) proofs.
+///
+/// It is responsible for interfacing with the `Reth` client and fetching necessary data required by
+/// the [`EvmEeProver`] for the proof generation.
 #[derive(Debug, Clone)]
 pub struct EvmEeOperator {
     el_client: HttpClient,
@@ -26,6 +30,7 @@ impl EvmEeOperator {
         Self { el_client }
     }
 
+    /// Retrieves the EVM EE [`Block`] for a given block number.
     pub async fn get_block(&self, block_num: u64) -> Result<Block, ProvingTaskError> {
         self.el_client
             .request(
