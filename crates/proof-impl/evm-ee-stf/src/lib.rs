@@ -17,100 +17,35 @@
 // limitations under the License.
 pub mod db;
 pub mod mpt;
+pub mod primitives;
 pub mod processor;
 pub mod prover;
-
-use std::collections::HashMap;
-
-use alloy_consensus::{serde_bincode_compat, Header};
+pub mod utils;
 use db::InMemoryDBHelper;
 use mpt::keccak;
+pub use primitives::{EvmBlockStfInput, EvmBlockStfOutput};
 use processor::{EvmConfig, EvmProcessor};
-use reth_primitives::{
-    revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256},
-    TransactionSignedNoHash, Withdrawal,
-};
+use reth_primitives::revm_primitives::alloy_primitives::B256;
 use revm::{primitives::SpecId, InMemoryDB};
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use strata_reth_evm::collect_withdrawal_intents;
-use strata_reth_primitives::WithdrawalIntent;
 use strata_zkvm::ZkVmEnv;
-
-use crate::mpt::{MptNode, StorageEntry};
+use utils::generate_exec_update;
 
 // TODO: Read the evm config from the genesis config. This should be done in compile time.
 const EVM_CONFIG: EvmConfig = EvmConfig {
     chain_id: 12345,
     spec_id: SpecId::SHANGHAI,
 };
-
-/// Public Parameters that proof asserts
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ELProofPublicParams {
-    pub block_idx: u64,
-    pub prev_blockhash: FixedBytes<32>,
-    pub new_blockhash: FixedBytes<32>,
-    pub new_state_root: FixedBytes<32>,
-    pub txn_root: FixedBytes<32>,
-    pub withdrawal_intents: Vec<WithdrawalIntent>,
-    pub deposits_txns_root: FixedBytes<32>,
-}
-
-#[serde_as]
-/// Necessary information to prove the execution of the RETH block.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ELProofInput {
-    /// The Keccak 256-bit hash of the parent block's header, in its entirety.
-    /// N.B. The reason serde_bincode_compat is necessary:
-    /// `[serde_bincode_compat]`(alloy_consensus::serde_bincode_compat)
-    #[serde_as(as = "serde_bincode_compat::Header")]
-    pub parent_header: Header,
-
-    /// The 160-bit address to which all fees collected from the successful mining of this block
-    /// be transferred.
-    pub beneficiary: Address,
-
-    /// A scalar value equal to the current limit of gas expenditure per block.
-    pub gas_limit: u64,
-
-    /// A scalar value equal to the reasonable output of Unix's time() at this block's inception.
-    pub timestamp: u64,
-
-    /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
-    /// fewer.
-    pub extra_data: Bytes,
-
-    /// A 256-bit hash which, combined with the nonce, proves that a sufficient amount of
-    /// computation has been carried out on this block.
-    pub mix_hash: B256,
-
-    /// The state trie of the parent block.
-    pub parent_state_trie: MptNode,
-
-    /// The storage of the parent block.
-    pub parent_storage: HashMap<Address, StorageEntry>,
-
-    /// The relevant contracts for the block.
-    pub contracts: Vec<Bytes>,
-
-    /// The ancestor headers of the parent block.
-    pub ancestor_headers: Vec<Header>,
-
-    /// A list of transactions to process.
-    pub transactions: Vec<TransactionSignedNoHash>,
-
-    /// A list of withdrawals to process.
-    pub withdrawals: Vec<Withdrawal>,
-}
-
 /// Executes the block with the given input and EVM configuration, returning public parameters.
 pub fn process_block_transaction(
-    mut input: ELProofInput,
+    mut input: EvmBlockStfInput,
     evm_config: EvmConfig,
-) -> ELProofPublicParams {
+) -> EvmBlockStfOutput {
     // Calculate the previous block hash
     let previous_block_hash = B256::from(keccak(alloy_rlp::encode(input.parent_header.clone())));
+
+    // Deposit requests are processed and forwarded as public parameters for verification on the CL
+    let deposit_requests = input.withdrawals.clone();
 
     // Initialize the in-memory database
     let db = match InMemoryDB::initialize(&mut input) {
@@ -135,32 +70,51 @@ pub fn process_block_transaction(
     let new_block_hash = B256::from(keccak(alloy_rlp::encode(block_header.clone())));
 
     // TODO: Optimize receipt iteration by implementing bloom filters or adding hints to
-    // `ELProofInput`. This will allow for efficient filtering of`WithdrawalIntentEvents`.
+    // `ElBlockStfInput`. This will allow for efficient filtering of`WithdrawalIntentEvents`.
     let withdrawal_intents =
         collect_withdrawal_intents(receipts.into_iter().map(|el| Some(el.receipt)))
             .collect::<Vec<_>>();
 
     // Construct the public parameters for the proof
-    ELProofPublicParams {
+    EvmBlockStfOutput {
         block_idx: block_header.number,
         new_blockhash: new_block_hash,
         new_state_root: block_header.state_root,
         prev_blockhash: previous_block_hash,
         txn_root: block_header.transactions_root,
-        deposits_txns_root: block_header.withdrawals_root.unwrap_or_default(),
+        deposit_requests,
         withdrawal_intents,
     }
 }
 
+/// Processes a sequence of EL block transactions from the given `zkvm` environment, ensuring block
+/// hash continuity and committing the resulting updates.
 pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
-    let input: ELProofInput = zkvm.read_serde();
-    let public_params = process_block_transaction(input, EVM_CONFIG);
-    zkvm.commit_serde(&public_params);
+    let num_blocks: u32 = zkvm.read_serde();
+    assert!(num_blocks > 0, "At least one block is required.");
+
+    let mut exec_updates = Vec::with_capacity(num_blocks as usize);
+    let mut current_blockhash = None;
+
+    for _ in 0..num_blocks {
+        let input: EvmBlockStfInput = zkvm.read_serde();
+        let output = process_block_transaction(input, EVM_CONFIG);
+
+        if let Some(expected_hash) = current_blockhash {
+            assert_eq!(output.prev_blockhash, expected_hash, "Block hash mismatch");
+        }
+
+        current_blockhash = Some(output.new_blockhash);
+        exec_updates.push(generate_exec_update(&output));
+    }
+
+    zkvm.commit_borsh(&exec_updates);
 }
 
 #[cfg(test)]
 mod tests {
     use revm::primitives::SpecId;
+    use serde::{Deserialize, Serialize};
 
     use super::*;
     const EVM_CONFIG: EvmConfig = EvmConfig {
@@ -170,8 +124,8 @@ mod tests {
 
     #[derive(Serialize, Deserialize)]
     struct TestData {
-        witness: ELProofInput,
-        params: ELProofPublicParams,
+        witness: EvmBlockStfInput,
+        params: EvmBlockStfOutput,
     }
 
     fn get_mock_data() -> TestData {
@@ -190,7 +144,7 @@ mod tests {
         let test_data = get_mock_data();
 
         let s = bincode::serialize(&test_data.witness).unwrap();
-        let d: ELProofInput = bincode::deserialize(&s[..]).unwrap();
+        let d: EvmBlockStfInput = bincode::deserialize(&s[..]).unwrap();
         assert_eq!(d, test_data.witness);
     }
 
@@ -200,7 +154,6 @@ mod tests {
 
         let input = test_data.witness;
         let op = process_block_transaction(input, EVM_CONFIG);
-
         assert_eq!(op, test_data.params);
     }
 }
