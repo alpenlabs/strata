@@ -93,6 +93,8 @@ pub struct StateCache {
     original_epoch_state: EpochState,
     new_ch_state: Chainstate,
     new_epoch_state: Option<EpochState>,
+
+    // Unused right now, will likely use later.
     write_ops: Vec<StateOp>,
 }
 

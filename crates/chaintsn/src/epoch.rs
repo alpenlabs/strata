@@ -12,7 +12,7 @@ use strata_state::{
     tx::ProtocolOperation,
 };
 
-use crate::{errors::TsnError, slot_rng::SlotRng};
+use crate::{errors::TsnError, macros::*, slot_rng::SlotRng};
 
 /// Rollup epoch-level input.
 pub struct EpochData<'b> {
@@ -56,7 +56,9 @@ pub fn process_epoch(
 
     // Increment the epoch counter.
     let cur_epoch = state.state().cur_epoch();
-    state.set_cur_epoch(cur_epoch + 1);
+    let new_epoch = cur_epoch + 1;
+    state.set_cur_epoch(new_epoch);
+    info!(%new_epoch, "internally advanced epoch");
 
     Ok(())
 }

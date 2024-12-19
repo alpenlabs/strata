@@ -398,7 +398,10 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
     async fn sync_status(&self) -> RpcResult<RpcSyncStatus> {
         let sync_state = self.status_channel.get_sync_state();
-        let cur_epoch = self.status_channel.get_cur_l2_epoch().unwrap_or(0);
+        let cur_epoch = self.status_channel.get_cur_l2_epoch().unwrap_or_else(|| {
+            warn!("cur_epoch unset, using default 0");
+            0
+        });
         Ok(sync_state
             .map(|sync| RpcSyncStatus {
                 tip_height: sync.tip_height(),
