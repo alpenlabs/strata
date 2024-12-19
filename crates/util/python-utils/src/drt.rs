@@ -110,16 +110,15 @@ fn deposit_request_transaction_inner(
     // Before signing the transaction, we need to sync the wallet with bitcoind
     sync_wallet(&mut wallet, &client)?;
 
-    let mut psbt = wallet
-        .build_tx()
+    let mut psbt = {
+        let mut builder = wallet.build_tx();
         // NOTE: the deposit won't be found by the sequencer if the order isn't correct.
-        .ordering(TxOrdering::Untouched)
-        .add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT)
-        .add_data(&op_return_data)
-        .fee_rate(fee_rate)
-        .clone()
-        .finish()
-        .expect("valid psbt");
+        builder.ordering(TxOrdering::Untouched);
+        builder.add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT);
+        builder.add_data(&op_return_data);
+        builder.fee_rate(fee_rate);
+        builder.finish().expect("valid psbt")
+    };
     wallet.sign(&mut psbt, Default::default()).unwrap();
 
     let tx = psbt.extract_tx().expect("valid tx");
@@ -216,15 +215,14 @@ fn spend_recovery_path_inner(
     sync_wallet(&mut wallet, &client)?;
 
     // Spend the recovery path
-    let mut psbt = wallet
-        .build_tx()
-        .policy_path(path, KeychainKind::External)
-        .drain_wallet()
-        .drain_to(address_to_send.script_pubkey())
-        .fee_rate(fee_rate)
-        .clone()
-        .finish()
-        .expect("valid psbt");
+    let mut psbt = {
+        let mut builder = wallet.build_tx();
+        builder.policy_path(path, KeychainKind::External);
+        builder.drain_wallet();
+        builder.drain_to(address_to_send.script_pubkey());
+        builder.fee_rate(fee_rate);
+        builder.finish().expect("valid psbt")
+    };
     wallet.sign(&mut psbt, Default::default()).unwrap();
 
     let tx = psbt.extract_tx().expect("valid tx");
@@ -669,13 +667,12 @@ mod tests {
 
         // Send 10 BTC to the change address
         let amount = Amount::from_btc(10.0).unwrap();
-        let mut psbt = wallet
-            .build_tx()
-            .add_recipient(change_address.script_pubkey(), amount)
-            .fee_rate(FeeRate::from_sat_per_vb_unchecked(2))
-            .clone()
-            .finish()
-            .unwrap();
+        let mut psbt = {
+            let mut builder = wallet.build_tx();
+            builder.add_recipient(change_address.script_pubkey(), amount);
+            builder.fee_rate(FeeRate::from_sat_per_vb_unchecked(2));
+            builder.finish().unwrap()
+        };
         wallet.sign(&mut psbt, Default::default()).unwrap();
         let signed_tx = psbt.extract_tx().unwrap();
         trace!(?signed_tx, "signed drt tx");
