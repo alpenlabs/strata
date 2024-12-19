@@ -238,7 +238,8 @@ pub fn apply_writes_to_state(
                     // Check if heights match accordingly
                     if !l1v
                         .last_finalized_checkpoint
-                        .as_ref().is_none_or(|prev_chp| {
+                        .as_ref()
+                        .is_none_or(|prev_chp| {
                             checkpt.batch_info.idx() == prev_chp.batch_info.idx() + 1
                         })
                     {
