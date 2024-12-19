@@ -11,7 +11,10 @@ use tracing::error;
 use super::{utils::get_pm_rollup_params, ProvingOp};
 use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
-/// Operations required for BTC block proving tasks.
+/// A struct that implements the [`ProvingOp`] trait for Bitcoin blockspace proof generation.
+///
+/// It interfaces with the Bitcoin blockchain via a [`BitcoinClient`] to fetch the necessary data
+/// required by the [`BtcBlockspaceProver`] for the proof generation.
 #[derive(Debug, Clone)]
 pub struct BtcBlockspaceOperator {
     btc_client: Arc<BitcoinClient>,
@@ -23,6 +26,7 @@ impl BtcBlockspaceOperator {
         Self { btc_client }
     }
 
+    /// Retrieves the [`L1BlockId`] for a given block number.
     pub async fn get_id(&self, block_num: u64) -> Result<L1BlockId, ProvingTaskError> {
         Ok(self
             .btc_client

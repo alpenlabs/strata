@@ -52,6 +52,10 @@ pub static CHECKPOINT_HOST: LazyLock<SP1Host> = std::sync::LazyLock::new(|| {
     }
 });
 
+/// Returns a reference to the appropriate `SP1Host` instance based on the given `ProofContext`.
+///
+/// This function maps the `ProofContext` variant to its corresponding static `SP1Host`
+/// instance, allowing for efficient host selection for different proof types.
 pub fn get_host(id: &ProofContext) -> &'static SP1Host {
     match id {
         ProofContext::BtcBlockspace(_) => &BTC_BLOCKSPACE_HOST,

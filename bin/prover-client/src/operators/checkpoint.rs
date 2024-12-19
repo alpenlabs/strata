@@ -12,33 +12,41 @@ use tokio::sync::Mutex;
 use tracing::error;
 
 use super::{
-    cl_agg::ClAggOperator, l1_batch::L1BatchController, utils::get_pm_rollup_params, ProvingOp,
+    cl_agg::ClAggOperator, l1_batch::L1BatchOperator, utils::get_pm_rollup_params, ProvingOp,
 };
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
-/// Operations required for BTC block proving tasks.
+/// A struct that implements the [`ProvingOp`] for Checkpoint Proof.
+///
+/// It is responsible for managing the data and tasks required to generate Checkpoint Proof. It
+/// fetches the necessary inputs for the [`CheckpointProver`] by:
+///
+/// - utilizing the [`L1BatchOperator`] to create and manage proving tasks for L1Batch. The
+///   resulting L1 Batch proof is incorporated as part of the input for the Checkpoint Proof.
+/// - utilizing the [`ClAggOperator`] to create and manage proving tasks for CL Aggregation. The
+///   resulting CL Aggregated proof is incorporated as part of the input for the Checkpoint Proof.
 #[derive(Debug, Clone)]
 pub struct CheckpointOperator {
     cl_client: HttpClient,
-    l1_batch_dispatcher: Arc<L1BatchController>,
-    l2_batch_dispatcher: Arc<ClAggOperator>,
+    l1_batch_operator: Arc<L1BatchOperator>,
+    l2_batch_operator: Arc<ClAggOperator>,
 }
 
 impl CheckpointOperator {
     /// Creates a new BTC operations instance.
     pub fn new(
         cl_client: HttpClient,
-        l1_batch_dispatcher: Arc<L1BatchController>,
-        l2_batch_dispatcher: Arc<ClAggOperator>,
+        l1_batch_operator: Arc<L1BatchOperator>,
+        l2_batch_operator: Arc<ClAggOperator>,
     ) -> Self {
         Self {
             cl_client,
-            l1_batch_dispatcher,
-            l2_batch_dispatcher,
+            l1_batch_operator,
+            l2_batch_operator,
         }
     }
 
-    async fn fetch_info(&self, ckp_idx: u64) -> Result<RpcCheckpointInfo, ProvingTaskError> {
+    async fn fetch_ckp_info(&self, ckp_idx: u64) -> Result<RpcCheckpointInfo, ProvingTaskError> {
         self.cl_client
             .get_checkpoint_info(ckp_idx)
             .await
@@ -47,6 +55,7 @@ impl CheckpointOperator {
             .ok_or(ProvingTaskError::WitnessNotFound)
     }
 
+    /// Retrieves the latest checkpoint index
     pub async fn fetch_latest_ckp_idx(&self) -> Result<u64, ProvingTaskError> {
         self.cl_client
             .get_latest_checkpoint_index()
@@ -67,18 +76,18 @@ impl ProvingOp for CheckpointOperator {
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let checkpoint_info = self.fetch_info(ckp_idx).await?;
+        let checkpoint_info = self.fetch_ckp_info(ckp_idx).await?;
 
         let ckp_proof_id = ProofContext::Checkpoint(ckp_idx);
 
         let l1_batch_keys = self
-            .l1_batch_dispatcher
+            .l1_batch_operator
             .create_task(checkpoint_info.l1_range, task_tracker.clone(), db)
             .await?;
         let l1_batch_id = l1_batch_keys.first().expect("at least one").context();
 
         let l2_batch_keys = self
-            .l2_batch_dispatcher
+            .l2_batch_operator
             .create_task(checkpoint_info.l2_range, task_tracker.clone(), db)
             .await?;
         let l2_batch_id = l2_batch_keys.first().expect("at least one").context();

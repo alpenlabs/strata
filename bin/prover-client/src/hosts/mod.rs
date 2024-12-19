@@ -8,6 +8,16 @@ pub mod risc0;
 #[cfg(feature = "sp1")]
 pub mod sp1;
 
+/// Retrieves the [`VerificationKey`] for the specified proof key.
+///
+/// This function determines the appropriate ZkVm host based on the provided [`ProofKey`]
+/// and retrieves the corresponding verification key.
+///
+/// # Panics
+///
+/// * If the `sp1` feature is not enabled and an SP1 host is requested.
+/// * If the `risc0` feature is not enabled and a Risc0 host is requested.
+/// * If the host type is unsupported or not recognized.
 pub fn get_verification_key(key: &ProofKey) -> VerificationKey {
     match key.host() {
         ProofZkVm::SP1 => {

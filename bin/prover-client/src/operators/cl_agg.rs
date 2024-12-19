@@ -9,7 +9,12 @@ use tokio::sync::Mutex;
 use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
-/// Operations required for CL block proving tasks.
+/// A struct that implements the [`ProvingOp`] for Consensus Layer (CL) Aggregated Proof.
+///
+/// It is responsible for managing the data and tasks required to generate proofs of CL Aggregation.
+/// It fetches the necessary inputs for the [`ClAggProver`] by: utilizing the [`ClStfOperator`] to
+/// create and manage proving tasks for CL STFs. The resulting CL STF proofs are incorporated as
+/// part of the   input for the CL STF proof.
 #[derive(Debug, Clone)]
 pub struct ClAggOperator {
     cl_stf_operator: Arc<ClStfOperator>,
