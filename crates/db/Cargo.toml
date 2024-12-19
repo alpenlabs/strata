@@ -20,6 +20,7 @@ parking_lot.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+strata-macros = { version = "0.1.0", path = "../macros" }
 
 [features]
 default = []
