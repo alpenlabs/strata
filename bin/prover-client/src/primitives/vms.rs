@@ -1,18 +1,7 @@
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 use strata_sp1_adapter::SP1Host;
-
-use crate::zkvm;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ProofVm {
-    BtcProving,
-    ELProving,
-    CLProving,
-    CLAggregation,
-    L1Batch,
-    Checkpoint,
-}
+use strata_zkvm_hosts::{get_sp1_host, ProofVm};
 
 pub struct ZkVMManager {
     vms: HashMap<ProofVm, &'static SP1Host>,
@@ -28,7 +17,7 @@ impl ZkVMManager {
     pub fn add_vm(&mut self, proof_vm: ProofVm) {
         // The `Vm` is expected to live for the lifetime of the ProverManager, ensuring the same
         // instance is reused to prove the same guest program
-        let vm = zkvm::get_host(proof_vm);
+        let vm = get_sp1_host(proof_vm);
         self.vms.insert(proof_vm, vm);
     }
 

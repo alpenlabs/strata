@@ -1,5 +1,5 @@
 use crate::{
-    host::ZkVmHost, input::ZkVmInputBuilder, ProofReceipt, ProofType, PublicValues,
+    host::ZkVmHost, input::ZkVmInputBuilder, ProofReceipt, ProofReport, ProofType, PublicValues,
     ZkVmInputResult, ZkVmResult,
 };
 
@@ -35,5 +35,17 @@ pub trait ZkVmProver {
         let _ = Self::process_output::<H>(receipt.public_values())?;
 
         Ok(receipt)
+    }
+
+    /// Outputs the useful performance stats related to proving.
+    fn perf_stats<'a, H>(input: &'a Self::Input, host: &H) -> ZkVmResult<ProofReport>
+    where
+        H: ZkVmHost,
+        H::Input<'a>: ZkVmInputBuilder<'a>,
+    {
+        let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)?;
+        let report = host.perf_report(zkvm_input, Self::proof_type())?;
+
+        Ok(report)
     }
 }

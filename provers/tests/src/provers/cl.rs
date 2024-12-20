@@ -1,9 +1,10 @@
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
-use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProver, ZkVmResult};
+use strata_zkvm::{ZkVmHost, ZkVmResult};
 
 use super::{el::ElProofGenerator, ProofGenerator};
 
+#[derive(Clone)]
 pub struct ClProofGenerator<H: ZkVmHost> {
     pub el_proof_generator: ElProofGenerator<H>,
     host: H,
@@ -18,7 +19,9 @@ impl<H: ZkVmHost> ClProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator<ClStfProver> for ClProofGenerator<H> {
+    type Input = u64;
+
     fn get_input(&self, block_num: &u64) -> ZkVmResult<ClStfInput> {
         // Generate EL proof required for aggregation
         let el_proof = self.el_proof_generator.get_proof(block_num)?;
@@ -40,12 +43,6 @@ impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
         })
     }
 
-    fn gen_proof(&self, block_num: &u64) -> ZkVmResult<ProofReceipt> {
-        let host = self.get_host();
-        let input = self.get_input(block_num)?;
-        ClStfProver::prove(&input, &host)
-    }
-
     fn get_proof_id(&self, block_num: &u64) -> String {
         format!("cl_block_{}", block_num)
     }
@@ -59,32 +56,30 @@ impl<H: ZkVmHost> ProofGenerator<u64, ClStfProver> for ClProofGenerator<H> {
 mod tests {
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(cl_host: H, el_host: H) {
+    fn test_proof<H: ZkVmHost>(cl_prover: ClProofGenerator<H>) {
         let height = 1;
 
-        let el_prover = ElProofGenerator::new(el_host);
-        let cl_prover = ClProofGenerator::new(el_prover, cl_host);
         let _ = cl_prover.get_proof(&height).unwrap();
     }
 
     #[test]
     #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
-        use crate::hosts::native::{cl_stf, evm_ee_stf};
-        test_proof(cl_stf(), evm_ee_stf());
+        use crate::provers::TEST_NATIVE_GENERATORS;
+        test_proof(TEST_NATIVE_GENERATORS.cl_block());
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        use crate::hosts::risc0::{cl_stf, evm_ee_stf};
-        test_proof(cl_stf(), evm_ee_stf());
+        use crate::provers::TEST_RISC0_GENERATORS;
+        test_proof(TEST_RISC0_GENERATORS.cl_block());
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
-        use crate::hosts::sp1::{cl_stf, evm_ee_stf};
-        test_proof(cl_stf(), evm_ee_stf());
+        use crate::provers::TEST_SP1_GENERATORS;
+        test_proof(TEST_SP1_GENERATORS.cl_block());
     }
 }

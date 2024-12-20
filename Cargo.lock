@@ -13329,12 +13329,7 @@ dependencies = [
  "strata-db",
  "strata-native-zkvm-adapter",
  "strata-primitives",
- "strata-proofimpl-btc-blockspace",
- "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-agg",
- "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
- "strata-proofimpl-l1-batch",
  "strata-prover-client-rpc-api",
  "strata-risc0-adapter",
  "strata-risc0-guest-builder",
@@ -13346,6 +13341,7 @@ dependencies = [
  "strata-test-utils",
  "strata-tx-parser",
  "strata-zkvm",
+ "strata-zkvm-hosts",
  "thiserror",
  "tokio",
  "tracing",
@@ -13828,6 +13824,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-zkvm-hosts"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "borsh",
+ "cfg-if",
+ "serde",
+ "strata-native-zkvm-adapter",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-checkpoint",
+ "strata-proofimpl-cl-agg",
+ "strata-proofimpl-cl-stf",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-proofimpl-l1-batch",
+ "strata-risc0-adapter",
+ "strata-risc0-guest-builder",
+ "strata-sp1-adapter",
+ "strata-sp1-guest-builder",
+ "thiserror",
+]
+
+[[package]]
 name = "strata-zkvm-tests"
 version = "0.1.0"
 dependencies = [
@@ -13852,6 +13871,7 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "strata-zkvm",
+ "strata-zkvm-hosts",
 ]
 
 [[package]]
