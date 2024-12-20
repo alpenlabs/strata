@@ -11,8 +11,8 @@ fi
 
 # Conditionally run cargo build based on PROVER_TEST
 if [ ! -z $PROVER_TEST ]; then
-    echo "Running on risc0-mock mode"
-    cargo build --release -F risc0-mock
+    echo "Running on sp1-mock mode"
+    cargo build --release -F sp1-mock
 	export PATH=$(realpath ../target/release/):$PATH
 else
     echo "Running on seq mode"

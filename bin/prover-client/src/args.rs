@@ -75,7 +75,16 @@ pub struct Args {
     /// The number of SP1 prover workers to spawn.
     ///
     /// This setting is only available if the `sp1` feature is enabled.
-    /// Defaults to `20`.
+    /// Defaults to `20` to ensure sufficient prover capacity.
+    ///
+    /// Rationale: We produce EVM EE and CL STF blocks approximately every 5 seconds, and proof
+    /// generation for these blocks in SP1 takes roughly 40 seconds. Over a 40-second period, this
+    /// results in the need to generate 16 proofs for 8 EVM EE blocks and 8 CL STF blocks.
+    /// Additionally, 2 BTC blocks are generated in the same timeframe, requiring 2 more proofs.
+    ///
+    /// To handle this workload and account for catching up in cases of backlog, a minimum of 18
+    /// workers is required. Setting the default to `20` provides a small buffer to ensure smooth
+    /// operation under normal and catch-up scenarios.
     #[cfg(feature = "sp1")]
     #[argh(
         option,

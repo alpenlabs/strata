@@ -44,3 +44,42 @@ pub fn get_verification_key(key: &ProofKey) -> VerificationKey {
         _ => panic!("Unsupported ZkVm"),
     }
 }
+
+pub enum ZkVmHostInstance {
+    Native(strata_native_zkvm_adapter::NativeHost),
+
+    #[cfg(feature = "sp1")]
+    SP1(&'static strata_sp1_adapter::SP1Host),
+
+    #[cfg(feature = "risc0")]
+    Risc0(&'static strata_risc0_adapter::Risc0Host),
+}
+
+pub fn resolve_host(proof_key: &ProofKey) -> ZkVmHostInstance {
+    match proof_key.host() {
+        ProofZkVm::Native => ZkVmHostInstance::Native(native::get_host(proof_key.context())),
+        ProofZkVm::SP1 => {
+            #[cfg(feature = "sp1")]
+            {
+                ZkVmHostInstance::SP1(sp1::get_host(proof_key.context()))
+            }
+            #[cfg(not(feature = "sp1"))]
+            {
+                panic!(
+                    "The `sp1` feature is not enabled. Enable the feature to use SP1 functionality"
+                );
+            }
+        }
+        ProofZkVm::Risc0 => {
+            #[cfg(feature = "risc0")]
+            {
+                ZkVmHostInstance::Risc0(risc0::get_host(proof_key.context()))
+            }
+            #[cfg(not(feature = "risc0"))]
+            {
+                panic!("The `risc0` feature is not enabled. Enable the feature to use Risc0 functionality");
+            }
+        }
+        _ => panic!("Unsupported ZkVm"),
+    }
+}

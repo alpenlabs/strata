@@ -90,7 +90,7 @@ pub async fn make_proof(
         task_tracker.update_status(task, ProvingTaskStatus::ProvingInProgress)?;
     }
 
-    let res = operator.prove(&task, &db).await;
+    let res = operator.process_proof(&task, &db).await;
 
     {
         let mut task_tracker = task_tracker.lock().await;

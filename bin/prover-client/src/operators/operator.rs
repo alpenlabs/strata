@@ -10,7 +10,10 @@ use super::{
     btc::BtcBlockspaceOperator, checkpoint::CheckpointOperator, cl_agg::ClAggOperator,
     cl_stf::ClStfOperator, evm_ee::EvmEeOperator, l1_batch::L1BatchOperator, ProvingOp,
 };
-use crate::errors::ProvingTaskError;
+use crate::{
+    errors::ProvingTaskError,
+    hosts::{resolve_host, ZkVmHostInstance},
+};
 
 #[derive(Debug, Clone)]
 pub struct ProofOperator {
@@ -72,16 +75,47 @@ impl ProofOperator {
         )
     }
 
-    pub async fn prove(&self, proof_key: &ProofKey, db: &ProofDb) -> Result<(), ProvingTaskError> {
+    pub async fn prove(
+        operator: &impl ProvingOp,
+        proof_key: &ProofKey,
+        db: &ProofDb,
+        host: ZkVmHostInstance,
+    ) -> Result<(), ProvingTaskError> {
+        match host {
+            ZkVmHostInstance::Native(host) => operator.prove(proof_key, db, &host).await,
+
+            #[cfg(feature = "sp1")]
+            ZkVmHostInstance::SP1(host) => operator.prove(proof_key, db, host).await,
+
+            #[cfg(feature = "risc0")]
+            ZkVmHostInstance::Risc0(host) => operator.prove(proof_key, db, host).await,
+        }
+    }
+
+    pub async fn process_proof(
+        &self,
+        proof_key: &ProofKey,
+        db: &ProofDb,
+    ) -> Result<(), ProvingTaskError> {
+        let host = resolve_host(proof_key);
+
         match proof_key.context() {
             ProofContext::BtcBlockspace(_) => {
-                self.btc_blockspace_operator.prove(proof_key, db).await
+                Self::prove(&self.btc_blockspace_operator, proof_key, db, host).await
             }
-            ProofContext::L1Batch(_, _) => self.l1_batch_operator.prove(proof_key, db).await,
-            ProofContext::EvmEeStf(_) => self.evm_ee_operator.prove(proof_key, db).await,
-            ProofContext::ClStf(_) => self.cl_stf_operator.prove(proof_key, db).await,
-            ProofContext::ClAgg(_, _) => self.cl_agg_operator.prove(proof_key, db).await,
-            ProofContext::Checkpoint(_) => self.checkpoint_operator.prove(proof_key, db).await,
+            ProofContext::L1Batch(_, _) => {
+                Self::prove(&self.l1_batch_operator, proof_key, db, host).await
+            }
+            ProofContext::EvmEeStf(_) => {
+                Self::prove(&self.evm_ee_operator, proof_key, db, host).await
+            }
+            ProofContext::ClStf(_) => Self::prove(&self.cl_stf_operator, proof_key, db, host).await,
+            ProofContext::ClAgg(_, _) => {
+                Self::prove(&self.cl_agg_operator, proof_key, db, host).await
+            }
+            ProofContext::Checkpoint(_) => {
+                Self::prove(&self.checkpoint_operator, proof_key, db, host).await
+            }
         }
     }
 
