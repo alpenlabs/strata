@@ -1,14 +1,20 @@
 use std::{fs, path::PathBuf};
 
 use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
-pub mod btc;
-pub mod checkpoint;
-pub mod cl;
-pub mod el;
+mod btc;
+mod checkpoint;
+mod cl;
+mod el;
 mod generators;
-pub mod l1_batch;
-pub mod l2_batch;
+mod l1_batch;
+mod l2_batch;
 
+pub mod proof_generators {
+    pub use crate::{
+        btc::BtcBlockProofGenerator, checkpoint::CheckpointProofGenerator, cl::ClProofGenerator,
+        el::ElProofGenerator, l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator,
+    };
+}
 #[cfg(feature = "risc0")]
 pub use generators::TEST_RISC0_GENERATORS;
 #[cfg(feature = "sp1")]
