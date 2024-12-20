@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/block-assembly",
   "crates/bridge-exec",
   "crates/bridge-relay",
   "crates/bridge-sig-manager",
@@ -71,6 +72,7 @@ default-members = [
 resolver = "2"
 
 [workspace.dependencies]
+strata-block-assembly = { path = "crates/block-assembly" }
 strata-bridge-exec = { path = "crates/bridge-exec" }
 strata-bridge-relay = { path = "crates/bridge-relay" }
 strata-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
