@@ -13378,7 +13378,6 @@ dependencies = [
  "sp1-sdk",
  "sp1-stark",
  "strata-native-zkvm-adapter",
- "strata-risc0-adapter",
  "strata-sp1-adapter",
  "strata-sp1-guest-builder",
  "strata-test-utils",
