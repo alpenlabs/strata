@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    permissions: write-all
     runs-on: ubuntu-latest
 
     steps:
@@ -51,7 +52,7 @@ jobs:
           RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
 
       - name: Run Evaluation
-        run: 
+        run: |
           cargo run --release -- \
           --github-token "${{ secrets.GITHUB_TOKEN }}" \
           --repo-owner "${{ github.repository_owner }}" \
