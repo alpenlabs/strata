@@ -5,6 +5,12 @@ import flexitest
 import testenv
 from utils import wait_for_proof_with_time_out
 
+# Parameters defining the range of Execution Engine (EE) blocks to be proven.
+EE_PROVER_PARAMS = {
+    "start_block": 1,
+    "end_block": 3,
+}
+
 
 @flexitest.register
 class ProverClientTest(testenv.StrataTester):
@@ -18,9 +24,11 @@ class ProverClientTest(testenv.StrataTester):
         # Wait for the some block building
         time.sleep(60)
 
-        # Dispatch the prover task
-        task_id = prover_client_rpc.dev_strata_proveELBlock(1)
-        self.debug(f"got the task id: {task_id}")
+        # Prove EL blocks from START_BLOCK to END_BLOCK
+        task_id = prover_client_rpc.dev_strata_proveELBlocks(
+            (EE_PROVER_PARAMS["start_block"], EE_PROVER_PARAMS["end_block"])
+        )
+        print("got the task id: {}", task_id)
         assert task_id is not None
 
         time_out = 10 * 60

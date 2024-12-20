@@ -4,12 +4,10 @@
 pub mod prover;
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, params::RollupParams};
-use strata_proofimpl_evm_ee_stf::ELProofPublicParams;
+use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
-    exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
     id::L2BlockId,
     tx::DepositInfo,
 };
@@ -41,19 +39,15 @@ impl L2BatchProofOutput {
 pub fn verify_and_transition(
     prev_chstate: Chainstate,
     new_l2_block: L2Block,
-    el_proof_pp: ELProofPublicParams,
+    exec_segment: &ExecSegment,
     rollup_params: &RollupParams,
 ) -> Chainstate {
-    verify_l2_block(&new_l2_block, &el_proof_pp, rollup_params);
+    verify_l2_block(&new_l2_block, exec_segment, rollup_params);
     apply_state_transition(prev_chstate, &new_l2_block, rollup_params)
 }
 
 /// Verifies the L2 block.
-fn verify_l2_block(
-    block: &L2Block,
-    el_proof_pp: &ELProofPublicParams,
-    chain_params: &RollupParams,
-) {
+fn verify_l2_block(block: &L2Block, exec_segment: &ExecSegment, chain_params: &RollupParams) {
     // Assert that the block has been signed by the designated signer
     assert!(
         check_block_credential(block.header(), chain_params),
@@ -67,25 +61,8 @@ fn verify_l2_block(
     );
 
     // Verify proof public params matches the exec segment
-    let proof_exec_segment = reconstruct_exec_segment(el_proof_pp);
-    let block_exec_segment = block.body().exec_segment().clone();
-    assert_eq!(proof_exec_segment, block_exec_segment);
-}
-
-/// Generates an execution segment from the given ELProof public parameters.
-pub fn reconstruct_exec_segment(el_proof_pp: &ELProofPublicParams) -> ExecSegment {
-    // create_evm_extra_payload
-    let update_input = UpdateInput::new(
-        el_proof_pp.block_idx,
-        Vec::new(),
-        Buf32(*el_proof_pp.txn_root),
-        create_evm_extra_payload(Buf32(*el_proof_pp.new_blockhash)),
-    );
-
-    let update_output = UpdateOutput::new_from_state(Buf32(*el_proof_pp.new_state_root));
-    let exec_update = ExecUpdate::new(update_input, update_output);
-
-    ExecSegment::new(exec_update)
+    let block_exec_segment = block.body().exec_segment();
+    assert_eq!(exec_segment, block_exec_segment);
 }
 
 /// Applies a state transition for a given L2 block.
@@ -110,16 +87,20 @@ fn apply_state_transition(
 pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
     let rollup_params: RollupParams = zkvm.read_serde();
     let (prev_state, block): (Chainstate, L2Block) = zkvm.read_borsh();
+    let el_pp_deserialized: Vec<ExecSegment> = zkvm.read_verified_borsh(el_vkey);
 
-    // Read the EL proof output
-    let el_pp_deserialized: ELProofPublicParams = zkvm.read_verified_serde(el_vkey);
-
-    let new_state = verify_and_transition(
-        prev_state.clone(),
-        block,
-        el_pp_deserialized,
-        &rollup_params,
+    // The CL block currently includes only a single ExecSegment
+    assert_eq!(
+        el_pp_deserialized.len(),
+        1,
+        "execsegment: expected exactly one"
     );
+
+    let exec_update = el_pp_deserialized
+        .first()
+        .expect("execsegment: failed to fetch the first");
+
+    let new_state = verify_and_transition(prev_state.clone(), block, exec_update, &rollup_params);
 
     let initial_snapshot = ChainStateSnapshot {
         hash: prev_state.compute_state_root(),

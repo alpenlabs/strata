@@ -2,9 +2,10 @@ use std::{collections::HashMap, path::PathBuf};
 
 use strata_consensus_logic::genesis::make_genesis_block;
 use strata_primitives::buf::{Buf32, Buf64};
-use strata_proofimpl_cl_stf::{reconstruct_exec_segment, Chainstate, StateCache};
+use strata_proofimpl_cl_stf::{Chainstate, StateCache};
 use strata_proofimpl_evm_ee_stf::{
-    process_block_transaction, processor::EvmConfig, ELProofInput, ELProofPublicParams,
+    process_block_transaction, processor::EvmConfig, utils::generate_exec_update, EvmBlockStfInput,
+    EvmBlockStfOutput,
 };
 use strata_state::{
     block::{L1Segment, L2Block, L2BlockBody},
@@ -18,13 +19,13 @@ use crate::l2::{gen_params, get_genesis_chainstate};
 /// generation and processing for testing STF proofs.
 #[derive(Debug, Clone)]
 pub struct EvmSegment {
-    inputs: HashMap<u64, ELProofInput>,
-    outputs: HashMap<u64, ELProofPublicParams>,
+    inputs: HashMap<u64, EvmBlockStfInput>,
+    outputs: HashMap<u64, EvmBlockStfOutput>,
 }
 
 impl EvmSegment {
-    /// Initializes the EvmSegment by loading existing [`ELProofInput`] data from the specified
-    /// range of block heights and generating corresponding ELProofPublicParams.
+    /// Initializes the EvmSegment by loading existing [`EvmBlockStfInput`] data from the specified
+    /// range of block heights and generating corresponding ElBlockStfOutput.
     ///
     /// This function reads witness data from JSON files, processes them, and stores the results
     /// for testing purposes of the STF proofs.
@@ -45,7 +46,7 @@ impl EvmSegment {
         for height in start_height..=end_height {
             let witness_path = dir.join(format!("witness_{}.json", height));
             let json_file = std::fs::read_to_string(witness_path).expect("Expected JSON file");
-            let el_proof_input: ELProofInput =
+            let el_proof_input: EvmBlockStfInput =
                 serde_json::from_str(&json_file).expect("Invalid JSON file");
             inputs.insert(height, el_proof_input.clone());
 
@@ -56,17 +57,17 @@ impl EvmSegment {
         Self { inputs, outputs }
     }
 
-    /// Retrieves the [`ELProofInput`] associated with the given block height.
+    /// Retrieves the [`EvmBlockStfInput`] associated with the given block height.
     ///
     /// Panics if no input is found for the specified height.
-    pub fn get_input(&self, height: &u64) -> &ELProofInput {
+    pub fn get_input(&self, height: &u64) -> &EvmBlockStfInput {
         self.inputs.get(height).expect("No input found at height")
     }
 
-    /// Retrieves the [`ELProofPublicParams`] associated with the given block height.
+    /// Retrieves the [`EvmBlockStfOutput`] associated with the given block height.
     ///
     /// Panics if no output is found for the specified height.
-    pub fn get_output(&self, height: &u64) -> &ELProofPublicParams {
+    pub fn get_output(&self, height: &u64) -> &EvmBlockStfOutput {
         self.outputs.get(height).expect("No output found at height")
     }
 }
@@ -101,7 +102,7 @@ impl L2Segment {
         for height in 1..=end_height {
             let el_proof_in = evm_segment.get_input(&height);
             let el_proof_out = evm_segment.get_output(&height);
-            let evm_ee_segment = reconstruct_exec_segment(el_proof_out);
+            let evm_ee_segment = generate_exec_update(el_proof_out);
             let l1_segment = L1Segment::new_empty();
             let body = L2BlockBody::new(l1_segment, evm_ee_segment);
 

@@ -27,12 +27,12 @@
   "timestamp": 1727739194,
   "extra_data": "0x726574682f76312e302e332f6d61636f73",
   "mix_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-  "parent_state_trie": {
+  "pre_state_trie": {
     "data": {
       "Digest": "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
     }
   },
-  "parent_storage": {},
+  "pre_state_storage": {},
   "contracts": [],
   "ancestor_headers": [],
   "transactions": [],

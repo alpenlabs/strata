@@ -114,11 +114,11 @@ impl StrataProverClientApiServer for ProverClientRpc {
         RpcResult::Ok(task_id)
     }
 
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Uuid> {
+    async fn prove_el_blocks(&self, block_range: (u64, u64)) -> RpcResult<Uuid> {
         let task_id = self
             .context
             .el_proving_task_dispatcher
-            .create_task(el_block_num)
+            .create_task(block_range)
             .await
             .expect("failed to add proving task, el block");
 
