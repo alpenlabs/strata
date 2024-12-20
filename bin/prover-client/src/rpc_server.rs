@@ -103,11 +103,11 @@ impl ProverClientRpc {
 
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
-    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<Uuid> {
+    async fn prove_btc_block(&self, block_range: (u64, u64)) -> RpcResult<Uuid> {
         let task_id = self
             .context
             .btc_proving_task_dispatcher
-            .create_task(btc_block_num)
+            .create_task(block_range)
             .await
             .expect("failed to add proving task, l1 block");
 
