@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_macros::gen_async_version;
 use strata_mmr::CompactMmr;
 use strata_primitives::{
     l1::*,
@@ -43,6 +44,7 @@ pub trait Database {
 }
 
 /// Database interface to control our view of L1 data.
+#[gen_async_version]
 pub trait L1Database {
     /// Atomically extends the chain with a new block, providing the manifest
     /// and a list of transactions we find relevant.  Returns error if
@@ -282,7 +284,7 @@ pub trait ProofDatabase {
     /// Deletes a proof by its key.
     ///
     /// Tries to delete a proof by its key, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool>;
 
     /// Inserts dependencies for a given [`ProofContext`] into the database.
@@ -298,7 +300,7 @@ pub trait ProofDatabase {
     /// Deletes dependencies for a given [`ProofContext`].
     ///
     /// Tries to delete dependencies of by its context, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool>;
 }
 
