@@ -53,11 +53,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     engine: &E,
     params: &Arc<Params>,
 ) -> Result<Option<(L2BlockId, L2Block)>, Error> {
-    debug!("preparing block");
-    let l1_db = database.l1_db();
     let l2_db = database.l2_db();
-    let cs_db = database.client_state_db();
-    let chs_db = database.chain_state_db();
 
     // Check the block we were supposed to build isn't already in the database,
     // if so then just republish that.  This checks that there just if we have a
@@ -89,6 +85,47 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     }
 
     let ts = now_millis();
+
+    let (header, body, block_acc) = prepare_block(
+        slot,
+        prev_block_id,
+        prev_block,
+        l1_state,
+        ts,
+        database,
+        engine,
+        params.as_ref(),
+    )?;
+
+    let header_sig = sign_header(&header, ik);
+    let signed_header = SignedL2BlockHeader::new(header, header_sig);
+
+    let blkid = signed_header.get_blockid();
+    let final_block = L2Block::new(signed_header, body);
+    let final_bundle = L2BlockBundle::new(final_block.clone(), block_acc);
+    info!(?blkid, "finished building new block");
+
+    // Store the block in the database.
+    let l2_db = database.l2_db();
+    l2_db.put_block_data(final_bundle)?;
+    debug!(?blkid, "wrote block to datastore");
+    todo!()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_block<D: Database, E: ExecEngineCtl>(
+    slot: u64,
+    prev_block_id: L2BlockId,
+    prev_block: L2BlockBundle,
+    l1_state: &LocalL1State,
+    ts: u64,
+    database: &D,
+    engine: &E,
+    params: &Params,
+) -> Result<(L2BlockHeader, L2BlockBody, L2BlockAccessory), Error> {
+    debug!("preparing block");
+    let l1_db = database.l1_db();
+    let chs_db = database.chain_state_db();
 
     let prev_global_sr = *prev_block.header().state_root();
 
@@ -139,21 +176,8 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     let new_state_root = post_state.compute_state_root();
 
     let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
-    let header_sig = sign_header(&header, ik);
-    let signed_header = SignedL2BlockHeader::new(header, header_sig);
 
-    let blkid = signed_header.get_blockid();
-    let final_block = L2Block::new(signed_header, body);
-    let final_bundle = L2BlockBundle::new(final_block.clone(), block_acc);
-    info!(?blkid, "finished building new block");
-
-    // Store the block in the database.
-    let l2_db = database.l2_db();
-    l2_db.put_block_data(final_bundle)?;
-    debug!(?blkid, "wrote block to datastore");
-
-    // TODO should we actually return the bundle here?
-    Ok(Some((blkid, final_block)))
+    Ok((header, body, block_acc))
 }
 
 fn prepare_l1_segment(
@@ -410,7 +434,7 @@ fn compute_post_state(
     prev_chstate: Chainstate,
     header: &impl L2Header,
     body: &L2BlockBody,
-    params: &Arc<Params>,
+    params: &Params,
 ) -> Result<(Chainstate, WriteBatch), Error> {
     let mut state_cache = StateCache::new(prev_chstate);
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
