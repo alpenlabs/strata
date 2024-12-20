@@ -5,7 +5,6 @@ use strata_risc0_guest_builder::{
     GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_CHECKPOINT_ELF, GUEST_RISC0_CL_AGG_ELF,
     GUEST_RISC0_CL_STF_ELF, GUEST_RISC0_EVM_EE_STF_ELF, GUEST_RISC0_L1_BATCH_ELF,
 };
-use strata_zkvm::ZkVmHost;
 
 use crate::ProofVm;
 
