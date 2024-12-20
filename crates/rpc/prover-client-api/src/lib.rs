@@ -13,7 +13,7 @@ pub trait StrataProverClientApi {
 
     /// Start proving the given el block
     #[method(name = "proveELBlock")]
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>>;
+    async fn prove_el_block(&self, el_block_range: (u64, u64)) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given cl block
     #[method(name = "proveCLBlock")]

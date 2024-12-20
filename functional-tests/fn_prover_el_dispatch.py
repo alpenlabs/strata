@@ -25,7 +25,7 @@ class ProverClientTest(testenv.StrataTester):
         time.sleep(5)
 
         # Dispatch the prover task
-        task_ids = prover_client_rpc.dev_strata_proveELBlock(1)
+        task_ids = prover_client_rpc.dev_strata_proveELBlock((1, 2))
         self.debug(f"got task ids: {task_ids}")
         task_id = task_ids[0]
         self.debug(f"using task id: {task_id}")

@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use alloy_rpc_types::Block;
+use alloy_rpc_types::{Block, Header};
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_primitives::{
     buf::Buf32,
     proof::{ProofContext, ProofKey},
 };
-use strata_proofimpl_evm_ee_stf::{prover::EvmEeProver, ELProofInput};
+use strata_proofimpl_evm_ee_stf::{
+    primitives::EvmEeProofInput, prover::EvmEeProver, EvmBlockStfInput,
+};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
 use tracing::error;
@@ -41,21 +43,38 @@ impl EvmEeOperator {
             .inspect_err(|_| error!(%block_num, "Failed to fetch EVM Block"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))
     }
+
+    /// Retrieves the EVM EE [`Block`] for a given block number.
+    async fn get_block_header(&self, blkid: Buf32) -> Result<Header, ProvingTaskError> {
+        let block: Block = self
+            .el_client
+            .request("eth_getBlockByHash", rpc_params![blkid, false])
+            .await
+            .inspect_err(|_| error!(%blkid, "Failed to fetch EVM Block Header"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+        Ok(block.header)
+    }
 }
 
 impl ProvingOp for EvmEeOperator {
     type Prover = EvmEeProver;
-    type Params = u64;
+    type Params = (u64, u64);
 
     async fn create_task(
         &self,
-        block_num: u64,
+        block_range: (u64, u64),
         task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let block = self.get_block(block_num).await?;
-        let blkid: Buf32 = block.header.hash.into();
-        let context = ProofContext::EvmEeStf(blkid);
+        let (start_block_num, end_block_num) = block_range;
+
+        let start_block = self.get_block(start_block_num).await?;
+        let start_blkid: Buf32 = start_block.header.hash.into();
+
+        let end_block = self.get_block(end_block_num).await?;
+        let end_blkid: Buf32 = end_block.header.hash.into();
+
+        let context = ProofContext::EvmEeStf(start_blkid, end_blkid);
 
         let mut task_tracker = task_tracker.lock().await;
         task_tracker.create_tasks(context, vec![])
@@ -65,18 +84,37 @@ impl ProvingOp for EvmEeOperator {
         &self,
         task_id: &ProofKey,
         _db: &ProofDb,
-    ) -> Result<ELProofInput, ProvingTaskError> {
-        let block_hash = match task_id.context() {
-            ProofContext::EvmEeStf(id) => id,
+    ) -> Result<EvmEeProofInput, ProvingTaskError> {
+        let (start_block_hash, end_block_hash) = match task_id.context() {
+            ProofContext::EvmEeStf(start, end) => (*start, *end),
             _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
         };
 
-        let witness: ELProofInput = self
-            .el_client
-            .request("strataee_getBlockWitness", rpc_params![block_hash, true])
-            .await
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+        let mut mini_batch = Vec::new();
 
-        Ok(witness)
+        let mut blkid = end_block_hash;
+        loop {
+            let witness: EvmBlockStfInput = self
+                .el_client
+                .request("strataee_getBlockWitness", rpc_params![blkid, true])
+                .await
+                .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+
+            mini_batch.push(witness);
+
+            if blkid == start_block_hash {
+                break;
+            } else {
+                blkid = Buf32::from(
+                    self.get_block_header(blkid)
+                        .await
+                        .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
+                        .parent_hash,
+                );
+            }
+        }
+        mini_batch.reverse();
+
+        Ok(mini_batch)
     }
 }

@@ -4,8 +4,6 @@ use strata_primitives::proof::ProofContext;
 use strata_sp1_adapter::SP1Host;
 use strata_sp1_guest_builder::*;
 
-use crate::ProofVm;
-
 pub static BTC_BLOCKSPACE_HOST: LazyLock<SP1Host> = std::sync::LazyLock::new(|| {
     {
         SP1Host::new_from_bytes(
@@ -54,31 +52,17 @@ pub static CHECKPOINT_HOST: LazyLock<SP1Host> = std::sync::LazyLock::new(|| {
     }
 });
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-pub fn get_host(vm: ProofVm) -> &'static SP1Host {
-    match vm {
-        ProofVm::BtcProving => &BTC_BLOCKSPACE_HOST,
-        ProofVm::L1Batch => &L1_BATCH_HOST,
-        ProofVm::ELProving => &EVM_EE_STF_HOST,
-        ProofVm::CLProving => &CL_STF_HOST,
-        ProofVm::CLAggregation => &CL_AGG_HOST,
-        ProofVm::Checkpoint => &CHECKPOINT_HOST,
-=======
-=======
 /// Returns a reference to the appropriate `SP1Host` instance based on the given `ProofContext`.
 ///
 /// This function maps the `ProofContext` variant to its corresponding static `SP1Host`
 /// instance, allowing for efficient host selection for different proof types.
->>>>>>> cc928b9d (docs: add docstrings)
 pub fn get_host(id: &ProofContext) -> &'static SP1Host {
     match id {
         ProofContext::BtcBlockspace(_) => &BTC_BLOCKSPACE_HOST,
         ProofContext::L1Batch(_, _) => &L1_BATCH_HOST,
-        ProofContext::EvmEeStf(_) => &EVM_EE_STF_HOST,
+        ProofContext::EvmEeStf(_, _) => &EVM_EE_STF_HOST,
         ProofContext::ClStf(_) => &CL_STF_HOST,
         ProofContext::ClAgg(_, _) => &CL_AGG_HOST,
         ProofContext::Checkpoint(_) => &CHECKPOINT_HOST,
->>>>>>> 54eac344 (fixes)
     }
 }

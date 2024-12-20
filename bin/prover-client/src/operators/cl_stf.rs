@@ -84,7 +84,7 @@ impl ProvingOp for ClStfOperator {
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let evm_ee_tasks = self
             .evm_ee_operator
-            .create_task(block_num, task_tracker.clone(), db)
+            .create_task((block_num, block_num), task_tracker.clone(), db)
             .await?;
         let evm_ee_id = evm_ee_tasks
             .first()

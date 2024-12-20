@@ -8,7 +8,6 @@ use strata_proofimpl_cl_agg::process_cl_agg;
 use strata_proofimpl_cl_stf::process_cl_stf;
 use strata_proofimpl_evm_ee_stf::process_block_transaction_outer;
 use strata_proofimpl_l1_batch::process_l1_batch_proof;
-use strata_zkvm::ZkVmHost;
 
 /// A mock verification key used in native mode when proof verification is not performed.
 ///
@@ -34,7 +33,7 @@ pub fn get_host(id: &ProofContext) -> NativeHost {
                 Ok(())
             })),
         },
-        ProofContext::EvmEeStf(_) => NativeHost {
+        ProofContext::EvmEeStf(_, _) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_block_transaction_outer(zkvm);
                 Ok(())

@@ -106,7 +106,7 @@ impl ProofOperator {
             ProofContext::L1Batch(_, _) => {
                 Self::prove(&self.l1_batch_operator, proof_key, db, host).await
             }
-            ProofContext::EvmEeStf(_) => {
+            ProofContext::EvmEeStf(_, _) => {
                 Self::prove(&self.evm_ee_operator, proof_key, db, host).await
             }
             ProofContext::ClStf(_) => Self::prove(&self.cl_stf_operator, proof_key, db, host).await,

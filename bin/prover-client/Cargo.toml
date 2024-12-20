@@ -13,14 +13,18 @@ strata-common.workspace = true
 strata-db.workspace = true
 strata-native-zkvm-adapter.workspace = true
 strata-primitives.workspace = true
+strata-proofimpl-btc-blockspace.workspace = true
+strata-proofimpl-checkpoint.workspace = true
+strata-proofimpl-cl-agg.workspace = true
+strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
+strata-proofimpl-l1-batch.workspace = true
 strata-prover-client-rpc-api.workspace = true
 strata-rocksdb.workspace = true
 strata-rpc-api = { workspace = true, features = ["client"] }
 strata-rpc-types.workspace = true
 strata-state.workspace = true
 strata-zkvm.workspace = true
-strata-zkvm-hosts = { workspace = true, features = ["sp1"] }
 
 alloy-rpc-types.workspace = true
 anyhow.workspace = true

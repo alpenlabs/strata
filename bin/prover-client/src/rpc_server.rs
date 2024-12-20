@@ -87,11 +87,11 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .expect("failed to create task"))
     }
 
-    async fn prove_el_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_el_block(&self, el_block_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
         Ok(self
             .operator
             .evm_ee_operator()
-            .create_task(el_block_num, self.task_tracker.clone(), &self.db)
+            .create_task(el_block_range, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }
