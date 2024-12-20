@@ -7,7 +7,7 @@ use serde::Serialize;
 use serde_json::json;
 use strata_provers_perf::{ProofGeneratorPerf, ProofReport, ZkVmHostPerf};
 use strata_test_utils::bitcoin::get_btc_chain;
-use strata_zkvm_tests::provers::{
+use strata_zkvm_tests::{
     ProofGenerator, TestProverGenerators, TEST_NATIVE_GENERATORS, TEST_SP1_GENERATORS,
 };
 

@@ -78,21 +78,18 @@ mod test {
     #[test]
     #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
-        use crate::provers::TEST_NATIVE_GENERATORS;
-        test_proof(TEST_NATIVE_GENERATORS.l1_batch());
+        test_proof(crate::TEST_NATIVE_GENERATORS.l1_batch());
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        use crate::provers::TEST_RISC0_GENERATORS;
-        test_proof(TEST_RISC0_GENERATORS.l1_batch());
+        test_proof(crate::TEST_RISC0_GENERATORS.l1_batch());
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
-        use crate::provers::TEST_SP1_GENERATORS;
-        test_proof(TEST_SP1_GENERATORS.l1_batch());
+        test_proof(crate::TEST_SP1_GENERATORS.l1_batch());
     }
 }
