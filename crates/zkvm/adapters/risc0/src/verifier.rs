@@ -31,8 +31,8 @@ pub fn verify_groth16(
 
 #[cfg(test)]
 mod tests {
-    use risc0_zkvm::{serde::to_vec, Receipt};
-    use strata_zkvm::Proof;
+    use risc0_zkvm::{serde::to_vec, InnerReceipt};
+    use strata_zkvm::{Proof, ProofReceipt};
 
     use super::verify_groth16;
     #[test]
@@ -48,9 +48,9 @@ mod tests {
         // Note: This is written in prover.rs
         let raw_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
 
-        let proof = Proof::new(raw_proof.to_vec());
-        let receipt: Receipt = bincode::deserialize(proof.as_bytes()).unwrap();
-        let seal = Proof::new(receipt.inner.groth16().unwrap().clone().seal);
+        let receipt: ProofReceipt = bincode::deserialize(raw_proof).unwrap();
+        let inner_receipt: InnerReceipt = bincode::deserialize(receipt.proof().as_bytes()).unwrap();
+        let seal = Proof::new(inner_receipt.groth16().unwrap().clone().seal);
 
         let public_params_raw: Vec<u8> = to_vec(&input)
             .unwrap()
