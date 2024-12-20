@@ -16,7 +16,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: Update rust-toolchain.toml to use latest nightly
         run: |
-          set -x
+          set -xe
 
           # Get the latest nightly date.
           # If the latest nightly date is not the same as the current nightly date,
