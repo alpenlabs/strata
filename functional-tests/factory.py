@@ -285,6 +285,7 @@ class ProverClientFactory(flexitest.Factory):
             "--bitcoind-url", bitcoind_config["bitcoind_sock"],
             "--bitcoind-user", bitcoind_config["bitcoind_user"],
             "--bitcoind-password", bitcoind_config["bitcoind_pass"],
+            "--datadir", datadir
         ]
         # fmt: on
         props = {"rpc_port": rpc_port}

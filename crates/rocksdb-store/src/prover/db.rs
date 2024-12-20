@@ -8,6 +8,7 @@ use strata_zkvm::ProofReceipt;
 use super::schemas::{ProofDepsSchema, ProofSchema};
 use crate::DbOpsConfig;
 
+#[derive(Debug, Clone)]
 pub struct ProofDb {
     db: Arc<OptimisticTransactionDB>,
     ops: DbOpsConfig,

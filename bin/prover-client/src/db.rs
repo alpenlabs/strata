@@ -1,10 +1,12 @@
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs, path::Path, sync::Arc};
 
 use rockbound::rocksdb;
 
-pub fn open_rocksdb_database() -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
-    let mut database_dir = PathBuf::default();
-    database_dir.push("rocksdb_prover");
+pub fn open_rocksdb_database(
+    database_dir: &Path,
+) -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
+    let mut database_dir = database_dir.to_path_buf();
+    database_dir.push("rocksdb");
 
     if !database_dir.exists() {
         fs::create_dir_all(&database_dir)?;

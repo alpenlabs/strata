@@ -45,12 +45,12 @@ pub enum ProofContext {
     /// Includes the starting and ending block heights.
     L1Batch(L1BlockId, L1BlockId),
 
-    /// Identifier for the height of an EVM Execution Environment (EE) block
-    /// used in generating the State Transition Function (STF) proof.
-    EvmEeStf(Buf32),
+    /// Identifier for the EVM Execution Environment (EE) blocks used in generating the State
+    /// Transition Function (STF) proof.
+    EvmEeStf(Buf32, Buf32),
 
-    /// Identifier for the height of a Consensus Layer (CL) block
-    /// used in generating the State Transition Function (STF) proof.
+    /// Identifier for the Consensus Layer (CL) block used in generating the State Transition
+    /// Function (STF) proof.
     ClStf(L2BlockId),
 
     /// Identifier for a batch of Consensus Layer (CL) blocks being proven.
@@ -68,6 +68,7 @@ pub enum ProofContext {
 /// - `SP1`: SP1 ZKVM.
 /// - `Risc0`: Risc0 ZKVM.
 /// - `Native`: Native ZKVM.
+#[non_exhaustive]
 #[derive(
     Debug,
     Clone,

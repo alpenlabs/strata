@@ -22,13 +22,13 @@ class ProverClientTest(testenv.StrataTester):
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the some block building
-        time.sleep(60)
+        time.sleep(5)
 
-        # Prove EL blocks from START_BLOCK to END_BLOCK
-        task_id = prover_client_rpc.dev_strata_proveELBlocks(
-            (EE_PROVER_PARAMS["start_block"], EE_PROVER_PARAMS["end_block"])
-        )
-        print("got the task id: {}", task_id)
+        # Dispatch the prover task
+        task_ids = prover_client_rpc.dev_strata_proveELBlock((1, 2))
+        self.debug(f"got task ids: {task_ids}")
+        task_id = task_ids[0]
+        self.debug(f"using task id: {task_id}")
         assert task_id is not None
 
         time_out = 10 * 60
