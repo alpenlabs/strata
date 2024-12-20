@@ -6,7 +6,7 @@
 //! ZKVMs.
 //!
 //! The operations are designed to interact with a [`ProofDb`] for storing and retrieving proofs,
-//! a [`TaskTracker`] for managing task dependencies, and [`ProofZkVm`] hosts for ZKVM-specific
+//! a [`TaskTracker`] for managing task dependencies, and [`ZkVmHost`] host for ZKVM-specific
 //! computations.
 //!
 //! Supported ZKVMs:
