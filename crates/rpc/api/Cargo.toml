@@ -4,6 +4,7 @@ name = "strata-rpc-api"
 version = "0.1.0"
 
 [dependencies]
+strata-block-assembly.workspace = true
 strata-bridge-sig-manager.workspace = true
 strata-bridge-tx-builder.workspace = true
 strata-common.workspace = true

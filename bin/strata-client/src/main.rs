@@ -3,6 +3,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 use bitcoin::{hashes::Hash, Address, BlockHash};
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
+use strata_block_assembly::{template_manager_worker, BlockTemplateManager, TemplateManagerHandle};
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
@@ -39,7 +40,7 @@ use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{
     runtime::Handle,
-    sync::{broadcast, oneshot},
+    sync::{broadcast, mpsc, oneshot},
 };
 use tracing::*;
 
@@ -388,7 +389,7 @@ fn start_sequencer_tasks(
         engine,
         bitcoin_client,
         ..
-    } = ctx;
+    } = ctx.clone();
 
     info!(seqkey_path = ?sequencer_config.sequencer_key, "initing sequencer duties task");
     let idata = load_seqkey(&sequencer_config.sequencer_key)?;
@@ -423,11 +424,16 @@ fn start_sequencer_tasks(
         broadcast_handle.clone(),
     )?;
 
+    let template_manager_handle = start_template_manager_task(ctx, executor);
+
     let admin_rpc = rpc_server::SequencerServerImpl::new(
         envelope_handle.clone(),
         broadcast_handle,
         params.clone(),
         checkpoint_handle.clone(),
+        template_manager_handle,
+        sync_manager.clone(),
+        l2_block_manager.clone(),
     );
     methods.merge(admin_rpc.into_rpc())?;
 
@@ -550,4 +556,23 @@ async fn start_rpc(
     rpc_handle.stopped().await;
 
     Ok(())
+}
+
+fn start_template_manager_task(ctx: CoreContext, executor: &TaskExecutor) -> TemplateManagerHandle {
+    let CoreContext {
+        database,
+        engine,
+        params,
+        status_channel,
+        ..
+    } = ctx;
+    let (tx, rx) = mpsc::channel(100);
+
+    let manager = BlockTemplateManager::new(params, database, engine, status_channel);
+    executor.spawn_critical_async(
+        "template_manager_worker",
+        template_manager_worker(manager, rx),
+    );
+
+    TemplateManagerHandle::new(tx)
 }
