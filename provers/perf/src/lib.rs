@@ -1,7 +1,9 @@
 use strata_zkvm::{ProofType, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult};
 use strata_zkvm_tests::{
-    btc::BtcBlockProofGenerator, checkpoint::CheckpointProofGenerator, cl::ClProofGenerator,
-    el::ElProofGenerator, l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator,
+    proof_generators::{
+        BtcBlockProofGenerator, CheckpointProofGenerator, ClProofGenerator, ElProofGenerator,
+        L1BatchProofGenerator, L2BatchProofGenerator,
+    },
     ProofGenerator,
 };
 
