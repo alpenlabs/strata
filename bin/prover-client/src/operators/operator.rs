@@ -15,6 +15,12 @@ use crate::{
     hosts::{resolve_host, ZkVmHostInstance},
 };
 
+/// A struct that manages various proof operators, each corresponding to a distinct proof type.
+///
+/// The `ProofOperator` provides initialization, accessors, and methods for orchestrating
+/// proof generation and processing. It is designed to encapsulate multiple operators
+/// implementing the `ProvingOp` trait while handling the trait's lack of object safety
+/// by organizing operations through this struct.
 #[derive(Debug, Clone)]
 pub struct ProofOperator {
     btc_blockspace_operator: BtcBlockspaceOperator,
@@ -26,6 +32,7 @@ pub struct ProofOperator {
 }
 
 impl ProofOperator {
+    /// Creates a new instance of `ProofOperator` with the provided proof operators.
     pub fn new(
         btc_blockspace_operator: BtcBlockspaceOperator,
         l1_batch_operator: L1BatchOperator,
@@ -44,12 +51,15 @@ impl ProofOperator {
         }
     }
 
+    /// Initializes a `ProofOperator` by creating and configuring the underlying proof operators.
     pub fn init(
         btc_client: BitcoinClient,
         evm_ee_client: HttpClient,
         cl_client: HttpClient,
     ) -> Self {
         let btc_client = Arc::new(btc_client);
+
+        // Create each operator using the respective clients.
         let btc_blockspace_operator = BtcBlockspaceOperator::new(btc_client.clone());
         let l1_batch_operator = L1BatchOperator::new(
             btc_client.clone(),
@@ -75,6 +85,7 @@ impl ProofOperator {
         )
     }
 
+    /// Asynchronously generates a proof using the specified operator and host environment.
     pub async fn prove(
         operator: &impl ProvingOp,
         proof_key: &ProofKey,
@@ -92,6 +103,7 @@ impl ProofOperator {
         }
     }
 
+    /// Processes a proof generation task by delegating to the appropriate proof operator.
     pub async fn process_proof(
         &self,
         proof_key: &ProofKey,
@@ -119,26 +131,32 @@ impl ProofOperator {
         }
     }
 
+    /// Returns a reference to the [`BtcBlockspaceOperator`].
     pub fn btc_operator(&self) -> &BtcBlockspaceOperator {
         &self.btc_blockspace_operator
     }
 
+    /// Returns a reference to the [`L1BatchOperator`]
     pub fn l1_batch_operator(&self) -> &L1BatchOperator {
         &self.l1_batch_operator
     }
 
+    /// Returns a reference to the [`EvmEeOperator`].
     pub fn evm_ee_operator(&self) -> &EvmEeOperator {
         &self.evm_ee_operator
     }
 
+    /// Returns a reference to the [`ClStfOperator`].
     pub fn cl_stf_operator(&self) -> &ClStfOperator {
         &self.cl_stf_operator
     }
 
+    /// Returns a reference to the [`ClAggOperator`].
     pub fn cl_agg_operator(&self) -> &ClAggOperator {
         &self.cl_agg_operator
     }
 
+    /// Returns a reference to the [`CheckpointOperator`].
     pub fn checkpoint_operator(&self) -> &CheckpointOperator {
         &self.checkpoint_operator
     }

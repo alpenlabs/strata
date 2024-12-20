@@ -25,9 +25,10 @@ static CL_AGG_HOST: LazyLock<Risc0Host> =
 static CHECKPOINT_HOST: LazyLock<Risc0Host> =
     std::sync::LazyLock::new(|| Risc0Host::init(GUEST_RISC0_CHECKPOINT_ELF));
 
-/// Returns a reference to the appropriate `Risc0Host` instance based on the given `ProofContext`.
+/// Returns a reference to the appropriate [`Risc0Host`] instance based on the given
+/// [`ProofContext`].
 ///
-/// This function maps the `ProofContext` variant to its corresponding static `Risc0Host`
+/// This function maps the [`ProofContext`] variant to its corresponding static [`Risc0Host`]
 /// instance, allowing for efficient host selection for different proof types.
 pub fn get_host(id: &ProofContext) -> &'static Risc0Host {
     match id {

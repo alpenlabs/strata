@@ -15,9 +15,10 @@ use strata_proofimpl_l1_batch::process_l1_batch_proof;
 /// required by a function signature, but actual verification is skipped.
 const MOCK_VK: [u32; 8] = [0u32; 8];
 
-/// Returns a reference to the appropriate `NativeHost` instance based on the given `ProofContext`.
+/// Returns a reference to the appropriate [`NativeHost`] instance based on the given
+/// [`ProofContext`].
 ///
-/// This function maps the `ProofContext` variant to its corresponding `NativeHost` instance,
+/// This function maps the `ProofContext` variant to its corresponding [`NativeHost`] instance,
 /// allowing for efficient host selection for different proof types.
 pub fn get_host(id: &ProofContext) -> NativeHost {
     match id {
