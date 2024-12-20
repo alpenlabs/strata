@@ -1,6 +1,9 @@
 //! Macro trait def for the `strata_` RPC namespace using jsonrpsee.
 use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use strata_block_assembly::{
+    BlockCompletionData, BlockGenerationConfig, BlockTemplate, SequencerDuty,
+};
 use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
@@ -173,6 +176,19 @@ pub trait StrataSequencerApi {
 
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
+
+    #[method(name = "strata_getSequencerDuties")]
+    async fn get_sequencer_duties(&self) -> RpcResult<Vec<SequencerDuty>>;
+
+    #[method(name = "strata_getBlockTemplate")]
+    async fn get_block_template(&self, config: BlockGenerationConfig) -> RpcResult<BlockTemplate>;
+
+    #[method(name = "strata_completeBlockTemplate")]
+    async fn complete_block_template(
+        &self,
+        template_id: L2BlockId,
+        completion: BlockCompletionData,
+    ) -> RpcResult<L2BlockId>;
 }
 
 /// rpc endpoints that are only available for debugging purpose and subject to change.
