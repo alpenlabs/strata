@@ -13884,6 +13884,7 @@ dependencies = [
  "bincode",
  "bitcoin",
  "borsh",
+ "cfg-if",
  "hex",
  "serde_json",
  "strata-native-zkvm-adapter",

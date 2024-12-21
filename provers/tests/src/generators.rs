@@ -1,5 +1,5 @@
 use core::panic;
-use std::{collections::HashMap, sync::LazyLock};
+use std::collections::HashMap;
 
 use btc::BtcBlockProofGenerator;
 use checkpoint::CheckpointProofGenerator;
@@ -7,31 +7,8 @@ use cl::ClProofGenerator;
 use el::ElProofGenerator;
 use l1_batch::L1BatchProofGenerator;
 use l2_batch::L2BatchProofGenerator;
-use strata_native_zkvm_adapter::NativeHost;
-#[cfg(feature = "risc0")]
-use strata_risc0_adapter::Risc0Host;
-#[cfg(feature = "sp1")]
-use strata_sp1_adapter::SP1Host;
 use strata_zkvm::ZkVmHost;
-#[cfg(feature = "risc0")]
-use strata_zkvm_hosts::get_risc0_host;
-#[cfg(feature = "sp1")]
-use strata_zkvm_hosts::get_sp1_host;
-use strata_zkvm_hosts::{get_native_host, ProofVm};
-
-/// Test prover generator for the SP1 Host.
-#[cfg(feature = "sp1")]
-pub static TEST_SP1_GENERATORS: LazyLock<TestProverGenerators<SP1Host>> =
-    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_sp1_host(vm).clone()));
-
-/// Test prover generator for the RISC0 Host.
-#[cfg(feature = "risc0")]
-pub static TEST_RISC0_GENERATORS: LazyLock<TestProverGenerators<Risc0Host>> =
-    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_risc0_host(vm).clone()));
-
-/// Test prover generator for the Native Host.
-pub static TEST_NATIVE_GENERATORS: LazyLock<TestProverGenerators<NativeHost>> =
-    std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| get_native_host(vm).clone()));
+use strata_zkvm_hosts::ProofVm;
 
 use super::{btc, checkpoint, cl, el, l1_batch, l2_batch};
 
