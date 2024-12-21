@@ -13,24 +13,15 @@ use strata_zkvm_tests::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut res = evaluate_performance(&*TEST_SP1_GENERATORS, "SP1".to_owned()).await;
-    //es = res.and(evaluate_performance(&*TEST_RISC0_GENERATORS, "RISC0".to_owned()).await);
-    res = res.and(evaluate_performance(&*TEST_NATIVE_GENERATORS, "NATIVE".to_owned()).await);
-    res
-}
+    let sp1_reports = evaluate_performance(&*TEST_SP1_GENERATORS).await?;
+    //evaluate_performance(&*TEST_RISC0_GENERATORS).await?;
+    let native_reports = evaluate_performance(&*TEST_NATIVE_GENERATORS).await?;
 
-pub async fn evaluate_performance<H: ZkVmHostPerf>(
-    generators: &TestProverGenerators<H>,
-    host_name: String,
-) -> Result<(), Box<dyn std::error::Error>> {
     let args = EvalArgs::parse();
-    sp1_sdk::utils::setup_logger();
 
-    let reports = run_generator_programs(generators);
-    // Prepare and format the results.
-    let reports_len = reports.len();
-    let success_count = reports.iter().filter(|r| r.success).count();
-    let results_text = format_results(&args, &reports, host_name);
+    let mut results_text = vec![format_header(&args)];
+    results_text.push(format_results(&sp1_reports, "SP1".to_owned()));
+    results_text.push(format_results(&native_reports, "NATIVE".to_owned()));
 
     // Print results
     println!("{}", results_text.join("\n"));
@@ -51,14 +42,25 @@ pub async fn evaluate_performance<H: ZkVmHostPerf>(
         }
     }
 
-    // Exit with an error if any programs failed.
-    let all_successful = success_count == reports_len;
-    if !all_successful {
+    if !native_reports
+        .iter()
+        .chain(sp1_reports.iter())
+        .all(|r| r.success)
+    {
         println!("Some programs failed. Please check the results above.");
         std::process::exit(1);
     }
 
     Ok(())
+}
+
+pub async fn evaluate_performance<H: ZkVmHostPerf>(
+    generators: &TestProverGenerators<H>,
+) -> Result<Vec<PerformanceReport>, Box<dyn std::error::Error>> {
+    //sp1_sdk::utils::setup_logger();
+
+    let reports = run_generator_programs(generators);
+    Ok(reports)
 }
 
 #[derive(Debug, Serialize)]
@@ -104,11 +106,7 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     reports
 }
 
-fn format_results(
-    args: &EvalArgs,
-    results: &[PerformanceReport],
-    host_name: String,
-) -> Vec<String> {
+fn format_header(args: &EvalArgs) -> String {
     let mut detail_text = String::new();
     if let Some(branch_name) = &args.branch_name {
         detail_text.push_str(&format!("*Branch*: {}\n", branch_name));
@@ -119,9 +117,12 @@ fn format_results(
     if let Some(author) = &args.author {
         detail_text.push_str(&format!("*Author*: {}\n", author));
     }
+    detail_text
+}
 
+fn format_results(results: &[PerformanceReport], host_name: String) -> String {
     let mut table_text = String::new();
-    table_text.push_str("```\n");
+    table_text.push_str("\n");
     table_text.push_str("| program           | cycles      | execute (mHz)  | core (kHZ)     | compress (KHz) | time   | success  |\n");
     table_text.push_str("|-------------------|-------------|----------------|----------------|----------------|--------|----------|");
 
@@ -137,13 +138,9 @@ fn format_results(
             if result.success { "✅" } else { "❌" }
         ));
     }
-    table_text.push_str("\n```");
+    table_text.push_str("\n");
 
-    vec![
-        format!("*{} Performance Test Results*\n", host_name),
-        detail_text,
-        table_text,
-    ]
+    format!("*{} Performance Test Results*\n {}", host_name, table_text)
 }
 
 pub fn time_operation<T, F: FnOnce() -> T>(operation: F) -> (T, Duration) {
@@ -179,22 +176,9 @@ fn format_duration(duration: f64) -> String {
 fn format_github_message(results_text: &[String]) -> String {
     let mut formatted_message = String::new();
 
-    if let Some(title) = results_text.first() {
-        // Add an extra asterisk for GitHub bold formatting
-        formatted_message.push_str(&title.replace('*', "**"));
+    for line in results_text {
+        formatted_message.push_str(&line.replace('*', "**"));
         formatted_message.push('\n');
-    }
-
-    if let Some(details) = results_text.get(1) {
-        // Add an extra asterisk for GitHub bold formatting
-        formatted_message.push_str(&details.replace('*', "**"));
-        formatted_message.push('\n');
-    }
-
-    if let Some(table) = results_text.get(2) {
-        // Remove the triple backticks as GitHub doesn't require them for table formatting
-        let cleaned_table = table.trim_start_matches("```").trim_end_matches("```");
-        formatted_message.push_str(cleaned_table);
     }
 
     formatted_message
