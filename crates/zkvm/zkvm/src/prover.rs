@@ -1,7 +1,7 @@
 use tracing::error;
 
 use crate::{
-    host::ZkVmHost, input::ZkVmInputBuilder, ProofReceipt, ProofReport, ProofType, PublicValues,
+    host::ZkVmHost, input::ZkVmInputBuilder, ProofReceipt, ProofType, PublicValues,
     ZkVmInputResult, ZkVmResult,
 };
 
@@ -41,17 +41,5 @@ pub trait ZkVmProver {
             .inspect_err(|e| error!(%host, ?e, "Failed to process output"))?;
 
         Ok(receipt)
-    }
-
-    /// Outputs the useful performance stats related to proving.
-    fn perf_stats<'a, H>(input: &'a Self::Input, host: &H) -> ZkVmResult<ProofReport>
-    where
-        H: ZkVmHost,
-        H::Input<'a>: ZkVmInputBuilder<'a>,
-    {
-        let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)?;
-        let report = host.perf_report(zkvm_input, Self::proof_type())?;
-
-        Ok(report)
     }
 }

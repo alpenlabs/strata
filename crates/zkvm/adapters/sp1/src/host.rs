@@ -3,8 +3,7 @@ use std::fmt;
 use serde::{de::DeserializeOwned, Serialize};
 use sp1_sdk::{HashableKey, ProverClient, SP1ProvingKey, SP1VerifyingKey};
 use strata_zkvm::{
-    ProofReport, ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder,
-    ZkVmResult,
+    ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
 };
 
 use crate::{input::SP1ProofInputBuilder, proof::SP1ProofReceipt};
@@ -48,6 +47,11 @@ impl SP1Host {
             proving_key,
             verifying_key,
         }
+    }
+
+    // TODO: consider moving to ZkVkHost trait.
+    pub fn get_elf(&self) -> &[u8] {
+        &self.elf
     }
 }
 
@@ -101,14 +105,6 @@ impl ZkVmHost for SP1Host {
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
 
         Ok(())
-    }
-
-    fn perf_report<'a>(
-        &self,
-        _input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
-        _proof_type: ProofType,
-    ) -> ZkVmResult<ProofReport> {
-        Ok(ProofReport { cycles: 0 })
     }
 }
 

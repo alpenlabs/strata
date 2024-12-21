@@ -20,8 +20,11 @@ impl<H: ZkVmHost> L1BatchProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<L1BatchProver> for L1BatchProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
     type Input = (u32, u32);
+    type P = L1BatchProver;
+    type H = H;
+
     fn get_input(&self, heights: &(u32, u32)) -> ZkVmResult<L1BatchProofInput> {
         let (start_height, end_height) = *heights;
 
@@ -50,7 +53,7 @@ impl<H: ZkVmHost> ProofGenerator<L1BatchProver> for L1BatchProofGenerator<H> {
         format!("l1_batch_{}_{}", start_height, end_height)
     }
 
-    fn get_host(&self) -> impl ZkVmHost {
+    fn get_host(&self) -> H {
         self.host.clone()
     }
 }
@@ -58,7 +61,6 @@ impl<H: ZkVmHost> ProofGenerator<L1BatchProver> for L1BatchProofGenerator<H> {
 #[cfg(test)]
 mod test {
     use strata_test_utils::l2::gen_params;
-    use strata_zkvm::ZkVmHost;
 
     use super::*;
 
@@ -76,21 +78,18 @@ mod test {
     #[test]
     #[cfg(not(any(feature = "risc0", feature = "sp1")))]
     fn test_native() {
-        use crate::provers::TEST_NATIVE_GENERATORS;
-        test_proof(TEST_NATIVE_GENERATORS.l1_batch());
+        test_proof(crate::TEST_NATIVE_GENERATORS.l1_batch());
     }
 
     #[test]
     #[cfg(feature = "risc0")]
     fn test_risc0() {
-        use crate::provers::TEST_RISC0_GENERATORS;
-        test_proof(TEST_RISC0_GENERATORS.l1_batch());
+        test_proof(crate::TEST_RISC0_GENERATORS.l1_batch());
     }
 
     #[test]
     #[cfg(feature = "sp1")]
     fn test_sp1() {
-        use crate::provers::TEST_SP1_GENERATORS;
-        test_proof(TEST_SP1_GENERATORS.l1_batch());
+        test_proof(crate::TEST_SP1_GENERATORS.l1_batch());
     }
 }

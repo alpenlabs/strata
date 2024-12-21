@@ -1,8 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use strata_zkvm::{
-    Proof, ProofReceipt, ProofReport, ProofType, PublicValues, VerificationKey, ZkVmError,
-    ZkVmHost, ZkVmResult,
+    Proof, ProofReceipt, ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmResult,
 };
 
 use crate::{env::NativeMachine, input::NativeMachineInputBuilder, proof::NativeProofReceipt};
@@ -44,14 +43,6 @@ impl ZkVmHost for NativeHost {
 
     fn verify_inner(&self, _proof: &NativeProofReceipt) -> ZkVmResult<()> {
         Ok(())
-    }
-
-    fn perf_report<'a>(
-        &self,
-        _input: NativeMachine,
-        _proof_type: ProofType,
-    ) -> ZkVmResult<ProofReport> {
-        Ok(ProofReport { cycles: 0 })
     }
 }
 
