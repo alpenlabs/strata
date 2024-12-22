@@ -4,11 +4,12 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from utils import generate_n_blocks, wait_until, wait_until_with_value
+import testenv
+from utils import generate_n_blocks, submit_da_blob, wait_until, wait_until_with_value, get_envelope_pushdata
 
 
 @flexitest.register
-class ResubmitCheckpointTest(flexitest.Test):
+class ResubmitCheckpointTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
@@ -43,24 +44,14 @@ class ResubmitCheckpointTest(flexitest.Test):
             try:
                 envelope_data = get_envelope_pushdata(tx.witness_data().hex())
             except ValueError:
-                print("NOt a envelope transaction")
+                print("Not an envelope transaction")
                 continue
 
-        # submit envelope data
-        _ = seqrpc.strataadmin_submitDABlob(envelope_data)
 
-        # Allow some time for sequencer to get the blob
-        time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
-
-        l1_status = seqrpc.strata_l1status()
-        txid = l1_status["last_published_txid"]
-
+        tx = submit_da_blob(btcrpc, seqrpc, envelope_data)
         # Calculate scriptbpubkey for sequencer address
         addrdata = btcrpc.proxy.validateaddress(seqaddr)
         scriptpubkey = addrdata["scriptPubKey"]
-
-        # Check if txn is present in mempool/blockchain and is spent to sequencer address
-        tx = btcrpc.gettransaction(txid)
 
         # NOTE: could have just compared address
         # but bitcoinlib is somehow giving bc1* addr even though network is regtest
@@ -68,18 +59,13 @@ class ResubmitCheckpointTest(flexitest.Test):
             tx.outputs[0].lock_script.hex() == scriptpubkey
         ), "Output should be locked to sequencer's scriptpubkey"
 
+        # ensure that client is still up and running
+        wait_until(lambda: seqrpc.strata_protocolVersion() is not None,
+                   error_with="sequencer rpc is not working")
+
+        # check if chain tip is being increased
+        cur_chain_tip = seqrpc.strata_clientStatus()['chain_tip_slot']
+        wait_until(lambda: seqrpc.strata_clientStatus()['chain_tip_slot'] > cur_chain_tip,
+                   "chain tip slot hasn't changed since resubmit of checkpoint blob")
+
         return True
-
-
-def get_envelope_pushdata(inp: str):
-    op_if = "63"
-    op_endif = "68"
-    op_pushbytes_33 = "21"
-    op_false = "00"
-    start_position = inp.index(f"{op_false}{op_if}")
-    end_position = inp.index(f"{op_endif}{op_pushbytes_33}", start_position)
-    op_if_block = inp[start_position + 3 : end_position]
-    op_pushdata = "4d"
-    pushdata_position = op_if_block.index(f"{op_pushdata}")
-    # we don't want PUSHDATA + num bytes b401
-    return op_if_block[pushdata_position + 2 + 4 :]

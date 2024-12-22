@@ -8,6 +8,7 @@ from threading import Thread
 from typing import Any, Callable, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
+from seqrpc import JsonrpcClient
 from strata_utils import convert_to_xonly_pk, musig_aggregate_pks
 
 from constants import *
@@ -464,3 +465,30 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     logger.addHandler(stream_handler)
 
     return logger
+
+def get_envelope_pushdata(inp: str):
+    op_if = "63"
+    op_endif = "68"
+    op_pushbytes_33 = "21"
+    op_false = "00"
+    start_position = inp.index(f"{op_false}{op_if}")
+    end_position = inp.index(f"{op_endif}{op_pushbytes_33}", start_position)
+    op_if_block = inp[start_position + 3 : end_position]
+    op_pushdata = "4d"
+    pushdata_position = op_if_block.index(f"{op_pushdata}")
+    # we don't want PUSHDATA + num bytes b401
+    return op_if_block[pushdata_position + 2 + 4 :]
+
+def submit_da_blob(btcrpc: BitcoindClient , seqrpc: JsonrpcClient, blobdata: str):
+    _ = seqrpc.strataadmin_submitDABlob(blobdata)
+
+    # Allow some time for sequencer to publish blob
+    time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
+
+    l1_status = seqrpc.strata_l1status()
+    txid = l1_status["last_published_txid"]
+
+    tx = btcrpc.gettransaction(txid)
+    return tx
+
+
