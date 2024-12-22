@@ -8,10 +8,10 @@ from threading import Thread
 from typing import Any, Callable, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
-from seqrpc import JsonrpcClient
 from strata_utils import convert_to_xonly_pk, musig_aggregate_pks
 
 from constants import *
+from seqrpc import JsonrpcClient
 
 
 def generate_jwt_secret() -> str:

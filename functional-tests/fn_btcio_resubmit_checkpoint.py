@@ -1,16 +1,14 @@
-import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
-from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
 import testenv
 from utils import (
     generate_n_blocks,
+    get_envelope_pushdata,
     submit_da_blob,
     wait_until,
     wait_until_with_value,
-    get_envelope_pushdata,
 )
 
 
