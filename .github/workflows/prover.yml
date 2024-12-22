@@ -40,6 +40,12 @@ jobs:
           export PATH=~/.sp1/bin:$PATH
           cargo prove --version
 
+      - name: Install RISC0 Toolchain
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 https://risczero.com/install | bash && ~/.risc0/bin/rzup install
+          export PATH=~/.risc0/bin:$PATH
+          cargo risczero --version
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
