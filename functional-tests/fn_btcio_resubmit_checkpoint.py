@@ -5,7 +5,13 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
 import testenv
-from utils import generate_n_blocks, submit_da_blob, wait_until, wait_until_with_value, get_envelope_pushdata
+from utils import (
+    generate_n_blocks,
+    submit_da_blob,
+    wait_until,
+    wait_until_with_value,
+    get_envelope_pushdata,
+)
 
 
 @flexitest.register
@@ -47,7 +53,6 @@ class ResubmitCheckpointTest(testenv.StrataTester):
                 print("Not an envelope transaction")
                 continue
 
-
         tx = submit_da_blob(btcrpc, seqrpc, envelope_data)
         # Calculate scriptbpubkey for sequencer address
         addrdata = btcrpc.proxy.validateaddress(seqaddr)
@@ -60,12 +65,16 @@ class ResubmitCheckpointTest(testenv.StrataTester):
         ), "Output should be locked to sequencer's scriptpubkey"
 
         # ensure that client is still up and running
-        wait_until(lambda: seqrpc.strata_protocolVersion() is not None,
-                   error_with="sequencer rpc is not working")
+        wait_until(
+            lambda: seqrpc.strata_protocolVersion() is not None,
+            error_with="sequencer rpc is not working",
+        )
 
         # check if chain tip is being increased
-        cur_chain_tip = seqrpc.strata_clientStatus()['chain_tip_slot']
-        wait_until(lambda: seqrpc.strata_clientStatus()['chain_tip_slot'] > cur_chain_tip,
-                   "chain tip slot hasn't changed since resubmit of checkpoint blob")
+        cur_chain_tip = seqrpc.strata_clientStatus()["chain_tip_slot"]
+        wait_until(
+            lambda: seqrpc.strata_clientStatus()["chain_tip_slot"] > cur_chain_tip,
+            "chain tip slot hasn't changed since resubmit of checkpoint blob",
+        )
 
         return True

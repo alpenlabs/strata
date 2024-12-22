@@ -466,6 +466,7 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
 
     return logger
 
+
 def get_envelope_pushdata(inp: str):
     op_if = "63"
     op_endif = "68"
@@ -479,7 +480,8 @@ def get_envelope_pushdata(inp: str):
     # we don't want PUSHDATA + num bytes b401
     return op_if_block[pushdata_position + 2 + 4 :]
 
-def submit_da_blob(btcrpc: BitcoindClient , seqrpc: JsonrpcClient, blobdata: str):
+
+def submit_da_blob(btcrpc: BitcoindClient, seqrpc: JsonrpcClient, blobdata: str):
     _ = seqrpc.strataadmin_submitDABlob(blobdata)
 
     # Allow some time for sequencer to publish blob
@@ -490,5 +492,3 @@ def submit_da_blob(btcrpc: BitcoindClient , seqrpc: JsonrpcClient, blobdata: str
 
     tx = btcrpc.gettransaction(txid)
     return tx
-
-
