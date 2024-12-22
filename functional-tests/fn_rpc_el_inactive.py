@@ -7,6 +7,11 @@ from utils import wait_until
 
 @flexitest.register
 class SeqStatusElInactiveTest(testenv.StrataTester):
+    """
+    Test that checks the behavior of client RPC when reth is down and ability to produce blocks
+    when reth is up again
+    """
+
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
@@ -53,10 +58,10 @@ class SeqStatusElInactiveTest(testenv.StrataTester):
             error_with="Sequencer stopped after Reth stopped",
         )
 
-        #check if new l1 blocks are being recognized
-        cur_l1_height = seqrpc.strata_l1status()['cur_height']
+        # check if new l1 blocks are being recognized
+        cur_l1_height = seqrpc.strata_l1status()["cur_height"]
         wait_until(
-            lambda: seqrpc.strata_l1status()['cur_height'] > cur_l1_height,
+            lambda: seqrpc.strata_l1status()["cur_height"] > cur_l1_height,
             error_with="Sequencer stopped after Reth stopped",
         )
 
