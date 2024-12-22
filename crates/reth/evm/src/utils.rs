@@ -34,7 +34,8 @@ pub fn collect_withdrawal_intents(
             WithdrawalIntentEvent::decode_log(&log, true)
                 .map(|evt| WithdrawalIntent {
                     amt: evt.amount,
-                    dest_pk: evt.dest_pk,
+                    txid: evt.txid,
+                    vout: evt.vout,
                 })
                 .ok()
         })
