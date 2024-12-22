@@ -297,6 +297,9 @@ where
                 if let Ok(msg) = msg {
                     let payload = msg.payload();
                     let parsed_payload = borsh::from_slice::<Payload>(payload);
+                    let scope = msg.scope();
+                    let parsed_scope = borsh::from_slice::<Scope>(scope);
+                    debug!(msg = ?msg, payload = ?parsed_payload, scope = ?parsed_scope, "got message from the L2 Client");
 
                     match parsed_payload {
                         Ok(payload) => Some((msg.source_id(), payload)),

@@ -15,7 +15,10 @@ use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcBridgeDuties;
 use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
 use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeDutyIndexOps};
-use tokio::{task::JoinSet, time::sleep};
+use tokio::{
+    task::JoinSet,
+    time::{sleep, timeout},
+};
 use tracing::{error, info, trace, warn};
 
 pub(super) struct TaskManager<L2Client, TxBuildContext, Bcast>
@@ -36,13 +39,20 @@ where
     TxBuildContext: BuildContext + Sync + Send + 'static,
     Bcast: Broadcaster + Sync + Send + 'static,
 {
-    pub(super) async fn start(&self, duty_polling_interval: Duration) -> anyhow::Result<()> {
+    pub(super) async fn start(
+        &self,
+        duty_polling_interval: Duration,
+        duty_timeout_duration: Duration,
+    ) -> anyhow::Result<()> {
+        info!(?duty_polling_interval, "Starting to poll for duties");
         loop {
             let RpcBridgeDuties {
                 duties,
                 start_index,
                 stop_index,
             } = self.poll_duties().await?;
+
+            info!(num_duties = duties.len(), "got duties");
 
             let mut handles = JoinSet::new();
             for duty in duties {
@@ -54,22 +64,26 @@ where
                 });
             }
 
-            let any_failed = handles.join_all().await.iter().any(|res| res.is_err());
-
-            // if none of the duties failed, update the duty index so that the
-            // next batch is fetched in the next poll.
-            //
-            // otherwise, don't update the index so that the current batch is refetched and
-            // ones that were not executed successfully are executed again.
-            if !any_failed {
-                info!(%start_index, %stop_index, "updating duty index");
-                if let Err(e) = self
-                    .bridge_duty_idx_db_ops
-                    .set_index_async(stop_index)
-                    .await
-                {
-                    error!(error = %e, %start_index, %stop_index, "could not update duty index");
+            // TODO: There should be timeout duration based on duty and not a common timeout
+            // duration
+            if let Ok(any_failed) = timeout(duty_timeout_duration, handles.join_all()).await {
+                // if none of the duties failed, update the duty index so that the
+                // next batch is fetched in the next poll.
+                //
+                // otherwise, don't update the index so that the current batch is refetched and
+                // ones that were not executed successfully are executed again.
+                if !any_failed.iter().any(|res| res.is_err()) {
+                    info!(%start_index, %stop_index, "updating duty index");
+                    if let Err(e) = self
+                        .bridge_duty_idx_db_ops
+                        .set_index_async(stop_index)
+                        .await
+                    {
+                        error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                    }
                 }
+            } else {
+                error!(?duty_timeout_duration, "some duties timed out");
             }
 
             sleep(duty_polling_interval).await;
