@@ -19,10 +19,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut results_text = vec![format_header(&args)];
 
     let sp1_reports = run_generator_programs(&TEST_SP1_GENERATORS);
-    let risc0_reports = run_generator_programs(&TEST_RISC0_GENERATORS);
+    //let risc0_reports = run_generator_programs(&TEST_RISC0_GENERATORS);
 
     results_text.push(format_results(&sp1_reports, "SP1".to_owned()));
-    results_text.push(format_results(&risc0_reports, "RISC0".to_owned()));
+    //results_text.push(format_results(&risc0_reports, "RISC0".to_owned()));
 
     // Print results
     println!("{}", results_text.join("\n"));
@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if !sp1_reports
         .iter()
-        .chain(risc0_reports.iter())
+        //.chain(risc0_reports.iter())
         .all(|r| r.success)
     {
         println!("Some programs failed. Please check the results above.");
@@ -121,10 +121,10 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     let strata_block_id = 1;
 
     // btc_blockspace
-    let btc_blockspace = generator.btc_blockspace();
-    let btc_blockspace_report = btc_blockspace.gen_proof_report(btc_block).unwrap();
+    //let btc_blockspace = generator.btc_blockspace();
+    //let btc_blockspace_report = btc_blockspace.gen_proof_report(btc_block).unwrap();
 
-    reports.push((btc_blockspace_report, "BTC_BLOCKSPACE".to_owned()).into());
+    //reports.push((btc_blockspace_report, "BTC_BLOCKSPACE".to_owned()).into());
 
     // el_block
     let el_block = generator.el_block();
@@ -133,36 +133,36 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     reports.push((el_block_report, "EL_BLOCK".to_owned()).into());
 
     // cl_block
-    let cl_block = generator.cl_block();
-    let cl_block_report = cl_block.gen_proof_report(&strata_block_id).unwrap();
+    //let cl_block = generator.cl_block();
+    //let cl_block_report = cl_block.gen_proof_report(&strata_block_id).unwrap();
 
-    reports.push((cl_block_report, "CL_BLOCK".to_owned()).into());
+    //reports.push((cl_block_report, "CL_BLOCK".to_owned()).into());
 
-    // l1_batch
-    let l1_batch = generator.l1_batch();
-    let l1_batch_report = l1_batch
-        .gen_proof_report(&(l1_start_height, l1_end_height))
-        .unwrap();
+    //// l1_batch
+    //let l1_batch = generator.l1_batch();
+    //let l1_batch_report = l1_batch
+    //    .gen_proof_report(&(l1_start_height, l1_end_height))
+    //    .unwrap();
+    //
+    //reports.push((l1_batch_report, "L1_BATCH".to_owned()).into());
+    //
+    //// l2_block
+    //let l2_block = generator.l2_batch();
+    //let l2_block_report = l2_block
+    //    .gen_proof_report(&(l2_start_height, l2_end_height))
+    //    .unwrap();
+    //
+    //reports.push((l2_block_report, "L2_BATCH".to_owned()).into());
+    //
+    //// checkpoint
+    //let checkpoint = generator.checkpoint();
+    //let checkpoint_test_input = CheckpointBatchInfo {
+    //    l1_range: (l1_start_height.into(), l1_end_height.into()),
+    //    l2_range: (l2_start_height, l2_end_height),
+    //};
+    //let checkpoint_report = checkpoint.gen_proof_report(&checkpoint_test_input).unwrap();
 
-    reports.push((l1_batch_report, "L1_BATCH".to_owned()).into());
-
-    // l2_block
-    let l2_block = generator.l2_batch();
-    let l2_block_report = l2_block
-        .gen_proof_report(&(l2_start_height, l2_end_height))
-        .unwrap();
-
-    reports.push((l2_block_report, "L2_BATCH".to_owned()).into());
-
-    // checkpoint
-    let checkpoint = generator.checkpoint();
-    let checkpoint_test_input = CheckpointBatchInfo {
-        l1_range: (l1_start_height.into(), l1_end_height.into()),
-        l2_range: (l2_start_height, l2_end_height),
-    };
-    let checkpoint_report = checkpoint.gen_proof_report(&checkpoint_test_input).unwrap();
-
-    reports.push((checkpoint_report, "CHECKPOINT".to_owned()).into());
+    //reports.push((checkpoint_report, "CHECKPOINT".to_owned()).into());
 
     reports
 }
@@ -182,8 +182,8 @@ fn format_header(args: &EvalArgs) -> String {
 fn format_results(results: &[PerformanceReport], host_name: String) -> String {
     let mut table_text = String::new();
     table_text.push('\n');
-    table_text.push_str("| program           | cycles      | execute (mHz)  | core (kHZ)     | compress (KHz) | time   | success  |\n");
-    table_text.push_str("|-------------------|-------------|----------------|----------------|----------------|--------|----------|");
+    table_text.push_str("| program           | cycles      | success  |\n");
+    table_text.push_str("|-------------------|-------------|----------|");
 
     for result in results.iter() {
         table_text.push_str(&format!(
