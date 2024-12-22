@@ -25,6 +25,11 @@ impl Risc0Host {
             id,
         }
     }
+
+    // TODO: consider moving to ZkVkHost trait.
+    pub fn get_elf(&self) -> &[u8] {
+        &self.elf
+    }
 }
 
 impl ZkVmHost for Risc0Host {

@@ -6,45 +6,34 @@ use reqwest::Client;
 use serde::Serialize;
 use serde_json::json;
 use strata_provers_perf::{ProofGeneratorPerf, ProofReport, ZkVmHostPerf};
-use strata_test_utils::bitcoin::get_btc_chain;
+use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params};
 use strata_zkvm_tests::{
-    ProofGenerator, TestProverGenerators, TEST_NATIVE_GENERATORS, TEST_SP1_GENERATORS,
+    CheckpointBatchInfo, TestProverGenerators, TEST_RISC0_GENERATORS, TEST_SP1_GENERATORS,
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let sp1_reports = evaluate_performance(&*TEST_SP1_GENERATORS).await?;
-    //evaluate_performance(&*TEST_RISC0_GENERATORS).await?;
-    let native_reports = evaluate_performance(&*TEST_NATIVE_GENERATORS).await?;
-
+    sp1_sdk::utils::setup_logger();
     let args = EvalArgs::parse();
 
     let mut results_text = vec![format_header(&args)];
+
+    let sp1_reports = run_generator_programs(&TEST_SP1_GENERATORS);
+    let risc0_reports = run_generator_programs(&TEST_RISC0_GENERATORS);
+
     results_text.push(format_results(&sp1_reports, "SP1".to_owned()));
-    results_text.push(format_results(&native_reports, "NATIVE".to_owned()));
+    results_text.push(format_results(&risc0_reports, "RISC0".to_owned()));
 
     // Print results
     println!("{}", results_text.join("\n"));
 
     // Post to GitHub PR
-    match (
-        &args.repo_owner,
-        &args.repo_name,
-        &args.pr_number,
-        &args.github_token,
-    ) {
-        (Some(owner), Some(repo), Some(pr_number), Some(token)) => {
-            let message = format_github_message(&results_text);
-            post_to_github_pr(owner, repo, pr_number, token, &message).await?;
-        }
-        _ => {
-            println!("Warning: post_to_github is true, required GitHub arguments are missing.")
-        }
-    }
+    let message = format_github_message(&results_text);
+    post_to_github_pr(&args, &message).await?;
 
-    if !native_reports
+    if !sp1_reports
         .iter()
-        .chain(sp1_reports.iter())
+        .chain(risc0_reports.iter())
         .all(|r| r.success)
     {
         println!("Some programs failed. Please check the results above.");
@@ -54,23 +43,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub async fn evaluate_performance<H: ZkVmHostPerf>(
-    generators: &TestProverGenerators<H>,
-) -> Result<Vec<PerformanceReport>, Box<dyn std::error::Error>> {
-    //sp1_sdk::utils::setup_logger();
+/// Flags for CLI invocation being parsed.
+#[derive(Parser, Clone)]
+#[command(about = "Evaluate the performance of SP1 on programs.")]
+struct EvalArgs {
+    /// The GitHub token for authentication
+    #[arg(long)]
+    pub github_token: String,
 
-    let reports = run_generator_programs(generators);
-    Ok(reports)
+    /// The GitHub repository owner.
+    #[arg(long)]
+    pub repo_owner: String,
+
+    /// The GitHub repository name.
+    #[arg(long)]
+    pub repo_name: String,
+
+    /// The GitHub PR number.
+    #[arg(long)]
+    pub pr_number: String,
+
+    /// The name of the branch.
+    #[arg(long)]
+    pub branch_name: String,
+
+    /// The commit hash.
+    #[arg(long)]
+    pub commit_hash: String,
+
+    /// The author of the commit.
+    #[arg(long)]
+    pub author: String,
 }
 
+/// Basic data about the performance of a certain [`ZkVmProver`].
+///
+/// TODO: Currently, only program and cycles are used, populalate the rest
+/// as part of full execution with timings reporting.
 #[derive(Debug, Serialize)]
 pub struct PerformanceReport {
     program: String,
     cycles: u64,
-    exec_khz: f64,
-    core_khz: f64,
-    compressed_khz: f64,
-    time: f64,
     success: bool,
 }
 
@@ -79,159 +92,131 @@ impl From<(ProofReport, String)> for PerformanceReport {
         PerformanceReport {
             program: value.1,
             cycles: value.0.cycles,
-            exec_khz: 0.0,
-            core_khz: 0.0,
-            compressed_khz: 0.0,
-            time: 0.0,
             success: true,
         }
     }
 }
 
+/// Runs all prover generators from [`TestProverGenerators`] against test inputs.
+///
+/// Generates [`PerformanceReport`] for each invocation.
 fn run_generator_programs<H: ZkVmHostPerf>(
     generator: &TestProverGenerators<H>,
 ) -> Vec<PerformanceReport> {
     let mut reports = vec![];
 
-    let btc_chain = get_btc_chain();
-    let btc_blockspace_input = btc_chain.get_block(40321);
+    // Init test params.
+    let params = gen_params();
+    let rollup_params = params.rollup();
 
+    let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
+    let l1_end_height = l1_start_height + 1;
+
+    let l2_start_height = 1;
+    let l2_end_height = 3;
+
+    let btc_block_id = 40321;
+    let btc_chain = get_btc_chain();
+    let btc_block = btc_chain.get_block(btc_block_id);
+    let strata_block_id = 1;
+
+    // btc_blockspace
     let btc_blockspace = generator.btc_blockspace();
-    let report = btc_blockspace
-        .gen_proof_report(btc_blockspace_input)
+    let btc_blockspace_report = btc_blockspace.gen_proof_report(btc_block).unwrap();
+
+    reports.push((btc_blockspace_report, "BTC_BLOCKSPACE".to_owned()).into());
+
+    // el_block
+    let el_block = generator.el_block();
+    let el_block_report = el_block.gen_proof_report(&strata_block_id).unwrap();
+
+    reports.push((el_block_report, "EL_BLOCK".to_owned()).into());
+
+    // cl_block
+    let cl_block = generator.cl_block();
+    let cl_block_report = cl_block.gen_proof_report(&strata_block_id).unwrap();
+
+    reports.push((cl_block_report, "CL_BLOCK".to_owned()).into());
+
+    // l1_batch
+    let l1_batch = generator.l1_batch();
+    let l1_batch_report = l1_batch
+        .gen_proof_report(&(l1_start_height, l1_end_height))
         .unwrap();
 
-    reports.push((report, btc_blockspace.get_proof_id(btc_blockspace_input)).into());
+    reports.push((l1_batch_report, "L1_BATCH".to_owned()).into());
+
+    // l2_block
+    let l2_block = generator.l2_batch();
+    let l2_block_report = l2_block
+        .gen_proof_report(&(l2_start_height, l2_end_height))
+        .unwrap();
+
+    reports.push((l2_block_report, "L2_BATCH".to_owned()).into());
+
+    // checkpoint
+    let checkpoint = generator.checkpoint();
+    let checkpoint_test_input = CheckpointBatchInfo {
+        l1_range: (l1_start_height.into(), l1_end_height.into()),
+        l2_range: (l2_start_height, l2_end_height),
+    };
+    let checkpoint_report = checkpoint.gen_proof_report(&checkpoint_test_input).unwrap();
+
+    reports.push((checkpoint_report, "CHECKPOINT".to_owned()).into());
 
     reports
 }
 
+/// Returns a formatted header for the performance report with basic PR data.
 fn format_header(args: &EvalArgs) -> String {
     let mut detail_text = String::new();
-    if let Some(branch_name) = &args.branch_name {
-        detail_text.push_str(&format!("*Branch*: {}\n", branch_name));
-    }
-    if let Some(commit_hash) = &args.commit_hash {
-        detail_text.push_str(&format!("*Commit*: {}\n", &commit_hash[..8]));
-    }
-    if let Some(author) = &args.author {
-        detail_text.push_str(&format!("*Author*: {}\n", author));
-    }
+
+    detail_text.push_str(&format!("*Branch*: {}\n", &args.branch_name));
+    detail_text.push_str(&format!("*Commit*: {}\n", &args.commit_hash[..8]));
+    detail_text.push_str(&format!("*Author*: {}\n", &args.author));
+
     detail_text
 }
 
+/// Returns formatted results for the [`PerformanceReport`]s shaped in a table.
 fn format_results(results: &[PerformanceReport], host_name: String) -> String {
     let mut table_text = String::new();
-    table_text.push_str("\n");
+    table_text.push('\n');
     table_text.push_str("| program           | cycles      | execute (mHz)  | core (kHZ)     | compress (KHz) | time   | success  |\n");
     table_text.push_str("|-------------------|-------------|----------------|----------------|----------------|--------|----------|");
 
     for result in results.iter() {
         table_text.push_str(&format!(
-            "\n| {:<17} | {:>11} | {:>14.2} | {:>14.2} | {:>14.2} | {:>6} | {:<7} |",
+            "\n| {:<17} | {:>11} | {:<7} |",
             result.program,
             result.cycles,
-            result.exec_khz / 1000.0,
-            result.core_khz,
-            result.compressed_khz,
-            format_duration(result.time),
             if result.success { "✅" } else { "❌" }
         ));
     }
-    table_text.push_str("\n");
+    table_text.push('\n');
 
     format!("*{} Performance Test Results*\n {}", host_name, table_text)
 }
 
-pub fn time_operation<T, F: FnOnce() -> T>(operation: F) -> (T, Duration) {
-    let start = Instant::now();
-    let result = operation();
-    let duration = start.elapsed();
-    (result, duration)
-}
-
-fn calculate_khz(cycles: u64, duration: Duration) -> f64 {
-    let duration_secs = duration.as_secs_f64();
-    if duration_secs > 0.0 {
-        (cycles as f64 / duration_secs) / 1_000.0
-    } else {
-        0.0
-    }
-}
-
-fn format_duration(duration: f64) -> String {
-    let secs = duration.round() as u64;
-    let minutes = secs / 60;
-    let seconds = secs % 60;
-
-    if minutes > 0 {
-        format!("{}m{}s", minutes, seconds)
-    } else if seconds > 0 {
-        format!("{}s", seconds)
-    } else {
-        format!("{}ms", (duration * 1000.0).round() as u64)
-    }
-}
-
-fn format_github_message(results_text: &[String]) -> String {
-    let mut formatted_message = String::new();
-
-    for line in results_text {
-        formatted_message.push_str(&line.replace('*', "**"));
-        formatted_message.push('\n');
-    }
-
-    formatted_message
-}
-
-#[derive(Parser, Clone)]
-#[command(about = "Evaluate the performance of SP1 on programs.")]
-struct EvalArgs {
-    /// The GitHub token for authentication, only used if post_to_github is true.
-    #[arg(long)]
-    pub github_token: Option<String>,
-
-    /// The GitHub repository owner.
-    #[arg(long)]
-    pub repo_owner: Option<String>,
-
-    /// The GitHub repository name.
-    #[arg(long)]
-    pub repo_name: Option<String>,
-
-    /// The GitHub PR number.
-    #[arg(long)]
-    pub pr_number: Option<String>,
-
-    /// The name of the branch.
-    #[arg(long)]
-    pub branch_name: Option<String>,
-
-    /// The commit hash.
-    #[arg(long)]
-    pub commit_hash: Option<String>,
-
-    /// The author of the commit.
-    #[arg(long)]
-    pub author: Option<String>,
-}
-
+/// Posts the message to the PR on the github.
+///
+/// Updates an existing previous comment (if there is one) or posts a new comment.
 async fn post_to_github_pr(
-    owner: &str,
-    repo: &str,
-    pr_number: &str,
-    token: &str,
+    args: &EvalArgs,
     message: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
-    let base_url = format!("https://api.github.com/repos/{}/{}", owner, repo);
+    let base_url = format!(
+        "https://api.github.com/repos/{}/{}",
+        &args.repo_owner, &args.repo_name
+    );
 
     // Get all comments on the PR
-    let comments_url = format!("{}/issues/{}/comments", base_url, pr_number);
+    let comments_url = format!("{}/issues/{}/comments", base_url, &args.pr_number);
     let comments_response = client
         .get(&comments_url)
-        .header("Authorization", format!("token {}", token))
-        .header("User-Agent", "sp1-perf-bot")
+        .header("Authorization", format!("token {}", &args.github_token))
+        .header("User-Agent", "strata-perf-bot")
         .send()
         .await?;
 
@@ -250,7 +235,7 @@ async fn post_to_github_pr(
         let comment_url = existing_comment["url"].as_str().unwrap();
         let response = client
             .patch(comment_url)
-            .header("Authorization", format!("token {}", token))
+            .header("Authorization", format!("token {}", &args.github_token))
             .header("User-Agent", "sp1-perf-bot")
             .json(&json!({
                 "body": message
@@ -265,8 +250,8 @@ async fn post_to_github_pr(
         // Create a new comment
         let response = client
             .post(&comments_url)
-            .header("Authorization", format!("token {}", token))
-            .header("User-Agent", "sp1-perf-bot")
+            .header("Authorization", format!("token {}", &args.github_token))
+            .header("User-Agent", "strata-perf-bot")
             .json(&json!({
                 "body": message
             }))
@@ -279,4 +264,15 @@ async fn post_to_github_pr(
     }
 
     Ok(())
+}
+
+fn format_github_message(results_text: &[String]) -> String {
+    let mut formatted_message = String::new();
+
+    for line in results_text {
+        formatted_message.push_str(&line.replace('*', "**"));
+        formatted_message.push('\n');
+    }
+
+    formatted_message
 }
