@@ -8,7 +8,9 @@ use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
-use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
+use strata_storage::
+    managers::DbManagers
+;
 use strata_tasks::TaskExecutor;
 use tokio::sync::{broadcast, mpsc};
 
@@ -79,12 +81,11 @@ pub fn start_sync_tasks<
 >(
     executor: &TaskExecutor,
     database: Arc<D>,
-    l2_block_manager: Arc<L2BlockManager>,
+    managers: &DbManagers,
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
     status_channel: StatusChannel,
-    checkpoint_manager: Arc<CheckpointDbManager>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -98,7 +99,7 @@ pub fn start_sync_tasks<
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
     let fcm_database = database.clone();
-    let fcm_l2_block_manager = l2_block_manager.clone();
+    let fcm_l2_block_manager = managers.l2();
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
     let fcm_params = params.clone();
@@ -123,9 +124,9 @@ pub fn start_sync_tasks<
     let client_worker_state = worker::WorkerState::open(
         params.clone(),
         database,
-        l2_block_manager,
+        managers.l2(),
         cupdate_tx,
-        checkpoint_manager,
+        managers.checkpoint(),
     )?;
 
     let csm_engine = engine.clone();
