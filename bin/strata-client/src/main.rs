@@ -31,7 +31,9 @@ use strata_rocksdb::{
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
-    managers::checkpoint::CheckpointDbManager, ops::bridge_relay::BridgeMsgOps, L2BlockManager,
+    managers::{create_db_managers, DbManagers},
+    ops::bridge_relay::BridgeMsgOps,
+    L2BlockManager,
 };
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{init_task_manager, ShutdownSignal, TaskExecutor};
@@ -87,12 +89,13 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     // TODO switch to num_cpus
     let pool = threadpool::ThreadPool::with_name("strata-pool".to_owned(), 8);
 
-    // Open and initialize the database.
+    // Open and initialize rocksdb.
     let rbdb = open_rocksdb_database(&config.client.datadir)?;
     let ops_config = DbOpsConfig::new(config.client.db_retry_count);
 
-    // initialize core databases
+    // Initialize core databases
     let database = init_core_dbs(rbdb.clone(), ops_config);
+    let managers = create_db_managers(database.clone(), pool.clone());
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
@@ -100,12 +103,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bridge_msg_ctx = strata_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
-    let checkpoint_manager: Arc<_> =
-        CheckpointDbManager::new(pool.clone(), database.clone()).into();
-    let checkpoint_handle: Arc<_> = CheckpointHandle::new(checkpoint_manager.clone()).into();
+    let checkpoint_handle: Arc<_> = CheckpointHandle::new(managers.checkpoint()).into();
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
-
-    let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
 
     // Check if we have to do genesis.
     if genesis::check_needs_client_init(database.as_ref())? {
@@ -121,8 +120,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         &config,
         params.clone(),
         database,
-        l2_block_manager,
-        checkpoint_manager,
+        &managers,
         bridge_msg_ops,
         bitcoin_client,
     )?;
@@ -297,8 +295,7 @@ fn start_core_tasks(
     config: &Config,
     params: Arc<Params>,
     database: Arc<CommonDb>,
-    l2_block_manager: Arc<L2BlockManager>,
-    checkpoint_manager: Arc<CheckpointDbManager>,
+    managers: &DbManagers,
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
@@ -309,7 +306,7 @@ fn start_core_tasks(
         config,
         database.clone(),
         params.as_ref(),
-        l2_block_manager.clone(),
+        managers.l2(),
         executor.handle(),
     )?;
 
@@ -325,12 +322,11 @@ fn start_core_tasks(
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
         database.clone(),
-        l2_block_manager.clone(),
+        managers,
         engine.clone(),
         pool.clone(),
         params.clone(),
         status_channel.clone(),
-        checkpoint_manager,
     )?
     .into();
 
@@ -358,7 +354,7 @@ fn start_core_tasks(
         pool,
         params,
         sync_manager,
-        l2_block_manager,
+        l2_block_manager: managers.l2(),
         status_channel,
         engine,
         relayer_handle,
