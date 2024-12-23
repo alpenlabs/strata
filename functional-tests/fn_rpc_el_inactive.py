@@ -40,7 +40,7 @@ class SeqStatusElInactiveTest(testenv.StrataTester):
         wait_until(
             lambda: web3.eth.get_balance(dest) == to_transfer * 3,
             error_with="Balance transfer not successful",
-            timeout=10
+            timeout=10,
         )
         reth.stop()
 
