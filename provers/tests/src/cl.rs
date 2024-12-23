@@ -58,14 +58,14 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
 mod tests {
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(cl_prover: ClProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(cl_prover: &ClProofGenerator<H>) {
         let height = 1;
 
         let _ = cl_prover.get_proof(&height).unwrap();
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
+    #[cfg(feature = "native")]
     fn test_native() {
         test_proof(crate::TEST_NATIVE_GENERATORS.cl_block());
     }

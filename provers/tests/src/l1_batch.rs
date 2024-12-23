@@ -59,12 +59,12 @@ impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use strata_test_utils::l2::gen_params;
 
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(l1_batch_proof_generator: L1BatchProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(l1_batch_proof_generator: &L1BatchProofGenerator<H>) {
         let params = gen_params();
         let rollup_params = params.rollup();
         let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
@@ -76,7 +76,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
+    #[cfg(feature = "native")]
     fn test_native() {
         test_proof(crate::TEST_NATIVE_GENERATORS.l1_batch());
     }

@@ -51,72 +51,60 @@ impl<H: ZkVmHost> TestProverGenerators<H> {
             host_provider(ProofVm::Checkpoint),
         );
 
-        generators.insert(
-            ProofVm::BtcProving,
-            TestGenerator::BtcBlock(btc_prover.clone()),
-        );
-        generators.insert(
-            ProofVm::L1Batch,
-            TestGenerator::L1Batch(l1_batch_prover.clone()),
-        );
-        generators.insert(
-            ProofVm::ELProving,
-            TestGenerator::ElBlock(el_prover.clone()),
-        );
-        generators.insert(
-            ProofVm::CLProving,
-            TestGenerator::ClBlock(cl_prover.clone()),
-        );
+        generators.insert(ProofVm::BtcProving, TestGenerator::BtcBlock(btc_prover));
+        generators.insert(ProofVm::L1Batch, TestGenerator::L1Batch(l1_batch_prover));
+        generators.insert(ProofVm::ELProving, TestGenerator::ElBlock(el_prover));
+        generators.insert(ProofVm::CLProving, TestGenerator::ClBlock(cl_prover));
         generators.insert(
             ProofVm::CLAggregation,
-            TestGenerator::L2Batch(l2_batch_prover.clone()),
+            TestGenerator::L2Batch(l2_batch_prover),
         );
         generators.insert(
             ProofVm::Checkpoint,
-            TestGenerator::Checkpoint(checkpoint_prover.clone()),
+            TestGenerator::Checkpoint(checkpoint_prover),
         );
 
         Self { generators }
     }
 
-    pub fn btc_blockspace(&self) -> BtcBlockProofGenerator<H> {
+    pub fn btc_blockspace(&self) -> &BtcBlockProofGenerator<H> {
         match self.generators.get(&ProofVm::BtcProving).unwrap() {
-            TestGenerator::BtcBlock(value) => value.clone(),
+            TestGenerator::BtcBlock(value) => value,
             _ => panic!("unexpected"),
         }
     }
 
-    pub fn el_block(&self) -> ElProofGenerator<H> {
+    pub fn el_block(&self) -> &ElProofGenerator<H> {
         match self.generators.get(&ProofVm::ELProving).unwrap() {
-            TestGenerator::ElBlock(value) => value.clone(),
+            TestGenerator::ElBlock(value) => value,
             _ => panic!("unexpected"),
         }
     }
 
-    pub fn cl_block(&self) -> ClProofGenerator<H> {
+    pub fn cl_block(&self) -> &ClProofGenerator<H> {
         match self.generators.get(&ProofVm::CLProving).unwrap() {
-            TestGenerator::ClBlock(value) => value.clone(),
+            TestGenerator::ClBlock(value) => value,
             _ => panic!("unexpected"),
         }
     }
 
-    pub fn l1_batch(&self) -> L1BatchProofGenerator<H> {
+    pub fn l1_batch(&self) -> &L1BatchProofGenerator<H> {
         match self.generators.get(&ProofVm::L1Batch).unwrap() {
-            TestGenerator::L1Batch(value) => value.clone(),
+            TestGenerator::L1Batch(value) => value,
             _ => panic!("unexpected"),
         }
     }
 
-    pub fn l2_batch(&self) -> L2BatchProofGenerator<H> {
+    pub fn l2_batch(&self) -> &L2BatchProofGenerator<H> {
         match self.generators.get(&ProofVm::CLAggregation).unwrap() {
-            TestGenerator::L2Batch(value) => value.clone(),
+            TestGenerator::L2Batch(value) => value,
             _ => panic!("unexpected"),
         }
     }
 
-    pub fn checkpoint(&self) -> CheckpointProofGenerator<H> {
+    pub fn checkpoint(&self) -> &CheckpointProofGenerator<H> {
         match self.generators.get(&ProofVm::Checkpoint).unwrap() {
-            TestGenerator::Checkpoint(value) => value.clone(),
+            TestGenerator::Checkpoint(value) => value,
             _ => panic!("unexpected"),
         }
     }

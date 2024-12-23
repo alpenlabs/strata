@@ -81,7 +81,7 @@ impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
 }
 
 #[allow(dead_code)]
-fn test_proof<H: ZkVmHost>(checkpoint_prover: CheckpointProofGenerator<H>) {
+fn test_proof<H: ZkVmHost>(checkpoint_prover: &CheckpointProofGenerator<H>) {
     let params = gen_params();
     let rollup_params = params.rollup();
     let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
@@ -101,11 +101,12 @@ fn test_proof<H: ZkVmHost>(checkpoint_prover: CheckpointProofGenerator<H>) {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use super::*;
 
     #[test]
+    #[cfg(feature = "native")]
     fn test_native() {
         test_proof(crate::TEST_NATIVE_GENERATORS.checkpoint());
     }

@@ -15,7 +15,7 @@ strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
 strata-zkvm.workspace = true
-strata-zkvm-hosts = { workspace = true, optional = true }
+strata-zkvm-hosts.workspace = true
 
 anyhow.workspace = true
 bincode.workspace = true

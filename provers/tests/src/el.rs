@@ -41,13 +41,13 @@ mod tests {
 
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(el_prover: ElProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(el_prover: &ElProofGenerator<H>) {
         let height = 1;
         let _ = el_prover.get_proof(&height).unwrap();
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
+    #[cfg(feature = "native")]
     fn test_native() {
         test_proof(crate::TEST_NATIVE_GENERATORS.el_block());
     }

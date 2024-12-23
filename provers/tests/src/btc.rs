@@ -41,12 +41,12 @@ impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use strata_test_utils::bitcoin::get_btc_chain;
 
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(generator: BtcBlockProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(generator: &BtcBlockProofGenerator<H>) {
         let btc_chain = get_btc_chain();
         let block = btc_chain.get_block(40321);
 
@@ -54,9 +54,9 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
+    #[cfg(feature = "native")]
     fn test_native() {
-        test_proof(crate::provers::TEST_NATIVE_GENERATORS.btc_blockspace());
+        test_proof(crate::TEST_NATIVE_GENERATORS.btc_blockspace());
     }
 
     #[test]

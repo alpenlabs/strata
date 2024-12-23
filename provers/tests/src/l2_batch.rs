@@ -47,15 +47,15 @@ impl<H: ZkVmHost> ProofGenerator for L2BatchProofGenerator<H> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(cl_agg_prover: L2BatchProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(cl_agg_prover: &L2BatchProofGenerator<H>) {
         let _ = cl_agg_prover.get_proof(&(1, 3)).unwrap();
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
+    #[cfg(feature = "native")]
     fn test_native() {
         test_proof(crate::TEST_NATIVE_GENERATORS.l2_batch());
     }
