@@ -1,10 +1,9 @@
 use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use alloy_rpc_types::engine::JwtSecret;
-use anyhow::Context;
 use bitcoin::{base58, bip32::Xpriv, Address, Network};
 use format_serde_error::SerdeError;
-use rockbound::{rocksdb, OptimisticTransactionDB};
+use rockbound::OptimisticTransactionDB;
 use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
 use strata_consensus_logic::{
     csm::state_tracker,
@@ -17,7 +16,7 @@ use strata_primitives::{
     buf::Buf32,
     keys::ZeroizableXpriv,
     l1::L1Status,
-    params::{Params, RollupParams},
+    params::{Params, RollupParams, SyncParams},
 };
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainstateDb,
@@ -26,7 +25,7 @@ use strata_rocksdb::{
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 use tracing::*;
 use zeroize::Zeroize;
 
@@ -103,9 +102,23 @@ pub fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
 
 /// Resolves the rollup params file to use, possibly from a path, and validates
 /// it to ensure it passes sanity checks.
-pub fn resolve_and_validate_rollup_params(path: Option<&Path>) -> Result<RollupParams, InitError> {
-    let params = resolve_rollup_params(path)?;
-    params.check_well_formed()?;
+pub fn resolve_and_validate_params(
+    path: Option<&Path>,
+    config: &Config,
+) -> Result<Arc<Params>, InitError> {
+    let rollup_params = resolve_rollup_params(path)?;
+    rollup_params.check_well_formed()?;
+
+    let params = Params {
+        rollup: rollup_params,
+        run: SyncParams {
+            // FIXME these shouldn't be configurable here
+            l1_follow_distance: config.sync.l1_follow_distance,
+            client_checkpoint_interval: config.sync.client_checkpoint_interval,
+            l2_blocks_fetch_limit: config.client.l2_blocks_fetch_limit,
+        },
+    }
+    .into();
     Ok(params)
 }
 
@@ -147,33 +160,6 @@ pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinC
         warn!("network not set to regtest, ignoring");
     }
     Ok(btc_rpc.into())
-}
-
-pub fn open_rocksdb_database(
-    config: &Config,
-) -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
-    let mut database_dir = config.client.datadir.clone();
-    database_dir.push("rocksdb");
-
-    if !database_dir.exists() {
-        fs::create_dir_all(&database_dir)?;
-    }
-
-    let dbname = strata_rocksdb::ROCKSDB_NAME;
-    let cfs = strata_rocksdb::STORE_COLUMN_FAMILIES;
-    let mut opts = rocksdb::Options::default();
-    opts.create_if_missing(true);
-    opts.create_missing_column_families(true);
-
-    let rbdb = rockbound::OptimisticTransactionDB::open(
-        &database_dir,
-        dbname,
-        cfs.iter().map(|s| s.to_string()),
-        &opts,
-    )
-    .context("opening database")?;
-
-    Ok(Arc::new(rbdb))
 }
 
 /// Loads sequencer identity data from the root key at the specified path.
@@ -230,7 +216,7 @@ pub fn init_engine_controller(
     db: Arc<CommonDb>,
     params: &Params,
     l2_block_manager: Arc<L2BlockManager>,
-    runtime: &Runtime,
+    handle: &Handle,
 ) -> anyhow::Result<Arc<RpcExecEngineCtl<EngineRpcClient>>> {
     let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
     let client = EngineRpcClient::from_url_secret(
@@ -242,7 +228,7 @@ pub fn init_engine_controller(
     let eng_ctl = strata_evmexec::engine::RpcExecEngineCtl::new(
         client,
         initial_fcs,
-        runtime.handle().clone(),
+        handle.clone(),
         l2_block_manager.clone(),
     );
     let eng_ctl = Arc::new(eng_ctl);
