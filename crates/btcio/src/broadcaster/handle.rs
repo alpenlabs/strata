@@ -53,6 +53,10 @@ impl L1BroadcastHandle {
     pub async fn get_last_broadcast_entry(&self) -> DbResult<Option<L1TxEntry>> {
         self.ops.get_last_broadcast_entry_async().await
     }
+
+    pub async fn get_tx_entry_by_idx_async(&self, idx: u64) -> DbResult<Option<L1TxEntry>> {
+        self.ops.get_tx_entry_async(idx).await
+    }
 }
 
 pub fn spawn_broadcaster_task<T>(

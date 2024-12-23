@@ -13,7 +13,8 @@ use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use strata_consensus_logic::{
-    checkpoint::CheckpointHandle, l1_handler::verify_proof, sync_manager::SyncManager,
+    checkpoint::CheckpointHandle, csm::state_tracker::reconstruct_state, l1_handler::verify_proof,
+    sync_manager::SyncManager,
 };
 use strata_db::{
     traits::*,
@@ -117,7 +118,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
             .map_err(Error::Db)?;
         let block_ids = l2_blocks
             .iter()
-            .map(|id| HexBytes32(*id.as_ref()))
+            .map(HexBytes32::from)
             .collect::<Vec<HexBytes32>>();
         Ok(block_ids)
     }
@@ -125,7 +126,9 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
         let db = self.database.clone();
         let chain_state = wait_blocking("chain_state_at_idx", move || {
-            db.chain_state_db().get_state_at(idx).map_err(Error::Db)
+            db.chain_state_db()
+                .get_toplevel_state(idx)
+                .map_err(Error::Db)
         })
         .await?;
         match chain_state {
@@ -139,12 +142,11 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
-        let db = self.database.clone();
-        let client_state = wait_blocking("client_state_at_idx", move || {
-            db.client_state_db().get_state_at(idx).map_err(Error::Db)
-        })
-        .await?;
-        Ok(client_state)
+        let database = self.database.clone();
+        let client_state_db = database.client_state_db().as_ref();
+        let cs = reconstruct_state(client_state_db, idx)
+            .map_err(|e| Error::Db(strata_db::DbError::Other(e.to_string())))?;
+        Ok(Some(cs))
     }
 
     async fn protocol_version(&self) -> RpcResult<u64> {
@@ -708,12 +710,9 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         Ok(txentry.map_err(|e| Error::Other(e.to_string()))?)
     }
 
-    async fn get_broadcast_entry_by_idx(&self, txid: HexBytes32) -> RpcResult<Option<L1TxEntry>> {
-        let mut txid = txid.0;
-        txid.reverse();
-        let id = Buf32::from(txid);
+    async fn get_broadcast_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>> {
         let broadcast_handle = self.broadcast_handle.clone();
-        let txentry = broadcast_handle.get_tx_entry_by_id_async(id).await;
+        let txentry = broadcast_handle.get_tx_entry_by_idx_async(idx).await;
         Ok(txentry.map_err(|e| Error::Other(e.to_string()))?)
     }
 

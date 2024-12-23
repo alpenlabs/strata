@@ -51,8 +51,15 @@ impl From<HexBytes> for Vec<u8> {
         value.0
     }
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
+
+impl From<&L2BlockId> for HexBytes32 {
+    fn from(value: &L2BlockId) -> Self {
+        Self(*value.as_ref())
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcL1Status {

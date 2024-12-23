@@ -154,7 +154,7 @@ pub trait StrataSequencerApi {
 
     /// Get the broadcast entry by its id
     #[method(name = "strata_getBroadcastEntryByIdx")]
-    async fn get_broadcast_entry_by_idx(&self, idx: HexBytes32) -> RpcResult<Option<L1TxEntry>>;
+    async fn get_broadcast_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>>;
 
     /// Adds L1Write sequencer duty which will be executed by sequencer
     #[method(name = "strataadmin_submitDABlob")]

@@ -57,10 +57,6 @@ impl ChainstateDatabase for ChainstateDb {
         Ok(self.db.get::<ChainstateSchema>(&idx)?)
     }
 
-    fn get_state_at(&self, idx: u64) -> DbResult<Option<strata_state::chain_state::Chainstate>> {
-        Ok(self.db.get::<ChainstateSchema>(&idx)?)
-    }
-
     fn write_genesis_state(
         &self,
         toplevel: &strata_state::chain_state::Chainstate,
