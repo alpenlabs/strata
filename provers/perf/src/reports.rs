@@ -10,9 +10,11 @@ impl ZkVmHostPerf for SP1Host {
         &self,
         input: <Self::Input<'a> as strata_zkvm::ZkVmInputBuilder<'a>>::Input,
         _proof_type: strata_zkvm::ProofType,
+        report_name: String,
     ) -> strata_zkvm::ZkVmResult<ProofReport> {
         Ok(ProofReport {
             cycles: get_cycles(self.get_elf(), &input),
+            report_name,
         })
     }
 }
@@ -22,10 +24,12 @@ impl ZkVmHostPerf for Risc0Host {
         &self,
         input: <Self::Input<'a> as strata_zkvm::ZkVmInputBuilder<'a>>::Input,
         _proof_type: strata_zkvm::ProofType,
+        report_name: String,
     ) -> strata_zkvm::ZkVmResult<ProofReport> {
         let mut exec = ExecutorImpl::from_elf(input, self.get_elf()).unwrap();
         Ok(ProofReport {
             cycles: exec.run().unwrap().user_cycles,
+            report_name,
         })
     }
 }

@@ -12,6 +12,7 @@ mod reports;
 #[derive(Debug, Clone)]
 pub struct ProofReport {
     pub cycles: u64,
+    pub report_name: String,
 }
 
 /// An extension trait that supports performance report for [`ZkVmHost`].
@@ -21,13 +22,14 @@ pub trait ZkVmHostPerf: ZkVmHost {
         &self,
         input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
         proof_type: ProofType,
+        report_name: String,
     ) -> ZkVmResult<ProofReport>;
 }
 
 /// An extension trait for the [`ProofGenerator`] to enhance it with report generation.
 pub trait ProofGeneratorPerf: ProofGenerator {
     /// Generates a proof report based on the input.
-    fn gen_proof_report(&self, input: &Self::Input) -> ZkVmResult<ProofReport>
+    fn gen_proof_report(&self, input: &Self::Input, report_name: String) -> ZkVmResult<ProofReport>
     where
         Self::H: ZkVmHostPerf,
     {
@@ -36,7 +38,11 @@ pub trait ProofGeneratorPerf: ProofGenerator {
 
         let zkvm_input =
             <Self::P as ZkVmProver>::prepare_input::<<Self::H as ZkVmHost>::Input<'_>>(&input)?;
-        let report = host.perf_report(zkvm_input, <Self::P as ZkVmProver>::proof_type())?;
+        let report = host.perf_report(
+            zkvm_input,
+            <Self::P as ZkVmProver>::proof_type(),
+            report_name,
+        )?;
 
         Ok(report)
     }
