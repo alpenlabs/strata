@@ -38,8 +38,7 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
 
         Ok(ClStfInput {
             rollup_params: rollup_params.clone(),
-            pre_state: pre_state.clone(),
-            l2_block: l2_block.clone(),
+            stf_witness_payloads: Vec::new(),
             evm_ee_proof: el_proof,
             evm_ee_vk: self.el_proof_generator.get_host().get_verification_key(),
         })
