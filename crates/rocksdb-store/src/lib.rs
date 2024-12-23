@@ -14,6 +14,8 @@ pub mod macros;
 mod sequence;
 pub mod utils;
 
+use anyhow::Context;
+
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
@@ -53,6 +55,8 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     BatchCheckpointSchema::COLUMN_FAMILY_NAME,
     // TODO add col families for other store types
 ];
+
+use std::{fs, path::Path, sync::Arc};
 
 use bridge::schemas::{
     BridgeDutyCheckpointSchema, BridgeDutyStatusSchema, BridgeDutyTxidSchema, BridgeTxStateSchema,
@@ -98,4 +102,30 @@ impl DbOpsConfig {
     pub fn new(retry_count: u16) -> Self {
         Self { retry_count }
     }
+}
+
+// Opens rocksdb database instance from datadir
+pub fn open_rocksdb_database(
+    datadir: &Path,
+) -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
+    let mut database_dir = datadir.to_path_buf();
+    database_dir.push("rocksdb");
+
+    if !database_dir.exists() {
+        fs::create_dir_all(&database_dir)?;
+    }
+
+    let mut opts = rockbound::rocksdb::Options::default();
+    opts.create_if_missing(true);
+    opts.create_missing_column_families(true);
+
+    let rbdb = rockbound::OptimisticTransactionDB::open(
+        &database_dir,
+        ROCKSDB_NAME,
+        STORE_COLUMN_FAMILIES.iter().map(|s| s.to_string()),
+        &opts,
+    )
+    .context("opening database")?;
+
+    Ok(Arc::new(rbdb))
 }

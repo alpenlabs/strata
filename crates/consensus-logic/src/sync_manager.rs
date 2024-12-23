@@ -10,10 +10,7 @@ use strata_primitives::params::Params;
 use strata_status::StatusChannel;
 use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use strata_tasks::TaskExecutor;
-use tokio::{
-    runtime::Runtime,
-    sync::{broadcast, mpsc},
-};
+use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     csm::{
@@ -81,7 +78,6 @@ pub fn start_sync_tasks<
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
     executor: &TaskExecutor,
-    runtime: &Runtime,
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
@@ -106,7 +102,7 @@ pub fn start_sync_tasks<
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
     let fcm_params = params.clone();
-    let handle = runtime.handle().clone();
+    let handle = executor.handle().clone();
     let st_ch = status_channel.clone();
     executor.spawn_critical("fork_choice_manager::tracker_task", move |shutdown| {
         // TODO this should be simplified into a builder or something
