@@ -27,9 +27,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Print results
     println!("{}", results_text.join("\n"));
 
-    // Post to GitHub PR
-    let message = format_github_message(&results_text);
-    post_to_github_pr(&args, &message).await?;
+    if args.post_to_gh {
+        // Post to GitHub PR
+        let message = format_github_message(&results_text);
+        post_to_github_pr(&args, &message).await?;
+    }
 
     if !sp1_reports
         .iter()
@@ -47,32 +49,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Parser, Clone)]
 #[command(about = "Evaluate the performance of SP1 on programs.")]
 struct EvalArgs {
-    /// The GitHub token for authentication
-    #[arg(long)]
+    /// Whether to post on github or run locally and only log the results.
+    #[arg(long, default_value_t = false)]
+    pub post_to_gh: bool,
+
+    /// The GitHub token for authentication.
+    #[arg(long, default_value = "")]
     pub github_token: String,
 
     /// The GitHub repository owner.
-    #[arg(long)]
+    #[arg(long, default_value = "")]
     pub repo_owner: String,
 
     /// The GitHub repository name.
-    #[arg(long)]
+    #[arg(long, default_value = "")]
     pub repo_name: String,
 
     /// The GitHub PR number.
-    #[arg(long)]
+    #[arg(long, default_value = "")]
     pub pr_number: String,
 
     /// The name of the branch.
-    #[arg(long)]
+    #[arg(long, default_value = "local")]
     pub branch_name: String,
 
     /// The commit hash.
-    #[arg(long)]
+    #[arg(long, default_value = "local")]
     pub commit_hash: String,
 
     /// The author of the commit.
-    #[arg(long)]
+    #[arg(long, default_value = "local")]
     pub author: String,
 }
 
