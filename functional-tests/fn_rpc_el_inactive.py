@@ -30,17 +30,17 @@ class SeqStatusElInactiveTest(testenv.StrataTester):
         web3: Web3 = reth.create_web3()
         wait_until(lambda: web3.is_connected(), error_with="Reth did not start properly")
 
-        # send 4 transaction so that reth can start after being stopped
+        # send 3 transaction so that reth can start after being stopped
         to_transfer = 1_000_000
-        dest = web3.to_checksum_address("0x0000000000000000000000000000000000000001")
-        transfer_balance(web3, dest, to_transfer)
+        dest = web3.to_checksum_address("0x0000000000000000000000000006000000000001")
         transfer_balance(web3, dest, to_transfer)
         transfer_balance(web3, dest, to_transfer)
         transfer_balance(web3, dest, to_transfer)
 
         wait_until(
-            lambda: web3.eth.get_balance(dest) == to_transfer * 4,
+            lambda: web3.eth.get_balance(dest) == to_transfer * 3,
             error_with="Balance transfer not successful",
+            timeout=10
         )
         reth.stop()
 
