@@ -54,7 +54,7 @@ jobs:
       - name: Run Evaluation
         run: |
           cargo run --profile prover-ci -- \
-          --post-to-gh "true" \
+          --post-to-gh \
           --github-token "${{ secrets.GITHUB_TOKEN }}" \
           --repo-owner "${{ github.repository_owner }}" \
           --repo-name "${{ github.event.repository.name }}" \

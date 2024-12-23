@@ -66,11 +66,11 @@ struct EvalArgs {
     pub pr_number: String,
 
     /// The name of the branch.
-    #[arg(long, default_value = "local")]
+    #[arg(long, default_value = "cur_branch")]
     pub branch_name: String,
 
     /// The commit hash.
-    #[arg(long, default_value = "local")]
+    #[arg(long, default_value = "local_commit")]
     pub commit_hash: String,
 
     /// The author of the commit.
@@ -186,9 +186,13 @@ fn run_generator_programs<H: ZkVmHostPerf>(
 fn format_header(args: &EvalArgs) -> String {
     let mut detail_text = String::new();
 
-    detail_text.push_str(&format!("*Branch*: {}\n", &args.branch_name));
-    detail_text.push_str(&format!("*Commit*: {}\n", &args.commit_hash[..8]));
-    detail_text.push_str(&format!("*Author*: {}\n", &args.author));
+    if args.post_to_gh {
+        detail_text.push_str(&format!("*Branch*: {}\n", &args.branch_name));
+        detail_text.push_str(&format!("*Commit*: {}\n", &args.commit_hash[..8]));
+        detail_text.push_str(&format!("*Author*: {}\n", &args.author));
+    } else {
+        detail_text.push_str("*Local execution*\n");
+    }
 
     detail_text
 }

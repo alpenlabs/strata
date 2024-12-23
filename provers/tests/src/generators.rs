@@ -37,7 +37,7 @@ impl<H: ZkVmHost> TestProverGenerators<H> {
         let mut generators = HashMap::new();
 
         // TODO: refactor deeper to remove clones.
-        // Likely not critical right now due to its being used in tests and perf CI (later).
+        // Likely not critical right now due to its being used in tests and perf CI.
         let btc_prover = BtcBlockProofGenerator::new(host_provider(ProofVm::BtcProving));
         let l1_batch_prover =
             L1BatchProofGenerator::new(btc_prover.clone(), host_provider(ProofVm::L1Batch));
