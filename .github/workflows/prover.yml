@@ -51,7 +51,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run Evaluation
+      - name: Run performance evaluation
         run: |
           cargo run --profile prover-ci -- \
           --post-to-gh \

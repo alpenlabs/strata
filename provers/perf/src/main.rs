@@ -149,35 +149,35 @@ fn run_generator_programs<H: ZkVmHostPerf>(
 
     reports.push(cl_block_report.into());
 
-    //// l1_batch
-    //println!("Generating a report for L1_BATCH");
-    //let l1_batch = generator.l1_batch();
-    //let l1_batch_report = l1_batch
-    //    .gen_proof_report(&(l1_start_height, l1_end_height), "L1_BATCH".to_owned())
-    //    .unwrap();
-    //
-    //reports.push(l1_batch_report.into());
-    //
-    //// l2_block
-    //println!("Generating a report for L2_BATCH");
-    //let l2_block = generator.l2_batch();
-    //let l2_block_report = l2_block
-    //    .gen_proof_report(&(l2_start_height, l2_end_height), "L2_BATCH".to_owned())
-    //    .unwrap();
-    //
-    //reports.push(l2_block_report.into());
-    //
-    //// checkpoint
-    //println!("Generating a report for CHECKPOINT");
-    //let checkpoint = generator.checkpoint();
-    //let checkpoint_test_input = CheckpointBatchInfo {
-    //    l1_range: (l1_start_height.into(), l1_end_height.into()),
-    //    l2_range: (l2_start_height, l2_end_height),
-    //};
-    //let checkpoint_report = checkpoint.gen_proof_report(&checkpoint_test_input,
-    // "CHECKPOINT".to_owned()).unwrap();
+    // l1_batch
+    println!("Generating a report for L1_BATCH");
+    let l1_batch = generator.l1_batch();
+    let l1_batch_report = l1_batch
+        .gen_proof_report(&(l1_start_height, l1_end_height), "L1_BATCH".to_owned())
+        .unwrap();
 
-    //reports.push(checkpoint_report.into());
+    reports.push(l1_batch_report.into());
+
+    // l2_block
+    println!("Generating a report for L2_BATCH");
+    let l2_block = generator.l2_batch();
+    let l2_block_report = l2_block
+        .gen_proof_report(&(l2_start_height, l2_end_height), "L2_BATCH".to_owned())
+        .unwrap();
+
+    reports.push(l2_block_report.into());
+
+    // checkpoint
+    println!("Generating a report for CHECKPOINT");
+    let checkpoint = generator.checkpoint();
+    let checkpoint_test_input = CheckpointBatchInfo {
+        l1_range: (l1_start_height.into(), l1_end_height.into()),
+        l2_range: (l2_start_height, l2_end_height),
+    };
+    let checkpoint_report = checkpoint
+        .gen_proof_report(&checkpoint_test_input, "CHECKPOINT".to_owned())
+        .unwrap();
+    reports.push(checkpoint_report.into());
 
     reports
 }
