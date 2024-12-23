@@ -121,22 +121,25 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     let strata_block_id = 1;
 
     // btc_blockspace
-    //let btc_blockspace = generator.btc_blockspace();
-    //let btc_blockspace_report = btc_blockspace.gen_proof_report(btc_block).unwrap();
+    println!("Generating a report for BTC_BLOCKSPACE");
+    let btc_blockspace = generator.btc_blockspace();
+    let btc_blockspace_report = btc_blockspace.gen_proof_report(btc_block).unwrap();
 
-    //reports.push((btc_blockspace_report, "BTC_BLOCKSPACE".to_owned()).into());
+    reports.push((btc_blockspace_report, "BTC_BLOCKSPACE".to_owned()).into());
 
     // el_block
+    println!("Generating a report for EL_BLOCK");
     let el_block = generator.el_block();
     let el_block_report = el_block.gen_proof_report(&strata_block_id).unwrap();
 
     reports.push((el_block_report, "EL_BLOCK".to_owned()).into());
 
     // cl_block
-    //let cl_block = generator.cl_block();
-    //let cl_block_report = cl_block.gen_proof_report(&strata_block_id).unwrap();
+    println!("Generating a report for CL_BLOCK");
+    let cl_block = generator.cl_block();
+    let cl_block_report = cl_block.gen_proof_report(&strata_block_id).unwrap();
 
-    //reports.push((cl_block_report, "CL_BLOCK".to_owned()).into());
+    reports.push((cl_block_report, "CL_BLOCK".to_owned()).into());
 
     //// l1_batch
     //let l1_batch = generator.l1_batch();
