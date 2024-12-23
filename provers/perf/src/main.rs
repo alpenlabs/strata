@@ -1,5 +1,3 @@
-use std::time::{Duration, Instant};
-
 use anyhow::Result;
 use clap::{command, Parser};
 use reqwest::Client;
@@ -7,9 +5,7 @@ use serde::Serialize;
 use serde_json::json;
 use strata_provers_perf::{ProofGeneratorPerf, ProofReport, ZkVmHostPerf};
 use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params};
-use strata_zkvm_tests::{
-    CheckpointBatchInfo, TestProverGenerators, TEST_RISC0_GENERATORS, TEST_SP1_GENERATORS,
-};
+use strata_zkvm_tests::{CheckpointBatchInfo, TestProverGenerators, TEST_SP1_GENERATORS};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -255,7 +251,7 @@ async fn post_to_github_pr(
         let response = client
             .patch(comment_url)
             .header("Authorization", format!("token {}", &args.github_token))
-            .header("User-Agent", "sp1-perf-bot")
+            .header("User-Agent", "strata-perf-bot")
             .json(&json!({
                 "body": message
             }))

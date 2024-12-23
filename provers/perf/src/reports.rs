@@ -1,6 +1,6 @@
-use risc0_zkvm::ExecutorImpl;
+//use risc0_zkvm::ExecutorImpl;
 use sp1_prover::utils::get_cycles;
-use strata_risc0_adapter::Risc0Host;
+//use strata_risc0_adapter::Risc0Host;
 use strata_sp1_adapter::SP1Host;
 
 use crate::{ProofReport, ZkVmHostPerf};
@@ -19,6 +19,7 @@ impl ZkVmHostPerf for SP1Host {
     }
 }
 
+/*
 impl ZkVmHostPerf for Risc0Host {
     fn perf_report<'a>(
         &self,
@@ -33,3 +34,4 @@ impl ZkVmHostPerf for Risc0Host {
         })
     }
 }
+*/

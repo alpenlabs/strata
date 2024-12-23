@@ -9,7 +9,7 @@ strata-sp1-adapter = {workspace = true, features = ["prover"] }
 strata-sp1-guest-builder = { path = "../sp1/", features = ["prover"] }
 strata-test-utils.workspace = true
 strata-zkvm.workspace = true
-strata-zkvm-tests = { path = "../tests/", features = ["sp1", "risc0"] }
+strata-zkvm-tests = { path = "../tests/", features = ["sp1"] }
 
 sp1-prover = "3.0.0"
 sp1-sdk = "3.0.0"
