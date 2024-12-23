@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  eval_perf:
     permissions: write-all
     runs-on: ubuntu-latest
 
@@ -51,15 +51,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build prover guest code
-        run: cargo build --profile prover-ci -F "prover"
-        working-directory: provers/sp1
-        env:
-          RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
-
       - name: Run Evaluation
         run: |
-          cargo run --release -- \
+          cargo run --profile prover-ci -- \
+          --post-to-gh "true" \
           --github-token "${{ secrets.GITHUB_TOKEN }}" \
           --repo-owner "${{ github.repository_owner }}" \
           --repo-name "${{ github.event.repository.name }}" \
