@@ -36,7 +36,7 @@ cfg_if! {
 
         /// Test prover generator for the SP1 Host.
         pub static TEST_SP1_GENERATORS: LazyLock<TestProverGenerators<SP1Host>> =
-        std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| strata_zkvm_hosts::get_sp1_host(vm).clone()));
+            std::sync::LazyLock::new(|| TestProverGenerators::init(|vm| strata_zkvm_hosts::get_sp1_host(vm).clone()));
     }
 }
 

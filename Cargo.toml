@@ -45,7 +45,6 @@ members = [
   "crates/util/mmr",
   "crates/util/shrex",
   "crates/vtxjmt",
-  "provers/perf",
   "provers/risc0",
   "provers/sp1",
   "provers/tests",
@@ -57,7 +56,6 @@ members = [
   "bin/strata-client",
   "bin/strata-reth",
   "bin/prover-client",
-  "provers/perf",
 
   # integration tests
   "tests",
