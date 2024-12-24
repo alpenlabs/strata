@@ -8,9 +8,7 @@ use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
-use strata_storage::
-    managers::DbManagers
-;
+use strata_storage::managers::DbManagers;
 use strata_tasks::TaskExecutor;
 use tokio::sync::{broadcast, mpsc};
 
