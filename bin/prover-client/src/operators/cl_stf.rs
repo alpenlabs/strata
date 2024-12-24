@@ -4,6 +4,7 @@ use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::{
     buf::Buf32,
+    params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
@@ -13,7 +14,7 @@ use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{evm_ee::EvmEeOperator, utils::get_pm_rollup_params, ProvingOp};
+use super::{evm_ee::EvmEeOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] trait for Consensus Layer (CL) State Transition
@@ -31,14 +32,20 @@ use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 pub struct ClStfOperator {
     cl_client: HttpClient,
     evm_ee_operator: Arc<EvmEeOperator>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl ClStfOperator {
     /// Creates a new CL operations instance.
-    pub fn new(cl_client: HttpClient, evm_ee_operator: Arc<EvmEeOperator>) -> Self {
+    pub fn new(
+        cl_client: HttpClient,
+        evm_ee_operator: Arc<EvmEeOperator>,
+        rollup_params: Arc<RollupParams>,
+    ) -> Self {
         Self {
             cl_client,
             evm_ee_operator,
+            rollup_params,
         }
     }
 
@@ -132,8 +139,9 @@ impl ProvingOp for ClStfOperator {
             .ok_or(ProvingTaskError::ProofNotFound(evm_ee_key))?;
         let evm_ee_vk = hosts::get_verification_key(&evm_ee_key);
 
+        let rollup_params = self.rollup_params.as_ref().clone();
         Ok(ClStfInput {
-            rollup_params: get_pm_rollup_params(),
+            rollup_params,
             pre_state,
             l2_block,
             evm_ee_proof,

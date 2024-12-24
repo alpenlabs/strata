@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jsonrpsee::http_client::HttpClient;
 use strata_btcio::rpc::BitcoinClient;
-use strata_primitives::proof::ProofContext;
+use strata_primitives::{params::RollupParams, proof::ProofContext};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
 
@@ -56,23 +56,30 @@ impl ProofOperator {
         btc_client: BitcoinClient,
         evm_ee_client: HttpClient,
         cl_client: HttpClient,
+        rollup_params: RollupParams,
     ) -> Self {
         let btc_client = Arc::new(btc_client);
+        let rollup_params = Arc::new(rollup_params);
 
         // Create each operator using the respective clients.
-        let btc_blockspace_operator = BtcBlockspaceOperator::new(btc_client.clone());
+        let btc_blockspace_operator =
+            BtcBlockspaceOperator::new(btc_client.clone(), rollup_params.clone());
         let l1_batch_operator = L1BatchOperator::new(
             btc_client.clone(),
             Arc::new(btc_blockspace_operator.clone()),
         );
         let evm_ee_operator = EvmEeOperator::new(evm_ee_client.clone());
-        let cl_stf_operator =
-            ClStfOperator::new(cl_client.clone(), Arc::new(evm_ee_operator.clone()));
+        let cl_stf_operator = ClStfOperator::new(
+            cl_client.clone(),
+            Arc::new(evm_ee_operator.clone()),
+            rollup_params.clone(),
+        );
         let cl_agg_operator = ClAggOperator::new(Arc::new(cl_stf_operator.clone()));
         let checkpoint_operator = CheckpointOperator::new(
             cl_client.clone(),
             Arc::new(l1_batch_operator.clone()),
             Arc::new(cl_agg_operator.clone()),
+            rollup_params.clone(),
         );
 
         ProofOperator::new(

@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
-use strata_primitives::proof::{ProofContext, ProofKey};
+use strata_primitives::{
+    params::RollupParams,
+    proof::{ProofContext, ProofKey},
+};
 use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_state::l1::L1BlockId;
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{utils::get_pm_rollup_params, ProvingOp};
+use super::ProvingOp;
 use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] trait for Bitcoin blockspace proof generation.
@@ -18,12 +21,16 @@ use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 #[derive(Debug, Clone)]
 pub struct BtcBlockspaceOperator {
     btc_client: Arc<BitcoinClient>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl BtcBlockspaceOperator {
     /// Creates a new BTC operations instance.
-    pub fn new(btc_client: Arc<BitcoinClient>) -> Self {
-        Self { btc_client }
+    pub fn new(btc_client: Arc<BitcoinClient>, rollup_params: Arc<RollupParams>) -> Self {
+        Self {
+            btc_client,
+            rollup_params,
+        }
     }
 
     /// Retrieves the [`L1BlockId`] for a given block number.
@@ -66,7 +73,7 @@ impl ProvingOp for BtcBlockspaceOperator {
         let block = self.btc_client.get_block(&blkid.into()).await.unwrap();
 
         Ok(BlockspaceProofInput {
-            rollup_params: get_pm_rollup_params(),
+            rollup_params: self.rollup_params.as_ref().clone(),
             block,
         })
     }

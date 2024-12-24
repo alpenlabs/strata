@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::{ProofContext, ProofKey};
+use strata_primitives::{
+    params::RollupParams,
+    proof::{ProofContext, ProofKey},
+};
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
@@ -11,9 +14,7 @@ use strata_zkvm::AggregationInput;
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{
-    cl_agg::ClAggOperator, l1_batch::L1BatchOperator, utils::get_pm_rollup_params, ProvingOp,
-};
+use super::{cl_agg::ClAggOperator, l1_batch::L1BatchOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] for Checkpoint Proof.
@@ -30,6 +31,7 @@ pub struct CheckpointOperator {
     cl_client: HttpClient,
     l1_batch_operator: Arc<L1BatchOperator>,
     l2_batch_operator: Arc<ClAggOperator>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl CheckpointOperator {
@@ -38,11 +40,13 @@ impl CheckpointOperator {
         cl_client: HttpClient,
         l1_batch_operator: Arc<L1BatchOperator>,
         l2_batch_operator: Arc<ClAggOperator>,
+        rollup_params: Arc<RollupParams>,
     ) -> Self {
         Self {
             cl_client,
             l1_batch_operator,
             l2_batch_operator,
+            rollup_params,
         }
     }
 
@@ -129,8 +133,9 @@ impl ProvingOp for CheckpointOperator {
         let cl_agg_vk = hosts::get_verification_key(&cl_agg_key);
         let l2_batch = AggregationInput::new(cl_agg_proof, cl_agg_vk);
 
+        let rollup_params = self.rollup_params.as_ref().clone();
         Ok(CheckpointProverInput {
-            rollup_params: get_pm_rollup_params(),
+            rollup_params,
             l1_batch,
             l2_batch,
         })

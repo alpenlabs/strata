@@ -50,7 +50,16 @@ async fn main() {
     )
     .expect("failed to connect to the btc client");
 
-    let operator = Arc::new(ProofOperator::init(btc_client, el_client, cl_client));
+    let rollup_params = args
+        .resolve_and_validate_rollup_params()
+        .expect("failed to resolve rollup params");
+
+    let operator = Arc::new(ProofOperator::init(
+        btc_client,
+        el_client,
+        cl_client,
+        rollup_params,
+    ));
     let task_tracker = Arc::new(Mutex::new(TaskTracker::new()));
 
     let rbdb = open_rocksdb_database(&args.datadir).expect("failed to open DB");
