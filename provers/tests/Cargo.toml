@@ -33,7 +33,7 @@ strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
 ] }
 
 # native
-strata-native-zkvm-adapter = {workspace = true, optional = true }
+strata-native-zkvm-adapter = { workspace = true, optional = true }
 
 anyhow.workspace = true
 bincode.workspace = true
@@ -50,5 +50,13 @@ mock = [
   "strata-risc0-adapter/mock",
 ]
 native = ["strata-zkvm-hosts/native"]
-risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder", "strata-zkvm-hosts/risc0"]
-sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder", "strata-zkvm-hosts/sp1"]
+risc0 = [
+  "strata-risc0-adapter",
+  "strata-risc0-guest-builder",
+  "strata-zkvm-hosts/risc0",
+]
+sp1 = [
+  "strata-sp1-adapter",
+  "strata-sp1-guest-builder",
+  "strata-zkvm-hosts/sp1",
+]
