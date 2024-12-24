@@ -298,23 +298,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         }
     }
 
-    async fn get_cl_block_witness_raw(&self, idx: u64) -> RpcResult<Option<Vec<u8>>> {
-        let blk_manifest_db = self.database.clone();
-        let blk_ids: Vec<L2BlockId> = wait_blocking("l2_blockid", move || {
-            blk_manifest_db
-                .clone()
-                .l2_db()
-                .get_blocks_at_height(idx)
-                .map_err(Error::Db)
-        })
-        .await?;
-
-        // Check if blk_ids is empty
-        let blkid = match blk_ids.first() {
-            Some(id) => id.to_owned(),
-            None => return Ok(None),
-        };
-
+    async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Option<Vec<u8>>> {
         let l2_blk_db = self.database.clone();
         let l2_blk_bundle = wait_blocking("l2_block", move || {
             let l2_db = l2_blk_db.l2_db();
@@ -322,14 +306,16 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         })
         .await?;
 
+        let prev_slot = l2_blk_bundle.block().header().header().blockidx() - 1;
+
         let chain_state_db = self.database.clone();
         let chain_state = wait_blocking("l2_chain_state", move || {
             let chs_db = chain_state_db.chain_state_db();
 
             chs_db
-                .get_toplevel_state(idx - 1)
+                .get_toplevel_state(prev_slot)
                 .map_err(Error::Db)?
-                .ok_or(Error::MissingChainstate(idx - 1))
+                .ok_or(Error::MissingChainstate(prev_slot))
         })
         .await?;
 

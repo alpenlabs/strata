@@ -44,7 +44,7 @@ pub trait StrataApi {
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcExecUpdate>>;
 
     #[method(name = "getCLBlockWitness")]
-    async fn get_cl_block_witness_raw(&self, index: u64) -> RpcResult<Option<Vec<u8>>>;
+    async fn get_cl_block_witness_raw(&self, block_id: L2BlockId) -> RpcResult<Option<Vec<u8>>>;
 
     #[method(name = "getCurrentDeposits")]
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;
