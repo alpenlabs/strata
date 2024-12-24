@@ -3,6 +3,7 @@ use std::sync::Arc;
 use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::{
+    buf::Buf32,
     params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
@@ -10,6 +11,7 @@ use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInpu
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcCheckpointInfo;
+use strata_state::id::L2BlockId;
 use strata_zkvm::AggregationInput;
 use tokio::sync::Mutex;
 use tracing::error;
@@ -59,6 +61,24 @@ impl CheckpointOperator {
             .ok_or(ProvingTaskError::WitnessNotFound)
     }
 
+    /// Retrieves the [`L2BlockId`] for the given `block_num`
+    pub async fn get_l2id(&self, block_num: u64) -> Result<L2BlockId, ProvingTaskError> {
+        let l2_headers = self
+            .cl_client
+            .get_headers_at_idx(block_num)
+            .await
+            .inspect_err(|_| error!(%block_num, "Failed to fetch l2_headers"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+
+        let cl_stf_id_buf: Buf32 = l2_headers
+            .expect("invalid height")
+            .first()
+            .expect("at least one l2 blockid")
+            .block_id
+            .into();
+        Ok(cl_stf_id_buf.into())
+    }
+
     /// Retrieves the latest checkpoint index
     pub async fn fetch_latest_ckp_idx(&self) -> Result<u64, ProvingTaskError> {
         self.cl_client
@@ -90,10 +110,18 @@ impl ProvingOp for CheckpointOperator {
             .await?;
         let l1_batch_id = l1_batch_keys.first().expect("at least one").context();
 
+        // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
+        // include the range interms of block_id.
+        // https://alpenlabs.atlassian.net/browse/STR-756
+        let start_l2_idx = self.get_l2id(checkpoint_info.l2_range.0).await?;
+        let end_l2_idx = self.get_l2id(checkpoint_info.l2_range.1).await?;
+        let l2_range = vec![(start_l2_idx, end_l2_idx)];
+
         let l2_batch_keys = self
             .l2_batch_operator
-            .create_task(vec![checkpoint_info.l2_range], task_tracker.clone(), db)
+            .create_task(l2_range, task_tracker.clone(), db)
             .await?;
+
         let l2_batch_id = l2_batch_keys.first().expect("at least one").context();
 
         let deps = vec![*l1_batch_id, *l2_batch_id];

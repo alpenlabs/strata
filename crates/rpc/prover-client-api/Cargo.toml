@@ -13,6 +13,7 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
+strata-primitives = { workspace = true }
 strata-rpc-types = { workspace = true }
 
 jsonrpsee = { workspace = true, features = ["server", "macros"] }

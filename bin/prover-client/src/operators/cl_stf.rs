@@ -49,25 +49,20 @@ impl ClStfOperator {
         }
     }
 
-    /// Retrieves the [`L2BlockId`] for the given `block_num`
-    pub async fn get_id(&self, block_num: u64) -> Result<L2BlockId, ProvingTaskError> {
-        let l2_headers = self
+    pub async fn get_exec_id(&self, cl_block_id: L2BlockId) -> Result<Buf32, ProvingTaskError> {
+        let header = self
             .cl_client
-            .get_headers_at_idx(block_num)
+            .get_header_by_id(cl_block_id)
             .await
-            .inspect_err(|_| error!(%block_num, "Failed to fetch l2_headers"))
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+            .inspect_err(|_| error!(%cl_block_id, "Failed to fetch corresponding ee data"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
+            .expect("invalid height");
 
-        let cl_stf_id_buf: Buf32 = l2_headers
-            .expect("invalid height")
-            .first()
-            .expect("at least one l2 blockid")
-            .block_id
-            .into();
-        Ok(cl_stf_id_buf.into())
+        let block = self.evm_ee_operator.get_block(header.block_idx).await?;
+        Ok(block.header.hash.into())
     }
 
-    /// Retrieves the previous [`L2Block`] for the given `block_id`
+    /// Retrieves the previous [`L2BlockId`] for the given `L2BlockId`
     pub async fn get_prev_block_id(
         &self,
         block_id: L2BlockId,
@@ -79,26 +74,15 @@ impl ClStfOperator {
             .inspect_err(|_| error!(%block_id, "Failed to fetch l2_header"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
-        let prev_block: Buf32 = l2_block.expect("invalid height").block_id.into();
+        let prev_block: Buf32 = l2_block.expect("invalid height").prev_block.into();
 
         Ok(prev_block.into())
-    }
-
-    /// Retrieves the slot num of the given [`L2BlockId`]
-    pub async fn get_slot(&self, id: L2BlockId) -> Result<u64, ProvingTaskError> {
-        let header = self
-            .cl_client
-            .get_header_by_id(id)
-            .await
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
-            .expect("invalid blkid");
-        Ok(header.block_idx)
     }
 }
 
 impl ProvingOp for ClStfOperator {
     type Prover = ClStfProver;
-    type Params = (u64, u64);
+    type Params = (L2BlockId, L2BlockId);
 
     async fn create_task(
         &self,
@@ -106,18 +90,25 @@ impl ProvingOp for ClStfOperator {
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        let (start_block_id, end_block_id) = block_range;
+
+        let el_start_block_id = self.get_exec_id(start_block_id).await?;
+        let el_end_block_id = self.get_exec_id(end_block_id).await?;
+
         let evm_ee_tasks = self
             .evm_ee_operator
-            .create_task(block_range, task_tracker.clone(), db)
+            .create_task(
+                (el_start_block_id, el_end_block_id),
+                task_tracker.clone(),
+                db,
+            )
             .await?;
+
         let evm_ee_id = evm_ee_tasks
             .first()
             .expect("creation of task should result on at least one key")
             .context();
 
-        let (start_block_num, end_block_num) = block_range;
-        let start_block_id = self.get_id(start_block_num).await?;
-        let end_block_id = self.get_id(end_block_num).await?;
         let cl_stf_id = ProofContext::ClStf(start_block_id, end_block_id);
 
         db.put_proof_deps(cl_stf_id, vec![*evm_ee_id])
@@ -154,6 +145,7 @@ impl ProvingOp for ClStfOperator {
                 blkid = self.get_prev_block_id(blkid).await?;
             }
         }
+        stf_witness_payloads.reverse();
 
         let evm_ee_ids = db
             .get_proof_deps(*task_id.context())
