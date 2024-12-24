@@ -18,17 +18,17 @@ impl<H: ZkVmHost> L2BatchProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator for L2BatchProofGenerator<H> {
-    type Input = (u64, u64);
-    type P = ClAggProver;
-    type H = H;
+impl<H: ZkVmHost> ProofGenerator<ClAggProver> for L2BatchProofGenerator<H> {
+    type Input = Vec<(u64, u64)>;
 
-    fn get_input(&self, heights: &(u64, u64)) -> ZkVmResult<ClAggInput> {
-        let (start_height, end_height) = *heights;
+    fn get_input(&self, batches: &Self::Input) -> ZkVmResult<ClAggInput> {
         let mut batch = Vec::new();
 
-        for block_num in start_height..=end_height {
-            let cl_proof = self.cl_proof_generator.get_proof(&block_num)?;
+        for mini_batch_range in batches {
+            let (start_height, end_height) = *mini_batch_range;
+            let cl_proof = self
+                .cl_proof_generator
+                .get_proof(&(start_height, end_height))?;
             batch.push(cl_proof);
         }
 
@@ -36,9 +36,12 @@ impl<H: ZkVmHost> ProofGenerator for L2BatchProofGenerator<H> {
         Ok(ClAggInput { batch, cl_stf_vk })
     }
 
-    fn get_proof_id(&self, heights: &(u64, u64)) -> String {
-        let (start_height, end_height) = *heights;
-        format!("l2_batch_{}_{}", start_height, end_height)
+    fn get_proof_id(&self, batches: &Self::Input) -> String {
+        if let (Some(first), Some(last)) = (batches.first(), batches.last()) {
+            format!("cl_batch_{}_{}", first.0, last.1)
+        } else {
+            "cl_batch_empty".to_string()
+        }
     }
 
     fn get_host(&self) -> H {
@@ -50,8 +53,8 @@ impl<H: ZkVmHost> ProofGenerator for L2BatchProofGenerator<H> {
 mod tests {
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(cl_agg_prover: &L2BatchProofGenerator<H>) {
-        let _ = cl_agg_prover.get_proof(&(1, 3)).unwrap();
+    fn test_proof<H: ZkVmHost>(cl_agg_prover: L2BatchProofGenerator<H>) {
+        let _ = cl_agg_prover.get_proof(&vec![(1, 3)]).unwrap();
     }
 
     #[test]

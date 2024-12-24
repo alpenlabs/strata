@@ -52,7 +52,7 @@ impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
 
         let l2_batch_proof = self
             .l2_batch_prover
-            .get_proof(&(l2_start_height, l2_end_height))
+            .get_proof(&vec![(l2_start_height, l2_end_height)])
             .unwrap();
         let l2_batch_vk = self.l2_batch_prover.get_host().get_verification_key();
         let l2_batch = AggregationInput::new(l2_batch_proof, l2_batch_vk);

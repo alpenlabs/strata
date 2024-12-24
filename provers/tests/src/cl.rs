@@ -19,33 +19,37 @@ impl<H: ZkVmHost> ClProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
-    type Input = u64;
-    type P = ClStfProver;
-    type H = H;
+impl<H: ZkVmHost> ProofGenerator<ClStfProver> for ClProofGenerator<H> {
+    type Input = (u64, u64);
 
-    fn get_input(&self, block_num: &u64) -> ZkVmResult<ClStfInput> {
+    fn get_input(&self, block_range: &(u64, u64)) -> ZkVmResult<ClStfInput> {
         // Generate EL proof required for aggregation
-        let el_proof = self.el_proof_generator.get_proof(block_num)?;
+        let el_proof = self.el_proof_generator.get_proof(block_range)?;
 
         // Read CL witness data
         let params = gen_params();
         let rollup_params = params.rollup();
 
-        let l2_segment = L2Segment::initialize_from_saved_evm_ee_data(*block_num);
-        let l2_block = l2_segment.get_block(*block_num);
-        let pre_state = l2_segment.get_pre_state(*block_num);
+        let l2_segment = L2Segment::initialize_from_saved_evm_ee_data(block_range.0, block_range.1);
+        let l2_blocks = l2_segment.blocks;
+        let pre_states = l2_segment.pre_states;
+
+        let mut stf_witness_payloads = Vec::new();
+        for (block, pre_state) in l2_blocks.iter().zip(pre_states.iter()) {
+            let witness = borsh::to_vec(&(pre_state, block)).unwrap();
+            stf_witness_payloads.push(witness);
+        }
 
         Ok(ClStfInput {
             rollup_params: rollup_params.clone(),
-            stf_witness_payloads: Vec::new(),
+            stf_witness_payloads,
             evm_ee_proof: el_proof,
             evm_ee_vk: self.el_proof_generator.get_host().get_verification_key(),
         })
     }
 
-    fn get_proof_id(&self, block_num: &u64) -> String {
-        format!("cl_block_{}", block_num)
+    fn get_proof_id(&self, block_range: &(u64, u64)) -> String {
+        format!("cl_block_{}_{}", block_range.0, block_range.1)
     }
 
     fn get_host(&self) -> H {
@@ -57,10 +61,11 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
 mod tests {
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(cl_prover: &ClProofGenerator<H>) {
-        let height = 1;
+    fn test_proof<H: ZkVmHost>(cl_prover: ClProofGenerator<H>) {
+        let start_height = 1;
+        let end_height = 3;
 
-        let _ = cl_prover.get_proof(&height).unwrap();
+        let _ = cl_prover.get_proof(&(start_height, end_height)).unwrap();
     }
 
     #[test]
