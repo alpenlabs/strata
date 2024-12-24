@@ -8,7 +8,11 @@ on:
 
 jobs:
   eval_perf:
-    permissions: write-all
+    permissions:
+      # Needed to install the toolchain.
+      contents: write
+      # Needed to post the performance report comments.
+      issues: write
     runs-on: ubuntu-latest
 
     steps:
@@ -50,12 +54,8 @@ jobs:
           cargo run --profile prover-ci -- \
           --post-to-gh \
           --github-token "${{ secrets.GITHUB_TOKEN }}" \
-          --repo-owner "${{ github.repository_owner }}" \
-          --repo-name "${{ github.event.repository.name }}" \
           --pr-number "${{ github.event.pull_request.number }}" \
-          --branch-name "${{ github.head_ref || github.ref_name }}" \
           --commit-hash "${{ github.sha }}" \
-          --author "${{ github.event.pull_request.user.login || github.actor }}"
         working-directory: provers/perf
         env:
           RUSTFLAGS: "-C target-cpu=native -C link-arg=-fuse-ld=lld"

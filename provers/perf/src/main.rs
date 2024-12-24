@@ -45,29 +45,13 @@ struct EvalArgs {
     #[arg(long, default_value = "")]
     pub github_token: String,
 
-    /// The GitHub repository owner.
-    #[arg(long, default_value = "")]
-    pub repo_owner: String,
-
-    /// The GitHub repository name.
-    #[arg(long, default_value = "")]
-    pub repo_name: String,
-
     /// The GitHub PR number.
     #[arg(long, default_value = "")]
     pub pr_number: String,
 
-    /// The name of the branch.
-    #[arg(long, default_value = "cur_branch")]
-    pub branch_name: String,
-
     /// The commit hash.
     #[arg(long, default_value = "local_commit")]
     pub commit_hash: String,
-
-    /// The author of the commit.
-    #[arg(long, default_value = "local")]
-    pub author: String,
 }
 
 /// Basic data about the performance of a certain [`ZkVmProver`].
@@ -179,9 +163,7 @@ fn format_header(args: &EvalArgs) -> String {
     let mut detail_text = String::new();
 
     if args.post_to_gh {
-        detail_text.push_str(&format!("*Branch*: {}\n", &args.branch_name));
         detail_text.push_str(&format!("*Commit*: {}\n", &args.commit_hash[..8]));
-        detail_text.push_str(&format!("*Author*: {}\n", &args.author));
     } else {
         detail_text.push_str("*Local execution*\n");
     }
@@ -217,13 +199,10 @@ async fn post_to_github_pr(
     message: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
-    let base_url = format!(
-        "https://api.github.com/repos/{}/{}",
-        &args.repo_owner, &args.repo_name
-    );
 
     // Get all comments on the PR
-    let comments_url = format!("{}/issues/{}/comments", base_url, &args.pr_number);
+    const BASE_URL: &str = "https://api.github.com/repos/alpenlabs/strata";
+    let comments_url = format!("{}/issues/{}/comments", BASE_URL, &args.pr_number);
     let comments_response = client
         .get(&comments_url)
         .header("Authorization", format!("token {}", &args.github_token))
