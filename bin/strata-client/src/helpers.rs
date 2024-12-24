@@ -3,13 +3,12 @@ use std::{fs, path::Path, sync::Arc, time::Duration};
 use alloy_rpc_types::engine::JwtSecret;
 use bitcoin::{base58, bip32::Xpriv, Address, Network};
 use format_serde_error::SerdeError;
-use rockbound::OptimisticTransactionDB;
 use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
 use strata_consensus_logic::{
     csm::state_tracker,
     duty::types::{Identity, IdentityData, IdentityKey},
 };
-use strata_db::{database::CommonDatabase, traits::Database};
+use strata_db::traits::Database;
 use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
 use strata_key_derivation::sequencer::SequencerKeys;
 use strata_primitives::{
@@ -18,10 +17,7 @@ use strata_primitives::{
     l1::L1Status,
     params::{Params, RollupParams, SyncParams},
 };
-use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainstateDb,
-    ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
-};
+use strata_rocksdb::CommonDb;
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
@@ -30,45 +26,6 @@ use tracing::*;
 use zeroize::Zeroize;
 
 use crate::{args::Args, config::Config, errors::InitError, network};
-
-pub type CommonDb =
-    CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainstateDb, RBCheckpointDB>;
-
-pub fn init_core_dbs(rbdb: Arc<OptimisticTransactionDB>, ops_config: DbOpsConfig) -> Arc<CommonDb> {
-    // Initialize databases.
-    let l1_db: Arc<_> = L1Db::new(rbdb.clone(), ops_config).into();
-    let l2_db: Arc<_> = L2Db::new(rbdb.clone(), ops_config).into();
-    let sync_ev_db: Arc<_> = strata_rocksdb::SyncEventDb::new(rbdb.clone(), ops_config).into();
-    let clientstate_db: Arc<_> = ClientStateDb::new(rbdb.clone(), ops_config).into();
-    let chainstate_db: Arc<_> = ChainstateDb::new(rbdb.clone(), ops_config).into();
-    let checkpoint_db: Arc<_> = RBCheckpointDB::new(rbdb.clone(), ops_config).into();
-    let database = CommonDatabase::new(
-        l1_db,
-        l2_db,
-        sync_ev_db,
-        clientstate_db,
-        chainstate_db,
-        checkpoint_db,
-    );
-
-    database.into()
-}
-
-pub fn init_broadcaster_database(
-    rbdb: Arc<OptimisticTransactionDB>,
-    ops_config: DbOpsConfig,
-) -> Arc<BroadcastDb> {
-    let l1_broadcast_db = L1BroadcastDb::new(rbdb.clone(), ops_config);
-    BroadcastDb::new(l1_broadcast_db.into()).into()
-}
-
-pub fn init_sequencer_database(
-    rbdb: Arc<OptimisticTransactionDB>,
-    ops_config: DbOpsConfig,
-) -> Arc<SequencerDB<RBSeqBlobDb>> {
-    let seqdb = RBSeqBlobDb::new(rbdb, ops_config).into();
-    SequencerDB::new(seqdb).into()
-}
 
 pub fn get_config(args: Args) -> Result<Config, InitError> {
     match args.config.as_ref() {

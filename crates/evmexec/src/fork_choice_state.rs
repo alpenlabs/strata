@@ -14,7 +14,7 @@ use crate::block::EVML2Block;
 
 pub fn fork_choice_state_initial<D: Database>(
     db: Arc<D>,
-    config: &RollupParams,
+    rollup_params: &RollupParams,
 ) -> Result<ForkchoiceState> {
     let last_cstate = get_last_checkpoint_state(db.as_ref())?;
 
@@ -25,7 +25,7 @@ pub fn fork_choice_state_initial<D: Database>(
             .and_then(|state| state.sync())
             .map(|sync_state| sync_state.chain_tip_blkid()),
     )?
-    .unwrap_or(config.evm_genesis_block_hash.into());
+    .unwrap_or(rollup_params.evm_genesis_block_hash.into());
 
     let finalized_block_hash = get_block_hash_by_id(
         db.as_ref(),

@@ -15,6 +15,7 @@ mod sequence;
 pub mod utils;
 
 use anyhow::Context;
+use strata_db::database::CommonDatabase;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
@@ -72,16 +73,25 @@ pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
 pub use bridge_relay::db::BridgeMsgDb;
 use bridge_relay::schemas::*;
 pub use broadcaster::db::L1BroadcastDb;
-use broadcaster::schemas::{BcastL1TxIdSchema, BcastL1TxSchema};
+use broadcaster::{
+    db::BroadcastDb,
+    schemas::{BcastL1TxIdSchema, BcastL1TxSchema},
+};
 pub use chain_state::db::ChainstateDb;
 pub use checkpoint::db::RBCheckpointDB;
 use checkpoint::schemas::BatchCheckpointSchema;
 pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
-use l2::schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema};
+use l2::{
+    db::L2Db,
+    schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema},
+};
 use rockbound::{schema::ColumnFamilyName, Schema};
 pub use sequencer::db::RBSeqBlobDb;
-use sequencer::schemas::{SeqBlobIdSchema, SeqBlobSchema};
+use sequencer::{
+    db::SequencerDB,
+    schemas::{SeqBlobIdSchema, SeqBlobSchema},
+};
 pub use sync_event::db::SyncEventDb;
 
 use crate::{
@@ -128,4 +138,46 @@ pub fn open_rocksdb_database(
     .context("opening database")?;
 
     Ok(Arc::new(rbdb))
+}
+
+pub type CommonDb =
+    CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainstateDb, RBCheckpointDB>;
+
+pub fn init_core_dbs(
+    rbdb: Arc<rockbound::OptimisticTransactionDB>,
+    ops_config: DbOpsConfig,
+) -> Arc<CommonDb> {
+    // Initialize databases.
+    let l1_db: Arc<_> = L1Db::new(rbdb.clone(), ops_config).into();
+    let l2_db: Arc<_> = L2Db::new(rbdb.clone(), ops_config).into();
+    let sync_ev_db: Arc<_> = SyncEventDb::new(rbdb.clone(), ops_config).into();
+    let clientstate_db: Arc<_> = ClientStateDb::new(rbdb.clone(), ops_config).into();
+    let chainstate_db: Arc<_> = ChainstateDb::new(rbdb.clone(), ops_config).into();
+    let checkpoint_db: Arc<_> = RBCheckpointDB::new(rbdb.clone(), ops_config).into();
+    let database = CommonDatabase::new(
+        l1_db,
+        l2_db,
+        sync_ev_db,
+        clientstate_db,
+        chainstate_db,
+        checkpoint_db,
+    );
+
+    database.into()
+}
+
+pub fn init_broadcaster_database(
+    rbdb: Arc<rockbound::OptimisticTransactionDB>,
+    ops_config: DbOpsConfig,
+) -> Arc<BroadcastDb> {
+    let l1_broadcast_db = L1BroadcastDb::new(rbdb.clone(), ops_config);
+    BroadcastDb::new(l1_broadcast_db.into()).into()
+}
+
+pub fn init_sequencer_database(
+    rbdb: Arc<rockbound::OptimisticTransactionDB>,
+    ops_config: DbOpsConfig,
+) -> Arc<SequencerDB<RBSeqBlobDb>> {
+    let seqdb = RBSeqBlobDb::new(rbdb, ops_config).into();
+    SequencerDB::new(seqdb).into()
 }
