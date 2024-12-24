@@ -484,11 +484,10 @@ def get_envelope_pushdata(inp: str):
 def submit_da_blob(btcrpc: BitcoindClient, seqrpc: JsonrpcClient, blobdata: str):
     _ = seqrpc.strataadmin_submitDABlob(blobdata)
 
-    # Allow some time for sequencer to publish blob
-    time.sleep(SEQ_PUBLISH_BATCH_INTERVAL_SECS)
-
-    l1_status = seqrpc.strata_l1status()
-    txid = l1_status["last_published_txid"]
-
-    tx = btcrpc.gettransaction(txid)
+    # if blob data is present in tx witness then return the transaction
+    tx = wait_until_with_value(
+        lambda: btcrpc.gettransaction(seqrpc.strata_l1status()["last_published_txid"]),
+        predicate=lambda tx: blobdata in tx.witness_data().hex(),
+        timeout=10,
+    )
     return tx
