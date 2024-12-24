@@ -143,10 +143,18 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
     async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
         let database = self.database.clone();
-        let client_state_db = database.client_state_db().as_ref();
-        let cs = reconstruct_state(client_state_db, idx)
-            .map_err(|e| Error::Db(strata_db::DbError::Other(e.to_string())))?;
-        Ok(Some(cs))
+        let cs = wait_blocking("clientstate_at_idx", move || {
+            let client_state_db = database.client_state_db();
+            match reconstruct_state(client_state_db.as_ref(), idx) {
+                Ok(client_state) => Ok(Some(client_state)),
+                Err(e) => {
+                    error!(%idx, %e, "failed to reconstruct client state");
+                    Err(Error::Other(e.to_string()))
+                }
+            }
+        })
+        .await?;
+        Ok(cs)
     }
 
     async fn protocol_version(&self) -> RpcResult<u64> {
