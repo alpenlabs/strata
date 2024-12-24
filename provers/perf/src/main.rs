@@ -13,12 +13,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = EvalArgs::parse();
 
     let mut results_text = vec![format_header(&args)];
-
     let sp1_reports = run_generator_programs(&TEST_SP1_GENERATORS);
-    //let risc0_reports = run_generator_programs(&TEST_RISC0_GENERATORS);
-
     results_text.push(format_results(&sp1_reports, "SP1".to_owned()));
-    //results_text.push(format_results(&risc0_reports, "RISC0".to_owned()));
 
     // Print results
     println!("{}", results_text.join("\n"));
@@ -29,11 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         post_to_github_pr(&args, &message).await?;
     }
 
-    if !sp1_reports
-        .iter()
-        //.chain(risc0_reports.iter())
-        .all(|r| r.success)
-    {
+    if !sp1_reports.iter().all(|r| r.success) {
         println!("Some programs failed. Please check the results above.");
         std::process::exit(1);
     }
