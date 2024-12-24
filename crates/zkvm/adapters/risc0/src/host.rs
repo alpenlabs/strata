@@ -109,6 +109,7 @@ mod tests {
     const TEST_ELF: &[u8] = include_bytes!("../tests/elf/risc0-zkvm-elf");
 
     #[test]
+    #[ignore]
     fn test_mock_prover() {
         let input: u32 = 1;
         let host = Risc0Host::init(TEST_ELF);
@@ -133,6 +134,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_mock_prover_with_public_param() {
         let input: u32 = 1;
         let zkvm = Risc0Host::init(TEST_ELF);

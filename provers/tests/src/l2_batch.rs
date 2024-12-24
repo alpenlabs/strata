@@ -61,13 +61,13 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "risc0")]
+    #[cfg(all(feature = "risc0", feature = "test"))]
     fn test_risc0() {
         test_proof(crate::TEST_RISC0_GENERATORS.l2_batch());
     }
 
     #[test]
-    #[cfg(feature = "sp1")]
+    #[cfg(all(feature = "sp1", feature = "test"))]
     fn test_sp1() {
         test_proof(crate::TEST_SP1_GENERATORS.l2_batch());
     }

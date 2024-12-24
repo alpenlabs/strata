@@ -61,3 +61,4 @@ sp1 = [
   "strata-sp1-guest-builder",
   "strata-zkvm-hosts/sp1",
 ]
+test = []

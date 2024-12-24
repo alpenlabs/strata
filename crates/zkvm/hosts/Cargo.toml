@@ -30,6 +30,7 @@ serde.workspace = true
 thiserror.workspace = true
 
 [features]
+default = []
 native = ["strata-native-zkvm-adapter"]
 risc0 = ["strata-risc0-adapter/prover", "strata-risc0-guest-builder/prover"]
 sp1 = ["strata-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]
