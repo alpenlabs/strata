@@ -3374,6 +3374,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "deadpool"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6541a3916932fe57768d4be0b1ffb5ec7cbf74ca8c903fdfd5c0fe8aa958f0ed"
+dependencies = [
+ "deadpool-runtime",
+ "num_cpus",
+ "tokio",
+]
+
+[[package]]
+name = "deadpool-runtime"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
+
+[[package]]
 name = "debug-helper"
 version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12398,6 +12415,7 @@ dependencies = [
  "async-trait",
  "bitcoin",
  "chrono",
+ "deadpool",
  "directories",
  "jsonrpsee",
  "rockbound",
@@ -12425,8 +12443,10 @@ dependencies = [
 name = "strata-bridge-exec"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bitcoin",
  "borsh",
+ "deadpool",
  "format_serde_error",
  "jsonrpsee",
  "serde",

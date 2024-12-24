@@ -21,21 +21,19 @@ use tokio::{
 };
 use tracing::{error, info, trace, warn};
 
-pub(super) struct TaskManager<L2Client, TxBuildContext, Bcast>
+pub(super) struct TaskManager<TxBuildContext, Bcast>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {
-    pub(super) exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
+    pub(super) exec_handler: Arc<ExecHandler<TxBuildContext>>,
     pub(super) broadcaster: Arc<Bcast>,
     pub(super) bridge_duty_db_ops: Arc<BridgeDutyOps>,
     pub(super) bridge_duty_idx_db_ops: Arc<BridgeDutyIndexOps>,
 }
 
-impl<L2Client, TxBuildContext, Bcast> TaskManager<L2Client, TxBuildContext, Bcast>
+impl<TxBuildContext, Bcast> TaskManager<TxBuildContext, Bcast>
 where
-    L2Client: StrataApiClient + Sync + Send + 'static,
     TxBuildContext: BuildContext + Sync + Send + 'static,
     Bcast: Broadcaster + Sync + Send + 'static,
 {
@@ -97,13 +95,12 @@ where
             .unwrap_or(Some(0))
             .unwrap_or(0);
 
+        let l2_rpc_client = self.exec_handler.l2_rpc_client_pool.get().await.expect("cannot get rpc client");
         let RpcBridgeDuties {
             duties,
             start_index,
             stop_index,
-        } = self
-            .exec_handler
-            .l2_rpc_client
+        } = l2_rpc_client
             .get_bridge_duties(self.exec_handler.own_index, start_index)
             .await?;
 
@@ -162,14 +159,13 @@ where
 /// # Errors
 ///
 /// If the duty fails to be processed.
-async fn process_duty<L2Client, TxBuildContext, Bcast>(
-    exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
+async fn process_duty<TxBuildContext, Bcast>(
+    exec_handler: Arc<ExecHandler<TxBuildContext>>,
     duty_status_ops: Arc<BridgeDutyOps>,
     broadcaster: Arc<Bcast>,
     duty: &BridgeDuty,
 ) -> ExecResult<()>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {
@@ -224,15 +220,14 @@ where
 /// # Errors
 ///
 /// If there is an error during the execution of the duty.
-async fn execute_duty<L2Client, TxBuildContext, Tx, Bcast>(
-    exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
+async fn execute_duty<TxBuildContext, Tx, Bcast>(
+    exec_handler: Arc<ExecHandler<TxBuildContext>>,
     broadcaster: Arc<Bcast>,
     duty_status_ops: Arc<BridgeDutyOps>,
     tracker_txid: Txid,
     tx_info: Tx,
 ) -> ExecResult<()>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Tx: TxKind + Debug,
     Bcast: Broadcaster,
@@ -292,13 +287,12 @@ where
 
 /// Aggregates nonces and signatures for a given [`Txid`] and then, broadcasts the fully signed
 /// transaction to Bitcoin.
-async fn aggregate_and_broadcast<L2Client, TxBuildContext, Bcast>(
-    exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
+async fn aggregate_and_broadcast<TxBuildContext, Bcast>(
+    exec_handler: Arc<ExecHandler<TxBuildContext>>,
     broadcaster: Arc<Bcast>,
     txid: &Txid,
 ) -> ExecResult<()>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {

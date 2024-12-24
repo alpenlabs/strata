@@ -6,8 +6,8 @@ use bitcoin::{
     key::{Keypair, Parity},
     secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
 };
-use jsonrpsee::{core::client::async_client::Client as L2RpcClient, ws_client::WsClientBuilder};
-use strata_bridge_exec::handler::ExecHandler;
+use deadpool::managed::{self, Pool};
+use strata_bridge_exec::{handler::ExecHandler, ws_client::{WsClientConfig, WsClientManager}};
 use strata_bridge_sig_manager::prelude::SignatureManager;
 use strata_bridge_tx_builder::prelude::TxBuildContext;
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
@@ -64,10 +64,12 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         BitcoinClient::new(args.btc_url, args.btc_user, args.btc_pass)
             .expect("error creating the bitcoin client"),
     );
-    let l2_rpc_client: L2RpcClient = WsClientBuilder::default()
-        .build(args.rollup_url)
-        .await
-        .expect("failed to connect to the rollup RPC server");
+
+    let config = WsClientConfig { url: args.rollup_url.clone() };
+    let manager = WsClientManager { config };
+    let l2_rpc_client_pool: Pool<WsClientManager> = managed::Pool::<WsClientManager>::builder(manager).max_size(5).build().unwrap();
+
+    let l2_rpc_client = l2_rpc_client_pool.get().await.expect("cannot get rpc client");
 
     // Get the keypair after deriving the wallet xpriv.
     let operator_keys = resolve_xpriv(args.master_xpriv, args.master_xpriv_path)?;
@@ -132,7 +134,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let exec_handler = ExecHandler {
         tx_build_ctx: tx_context,
         sig_manager,
-        l2_rpc_client,
+        l2_rpc_client_pool,
         keypair,
         own_index,
         msg_polling_interval,

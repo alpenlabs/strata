@@ -248,7 +248,7 @@ tracing-opentelemetry = "0.27"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 zeroize = { version = "1.8.1", features = ["derive"] }
-
+deadpool = "0.12.1"
 # This is needed for custom build of SP1
 [profile.release.build-override]
 opt-level = 3
