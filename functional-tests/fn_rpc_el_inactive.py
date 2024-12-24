@@ -1,3 +1,5 @@
+import time
+
 import flexitest
 from web3 import Web3
 
@@ -46,23 +48,25 @@ class SeqStatusElInactiveTest(testenv.StrataTester):
 
         assert not web3.is_connected(), "Reth did not stop"
 
-        # check if rpc is still working after sequencer has stopped
+        # check if rpc is still working
         wait_until(
-            lambda: seqrpc.strata_protocolVersion() is not None,
-            error_with="Sequencer stopped after Reth stopped",
+            lambda: seqrpc.strata_clientStatus() is not None,
+            error_with="RPC server of sequencer crashed",
         )
 
-        # check if sync status is working properly
-        wait_until(
-            lambda: seqrpc.strata_syncStatus() is not None,
-            error_with="Sequencer stopped after Reth stopped",
-        )
+        cur_slot = seqrpc.strata_clientStatus()["chain_tip_slot"]
+        # wait for 2 seconds
+        time.sleep(2)
+        new_slot = seqrpc.strata_clientStatus()["chain_tip_slot"]
+
+        # block production should halt
+        assert cur_slot == new_slot, "Block production didn't halt"
 
         # check if new l1 blocks are being recognized
         cur_l1_height = seqrpc.strata_l1status()["cur_height"]
         wait_until(
             lambda: seqrpc.strata_l1status()["cur_height"] > cur_l1_height,
-            error_with="Sequencer stopped after Reth stopped",
+            error_with="L1 reader crashed after reth stopped",
         )
 
         reth.start()
