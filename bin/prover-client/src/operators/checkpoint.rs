@@ -92,7 +92,7 @@ impl ProvingOp for CheckpointOperator {
 
         let l2_batch_keys = self
             .l2_batch_operator
-            .create_task(checkpoint_info.l2_range, task_tracker.clone(), db)
+            .create_task(vec![checkpoint_info.l2_range], task_tracker.clone(), db)
             .await?;
         let l2_batch_id = l2_batch_keys.first().expect("at least one").context();
 

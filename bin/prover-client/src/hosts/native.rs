@@ -22,37 +22,37 @@ const MOCK_VK: [u32; 8] = [0u32; 8];
 /// allowing for efficient host selection for different proof types.
 pub fn get_host(id: &ProofContext) -> NativeHost {
     match id {
-        ProofContext::BtcBlockspace(_) => NativeHost {
+        ProofContext::BtcBlockspace(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_blockspace_proof_outer(zkvm);
                 Ok(())
             })),
         },
-        ProofContext::L1Batch(_, _) => NativeHost {
+        ProofContext::L1Batch(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_l1_batch_proof(zkvm, &MOCK_VK);
                 Ok(())
             })),
         },
-        ProofContext::EvmEeStf(_, _) => NativeHost {
+        ProofContext::EvmEeStf(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_block_transaction_outer(zkvm);
                 Ok(())
             })),
         },
-        ProofContext::ClStf(_) => NativeHost {
+        ProofContext::ClStf(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 batch_process_cl_stf(zkvm, &MOCK_VK);
                 Ok(())
             })),
         },
-        ProofContext::ClAgg(_, _) => NativeHost {
+        ProofContext::ClAgg(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_cl_agg(zkvm, &MOCK_VK);
                 Ok(())
             })),
         },
-        ProofContext::Checkpoint(_) => NativeHost {
+        ProofContext::Checkpoint(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_checkpoint_proof_outer(zkvm, &MOCK_VK, &MOCK_VK);
                 Ok(())

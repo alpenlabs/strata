@@ -96,11 +96,11 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .expect("failed to create task"))
     }
 
-    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_cl_block(&self, cl_block_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
         Ok(self
             .operator
             .cl_stf_operator()
-            .create_task(cl_block_num, self.task_tracker.clone(), &self.db)
+            .create_task(cl_block_range, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }
@@ -114,7 +114,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .expect("failed to create task"))
     }
 
-    async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_l2_batch(&self, l2_range: Vec<(u64, u64)>) -> RpcResult<Vec<ProofKey>> {
         Ok(self
             .operator
             .cl_agg_operator()
