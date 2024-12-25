@@ -1,7 +1,6 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Address, BlockHash};
-use config::{ClientMode, Config, SequencerConfig};
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
@@ -10,7 +9,10 @@ use strata_btcio::{
     rpc::{traits::Reader, BitcoinClient},
     writer::{config::WriterConfig, start_inscription_task},
 };
-use strata_common::logging;
+use strata_common::{
+    config::{ClientMode, Config, SequencerConfig},
+    logging,
+};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
     duty::{types::DutyBatch, worker as duty_worker},
@@ -27,12 +29,12 @@ use strata_primitives::params::Params;
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, init_broadcaster_database, init_core_dbs,
     init_sequencer_database, open_rocksdb_database, sequencer::db::SequencerDB, CommonDb,
-    DbOpsConfig, RBSeqBlobDb,
+    DbOpsConfig, RBSeqBlobDb, ROCKSDB_NAME,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
-    managers::{create_db_managers, DbManagers},
+    managers::{create_db_manager, DbManager},
     ops::bridge_relay::BridgeMsgOps,
     L2BlockManager,
 };
@@ -47,7 +49,6 @@ use tracing::*;
 use crate::{args::Args, helpers::*};
 
 mod args;
-mod config;
 mod errors;
 mod extractor;
 mod helpers;
@@ -91,12 +92,12 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let pool = threadpool::ThreadPool::with_name("strata-pool".to_owned(), 8);
 
     // Open and initialize rocksdb.
-    let rbdb = open_rocksdb_database(&config.client.datadir)?;
+    let rbdb = open_rocksdb_database(&config.client.datadir, ROCKSDB_NAME)?;
     let ops_config = DbOpsConfig::new(config.client.db_retry_count);
 
     // Initialize core databases
     let database = init_core_dbs(rbdb.clone(), ops_config);
-    let managers = create_db_managers(database.clone(), pool.clone());
+    let manager = create_db_manager(database.clone(), pool.clone());
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
@@ -104,7 +105,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bridge_msg_ctx = strata_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
-    let checkpoint_handle: Arc<_> = CheckpointHandle::new(managers.checkpoint()).into();
+    let checkpoint_handle: Arc<_> = CheckpointHandle::new(manager.checkpoint()).into();
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
 
     // Check if we have to do genesis.
@@ -121,7 +122,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         &config,
         params.clone(),
         database,
-        &managers,
+        &manager,
         bridge_msg_ops,
         bitcoin_client,
     )?;
@@ -296,7 +297,7 @@ fn start_core_tasks(
     config: &Config,
     params: Arc<Params>,
     database: Arc<CommonDb>,
-    managers: &DbManagers,
+    managers: &DbManager,
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
