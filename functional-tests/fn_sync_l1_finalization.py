@@ -20,14 +20,6 @@ class BlockFinalizationTest(testenv.StrataTester):
         settings = net_settings.get_fast_batch_settings()
         settings.genesis_trigger = premine_blocks + 5
 
-        # TODO apply the rest of these
-        #    **FAST_BATCH_ROLLUP_PARAMS,
-        #    # Setup reasonal horizon/genesis height
-        #    "horizon_l1_height": premine_blocks - 3,
-        #    "genesis_l1_height": premine_blocks + 5,
-        #    "proof_publish_mode": {
-        #        "timeout": self.timeout,
-
         ctx.set_env(testenv.BasicEnvConfig(premine_blocks, rollup_settings=settings))
 
     def main(self, ctx: flexitest.RunContext):

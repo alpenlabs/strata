@@ -6,7 +6,7 @@ from flexitest.service import Service
 
 import net_settings
 import testenv
-from constants import FAST_BATCH_ROLLUP_PARAMS
+from constants import DEFAULT_ROLLUP_PARAMS
 from utils import (
     ManualGenBlocksConfig,
     check_nth_checkpoint_finalized,
@@ -40,7 +40,7 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         seq_addr = seq.get_prop("address")
 
         # FIXME change this to fetch from the params
-        finality_depth = FAST_BATCH_ROLLUP_PARAMS["l1_reorg_safe_depth"]
+        finality_depth = DEFAULT_ROLLUP_PARAMS["l1_reorg_safe_depth"]
 
         # Wait for seq
         wait_until(
@@ -71,7 +71,7 @@ def check_nth_checkpoint_finalized_on_reorg(checkpt_idx: int, seq: Service, btc:
     seqrpc = seq.create_rpc()
     btcrpc = btc.create_rpc()
     seq_addr = seq.get_prop("address")
-    finality_depth = FAST_BATCH_ROLLUP_PARAMS["l1_reorg_safe_depth"]
+    finality_depth = DEFAULT_ROLLUP_PARAMS["l1_reorg_safe_depth"]
     manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth, seq_addr)
 
     # gen some blocks
