@@ -1,5 +1,3 @@
-from bitcoinlib.keys import Key
-
 BD_USERNAME = "alpen"
 BD_PASSWORD = "alpen"
 DD_ROOT = "_dd"
@@ -30,48 +28,5 @@ DEFAULT_EPOCH_SLOTS = 64
 DEFAULT_GENESIS_TRIGGER_HT = 5
 DEFAULT_OPERATOR_CNT = 2
 DEFAULT_PROOF_TIMEOUT = 5  # Secs
+DEFAULT_MESSAGE_INTERVAL_MSEC = 500
 DEFAULT_TAKEBACK_TIMEOUT = 1008  # Blocks (1 week)
-
-# magic values
-# TODO Remove every single one of these
-EVM_GENESIS_BLOCK_STATE_HASH = "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
-EVM_GENESIS_BLOCK_STATE_ROOT = "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-ROLLUP_VK = "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
-SEQ_KEY = b"alpen" + b"_1337" * 5 + b"xx"  # must be 32 bytes
-SEQ_PUBKEY = Key(SEQ_KEY.hex()).x_hex
-
-# TODO initialize this with the new genesis tool instead of having it hardcoded
-DEFAULT_ROLLUP_PARAMS: dict = {
-    "rollup_name": "alpenstrata",
-    "block_time": int(DEFAULT_BLOCK_TIME_SEC * 1_000),
-    "message_interval": int((DEFAULT_BLOCK_TIME_SEC * 1_000) / 2),
-    "cred_rule": {
-        "schnorr_key": SEQ_PUBKEY,
-    },
-    "horizon_l1_height": 3,
-    "genesis_l1_height": DEFAULT_GENESIS_TRIGGER_HT,
-    "evm_genesis_block_hash": EVM_GENESIS_BLOCK_STATE_HASH,
-    "evm_genesis_block_state_root": EVM_GENESIS_BLOCK_STATE_ROOT,
-    "l1_reorg_safe_depth": 4,
-    "target_l2_batch_size": DEFAULT_EPOCH_SLOTS,
-    "address_length": 20,
-    "deposit_amount": 1_000_000_000,
-    # 5% according to `OPERATOR_FEE` in `bridge-tx-builder/src/constants.rs
-    "operator_fee": 50_000_000,
-    # ANYONE_CAN_SPEND_OUTPUT_VALUE (330) in `bridge-tx-builder/src/constants.rs`
-    # + 5.5 sats/vB (200 vbytes) according to `MIN_RELAY_FEE`
-    # in `bridge-tx-builder/src/constants.rs`
-    "withdraw_extra_fee": int(330 + 5.5 * 200),
-    "rollup_vk": {
-        "risc0": ROLLUP_VK,
-    },
-    "dispatch_assignment_dur": 64,
-    "proof_publish_mode": {
-        # use an empty proof in batch after this many seconds of not receiving a proof
-        # "timeout": 30,
-        "timeout": 60 * 10,
-    },
-    "max_deposits_in_block": 16,
-    "operator_config": {"static": [{"signing_pk": "01" * 32, "wallet_pk": "02" * 32}]},
-    "network": "regtest",
-}

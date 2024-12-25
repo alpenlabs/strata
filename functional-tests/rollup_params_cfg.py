@@ -48,3 +48,13 @@ class RollupConfig(BaseModel):
     proof_publish_mode: ProofPublishMode
     max_deposits_in_block: int
     network: str
+
+    # Additional fields that aren't coming from datatool config generation (yet)
+    # and has to be supplied manually.
+    # TODO: extend datatool to return OPERATOR_FEE from bridge-tx-builder/src/constants.rs
+    operator_fee: int = 50_000_000
+    # TODO: this is currently an inconsistent mess, figure it out.
+    # ANYONE_CAN_SPEND_OUTPUT_VALUE (330) in `bridge-tx-builder/src/constants.rs`
+    # + 5.5 sats/vB (200 vbytes) according to `MIN_RELAY_FEE`
+    # in `bridge-tx-builder/src/constants.rs`
+    withdraw_extra_fee: int = int(330 + 5.5 * 200)

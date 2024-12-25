@@ -114,6 +114,7 @@ class RollupParamsSettings:
     block_time_sec: int
     epoch_slots: int
     genesis_trigger: int
+    message_interval: int
     proof_timeout: Optional[int] = None
 
     # NOTE: type annotation: Ideally we would use `Self` but couldn't use it
@@ -124,6 +125,7 @@ class RollupParamsSettings:
             block_time_sec=DEFAULT_BLOCK_TIME_SEC,
             epoch_slots=DEFAULT_EPOCH_SLOTS,
             genesis_trigger=DEFAULT_GENESIS_TRIGGER_HT,
+            message_interval=DEFAULT_MESSAGE_INTERVAL_MSEC,
             proof_timeout=DEFAULT_PROOF_TIMEOUT,
         )
 

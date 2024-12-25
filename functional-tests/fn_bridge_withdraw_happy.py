@@ -12,25 +12,19 @@ from web3.middleware import SignAndSendRawMiddlewareBuilder
 
 import testenv
 from constants import (
-    DEFAULT_ROLLUP_PARAMS,
     PRECOMPILE_BRIDGEOUT_ADDRESS,
     SATS_TO_WEI,
     UNSPENDABLE_ADDRESS,
 )
+from rollup_params_cfg import RollupConfig
 from utils import get_bridge_pubkey, wait_until
 
 # Local constants
-# D BTC
-DEPOSIT_AMOUNT = DEFAULT_ROLLUP_PARAMS["deposit_amount"]
 # Gas for the withdrawal transaction
 WITHDRAWAL_GAS_FEE = 22_000  # technically is 21_000
 # Ethereum Private Key
 # NOTE: don't use this private key in production
 ETH_PRIVATE_KEY = "0x0000000000000000000000000000000000000000000000000000000000000001"
-# BTC Operator's fee for withdrawal
-OPERATOR_FEE = DEFAULT_ROLLUP_PARAMS["operator_fee"]
-# BTC extra fee for withdrawal
-WITHDRAWAL_EXTRA_FEE = DEFAULT_ROLLUP_PARAMS["withdraw_extra_fee"]
 
 
 @flexitest.register
@@ -48,6 +42,15 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
     def main(self, ctx: flexitest.RunContext):
         address = ctx.env.gen_ext_btc_address()
         withdraw_address = ctx.env.gen_ext_btc_address()
+
+        cfg: RollupConfig = ctx.env.rollup_cfg()
+        # D BTC
+        deposit_amount = cfg.deposit_amount
+        # BTC Operator's fee for withdrawal
+        operator_fee = cfg.operator_fee
+        # BTC extra fee for withdrawal
+        withdraw_extra_fee = cfg.withdraw_extra_fee
+
         self.debug(f"Address: {address}")
         self.debug(f"Change Address: {withdraw_address}")
         self.debug(f"Gas: {WITHDRAWAL_GAS_FEE}")
@@ -105,13 +108,13 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         balance_after_deposits = int(rethrpc.eth_getBalance(el_address), 16)
         self.debug(f"Strata Balance after deposits: {balance_after_deposits}")
         wait_until(
-            lambda: int(rethrpc.eth_getBalance(el_address), 16) == 2 * DEPOSIT_AMOUNT * SATS_TO_WEI
+            lambda: int(rethrpc.eth_getBalance(el_address), 16) == 2 * deposit_amount * SATS_TO_WEI
         )
 
         # Get the balance of the EL address after the deposits
         balance = int(rethrpc.eth_getBalance(el_address), 16)
         self.debug(f"Strata Balance after deposits: {balance}")
-        assert balance == 2 * DEPOSIT_AMOUNT * SATS_TO_WEI, "Strata balance is not expected"
+        assert balance == 2 * deposit_amount * SATS_TO_WEI, "Strata balance is not expected"
 
         # Send funds to the bridge precompile address for a withdrawal
         change_address_pk = extract_p2tr_pubkey(withdraw_address)
@@ -135,7 +138,7 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         # Make sure that the balance is expected
         balance_post_withdraw = int(rethrpc.eth_getBalance(el_address), 16)
         self.debug(f"Strata Balance after withdrawal: {balance_post_withdraw}")
-        difference = DEPOSIT_AMOUNT * SATS_TO_WEI - total_gas_used
+        difference = deposit_amount * SATS_TO_WEI - total_gas_used
         self.debug(f"Strata Balance difference: {difference}")
         assert difference == balance_post_withdraw, "balance difference is not expected"
 
@@ -147,7 +150,7 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         # Make sure that the balance in the BTC wallet is D BTC - operator's fees
         btc_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
         self.debug(f"BTC balance: {btc_balance}")
-        difference = DEPOSIT_AMOUNT - OPERATOR_FEE - WITHDRAWAL_EXTRA_FEE
+        difference = deposit_amount - operator_fee - withdraw_extra_fee
         self.debug(f"BTC expected balance: {original_balance + difference}")
         assert btc_balance == original_balance + difference, "BTC balance is not expected"
 
@@ -202,11 +205,12 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         self.debug(f"Bridge address: {PRECOMPILE_BRIDGEOUT_ADDRESS}")
 
         data_bytes = bytes.fromhex(change_address_pk)
+        deposit_amount = ctx.env.rollup_cfg().deposit_amount
 
         transaction = {
             "from": el_address,
             "to": PRECOMPILE_BRIDGEOUT_ADDRESS,
-            "value": DEPOSIT_AMOUNT * SATS_TO_WEI,
+            "value": deposit_amount * SATS_TO_WEI,
             "gas": gas,
             "data": data_bytes,
         }
@@ -223,11 +227,12 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         self.debug(f"Bridge address: {PRECOMPILE_BRIDGEOUT_ADDRESS}")
 
         data_bytes = bytes.fromhex(change_address_pk)
+        deposit_amount = ctx.env.rollup_cfg().deposit_amount
 
         transaction = {
             "from": el_address,
             "to": PRECOMPILE_BRIDGEOUT_ADDRESS,
-            "value": DEPOSIT_AMOUNT * SATS_TO_WEI,
+            "value": deposit_amount * SATS_TO_WEI,
             "data": data_bytes,
         }
         return web3.eth.estimate_gas(transaction)
