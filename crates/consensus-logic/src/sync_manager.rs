@@ -8,7 +8,7 @@ use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
-use strata_storage::managers::DbManagers;
+use strata_storage::managers::DbManager;
 use strata_tasks::TaskExecutor;
 use tokio::sync::{broadcast, mpsc};
 
@@ -79,7 +79,7 @@ pub fn start_sync_tasks<
 >(
     executor: &TaskExecutor,
     database: Arc<D>,
-    managers: &DbManagers,
+    managers: &DbManager,
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,

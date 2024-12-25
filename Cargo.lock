@@ -12998,9 +12998,13 @@ dependencies = [
 name = "strata-common"
 version = "0.1.0"
 dependencies = [
+ "bitcoin",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "serde",
+ "strata-primitives",
+ "toml 0.5.11",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber 0.3.18",

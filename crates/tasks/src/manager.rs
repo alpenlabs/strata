@@ -376,15 +376,6 @@ impl TaskExecutor {
     }
 }
 
-pub fn init_task_manager() -> TaskManager {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name("strata-rt")
-        .build()
-        .expect("init: build rt");
-    TaskManager::new(runtime.handle().clone())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

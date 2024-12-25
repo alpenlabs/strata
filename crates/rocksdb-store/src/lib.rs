@@ -20,7 +20,7 @@ use strata_db::database::CommonDatabase;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-pub const ROCKSDB_NAME: &str = "strata";
+pub const ROCKSDB_NAME: &str = "strata-client";
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     SequenceSchema::COLUMN_FAMILY_NAME,
@@ -117,6 +117,7 @@ impl DbOpsConfig {
 // Opens rocksdb database instance from datadir
 pub fn open_rocksdb_database(
     datadir: &Path,
+    dbname: &'static str,
 ) -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
     let mut database_dir = datadir.to_path_buf();
     database_dir.push("rocksdb");
@@ -131,7 +132,7 @@ pub fn open_rocksdb_database(
 
     let rbdb = rockbound::OptimisticTransactionDB::open(
         &database_dir,
-        ROCKSDB_NAME,
+        dbname,
         STORE_COLUMN_FAMILIES.iter().map(|s| s.to_string()),
         &opts,
     )
