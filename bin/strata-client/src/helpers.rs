@@ -4,6 +4,7 @@ use alloy_rpc_types::engine::JwtSecret;
 use bitcoin::{base58, bip32::Xpriv, Address, Network};
 use format_serde_error::SerdeError;
 use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
+use strata_common::config::Config;
 use strata_consensus_logic::{
     csm::state_tracker,
     duty::types::{Identity, IdentityData, IdentityKey},
@@ -25,17 +26,17 @@ use tokio::runtime::Handle;
 use tracing::*;
 use zeroize::Zeroize;
 
-use crate::{args::Args, config::Config, errors::InitError, network};
+use crate::{args::Args, errors::InitError, network};
 
 pub fn get_config(args: Args) -> Result<Config, InitError> {
     match args.config.as_ref() {
         Some(config_path) => {
             // Values passed over arguments get the precedence over the configuration files
             let mut config = load_configuration(config_path)?;
-            config.update_from_args(&args);
+            args.update_config(&mut config);
             Ok(config)
         }
-        None => match Config::from_args(&args) {
+        None => match args.derive_config() {
             Err(msg) => {
                 eprintln!("Error: {}", msg);
                 std::process::exit(1);
@@ -102,6 +103,7 @@ fn load_rollup_params(path: &Path) -> Result<RollupParams, InitError> {
     Ok(rollup_params)
 }
 
+// TODO: remove this after builder is done
 pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinClient>> {
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -186,7 +188,7 @@ pub fn init_engine_controller(
         client,
         initial_fcs,
         handle.clone(),
-        l2_block_manager.clone(),
+        l2_block_manager,
     );
     let eng_ctl = Arc::new(eng_ctl);
     Ok(eng_ctl)
