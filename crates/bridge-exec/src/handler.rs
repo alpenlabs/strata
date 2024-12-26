@@ -126,7 +126,8 @@ where
             .l2_rpc_client_pool
             .get()
             .await
-            .expect("cannot get client");
+            .map_err(|err| ExecError::WsPool(err))?;
+
         l2_rpc_client.submit_bridge_msg(raw_message.into()).await?;
 
         info!(%txid, ?scope, ?payload, "broadcasted message");
@@ -289,9 +290,11 @@ where
         Payload: BorshDeserialize + Debug,
     {
         let raw_scope: HexBytes = scope.into();
-        info!(scope=?scope, "getting messages from the L2 Client");
-        // TODO ASH convert this to concrete ExecError
-        let l2_rpc_client = self.l2_rpc_client_pool.get().await.expect("no rpc client");
+        info!(scope = ?scope, "getting messages from the L2 Client");
+
+        let l2_rpc_client = self.l2_rpc_client_pool.get()
+            .await
+            .map_err(|err| ExecError::WsPool(err))?;
 
         let received_payloads = l2_rpc_client
             .get_msgs_by_scope(raw_scope)
