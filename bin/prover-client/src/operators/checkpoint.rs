@@ -69,6 +69,7 @@ impl CheckpointOperator {
             .ok_or(ProvingTaskError::WitnessNotFound)
     }
 
+    /// Returns a reference to the internal CL (Consensus Layer) `HttpClient`.
     pub fn cl_client(&self) -> &HttpClient {
         &self.cl_client
     }

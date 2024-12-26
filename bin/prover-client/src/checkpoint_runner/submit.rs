@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use jsonrpsee::{
     core::{client::ClientT, params::ArrayParams},
     http_client::HttpClient,
@@ -13,7 +15,7 @@ pub async fn submit_checkpoint_proof(
     checkpoint_index: u64,
     sequencer_client: &HttpClient,
     proof_key: ProofKey,
-    proof_db: &ProofDb,
+    proof_db: Arc<ProofDb>,
 ) -> anyhow::Result<()> {
     let proof = proof_db.get_proof(proof_key).unwrap().unwrap();
     let proof_bytes = HexBytes::from(proof.proof().as_bytes());

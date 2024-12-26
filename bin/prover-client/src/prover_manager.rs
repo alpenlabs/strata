@@ -6,8 +6,8 @@ use tokio::{spawn, sync::Mutex, time::sleep};
 use tracing::{error, info};
 
 use crate::{
-    errors::ProvingTaskError, operators::ProofOperator, status::ProvingTaskStatus,
-    task_tracker::TaskTracker,
+    checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError,
+    operators::ProofOperator, status::ProvingTaskStatus, task_tracker::TaskTracker,
 };
 
 #[derive(Debug, Clone)]
@@ -67,10 +67,14 @@ impl ProverManager {
 
                 // Spawn a new task
                 spawn(async move {
-                    match make_proof(operator.clone(), task_tracker, task, db).await {
+                    match make_proof(operator.clone(), task_tracker, task, db.clone()).await {
                         Ok(_) => {
-                            if let ProofContext::Checkpoint(ckp_id) = task.context() {
-                                submit_checkpoint(*ckp_id, operator.clone()).await;
+                            // If checkpoint proving; submit proof to sequencer
+                            if let ProofContext::Checkpoint(checkpoint_index) = task.context() {
+                                let cl_client = operator.checkpoint_operator().cl_client();
+                                let _ =
+                                    submit_checkpoint_proof(*checkpoint_index, cl_client, task, db)
+                                        .await;
                             }
                         }
                         Err(err) => {
@@ -84,10 +88,6 @@ impl ProverManager {
             sleep(Duration::from_secs(self.loop_interval)).await;
         }
     }
-}
-
-async fn submit_checkpoint(ckp_id: u64, operator: Arc<ProofOperator>) {
-    println!("submmiting the checkpint {:?}", ckp_id);
 }
 
 pub async fn make_proof(
