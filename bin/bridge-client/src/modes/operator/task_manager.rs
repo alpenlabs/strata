@@ -44,45 +44,46 @@ where
     ) -> anyhow::Result<()> {
         info!(?duty_polling_interval, "Starting to poll for duties");
         loop {
-            let RpcBridgeDuties {
+            if let Ok(RpcBridgeDuties {
                 duties,
                 start_index,
                 stop_index,
-            } = self.poll_duties().await?;
+            }) = self.poll_duties().await
+            {
+                info!(num_duties = duties.len(), "got duties");
 
-            info!(num_duties = duties.len(), "got duties");
+                let mut handles = JoinSet::new();
+                for duty in duties {
+                    let exec_handler = self.exec_handler.clone();
+                    let bridge_duty_ops = self.bridge_duty_db_ops.clone();
+                    let broadcaster = self.broadcaster.clone();
+                    handles.spawn(async move {
+                        process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
+                    });
+                }
 
-            let mut handles = JoinSet::new();
-            for duty in duties {
-                let exec_handler = self.exec_handler.clone();
-                let bridge_duty_ops = self.bridge_duty_db_ops.clone();
-                let broadcaster = self.broadcaster.clone();
-                handles.spawn(async move {
-                    process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
-                });
-            }
-
-            // TODO: There should be timeout duration based on duty and not a common timeout
-            // duration
-            if let Ok(any_failed) = timeout(duty_timeout_duration, handles.join_all()).await {
-                // if none of the duties failed, update the duty index so that the
-                // next batch is fetched in the next poll.
-                //
-                // otherwise, don't update the index so that the current batch is refetched and
-                // ones that were not executed successfully are executed again.
-                if !any_failed.iter().any(|res| res.is_err()) {
-                    info!(%start_index, %stop_index, "updating duty index");
-                    if let Err(e) = self
-                        .bridge_duty_idx_db_ops
-                        .set_index_async(stop_index)
-                        .await
-                    {
-                        error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                // TODO: There should be timeout duration based on duty and not a common timeout
+                // duration
+                if let Ok(any_failed) = timeout(duty_timeout_duration, handles.join_all()).await {
+                    // if none of the duties failed, update the duty index so that the
+                    // next batch is fetched in the next poll.
+                    //
+                    // otherwise, don't update the index so that the current batch is refetched and
+                    // ones that were not executed successfully are executed again.
+                    if !any_failed.iter().any(|res| res.is_err()) {
+                        info!(%start_index, %stop_index, "updating duty index");
+                        if let Err(e) = self
+                            .bridge_duty_idx_db_ops
+                            .set_index_async(stop_index)
+                            .await
+                        {
+                            error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                        }
                     }
                 }
-            }
 
-            sleep(duty_polling_interval).await;
+                sleep(duty_polling_interval).await;
+            }
         }
     }
 
@@ -95,7 +96,12 @@ where
             .unwrap_or(Some(0))
             .unwrap_or(0);
 
-        let l2_rpc_client = self.exec_handler.l2_rpc_client_pool.get().await.expect("cannot get rpc client");
+        let l2_rpc_client = self
+            .exec_handler
+            .l2_rpc_client_pool
+            .get()
+            .await
+            .expect("cannot get rpc client");
         let RpcBridgeDuties {
             duties,
             start_index,

@@ -1,23 +1,31 @@
 use core::fmt;
 
 use deadpool::managed::{self, Manager, RecycleError, RecycleResult};
-use jsonrpsee::{core::{async_trait, client::{BatchResponse, ClientT}, params::BatchRequestBuilder, traits::ToRpcParams, BoxError, DeserializeOwned},  ws_client::{WsClient as WebsocketClient, WsClientBuilder}};
-use jsonrpsee::core::ClientError;
+use jsonrpsee::{
+    core::{
+        async_trait,
+        client::{BatchResponse, ClientT},
+        params::BatchRequestBuilder,
+        traits::ToRpcParams,
+        BoxError, ClientError, DeserializeOwned,
+    },
+    ws_client::{WsClient as WebsocketClient, WsClientBuilder},
+};
 
 #[derive(Clone, Debug)]
 pub struct WsClientConfig {
-    pub url: String
+    pub url: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct WsClientManager {
-    pub config: WsClientConfig
+    pub config: WsClientConfig,
 }
 
 #[derive(Debug)]
 pub enum WsClientState {
     Working(WebsocketClient),
-    NotWorking
+    NotWorking,
 }
 
 #[derive(Debug)]
@@ -49,12 +57,16 @@ impl Manager for WsClientManager {
                 if cl.is_connected() {
                     Ok(())
                 } else {
-                    Err(RecycleError::Message("Connection lost, recreate client".to_string().into()))
+                    Err(RecycleError::Message(
+                        "Connection lost, recreate client".to_string().into(),
+                    ))
                 }
-            },
-            WsClientState::NotWorking => {
-                  Err(RecycleError::Message("Connection still not found, recreate client".to_string().into()))
-            },
+            }
+            WsClientState::NotWorking => Err(RecycleError::Message(
+                "Connection still not found, recreate client"
+                    .to_string()
+                    .into(),
+            )),
         }
     }
 }
@@ -64,43 +76,31 @@ impl ClientT for WsClient {
     /// Send a [notification request](https://www.jsonrpc.org/specification#notification).
     ///
     /// Notifications do not produce a response on the JSON-RPC server.
-    async fn notification<Params>(
-        &self,
-        method: &str,
-        params: Params,
-    ) -> Result<(), ClientError>
+    async fn notification<Params>(&self, method: &str, params: Params) -> Result<(), ClientError>
     where
-        Params: ToRpcParams + Send ,
+        Params: ToRpcParams + Send,
     {
         match &self.0 {
-            WsClientState::Working(inner) => {
-                inner.notification(method, params).await
-            }
-            WsClientState::NotWorking => Err(ClientError::Transport(
-                BoxError::from("Client is NotWorking".to_string()),
-            )),
+            WsClientState::Working(inner) => inner.notification(method, params).await,
+            WsClientState::NotWorking => Err(ClientError::Transport(BoxError::from(
+                "Client is Not Working".to_string(),
+            ))),
         }
     }
 
     /// Send a [method call request](https://www.jsonrpc.org/specification#request_object).
     ///
     /// Returns `Ok` if the server responds successfully, otherwise a `ClientError`.
-    async fn request<R, Params>(
-        &self,
-        method: &str,
-        params: Params,
-    ) -> Result<R, ClientError>
+    async fn request<R, Params>(&self, method: &str, params: Params) -> Result<R, ClientError>
     where
         R: DeserializeOwned,
         Params: ToRpcParams + Send,
     {
         match &self.0 {
-            WsClientState::Working(inner) => {
-                inner.request(method, params).await
-            }
-            WsClientState::NotWorking => Err(ClientError::Transport(
-                BoxError::from("Client is NotWorking".to_string()),
-            )),
+            WsClientState::Working(inner) => inner.request(method, params).await,
+            WsClientState::NotWorking => Err(ClientError::Transport(BoxError::from(
+                "Client is Not Working".to_string(),
+            ))),
         }
     }
 
@@ -117,12 +117,10 @@ impl ClientT for WsClient {
         R: DeserializeOwned + fmt::Debug + 'a,
     {
         match &self.0 {
-            WsClientState::Working(inner) => {
-                inner.batch_request(batch).await
-            }
-            WsClientState::NotWorking => Err(ClientError::Transport(
-                BoxError::from("Client is NotWorking".to_string()),
-            )),
+            WsClientState::Working(inner) => inner.batch_request(batch).await,
+            WsClientState::NotWorking => Err(ClientError::Transport(BoxError::from(
+                "Client is NotWorking".to_string(),
+            ))),
         }
     }
 }
