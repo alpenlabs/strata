@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 strata-bridge-tx-builder.workspace = true
 strata-common.workspace = true
+strata-component.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true

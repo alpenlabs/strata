@@ -49,6 +49,9 @@ use tracing::*;
 use crate::{args::Args, helpers::*};
 
 mod args;
+mod builder;
+mod client;
+mod component; // TODO: REMOVE THIS, experimental
 mod errors;
 mod extractor;
 mod helpers;

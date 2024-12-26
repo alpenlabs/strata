@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 strata-btcio.workspace = true
 strata-chaintsn.workspace = true
+strata-component.workspace = true
 strata-crypto = { workspace = true, default-features = true }
 strata-db.workspace = true
 strata-eectl.workspace = true

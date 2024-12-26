@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
-use strata_component::CsmHandle;
 use strata_db::{errors::DbError, traits::*};
 use strata_state::sync_event::SyncEvent;
 use tokio::sync::{mpsc, oneshot};
 use tracing::*;
 
-use super::message::CsmMessage;
-
+/// Sync control message.
+#[derive(Copy, Clone, Debug)]
+pub enum CsmMessage {
+    /// Process a sync event at a given index.
+    EventInput(u64),
+}
 /// Controller handle for the consensus state machine.  Used to submit new sync
 /// events for persistence and processing.
 pub struct CsmController {
@@ -27,10 +30,6 @@ impl CsmController {
             csm_tx,
         }
     }
-}
-
-impl CsmHandle for CsmController {
-    type Event = SyncEvent;
 
     /// Writes a sync event to the database and updates the watch channel to
     /// trigger the CSM executor to process the event.

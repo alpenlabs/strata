@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use strata_chaintsn::transition::process_block;
+use strata_component::CsmHandle;
 use strata_db::{
     errors::DbError,
     traits::{BlockStatus, ChainstateDatabase, Database},

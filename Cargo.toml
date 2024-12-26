@@ -6,6 +6,7 @@ members = [
   "crates/bridge-tx-builder",
   "crates/btcio",
   "crates/chaintsn",
+  "crates/component",
   "crates/common",
   "crates/consensus-logic",
   "crates/crypto",
@@ -80,6 +81,7 @@ strata-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
 strata-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 strata-btcio = { path = "crates/btcio" }
 strata-chaintsn = { path = "crates/chaintsn" }
+strata-component = { path = "crates/component" }
 strata-common = { path = "crates/common" }
 strata-consensus-logic = { path = "crates/consensus-logic" }
 strata-crypto = { path = "crates/crypto", default-features = false }

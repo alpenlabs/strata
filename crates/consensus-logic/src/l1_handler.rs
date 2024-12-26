@@ -6,6 +6,7 @@ use bitcoin::{
     Block, Wtxid,
 };
 use secp256k1::XOnlyPublicKey;
+use strata_component::CsmHandle;
 use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,

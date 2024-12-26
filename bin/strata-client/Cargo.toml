@@ -11,6 +11,7 @@ path = "src/main.rs"
 strata-bridge-relay.workspace = true
 strata-bridge-tx-builder.workspace = true
 strata-btcio.workspace = true
+strata-component.workspace = true
 strata-common.workspace = true
 strata-consensus-logic.workspace = true
 strata-db.workspace = true
