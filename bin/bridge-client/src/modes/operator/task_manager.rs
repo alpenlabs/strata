@@ -36,37 +36,37 @@ where
 {
     pub(super) async fn start(&self, duty_polling_interval: Duration) -> anyhow::Result<()> {
         loop {
-            let RpcBridgeDuties {
+            if let Ok(RpcBridgeDuties {
                 duties,
                 start_index,
                 stop_index,
-            } = self.poll_duties().await?;
+            }) = self.poll_duties().await {
+                let mut handles = JoinSet::new();
+                for duty in duties {
+                    let exec_handler = self.exec_handler.clone();
+                    let bridge_duty_ops = self.bridge_duty_db_ops.clone();
+                    let broadcaster = self.broadcaster.clone();
+                    handles.spawn(async move {
+                        process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
+                    });
+                }
 
-            let mut handles = JoinSet::new();
-            for duty in duties {
-                let exec_handler = self.exec_handler.clone();
-                let bridge_duty_ops = self.bridge_duty_db_ops.clone();
-                let broadcaster = self.broadcaster.clone();
-                handles.spawn(async move {
-                    process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
-                });
-            }
+                let any_failed = handles.join_all().await.iter().any(|res| res.is_err());
 
-            let any_failed = handles.join_all().await.iter().any(|res| res.is_err());
-
-            // if none of the duties failed, update the duty index so that the
-            // next batch is fetched in the next poll.
-            //
-            // otherwise, don't update the index so that the current batch is refetched and
-            // ones that were not executed successfully are executed again.
-            if !any_failed {
-                info!(%start_index, %stop_index, "updating duty index");
-                if let Err(e) = self
-                    .bridge_duty_idx_db_ops
-                    .set_index_async(stop_index)
-                    .await
-                {
-                    error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                // if none of the duties failed, update the duty index so that the
+                // next batch is fetched in the next poll.
+                //
+                // otherwise, don't update the index so that the current batch is refetched and
+                // ones that were not executed successfully are executed again.
+                if !any_failed {
+                    info!(%start_index, %stop_index, "updating duty index");
+                    if let Err(e) = self
+                        .bridge_duty_idx_db_ops
+                        .set_index_async(stop_index)
+                        .await
+                    {
+                        error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                    }
                 }
             }
 

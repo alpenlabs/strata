@@ -77,7 +77,7 @@ impl ClientT for WsClient {
                 inner.notification(method, params).await
             }
             WsClientState::NotWorking => Err(ClientError::Transport(
-                BoxError::from("Client is NotWorking".to_string()),
+                BoxError::from("Client is Not Working".to_string()),
             )),
         }
     }
@@ -99,7 +99,7 @@ impl ClientT for WsClient {
                 inner.request(method, params).await
             }
             WsClientState::NotWorking => Err(ClientError::Transport(
-                BoxError::from("Client is NotWorking".to_string()),
+                BoxError::from("Client is Not Working".to_string()),
             )),
         }
     }
