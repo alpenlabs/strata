@@ -16,6 +16,7 @@ rustdoc.all = "warn"
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
 strata-state.workspace = true
+strata-zkvm.workspace = true
 
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 
