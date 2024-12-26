@@ -92,6 +92,22 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
     spawn(async move { manager.process_pending_tasks().await });
     debug!("Spawn process pending tasks");
 
+    // run the checkpoint runner
+    if args.enable_checkpoint_runner {
+        let checkpoint_operator = operator.checkpoint_operator().clone();
+        let task_tracker_for_checkpoint = task_tracker.clone();
+        let db_for_checkpoint = db.clone();
+
+        spawn(async move {
+            checkpoint_proof_runner(
+                checkpoint_operator,
+                task_tracker_for_checkpoint,
+                db_for_checkpoint,
+            )
+            .await
+        });
+    }
+
     // Run prover manager in dev mode or runner mode
     if args.enable_dev_rpcs {
         // Run the RPC server on dev mode only
@@ -105,18 +121,6 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
         )
         .await
         .context("Failed to run the prover client RPC server")?;
-    }
-
-    // run the checkpoint runner
-    if args.enable_dev_rpcs {
-        spawn(async move {
-            checkpoint_proof_runner(
-                operator.checkpoint_operator().clone(),
-                task_tracker.clone(),
-                db.clone(),
-            )
-            .await
-        });
     }
 
     Ok(())
