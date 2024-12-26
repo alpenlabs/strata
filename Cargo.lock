@@ -13391,6 +13391,7 @@ dependencies = [
  "jsonrpsee",
  "strata-primitives",
  "strata-rpc-types",
+ "strata-zkvm",
 ]
 
 [[package]]
