@@ -6,7 +6,7 @@ use bitcoin::{
     Block, Wtxid,
 };
 use secp256k1::XOnlyPublicKey;
-use strata_component::CsmHandle;
+use strata_component::{csm_handle::CsmController, CsmHandle};
 use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
@@ -24,8 +24,6 @@ use strata_tx_parser::messages::{BlockData, L1Event};
 use strata_zkvm::ZkVmResult;
 use tokio::sync::mpsc;
 use tracing::*;
-
-use crate::csm::ctl::CsmController;
 
 /// Consumes L1 events and reflects them in the database.
 pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(

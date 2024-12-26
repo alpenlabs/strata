@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use strata_chaintsn::transition::process_block;
-use strata_component::CsmHandle;
+use strata_component::{csm_handle::CsmController, CsmHandle};
 use strata_db::{
     errors::DbError,
     traits::{BlockStatus, ChainstateDatabase, Database},
@@ -21,9 +21,7 @@ use tokio::{runtime::Handle, sync::mpsc};
 use tracing::*;
 
 use crate::{
-    csm::{ctl::CsmController, message::ForkChoiceMessage},
-    errors::*,
-    reorg, unfinalized_tracker,
+    csm::message::ForkChoiceMessage, errors::*, reorg, unfinalized_tracker,
     unfinalized_tracker::UnfinalizedBlockTracker,
 };
 

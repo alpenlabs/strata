@@ -5,7 +5,8 @@ use strata_btcio::{
     rpc::traits::Reader,
 };
 use strata_common::config::Config;
-use strata_consensus_logic::{csm::ctl::CsmController, l1_handler::bitcoin_data_handler_task};
+use strata_component::csm_handle::CsmController;
+use strata_consensus_logic::l1_handler::bitcoin_data_handler_task;
 use strata_db::traits::{Database, L1Database};
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;

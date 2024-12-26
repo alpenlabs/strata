@@ -50,7 +50,7 @@ pub fn main_inner(args: Args) -> anyhow::Result<()> {
 
     let client_builder = ClientBuilder::default().with_reader(L1ReaderBuilder);
 
-    let (client, run_context): (Client<L1Reader, (), (), ()>, _) = client_builder
+    let (client, csm_context): (Client<L1Reader, (), (), ()>, _) = client_builder
         .build_and_validate(
             build_ctx,
             task_manager,
@@ -59,8 +59,8 @@ pub fn main_inner(args: Args) -> anyhow::Result<()> {
             pool.clone(),
         );
 
-    client.do_genesis(&run_context, database)?;
-    let cl_handle = client.run(&run_context);
+    client.do_genesis(&csm_context, database)?;
+    let cl_handle = strata_component::Client::run(&client, &csm_context);
 
     // create rpcs
     // and wait forever, like a mad lover

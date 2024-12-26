@@ -4,6 +4,7 @@
 
 use std::{sync::Arc, thread};
 
+use strata_component::csm_handle::ClientUpdateNotif;
 use strata_db::{
     traits::*,
     types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus},
@@ -20,11 +21,7 @@ use tokio::{
 };
 use tracing::*;
 
-use super::{
-    config::CsmExecConfig,
-    message::{ClientUpdateNotif, CsmMessage},
-    state_tracker,
-};
+use super::{config::CsmExecConfig, state_tracker};
 use crate::{errors::Error, genesis};
 
 /// Mutable worker state that we modify in the consensus worker task.
@@ -116,7 +113,7 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
     mut state: WorkerState<D>,
     engine: Arc<E>,
-    mut msg_rx: mpsc::Receiver<CsmMessage>,
+    mut msg_rx: mpsc::Receiver<strata_component::csm_handle::CsmMessage>,
     status_channel: StatusChannel,
 ) -> Result<(), Error> {
     while let Some(msg) = msg_rx.blocking_recv() {
@@ -145,12 +142,12 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
 fn process_msg<D: Database>(
     state: &mut WorkerState<D>,
     engine: &impl ExecEngineCtl,
-    msg: &CsmMessage,
+    msg: &strata_component::csm_handle::CsmMessage,
     status_channel: &StatusChannel,
     shutdown: &ShutdownGuard,
 ) -> anyhow::Result<()> {
     match msg {
-        CsmMessage::EventInput(idx) => {
+        strata_component::csm_handle::CsmMessage::EventInput(idx) => {
             // If we somehow missed a sync event we need to try to rerun those,
             // just in case.
             let cur_ev_idx = state.state_tracker.cur_state_idx();

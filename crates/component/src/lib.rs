@@ -1,6 +1,7 @@
 use component::ClientComponent;
-use context::RunContext;
+use context::{CsmContext, RunContext};
 use sidecar::SideCar;
+use strata_db::traits::Database;
 
 pub mod component;
 pub mod context;
@@ -19,7 +20,7 @@ pub trait Client<R: ClientComponent, F: ClientComponent, C: ClientComponent, Ch:
         sidecars: Vec<Box<dyn SideCar>>,
     ) -> Self;
 
-    fn run(&self, runctx: &RunContext) -> ClientHandle;
+    fn run<D: Database + Sync + Send + 'static>(&self, runctx: &CsmContext<D>) -> ClientHandle;
 
     // TODO validate
 }

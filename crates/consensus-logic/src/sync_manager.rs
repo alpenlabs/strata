@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 
+use strata_component::csm_handle::{ClientUpdateNotif, CsmController, CsmMessage};
 use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
@@ -13,11 +14,7 @@ use strata_tasks::TaskExecutor;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{
-    csm::{
-        ctl::CsmController,
-        message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
-        worker,
-    },
+    csm::{message::ForkChoiceMessage, worker},
     fork_choice_manager,
 };
 

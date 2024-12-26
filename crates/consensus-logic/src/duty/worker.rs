@@ -7,6 +7,7 @@ use std::{
 };
 
 use strata_btcio::writer::InscriptionHandle;
+use strata_component::csm_handle::ClientUpdateNotif;
 use strata_crypto::sign_schnorr_sig;
 use strata_db::traits::*;
 use strata_eectl::engine::ExecEngineCtl;
@@ -30,11 +31,8 @@ use super::{
     types::{self, Duty, DutyBatch, Identity, IdentityKey},
 };
 use crate::{
-    checkpoint::CheckpointHandle,
-    csm::message::{ClientUpdateNotif, ForkChoiceMessage},
-    duty::checkpoint::check_and_get_batch_checkpoint,
-    errors::Error,
-    sync_manager::SyncManager,
+    checkpoint::CheckpointHandle, csm::message::ForkChoiceMessage,
+    duty::checkpoint::check_and_get_batch_checkpoint, errors::Error, sync_manager::SyncManager,
 };
 
 pub fn duty_tracker_task<D: Database>(

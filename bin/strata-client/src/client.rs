@@ -1,39 +1,90 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use strata_component::{
-    component::ClientComponent, context::RunContext, sidecar::SideCar, Client as ClientT,
-    ClientHandle,
+    component::ClientComponent,
+    context::{CsmContext, RunContext},
+    csm_handle::ClientUpdateNotif,
+    sidecar::SideCar,
+    Client as ClientT, ClientHandle,
 };
-use strata_consensus_logic::genesis;
+use strata_consensus_logic::{
+    csm::worker::{client_worker_task, WorkerState},
+    genesis,
+};
 use strata_db::traits::Database;
+use strata_eectl::stub::StubController;
+use tokio::sync::broadcast;
 use tracing::info;
 
 pub struct Client<LR, F, C, Ch> {
     reader: LR,
-    // writer: W,
     fcm: F,
-    // rpc: R,
     csm: C,
     chain: Ch,
     sidecars: Vec<Box<dyn SideCar>>,
 }
 
 impl<LR, F, C, Ch> Client<LR, F, C, Ch> {
-    pub fn run(&self, runctx: &RunContext) -> ClientHandle {
-        ClientHandle
-    }
-
-    pub fn do_genesis(
+    pub fn do_genesis<D: Database + Send + Sync + 'static>(
         &self,
-        runctx: &RunContext,
+        csm: &CsmContext<D>,
         database: Arc<impl Database>,
     ) -> anyhow::Result<()> {
         // Check if we have to do genesis.
         if genesis::check_needs_client_init(database.as_ref())? {
             info!("need to init client state!");
-            genesis::init_client_state(&runctx.params, database.as_ref())?;
+            genesis::init_client_state(&csm.params, database.as_ref())?;
         }
         Ok(())
+    }
+
+    pub fn run_csm<D: Database + Send + Sync + 'static>(
+        &self,
+        csmctx: CsmContext<D>,
+    ) -> anyhow::Result<RunContext> {
+        let CsmContext {
+            config,
+            params,
+            db_manager,
+            task_manager,
+            status_channel,
+            csm_handle,
+            csm_rx,
+            database,
+        } = csmctx;
+
+        // Prepare the client worker state and start the thread for that.
+        let (cupdate_tx, cupdate_rx) = broadcast::channel::<Arc<ClientUpdateNotif>>(64);
+        let client_worker_state = WorkerState::open(
+            params.clone().into(),
+            database.clone(),
+            db_manager.l2(),
+            cupdate_tx.clone(),
+            db_manager.checkpoint(),
+        )?;
+
+        // TODO: replace with actual engine
+        let engine = StubController::new(Duration::from_secs(3));
+
+        let csm_engine = Arc::new(engine);
+        let st_ch = status_channel.clone();
+
+        task_manager
+            .executor()
+            .spawn_critical("client_worker_task", move |shutdown| {
+                client_worker_task(shutdown, client_worker_state, csm_engine, csm_rx, st_ch)
+                    .map_err(Into::into)
+            });
+
+        Ok(RunContext {
+            config,
+            params,
+            db_manager,
+            task_manager,
+            status_channel,
+            csm_handle,
+            cupdate_rx,
+        })
     }
 }
 
@@ -56,7 +107,7 @@ impl<R: ClientComponent, F: ClientComponent, C: ClientComponent, Ch: ClientCompo
         }
     }
 
-    fn run(&self, runctx: &RunContext) -> ClientHandle {
+    fn run<D: Database + Send + Sync + 'static>(&self, runctx: &CsmContext<D>) -> ClientHandle {
         ClientHandle
     }
 }

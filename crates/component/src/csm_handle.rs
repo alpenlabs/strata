@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use strata_db::{errors::DbError, traits::*};
-use strata_state::sync_event::SyncEvent;
+use strata_state::{
+    client_state::ClientState, operation::ClientUpdateOutput, sync_event::SyncEvent,
+};
 use tokio::sync::{mpsc, oneshot};
 use tracing::*;
 
@@ -11,6 +13,41 @@ pub enum CsmMessage {
     /// Process a sync event at a given index.
     EventInput(u64),
 }
+
+/// Package describing a new consensus state produced from a new sync event.
+#[derive(Clone, Debug)]
+pub struct ClientUpdateNotif {
+    sync_event_idx: u64,
+    tsn_output: Arc<ClientUpdateOutput>,
+    new_state: Arc<ClientState>,
+}
+
+impl ClientUpdateNotif {
+    pub fn new(
+        sync_event_idx: u64,
+        tsn_output: Arc<ClientUpdateOutput>,
+        new_state: Arc<ClientState>,
+    ) -> Self {
+        Self {
+            sync_event_idx,
+            tsn_output,
+            new_state,
+        }
+    }
+
+    pub fn sync_event_idx(&self) -> u64 {
+        self.sync_event_idx
+    }
+
+    pub fn tsn_output(&self) -> &ClientUpdateOutput {
+        &self.tsn_output
+    }
+
+    pub fn new_state(&self) -> &ClientState {
+        &self.new_state
+    }
+}
+
 /// Controller handle for the consensus state machine.  Used to submit new sync
 /// events for persistence and processing.
 pub struct CsmController {
@@ -33,7 +70,7 @@ impl CsmController {
 
     /// Writes a sync event to the database and updates the watch channel to
     /// trigger the CSM executor to process the event.
-    fn submit_event(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
+    pub fn submit_event(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
         trace!(?sync_event, "Writing sync event");
         let ev_idx = self
             .submit_event_shim
@@ -51,7 +88,7 @@ impl CsmController {
 
     /// Writes a sync event to the database and updates the watch channel to
     /// trigger the CSM executor to process the event.
-    async fn submit_event_async(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
+    pub async fn submit_event_async(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
         let ev_idx = self.submit_event_shim.submit_event(sync_event).await?;
         let msg = CsmMessage::EventInput(ev_idx);
         if self.csm_tx.send(msg).await.is_err() {

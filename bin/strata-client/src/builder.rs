@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use strata_component::{
     component::ComponentBuilder,
-    context::{BuildContext, RunContext},
+    context::{BuildContext, CsmContext, RunContext},
     csm_handle::{CsmController, CsmMessage},
     sidecar::SideCar,
     CsmHandle,
@@ -111,7 +111,7 @@ impl<LR: ComponentBuilder, F: ComponentBuilder, C: ComponentBuilder, Ch: Compone
         status_channel: StatusChannel,
         database: Arc<D>,
         pool: threadpool::ThreadPool,
-    ) -> (Cl, RunContext) {
+    ) -> (Cl, CsmContext<D>) {
         let reader = self.reader.build(&buildctx);
         let fcm = self.fcm.build(&buildctx);
         let csm = self.csm.build(&buildctx);
@@ -122,16 +122,18 @@ impl<LR: ComponentBuilder, F: ComponentBuilder, C: ComponentBuilder, Ch: Compone
         let client = Cl::from_components(reader, fcm, csm, chain, sidecars);
 
         // TODO: validate
-        let (csm_handle, csm_rx) = self.build_csm(database, pool);
+        let (csm_handle, csm_rx) = self.build_csm(database.clone(), pool);
 
-        let runctx = RunContext {
+        let csmctx = CsmContext {
             config: buildctx.config,
             params: buildctx.params,
             db_manager: buildctx.db_manager,
             task_manager,
             status_channel,
             csm_handle,
+            csm_rx,
+            database,
         };
-        (client, runctx)
+        (client, csmctx)
     }
 }
