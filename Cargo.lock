@@ -13472,6 +13472,7 @@ dependencies = [
  "strata-rocksdb",
  "strata-rpc-api",
  "strata-rpc-types",
+ "strata-rpc-utils",
  "strata-sp1-adapter",
  "strata-sp1-guest-builder",
  "strata-state",
