@@ -51,9 +51,9 @@ class RollupConfig(BaseModel):
 
     # Additional fields that aren't coming from datatool config generation (yet)
     # and has to be supplied manually.
-    # TODO: extend datatool to return OPERATOR_FEE from bridge-tx-builder/src/constants.rs
+    # TODO(STR-816): make datatool return OPERATOR_FEE from bridge-tx-builder/src/constants.rs
     operator_fee: int = 50_000_000
-    # TODO: this is currently an inconsistent mess, figure it out.
+    # TODO(STR-816): this is currently an inconsistent mess, figure it out.
     # ANYONE_CAN_SPEND_OUTPUT_VALUE (330) in `bridge-tx-builder/src/constants.rs`
     # + 5.5 sats/vB (200 vbytes) according to `MIN_RELAY_FEE`
     # in `bridge-tx-builder/src/constants.rs`

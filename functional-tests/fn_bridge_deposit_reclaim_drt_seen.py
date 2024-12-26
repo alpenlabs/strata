@@ -12,6 +12,7 @@ from constants import (
     DEFAULT_TAKEBACK_TIMEOUT,
     UNSPENDABLE_ADDRESS,
 )
+from rollup_params_cfg import RollupConfig
 from utils import get_bridge_pubkey, wait_until
 
 # Fee for the take back path at 2 sat/vbyte
@@ -143,7 +144,8 @@ class BridgeDepositReclaimDrtSeenTest(testenv.StrataTester):
             btc_password,
         )
         self.debug(f"User BTC balance (after takeback): {refund_btc_balance}")
-        deposit_amount = ctx.env.rollup_cfg().deposit_amount
+        cfg: RollupConfig = ctx.env.rollup_cfg()
+        deposit_amount = cfg.deposit_amount
         expected_balance = 5 * deposit_amount - TAKE_BACK_FEE
         assert refund_btc_balance >= expected_balance, "BTC balance is not as expected"
 
