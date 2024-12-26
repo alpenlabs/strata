@@ -12800,7 +12800,6 @@ dependencies = [
 name = "strata-bridge-exec"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "bitcoin",
  "borsh",
  "deadpool",

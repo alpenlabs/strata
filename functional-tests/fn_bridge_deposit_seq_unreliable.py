@@ -9,11 +9,11 @@ from strata_utils import (
 from web3 import Web3
 from web3.middleware import SignAndSendRawMiddlewareBuilder
 
+import testenv
 from constants import (
     DEFAULT_ROLLUP_PARAMS,
     SATS_TO_WEI,
 )
-import testenv
 from utils import get_bridge_pubkey, wait_until, wait_until_with_value
 
 # Local constants
@@ -89,7 +89,7 @@ class BridgeDepositSequencerUnreliableTest(testenv.StrataTester):
         # Get operators pubkey and musig2 aggregates it
         bridge_pk = get_bridge_pubkey(seqrpc)
         self.debug(f"Bridge pubkey: {bridge_pk}")
-        self.debug(f"Stopping the sequencer")
+        self.debug("Stopping the sequencer")
 
         self.make_drt(ctx, el_address, bridge_pk)
         time.sleep(2)
@@ -106,13 +106,13 @@ class BridgeDepositSequencerUnreliableTest(testenv.StrataTester):
         wait_until(
             lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
-            timeout=10
+            timeout=10,
         )
 
         balance_after_deposits = wait_until_with_value(
             lambda: int(rethrpc.eth_getBalance(el_address), 16),
             predicate=lambda v: v == 2 * DEPOSIT_AMOUNT * SATS_TO_WEI,
-            timeout=15
+            timeout=15,
         )
         self.debug(f"Strata Balance after deposits: {balance_after_deposits}")
 

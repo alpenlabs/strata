@@ -40,7 +40,8 @@ where
                 duties,
                 start_index,
                 stop_index,
-            }) = self.poll_duties().await {
+            }) = self.poll_duties().await
+            {
                 let mut handles = JoinSet::new();
                 for duty in duties {
                     let exec_handler = self.exec_handler.clone();
@@ -83,7 +84,12 @@ where
             .unwrap_or(Some(0))
             .unwrap_or(0);
 
-        let l2_rpc_client = self.exec_handler.l2_rpc_client_pool.get().await.expect("cannot get rpc client");
+        let l2_rpc_client = self
+            .exec_handler
+            .l2_rpc_client_pool
+            .get()
+            .await
+            .expect("cannot get rpc client");
         let RpcBridgeDuties {
             duties,
             start_index,

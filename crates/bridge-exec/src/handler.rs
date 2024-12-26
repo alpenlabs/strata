@@ -20,13 +20,14 @@ use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::HexBytes;
 use tracing::{debug, info, warn};
 
-use crate::{errors::{ExecError, ExecResult}, ws_client::WsClientManager};
+use crate::{
+    errors::{ExecError, ExecResult},
+    ws_client::WsClientManager,
+};
 
 /// The execution context for handling bridge-related signing activities.
 #[derive(Clone)]
-pub struct ExecHandler<
-    TxBuildContext: BuildContext + Sync + Send,
-> {
+pub struct ExecHandler<TxBuildContext: BuildContext + Sync + Send> {
     /// The build context required to create transaction data needed for signing.
     pub tx_build_ctx: TxBuildContext,
 
@@ -121,10 +122,12 @@ where
         let raw_message = borsh::to_vec::<BridgeMessage>(&signed_message)
             .expect("should be able to borsh serialize raw message");
 
-        let l2_rpc_client = self.l2_rpc_client_pool.get().await.expect("cannot get client");
-        l2_rpc_client
-            .submit_bridge_msg(raw_message.into())
-            .await?;
+        let l2_rpc_client = self
+            .l2_rpc_client_pool
+            .get()
+            .await
+            .expect("cannot get client");
+        l2_rpc_client.submit_bridge_msg(raw_message.into()).await?;
 
         info!(%txid, ?scope, ?payload, "broadcasted message");
         Ok(signed_message)
