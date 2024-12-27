@@ -400,12 +400,7 @@ mod test {
     async fn client_works() {
         logging::init(logging::LoggerConfig::with_base_name("btcio-tests"));
 
-        // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
-        set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
-        let bitcoind = BitcoinD::from_downloaded().unwrap();
-        let url = bitcoind.rpc_url();
-        let (user, password) = get_auth(&bitcoind);
-        let client = BitcoinClient::new(url, user, password).unwrap();
+        let (bitcoind, client) = get_bitcoind_and_client();
 
         // network
         let got = client.network().await.unwrap();
