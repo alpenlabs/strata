@@ -11,6 +11,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, musig_aggregate_pks
 
 from constants import *
+from seqrpc import JsonrpcClient
 
 
 def generate_jwt_secret() -> str:
@@ -464,3 +465,29 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     logger.addHandler(stream_handler)
 
     return logger
+
+
+def get_envelope_pushdata(inp: str):
+    op_if = "63"
+    op_endif = "68"
+    op_pushbytes_33 = "21"
+    op_false = "00"
+    start_position = inp.index(f"{op_false}{op_if}")
+    end_position = inp.index(f"{op_endif}{op_pushbytes_33}", start_position)
+    op_if_block = inp[start_position + 3 : end_position]
+    op_pushdata = "4d"
+    pushdata_position = op_if_block.index(f"{op_pushdata}")
+    # we don't want PUSHDATA + num bytes b401
+    return op_if_block[pushdata_position + 2 + 4 :]
+
+
+def submit_da_blob(btcrpc: BitcoindClient, seqrpc: JsonrpcClient, blobdata: str):
+    _ = seqrpc.strataadmin_submitDABlob(blobdata)
+
+    # if blob data is present in tx witness then return the transaction
+    tx = wait_until_with_value(
+        lambda: btcrpc.gettransaction(seqrpc.strata_l1status()["last_published_txid"]),
+        predicate=lambda tx: blobdata in tx.witness_data().hex(),
+        timeout=10,
+    )
+    return tx
