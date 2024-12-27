@@ -281,7 +281,6 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         params = params_gen_data["params"]
         # Instantiaze the generated rollup config so it's convenient to work with.
         rollup_cfg = RollupConfig.model_validate_json(params)
-        print("AZAZA VALIDATED")
 
         # Construct the bridge pubkey from the config.
         # Technically, we could use utils::get_bridge_pubkey, but this makes sequencer
