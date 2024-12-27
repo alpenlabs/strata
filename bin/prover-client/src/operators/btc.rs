@@ -70,7 +70,12 @@ impl ProvingOp for BtcBlockspaceOperator {
             _ => return Err(ProvingTaskError::InvalidInput("BtcBlockspace".to_string())),
         };
 
-        let block = self.btc_client.get_block(&blkid.into()).await.unwrap();
+        let block = self
+            .btc_client
+            .get_block(&blkid.into())
+            .await
+            .inspect_err(|_| error!(%blkid, "Failed to fetch BTC BlockId"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
         Ok(BlockspaceProofInput {
             rollup_params: self.rollup_params.as_ref().clone(),
