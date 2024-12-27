@@ -13326,6 +13326,7 @@ dependencies = [
  "rayon",
  "rockbound",
  "serde",
+ "serde_json",
  "strata-btcio",
  "strata-common",
  "strata-db",

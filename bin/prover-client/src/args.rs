@@ -1,7 +1,8 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use argh::FromArgs;
-use strata_primitives::proof::ProofZkVm;
+use serde_json::from_str;
+use strata_primitives::{params::RollupParams, proof::ProofZkVm};
 
 pub(super) const DEV_RPC_PORT: usize = 4844;
 pub(super) const DEV_RPC_URL: &str = "0.0.0.0";
@@ -59,6 +60,10 @@ pub struct Args {
     /// The password for the bitcoind RPC authentication.
     #[argh(option, description = "bitcoind RPC password")]
     pub bitcoind_password: String,
+
+    /// Path to the custom rollup configuration file.
+    #[argh(option, short = 'p', description = "custom rollup config path")]
+    pub rollup_params: PathBuf,
 
     /// The number of Risc0 prover workers to spawn.
     ///
@@ -172,5 +177,14 @@ impl Args {
         }
 
         workers
+    }
+
+    /// Resolves the rollup params file to use, from a path, and validates
+    /// it to ensure it passes sanity checks.
+    pub fn resolve_and_validate_rollup_params(&self) -> anyhow::Result<RollupParams> {
+        let json = fs::read_to_string(&self.rollup_params)?;
+        let rollup_params = from_str::<RollupParams>(&json)?;
+        rollup_params.check_well_formed()?;
+        Ok(rollup_params)
     }
 }

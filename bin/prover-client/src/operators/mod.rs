@@ -33,7 +33,6 @@ pub mod cl_stf;
 pub mod evm_ee;
 pub mod l1_batch;
 pub mod operator;
-pub mod utils;
 
 pub use operator::ProofOperator;
 

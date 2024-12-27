@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use anyhow::Context;
 use args::Args;
 use db::open_rocksdb_database;
 use jsonrpsee::http_client::HttpClientBuilder;
@@ -13,7 +14,7 @@ use strata_common::logging;
 use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use task_tracker::TaskTracker;
 use tokio::{spawn, sync::Mutex};
-use tracing::{debug, info};
+use tracing::debug;
 
 mod args;
 mod db;
@@ -26,34 +27,53 @@ mod status;
 mod task_tracker;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
+    let args: Args = argh::from_env();
+    if let Err(e) = main_inner(args).await {
+        eprintln!("FATAL ERROR: {e}");
+
+        return Err(e);
+    }
+
+    Ok(())
+}
+
+async fn main_inner(args: Args) -> anyhow::Result<()> {
     logging::init(logging::LoggerConfig::with_base_name(
         "strata-prover-client",
     ));
-    info!("Running strata prover client in dev mode");
 
-    let args: Args = argh::from_env();
     debug!("Running prover client with args {:?}", args);
+
+    let rollup_params = args
+        .resolve_and_validate_rollup_params()
+        .context("Failed to resolve and validate rollup parameters")?;
 
     let el_client = HttpClientBuilder::default()
         .build(args.get_reth_rpc_url())
-        .expect("failed to connect to the el client");
+        .context("Failed to connect to the Ethereum client")?;
 
     let cl_client = HttpClientBuilder::default()
         .build(args.get_sequencer_rpc_url())
-        .expect("failed to connect to the el client");
+        .context("Failed to connect to the CL Sequencer client")?;
 
     let btc_client = BitcoinClient::new(
         args.get_btc_rpc_url(),
         args.bitcoind_user.clone(),
         args.bitcoind_password.clone(),
     )
-    .expect("failed to connect to the btc client");
+    .context("Failed to connect to the Bitcoin client")?;
 
-    let operator = Arc::new(ProofOperator::init(btc_client, el_client, cl_client));
+    let operator = Arc::new(ProofOperator::init(
+        btc_client,
+        el_client,
+        cl_client,
+        rollup_params,
+    ));
     let task_tracker = Arc::new(Mutex::new(TaskTracker::new()));
 
-    let rbdb = open_rocksdb_database(&args.datadir).expect("failed to open DB");
+    let rbdb =
+        open_rocksdb_database(&args.datadir).context("Failed to open the RocksDB database")?;
     let db_ops = DbOpsConfig { retry_count: 3 };
     let db = Arc::new(ProofDb::new(rbdb, db_ops));
 
@@ -66,13 +86,13 @@ async fn main() {
     );
     debug!("Initialized Prover Manager");
 
-    // run prover manager in background
+    // Run prover manager in background
     spawn(async move { manager.process_pending_tasks().await });
     debug!("Spawn process pending tasks");
 
     // Run prover manager in dev mode or runner mode
     if args.enable_dev_rpcs {
-        // Run the rpc server on dev mode only
+        // Run the RPC server on dev mode only
         let rpc_url = args.get_dev_rpc_url();
         run_rpc_server(
             task_tracker.clone(),
@@ -82,8 +102,10 @@ async fn main() {
             args.enable_dev_rpcs,
         )
         .await
-        .expect("prover client rpc")
+        .context("Failed to run the prover client RPC server")?;
     }
+
+    Ok(())
 }
 
 async fn run_rpc_server(
