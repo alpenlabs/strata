@@ -129,6 +129,16 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .map_err(to_jsonrpsee_error("failed to create task for l2 batch"))
     }
 
+    async fn prove_checkpoint(&self, ckp_idx: u64) -> RpcResult<Vec<ProofKey>> {
+        self.operator
+            .checkpoint_operator()
+            .create_task(ckp_idx, self.task_tracker.clone(), &self.db)
+            .await
+            .map_err(to_jsonrpsee_error(
+                "failed to create task for given checkpoint",
+            ))
+    }
+
     async fn prove_latest_checkpoint(&self) -> RpcResult<Vec<ProofKey>> {
         let latest_ckp_idx = self
             .operator
