@@ -257,7 +257,7 @@ impl HeaderVerificationState {
         cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
 
         let mut serialized_timestamps = [0u8; 11 * 4];
-        for (i, &timestamp) in self.last_11_blocks_timestamps.timestamps.iter().enumerate() {
+        for (i, &timestamp) in self.last_11_blocks_timestamps.buffer.iter().enumerate() {
             serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
         }
 
