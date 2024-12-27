@@ -133,7 +133,7 @@ impl Chainstate {
 #[cfg(any(test, feature = "test_utils"))]
 impl Chainstate {
     pub fn set_epoch(&mut self, ep: u64) {
-        self.epoch = ep;
+        self.cur_epoch = ep;
     }
 }
 
@@ -183,10 +183,10 @@ pub struct EpochState {
 
 impl EpochState {
     pub fn from_genesis(gd: &GenesisStateData) -> Self {
-        // FIXME make this accurately reflect the epoch level state
-        let l1_block = L1BlockCommitment::new(0, *gd.l1_state().safe_block().blkid());
+        let l1_gs = gd.l1_state();
+        let l1_block = L1BlockCommitment::new(l1_gs.safe_height(), *l1_gs.safe_block().blkid());
         Self {
-            finalized_epoch: EpochCommitment::zero(),
+            finalized_epoch: EpochCommitment::new(0, 0, gd.genesis_blkid()),
             safe_l1_block: l1_block,
             operator_table: gd.operator_table().clone(),
             deposits_table: bridge_state::DepositsTable::new_empty(),

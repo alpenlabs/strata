@@ -169,6 +169,7 @@ fn prepare_l1_segment(
 ) -> Result<L1Segment, Error> {
     let csm_l1_height = local_l1_state.tip_l1_block_height();
     let state_l1_height = prev_chstate.epoch_state().safe_l1_height();
+    let first_new_block = state_l1_height + 1;
     trace!(%csm_l1_height, %state_l1_height, "figuring out which blocks to include in L1 segment");
 
     // We don't have to worry about reorgs now, just shove all the ones above
@@ -176,7 +177,7 @@ fn prepare_l1_segment(
     //
     // TODO only put ones that are buryable
     let mut payloads = Vec::new();
-    for height in (state_l1_height..=csm_l1_height).take(max_l1_entries) {
+    for height in (first_new_block..=csm_l1_height).take(max_l1_entries) {
         let rec = load_header_record(height, l1_db)?;
         let deposit_update_tx = fetch_deposit_update_txs(height, l1_db)?;
         payloads.push(

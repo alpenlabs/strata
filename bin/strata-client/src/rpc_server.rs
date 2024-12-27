@@ -186,11 +186,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let sync_state = self.status_channel.get_sync_state();
         let l1_view = self.status_channel.get_l1_view();
 
-        let last_l1 = l1_view.tip_blkid().cloned().unwrap_or_else(|| {
-            // TODO figure out a better way to do this
-            warn!("last L1 block not set in client state, returning zero");
-            L1BlockId::from(Buf32::zero())
-        });
+        let tip_l1_blkid = l1_view.tip_l1_blkid();
 
         // Copy these out of the sync state, if they're there.
         let (chain_tip, finalized_blkid, finalized_epoch) = sync_state
@@ -222,8 +218,9 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
             cur_epoch: epoch,
             finalized_blkid: *finalized_blkid.as_ref(),
             finalized_epoch,
-            last_l1_block: *last_l1.as_ref(),
-            buried_l1_height: l1_view.buried_l1_height(),
+            last_l1_block: *tip_l1_blkid.as_ref(),
+            // FIXME make this coherent when we re-add this construct
+            buried_l1_height: 0,
         })
     }
 
