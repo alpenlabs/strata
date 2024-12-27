@@ -242,6 +242,8 @@ pub mod corepc_node_helpers {
     use bitcoin::{Address, BlockHash};
     use corepc_node::BitcoinD;
 
+    use crate::rpc::BitcoinClient;
+
     /// Get the authentication credentials for a given `bitcoind` instance.
     pub fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
         let params = &bitcoind.params;
@@ -268,5 +270,15 @@ pub mod corepc_node_helpers {
             .map(|hash| hash.parse::<BlockHash>())
             .collect::<Result<Vec<_>, _>>()?;
         Ok(block_hashes)
+    }
+
+    pub fn get_bitcoind_and_client() -> (BitcoinD, BitcoinClient) {
+        // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
+        std::env::set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
+        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let url = bitcoind.rpc_url();
+        let (user, password) = get_auth(&bitcoind);
+        let client = BitcoinClient::new(url, user, password).unwrap();
+        (bitcoind, client)
     }
 }
