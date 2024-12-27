@@ -2,6 +2,7 @@ use component::ClientComponent;
 use context::{CsmContext, RunContext};
 use sidecar::SideCar;
 use strata_db::traits::Database;
+use strata_eectl::engine::ExecEngineCtl;
 
 pub mod component;
 pub mod context;
@@ -11,7 +12,14 @@ pub mod sidecar;
 pub struct ClientHandle;
 
 /// Trait that should be implemented by a strata client
-pub trait Client<R: ClientComponent, F: ClientComponent, C: ClientComponent, Ch: ClientComponent> {
+pub trait Client<
+    D: Database + Send + Sync + 'static,
+    R: ClientComponent<D>,
+    F: ClientComponent<D>,
+    C: ClientComponent<D>,
+    Ch: ClientComponent<D>,
+>
+{
     fn from_components(
         reader: R,
         fcm: F,
@@ -20,7 +28,7 @@ pub trait Client<R: ClientComponent, F: ClientComponent, C: ClientComponent, Ch:
         sidecars: Vec<Box<dyn SideCar>>,
     ) -> Self;
 
-    fn run<D: Database + Sync + Send + 'static>(&self, runctx: &CsmContext<D>) -> ClientHandle;
+    fn run<E: ExecEngineCtl>(&self, runctx: &CsmContext<D, E>) -> ClientHandle;
 
     // TODO validate
 }

@@ -8,6 +8,7 @@ use strata_component::{
     CsmHandle,
 };
 use strata_db::traits::Database;
+use strata_eectl::engine::ExecEngineCtl;
 use strata_status::StatusChannel;
 use strata_tasks::TaskManager;
 use tokio::sync::mpsc::{self, Receiver};
@@ -101,17 +102,20 @@ impl<LR: ComponentBuilder, F: ComponentBuilder, C: ComponentBuilder, Ch: Compone
         (csm_ctl, csm_rx)
     }
 
+    fn build_engine<E: ExecEngineCtl>(&self) -> Arc<E> {}
+
     pub fn build_and_validate<
         D: Database + Sync + Send + 'static,
-        Cl: strata_component::Client<LR::Output, F::Output, C::Output, Ch::Output>,
+        E: ExecEngineCtl,
+        Cl: strata_component::Client<D, LR::Output, F::Output, C::Output, Ch::Output>,
     >(
         &self,
-        buildctx: BuildContext,
+        buildctx: BuildContext<D>,
         task_manager: TaskManager,
         status_channel: StatusChannel,
         database: Arc<D>,
         pool: threadpool::ThreadPool,
-    ) -> (Cl, CsmContext<D>) {
+    ) -> (Cl, CsmContext<D, E>) {
         let reader = self.reader.build(&buildctx);
         let fcm = self.fcm.build(&buildctx);
         let csm = self.csm.build(&buildctx);
@@ -123,6 +127,7 @@ impl<LR: ComponentBuilder, F: ComponentBuilder, C: ComponentBuilder, Ch: Compone
 
         // TODO: validate
         let (csm_handle, csm_rx) = self.build_csm(database.clone(), pool);
+        let engine = self.build_engine();
 
         let csmctx = CsmContext {
             config: buildctx.config,
@@ -133,7 +138,10 @@ impl<LR: ComponentBuilder, F: ComponentBuilder, C: ComponentBuilder, Ch: Compone
             csm_handle,
             csm_rx,
             database,
+            engine,
         };
         (client, csmctx)
     }
+
+    fn build_engine<E: ExecEngineCtl>(&self) -> Arc<E> {}
 }

@@ -1,29 +1,31 @@
+use strata_db::traits::Database;
+
 use crate::context::{BuildContext, ComponentHandle, RunContext};
 
 /// Trait which must be implemented by every component of the system
-pub trait ClientComponent {
+pub trait ClientComponent<D: Database> {
     // Startup checks and all
     fn validate(&self);
     // Actually run the component
-    fn run(&self, runctx: RunContext) -> ComponentHandle;
+    fn run(&self, runctx: RunContext<D>) -> ComponentHandle;
 }
 
-impl ClientComponent for () {
+impl<D: Database> ClientComponent<D> for () {
     fn validate(&self) {}
 
-    fn run(&self, runctx: RunContext) -> ComponentHandle {
+    fn run(&self, runctx: RunContext<D>) -> ComponentHandle {
         ComponentHandle
     }
 }
 
 /// Trait which must be implemented by builders of the components
-pub trait ComponentBuilder {
-    type Output: ClientComponent;
+pub trait ComponentBuilder<D: Database> {
+    type Output: ClientComponent<D>;
     // Create the component
-    fn build(&self, buildctx: &BuildContext) -> Self::Output;
+    fn build(&self, buildctx: &BuildContext<D>) -> Self::Output;
 }
 
-impl ComponentBuilder for () {
+impl<D: Database> ComponentBuilder<D> for () {
     type Output = ();
-    fn build(&self, _buildctx: &BuildContext) {}
+    fn build(&self, _buildctx: &BuildContext<D>) {}
 }

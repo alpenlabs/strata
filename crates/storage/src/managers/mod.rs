@@ -7,21 +7,26 @@ pub mod l2;
 
 /// A consolidation of database managers and ops. Ideally ops should not be exposed.
 #[derive(Clone)]
-pub struct DbManager {
+pub struct DbManager<D: Database> {
     l2_block_manager: Arc<l2::L2BlockManager>,
     checkpoint_manager: Arc<checkpoint::CheckpointDbManager>,
+    db: Arc<D>, // Ultimately, we want to get rid of this
 }
-impl DbManager {
-    pub fn l2(&self) -> Arc<l2::L2BlockManager> {
-        self.l2_block_manager.clone()
+impl<D: Database> DbManager<D> {
+    pub fn l2(&self) -> &Arc<l2::L2BlockManager> {
+        &self.l2_block_manager
     }
 
-    pub fn checkpoint(&self) -> Arc<checkpoint::CheckpointDbManager> {
-        self.checkpoint_manager.clone()
+    pub fn checkpoint(&self) -> &Arc<checkpoint::CheckpointDbManager> {
+        &self.checkpoint_manager
+    }
+
+    pub fn db(&self) -> &Arc<D> {
+        &self.db
     }
 }
 
-pub fn create_db_manager<D>(db: Arc<D>, pool: threadpool::ThreadPool) -> DbManager
+pub fn create_db_manager<D>(db: Arc<D>, pool: threadpool::ThreadPool) -> DbManager<D>
 where
     D: Database + Sync + Send + 'static,
 {
@@ -33,5 +38,6 @@ where
     DbManager {
         checkpoint_manager,
         l2_block_manager,
+        db,
     }
 }

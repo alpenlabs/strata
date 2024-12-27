@@ -45,7 +45,7 @@ pub fn main_inner(args: Args) -> anyhow::Result<()> {
     // Initialize core databases and validate
     let database = init_core_dbs(rbdb.clone(), ops_config);
     let manager = create_db_manager(database.clone(), pool.clone());
-    let build_ctx = BuildContext::new(config.clone(), (*params).clone(), manager.clone());
+    let build_ctx = BuildContext::new(config.clone(), (*params).clone(), manager);
     let status_channel = init_status_channel(database.as_ref())?;
 
     let client_builder = ClientBuilder::default().with_reader(L1ReaderBuilder);
@@ -75,7 +75,7 @@ pub fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Checkpoint handle can be separated out as this is used by sequencer specific tasks and
     // rpcs
-    let checkpoint_handle: Arc<_> = CheckpointHandle::new(manager.checkpoint()).into();
+    let checkpoint_handle: Arc<_> = CheckpointHandle::new(manager.checkpoint().clone()).into();
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
 
     info!("init finished, starting main tasks");

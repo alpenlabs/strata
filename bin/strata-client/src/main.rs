@@ -113,7 +113,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bridge_msg_ctx = strata_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
-    let checkpoint_handle: Arc<_> = CheckpointHandle::new(manager.checkpoint()).into();
+    let checkpoint_handle: Arc<_> = CheckpointHandle::new(manager.checkpoint().clone()).into();
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
 
     // Check if we have to do genesis.
@@ -299,13 +299,13 @@ fn do_startup_checks(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn start_core_tasks(
+fn start_core_tasks<D: Database>(
     executor: &TaskExecutor,
     pool: threadpool::ThreadPool,
     config: &Config,
     params: Arc<Params>,
     database: Arc<CommonDb>,
-    managers: &DbManager,
+    managers: &DbManager<D>,
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
@@ -316,7 +316,7 @@ fn start_core_tasks(
         config,
         database.clone(),
         params.as_ref(),
-        managers.l2(),
+        managers.l2().clone(),
         executor.handle(),
     )?;
 
@@ -364,7 +364,7 @@ fn start_core_tasks(
         pool,
         params,
         sync_manager,
-        l2_block_manager: managers.l2(),
+        l2_block_manager: managers.l2().clone(),
         status_channel,
         engine,
         relayer_handle,

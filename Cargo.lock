@@ -13019,6 +13019,7 @@ dependencies = [
  "anyhow",
  "strata-common",
  "strata-db",
+ "strata-eectl",
  "strata-primitives",
  "strata-state",
  "strata-status",

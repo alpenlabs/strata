@@ -4,6 +4,7 @@ use strata_component::{
     context::{BuildContext, ComponentHandle, RunContext},
     CsmHandle,
 };
+use strata_db::traits::Database;
 use tracing::*;
 
 use crate::rpc::BitcoinClient;
@@ -14,10 +15,10 @@ pub struct L1Reader {
 
 pub struct L1ReaderBuilder;
 
-impl ComponentBuilder for L1ReaderBuilder {
+impl<D: Database> ComponentBuilder<D> for L1ReaderBuilder {
     type Output = L1Reader;
 
-    fn build(&self, buildctx: &BuildContext) -> L1Reader {
+    fn build(&self, buildctx: &BuildContext<D>) -> L1Reader {
         // Set up Bitcoin client RPC.
         let bitcoind_url = format!("http://{}", buildctx.config.bitcoind_rpc.rpc_url);
         let client = BitcoinClient::new(
@@ -37,10 +38,10 @@ impl ComponentBuilder for L1ReaderBuilder {
 
 // NOTE: not sure if this L1Reader should be defined in btcio. in general whether a component should
 // be defined in the respective crates instead of defining centrally like this
-impl ClientComponent for L1Reader {
+impl<D: Database> ClientComponent<D> for L1Reader {
     fn validate(&self) {}
 
-    fn run(&self, runctx: RunContext) -> ComponentHandle {
+    fn run(&self, runctx: RunContext<D>) -> ComponentHandle {
         // let (ev_tx, ev_rx) = mpsc::channel::<L1Event>(100); // TODO: think about the buffer size
 
         // // TODO switch to checking the L1 tip in the consensus/client state

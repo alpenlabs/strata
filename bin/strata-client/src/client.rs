@@ -12,7 +12,7 @@ use strata_consensus_logic::{
     genesis,
 };
 use strata_db::traits::Database;
-use strata_eectl::stub::StubController;
+use strata_eectl::{engine::ExecEngineCtl, stub::StubController};
 use tokio::sync::broadcast;
 use tracing::info;
 
@@ -25,9 +25,9 @@ pub struct Client<LR, F, C, Ch> {
 }
 
 impl<LR, F, C, Ch> Client<LR, F, C, Ch> {
-    pub fn do_genesis<D: Database + Send + Sync + 'static>(
+    pub fn do_genesis<D: Database + Send + Sync + 'static, E: ExecEngineCtl>(
         &self,
-        csm: &CsmContext<D>,
+        csm: &CsmContext<D, E>,
         database: Arc<impl Database>,
     ) -> anyhow::Result<()> {
         // Check if we have to do genesis.
@@ -38,10 +38,10 @@ impl<LR, F, C, Ch> Client<LR, F, C, Ch> {
         Ok(())
     }
 
-    pub fn run_csm<D: Database + Send + Sync + 'static>(
+    pub fn run_csm<D: Database + Send + Sync + 'static, E: ExecEngineCtl>(
         &self,
-        csmctx: CsmContext<D>,
-    ) -> anyhow::Result<RunContext> {
+        csmctx: CsmContext<D, E>,
+    ) -> anyhow::Result<RunContext<D>> {
         let CsmContext {
             config,
             params,
@@ -51,6 +51,7 @@ impl<LR, F, C, Ch> Client<LR, F, C, Ch> {
             csm_handle,
             csm_rx,
             database,
+            ..
         } = csmctx;
 
         // Prepare the client worker state and start the thread for that.
@@ -58,9 +59,9 @@ impl<LR, F, C, Ch> Client<LR, F, C, Ch> {
         let client_worker_state = WorkerState::open(
             params.clone().into(),
             database.clone(),
-            db_manager.l2(),
+            db_manager.l2().clone(),
             cupdate_tx.clone(),
-            db_manager.checkpoint(),
+            db_manager.checkpoint().clone(),
         )?;
 
         // TODO: replace with actual engine
@@ -88,8 +89,13 @@ impl<LR, F, C, Ch> Client<LR, F, C, Ch> {
     }
 }
 
-impl<R: ClientComponent, F: ClientComponent, C: ClientComponent, Ch: ClientComponent>
-    ClientT<R, F, C, Ch> for Client<R, F, C, Ch>
+impl<
+        D: Database + Send + Sync + 'static,
+        R: ClientComponent<D>,
+        F: ClientComponent<D>,
+        C: ClientComponent<D>,
+        Ch: ClientComponent<D>,
+    > ClientT<D, R, F, C, Ch> for Client<R, F, C, Ch>
 {
     fn from_components(
         reader: R,
@@ -107,7 +113,7 @@ impl<R: ClientComponent, F: ClientComponent, C: ClientComponent, Ch: ClientCompo
         }
     }
 
-    fn run<D: Database + Send + Sync + 'static>(&self, runctx: &CsmContext<D>) -> ClientHandle {
+    fn run<E: ExecEngineCtl>(&self, runctx: &CsmContext<D, E>) -> ClientHandle {
         ClientHandle
     }
 }
