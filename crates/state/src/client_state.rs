@@ -188,6 +188,15 @@ impl SyncState {
         &self.finalized_blkid
     }
 
+    /// Returns the commitment for the finalized epoch.
+    pub fn get_epoch_commitment(&self) -> EpochCommitment {
+        EpochCommitment::new(
+            self.finalized_epoch(),
+            self.finalized_slot(),
+            *self.finalized_blkid(),
+        )
+    }
+
     pub fn confirmed_checkpoint_blocks(&self) -> &[(u64, L2BlockId)] {
         &self.confirmed_checkpoint_blocks
     }
