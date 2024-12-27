@@ -68,7 +68,20 @@ impl From<L1BlockId> for BlockHash {
 /// Commitment to a particular L1 block with both height and blkid.
 ///
 /// This is analogous in intention to the `EpochCommitment` type.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Arbitrary,
+    BorshSerialize,
+    BorshDeserialize,
+    Deserialize,
+    Serialize,
+)]
 pub struct L1BlockCommitment {
     height: u64,
     blkid: L1BlockId,
@@ -79,7 +92,7 @@ impl L1BlockCommitment {
         Self { height, blkid }
     }
 
-    pub fn heieght(&self) -> u64 {
+    pub fn height(&self) -> u64 {
         self.height
     }
 

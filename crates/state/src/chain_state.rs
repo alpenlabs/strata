@@ -214,7 +214,7 @@ impl EpochState {
     }
 
     pub fn safe_l1_height(&self) -> u64 {
-        self.safe_l1_block.heieght()
+        self.safe_l1_block.height()
     }
 
     pub fn get_deposit(&self, idx: u32) -> Option<&DepositEntry> {

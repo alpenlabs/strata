@@ -56,7 +56,7 @@ pub fn process_event<D: Database>(
             if let Some(l1_vs) = l1_vs {
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
                 let mut updated_l1vs = l1_vs.clone();
-                for height in (l1_vs_height + 1..l1v.tip_height()) {
+                for height in (l1_vs_height..l1v.tip_l1_block_height()) {
                     let block_mf = l1_db
                         .get_block_manifest(height)?
                         .ok_or(Error::MissingL1BlockHeight(height))?;
@@ -65,12 +65,13 @@ pub fn process_event<D: Database>(
                     updated_l1vs =
                         updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
                 }
+
                 writes.push(ClientStateWrite::UpdateVerificationState(updated_l1vs))
             }
 
             // Only accept the block if it's the next block in the chain we expect to accept.
-            let cur_seen_tip_height = l1v.tip_height();
-            let next_exp_height = l1v.next_expected_block();
+            let cur_seen_tip_height = l1v.tip_l1_block_height();
+            let next_exp_height = l1v.next_expected_l1_block();
             if next_exp_height > params.rollup().horizon_l1_height {
                 // TODO check that the new block we're trying to add has the same parent as the tip
                 // block
@@ -80,7 +81,8 @@ pub fn process_event<D: Database>(
             }
 
             if *height == next_exp_height {
-                writes.push(ClientStateWrite::AcceptL1Block(*l1blkid));
+                let commitment = L1BlockCommitment::new(*height, *l1blkid);
+                writes.push(ClientStateWrite::SetL1Tip(commitment));
             } else {
                 #[cfg(test)]
                 warn!("not sure what to do here h={height} exp={next_exp_height}");
@@ -138,13 +140,13 @@ pub fn process_event<D: Database>(
         SyncEvent::L1Revert(to_height) => {
             let l1_db = database.l1_db();
 
-            let buried = state.l1_view().buried_l1_height();
-            if *to_height < buried {
-                error!(%to_height, %buried, "got L1 revert below buried height");
-                return Err(Error::ReorgTooDeep(*to_height, buried));
-            }
+            let blkmf = l1_db
+                .get_block_manifest(*to_height)?
+                .ok_or(Error::MissingL1BlockHeight(*to_height))?;
+            let commitment = L1BlockCommitment::new(*to_height, blkmf.block_hash().into());
 
             writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
+            writes.push(ClientStateWrite::SetL1Tip(commitment));
         }
 
         SyncEvent::L1DABatch(height, checkpoints) => {
@@ -206,18 +208,13 @@ pub fn process_event<D: Database>(
             // height of last matured L1 block in chain state
             let chs_last_buried = chainstate.epoch_state().safe_l1_height().saturating_sub(1);
             // buried height in client state
-            let cls_last_buried = state.l1_view().buried_l1_height();
 
-            if chs_last_buried > cls_last_buried {
-                // can bury till last matured block in chainstate
-                // FIXME: this logic is not necessary for fullnode.
-                // Need to refactor this part for block builder only.
-                let client_state_bury_height = min(
-                    chs_last_buried,
-                    // keep at least 1 item
-                    state.l1_view().tip_height().saturating_sub(1),
-                );
-                writes.push(ClientStateWrite::UpdateBuried(client_state_bury_height));
+            // FIXME this is ugly but we're cleaning all this up soon anyways
+            if let Some(l1seg) = block.l1_segment() {
+                let safe_l1_height = chainstate.epoch_state().safe_l1_height();
+                let safe_l1_blkid = chainstate.epoch_state().safe_l1_blkid();
+                let commitment = L1BlockCommitment::new(safe_l1_height, *safe_l1_blkid);
+                writes.push(ClientStateWrite::SetL1Tip(commitment));
             }
 
             // TODO better checks here
@@ -346,7 +343,7 @@ fn handle_checkpoint_finalization(
             // and have negligible chance of reorg.
             let maturable_height = state
                 .l1_view()
-                .next_expected_block()
+                .next_expected_l1_block()
                 .saturating_sub(safe_depth);
 
             // The l1 height should be handled only if it is less than maturable height
