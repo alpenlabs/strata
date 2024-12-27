@@ -9,10 +9,7 @@ use strata_btcio::{
     },
 };
 use strata_db::traits::ProofDatabase;
-use strata_primitives::{
-    params::RollupParams,
-    proof::{ProofContext, ProofKey},
-};
+use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_state::l1::L1BlockId;
@@ -133,7 +130,6 @@ impl ProvingOp for L1BatchOperator {
         let state = get_verification_state(
             self.btc_client.as_ref(),
             start_height,
-            self.rollup_params.genesis_l1_height,
             &MAINNET.clone().into(),
         )
         .await
