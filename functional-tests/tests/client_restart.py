@@ -22,11 +22,14 @@ class BlockFinalizationSeqRestartTest(testenv.StrataTester):
         seq = ctx.get_service("sequencer")
         seqrpc = seq.create_rpc()
 
+        prover = ctx.get_service("prover-client")
+        prover_rpc = prover.create_rpc()
+
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
         # Check for first 2 checkpoints
         for n in range(2):
-            check_nth_checkpoint_finalized(n, seqrpc)
+            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
             self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         # Stop sequencer
@@ -40,7 +43,7 @@ class BlockFinalizationSeqRestartTest(testenv.StrataTester):
 
         # Check for next 2 checkpoints
         for n in range(2, 4):
-            check_nth_checkpoint_finalized(n, seqrpc)
+            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
             self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc, 0)

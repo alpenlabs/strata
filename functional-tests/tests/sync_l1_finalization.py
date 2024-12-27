@@ -21,14 +21,16 @@ class BlockFinalizationTest(testenv.StrataTester):
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
-
         seqrpc = seq.create_rpc()
+
+        prover = ctx.get_service("prover_client")
+        prover_rpc = prover.create_rpc()
 
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
         # Check for first 4 checkpoints
         for n in range(4):
-            check_nth_checkpoint_finalized(n, seqrpc)
+            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
             self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         # Proof for checkpoint 0 is already sent above

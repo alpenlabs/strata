@@ -8,6 +8,7 @@ use strata_btcio::{
         BitcoinClient,
     },
 };
+use strata_db::traits::ProofDatabase;
 use strata_primitives::{
     params::RollupParams,
     proof::{ProofContext, ProofKey},
@@ -132,6 +133,7 @@ impl ProvingOp for L1BatchOperator {
         let state = get_verification_state(
             self.btc_client.as_ref(),
             start_height,
+            self.rollup_params.genesis_l1_height,
             &MAINNET.clone().into(),
         )
         .await
