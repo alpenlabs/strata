@@ -61,7 +61,7 @@ strata-risc0-guest-builder = { path = "../../provers/risc0", optional = true }
 strata-test-utils.workspace = true
 
 [features]
-default = ["sp1"]
+default = []
 sp1 = ["strata-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]
 sp1-mock = ["sp1", "strata-sp1-adapter/mock", "strata-sp1-guest-builder/mock"]
 

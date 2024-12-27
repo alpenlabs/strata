@@ -286,7 +286,9 @@ class ProverClientFactory(flexitest.Factory):
             "--bitcoind-url", bitcoind_config["bitcoind_sock"],
             "--bitcoind-user", bitcoind_config["bitcoind_user"],
             "--bitcoind-password", bitcoind_config["bitcoind_pass"],
-            "--datadir", datadir
+            "--datadir", datadir,
+            "--native-workers", str(20),
+            "--loop-interval", str(100)
         ]
         # fmt: on
 

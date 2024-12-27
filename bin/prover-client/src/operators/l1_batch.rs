@@ -9,7 +9,10 @@ use strata_btcio::{
     },
 };
 use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::{ProofContext, ProofKey};
+use strata_primitives::{
+    params::RollupParams,
+    proof::{ProofContext, ProofKey},
+};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
@@ -31,16 +34,19 @@ use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 pub struct L1BatchOperator {
     btc_client: Arc<BitcoinClient>,
     btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl L1BatchOperator {
     pub fn new(
         btc_client: Arc<BitcoinClient>,
         btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
+        rollup_params: Arc<RollupParams>,
     ) -> Self {
         Self {
             btc_client,
             btc_blockspace_operator,
+            rollup_params,
         }
     }
 }
@@ -60,10 +66,6 @@ impl ProvingOp for L1BatchOperator {
         let len = (end_height - start_height) as usize + 1;
         let mut btc_deps = Vec::with_capacity(len);
 
-        let start_blkid = self.btc_blockspace_operator.get_id(start_height).await?;
-        let end_blkid = self.btc_blockspace_operator.get_id(end_height).await?;
-        let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
-
         for height in start_height..=end_height {
             let blkid = self.btc_blockspace_operator.get_id(height).await?;
             let proof_id = ProofContext::BtcBlockspace(blkid);
@@ -72,6 +74,10 @@ impl ProvingOp for L1BatchOperator {
                 .await?;
             btc_deps.push(proof_id);
         }
+
+        let start_blkid = self.btc_blockspace_operator.get_id(start_height).await?;
+        let end_blkid = self.btc_blockspace_operator.get_id(end_height).await?;
+        let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
 
         db.put_proof_deps(l1_batch_proof_id, btc_deps.clone())
             .map_err(ProvingTaskError::DatabaseError)?;
@@ -127,6 +133,7 @@ impl ProvingOp for L1BatchOperator {
         let state = get_verification_state(
             self.btc_client.as_ref(),
             start_height,
+            self.rollup_params.genesis_l1_height,
             &MAINNET.clone().into(),
         )
         .await

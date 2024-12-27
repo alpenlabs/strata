@@ -134,6 +134,7 @@ class RollupParamsSettings:
 def check_nth_checkpoint_finalized(
     idx,
     seqrpc,
+    prover_rpc,
     manual_gen: ManualGenBlocksConfig | None = None,
     proof_timeout: int | None = None,
 ):
@@ -166,7 +167,7 @@ def check_nth_checkpoint_finalized(
 
     # Submit checkpoint if proof_timeout is not set
     if proof_timeout is None:
-        submit_checkpoint(idx, seqrpc, manual_gen)
+        submit_checkpoint(idx, seqrpc, prover_rpc, manual_gen)
     else:
         # Just wait until timeout period instead of submitting so that sequencer submits empty proof
         delta = 1
@@ -186,7 +187,7 @@ def check_nth_checkpoint_finalized(
     )
 
 
-def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None = None):
+def submit_checkpoint(idx: int, seqrpc, prover_rpc, manual_gen: ManualGenBlocksConfig | None = None):
     """
     Submits checkpoint and if manual_gen, waits till it is present in l1
     """
@@ -198,10 +199,15 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
     # empty proof hex.
     # NOTE: The functional tests for verifying proofs need to provide non-empty
     # proofs
-    empty_proof_receipt = {"proof": [], "public_values": []}
+    time.sleep(5)
+    proof_keys = prover_rpc.dev_strata_proveCheckpoint(idx)
+    print(proof_keys)
+    proof_key = proof_keys[0]
+    wait_for_proof_with_time_out(prover_rpc, proof_key, time_out=100)
+    proof = prover_rpc.dev_strata_getProof(proof_key)
 
     # This is arbitrary
-    seqrpc.strataadmin_submitCheckpointProof(idx, empty_proof_receipt)
+    seqrpc.strataadmin_submitCheckpointProof(idx, proof)
 
     # Wait a while for it to be posted to l1. This will happen when there
     # is a new published txid in l1status
@@ -271,7 +277,8 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
         assert proof_status is not None
         print(f"Got the proof status {proof_status}")
         if proof_status == "Completed":
-            print(f"Completed the proof generation for {task_id}")
+            proof = prover_client_rpc.dev_strata_getProof(task_id)
+            print(f"Completed the proof generation for {task_id}: {proof}")
             break
 
         time.sleep(2)

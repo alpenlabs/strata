@@ -67,6 +67,7 @@ impl ProofOperator {
         let l1_batch_operator = L1BatchOperator::new(
             btc_client.clone(),
             Arc::new(btc_blockspace_operator.clone()),
+            rollup_params.clone(),
         );
         let evm_ee_operator = EvmEeOperator::new(evm_ee_client.clone());
         let cl_stf_operator = ClStfOperator::new(
