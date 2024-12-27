@@ -45,6 +45,10 @@ pub trait StrataProverClientApi {
         l2_range: (u64, u64),
     ) -> RpcResult<Vec<ProofKey>>;
 
+    /// Start proving the given checkpoint
+    #[method(name = "proveCheckpoint")]
+    async fn prove_checkpoint(&self, ckp_idx: u64) -> RpcResult<Vec<ProofKey>>;
+
     /// Start proving the latest checkpoint info from the sequencer
     #[method(name = "proveLatestCheckPoint")]
     async fn prove_latest_checkpoint(&self) -> RpcResult<Vec<ProofKey>>;
