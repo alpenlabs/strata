@@ -245,7 +245,7 @@ pub mod corepc_node_helpers {
     use crate::rpc::BitcoinClient;
 
     /// Get the authentication credentials for a given `bitcoind` instance.
-    pub fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
+    fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
         let params = &bitcoind.params;
         let cookie_values = params.get_cookie_values().unwrap().unwrap();
         (cookie_values.user, cookie_values.password)
