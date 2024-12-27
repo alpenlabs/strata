@@ -145,7 +145,7 @@ class RollupParamsSettings:
 
 
 def check_nth_checkpoint_finalized(
-    idx,
+    epoch_idx: int,
     seqrpc,
     prover_rpc,
     manual_gen: ManualGenBlocksConfig | None = None,
@@ -155,32 +155,34 @@ def check_nth_checkpoint_finalized(
     This check expects nth checkpoint to be finalized
 
     Params:
-        - idx: The index of checkpoint
+        - epoch_idx: The index of checkpoint
         - seqrpc: The sequencer rpc
         - manual_gen: If we need to generate blocks manually
     """
+    # FIXME this function needs to be reworked to use the epoch data itself instead of relying on the checkpoint info, which is only populated if there's a sequencer running
+
     syncstat = seqrpc.strata_syncStatus()
 
     # Wait until we find our expected checkpoint.
     batch_info = wait_until_with_value(
-        lambda: seqrpc.strata_getCheckpointInfo(idx),
+        lambda: seqrpc.strata_getCheckpointInfo(epoch_idx),
         predicate=lambda v: v is not None,
-        error_with=f"Could not find checkpoint info for index {idx}",
+        error_with=f"Could not find checkpoint info for index {epoch_idx}",
         timeout=3,
     )
 
     assert (
         syncstat["finalized_block_id"] != batch_info["l2_blockid"]
-    ), "Checkpoint block should not yet finalize"
-    assert batch_info["idx"] == idx
-    checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
-    assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
+    ), "Checkpoint block should not yet be finalized"
+    assert batch_info["epoch"] == epoch_idx
+    checkpoint_info_next = seqrpc.strata_getCheckpointInfo(epoch_idx + 1)
+    assert checkpoint_info_next is None, f"There should be no checkpoint info for {epoch_idx + 1} index"
 
     to_finalize_blkid = batch_info["l2_blockid"]
 
     # Submit checkpoint if proof_timeout is not set
     if proof_timeout is None:
-        submit_checkpoint(idx, seqrpc, prover_rpc, manual_gen)
+        submit_checkpoint(epoch_idx, seqrpc, prover_rpc, manual_gen)
     else:
         # Just wait until timeout period instead of submitting so that sequencer submits empty proof
         delta = 1
