@@ -334,13 +334,8 @@ async fn process_block<R: Reader>(
 
     if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
-        let l1_verification_state = get_verification_state(
-            ctx.client.as_ref(),
-            genesis_ht,
-            genesis_ht + 1,
-            &get_btc_params(),
-        )
-        .await?;
+        let l1_verification_state =
+            get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
         if let Err(e) = ctx
             .event_tx
             .send(L1Event::GenesisVerificationState(
@@ -362,7 +357,6 @@ async fn process_block<R: Reader>(
 pub async fn get_verification_state(
     client: &impl Reader,
     height: u64,
-    genesis_height: u64,
     params: &BtcParams,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
@@ -391,19 +385,8 @@ pub async fn get_verification_state(
 
     // Calculate the 'head' index for the ring buffer based on the current block height.
     // The 'head' represents the position in the buffer where the next timestamp will be inserted.
-
-    // If the current height is less than the genesis height, we haven't started processing blocks
-    // yet. In this case, set 'head' to 0.
-    let head = if height <= genesis_height {
-        0
-    } else {
-        // Calculate the 'head' index using the formula:
-        // (current height + buffer size - 1 - genesis height) % buffer size
-        // This ensures the 'head' points to the correct position in the ring buffer.
-        (height + N as u64 - 1 - genesis_height) % N as u64
-    };
-
-    let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head as usize);
+    let head = height as usize % N;
+    let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head);
 
     let l1_blkid: L1BlockId = vb.header.block_hash().into();
 
@@ -422,7 +405,7 @@ pub async fn get_verification_state(
 
 #[cfg(test)]
 mod test {
-    use bitcoin::{hashes::Hash, Address, Network};
+    use bitcoin::{hashes::Hash, Network};
     use corepc_node::BitcoinD;
     use strata_primitives::{
         buf::Buf32,
@@ -440,7 +423,7 @@ mod test {
     use crate::{
         rpc::BitcoinClient,
         test_utils::{
-            corepc_node_helpers::{get_auth, mine_blocks},
+            corepc_node_helpers::{get_auth, get_bitcoind_and_client, mine_blocks},
             TestBitcoinClient,
         },
     };
@@ -561,46 +544,28 @@ mod test {
         assert_eq!(state.next_height(), checkpoint_height + 1);
     }
 
-    async fn test_for_genesis_height(
-        genesis_height: u64,
-        client: &impl Reader,
-        params: &BtcParams,
-    ) {
-        let len = 5;
-        let mut header_vs =
-            get_verification_state(client, genesis_height + 1, genesis_height, params)
-                .await
-                .unwrap();
-
-        for height in genesis_height + 1..genesis_height + len {
-            let block = client.get_block_at(height).await.unwrap();
-            header_vs.check_and_update_continuity(&block.header, params);
-        }
-
-        let new_header_vs =
-            get_verification_state(client, genesis_height + len, genesis_height, params)
-                .await
-                .unwrap();
-
-        assert_eq!(header_vs, new_header_vs);
-    }
-
     #[tokio::test()]
     async fn test_header_verification_state() {
-        // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
-        std::env::set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
-        let bitcoind = BitcoinD::from_downloaded().unwrap();
-        let url = bitcoind.rpc_url();
-        let (user, password) = get_auth(&bitcoind);
-        let client = BitcoinClient::new(url, user, password).unwrap();
+        let (bitcoind, client) = get_bitcoind_and_client();
 
         let _ = mine_blocks(&bitcoind, 105, None).unwrap();
         let params = get_btc_params();
 
-        test_for_genesis_height(1, &client, &params).await;
-        test_for_genesis_height(5, &client, &params).await;
-        test_for_genesis_height(10, &client, &params).await;
-        test_for_genesis_height(15, &client, &params).await;
-        test_for_genesis_height(100, &client, &params).await;
+        let len = 5;
+        let genesis_height = 10;
+        let mut header_vs = get_verification_state(&client, genesis_height + 1, &params)
+            .await
+            .unwrap();
+
+        for height in genesis_height + 1..genesis_height + len {
+            let block = client.get_block_at(height).await.unwrap();
+            header_vs.check_and_update_continuity(&block.header, &params);
+        }
+
+        let new_header_vs = get_verification_state(&client, genesis_height + len, &params)
+            .await
+            .unwrap();
+
+        assert_eq!(header_vs, new_header_vs);
     }
 }

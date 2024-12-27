@@ -9,10 +9,7 @@ use strata_btcio::{
     },
 };
 use strata_db::traits::ProofDatabase;
-use strata_primitives::{
-    params::RollupParams,
-    proof::{ProofContext, ProofKey},
-};
+use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
@@ -34,19 +31,16 @@ use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 pub struct L1BatchOperator {
     btc_client: Arc<BitcoinClient>,
     btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
-    rollup_params: Arc<RollupParams>,
 }
 
 impl L1BatchOperator {
     pub fn new(
         btc_client: Arc<BitcoinClient>,
         btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
-        rollup_params: Arc<RollupParams>,
     ) -> Self {
         Self {
             btc_client,
             btc_blockspace_operator,
-            rollup_params,
         }
     }
 }
@@ -133,7 +127,6 @@ impl ProvingOp for L1BatchOperator {
         let state = get_verification_state(
             self.btc_client.as_ref(),
             start_height,
-            self.rollup_params.genesis_l1_height,
             &MAINNET.clone().into(),
         )
         .await

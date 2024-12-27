@@ -394,7 +394,7 @@ mod test {
     use strata_common::logging;
 
     use super::*;
-    use crate::test_utils::corepc_node_helpers::{get_auth, mine_blocks};
+    use crate::test_utils::corepc_node_helpers::{get_bitcoind_and_client, mine_blocks};
 
     #[tokio::test()]
     async fn client_works() {
