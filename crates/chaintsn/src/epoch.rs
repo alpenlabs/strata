@@ -101,9 +101,11 @@ fn process_l1_segment(
                 let op = tx.tx().protocol_operation();
                 match op {
                     ProtocolOperation::Deposit(dinfo) => {
-                        let intent = DepositIntent::new(dinfo.amt, dinfo.address.clone());
-                        state.create_new_deposit_entry(&dinfo.outpoint, &op_idxs, dinfo.amt);
+                        let amt = dinfo.amt;
+                        let intent = DepositIntent::new(amt, dinfo.address.clone());
+                        state.create_new_deposit_entry(&dinfo.outpoint, &op_idxs, amt);
                         state.submit_ee_deposit_intent(intent);
+                        trace!(%amt, "accepted deposit");
                     }
 
                     ProtocolOperation::Checkpoint(ckpt) => {

@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, l1::L1BlockCommitment};
 
 use crate::{
     batch::{BatchInfo, BootstrapState},
@@ -99,12 +99,8 @@ impl ClientState {
             .expect("clientstate: missing sync state")
     }
 
-    pub fn most_recent_l1_block(&self) -> Option<&L1BlockId> {
-        self.local_l1_view.local_unaccepted_blocks.last()
-    }
-
     pub fn next_exp_l1_block(&self) -> u64 {
-        self.local_l1_view.next_expected_block
+        self.local_l1_view.next_expected_l1_block()
     }
 
     pub fn genesis_l1_height(&self) -> u64 {
@@ -209,15 +205,8 @@ impl SyncState {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct LocalL1State {
-    /// Local sequence of blocks that should reorg blocks in the chainstate.
-    ///
-    /// This MUST be ordered by block height, so the first block here is the
-    /// buried height +1.
-    // TODO this needs more tracking to make it remember where we are properly
-    pub(super) local_unaccepted_blocks: Vec<L1BlockId>,
-
     /// Next L1 block height we expect to receive
-    pub(super) next_expected_block: u64,
+    pub(super) tip_l1_block: L1BlockCommitment,
 
     /// Last finalized checkpoint
     pub(super) last_finalized_checkpoint: Option<L1Checkpoint>,
@@ -235,53 +224,36 @@ impl LocalL1State {
     /// # Panics
     ///
     /// If we try to construct it in a way that implies we don't have the L1 genesis block.
-    pub fn new(next_expected_block: u64) -> Self {
-        if next_expected_block == 0 {
+    pub fn new(tip_l1_block: u64) -> Self {
+        if tip_l1_block == 0 {
             panic!("clientstate: tried to construct without known L1 genesis block");
         }
 
+        // TODO maybe avoid using a fake blkid
+        let fake_blkid = L1BlockId::from(Buf32::zero());
         Self {
-            local_unaccepted_blocks: Vec::new(),
-            next_expected_block,
+            tip_l1_block: L1BlockCommitment::new(tip_l1_block, fake_blkid),
             verified_checkpoints: Vec::new(),
             last_finalized_checkpoint: None,
             header_verification_state: None,
         }
     }
 
-    /// Returns a slice of the unaccepted blocks.
-    pub fn local_unaccepted_blocks(&self) -> &[L1BlockId] {
-        &self.local_unaccepted_blocks
-    }
-
     /// Returns the height of the next block we expected to receive.
-    pub fn next_expected_block(&self) -> u64 {
-        self.next_expected_block
+    pub fn next_expected_l1_block(&self) -> u64 {
+        self.tip_l1_block.height() + 1
     }
 
-    /// Returned the height of the buried L1 block, which we can't reorg to.
-    pub fn buried_l1_height(&self) -> u64 {
-        self.next_expected_block - self.local_unaccepted_blocks.len() as u64
+    pub fn tip_l1_blkid(&self) -> &L1BlockId {
+        self.tip_l1_block.blkid()
     }
 
-    /// Returns an iterator over the unaccepted L2 blocks, from the lowest up.
-    pub fn unacc_blocks_iter(&self) -> impl Iterator<Item = (u64, &L1BlockId)> {
-        self.local_unaccepted_blocks()
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (self.buried_l1_height() + i as u64, b))
-    }
-
-    pub fn tip_height(&self) -> u64 {
-        if self.next_expected_block == 0 {
+    pub fn tip_l1_block_height(&self) -> u64 {
+        if self.next_expected_l1_block() == 0 {
             panic!("clientstate: started without L1 genesis block somehow");
         }
 
-        self.next_expected_block - 1
-    }
-
-    pub fn tip_blkid(&self) -> Option<&L1BlockId> {
-        self.local_unaccepted_blocks().last()
+        self.tip_l1_block.height()
     }
 
     pub fn last_finalized_checkpoint(&self) -> Option<&L1Checkpoint> {

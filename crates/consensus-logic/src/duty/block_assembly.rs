@@ -167,24 +167,20 @@ fn prepare_l1_segment(
     max_l1_entries: usize,
     params: &RollupParams,
 ) -> Result<L1Segment, Error> {
-    let unacc_blocks = local_l1_state.unacc_blocks_iter().collect::<Vec<_>>();
+    let csm_l1_height = local_l1_state.tip_l1_block_height();
     let state_l1_height = prev_chstate.epoch_state().safe_l1_height();
-    trace!(unacc_blocks = %unacc_blocks.len(), %state_l1_height, "figuring out which blocks to include in L1 segment");
+    trace!(%csm_l1_height, %state_l1_height, "figuring out which blocks to include in L1 segment");
 
     // We don't have to worry about reorgs now, just shove all the ones above
     // the current height in.
     //
     // TODO only put ones that are buryable
     let mut payloads = Vec::new();
-    for (h, _b) in unacc_blocks
-        .iter()
-        .filter(|(h, _)| *h > state_l1_height)
-        .take(max_l1_entries)
-    {
-        let rec = load_header_record(*h, l1_db)?;
-        let deposit_update_tx = fetch_deposit_update_txs(*h, l1_db)?;
+    for height in (state_l1_height..=csm_l1_height).take(max_l1_entries) {
+        let rec = load_header_record(height, l1_db)?;
+        let deposit_update_tx = fetch_deposit_update_txs(height, l1_db)?;
         payloads.push(
-            L1HeaderPayload::new(*h, rec)
+            L1HeaderPayload::new(height, rec)
                 .with_deposit_update_txs(deposit_update_tx)
                 .build(),
         );

@@ -69,7 +69,10 @@ fn extract_batch_duties(
             let first_checkpoint_idx = 0;
 
             // Include genesis l1 height to current seen height
-            let l1_range = (state.genesis_l1_height(), state.l1_view().tip_height());
+            let l1_range = (
+                state.genesis_l1_height(),
+                state.l1_view().tip_l1_block_height(),
+            );
 
             let genesis_l1_state_hash = state
                 .genesis_verification_hash()
@@ -113,7 +116,10 @@ fn extract_batch_duties(
         Some(prev_checkpoint) => {
             let checkpoint = prev_checkpoint.batch_info.clone();
 
-            let l1_range = (checkpoint.l1_range.1 + 1, state.l1_view().tip_height());
+            let l1_range = (
+                checkpoint.l1_range.1 + 1,
+                state.l1_view().tip_l1_block_height(),
+            );
             let current_l1_state = state
                 .l1_view()
                 .tip_verification_state()
