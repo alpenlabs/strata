@@ -394,34 +394,7 @@ mod test {
     use strata_common::logging;
 
     use super::*;
-
-    /// Get the authentication credentials for a given `bitcoind` instance.
-    fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
-        let params = &bitcoind.params;
-        let cookie_values = params.get_cookie_values().unwrap().unwrap();
-        (cookie_values.user, cookie_values.password)
-    }
-
-    /// Mine a number of blocks of a given size `count`, which may be specified to a given coinbase
-    /// `address`.
-    pub fn mine_blocks(
-        bitcoind: &BitcoinD,
-        count: usize,
-        address: Option<Address>,
-    ) -> anyhow::Result<Vec<BlockHash>> {
-        let coinbase_address = match address {
-            Some(address) => address,
-            None => bitcoind.client.new_address()?,
-        };
-        let block_hashes = bitcoind
-            .client
-            .generate_to_address(count as _, &coinbase_address)?
-            .0
-            .iter()
-            .map(|hash| hash.parse::<BlockHash>())
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(block_hashes)
-    }
+    use crate::test_utils::corepc_node_helpers::{get_auth, mine_blocks};
 
     #[tokio::test()]
     async fn client_works() {
