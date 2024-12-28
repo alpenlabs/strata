@@ -57,8 +57,8 @@ impl TaskTracker {
         for host in vms {
             let task = ProofKey::new(proof_id, *host);
             tasks.push(task);
-            let dep_tasks = deps.iter().map(|&dep| ProofKey::new(dep, *host)).collect();
-            self.insert_task(task, dep_tasks)?;
+            let dep_tasks: Vec<_> = deps.iter().map(|&dep| ProofKey::new(dep, *host)).collect();
+            self.insert_task(task, &dep_tasks)?;
         }
 
         Ok(tasks)
@@ -70,25 +70,28 @@ impl TaskTracker {
     /// - If dependencies are provided, the task is marked as `WaitingForDependencies`.
     ///
     /// Returns an error if the task already exists.
-    pub fn insert_task(
-        &mut self,
-        id: ProofKey,
-        deps: Vec<ProofKey>,
-    ) -> Result<(), ProvingTaskError> {
+    pub fn insert_task(&mut self, id: ProofKey, deps: &[ProofKey]) -> Result<(), ProvingTaskError> {
         if self.tasks.contains_key(&id) {
             return Err(ProvingTaskError::TaskAlreadyFound(id));
         }
 
-        for dep in &deps {
-            if !self.tasks.contains_key(dep) {
-                return Err(ProvingTaskError::DependencyNotFound(*dep));
+        // Gather dependencies that are not completed
+        let mut pending_deps = Vec::with_capacity(deps.len());
+        for &dep in deps {
+            let status = self
+                .tasks
+                .get(&dep)
+                .ok_or_else(|| ProvingTaskError::DependencyNotFound(dep))?;
+
+            if *status != ProvingTaskStatus::Completed {
+                pending_deps.push(dep);
             }
         }
 
         let status = if deps.is_empty() {
             ProvingTaskStatus::Pending
         } else {
-            ProvingTaskStatus::WaitingForDependencies(HashSet::from_iter(deps))
+            ProvingTaskStatus::WaitingForDependencies(HashSet::from_iter(pending_deps))
         };
 
         self.tasks.insert(id, status);
@@ -138,6 +141,14 @@ impl TaskTracker {
                         }
                     }
                 }
+
+                // TODO: Develop a strategy to remove completed tasks from the task tracker.
+                // The naive approach of simply calling self.tasks.remove(&id) is not sufficient
+                // because there are cases where the task is still a dependency for tasks that have
+                // not yet been created. For example, in the case of L1 Batch
+                // proofs, while dependent tasks for BTC Blockspaces are being created,
+                // some proofs for BTC Blockspace might already be generated. Removing them from the
+                // task tracker prematurely would result in a TaskNotFound error.
             }
             Ok(())
         } else {
@@ -206,7 +217,7 @@ mod tests {
         let mut tracker = TaskTracker::new();
         let (id, _) = gen_task_with_deps(0);
 
-        tracker.insert_task(id, vec![]).unwrap();
+        tracker.insert_task(id, &[]).unwrap();
         assert!(
             matches!(tracker.get_task(id), Ok(&ProvingTaskStatus::Pending)),
             "Task with no dependencies should be Pending"
@@ -219,9 +230,9 @@ mod tests {
         let (id, deps) = gen_task_with_deps(2);
 
         for dep in &deps {
-            tracker.insert_task(*dep, vec![]).unwrap();
+            tracker.insert_task(*dep, &[]).unwrap();
         }
-        tracker.insert_task(id, deps.clone()).unwrap();
+        tracker.insert_task(id, &deps.clone()).unwrap();
         assert!(
             matches!(
                 tracker.get_task(id),
@@ -245,9 +256,9 @@ mod tests {
         let mut tracker = TaskTracker::new();
         let (id, deps) = gen_task_with_deps(2);
         for dep in &deps {
-            tracker.insert_task(*dep, vec![]).unwrap();
+            tracker.insert_task(*dep, &[]).unwrap();
         }
-        tracker.insert_task(id, deps.clone()).unwrap();
+        tracker.insert_task(id, &deps).unwrap();
 
         for dep in &deps {
             tracker
