@@ -406,7 +406,6 @@ pub async fn get_verification_state(
 #[cfg(test)]
 mod test {
     use bitcoin::{hashes::Hash, Network};
-    use corepc_node::BitcoinD;
     use strata_primitives::{
         buf::Buf32,
         l1::{BitcoinAddress, L1Status},
@@ -420,12 +419,9 @@ mod test {
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::*;
-    use crate::{
-        rpc::BitcoinClient,
-        test_utils::{
-            corepc_node_helpers::{get_auth, get_bitcoind_and_client, mine_blocks},
-            TestBitcoinClient,
-        },
+    use crate::test_utils::{
+        corepc_node_helpers::{get_bitcoind_and_client, mine_blocks},
+        TestBitcoinClient,
     };
 
     const N_RECENT_BLOCKS: usize = 10;
@@ -548,21 +544,21 @@ mod test {
     async fn test_header_verification_state() {
         let (bitcoind, client) = get_bitcoind_and_client();
 
-        let _ = mine_blocks(&bitcoind, 105, None).unwrap();
+        let _ = mine_blocks(&bitcoind, 115, None).unwrap();
         let params = get_btc_params();
 
-        let len = 5;
-        let genesis_height = 10;
-        let mut header_vs = get_verification_state(&client, genesis_height + 1, &params)
+        let len = 15;
+        let height = 100;
+        let mut header_vs = get_verification_state(&client, height, &params)
             .await
             .unwrap();
 
-        for height in genesis_height + 1..genesis_height + len {
-            let block = client.get_block_at(height).await.unwrap();
+        for h in height..height + len {
+            let block = client.get_block_at(h).await.unwrap();
             header_vs.check_and_update_continuity(&block.header, &params);
         }
 
-        let new_header_vs = get_verification_state(&client, genesis_height + len, &params)
+        let new_header_vs = get_verification_state(&client, height + len, &params)
             .await
             .unwrap();
 
