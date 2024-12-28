@@ -55,7 +55,7 @@ pub trait StrataProverClientApi {
 
     /// Get the task status of `key`
     #[method(name = "getTaskStatus")]
-    async fn get_task_status(&self, key: ProofKey) -> RpcResult<Option<String>>;
+    async fn get_task_status(&self, key: ProofKey) -> RpcResult<String>;
 
     /// Get proof with the given `key`
     #[method(name = "getProof")]
