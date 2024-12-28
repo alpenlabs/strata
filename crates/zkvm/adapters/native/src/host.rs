@@ -24,7 +24,7 @@ impl ZkVmHost for NativeHost {
     ) -> ZkVmResult<NativeProofReceipt> {
         (self.process_proof)(&native_machine)?;
         let output = native_machine.state.borrow().output.clone();
-        let proof = Proof::default();
+        let proof = Proof::new(output.clone());
         let public_values = PublicValues::new(output);
         Ok(ProofReceipt::new(proof, public_values).try_into()?)
     }
@@ -41,7 +41,14 @@ impl ZkVmHost for NativeHost {
         Ok(public_params)
     }
 
-    fn verify_inner(&self, _proof: &NativeProofReceipt) -> ZkVmResult<()> {
+    fn verify_inner(&self, proof: &NativeProofReceipt) -> ZkVmResult<()> {
+        let receipt = proof.clone().inner();
+        if receipt.proof().as_bytes() != receipt.public_values().as_bytes() {
+            return Err(ZkVmError::ProofVerificationError(
+                "Proof does not match public values".to_string(),
+            ));
+        }
+
         Ok(())
     }
 }
