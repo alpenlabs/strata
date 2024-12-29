@@ -30,7 +30,7 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv, btc_blockspace_vk: &[u32; 8])
     let num_inputs: u32 = zkvm.read_serde();
     assert!(num_inputs > 0);
 
-    let initial_snapshot = state.compute_snapshot();
+    let initial_snapshot = state.compute_initial_snapshot();
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
     let mut rollup_params_commitment = None;
@@ -50,7 +50,7 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv, btc_blockspace_vk: &[u32; 8])
             rollup_params_commitment = Some(blkpo.rollup_params_commitment);
         }
     }
-    let final_snapshot = state.compute_snapshot();
+    let final_snapshot = state.compute_final_snapshot();
 
     let output = L1BatchProofOutput {
         deposits,

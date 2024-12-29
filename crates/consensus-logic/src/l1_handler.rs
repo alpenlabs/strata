@@ -144,7 +144,7 @@ fn check_for_da_batch(
 
     let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
         if let Some(seq_pubkey) = seq_pubkey {
-            if !signed_checkpoint.verify_sig(seq_pubkey.into()) {
+            if !signed_checkpoint.verify_sig(&seq_pubkey.into()) {
                 error!(
                     ?tx,
                     ?signed_checkpoint,
@@ -168,6 +168,7 @@ pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) 
     let rollup_vk = rollup_params.rollup_vk;
     let checkpoint_idx = checkpoint.batch_info().idx();
     let proof = checkpoint.proof();
+    info!(%checkpoint_idx, "verifying proof");
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
@@ -176,7 +177,7 @@ pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) 
         return Ok(());
     }
 
-    let public_params_raw = borsh::to_vec(&checkpoint).unwrap();
+    let public_params_raw = borsh::to_vec(&checkpoint.proof_output()).unwrap();
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint

@@ -187,7 +187,9 @@ def check_nth_checkpoint_finalized(
     )
 
 
-def submit_checkpoint(idx: int, seqrpc, prover_rpc, manual_gen: ManualGenBlocksConfig | None = None):
+def submit_checkpoint(
+    idx: int, seqrpc, prover_rpc, manual_gen: ManualGenBlocksConfig | None = None
+):
     """
     Submits checkpoint and if manual_gen, waits till it is present in l1
     """

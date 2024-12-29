@@ -34,10 +34,11 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
         btc = ctx.get_service("bitcoin")
-        prover = ctx.get_service("prover")
+        prover = ctx.get_service("prover_client")
 
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
+        prover_rpc = prover.create_rpc()
         seq_addr = seq.get_prop("address")
 
         cfg: RollupConfig = ctx.env.rollup_cfg()
@@ -57,7 +58,7 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
 
         # Sanity Check for first checkpoint
         idx = 0
-        check_nth_checkpoint_finalized(idx, seqrpc, manual_gen)
+        check_nth_checkpoint_finalized(idx, seqrpc, prover_rpc, manual_gen)
         self.debug(f"Pass checkpoint finalization for checkpoint {idx}")
 
         # TODO remove this after adding a proper config file
@@ -67,7 +68,9 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         check_nth_checkpoint_finalized_on_reorg(idx + 1, seq, btc, prover)
 
 
-def check_nth_checkpoint_finalized_on_reorg(checkpt_idx: int, seq: Service, btc: Service, prover: Service):
+def check_nth_checkpoint_finalized_on_reorg(
+    checkpt_idx: int, seq: Service, btc: Service, prover: Service
+):
     # Now submit another checkpoint proof and produce a couple of blocks(less than reorg depth)
     seqrpc = seq.create_rpc()
     btcrpc = btc.create_rpc()

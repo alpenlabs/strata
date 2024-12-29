@@ -237,7 +237,16 @@ impl HeaderVerificationState {
         new_self
     }
 
-    pub fn compute_snapshot(&self) -> HeaderVerificationStateSnapshot {
+    // Need to improve upon this?
+    pub fn compute_initial_snapshot(&self) -> HeaderVerificationStateSnapshot {
+        HeaderVerificationStateSnapshot {
+            hash: self.compute_hash().unwrap(),
+            block_num: self.last_verified_block_num as u64 + 1, // because inclusive
+            acc_pow: self.total_accumulated_pow,
+        }
+    }
+
+    pub fn compute_final_snapshot(&self) -> HeaderVerificationStateSnapshot {
         HeaderVerificationStateSnapshot {
             hash: self.compute_hash().unwrap(),
             block_num: self.last_verified_block_num as u64,
