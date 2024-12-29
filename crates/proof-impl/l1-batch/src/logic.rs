@@ -32,7 +32,7 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
     let num_inputs: u32 = zkvm.read_serde();
     assert!(num_inputs > 0);
 
-    let initial_snapshot = state.compute_snapshot();
+    let initial_snapshot = state.compute_initial_snapshot();
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
@@ -44,8 +44,7 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
         deposits.extend(blockscan_result.deposits);
         prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);
     }
-
-    let final_snapshot = state.compute_snapshot();
+    let final_snapshot = state.compute_final_snapshot();
 
     let output = L1BatchProofOutput {
         deposits,
