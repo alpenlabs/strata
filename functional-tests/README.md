@@ -30,6 +30,13 @@ rm -rf bitcoin-28.0 bitcoin-28.0-x86_64-linux-gnu.tar.gz
 bitcoind --version
 ```
 
+On macOS, you must have Rosetta installed:
+
+```bash
+# macOS only
+softwareupdate --install-rosetta
+```
+
 ### Poetry
 
 > [!NOTE]
