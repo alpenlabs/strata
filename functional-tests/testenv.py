@@ -424,7 +424,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             bitcoind_config,
             f"http://localhost:{seq_port}",
             f"http://localhost:{reth_rpc_http_port}",
-                params,
+            params,
         )
         svcs["prover_client"] = prover_client
 

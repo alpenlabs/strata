@@ -387,10 +387,8 @@ impl Signer for BitcoinClient {
 
 #[cfg(test)]
 mod test {
-    use std::env::set_var;
 
     use bitcoin::{consensus, hashes::Hash, NetworkKind};
-    use corepc_node::BitcoinD;
     use strata_common::logging;
 
     use super::*;

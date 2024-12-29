@@ -56,16 +56,14 @@ pub fn process_event<D: Database>(
             if let Some(l1_vs) = l1_vs {
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
                 let mut updated_l1vs = l1_vs.clone();
-                if l1_vs_height < l1v.tip_height() {
-                    for height in (l1_vs_height..l1v.tip_height()) {
-                        let block_mf = l1_db
-                            .get_block_manifest(height)?
-                            .ok_or(Error::MissingL1BlockHeight(height))?;
-                        let header: Header =
-                            bitcoin::consensus::deserialize(block_mf.header()).unwrap();
-                        updated_l1vs = updated_l1vs
-                            .check_and_update_continuity_new(&header, &get_btc_params());
-                    }
+                for height in (l1_vs_height + 1..l1v.tip_height()) {
+                    let block_mf = l1_db
+                        .get_block_manifest(height)?
+                        .ok_or(Error::MissingL1BlockHeight(height))?;
+                    let header: Header =
+                        bitcoin::consensus::deserialize(block_mf.header()).unwrap();
+                    updated_l1vs =
+                        updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
                 }
                 writes.push(ClientStateWrite::UpdateVerificationState(updated_l1vs))
             }

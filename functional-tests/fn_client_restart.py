@@ -23,7 +23,7 @@ class BlockFinalizationSeqRestartTest(testenv.StrataTester):
         seq = ctx.get_service("sequencer")
         seqrpc = seq.create_rpc()
 
-        prover = ctx.get_service("prover-client")
+        prover = ctx.get_service("prover_client")
         prover_rpc = prover.create_rpc()
 
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
