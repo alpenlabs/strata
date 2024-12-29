@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
-use jsonrpsee::{
-    core::{client::ClientT, params::ArrayParams},
-    http_client::HttpClient,
-    rpc_params,
-};
+use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_rocksdb::prover::db::ProofDb;
+use strata_rpc_api::StrataSequencerApiClient;
 use strata_rpc_types::{HexBytes, ProofKey};
 use tracing::info;
 
@@ -28,10 +25,7 @@ pub async fn submit_checkpoint_proof(
     );
 
     sequencer_client
-        .request::<(), ArrayParams>(
-            "strataadmin_submitCheckpointProof",
-            rpc_params![checkpoint_index, proof_bytes],
-        )
+        .submit_checkpoint_proof(checkpoint_index, proof_bytes)
         .await
         .map_err(|e| CheckpointError::SubmitProofError {
             index: checkpoint_index,

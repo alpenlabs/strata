@@ -296,6 +296,12 @@ class ProverClientFactory(flexitest.Factory):
 
         cmd.extend(["--rollup-params", rollup_params_file])
 
+        print("Abishek Ping here")
+        dev_mode = True
+        if dev_mode:
+            cmd.extend(["--enable_dev_rpcs", False])
+            cmd.extend(["--enable_checkpoint_runner", True])
+
         props = {"rpc_port": rpc_port}
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
