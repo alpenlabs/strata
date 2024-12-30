@@ -391,7 +391,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let blocks = futures::future::join_all(
             block_ids
                 .iter()
-                .map(|blkid| self.l2_block_manager.get_block_async(blkid)),
+                .map(|blkid| self.l2_block_manager.get_block_data_async(blkid)),
         )
         .await;
 
@@ -408,7 +408,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     async fn get_raw_bundle_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<HexBytes>> {
         let block = self
             .l2_block_manager
-            .get_block_async(&block_id)
+            .get_block_data_async(&block_id)
             .await
             .map_err(|e| Error::Other(e.to_string()))?
             .map(|block| {
