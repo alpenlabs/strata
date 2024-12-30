@@ -80,9 +80,12 @@ pub fn process_event<D: Database>(
                     .ok_or(Error::MissingL1BlockHeight(cur_seen_tip_height))?;
             }
 
+            // Moved this out of the following if-else to make the code work.
+            let commitment = L1BlockCommitment::new(*height, *l1blkid);
+            writes.push(ClientStateWrite::SetL1Tip(commitment));
+
             if *height == next_exp_height {
-                let commitment = L1BlockCommitment::new(*height, *l1blkid);
-                writes.push(ClientStateWrite::SetL1Tip(commitment));
+                // TODO
             } else {
                 #[cfg(test)]
                 warn!("not sure what to do here h={height} exp={next_exp_height}");

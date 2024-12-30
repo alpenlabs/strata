@@ -220,14 +220,20 @@ pub struct RpcExecUpdate {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcSyncStatus {
     /// Current head L2 slot known to this node.
-    // TODO rename to "slot"
-    pub tip_height: u64,
+    pub cur_epoch: u64,
+
+    /// Current slot known to this node.
+    pub tip_slot: u64,
+
+    /// Current L2 blockid known to this node.
+    pub tip_blkid: L2BlockId,
 
     /// Current head L2 slot known to this node.
-    pub tip_epoch: u64,
+    // TODO rename to "slot"
+    pub csm_tip_height: u64,
 
     /// Last L2 block we've chosen as the current tip.
-    pub tip_block_id: L2BlockId,
+    pub csm_tip_block_id: L2BlockId,
 
     /// L2 block that's been finalized and proven on L1.
     pub finalized_block_id: L2BlockId,

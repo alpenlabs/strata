@@ -73,6 +73,11 @@ pub fn apply_write_batch_to_chainstate(
         apply_op_to_chainstate(op, &mut chainstate);
     }
 
+    // Don't want to forget about this either.
+    if let Some(es) = batch.new_toplevel_epoch_state.clone() {
+        chainstate.epoch_state = es;
+    }
+
     chainstate
 }
 
@@ -89,6 +94,9 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
 /// be made generic over a state provider that exposes access to that and then
 /// the `WriteBatch` will include writes that can be made to that.
 pub struct StateCache {
+    // The structure of these fields is a little weird because we're likely to
+    // split these types apart more.  The epoch state in `new_ch_state` gets
+    // overwritten with `new_epoch_state` when we finalized the write batch.
     original_ch_state: Chainstate,
     original_epoch_state: EpochState,
     new_ch_state: Chainstate,
@@ -147,12 +155,18 @@ impl StateCache {
     /// Finalizes the changes made to the state, exporting it and a write batch
     /// that can be applied to the previous state to produce it.
     pub fn finalize(self) -> (Chainstate, WriteBatch) {
-        let wb = WriteBatch::new(
-            self.new_ch_state.clone(),
-            self.new_epoch_state,
-            self.write_ops,
-        );
-        (self.new_ch_state, wb)
+        let mut nchs = self.new_ch_state;
+
+        // If we wrote to the new epoch state then we have to reflect that in
+        // the chainstate.  It actually took me a lot longer to realize this was
+        // a necessary step and I wasted kinda a lot of time, but improved other
+        // things in the process. :/
+        if let Some(nes) = self.new_epoch_state.clone() {
+            nchs.epoch_state = nes;
+        }
+
+        let wb = WriteBatch::new(nchs.clone(), self.new_epoch_state, self.write_ops);
+        (nchs, wb)
     }
 
     /// Returns if the state cache is empty, meaning that no writes have been

@@ -48,10 +48,10 @@ pub struct ForkChoiceManager<D: Database> {
 
     /// Current best block.
     // TODO make sure we actually want to have this
-    cur_best_block: L2BlockId,
+    tip_blkid: L2BlockId,
 
-    /// Current best block index.
-    cur_index: u64,
+    /// Current tip slot.
+    tip_slot: u64,
 }
 
 impl<D: Database> ForkChoiceManager<D> {
@@ -62,8 +62,8 @@ impl<D: Database> ForkChoiceManager<D> {
         l2_block_manager: Arc<L2BlockManager>,
         cur_csm_state: Arc<ClientState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
-        cur_best_block: L2BlockId,
-        cur_index: u64,
+        tip_blkid: L2BlockId,
+        tip_slot: u64,
     ) -> Self {
         Self {
             params,
@@ -71,8 +71,8 @@ impl<D: Database> ForkChoiceManager<D> {
             l2_block_manager,
             cur_csm_state,
             chain_tracker,
-            cur_best_block,
-            cur_index,
+            tip_blkid,
+            tip_slot,
         }
     }
 
@@ -96,8 +96,8 @@ impl<D: Database> ForkChoiceManager<D> {
 
     fn get_block_index(&self, blkid: &L2BlockId) -> anyhow::Result<u64> {
         // FIXME this is horrible but it makes our current use case much faster, see below
-        if *blkid == self.cur_best_block {
-            return Ok(self.cur_index);
+        if *blkid == self.tip_blkid {
+            return Ok(self.tip_slot);
         }
 
         // FIXME we should have some in-memory cache of blkid->height, although now that we use the
@@ -358,7 +358,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             // Insert block into pending block tracker and figure out if we
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
-            let cur_tip = fcm_state.cur_best_block;
+            let cur_tip = fcm_state.tip_blkid;
             let new_tip = fcm_state
                 .chain_tracker
                 .attach_block(blkid, block_bundle.header())?;
@@ -380,34 +380,16 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &fcm_state.chain_tracker)
                 .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
 
-            debug!(reorg = ?reorg, "REORG");
+            debug!(?reorg, "REORG");
 
             // Only if the update actually does something should we try to
             // change the fork choice tip.
             if reorg.is_identity() {
                 return Ok(());
             }
+
             // Apply the reorg.
             match apply_tip_update(&reorg, fcm_state) {
-                Err(e) => {
-                    warn!(err = ?e, "failed to compute CL STF");
-
-                    // Specifically state transition errors we want to handle
-                    // specially so that we can remember to not accept the block again.
-                    if let Some(Error::InvalidStateTsn(inv_blkid, _)) = e.downcast_ref() {
-                        warn!(
-                            ?blkid,
-                            ?inv_blkid,
-                            "invalid block on seemingly good fork, rejecting block"
-                        );
-
-                        fcm_state.set_block_status(inv_blkid, BlockStatus::Invalid)?;
-                        return Ok(());
-                    }
-
-                    // Everything else we should fail on.
-                    return Err(e);
-                }
                 Ok(post_state) => {
                     // Block is valid, update the status
                     fcm_state.set_block_status(&blkid, BlockStatus::Valid)?;
@@ -415,6 +397,8 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
                     // TODO also update engine tip block
 
                     // Insert the sync event and submit it to the executor.
+                    // TODO remove this CSM message, we're changing it to be unaware of new tip
+                    // updates
                     let tip_blkid = *reorg.new_tip();
                     info!(?tip_blkid, "new chain tip block");
                     let ev = SyncEvent::NewTipBlock(tip_blkid);
@@ -422,6 +406,26 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
 
                     // Update status
                     status_channel.update_chainstate(post_state);
+                }
+
+                Err(e) => {
+                    warn!(err = ?e, "failed to compute CL STF");
+
+                    // Specifically state transition errors we want to handle
+                    // specially so that we can remember to not accept the block again.
+                    if let Some(Error::InvalidStateTsn(invalid_blkid, _)) = e.downcast_ref() {
+                        warn!(
+                            new_tip = ?blkid,
+                            ?invalid_blkid,
+                            "invalid block on seemingly good fork, rejecting block"
+                        );
+
+                        fcm_state.set_block_status(invalid_blkid, BlockStatus::Invalid)?;
+                        return Ok(());
+                    }
+
+                    // Everything else we should fail on.
+                    return Err(e);
                 }
             }
         }
@@ -538,13 +542,14 @@ fn pick_best_block<'t>(
 
 fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
-    fc_manager: &mut ForkChoiceManager<D>,
+    fcm: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<Chainstate> {
-    let chs_db = fc_manager.database.chain_state_db();
+    let rparams = fcm.params.rollup();
+    let chs_db = fcm.database.chain_state_db();
 
-    // See if we need to roll back recent changes.
+    // See if we need to roll back recent blocks.
     let pivot_blkid = reorg.pivot();
-    let pivot_idx = fc_manager.get_block_index(pivot_blkid)?;
+    let pivot_idx = fcm.get_block_index(pivot_blkid)?;
 
     // Load the post-state of the pivot block as the block to start computing
     // blocks going forwards with.
@@ -563,7 +568,7 @@ fn apply_tip_update<D: Database>(
         // Load the previous block and its post-state.
         // TODO make this not load both of the full blocks, we might have them
         // in memory anyways
-        let block = fc_manager
+        let block = fcm
             .get_block_data(blkid)?
             .ok_or(Error::MissingL2Block(*blkid))?;
         let block_idx = block.header().blockidx();
@@ -574,7 +579,6 @@ fn apply_tip_update<D: Database>(
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
         // FIXME epoch state bookkeeping
-        let rparams = fc_manager.params.rollup();
         let epoch_state = pre_state.epoch_state().clone();
         let mut prestate_cache = StateCache::new(pre_state, epoch_state);
         debug!("processing block");
@@ -590,7 +594,7 @@ fn apply_tip_update<D: Database>(
 
     // Check to see if we need to roll back to a previous state in order to
     // compute new states.
-    if pivot_idx < fc_manager.cur_index {
+    if pivot_idx < fcm.tip_slot {
         debug!(?pivot_blkid, %pivot_idx, "rolling back chainstate");
         chs_db.rollback_writes_to(pivot_idx)?;
     }
@@ -600,8 +604,8 @@ fn apply_tip_update<D: Database>(
     for (idx, blkid, writes) in updates {
         debug!(?blkid, "applying CL state update");
         chs_db.write_state_update(idx, &writes)?;
-        fc_manager.cur_best_block = *blkid;
-        fc_manager.cur_index = idx;
+        fcm.tip_blkid = *blkid;
+        fcm.tip_slot = idx;
     }
 
     Ok(pre_state)

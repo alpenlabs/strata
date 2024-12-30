@@ -95,15 +95,15 @@ pub async fn sync_worker<T: SyncClient>(
                     continue;
                 };
 
-                if state.has_block(&status.tip_block_id) {
+                if state.has_block(&status.csm_tip_block_id) {
                     // in sync with client
                     continue;
                 }
 
-                debug!(current_height = state.tip_height(), target_height = status.tip_height, "syncing to target height");
+                debug!(current_height = state.tip_height(), target_height = status.csm_tip_height, "syncing to target height");
 
                 let start_height = state.tip_height() + 1;
-                let end_height = status.tip_height;
+                let end_height = status.csm_tip_height;
 
                 if let Err(err) = sync_blocks_by_range(state, context, start_height, end_height).await {
                     error!(start_height = start_height, end_height = end_height, err = ?err, "failed to sync blocks");

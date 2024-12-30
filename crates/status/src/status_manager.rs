@@ -1,7 +1,7 @@
 //! Manages and updates unified status bundles
 use std::{cell::Ref, sync::Arc};
 
-use strata_primitives::l1::L1Status;
+use strata_primitives::{l1::L1Status, l2::L2BlockId};
 use strata_state::{
     bridge_state::{DepositsTable, OperatorTable},
     chain_state::Chainstate,
@@ -87,6 +87,20 @@ impl StatusChannel {
 
     fn get_chainstate_cloned(&self) -> Option<Chainstate> {
         self.receiver.chs.borrow().clone()
+    }
+
+    /// Gets the current L2 chain tip, if set.
+    ///
+    /// Returns a tuple of (epoch, slot, blkid).
+    pub fn get_cur_l2_tip(&self) -> Option<(u64, u64, L2BlockId)> {
+        let chs = self.get_chainstate_cloned();
+        chs.map(|chs| {
+            (
+                chs.cur_epoch(),
+                chs.chain_tip_slot(),
+                chs.chain_tip_blockid(),
+            )
+        })
     }
 
     /// Gets the epoch of the current chain tip.
