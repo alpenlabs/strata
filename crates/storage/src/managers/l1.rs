@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use strata_db::{traits::Database, DbResult};
-use strata_mmr::CompactMmr;
 use strata_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1TxRef},
@@ -41,18 +40,6 @@ impl L1BlockManager {
     ) -> DbResult<()> {
         self.ops.put_block_data_async(idx, mf, txs).await?;
         self.block_cache.purge(&idx);
-        Ok(())
-    }
-
-    pub fn put_mmr_checkpoint(&self, idx: u64, mmr: CompactMmr) -> DbResult<()> {
-        self.ops.put_mmr_checkpoint_blocking(idx, mmr)?;
-        // TODO: mmr cache
-        Ok(())
-    }
-
-    pub async fn put_mmr_checkpoint_async(&self, idx: u64, mmr: CompactMmr) -> DbResult<()> {
-        self.ops.put_mmr_checkpoint_async(idx, mmr).await?;
-        // TODO: mmr cache
         Ok(())
     }
 
@@ -115,14 +102,6 @@ impl L1BlockManager {
     pub async fn get_tx_async(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
         // TODO: possibly a cache
         self.ops.get_tx_async(tx_ref).await
-    }
-
-    pub fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>> {
-        self.ops.get_last_mmr_to_blocking(idx)
-    }
-
-    pub async fn get_last_mmr_to_async(&self, idx: u64) -> DbResult<Option<CompactMmr>> {
-        self.ops.get_last_mmr_to_async(idx).await
     }
 
     pub fn get_txs_from(&self, start_idx: u64) -> DbResult<(Vec<L1Tx>, u64)> {
