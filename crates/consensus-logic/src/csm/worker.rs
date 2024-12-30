@@ -282,7 +282,7 @@ fn apply_action<D: Database>(
             warn!(?blkid, "marking block invalid!");
             state
                 .l2_block_manager
-                .put_block_status_blocking(&blkid, BlockStatus::Invalid)?;
+                .set_block_status_blocking(&blkid, BlockStatus::Invalid)?;
         }
 
         SyncAction::FinalizeBlock(blkid) => {
