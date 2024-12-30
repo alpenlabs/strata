@@ -79,7 +79,7 @@ pub async fn sync_worker<T: SyncClient>(
                 };
 
                 let finalized_blockid = sync.finalized_blkid();
-                let Ok(Some(finalized_block)) = context.l2_block_manager.get_block_async(finalized_blockid).await else {
+                let Ok(Some(finalized_block)) = context.l2_block_manager.get_block_data_async(finalized_blockid).await else {
                     error!(finalized_blockid = ?finalized_blockid, "missing finalized block");
                     continue;
                 };
@@ -192,7 +192,7 @@ async fn handle_new_block<T: SyncClient>(
         state.attach_block(block.header())?;
         context
             .l2_block_manager
-            .put_block_async(block.clone())
+            .put_block_data_async(block.clone())
             .await?;
         let block_idx = block.header().blockidx();
         debug!(%block_idx, "l2 sync: sending chain tip msg");

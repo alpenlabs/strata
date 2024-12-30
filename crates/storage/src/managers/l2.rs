@@ -23,32 +23,32 @@ impl L2BlockManager {
     }
 
     /// Puts a block in the database, purging cache entry.
-    pub async fn put_block_async(&self, bundle: L2BlockBundle) -> DbResult<()> {
+    pub async fn put_block_data_async(&self, bundle: L2BlockBundle) -> DbResult<()> {
         let id = bundle.block().header().get_blockid();
-        self.ops.put_block_async(bundle).await?;
+        self.ops.put_block_data_async(bundle).await?;
         self.block_cache.purge(&id);
         Ok(())
     }
 
     /// Puts in a block in the database, purging cache entry.
-    pub fn put_block_blocking(&self, bundle: L2BlockBundle) -> DbResult<()> {
+    pub fn put_block_data_blocking(&self, bundle: L2BlockBundle) -> DbResult<()> {
         let id = bundle.block().header().get_blockid();
-        self.ops.put_block_blocking(bundle)?;
+        self.ops.put_block_data_blocking(bundle)?;
         self.block_cache.purge(&id);
         Ok(())
     }
 
     /// Gets a block either in the cache or from the underlying database.
-    pub async fn get_block_async(&self, id: &L2BlockId) -> DbResult<Option<L2BlockBundle>> {
+    pub async fn get_block_data_async(&self, id: &L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         self.block_cache
-            .get_or_fetch(id, || self.ops.get_block_chan(*id))
+            .get_or_fetch(id, || self.ops.get_block_data_chan(*id))
             .await
     }
 
     /// Gets a block either in the cache or from the underlying database.
-    pub fn get_block_blocking(&self, id: &L2BlockId) -> DbResult<Option<L2BlockBundle>> {
+    pub fn get_block_data_blocking(&self, id: &L2BlockId) -> DbResult<Option<L2BlockBundle>> {
         self.block_cache
-            .get_or_fetch_blocking(id, || self.ops.get_block_blocking(*id))
+            .get_or_fetch_blocking(id, || self.ops.get_block_data_blocking(*id))
     }
 
     /// Gets the block at a height.  Async.
@@ -72,16 +72,16 @@ impl L2BlockManager {
     }
 
     /// Sets the block's verification status.  Async.
-    pub async fn put_block_status_async(
+    pub async fn set_block_status_async(
         &self,
         id: &L2BlockId,
         status: BlockStatus,
     ) -> DbResult<()> {
-        self.ops.put_block_status_async(*id, status).await
+        self.ops.set_block_status_async(*id, status).await
     }
 
     /// Sets the block's verification status.  Blocking.
-    pub fn put_block_status_blocking(&self, id: &L2BlockId, status: BlockStatus) -> DbResult<()> {
-        self.ops.put_block_status_blocking(*id, status)
+    pub fn set_block_status_blocking(&self, id: &L2BlockId, status: BlockStatus) -> DbResult<()> {
+        self.ops.set_block_status_blocking(*id, status)
     }
 }
