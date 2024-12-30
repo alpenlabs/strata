@@ -30,13 +30,6 @@ rm -rf bitcoin-28.0 bitcoin-28.0-x86_64-linux-gnu.tar.gz
 bitcoind --version
 ```
 
-On macOS, you must have Rosetta installed:
-
-```bash
-# macOS only
-softwareupdate --install-rosetta
-```
-
 ### Poetry
 
 > [!NOTE]
@@ -67,6 +60,15 @@ Finally, install all test dependencies (without installing the root package):
 
 ```bash
 poetry install --no-root
+```
+
+### Rosetta
+
+On macOS, you must have Rosetta emulation installed in order to compile the `solx` dependency:
+
+```bash
+# macOS only
+softwareupdate --install-rosetta
 ```
 
 ## Running tests
