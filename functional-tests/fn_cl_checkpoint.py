@@ -2,7 +2,7 @@ import flexitest
 
 import net_settings
 import testenv
-from utils import wait_until
+from utils import wait_until, wait_until_with_value
 
 REORG_DEPTH = 3
 
@@ -28,16 +28,23 @@ class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
         ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
         assert ckp_idx is not None
 
+        self.debug(f"checkpoint: {ckp_idx} finalized")
+
         ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
         assert ckp is not None
 
         # wait for checkpoint confirmation
-        wait_until(
-            lambda: seqrpc.strata_getLatestCheckpointIndex(True) >= ckp_idx,
+        ckp_idx = wait_until_with_value(
+            lambda: seqrpc.strata_getLatestCheckpointIndex(True),
+            predicate=lambda v: v > ckp_idx,
             error_with="Checkpoint was not confirmed on time",
-            timeout=10,
+            timeout=300,
         )
+        self.debug(f"checkpoint: {ckp_idx} finalized")
+
         ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
         # print(ckp)
         assert ckp is not None
         assert ckp["commitment"] is not None
+
+

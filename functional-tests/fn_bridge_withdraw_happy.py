@@ -10,6 +10,7 @@ from strata_utils import (
 from web3 import Web3
 from web3.middleware import SignAndSendRawMiddlewareBuilder
 
+import net_settings
 import testenv
 from constants import (
     PRECOMPILE_BRIDGEOUT_ADDRESS,
@@ -37,7 +38,10 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        fast_batch_settings = net_settings.get_fast_batch_settings()
+        ctx.set_env(
+            testenv.BasicEnvConfig(pre_generate_blocks=101, rollup_settings=fast_batch_settings)
+        )
 
     def main(self, ctx: flexitest.RunContext):
         address = ctx.env.gen_ext_btc_address()
@@ -142,7 +146,29 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         self.debug(f"Strata Balance difference: {difference}")
         assert difference == balance_post_withdraw, "balance difference is not expected"
 
-        # Wait for the withdraw address to have a positive balance
+        ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
+        assert ckp_idx is not None
+
+        self.debug(f"Current checkpoint = {ckp_idx}")
+
+        ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
+        assert ckp is not None
+
+        self.debug(f"Current checkpoint details: {ckp}")
+
+        # wait for checkpoint confirmation
+        wait_until(
+            lambda: seqrpc.strata_getLatestCheckpointIndex(True) >= ckp_idx,
+            error_with="Checkpoint was not confirmed on time",
+            timeout=120,
+        )
+
+        # 2 accounts for the previous 2 deposit duties
+        duties = seqrpc.strata_getBridgeDuties(0, 0)["duties"]
+        self.debug(f"Bridge duties right after withdrawal: {duties} ")
+        wait_until(lambda: seqrpc.strata_getBridgeDuties(0, 0)["duties"].len() > 2, timeout=120)
+
+        # # Wait for the withdraw address to have a positive balance
         self.mine_blocks_until_maturity(
             btcrpc, withdraw_address, btc_url, btc_user, btc_password, original_balance
         )
@@ -256,5 +282,6 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         btcrpc.proxy.generatetoaddress(number_of_blocks, UNSPENDABLE_ADDRESS)
         wait_until(
             lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password)
-            > original_balance
+            > original_balance,
+            timeout=60 # wait till checkpoint
         )
