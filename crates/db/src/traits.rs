@@ -66,6 +66,7 @@ pub trait L1Database {
     /// Gets the block manifest for a block index.
     fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>>;
 
+    // TODO: This should not exist in database level and should be handled by downstream manager.
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>>;

@@ -99,7 +99,7 @@ macro_rules! inst_ops_common {
             }
 
             #[async_trait::async_trait]
-            pub trait ShimTrait: Sync + Send + 'static {
+            pub(crate) trait ShimTrait: Sync + Send + 'static {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret>;
                     fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbRecv<$ret>;
@@ -152,8 +152,8 @@ macro_rules! inst_ops {
     }
 }
 
-/// Same as `inst_ops` but automatically generates the functions. The function name must exist
-/// inside the database instance
+/// Same as `inst_ops` but calls the methods on context db. The function name must exist
+/// in the database instance
 macro_rules! inst_ops_auto {
     {
         ($db_method: ident, $base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
