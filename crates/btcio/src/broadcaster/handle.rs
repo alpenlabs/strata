@@ -24,7 +24,11 @@ impl L1BroadcastHandle {
     }
 
     pub async fn get_tx_status(&self, txid: Buf32) -> DbResult<Option<L1TxStatus>> {
-        self.ops.get_tx_status_async(txid).await
+        Ok(self
+            .ops
+            .get_tx_entry_by_id_async(txid)
+            .await?
+            .map(|e| e.status))
     }
 
     /// Insert an entry to the database
