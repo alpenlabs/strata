@@ -108,7 +108,7 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
     // Pull data from CSM state that we've observed from L1, like new headers.
     let l1_seg = if is_epoch_final_slot {
         Some(prepare_l1_segment(
-            l1_state,
+            l1_state.tip_l1_block_height(),
             &prev_chstate,
             l1_db.as_ref(),
             MAX_L1_ENTRIES_PER_BLOCK,
@@ -161,13 +161,13 @@ pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
 }
 
 fn prepare_l1_segment(
-    local_l1_state: &LocalL1State,
+    best_known_l1_tip: u64,
     prev_chstate: &Chainstate,
     l1_db: &impl L1Database,
     max_l1_entries: usize,
     params: &RollupParams,
 ) -> Result<L1Segment, Error> {
-    let csm_l1_height = local_l1_state.tip_l1_block_height();
+    let csm_l1_height = best_known_l1_tip;
     let state_l1_height = prev_chstate.epoch_state().safe_l1_height();
     let first_new_block = state_l1_height + 1;
     trace!(%csm_l1_height, %state_l1_height, "figuring out which blocks to include in L1 segment");
@@ -189,6 +189,10 @@ fn prepare_l1_segment(
 
     if !payloads.is_empty() {
         debug!(n = %payloads.len(), "have new L1 blocks to provide");
+    } else {
+        // Warning because epochs are slow and we should usually have new L1
+        // blocks to provide at this point.
+        warn!("have no new L1 blocks to provide?");
     }
 
     Ok(L1Segment::new(payloads))
