@@ -101,7 +101,7 @@ impl Chainstate {
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
-        let hashed_state = HashedChainstate {
+        let hashed_state = HashedChainState {
             last_block: self.last_block.into(),
             slot: self.slot,
             epoch: self.epoch,
