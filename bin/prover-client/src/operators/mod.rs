@@ -30,6 +30,7 @@ pub mod btc;
 pub mod checkpoint;
 pub mod cl_agg;
 pub mod cl_stf;
+mod constants;
 pub mod evm_ee;
 pub mod l1_batch;
 pub mod operator;

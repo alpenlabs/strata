@@ -71,15 +71,14 @@ impl CheckpointOperator {
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
         let headers = l2_headers.ok_or_else(|| {
-            error!(%block_num, "No L2 headers found at block height");
-            ProvingTaskError::WitnessNotFound
+            error!(%block_num, "Failed to fetch L2 block");
+            ProvingTaskError::InvalidWitness(format!("Invalid L2 block height {}", block_num))
         })?;
 
         let first_header: Buf32 = headers
             .first()
             .ok_or_else(|| {
-                error!(%block_num, "Empty L2 headers response");
-                ProvingTaskError::InvalidWitness("Invalid block height".to_string())
+                ProvingTaskError::InvalidWitness(format!("Invalid L2 block height {}", block_num))
             })?
             .block_id
             .into();
@@ -116,7 +115,10 @@ impl ProvingOp for CheckpointOperator {
             .l1_batch_operator
             .create_task(checkpoint_info.l1_range, task_tracker.clone(), db)
             .await?;
-        let l1_batch_id = l1_batch_keys.first().expect("at least one").context();
+        let l1_batch_id = l1_batch_keys
+            .first()
+            .ok_or_else(|| ProvingTaskError::NoTasksFound)?
+            .context();
 
         // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
         // include the range interms of block_id.
@@ -130,7 +132,10 @@ impl ProvingOp for CheckpointOperator {
             .create_task(l2_range, task_tracker.clone(), db)
             .await?;
 
-        let l2_batch_id = l2_batch_keys.first().expect("at least one").context();
+        let l2_batch_id = l2_batch_keys
+            .first()
+            .ok_or_else(|| ProvingTaskError::NoTasksFound)?
+            .context();
 
         let deps = vec![*l1_batch_id, *l2_batch_id];
 

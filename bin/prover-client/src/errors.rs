@@ -50,6 +50,10 @@ pub enum ProvingTaskError {
     #[error("Witness not found")]
     WitnessNotFound,
 
+    /// Occurs when a newly created proving task is expected but none is found.
+    #[error("No tasks found after creation; at least one was expected")]
+    NoTasksFound,
+
     /// Occurs when the witness data provided is invalid.
     #[error("{0}")]
     InvalidWitness(String),

@@ -18,8 +18,10 @@ impl<H: ZkVmHost> L2BatchProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<ClAggProver> for L2BatchProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for L2BatchProofGenerator<H> {
     type Input = Vec<(u64, u64)>;
+    type P = ClAggProver;
+    type H = H;
 
     fn get_input(&self, batches: &Self::Input) -> ZkVmResult<ClAggInput> {
         let mut batch = Vec::new();
@@ -53,7 +55,7 @@ impl<H: ZkVmHost> ProofGenerator<ClAggProver> for L2BatchProofGenerator<H> {
 mod tests {
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(cl_agg_prover: L2BatchProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(cl_agg_prover: &L2BatchProofGenerator<H>) {
         let _ = cl_agg_prover.get_proof(&vec![(1, 3)]).unwrap();
     }
 

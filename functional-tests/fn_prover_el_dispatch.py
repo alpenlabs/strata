@@ -3,7 +3,7 @@ import time
 import flexitest
 
 import testenv
-from utils import wait_for_proof_with_time_out
+from utils import el_slot_to_block_id, wait_for_proof_with_time_out
 
 # Parameters defining the range of Execution Engine (EE) blocks to be proven.
 EE_PROVER_PARAMS = {
@@ -27,8 +27,8 @@ class ProverClientTest(testenv.StrataTester):
         time.sleep(5)
 
         # Dispatch the prover task
-        start_block_id = self.blockidx_2_blockid(rethrpc, EE_PROVER_PARAMS["start_block"])
-        end_block_id = self.blockidx_2_blockid(rethrpc, EE_PROVER_PARAMS["end_block"])
+        start_block_id = el_slot_to_block_id(rethrpc, EE_PROVER_PARAMS["start_block"])
+        end_block_id = el_slot_to_block_id(rethrpc, EE_PROVER_PARAMS["end_block"])
 
         task_ids = prover_client_rpc.dev_strata_proveElBlocks((start_block_id, end_block_id))
         self.debug(f"got task ids: {task_ids}")
@@ -38,6 +38,3 @@ class ProverClientTest(testenv.StrataTester):
 
         time_out = 10 * 60
         wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
-
-    def blockidx_2_blockid(self, rethrpc, blockid):
-        return rethrpc.eth_getBlockByNumber(hex(blockid), False)["hash"]

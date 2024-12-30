@@ -15,8 +15,11 @@ impl<H: ZkVmHost> ElProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<EvmEeProver> for ElProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for ElProofGenerator<H> {
     type Input = (u64, u64);
+    type P = EvmEeProver;
+    type H = H;
+
     fn get_input(&self, block_range: &(u64, u64)) -> ZkVmResult<EvmEeProofInput> {
         let (start_block, end_block) = block_range;
         let evm_segment = EvmSegment::initialize_from_saved_ee_data(*start_block, *end_block);
@@ -38,7 +41,7 @@ mod tests {
 
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(el_prover: ElProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(el_prover: &ElProofGenerator<H>) {
         let start_height = 1;
         let end_height = 2;
         let _ = el_prover.get_proof(&(start_height, end_height)).unwrap();

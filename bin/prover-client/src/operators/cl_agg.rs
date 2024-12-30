@@ -6,6 +6,7 @@ use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
+use tracing::error;
 
 use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
@@ -40,8 +41,16 @@ impl ProvingOp for ClAggOperator {
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let mut cl_stf_deps = Vec::with_capacity(batches.len());
 
-        let start_blkid = batches.first().expect("Proof request with empty batch").0;
-        let end_blkid = batches.last().expect("Proof request with empty batch").1;
+        // Extract first and last block IDs from batches, error if empty
+        let (start_blkid, end_blkid) = match (batches.first(), batches.last()) {
+            (Some(first), Some(last)) => (first.0, last.1),
+            _ => {
+                error!("Aggregation task with empty batch");
+                return Err(ProvingTaskError::InvalidInput(
+                    "Aggregation task with empty batch".into(),
+                ));
+            }
+        };
 
         let cl_agg_proof_id = ProofContext::ClAgg(start_blkid, end_blkid);
 
