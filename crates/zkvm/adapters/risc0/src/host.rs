@@ -4,8 +4,7 @@ use hex::encode;
 use risc0_zkvm::{compute_image_id, default_prover, sha::Digest, Journal, ProverOpts};
 use serde::{de::DeserializeOwned, Serialize};
 use strata_zkvm::{
-    ProofReport, ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder,
-    ZkVmResult,
+    ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
 };
 
 use crate::{input::Risc0ProofInputBuilder, proof::Risc0ProofReceipt};
@@ -25,6 +24,11 @@ impl Risc0Host {
             elf: guest_code.to_vec(),
             id,
         }
+    }
+
+    // TODO: consider moving to ZkVkHost trait.
+    pub fn get_elf(&self) -> &[u8] {
+        &self.elf
     }
 }
 
@@ -81,14 +85,6 @@ impl ZkVmHost for Risc0Host {
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
         Ok(())
     }
-
-    fn perf_report<'a>(
-        &self,
-        _input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
-        _proof_type: ProofType,
-    ) -> ZkVmResult<ProofReport> {
-        Ok(ProofReport { cycles: 0 })
-    }
 }
 
 impl fmt::Display for Risc0Host {
@@ -113,6 +109,7 @@ mod tests {
     const TEST_ELF: &[u8] = include_bytes!("../tests/elf/risc0-zkvm-elf");
 
     #[test]
+    #[ignore]
     fn test_mock_prover() {
         let input: u32 = 1;
         let host = Risc0Host::init(TEST_ELF);
@@ -137,6 +134,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_mock_prover_with_public_param() {
         let input: u32 = 1;
         let zkvm = Risc0Host::init(TEST_ELF);

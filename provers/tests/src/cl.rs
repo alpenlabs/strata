@@ -19,8 +19,10 @@ impl<H: ZkVmHost> ClProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<ClStfProver> for ClProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
     type Input = u64;
+    type P = ClStfProver;
+    type H = H;
 
     fn get_input(&self, block_num: &u64) -> ZkVmResult<ClStfInput> {
         // Generate EL proof required for aggregation
@@ -47,7 +49,7 @@ impl<H: ZkVmHost> ProofGenerator<ClStfProver> for ClProofGenerator<H> {
         format!("cl_block_{}", block_num)
     }
 
-    fn get_host(&self) -> impl ZkVmHost {
+    fn get_host(&self) -> H {
         self.host.clone()
     }
 }
@@ -56,30 +58,27 @@ impl<H: ZkVmHost> ProofGenerator<ClStfProver> for ClProofGenerator<H> {
 mod tests {
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(cl_prover: ClProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(cl_prover: &ClProofGenerator<H>) {
         let height = 1;
 
         let _ = cl_prover.get_proof(&height).unwrap();
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
+    #[cfg(feature = "native")]
     fn test_native() {
-        use crate::provers::TEST_NATIVE_GENERATORS;
-        test_proof(TEST_NATIVE_GENERATORS.cl_block());
+        test_proof(crate::TEST_NATIVE_GENERATORS.cl_block());
     }
 
     #[test]
-    #[cfg(feature = "risc0")]
+    #[cfg(all(feature = "risc0", feature = "test"))]
     fn test_risc0() {
-        use crate::provers::TEST_RISC0_GENERATORS;
-        test_proof(TEST_RISC0_GENERATORS.cl_block());
+        test_proof(crate::TEST_RISC0_GENERATORS.cl_block());
     }
 
     #[test]
-    #[cfg(feature = "sp1")]
+    #[cfg(all(feature = "sp1", feature = "test"))]
     fn test_sp1() {
-        use crate::provers::TEST_SP1_GENERATORS;
-        test_proof(TEST_SP1_GENERATORS.cl_block());
+        test_proof(crate::TEST_SP1_GENERATORS.cl_block());
     }
 }

@@ -12,10 +12,10 @@ strata-sp1-guest-builder = { path = "../../../provers/sp1", optional = true }
 strata-risc0-adapter = { workspace = true, optional = true }
 strata-risc0-guest-builder = { path = "../../../provers/risc0", optional = true }
 
-strata-primitives.workspace = true
+# native
+strata-native-zkvm-adapter = { workspace = true, optional = true }
 
-# TODO: make it optional, via the native feature.
-strata-native-zkvm-adapter.workspace = true
+strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
 strata-proofimpl-cl-agg.workspace = true
@@ -25,11 +25,12 @@ strata-proofimpl-l1-batch.workspace = true
 
 bincode.workspace = true
 borsh.workspace = true
-cfg-if = "1.0.0"
+cfg-if.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 
 [features]
-native = []
+default = []
+native = ["strata-native-zkvm-adapter"]
 risc0 = ["strata-risc0-adapter/prover", "strata-risc0-guest-builder/prover"]
 sp1 = ["strata-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]

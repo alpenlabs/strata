@@ -31,8 +31,11 @@ pub struct CheckpointBatchInfo {
     pub l2_range: (u64, u64),
 }
 
-impl<H: ZkVmHost> ProofGenerator<CheckpointProver> for CheckpointProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
     type Input = CheckpointBatchInfo;
+    type P = CheckpointProver;
+    type H = H;
+
     fn get_input(&self, batch_info: &CheckpointBatchInfo) -> ZkVmResult<CheckpointProverInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
@@ -72,13 +75,13 @@ impl<H: ZkVmHost> ProofGenerator<CheckpointProver> for CheckpointProofGenerator<
         )
     }
 
-    fn get_host(&self) -> impl ZkVmHost {
+    fn get_host(&self) -> H {
         self.host.clone()
     }
 }
 
 #[allow(dead_code)]
-fn test_proof<H: ZkVmHost>(checkpoint_prover: CheckpointProofGenerator<H>) {
+fn test_proof<H: ZkVmHost>(checkpoint_prover: &CheckpointProofGenerator<H>) {
     let params = gen_params();
     let rollup_params = params.rollup();
     let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
@@ -98,27 +101,25 @@ fn test_proof<H: ZkVmHost>(checkpoint_prover: CheckpointProofGenerator<H>) {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use super::*;
 
     #[test]
+    #[cfg(feature = "native")]
     fn test_native() {
-        use crate::provers::TEST_NATIVE_GENERATORS;
-        test_proof(TEST_NATIVE_GENERATORS.checkpoint());
+        test_proof(crate::TEST_NATIVE_GENERATORS.checkpoint());
     }
 
     #[test]
-    #[cfg(feature = "risc0")]
+    #[cfg(all(feature = "risc0", feature = "test"))]
     fn test_risc0() {
-        use crate::provers::TEST_RISC0_GENERATORS;
-        test_proof(TEST_RISC0_GENERATORS.checkpoint());
+        test_proof(crate::TEST_RISC0_GENERATORS.checkpoint());
     }
 
     #[test]
-    #[cfg(feature = "sp1")]
+    #[cfg(all(feature = "sp1", feature = "test"))]
     fn test_sp1() {
-        use crate::provers::TEST_SP1_GENERATORS;
-        test_proof(TEST_SP1_GENERATORS.checkpoint());
+        test_proof(crate::TEST_SP1_GENERATORS.checkpoint());
     }
 }
