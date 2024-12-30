@@ -50,6 +50,10 @@ pub enum ProvingTaskError {
     #[error("Witness not found")]
     WitnessNotFound,
 
+    /// Occurs when the witness data provided is invalid.
+    #[error("{0}")]
+    InvalidWitness(String),
+
     /// Represents a generic database error.
     #[error("Database error: {0:?}")]
     DatabaseError(DbError),

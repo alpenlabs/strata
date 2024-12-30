@@ -70,13 +70,21 @@ impl CheckpointOperator {
             .inspect_err(|_| error!(%block_num, "Failed to fetch l2_headers"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
-        let cl_stf_id_buf: Buf32 = l2_headers
-            .expect("invalid height")
+        let headers = l2_headers.ok_or_else(|| {
+            error!(%block_num, "No L2 headers found at block height");
+            ProvingTaskError::WitnessNotFound
+        })?;
+
+        let first_header: Buf32 = headers
             .first()
-            .expect("at least one l2 blockid")
+            .ok_or_else(|| {
+                error!(%block_num, "Empty L2 headers response");
+                ProvingTaskError::InvalidWitness("Invalid block height".to_string())
+            })?
             .block_id
             .into();
-        Ok(cl_stf_id_buf.into())
+
+        Ok(first_header.into())
     }
 
     /// Retrieves the latest checkpoint index
