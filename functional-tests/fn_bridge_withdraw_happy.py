@@ -145,17 +145,17 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         self.debug(f"Strata Balance difference: {difference}")
         assert difference == balance_post_withdraw, "balance difference is not expected"
 
-        prev_duty_count = 2 # from the two deposits
+        prev_duty_count = 2  # from the two deposits
         wait_until(
             lambda: len(seqrpc.strata_getBridgeDuties(0, 0).get("duties", [])) > prev_duty_count,
-            timeout=30
+            timeout=30,
         )
 
         # # Wait for the balance in the withdraw address to increase
         wait_until(
             lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password)
             > original_balance,
-            timeout=30 # time to process the withdrawal
+            timeout=30,  # time to process the withdrawal
         )
 
         # Make sure that the balance in the BTC wallet is D BTC - operator's fees
