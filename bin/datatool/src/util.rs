@@ -27,7 +27,6 @@ use strata_primitives::{
     params::{ProofPublishMode, RollupParams},
     proof::RollupVerifyingKey,
 };
-use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
 use zeroize::Zeroize;
 
 use crate::args::{
@@ -63,6 +62,58 @@ pub(super) fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result
         Subcommand::SeqPrivkey(subc) => exec_genseqprivkey(subc, ctx),
         Subcommand::OpXpub(subc) => exec_genopxpub(subc, ctx),
         Subcommand::Params(subc) => exec_genparams(subc, ctx),
+    }
+}
+
+/// Returns the appropriate [`RollupVerifyingKey`] based on the enabled features.
+///
+/// # Behavior
+///
+/// - If the **sp1** feature is exclusively enabled, returns an `SP1VerifyingKey`.
+/// - If the **risc0** feature is exclusively enabled, returns a `Risc0VerifyingKey`.
+/// - If **both** `sp1` and `risc0` are enabled at once, this function will **panic**.
+/// - If **neither** `sp1` nor `risc0` is enabled, returns a `NativeVerifyingKey`.
+///
+/// # Panics
+///
+/// Panics if both `sp1` and `risc0` features are enabled simultaneously, since
+/// only one ZKVM can be supported at a time.  
+fn resolve_rollup_vk() -> RollupVerifyingKey {
+    // Use SP1 if only `sp1` feature is enabled
+    #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+    {
+        // We import the SP1 guest builder checkpoint verifying key hash string here.
+        // Right now, for demonstration, we pass in Buf32::zero() to the verifying key constructor.
+        // Replace this with actual hash or verification key bytes when available.
+        use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
+        let vk_buf32: Buf32 = GUEST_CHECKPOINT_VK_HASH_STR
+            .parse()
+            .expect("invalid sp1 checkpoint verifier key hash");
+        RollupVerifyingKey::SP1VerifyingKey(vk_buf32)
+    }
+
+    // Use Risc0 if only `risc0` feature is enabled
+    #[cfg(all(feature = "risc0", not(feature = "sp1")))]
+    {
+        use strata_risc0_guest_builder::GUEST_RISC0_CHECKPOINT_ID;
+        let vk_u8: [u8; 32] = bytemuck::cast(GUEST_RISC0_CHECKPOINT_ID);
+        let vk_buf32 = vk_u8.into();
+        RollupVerifyingKey::Risc0VerifyingKey(vk_buf32)
+    }
+
+    // Panic if both `sp1` and `risc0` feature are enabled
+    #[cfg(all(feature = "risc0", feature = "sp1"))]
+    {
+        panic!(
+            "Conflicting ZKVM features: both 'sp1' and 'risc0' are enabled. \
+             Please disable one of them, as only a single ZKVM can be supported at a time."
+        )
+    }
+
+    // If neither `risc0` nor `sp1` is enabled, use the Native verifying key
+    #[cfg(all(not(feature = "risc0"), not(feature = "sp1")))]
+    {
+        RollupVerifyingKey::NativeVerifyingKey(Buf32::zero())
     }
 }
 
@@ -200,9 +251,7 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         .unwrap_or(1_000_000_000);
 
     // Parse the checkpoint verification key.
-    let rollup_vk: Buf32 = GUEST_CHECKPOINT_VK_HASH_STR
-        .parse()
-        .expect("invalid checkpoint verifier key hash");
+    let rollup_vk = resolve_rollup_vk();
 
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
@@ -357,7 +406,7 @@ pub struct ParamsConfig {
     /// Operators' keys.
     opkeys: Vec<Xpub>,
     /// Verifier's key.
-    rollup_vk: Buf32,
+    rollup_vk: RollupVerifyingKey,
     /// Amount of sats to deposit.
     deposit_sats: u64,
     /// Timeout for proofs.
@@ -407,7 +456,7 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
         target_l2_batch_size: config.epoch_slots as u64,
         address_length: 20,
         deposit_amount: config.deposit_sats,
-        rollup_vk: RollupVerifyingKey::SP1VerifyingKey(config.rollup_vk),
+        rollup_vk: config.rollup_vk,
         // TODO make configurable
         dispatch_assignment_dur: 64,
         proof_publish_mode: config
