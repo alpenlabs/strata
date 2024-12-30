@@ -5,7 +5,6 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
 import testenv
-from constants import DEFAULT_ROLLUP_PARAMS
 from utils import get_bridge_pubkey
 
 
@@ -109,7 +108,7 @@ class BridgeDepositHappyTest(testenv.StrataTester):
         Test depositing funds into the bridge and verifying the corresponding increase in balance
         on the Strata side.
         """
-        rollup_deposit_amount = DEFAULT_ROLLUP_PARAMS["deposit_amount"]
+        rollup_deposit_amount = ctx.env.rollup_cfg().deposit_amount
 
         btc = ctx.get_service("bitcoin")
         seq = ctx.get_service("sequencer")

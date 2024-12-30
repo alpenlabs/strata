@@ -6,7 +6,7 @@ from flexitest.service import Service
 
 import net_settings
 import testenv
-from constants import FAST_BATCH_ROLLUP_PARAMS
+from rollup_params_cfg import RollupConfig
 from utils import (
     ManualGenBlocksConfig,
     check_nth_checkpoint_finalized,
@@ -39,8 +39,8 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         btcrpc: BitcoindClient = btc.create_rpc()
         seq_addr = seq.get_prop("address")
 
-        # FIXME change this to fetch from the params
-        finality_depth = FAST_BATCH_ROLLUP_PARAMS["l1_reorg_safe_depth"]
+        cfg: RollupConfig = ctx.env.rollup_cfg()
+        finality_depth = cfg.l1_reorg_safe_depth
 
         # Wait for seq
         wait_until(
@@ -63,15 +63,18 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         # We need to wait for the tx to be published to L1
         time.sleep(0.5)
         # Test reorg, without pruning anything, let mempool and wallet retain the txs
-        check_nth_checkpoint_finalized_on_reorg(idx + 1, seq, btc)
+        check_nth_checkpoint_finalized_on_reorg(ctx, idx + 1, seq, btc)
 
 
-def check_nth_checkpoint_finalized_on_reorg(checkpt_idx: int, seq: Service, btc: Service):
+def check_nth_checkpoint_finalized_on_reorg(
+    ctx: flexitest.RunContext, checkpt_idx: int, seq: Service, btc: Service
+):
     # Now submit another checkpoint proof and produce a couple of blocks(less than reorg depth)
     seqrpc = seq.create_rpc()
     btcrpc = btc.create_rpc()
     seq_addr = seq.get_prop("address")
-    finality_depth = FAST_BATCH_ROLLUP_PARAMS["l1_reorg_safe_depth"]
+    cfg: RollupConfig = ctx.env.rollup_cfg()
+    finality_depth = cfg.l1_reorg_safe_depth
     manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth, seq_addr)
 
     # gen some blocks

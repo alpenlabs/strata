@@ -2,7 +2,8 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 import testenv
-from constants import DEFAULT_ROLLUP_PARAMS, SEQ_PUBLISH_BATCH_INTERVAL_SECS
+from constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
+from rollup_params_cfg import RollupConfig
 from utils import broadcast_tx, wait_until
 
 
@@ -21,16 +22,17 @@ class BridgeDutiesTest(testenv.StrataTester):
 
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
+        cfg: RollupConfig = ctx.env.rollup_cfg()
 
         addr = ctx.env.gen_ext_btc_address()
         fees_in_btc = 0.01
         sats_per_btc = 10**8
-        amount_to_send = DEFAULT_ROLLUP_PARAMS["deposit_amount"] / sats_per_btc + fees_in_btc
+        amount_to_send = cfg.deposit_amount / sats_per_btc + fees_in_btc
 
         el_address = ctx.env.gen_el_address()
         el_address_bytes = list(bytes.fromhex(el_address))
         take_back_leaf_hash = "02" * 32
-        magic_bytes = DEFAULT_ROLLUP_PARAMS["rollup_name"].encode("utf-8").hex()
+        magic_bytes = cfg.rollup_name.encode("utf-8").hex()
         outputs = [
             {addr: amount_to_send},
             {"data": f"{magic_bytes}{take_back_leaf_hash}{el_address}"},

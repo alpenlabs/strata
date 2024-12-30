@@ -50,7 +50,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
     A common thin layer for all instances of the Environments.
     """
 
-    def __init__(self, srvs, bridge_pk):
+    def __init__(self, srvs, bridge_pk, rollup_cfg: RollupConfig):
         super().__init__(srvs)
         self._el_address_gen = (
             f"deada00{x:04X}dca3ebeefdeadf001900dca3ebeef" for x in range(16**4)
@@ -58,6 +58,7 @@ class BasicLiveEnv(flexitest.LiveEnv):
         self._ext_btc_addr_idx = 0
         self._rec_btc_addr_idx = 0
         self._bridge_pk = bridge_pk
+        self._rollup_cfg = rollup_cfg
 
     def gen_el_address(self) -> str:
         """
@@ -83,6 +84,9 @@ class BasicLiveEnv(flexitest.LiveEnv):
         self._rec_btc_addr_idx += 1
         return rec_tr_addr
 
+    def rollup_cfg(self) -> RollupConfig:
+        return self._rollup_cfg
+
 
 class BasicEnvConfig(flexitest.EnvConfig):
     def __init__(
@@ -93,7 +97,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         enable_prover_client: bool = False,
         pre_fund_addrs: bool = True,
         n_operators: int = 2,
-        message_interval: int = DEFAULT_ROLLUP_PARAMS["message_interval"],
+        message_interval: int = 0,
         custom_chain: str = "dev",
     ):
         super().__init__()
@@ -217,6 +221,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         svcs["sequencer"] = sequencer
         svcs["reth"] = reth
 
+        operator_message_interval = self.message_interval or settings.message_interval
         # Create all the bridge clients.
         for i in range(self.n_operators):
             xpriv_path = params_gen_data["opseedpaths"][i]
@@ -225,7 +230,10 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 xpriv = f.read().strip()
             seq_url = sequencer.get_prop("rpc_url")
             br = bridge_fac.create_operator(
-                xpriv, seq_url, bitcoind_config, message_interval=self.message_interval
+                xpriv,
+                seq_url,
+                bitcoind_config,
+                message_interval=operator_message_interval,
             )
             name = f"bridge.{i}"
             svcs[name] = br
@@ -243,7 +251,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
             )
             svcs["prover_client"] = prover_client
 
-        return BasicLiveEnv(svcs, bridge_pk)
+        return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)
 
 
 class HubNetworkEnvConfig(flexitest.EnvConfig):
@@ -362,8 +370,10 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             with open(xpriv_path) as f:
                 xpriv = f.read().strip()
             seq_url = sequencer.get_prop("rpc_url")
-            br = bridge_fac.create_operator(xpriv, seq_url, bitcoind_config)
+            br = bridge_fac.create_operator(
+                xpriv, seq_url, bitcoind_config, message_interval=settings.message_interval
+            )
             name = f"bridge.{i}"
             svcs[name] = br
 
-        return BasicLiveEnv(svcs, bridge_pk)
+        return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)

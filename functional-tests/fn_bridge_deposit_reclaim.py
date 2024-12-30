@@ -8,12 +8,10 @@ from strata_utils import (
 )
 
 import testenv
-from constants import DEFAULT_ROLLUP_PARAMS, DEFAULT_TAKEBACK_TIMEOUT, UNSPENDABLE_ADDRESS
+from constants import DEFAULT_TAKEBACK_TIMEOUT, UNSPENDABLE_ADDRESS
 from utils import get_bridge_pubkey, wait_until
 
 # Local constants
-# D BTC
-DEPOSIT_AMOUNT = DEFAULT_ROLLUP_PARAMS["deposit_amount"]
 # Fee for the take back path at 2 sat/vbyte
 TAKE_BACK_FEE = 17_243
 
@@ -150,7 +148,8 @@ class BridgeDepositReclaimTest(testenv.StrataTester):
             btc_password,
         )
         self.debug(f"User BTC balance (after takeback): {refund_btc_balance}")
-        expected_balance = 5 * DEPOSIT_AMOUNT - TAKE_BACK_FEE
+        deposit_amount = ctx.env.rollup_cfg().deposit_amount
+        expected_balance = 5 * deposit_amount - TAKE_BACK_FEE
         assert refund_btc_balance >= expected_balance, "BTC balance is not as expected"
 
         # Now let's see if the EVM side has no funds
