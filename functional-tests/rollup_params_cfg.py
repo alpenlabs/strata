@@ -1,3 +1,5 @@
+from typing import Union
+
 from pydantic import BaseModel
 
 
@@ -17,8 +19,19 @@ class OperatorConfig(BaseModel):
         return [operator.wallet_pk for operator in self.static]
 
 
-class RollupVk(BaseModel):
+class Sp1RollupVk(BaseModel):
     sp1: str
+
+
+class Risc0RollupVk(BaseModel):
+    risc0: str
+
+
+class NativeRollupVk(BaseModel):
+    native: str
+
+
+RollupVk = Union[Sp1RollupVk, Risc0RollupVk, NativeRollupVk]
 
 
 class ProofPublishMode(BaseModel):

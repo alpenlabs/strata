@@ -82,9 +82,6 @@ fn resolve_rollup_vk() -> RollupVerifyingKey {
     // Use SP1 if only `sp1` feature is enabled
     #[cfg(all(feature = "sp1", not(feature = "risc0")))]
     {
-        // We import the SP1 guest builder checkpoint verifying key hash string here.
-        // Right now, for demonstration, we pass in Buf32::zero() to the verifying key constructor.
-        // Replace this with actual hash or verification key bytes when available.
         use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
         let vk_buf32: Buf32 = GUEST_CHECKPOINT_VK_HASH_STR
             .parse()
