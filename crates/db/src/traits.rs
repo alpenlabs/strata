@@ -66,6 +66,7 @@ pub trait L1Database {
     /// Gets the block manifest for a block index.
     fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>>;
 
+    // TODO: This should not exist in database level and should be handled by downstream manager.
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>>;
@@ -282,7 +283,7 @@ pub trait ProofDatabase {
     /// Deletes a proof by its key.
     ///
     /// Tries to delete a proof by its key, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool>;
 
     /// Inserts dependencies for a given [`ProofContext`] into the database.
@@ -298,7 +299,7 @@ pub trait ProofDatabase {
     /// Deletes dependencies for a given [`ProofContext`].
     ///
     /// Tries to delete dependencies of by its context, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool>;
 }
 
