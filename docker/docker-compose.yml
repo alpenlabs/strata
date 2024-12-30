@@ -2,7 +2,7 @@ x-base-client: &base-client
   build:
     context: ../
     dockerfile: ./docker/client/Dockerfile
-  image: "strata_client:poc0.1.0"
+  image: "strata_client:0.1.0"
   networks:
     - strata_network
 
@@ -10,7 +10,7 @@ x-base-reth: &base-reth
   build:
     context: ../
     dockerfile: ./docker/reth/Dockerfile
-  image: "strata_reth:poc0.1.0"
+  image: "strata_reth:0.1.0"
   networks:
     - strata_network
 

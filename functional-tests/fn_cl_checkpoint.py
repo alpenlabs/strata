@@ -46,5 +46,3 @@ class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
         # print(ckp)
         assert ckp is not None
         assert ckp["commitment"] is not None
-
-
