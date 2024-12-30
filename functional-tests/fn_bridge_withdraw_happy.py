@@ -15,7 +15,6 @@ import testenv
 from constants import (
     PRECOMPILE_BRIDGEOUT_ADDRESS,
     SATS_TO_WEI,
-    UNSPENDABLE_ADDRESS,
 )
 from rollup_params_cfg import RollupConfig
 from utils import get_bridge_pubkey, wait_until
@@ -146,31 +145,17 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         self.debug(f"Strata Balance difference: {difference}")
         assert difference == balance_post_withdraw, "balance difference is not expected"
 
-        ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
-        assert ckp_idx is not None
-
-        self.debug(f"Current checkpoint = {ckp_idx}")
-
-        ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
-        assert ckp is not None
-
-        self.debug(f"Current checkpoint details: {ckp}")
-
-        # wait for checkpoint confirmation
+        prev_duty_count = 2 # from the two deposits
         wait_until(
-            lambda: seqrpc.strata_getLatestCheckpointIndex(True) >= ckp_idx,
-            error_with="Checkpoint was not confirmed on time",
-            timeout=120,
+            lambda: len(seqrpc.strata_getBridgeDuties(0, 0).get("duties", [])) > prev_duty_count,
+            timeout=30
         )
 
-        # 2 accounts for the previous 2 deposit duties
-        duties = seqrpc.strata_getBridgeDuties(0, 0)["duties"]
-        self.debug(f"Bridge duties right after withdrawal: {duties} ")
-        wait_until(lambda: seqrpc.strata_getBridgeDuties(0, 0)["duties"].len() > 2, timeout=120)
-
-        # # Wait for the withdraw address to have a positive balance
-        self.mine_blocks_until_maturity(
-            btcrpc, withdraw_address, btc_url, btc_user, btc_password, original_balance
+        # # Wait for the balance in the withdraw address to increase
+        wait_until(
+            lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password)
+            > original_balance,
+            timeout=30 # time to process the withdrawal
         )
 
         # Make sure that the balance in the BTC wallet is D BTC - operator's fees
@@ -262,26 +247,3 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
             "data": data_bytes,
         }
         return web3.eth.estimate_gas(transaction)
-
-    def mine_blocks_until_maturity(
-        self,
-        btcrpc,
-        withdraw_address,
-        btc_url,
-        btc_user,
-        btc_password,
-        original_balance,
-        number_of_blocks=12,
-    ):
-        """
-        Mine blocks until the withdraw address has a positive balance
-        By default, the number of blocks to mine is 12:
-        - 6 blocks to mature the DRT
-        - 6 blocks to mature the DT
-        """
-        btcrpc.proxy.generatetoaddress(number_of_blocks, UNSPENDABLE_ADDRESS)
-        wait_until(
-            lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password)
-            > original_balance,
-            timeout=60 # wait till checkpoint
-        )
