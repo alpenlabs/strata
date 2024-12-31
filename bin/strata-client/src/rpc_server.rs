@@ -51,6 +51,11 @@ use tracing::*;
 
 use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
+#[cfg(feature = "debug-utils")]
+use strata_common::bail_manager::BAIL_SENDER;
+#[cfg(feature = "debug-utils")]
+use strata_rpc_api::StrataDebugApiServer;
+
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
     l2_db: &Arc<<D as Database>::L2DB>,
     blkid: L2BlockId,
@@ -734,3 +739,24 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .map_err(|e| Error::Other(e.to_string()))?)
     }
 }
+
+#[cfg(feature = "debug-utils")]
+pub struct DebugServerImpl;
+
+#[cfg(feature = "debug-utils")]
+impl DebugServerImpl {
+    pub fn new() -> Self {
+       Self
+    }
+}
+
+#[cfg(feature = "debug-utils")]
+#[async_trait]
+impl StrataDebugApiServer for DebugServerImpl {
+    async fn process_exit(&self, ctx: String) -> RpcResult<()> {
+        //TODO: some handling here
+        let _sender = BAIL_SENDER.send(ctx);
+        Ok(())
+    }
+}
+

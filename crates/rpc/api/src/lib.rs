@@ -152,3 +152,12 @@ pub trait StrataSequencerApi {
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
 }
+
+/// Debug Specific Api
+#[cfg_attr(not(feature = "client"), rpc(server))]
+#[cfg_attr(feature = "client", rpc(server, client))]
+pub trait StrataDebugApi {
+    /// for exiting the client based on context
+    #[method(name = "stratadebug_bail")]
+    async fn process_exit(&self, ctx: String) -> RpcResult<()>;
+}

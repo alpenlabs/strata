@@ -42,6 +42,9 @@ use tracing::*;
 
 use crate::{args::Args, helpers::*};
 
+#[cfg(feature="debug-utils")]
+use strata_rpc_api::StrataDebugApiServer;
+
 mod args;
 mod config;
 mod errors;
@@ -546,6 +549,12 @@ async fn start_rpc(
         .build(format!("{rpc_host}:{rpc_port}"))
         .await
         .expect("init: build rpc server");
+
+   #[cfg(feature = "debug-utils")]
+   {
+        let debug_rpc = rpc_server::DebugServerImpl::new();
+        methods.merge(debug_rpc.into_rpc())?;
+    }
 
     let rpc_handle = rpc_server.start(methods);
 
