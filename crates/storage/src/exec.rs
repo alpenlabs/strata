@@ -3,61 +3,11 @@
 //! This manages the indirection to spawn async requests onto a threadpool and execute blocking
 //! calls locally.
 
-use std::sync::Arc;
-
 pub use strata_db::{errors::DbError, DbResult};
 pub use tracing::*;
 
 /// Handle for receiving a result from a database operation on another thread.
 pub type DbRecv<T> = tokio::sync::oneshot::Receiver<DbResult<T>>;
-
-/// Shim to opaquely execute the operation without being aware of the underlying impl.
-#[allow(dead_code)] // FIXME: remove this
-pub struct OpShim<T, R> {
-    executor_fn: Arc<dyn Fn(T) -> DbResult<R> + Sync + Send + 'static>,
-}
-
-impl<T, R> OpShim<T, R>
-where
-    T: Sync + Send + 'static,
-    R: Sync + Send + 'static,
-{
-    #[allow(dead_code)] // FIXME: remove this
-    pub fn wrap<F>(op: F) -> Self
-    where
-        F: Fn(T) -> DbResult<R> + Sync + Send + 'static,
-    {
-        Self {
-            executor_fn: Arc::new(op),
-        }
-    }
-
-    /// Executes the operation on the provided thread pool and returns the result over.
-    #[allow(dead_code)] // FIXME: remove this
-    pub async fn exec_async(&self, pool: &threadpool::ThreadPool, arg: T) -> DbResult<R> {
-        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
-
-        let exec_fn = self.executor_fn.clone();
-
-        pool.execute(move || {
-            let res = exec_fn(arg);
-            if resp_tx.send(res).is_err() {
-                tracing::warn!("failed to send response");
-            }
-        });
-
-        match resp_rx.await {
-            Ok(v) => v,
-            Err(e) => Err(DbError::Other(format!("{e}"))),
-        }
-    }
-
-    /// Executes the operation directly.
-    #[allow(dead_code)] // FIXME: remove this
-    pub fn exec_blocking(&self, arg: T) -> DbResult<R> {
-        (self.executor_fn)(arg)
-    }
-}
 
 macro_rules! inst_ops_common {
     {
@@ -99,7 +49,7 @@ macro_rules! inst_ops_common {
             }
 
             #[async_trait::async_trait]
-            pub(crate) trait ShimTrait: Sync + Send + 'static {
+            trait ShimTrait: Sync + Send + 'static {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret>;
                     fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbRecv<$ret>;
@@ -156,7 +106,7 @@ macro_rules! inst_ops {
 /// in the database instance
 macro_rules! inst_ops_auto {
     {
-        ($db_method: ident, $base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
+        ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
             $($iname:ident($($aname:ident: $aty:ty),*) => $ret:ty;)*
         }
     } => {
@@ -170,7 +120,7 @@ macro_rules! inst_ops_auto {
             impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
-                        self.ctx.db.$db_method().$iname($($aname),*)
+                        self.ctx.db().$iname($($aname),*)
                     }
 
                     fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbRecv<$ret> {
@@ -178,7 +128,7 @@ macro_rules! inst_ops_auto {
                         let ctx = self.ctx.clone();
 
                         pool.execute(move || {
-                            let res = ctx.db.$db_method().$iname($($aname),*);
+                            let res = ctx.db().$iname($($aname),*);
                             if resp_tx.send(res).is_err() {
                                 warn!("failed to send response");
                             }
