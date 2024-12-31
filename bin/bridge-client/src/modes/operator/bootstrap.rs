@@ -28,7 +28,7 @@ use super::{constants::DB_THREAD_COUNT, task_manager::TaskManager};
 use crate::{
     args::Cli,
     constants::{
-        DEFAULT_DUTY_TIMEOUT_DURATION, DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, ROCKSDB_RETRY_COUNT,
+        DEFAULT_DUTY_TIMEOUT_SEC, DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, ROCKSDB_RETRY_COUNT,
     },
     db::open_rocksdb_database,
     rpc_server::{self, BridgeRpc},
@@ -150,9 +150,9 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         Duration::from_millis,
     );
 
-    let duty_timeout_duration = args.duty_timeout_duration.map_or(
-        Duration::from_secs(DEFAULT_DUTY_TIMEOUT_DURATION),
-        Duration::from_secs,
+    let duty_timeout_duration = Duration::from_secs(
+        args.duty_timeout_duration
+            .unwrap_or(DEFAULT_DUTY_TIMEOUT_SEC),
     );
 
     // TODO: wrap these in `strata-tasks`
