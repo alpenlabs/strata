@@ -205,7 +205,8 @@ async fn post_to_github_pr(
     let comments_url = format!("{}/issues/{}/comments", BASE_URL, &args.pr_number);
     let comments_response = client
         .get(&comments_url)
-        .header("Authorization", format!("token {}", &args.github_token))
+        .header("Authorization", format!("Bearer {}", &args.github_token))
+        .header("X-GitHub-Api-Version", "2022-11-28")
         .header("User-Agent", "strata-perf-bot")
         .send()
         .await?;
