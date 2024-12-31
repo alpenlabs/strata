@@ -12,7 +12,6 @@ jobs:
       # Needed to install the toolchain.
       contents: write
       # Needed to post the performance report comments.
-      # pull-requests: write
       issues: write
     runs-on: ubuntu-latest
 

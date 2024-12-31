@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{command, Parser};
+use num_format::{Locale, ToFormattedString};
 use reqwest::Client;
 use serde::Serialize;
 use serde_json::json;
@@ -182,7 +183,7 @@ fn format_results(results: &[PerformanceReport], host_name: String) -> String {
         table_text.push_str(&format!(
             "\n| {:<17} | {:>11} | {:<7} |",
             result.program,
-            result.cycles,
+            result.cycles.to_formatted_string(&Locale::en),
             if result.success { "✅" } else { "❌" }
         ));
     }
