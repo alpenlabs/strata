@@ -53,6 +53,8 @@ use strata_storage::L2BlockManager;
 use strata_zkvm::ProofReceipt;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
+#[cfg(feature = "debug-utils")]
+use {strata_common::bail_manager::BAIL_SENDER, strata_rpc_api::StrataDebugApiServer};
 
 use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
@@ -877,5 +879,11 @@ impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRp
         })
         .await?;
         Ok(cs)
+    }
+
+    async fn set_bail_context(&self, _ctx: String) -> RpcResult<()> {
+        #[cfg(feature = "debug-utils")]
+        let _sender = BAIL_SENDER.send(Some(ctx));
+        Ok(())
     }
 }

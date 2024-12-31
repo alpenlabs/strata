@@ -13,3 +13,8 @@ strata-primitives.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
+tokio = {workspace = true, optional = true}
+thiserror = {workspace = true, optional = true}
+
+[features]
+debug-utils = ["tokio", "thiserror"]

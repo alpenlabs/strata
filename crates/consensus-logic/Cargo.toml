@@ -19,6 +19,7 @@ strata-status.workspace = true
 strata-storage.workspace = true
 strata-tasks.workspace = true
 strata-zkvm.workspace = true
+strata-common = { workspace = true , default-features = true }
 
 anyhow.workspace = true
 bitcoin.workspace = true
@@ -35,3 +36,6 @@ rand = { version = "0.8.5", features = ["getrandom", "std_rng"] }
 strata-db = { workspace = true, features = ["stubs"] }
 strata-rocksdb = { workspace = true, features = ["test_utils"] }
 strata-test-utils.workspace = true
+
+[features]
+debug-utils = ["strata-common/debug-utils"]

@@ -190,4 +190,7 @@ pub trait StrataDebugApi {
     /// Get the ClientState at a certain index
     #[method(name = "debug_getClientStateAtIdx")]
     async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>>;
+    /// for exiting the client based on context
+    #[method(name = "stratadebug_bail")]
+    async fn set_bail_context(&self, ctx: String) -> RpcResult<()>;
 }
