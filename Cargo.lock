@@ -13462,6 +13462,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-sequencer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argh",
+ "bitcoin",
+ "jsonrpsee",
+ "serde",
+ "strata-block-assembly",
+ "strata-common",
+ "strata-consensus-logic",
+ "strata-crypto",
+ "strata-key-derivation",
+ "strata-primitives",
+ "strata-rpc-api",
+ "strata-state",
+ "strata-tasks",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "strata-sp1-adapter"
 version = "0.1.0"
 dependencies = [

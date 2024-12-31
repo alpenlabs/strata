@@ -57,6 +57,7 @@ members = [
   "bin/strata-cli",
   "bin/strata-client",
   "bin/strata-reth",
+  "bin/strata-sequencer",
   "bin/prover-client",
   "provers/perf",
 
@@ -71,6 +72,7 @@ default-members = [
   "bin/prover-client",
   "bin/strata-reth",
   "bin/strata-client",
+  "bin/strata-sequencer",
 ]
 
 resolver = "2"

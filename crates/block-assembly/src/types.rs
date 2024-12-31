@@ -7,7 +7,7 @@ use strata_state::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SequencerDuty {
-    SignBlock(u64),
+    SignBlock(u64, L2BlockId),
     // SignCheckpoint(..)
     // ..
 }
@@ -56,8 +56,12 @@ pub struct BlockTemplate {
 }
 
 impl BlockTemplate {
-    pub fn block_id(&self) -> L2BlockId {
+    pub fn template_id(&self) -> L2BlockId {
         self.header.get_blockid()
+    }
+
+    pub fn header(&self) -> &L2BlockHeader {
+        &self.header
     }
 
     pub fn from_full_ref(full: &BlockTemplateFull) -> Self {
@@ -73,6 +77,10 @@ pub struct BlockCompletionData {
 }
 
 impl BlockCompletionData {
+    pub fn from_signature(signature: Buf64) -> Self {
+        Self { signature }
+    }
+
     pub fn signature(&self) -> &Buf64 {
         &self.signature
     }
