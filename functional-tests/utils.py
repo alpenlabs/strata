@@ -225,7 +225,7 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
 
 def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: int):
     """
-    This check requires that submitting nonexistent batch proof fails
+    Requires that submitting nonexistent batch proof fails
     """
     empty_proof_receipt = {"proof": [], "public_values": []}
 
@@ -243,7 +243,7 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
 
 def check_already_sent_proof(seqrpc, sent_batch: int):
     """
-    This check requires that submitting proof that was already sent fails
+    Requires that submitting proof that was already sent fails
     """
     empty_proof_receipt = {"proof": [], "public_values": []}
     try:
