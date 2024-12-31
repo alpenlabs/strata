@@ -9,6 +9,7 @@ use std::{
 };
 
 use futures_util::{future::select, FutureExt, TryFutureExt};
+use thiserror::Error;
 use tokio::{runtime::Handle, sync::mpsc};
 use tracing::{debug, error, info, warn};
 
@@ -26,7 +27,7 @@ enum FailureReason {
 }
 
 /// Error with the name of the task that panicked and an error downcasted to string, if possible.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub struct TaskError {
     task_name: String,
     reason: FailureReason,
@@ -67,16 +68,6 @@ impl TaskError {
             task_name: task_name.to_string(),
             reason: FailureReason::Err(err),
         }
-    }
-}
-
-impl From<TaskError> for anyhow::Error {
-    fn from(value: TaskError) -> Self {
-        match value.reason {
-            FailureReason::Err(error) => error,
-            FailureReason::Panic(panic_message) => anyhow::Error::msg(panic_message),
-        }
-        .context(value.task_name)
     }
 }
 

@@ -12736,7 +12736,7 @@ dependencies = [
  "strata-state",
  "strata-status",
  "strata-test-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
 ]
@@ -13720,6 +13720,30 @@ name = "strata-rpc-utils"
 version = "0.1.0"
 dependencies = [
  "jsonrpsee",
+]
+
+[[package]]
+name = "strata-sequencer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argh",
+ "bitcoin",
+ "jsonrpsee",
+ "serde",
+ "strata-block-assembly",
+ "strata-common",
+ "strata-consensus-logic",
+ "strata-crypto",
+ "strata-key-derivation",
+ "strata-primitives",
+ "strata-rpc-api",
+ "strata-state",
+ "strata-tasks",
+ "thiserror 2.0.11",
+ "tokio",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]
