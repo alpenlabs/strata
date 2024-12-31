@@ -69,13 +69,20 @@ pub fn apply_write_batch_to_chainstate(
     mut chainstate: Chainstate,
     batch: &WriteBatch,
 ) -> Chainstate {
-    for op in &batch.ops {
-        apply_op_to_chainstate(op, &mut chainstate);
-    }
+    // This overwrites the whole toplevel state.  This probably makes you think
+    // it doesn't make sense to take the chainstate arg at all.  But this will
+    // probably make more sense in the future when we make the state structure
+    // more sophisticated, splitting apart the epoch state from the per-slot
+    // state more.
+    chainstate = batch.new_toplevel_chain_state.clone();
 
     // Don't want to forget about this either.
     if let Some(es) = batch.new_toplevel_epoch_state.clone() {
         chainstate.epoch_state = es;
+    }
+
+    for op in &batch.ops {
+        apply_op_to_chainstate(op, &mut chainstate);
     }
 
     chainstate
