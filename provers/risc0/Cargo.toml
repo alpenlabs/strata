@@ -41,5 +41,5 @@ methods = [
 ]
 
 [features]
-default = []
+default = ["prover"]
 prover = ["dep:strata-risc0-adapter"]
