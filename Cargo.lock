@@ -13650,6 +13650,7 @@ dependencies = [
  "strata-primitives",
  "strata-rpc-types",
  "strata-state",
+ "strata-zkvm",
  "thiserror",
 ]
 

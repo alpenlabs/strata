@@ -315,7 +315,7 @@ fn apply_action<D: Database>(
                 let entry = CheckpointEntry::new(
                     c.batch_info().clone(),
                     c.bootstrap_state().clone(),
-                    c.proof().clone(),
+                    c.get_proof_receipt(),
                     pstatus,
                     cstatus,
                 );
@@ -333,7 +333,7 @@ fn apply_action<D: Database>(
                 let entry = CheckpointEntry::new(
                     c.batch_info().clone(),
                     c.bootstrap_state().clone(),
-                    c.proof().clone(),
+                    c.get_proof_receipt(),
                     pstatus,
                     cstatus,
                 );
