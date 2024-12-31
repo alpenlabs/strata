@@ -79,6 +79,10 @@ pub fn process_block(
         epoch::process_epoch(state, &epoch_data, params)?;
     }
 
+    // TODO remove
+    let final_epoch = state.state().cur_epoch();
+    debug!("epoch now is {final_epoch}");
+
     Ok(())
 }
 
