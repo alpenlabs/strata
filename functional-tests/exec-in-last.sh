@@ -20,4 +20,4 @@ cd $1
 cd $2
 
 shift 2
-exec $@
+exec "$@"
