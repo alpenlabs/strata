@@ -198,10 +198,10 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
     # empty proof hex.
     # NOTE: The functional tests for verifying proofs need to provide non-empty
     # proofs
-    proof_hex = ""
+    empty_proof_receipt = {"proof": [], "public_values": []}
 
     # This is arbitrary
-    seqrpc.strataadmin_submitCheckpointProof(idx, proof_hex)
+    seqrpc.strataadmin_submitCheckpointProof(idx, empty_proof_receipt)
 
     # Wait a while for it to be posted to l1. This will happen when there
     # is a new published txid in l1status
@@ -225,18 +225,32 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
 
 def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: int):
     """
-    This check requires that subnitting nonexistent batch proof fails
+    This check requires that submitting nonexistent batch proof fails
     """
-    proof_hex = ""
+    empty_proof_receipt = {"proof": [], "public_values": []}
 
     try:
-        seqrpc.strataadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
+        seqrpc.strataadmin_submitCheckpointProof(nonexistent_batch, empty_proof_receipt)
     except Exception as e:
         if hasattr(e, "code"):
             assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
         else:
             print("Unexpected error occurred")
             raise e
+    else:
+        raise AssertionError("Expected rpc error")
+
+
+def check_already_sent_proof(seqrpc, sent_batch: int):
+    """
+    This check requires that submitting proof that was already sent fails
+    """
+    empty_proof_receipt = {"proof": [], "public_values": []}
+    try:
+        # Proof for checkpoint 0 is already sent
+        seqrpc.strataadmin_submitCheckpointProof(sent_batch, empty_proof_receipt)
+    except Exception as e:
+        assert e.code == ERROR_PROOF_ALREADY_CREATED
     else:
         raise AssertionError("Expected rpc error")
 
