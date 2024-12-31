@@ -1,15 +1,18 @@
-from typing import Union
+from typing import Annotated, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, StringConstraints
+
+# A string that optionally starts with 0x, followed by exactly 64 hex characters
+StrBuf32 = Annotated[str, StringConstraints(pattern=r"^(0x)?[0-9A-Fa-f]{64}$")]
 
 
 class CredRule(BaseModel):
-    schnorr_key: str
+    schnorr_key: StrBuf32
 
 
 class OperatorConfigItem(BaseModel):
-    signing_pk: str
-    wallet_pk: str
+    signing_pk: StrBuf32
+    wallet_pk: StrBuf32
 
 
 class OperatorConfig(BaseModel):
@@ -20,15 +23,15 @@ class OperatorConfig(BaseModel):
 
 
 class Sp1RollupVk(BaseModel):
-    sp1: str
+    sp1: StrBuf32
 
 
 class Risc0RollupVk(BaseModel):
-    risc0: str
+    risc0: StrBuf32
 
 
 class NativeRollupVk(BaseModel):
-    native: str
+    native: StrBuf32
 
 
 RollupVk = Union[Sp1RollupVk, Risc0RollupVk, NativeRollupVk]
@@ -50,8 +53,8 @@ class RollupConfig(BaseModel):
     horizon_l1_height: int
     genesis_l1_height: int
     operator_config: OperatorConfig
-    evm_genesis_block_hash: str
-    evm_genesis_block_state_root: str
+    evm_genesis_block_hash: StrBuf32
+    evm_genesis_block_state_root: StrBuf32
     l1_reorg_safe_depth: int
     target_l2_batch_size: int
     address_length: int
