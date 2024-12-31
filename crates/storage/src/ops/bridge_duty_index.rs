@@ -17,24 +17,15 @@ impl<D: BridgeDutyIndexDatabase + Sync + Send + 'static> Context<D> {
     pub fn into_ops(self, pool: threadpool::ThreadPool) -> BridgeDutyIndexOps {
         BridgeDutyIndexOps::new(pool, Arc::new(self))
     }
+
+    pub fn db(&self) -> &D {
+        self.db.as_ref()
+    }
 }
 
-inst_ops! {
+inst_ops_auto! {
     (BridgeDutyIndexOps, Context<D: BridgeDutyIndexDatabase>) {
         get_index() => Option<u64>;
         set_index(index: u64) => ();
     }
-}
-
-fn get_index<D: BridgeDutyIndexDatabase + Sync + Send + 'static>(
-    context: &Context<D>,
-) -> DbResult<Option<u64>> {
-    context.db.get_index()
-}
-
-fn set_index<D: BridgeDutyIndexDatabase + Sync + Send + 'static>(
-    context: &Context<D>,
-    index: u64,
-) -> DbResult<()> {
-    context.db.set_index(index)
 }

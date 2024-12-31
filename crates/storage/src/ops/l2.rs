@@ -20,10 +20,14 @@ impl<D: Database + Sync + Send + 'static> Context<D> {
     pub fn into_ops(self, pool: threadpool::ThreadPool) -> L2DataOps {
         L2DataOps::new(pool, Arc::new(self))
     }
+
+    pub fn db(&self) -> &impl L2BlockDatabase {
+        self.db.l2_db().as_ref()
+    }
 }
 
 inst_ops_auto! {
-    (l2_db, L2DataOps, Context<D: Database>) {
+    (L2DataOps, Context<D: Database>) {
         get_block_data(id: L2BlockId) => Option<L2BlockBundle>;
         get_blocks_at_height(h: u64) => Vec<L2BlockId>;
         get_block_status(id: L2BlockId) => Option<BlockStatus>;
