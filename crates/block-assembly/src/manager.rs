@@ -14,7 +14,10 @@ use strata_primitives::{
     l2::L2BlockId,
     params::{Params, RollupParams},
 };
-use strata_state::{block::L2BlockBundle, header::L2BlockHeader};
+use strata_state::{
+    block::L2BlockBundle,
+    header::{L2BlockHeader, L2Header},
+};
 use strata_status::StatusChannel;
 
 use crate::{BlockCompletionData, BlockTemplate, BlockTemplateFull, Error};
@@ -27,6 +30,7 @@ pub struct BlockTemplateManager<D, E> {
     pub(crate) status_channel: StatusChannel,
     // TODO: add some form of expiry to purge orphaned items
     pending_templates: HashMap<L2BlockId, BlockTemplateFull>,
+    pending_by_parent: HashMap<L2BlockId, L2BlockId>,
 }
 
 impl<D, E> BlockTemplateManager<D, E>
@@ -46,11 +50,14 @@ where
             engine,
             status_channel,
             pending_templates: HashMap::new(),
+            pending_by_parent: HashMap::new(),
         }
     }
 
     pub fn insert_template(&mut self, block_id: L2BlockId, template: BlockTemplateFull) {
+        let parent = *template.header().parent();
         self.pending_templates.insert(block_id, template);
+        self.pending_by_parent.insert(parent, block_id);
     }
 
     pub fn get_block_template(&self, block_id: L2BlockId) -> Result<BlockTemplate, Error> {
@@ -58,6 +65,18 @@ where
             .get(&block_id)
             .map(BlockTemplate::from_full_ref)
             .ok_or(Error::UnknownBlockId(block_id))
+    }
+
+    pub fn get_block_template_by_parent(
+        &self,
+        parent_block_id: L2BlockId,
+    ) -> Result<BlockTemplate, Error> {
+        let block_id = self
+            .pending_by_parent
+            .get(&parent_block_id)
+            .ok_or(Error::UnknownBlockId(parent_block_id))?;
+
+        self.get_block_template(*block_id)
     }
 
     pub fn complete_block_template(
@@ -76,6 +95,8 @@ where
                     Err(Error::InvalidSignature(block_id, *completion.signature()))
                 } else {
                     let template = entry.remove();
+                    let parent = template.header().parent();
+                    self.pending_by_parent.remove(parent);
                     Ok(template.complete_block_template(completion))
                 }
             }

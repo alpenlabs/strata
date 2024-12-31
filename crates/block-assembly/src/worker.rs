@@ -50,6 +50,11 @@ where
     D: Database,
     E: ExecEngineCtl,
 {
+    // check if we already have pending template for this parent block id
+    if let Ok(template) = manager.get_block_template_by_parent(config.parent_block_id()) {
+        return Ok(template);
+    }
+
     let full_template = generate_block_template_inner(
         config,
         manager.params.as_ref(),

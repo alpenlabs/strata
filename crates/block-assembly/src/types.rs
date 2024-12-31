@@ -88,6 +88,13 @@ pub struct BlockGenerationConfig {
 }
 
 impl BlockGenerationConfig {
+    pub fn from_parent_block_id(parent_block_id: L2BlockId) -> Self {
+        Self {
+            parent_block_id,
+            ..Default::default()
+        }
+    }
+
     pub fn parent_block_id(&self) -> L2BlockId {
         self.parent_block_id
     }
