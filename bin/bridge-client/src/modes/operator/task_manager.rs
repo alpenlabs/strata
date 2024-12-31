@@ -82,8 +82,6 @@ where
                         error!(error = %e, %start_index, %stop_index, "could not update duty index");
                     }
                 }
-            } else {
-                error!(?duty_timeout_duration, "some duties timed out");
             }
 
             sleep(duty_polling_interval).await;

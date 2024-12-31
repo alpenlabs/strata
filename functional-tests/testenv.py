@@ -198,8 +198,8 @@ class BridgeTestBase(StrataTester):
         """
         # Get relevant data
         btc_url = self.btcrpc.base_url
-        btc_user = self.btc.props["rpc_user"]
-        btc_password = self.btc.props["rpc_password"]
+        btc_user = self.btc.get_prop("rpc_user")
+        btc_password = self.btc.get_prop("rpc_password")
         seq_addr = self.seq.get_prop("address")
 
         # Create the deposit request transaction

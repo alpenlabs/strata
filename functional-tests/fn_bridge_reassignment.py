@@ -45,8 +45,8 @@ class BridgeWithdrawReassignmentTest(testenv.BridgeTestBase):
         dispatch_assignment_duration = cfg.dispatch_assignment_dur
 
         btc_url = self.btcrpc.base_url
-        btc_user = self.btc.props["rpc_user"]
-        btc_password = self.btc.props["rpc_password"]
+        btc_user = self.btc.get_prop("rpc_user")
+        btc_password = self.btc.get_prop("rpc_password")
         bridge_pk = get_bridge_pubkey(self.seqrpc)
         self.debug(f"Bridge pubkey: {bridge_pk}")
 

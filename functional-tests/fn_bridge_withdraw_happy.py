@@ -46,8 +46,8 @@ class BridgeWithdrawHappyTest(testenv.BridgeTestBase):
 
         # Original BTC balance
         btc_url = self.btcrpc.base_url
-        btc_user = self.btc.props["rpc_user"]
-        btc_password = self.btc.props["rpc_password"]
+        btc_user = self.btc.get_prop("rpc_user")
+        btc_password = self.btc.get_prop("rpc_password")
         original_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
         self.debug(f"BTC balance before withdraw: {original_balance}")
 
