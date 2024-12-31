@@ -38,6 +38,8 @@ impl L1BroadcastHandle {
     /// This function is infallible. If the entry already exists it will update with the new
     /// `txentry`.
     pub async fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>> {
+        trace!(%txid, "insert_new_tx_entry");
+        assert!(txentry.try_to_tx().is_ok(), "invalid tx entry {txentry:?}");
         let Some(idx) = self.ops.put_tx_entry_async(txid, txentry.clone()).await? else {
             return Ok(None);
         };

@@ -18,10 +18,14 @@ impl<D: BroadcastDatabase + Sync + Send + 'static> Context<D> {
     pub fn into_ops(self, pool: threadpool::ThreadPool) -> BroadcastDbOps {
         BroadcastDbOps::new(pool, Arc::new(self))
     }
+
+    pub fn db(&self) -> &impl L1BroadcastDatabase {
+        self.db.l1_broadcast_db().as_ref()
+    }
 }
 
 inst_ops_auto! {
-    (l1_broadcast_db, BroadcastDbOps, Context<D: BroadcastDatabase>) {
+    (BroadcastDbOps, Context<D: BroadcastDatabase>) {
         get_tx_entry(idx: u64) => Option<L1TxEntry>;
         get_tx_entry_by_id(id: Buf32) => Option<L1TxEntry>;
         get_txid(idx: u64) => Option<Buf32>;
