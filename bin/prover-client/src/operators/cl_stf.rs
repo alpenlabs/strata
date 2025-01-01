@@ -15,7 +15,7 @@ use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{constants::MAX_PROVING_BLOCK_RANGE, evm_ee::EvmEeOperator, ProvingOp};
+use super::{evm_ee::EvmEeOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] trait for Consensus Layer (CL) State Transition
@@ -162,12 +162,6 @@ impl ProvingOp for ClStfOperator {
         let start_block = self.get_l2_block_header(start_block_hash).await?;
         let end_block = self.get_l2_block_header(end_block_hash).await?;
         let num_blocks = end_block.block_idx - start_block.block_idx;
-        if num_blocks > MAX_PROVING_BLOCK_RANGE {
-            return Err(ProvingTaskError::InvalidInput(format!(
-                "Block range exceeds maximum limit {:?}",
-                task_id.context()
-            )));
-        }
 
         // Get ancestor blocks and reverse to oldest-first order
         let mut l2_block_ids = self.get_block_ancestors(end_block_hash, num_blocks).await?;
@@ -175,13 +169,12 @@ impl ProvingOp for ClStfOperator {
 
         let mut stf_witness_payloads = Vec::new();
         for l2_block_id in l2_block_ids {
-            let raw_witness: Option<Vec<u8>> = self
+            let raw_witness: Vec<u8> = self
                 .cl_client
                 .get_cl_block_witness_raw(l2_block_id)
                 .await
                 .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
-            let witness = raw_witness.ok_or(ProvingTaskError::WitnessNotFound)?;
-            stf_witness_payloads.push(witness);
+            stf_witness_payloads.push(raw_witness);
         }
 
         let evm_ee_ids = db

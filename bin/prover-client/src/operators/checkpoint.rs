@@ -121,7 +121,7 @@ impl ProvingOp for CheckpointOperator {
             .context();
 
         // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
-        // include the range interms of block_id.
+        // include the range in terms of block_id.
         // https://alpenlabs.atlassian.net/browse/STR-756
         let start_l2_idx = self.get_l2id(checkpoint_info.l2_range.0).await?;
         let end_l2_idx = self.get_l2id(checkpoint_info.l2_range.1).await?;

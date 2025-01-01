@@ -298,7 +298,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         }
     }
 
-    async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Option<Vec<u8>>> {
+    async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
         let l2_blk_db = self.database.clone();
         let l2_blk_bundle = wait_blocking("l2_block", move || {
             let l2_db = l2_blk_db.l2_db();
@@ -323,7 +323,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
             .map_err(|_| Error::Other("Failed to get raw cl block witness".to_string()))?;
 
-        Ok(Some(raw_cl_block_witness))
+        Ok(raw_cl_block_witness)
     }
 
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {

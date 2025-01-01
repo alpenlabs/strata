@@ -42,6 +42,7 @@ impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
 
         let (l1_start_height, l1_end_height) = batch_info.l1_range;
         let (l2_start_height, l2_end_height) = batch_info.l2_range;
+        let cl_batches = vec![(l2_start_height, l2_end_height)];
 
         let l1_batch_proof = self
             .l1_batch_prover
@@ -50,10 +51,7 @@ impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
         let l1_batch_vk = self.l1_batch_prover.get_host().get_verification_key();
         let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);
 
-        let l2_batch_proof = self
-            .l2_batch_prover
-            .get_proof(&vec![(l2_start_height, l2_end_height)])
-            .unwrap();
+        let l2_batch_proof = self.l2_batch_prover.get_proof(&cl_batches).unwrap();
         let l2_batch_vk = self.l2_batch_prover.get_host().get_verification_key();
         let l2_batch = AggregationInput::new(l2_batch_proof, l2_batch_vk);
 
