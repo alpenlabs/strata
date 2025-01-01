@@ -48,6 +48,11 @@ use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
+#[cfg(feature = "debug-utils")]
+use {
+    strata_common::bail_manager::{BailContext, BAIL_SENDER},
+    strata_rpc_api::StrataDebugApiServer,
+};
 
 use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
@@ -732,5 +737,18 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .get_tx_status(id)
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
+    }
+}
+
+#[cfg(feature = "debug-utils")]
+pub struct DebugServerImpl;
+
+#[cfg(feature = "debug-utils")]
+#[async_trait]
+impl StrataDebugApiServer for DebugServerImpl {
+    async fn set_bail_context(&self, ctx: BailContext) -> RpcResult<()> {
+        //TODO: some handling here
+        let _sender = BAIL_SENDER.send(Some(ctx));
+        Ok(())
     }
 }

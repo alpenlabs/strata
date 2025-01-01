@@ -1,6 +1,8 @@
 //! Macro trait def for the `strata_` RPC namespace using jsonrpsee.
 use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+#[cfg(feature = "debug-utils")]
+use strata_common::bail_manager::BailContext;
 use strata_db::types::L1TxStatus;
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
@@ -151,4 +153,14 @@ pub trait StrataSequencerApi {
 
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
+}
+
+/// Debug Specific Api
+#[cfg(feature = "debug-utils")]
+#[cfg_attr(all(feature = "debug-utils", not(feature = "client")), rpc(server))]
+#[cfg_attr(all(feature = "debug-utils", feature = "client"), rpc(server, client))]
+pub trait StrataDebugApi {
+    /// for exiting the client based on context
+    #[method(name = "stratadebug_bail")]
+    async fn set_bail_context(&self, ctx: BailContext) -> RpcResult<()>;
 }
