@@ -441,11 +441,13 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         rollup_settings: Optional[RollupParamsSettings] = None,
         auto_generate_blocks: bool = True,
         n_operators: int = 2,
+        duty_timeout_duration: int = 10,
     ):
         self.pre_generate_blocks = pre_generate_blocks
         self.rollup_settings = rollup_settings
         self.auto_generate_blocks = auto_generate_blocks
         self.n_operators = n_operators
+        self.duty_timeout_duration = duty_timeout_duration
         super().__init__()
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
@@ -551,7 +553,11 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
                 xpriv = f.read().strip()
             seq_url = sequencer.get_prop("rpc_url")
             br = bridge_fac.create_operator(
-                xpriv, seq_url, bitcoind_config, message_interval=settings.message_interval
+                xpriv,
+                seq_url,
+                bitcoind_config,
+                message_interval=settings.message_interval,
+                duty_timeout_duration=self.duty_timeout_duration,
             )
             name = f"bridge.{i}"
             svcs[name] = br
