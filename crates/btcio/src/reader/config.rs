@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strata_common::config::Config;
+use strata_config::Config;
 use strata_primitives::params::Params;
 
 #[derive(Clone, Debug)]

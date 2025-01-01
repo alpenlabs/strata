@@ -9,10 +9,8 @@ use strata_btcio::{
     rpc::{traits::Reader, BitcoinClient},
     writer::{config::WriterConfig, start_inscription_task},
 };
-use strata_common::{
-    config::{ClientMode, Config, SequencerConfig},
-    logging,
-};
+use strata_common::logging;
+use strata_config::{ClientMode, Config, SequencerConfig};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
     duty::{types::DutyBatch, worker as duty_worker},

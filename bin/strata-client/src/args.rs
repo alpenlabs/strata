@@ -2,11 +2,10 @@ use std::path::PathBuf;
 
 use argh::FromArgs;
 use bitcoin::Network;
-use strata_common::config::{
-    BitcoindConfig, ClientConfig, ClientMode, Config, ExecConfig, FullNodeConfig, RethELConfig,
-    SequencerConfig, SyncConfig,
+use strata_config::{
+    BitcoindConfig, ClientConfig, ClientMode, Config, ExecConfig, FullNodeConfig, RelayerConfig,
+    RethELConfig, SequencerConfig, SyncConfig,
 };
-use strata_primitives::relay::types::RelayerConfig;
 
 #[derive(Debug, Clone, FromArgs)]
 #[argh(description = "Alpen Strata sequencer")]

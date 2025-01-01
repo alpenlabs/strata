@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use bitcoin::Network;
 use serde::Deserialize;
-use strata_primitives::relay::types::RelayerConfig;
+
+use crate::RelayerConfig;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SequencerConfig {

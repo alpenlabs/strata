@@ -13,6 +13,3 @@ strata-primitives.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
-
-[dev-dependencies]
-toml.workspace = true

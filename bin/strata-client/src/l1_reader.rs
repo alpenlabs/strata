@@ -4,7 +4,7 @@ use strata_btcio::{
     reader::{config::ReaderConfig, query::bitcoin_data_reader_task},
     rpc::traits::Reader,
 };
-use strata_common::config::Config;
+use strata_config::Config;
 use strata_consensus_logic::{csm::ctl::CsmController, l1_handler::bitcoin_data_handler_task};
 use strata_db::traits::{Database, L1Database};
 use strata_primitives::params::Params;
