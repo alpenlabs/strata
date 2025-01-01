@@ -2,10 +2,8 @@ import flexitest
 
 import net_settings
 import testenv
-from constants import (
-    ERROR_PROOF_ALREADY_CREATED,
-)
 from utils import (
+    check_already_sent_proof,
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,
 )
@@ -34,15 +32,5 @@ class BlockFinalizationTest(testenv.StrataTester):
             check_nth_checkpoint_finalized(n, seqrpc)
             self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
-        check_already_sent_proof(seqrpc)
-
-
-def check_already_sent_proof(seqrpc):
-    try:
-        # Proof for checkpoint 0 is already sent
-        seqrpc.strataadmin_submitCheckpointProof(0, "abc123")
-    except Exception as e:
-        print(e)
-        assert e.code == ERROR_PROOF_ALREADY_CREATED
-    else:
-        raise AssertionError("Expected rpc error")
+        # Proof for checkpoint 0 is already sent above
+        check_already_sent_proof(seqrpc, 0)
