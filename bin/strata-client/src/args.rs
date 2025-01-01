@@ -67,29 +67,18 @@ impl Args {
         let args = self.clone();
         Ok(Config {
             bitcoind_rpc: BitcoindConfig {
-                rpc_url: args
-                    .bitcoind_host
-                    .ok_or_else(|| "args: no bitcoin --rpc-url provided".to_string())?,
-                rpc_user: args
-                    .bitcoind_user
-                    .ok_or_else(|| "args: no bitcoin --rpc-user provided".to_string())?,
-                rpc_password: args
-                    .bitcoind_password
-                    .ok_or_else(|| "args: no bitcoin --rpc-password provided".to_string())?,
-                network: args
-                    .network
-                    .ok_or_else(|| "args: no bitcoin --network provided".to_string())?,
+                rpc_url: require(args.bitcoind_host, "args: no bitcoin --rpc-url provided")?,
+                rpc_user: require(args.bitcoind_user, "args: no bitcoin --rpc-user provided")?,
+                rpc_password: require(
+                    args.bitcoind_password,
+                    "args: no bitcoin --rpc-password provided",
+                )?,
+                network: require(args.network, "args: no bitcoin --network provided")?,
             },
             client: ClientConfig {
-                rpc_host: args
-                    .rpc_host
-                    .ok_or_else(|| "args: no client --rpc-host provided".to_string())?,
-                rpc_port: args
-                    .rpc_port
-                    .ok_or_else(|| "args: no client --rpc-port provided".to_string())?,
-                datadir: args
-                    .datadir
-                    .ok_or_else(|| "args: no client --datadir provided".to_string())?,
+                rpc_host: require(args.rpc_host, "args: no client --rpc-host provided")?,
+                rpc_port: require(args.rpc_port, "args: no client --rpc-port provided")?,
+                datadir: require(args.datadir, "args: no client --datadir provided")?,
                 client_mode: {
                     if let Some(sequencer_key) = args.sequencer_key {
                         ClientMode::Sequencer(SequencerConfig {
@@ -167,4 +156,8 @@ impl Args {
             config.client.db_retry_count = db_retry_count;
         }
     }
+}
+
+fn require<T>(field: Option<T>, err_msg: &str) -> Result<T, String> {
+    field.ok_or_else(|| err_msg.to_string())
 }
