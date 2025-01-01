@@ -128,7 +128,9 @@ impl ProofOperator {
             ProofContext::EvmEeStf(_, _) => {
                 Self::prove(&self.evm_ee_operator, proof_key, db, host).await
             }
-            ProofContext::ClStf(_) => Self::prove(&self.cl_stf_operator, proof_key, db, host).await,
+            ProofContext::ClStf(_, _) => {
+                Self::prove(&self.cl_stf_operator, proof_key, db, host).await
+            }
             ProofContext::ClAgg(_, _) => {
                 Self::prove(&self.cl_agg_operator, proof_key, db, host).await
             }

@@ -1,6 +1,7 @@
 //! Provides prover-client related APIs for the RPC server.
 
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use strata_primitives::{buf::Buf32, l2::L2BlockId};
 use strata_rpc_types::ProofKey;
 
 /// RPCs related to information about the client itself.
@@ -12,12 +13,15 @@ pub trait StrataProverClientApi {
     async fn prove_btc_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given el block
-    #[method(name = "proveELBlock")]
-    async fn prove_el_block(&self, el_block_range: (u64, u64)) -> RpcResult<Vec<ProofKey>>;
+    #[method(name = "proveElBlocks")]
+    async fn prove_el_blocks(&self, el_block_range: (Buf32, Buf32)) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given cl block
-    #[method(name = "proveCLBlock")]
-    async fn prove_cl_block(&self, cl_block_num: u64) -> RpcResult<Vec<ProofKey>>;
+    #[method(name = "proveClBlocks")]
+    async fn prove_cl_blocks(
+        &self,
+        cl_block_range: (L2BlockId, L2BlockId),
+    ) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given l1 Batch
     #[method(name = "proveL1Batch")]
@@ -25,7 +29,10 @@ pub trait StrataProverClientApi {
 
     /// Start proving the given l2 batch
     #[method(name = "proveL2Batch")]
-    async fn prove_l2_batch(&self, l2_range: (u64, u64)) -> RpcResult<Vec<ProofKey>>;
+    async fn prove_l2_batch(
+        &self,
+        l2_range: Vec<(L2BlockId, L2BlockId)>,
+    ) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given checkpoint info
     #[method(name = "proveCheckpointRaw")]

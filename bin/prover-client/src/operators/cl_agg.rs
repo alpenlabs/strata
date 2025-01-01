@@ -4,7 +4,9 @@ use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
 use strata_rocksdb::prover::db::ProofDb;
+use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
+use tracing::error;
 
 use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
@@ -29,28 +31,33 @@ impl ClAggOperator {
 
 impl ProvingOp for ClAggOperator {
     type Prover = ClAggProver;
-    type Params = (u64, u64);
+    type Params = Vec<(L2BlockId, L2BlockId)>;
 
     async fn create_task(
         &self,
-        params: (u64, u64),
+        batches: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let (start_height, end_height) = params;
+        let mut cl_stf_deps = Vec::with_capacity(batches.len());
 
-        let len = (end_height - start_height) as usize + 1;
-        let mut cl_stf_deps = Vec::with_capacity(len);
+        // Extract first and last block IDs from batches, error if empty
+        let (start_blkid, end_blkid) = match (batches.first(), batches.last()) {
+            (Some(first), Some(last)) => (first.0, last.1),
+            _ => {
+                error!("Aggregation task with empty batch");
+                return Err(ProvingTaskError::InvalidInput(
+                    "Aggregation task with empty batch".into(),
+                ));
+            }
+        };
 
-        let start_blkid = self.cl_stf_operator.get_id(start_height).await?;
-        let end_blkid = self.cl_stf_operator.get_id(end_height).await?;
         let cl_agg_proof_id = ProofContext::ClAgg(start_blkid, end_blkid);
 
-        for height in start_height..=end_height {
-            let blkid = self.cl_stf_operator.get_id(height).await?;
-            let proof_id = ProofContext::ClStf(blkid);
+        for (start_blkid, end_blkid) in batches {
+            let proof_id = ProofContext::ClStf(start_blkid, end_blkid);
             self.cl_stf_operator
-                .create_task(height, task_tracker.clone(), db)
+                .create_task((start_blkid, end_blkid), task_tracker.clone(), db)
                 .await?;
             cl_stf_deps.push(proof_id);
         }
@@ -67,7 +74,7 @@ impl ProvingOp for ClAggOperator {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<ClAggInput, ProvingTaskError> {
-        let (start_blkid, _) = match task_id.context() {
+        let (start_blkid, end_blkid) = match task_id.context() {
             ProofContext::ClAgg(start, end) => (start, end),
             _ => return Err(ProvingTaskError::InvalidInput("ClAgg".to_string())),
         };
@@ -88,7 +95,7 @@ impl ProvingOp for ClAggOperator {
         }
 
         let cl_stf_vk = hosts::get_verification_key(&ProofKey::new(
-            ProofContext::ClStf(*start_blkid),
+            ProofContext::ClStf(*start_blkid, *end_blkid),
             *task_id.host(),
         ));
         Ok(ClAggInput { batch, cl_stf_vk })

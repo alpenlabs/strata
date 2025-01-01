@@ -1,0 +1,11 @@
+[package]
+edition = "2024"
+name = "strata-config"
+version = "0.1.0"
+
+[dependencies]
+bitcoin.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+toml.workspace = true

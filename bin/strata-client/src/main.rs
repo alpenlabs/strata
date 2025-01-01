@@ -1,7 +1,6 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Address, BlockHash};
-use config::{ClientMode, Config, SequencerConfig};
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
@@ -11,6 +10,7 @@ use strata_btcio::{
     writer::{config::WriterConfig, start_inscription_task},
 };
 use strata_common::logging;
+use strata_config::{ClientMode, Config, SequencerConfig};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
     duty::{types::DutyBatch, worker as duty_worker},
@@ -23,19 +23,21 @@ use strata_db::{
 };
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
-use strata_primitives::params::{Params, SyncParams};
+use strata_primitives::params::Params;
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
+    broadcaster::db::BroadcastDb, init_broadcaster_database, init_core_dbs,
+    init_sequencer_database, open_rocksdb_database, sequencer::db::SequencerDB, CommonDb,
+    DbOpsConfig, RBSeqBlobDb, ROCKSDB_NAME,
 };
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
-    managers::checkpoint::CheckpointDbManager, ops::bridge_relay::BridgeMsgOps, L2BlockManager,
+    create_node_storage, ops::bridge_relay::BridgeMsgOps, L2BlockManager, NodeStorage,
 };
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{
-    runtime::{Handle, Runtime},
+    runtime::Handle,
     sync::{broadcast, oneshot},
 };
 use tracing::*;
@@ -43,7 +45,6 @@ use tracing::*;
 use crate::{args::Args, helpers::*};
 
 mod args;
-mod config;
 mod errors;
 mod extractor;
 mod helpers;
@@ -70,47 +71,34 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn main_inner(args: Args) -> anyhow::Result<()> {
-    // Start runtime for async IO tasks.
+    // Load and validate configuration and params
+    let config = get_config(args.clone())?;
+    // Set up block params.
+    let params = resolve_and_validate_params(args.rollup_params.as_deref(), &config)
+        .map_err(anyhow::Error::from)?;
+
+    // Init the task manager and logging before we do anything else.
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("strata-rt")
         .build()
         .expect("init: build rt");
+    let task_manager = TaskManager::new(runtime.handle().clone());
+    let executor = task_manager.executor();
 
-    // Init the logging before we do anything else.
-    init_logging(runtime.handle());
-
-    let config = get_config(args.clone())?;
-
-    // Set up block params.
-    let rparams = resolve_and_validate_rollup_params(args.rollup_params.as_deref())
-        .map_err(anyhow::Error::from)?;
-    let params: Arc<_> = Params {
-        rollup: rparams,
-        run: SyncParams {
-            // FIXME these shouldn't be configurable here
-            l1_follow_distance: config.sync.l1_follow_distance,
-            client_checkpoint_interval: config.sync.client_checkpoint_interval,
-            l2_blocks_fetch_limit: config.client.l2_blocks_fetch_limit,
-        },
-    }
-    .into();
-
-    let mut methods = jsonrpsee::Methods::new();
-
-    // Open and initialize the database.
-    let rbdb = open_rocksdb_database(&config)?;
-    let ops_config = DbOpsConfig::new(config.client.db_retry_count);
-
-    // initialize core databases
-    let database = init_core_dbs(rbdb.clone(), ops_config);
+    init_logging(executor.handle());
 
     // Init thread pool for batch jobs.
     // TODO switch to num_cpus
     let pool = threadpool::ThreadPool::with_name("strata-pool".to_owned(), 8);
 
-    let task_manager = TaskManager::new(runtime.handle().clone());
-    let executor = task_manager.executor();
+    // Open and initialize rocksdb.
+    let rbdb = open_rocksdb_database(&config.client.datadir, ROCKSDB_NAME)?;
+    let ops_config = DbOpsConfig::new(config.client.db_retry_count);
+
+    // Initialize core databases
+    let database = init_core_dbs(rbdb.clone(), ops_config);
+    let manager = create_node_storage(database.clone(), pool.clone());
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
@@ -118,12 +106,8 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bridge_msg_ctx = strata_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
-    let checkpoint_manager: Arc<_> =
-        CheckpointDbManager::new(pool.clone(), database.clone()).into();
-    let checkpoint_handle: Arc<_> = CheckpointHandle::new(checkpoint_manager.clone()).into();
+    let checkpoint_handle: Arc<_> = CheckpointHandle::new(manager.checkpoint().clone()).into();
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
-
-    let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
 
     // Check if we have to do genesis.
     if genesis::check_needs_client_init(database.as_ref())? {
@@ -136,15 +120,15 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let ctx = start_core_tasks(
         &executor,
         pool,
-        &runtime,
         &config,
         params.clone(),
         database,
-        l2_block_manager,
-        checkpoint_manager,
+        &manager,
         bridge_msg_ops,
         bitcoin_client,
     )?;
+
+    let mut methods = jsonrpsee::Methods::new();
 
     match &config.client.client_mode {
         // If we're a sequencer, start the sequencer db and duties task.
@@ -164,7 +148,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 &config,
                 sequencer_config,
                 &executor,
-                &runtime,
                 seq_db,
                 checkpoint_handle.clone(),
                 broadcast_handle,
@@ -253,7 +236,7 @@ fn do_startup_checks(
     database: &impl Database,
     engine: &impl ExecEngineCtl,
     bitcoin_client: &impl Reader,
-    runtime: &Runtime,
+    handle: &Handle,
 ) -> anyhow::Result<()> {
     let chain_state_db = database.chain_state_db();
     let last_state_idx = match chain_state_db.get_last_state_idx() {
@@ -274,7 +257,7 @@ fn do_startup_checks(
     let safe_l1blockid = last_chain_state.l1_view().safe_block().blkid();
     let block_hash = BlockHash::from_slice(safe_l1blockid.as_ref())?;
 
-    match runtime.block_on(bitcoin_client.get_block(&block_hash)) {
+    match handle.block_on(bitcoin_client.get_block(&block_hash)) {
         Ok(_block) => {
             info!("startup: last matured block: {}", block_hash);
         }
@@ -312,12 +295,10 @@ fn do_startup_checks(
 fn start_core_tasks(
     executor: &TaskExecutor,
     pool: threadpool::ThreadPool,
-    runtime: &Runtime,
     config: &Config,
     params: Arc<Params>,
     database: Arc<CommonDb>,
-    l2_block_manager: Arc<L2BlockManager>,
-    checkpoint_manager: Arc<CheckpointDbManager>,
+    storage: &NodeStorage,
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
@@ -328,8 +309,8 @@ fn start_core_tasks(
         config,
         database.clone(),
         params.as_ref(),
-        l2_block_manager.clone(),
-        runtime,
+        storage.l2().clone(),
+        executor.handle(),
     )?;
 
     // do startup checks
@@ -337,20 +318,18 @@ fn start_core_tasks(
         database.as_ref(),
         engine.as_ref(),
         bitcoin_client.as_ref(),
-        runtime,
+        executor.handle(),
     )?;
 
     // Start the sync manager.
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
-        runtime,
         database.clone(),
-        l2_block_manager.clone(),
+        storage,
         engine.clone(),
         pool.clone(),
         params.clone(),
         status_channel.clone(),
-        checkpoint_manager,
     )?
     .into();
 
@@ -378,7 +357,7 @@ fn start_core_tasks(
         pool,
         params,
         sync_manager,
-        l2_block_manager,
+        l2_block_manager: storage.l2().clone(),
         status_channel,
         engine,
         relayer_handle,
@@ -392,7 +371,6 @@ fn start_sequencer_tasks(
     config: &Config,
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
-    runtime: &Runtime,
     seq_db: Arc<SequencerDB<RBSeqBlobDb>>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
@@ -421,7 +399,7 @@ fn start_sequencer_tasks(
         Some(address) => {
             Address::from_str(address)?.require_network(config.bitcoind_rpc.network)?
         }
-        None => runtime.block_on(generate_sequencer_address(
+        None => executor.handle().block_on(generate_sequencer_address(
             &bitcoin_client,
             SEQ_ADDR_GENERATION_TIMEOUT,
             BITCOIN_POLL_INTERVAL,

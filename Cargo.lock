@@ -6914,6 +6914,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-format"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a652d9771a63711fd3c3deb670acfbe5c30a4072e664d7a3bf5a9e1056ac72c3"
+dependencies = [
+ "arrayvec",
+ "itoa",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12899,6 +12909,7 @@ dependencies = [
  "bitcoin",
  "sha2 0.10.8",
  "strata-btcio",
+ "strata-config",
  "strata-primitives",
  "strata-state",
  "strata-status",
@@ -12968,6 +12979,7 @@ dependencies = [
  "sha2 0.10.8",
  "strata-bridge-tx-builder",
  "strata-common",
+ "strata-config",
  "strata-db",
  "strata-primitives",
  "strata-rocksdb",
@@ -13060,6 +13072,7 @@ dependencies = [
  "strata-bridge-tx-builder",
  "strata-btcio",
  "strata-common",
+ "strata-config",
  "strata-consensus-logic",
  "strata-db",
  "strata-eectl",
@@ -13091,12 +13104,24 @@ dependencies = [
 name = "strata-common"
 version = "0.1.0"
 dependencies = [
+ "bitcoin",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "serde",
+ "strata-primitives",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber 0.3.19",
+]
+
+[[package]]
+name = "strata-config"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "serde",
+ "toml 0.5.11",
 ]
 
 [[package]]
@@ -13457,6 +13482,7 @@ name = "strata-prover-client-rpc-api"
 version = "0.1.0"
 dependencies = [
  "jsonrpsee",
+ "strata-primitives",
  "strata-rpc-types",
 ]
 
@@ -13467,6 +13493,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "clap",
+ "num-format",
  "reqwest 0.12.12",
  "serde",
  "serde_json",
@@ -13745,7 +13772,8 @@ dependencies = [
  "strata-primitives",
  "strata-rpc-types",
  "strata-state",
- "thiserror 1.0.69",
+ "strata-zkvm",
+ "thiserror",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@ use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
 use strata_proofimpl_btc_blockspace::logic::process_blockspace_proof_outer;
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
 use strata_proofimpl_cl_agg::process_cl_agg;
-use strata_proofimpl_cl_stf::process_cl_stf;
+use strata_proofimpl_cl_stf::batch_process_cl_stf;
 use strata_proofimpl_evm_ee_stf::process_block_transaction_outer;
 use strata_proofimpl_l1_batch::process_l1_batch_proof;
 
@@ -43,7 +43,7 @@ static EVM_EE_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| Nativ
 /// A native host for [`ProofVm::CLProving`] prover.
 static CL_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_cl_stf(zkvm, &MOCK_VK);
+        batch_process_cl_stf(zkvm, &MOCK_VK);
         Ok(())
     })),
 });

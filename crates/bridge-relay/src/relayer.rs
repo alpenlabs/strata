@@ -4,7 +4,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use strata_primitives::relay::types::{BridgeMessage, RelayerConfig, Scope};
+use strata_config::RelayerConfig;
+use strata_primitives::relay::types::{BridgeMessage, Scope};
 use strata_status::StatusChannel;
 use strata_storage::ops::bridge_relay::BridgeMsgOps;
 use strata_tasks::TaskExecutor;

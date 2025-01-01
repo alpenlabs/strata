@@ -9,6 +9,7 @@ use strata_rpc_types::{
     RpcExecUpdate, RpcSyncStatus,
 };
 use strata_state::{id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent};
+use strata_zkvm::ProofReceipt;
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
@@ -44,7 +45,7 @@ pub trait StrataApi {
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcExecUpdate>>;
 
     #[method(name = "getCLBlockWitness")]
-    async fn get_cl_block_witness_raw(&self, index: u64) -> RpcResult<Option<Vec<u8>>>;
+    async fn get_cl_block_witness_raw(&self, block_id: L2BlockId) -> RpcResult<Vec<u8>>;
 
     #[method(name = "getCurrentDeposits")]
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;
@@ -139,7 +140,7 @@ pub trait StrataSequencerApi {
 
     /// Verifies and adds the submitted proof to the checkpoint database
     #[method(name = "strataadmin_submitCheckpointProof")]
-    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
+    async fn submit_checkpoint_proof(&self, idx: u64, proof: ProofReceipt) -> RpcResult<()>;
 
     // TODO: rpc endpoints that deal with L1 writes are currently limited to sequencer
     // due to l1 writer using wallet rpcs. Move these to common rpc once writer
