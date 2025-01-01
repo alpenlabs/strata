@@ -86,6 +86,21 @@ impl CooperativeWithdrawalInfo {
         self.deposit_outpoint
     }
 
+    /// Get the assignee for this withdrawal request.
+    pub fn assigned_operator_idx(&self) -> OperatorIdx {
+        self.assigned_operator_idx
+    }
+
+    /// Get the recipient's [`XOnlyPk`].
+    pub fn user_pk(&self) -> XOnlyPk {
+        self.user_pk
+    }
+
+    /// Get the execution deadline for the request.
+    pub fn exec_deadline(&self) -> u64 {
+        self.exec_deadline
+    }
+
     /// Check if the passed bitcoin block height is greater than the deadline for the withdrawal.
     pub fn is_expired_at(&self, block_height: BitcoinBlockHeight) -> bool {
         self.exec_deadline < block_height

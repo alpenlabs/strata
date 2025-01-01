@@ -33,10 +33,11 @@ use strata_rpc_types::{
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
-    batch::BatchCheckpoint,
     block::L2BlockBundle,
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
+    chain_state::Chainstate,
+    client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
     header::L2Header,
     id::L2BlockId,
@@ -88,6 +89,69 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
             checkpoint_handle,
             relayer_handle,
         }
+    }
+
+    /// Gets a ref to the current client state as of the last update.
+    async fn get_client_state(&self) -> ClientState {
+        self.sync_manager.status_channel().client_state()
+    }
+
+    /// Gets a clone of the current client state and fetches the chainstate that
+    /// of the L2 block that it considers the tip state.
+    async fn get_cur_states(&self) -> Result<(ClientState, Option<Arc<Chainstate>>), Error> {
+        let cs = self.get_client_state().await;
+
+        if cs.sync().is_none() {
+            return Ok((cs, None));
+        }
+
+        let ss = cs.sync().unwrap();
+        let tip_blkid = *ss.chain_tip_blkid();
+
+        let db = self.database.clone();
+        let chs = wait_blocking("load_chainstate", move || {
+            // FIXME this is horrible, the sync state should have the block
+            // number in it somewhere
+            let l2_db = db.l2_db();
+            let tip_block = l2_db
+                .get_block_data(tip_blkid)?
+                .ok_or(Error::MissingL2Block(tip_blkid))?;
+            let idx = tip_block.header().blockidx();
+
+            let chs_db = db.chain_state_db();
+            let toplevel_st = chs_db
+                .get_toplevel_state(idx)?
+                .ok_or(Error::MissingChainstate(idx))?;
+
+            Ok(Arc::new(toplevel_st))
+        })
+        .await?;
+
+        Ok((cs, Some(chs)))
+    }
+
+    async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
+        let cs = self.get_client_state().await;
+
+        let Some(last_checkpoint) = cs.l1_view().last_finalized_checkpoint() else {
+            return Ok(None);
+        };
+        let (_, l2_blockidx) = last_checkpoint.batch_info.l2_range;
+
+        // in current implementation, chainstate idx == l2 block idx
+        let idx = l2_blockidx;
+
+        let db = self.database.clone();
+
+        wait_blocking("load_checkpoint_chainstate", move || {
+            let chainstate_db = db.chain_state_db();
+            let chainstate = chainstate_db
+                .get_toplevel_state(idx)?
+                .ok_or(Error::MissingChainstate(idx))?;
+
+            Ok(Some(Arc::new(chainstate)))
+        })
+        .await
     }
 }
 
@@ -465,16 +529,23 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
-        let deps_table = self
-            .status_channel
-            .deposits_table()
-            .ok_or(Error::BeforeGenesis)?;
-
-        let withdrawal_duties = extract_withdrawal_infos(&deps_table).map(BridgeDuty::from);
+        // withdrawal duties should only be generated from finalized checkpoint states
+        let withdrawal_duties =
+            self.get_last_checkpoint_chainstate()
+                .await
+                .map(|chainstate_opt| {
+                    chainstate_opt
+                        .map(|chainstate| {
+                            extract_withdrawal_infos(chainstate.deposits_table())
+                                .map(BridgeDuty::from)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
+                })?;
 
         let mut duties = vec![];
         duties.extend(deposit_duties);
-        duties.extend(withdrawal_duties);
+        duties.extend(withdrawal_duties.into_iter());
 
         info!(%operator_idx, %start_index, "dispatching duties");
         Ok(RpcBridgeDuties {
@@ -512,18 +583,29 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
             .get_checkpoint(idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
-        let batch_comm: Option<BatchCheckpoint> = entry.map(Into::into);
-        Ok(batch_comm.map(|bc| bc.batch_info().clone().into()))
+
+        Ok(entry.map(Into::into))
     }
 
-    async fn get_latest_checkpoint_index(&self) -> RpcResult<Option<u64>> {
-        let idx = self
-            .checkpoint_handle
-            .get_last_checkpoint_idx()
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
+    async fn get_latest_checkpoint_index(&self, finalized: Option<bool>) -> RpcResult<Option<u64>> {
+        let finalized = finalized.unwrap_or(false);
+        if finalized {
+            // get last finalized checkpoint index from state
+            let (client_state, _) = self.get_cur_states().await?;
+            Ok(client_state
+                .l1_view()
+                .last_finalized_checkpoint()
+                .map(|checkpoint| checkpoint.batch_info.idx()))
+        } else {
+            // get latest checkpoint index from db
+            let idx = self
+                .checkpoint_handle
+                .get_last_checkpoint_idx()
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?;
 
-        return Ok(idx);
+            Ok(idx)
+        }
     }
 
     async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {

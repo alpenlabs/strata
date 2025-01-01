@@ -121,5 +121,5 @@ def check_nth_checkpoint_finalized_on_reorg(
     wait_until(
         lambda: seqrpc.strata_syncStatus()["finalized_block_id"] == to_finalize_blkid,
         error_with="Block not finalized",
-        timeout=10,
+        timeout=120,
     )

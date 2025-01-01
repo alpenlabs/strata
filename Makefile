@@ -8,7 +8,7 @@ BUILD_PATH = "target"
 FUNCTIONAL_TESTS_DIR  = functional-tests
 FUNCTIONAL_TESTS_DATADIR = _dd
 DOCKER_DIR = docker
-DOCKER_DATADIR = data
+DOCKER_DATADIR = .data
 
 # Cargo profile for builds. Default is for local builds, CI uses an override.
 PROFILE ?= release
@@ -231,3 +231,7 @@ pr: lint sec rustdocs test-doc test-unit test-int test-functional ## Runs lints 
 	@test -z "$$(git status --porcelain)" || echo "WARNNG: You have uncommitted changes"
 	@echo "All good to create a PR!"
 
+
+.PHONY: docker
+docker: docker-down docker-up
+	echo "Done!"

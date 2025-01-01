@@ -5,7 +5,7 @@ use strata_crypto::verify_schnorr_sig;
 use strata_primitives::buf::{Buf32, Buf64};
 use strata_zkvm::Proof;
 
-use crate::id::L2BlockId;
+use crate::{id::L2BlockId, l1::L1BlockId};
 
 /// Public parameters for batch proof to be posted to DA.
 /// Will be updated as prover specs evolve.
@@ -115,6 +115,9 @@ pub struct BatchInfo {
     /// The last L2 block upto which this checkpoint covers since the previous checkpoint
     pub l2_blockid: L2BlockId,
 
+    /// The last L1 block upto which this checkpoint covers since the previous checkpoint
+    pub l1_blockid: L1BlockId,
+
     /// PoW transition in the given `l1_range`
     pub l1_pow_transition: (u128, u128),
 
@@ -132,6 +135,7 @@ impl BatchInfo {
         l1_transition: (Buf32, Buf32),
         l2_transition: (Buf32, Buf32),
         l2_blockid: L2BlockId,
+        l1_blockid: L1BlockId,
         l1_pow_transition: (u128, u128),
         rollup_params_commitment: Buf32,
     ) -> Self {
@@ -142,6 +146,7 @@ impl BatchInfo {
             l1_transition,
             l2_transition,
             l2_blockid,
+            l1_blockid,
             l1_pow_transition,
             rollup_params_commitment,
         }
@@ -153,6 +158,10 @@ impl BatchInfo {
 
     pub fn l2_blockid(&self) -> &L2BlockId {
         &self.l2_blockid
+    }
+
+    pub fn l1_blockid(&self) -> &L1BlockId {
+        &self.l1_blockid
     }
 
     pub fn initial_l1_state_hash(&self) -> &Buf32 {
@@ -249,6 +258,57 @@ impl BootstrapState {
             start_l2_height,
             initial_l2_state,
             total_acc_pow,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
+pub struct CheckpointProofOutput {
+    pub batch_info: BatchInfo,
+    pub bootstrap_state: BootstrapState,
+}
+
+impl CheckpointProofOutput {
+    pub fn new(batch_info: BatchInfo, bootstrap_state: BootstrapState) -> CheckpointProofOutput {
+        Self {
+            batch_info,
+            bootstrap_state,
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
+pub struct CommitmentInfo {
+    pub blockhash: Buf32,
+    pub txid: Buf32,
+    pub wtxid: Buf32,
+}
+
+impl CommitmentInfo {
+    pub fn new(blockhash: Buf32, txid: Buf32, wtxid: Buf32) -> Self {
+        Self {
+            blockhash,
+            txid,
+            wtxid,
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
+pub struct BatchCheckpointWithCommitment {
+    pub batch_checkpoint: BatchCheckpoint,
+    pub commitment: CommitmentInfo,
+}
+
+impl BatchCheckpointWithCommitment {
+    pub fn new(batch_checkpoint: BatchCheckpoint, commitment: CommitmentInfo) -> Self {
+        Self {
+            batch_checkpoint,
+            commitment,
         }
     }
 }

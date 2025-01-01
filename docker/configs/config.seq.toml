@@ -9,7 +9,7 @@ db_retry_count = 5
 sequencer_key = "configs/sequencer.key.hex"
 
 [bitcoind_rpc]
-rpc_url = "bitcoind:18443"
+rpc_url = "bitcoind:18443/wallet/default"
 rpc_user = "rpcuser"
 rpc_password = "rpcpassword"
 network = "regtest"

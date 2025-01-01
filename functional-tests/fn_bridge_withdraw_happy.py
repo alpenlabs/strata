@@ -10,11 +10,11 @@ from strata_utils import (
 from web3 import Web3
 from web3.middleware import SignAndSendRawMiddlewareBuilder
 
+import net_settings
 import testenv
 from constants import (
     PRECOMPILE_BRIDGEOUT_ADDRESS,
     SATS_TO_WEI,
-    UNSPENDABLE_ADDRESS,
 )
 from rollup_params_cfg import RollupConfig
 from utils import get_bridge_pubkey, wait_until
@@ -37,7 +37,10 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        fast_batch_settings = net_settings.get_fast_batch_settings()
+        ctx.set_env(
+            testenv.BasicEnvConfig(pre_generate_blocks=101, rollup_settings=fast_batch_settings)
+        )
 
     def main(self, ctx: flexitest.RunContext):
         address = ctx.env.gen_ext_btc_address()
@@ -142,9 +145,17 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
         self.debug(f"Strata Balance difference: {difference}")
         assert difference == balance_post_withdraw, "balance difference is not expected"
 
-        # Wait for the withdraw address to have a positive balance
-        self.mine_blocks_until_maturity(
-            btcrpc, withdraw_address, btc_url, btc_user, btc_password, original_balance
+        prev_duty_count = 2  # from the two deposits
+        wait_until(
+            lambda: len(seqrpc.strata_getBridgeDuties(0, 0).get("duties", [])) > prev_duty_count,
+            timeout=30,
+        )
+
+        # # Wait for the balance in the withdraw address to increase
+        wait_until(
+            lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password)
+            > original_balance,
+            timeout=30,  # time to process the withdrawal
         )
 
         # Make sure that the balance in the BTC wallet is D BTC - operator's fees
@@ -236,25 +247,3 @@ class BridgeWithdrawHappyTest(testenv.StrataTester):
             "data": data_bytes,
         }
         return web3.eth.estimate_gas(transaction)
-
-    def mine_blocks_until_maturity(
-        self,
-        btcrpc,
-        withdraw_address,
-        btc_url,
-        btc_user,
-        btc_password,
-        original_balance,
-        number_of_blocks=12,
-    ):
-        """
-        Mine blocks until the withdraw address has a positive balance
-        By default, the number of blocks to mine is 12:
-        - 6 blocks to mature the DRT
-        - 6 blocks to mature the DT
-        """
-        btcrpc.proxy.generatetoaddress(number_of_blocks, UNSPENDABLE_ADDRESS)
-        wait_until(
-            lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password)
-            > original_balance
-        )

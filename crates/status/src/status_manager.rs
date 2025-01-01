@@ -117,6 +117,10 @@ impl StatusChannel {
         self.receiver.chs.borrow().clone()
     }
 
+    pub fn client_state(&self) -> ClientState {
+        self.receiver.cl.borrow().clone()
+    }
+
     /// Waits until there's a new client state and returns the client state.
     pub async fn wait_for_client_change(&self) -> Result<ClientState, RecvError> {
         let mut s = self.receiver.cl.clone();

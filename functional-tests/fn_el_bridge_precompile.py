@@ -26,9 +26,6 @@ class ElBridgePrecompileTest(testenv.StrataTester):
         ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
-        self.warning("SKIPPING TEST fn_el_bridge_precompile")
-        return True
-
         reth = ctx.get_service("reth")
         web3: Web3 = reth.create_web3()
 
