@@ -5,8 +5,12 @@ use revm::{
     primitives::{Address, EVMError, SpecId, U256},
     Context, ContextPrecompile, Database,
 };
+use revm_primitives::Precompile;
 
-use crate::constants::{BASEFEE_ADDRESS, FIXED_WITHDRAWAL_WEI};
+use crate::{
+    constants::{BASEFEE_ADDRESS, FIXED_WITHDRAWAL_WEI},
+    precompiles::schnorr::verify_schnorr_precompile,
+};
 
 /// Add rollup specific customizations to EVM
 pub fn set_evm_handles<EXT, DB>(handler: &mut EvmHandler<EXT, DB>)
@@ -19,12 +23,18 @@ where
     let prev_handle = handler.pre_execution.load_precompiles.clone();
     handler.pre_execution.load_precompiles = Arc::new(move || {
         let mut precompiles = prev_handle();
-        precompiles.extend([(
-            crate::precompiles::bridge::BRIDGEOUT_ADDRESS,
-            ContextPrecompile::ContextStateful(Arc::new(
-                crate::precompiles::bridge::BridgeoutPrecompile::new(FIXED_WITHDRAWAL_WEI),
-            )),
-        )]);
+        precompiles.extend([
+            (
+                crate::precompiles::bridge::BRIDGEOUT_ADDRESS,
+                ContextPrecompile::ContextStateful(Arc::new(
+                    crate::precompiles::bridge::BridgeoutPrecompile::new(FIXED_WITHDRAWAL_WEI),
+                )),
+            ),
+            (
+                crate::constants::SCHNORR_ADDRESS,
+                ContextPrecompile::Ordinary(Precompile::Standard(verify_schnorr_precompile)),
+            ),
+        ]);
         precompiles
     });
 

@@ -4,9 +4,15 @@ name = "strata-reth-evm"
 version = "0.1.0"
 
 [dependencies]
+strata-crypto.workspace = true
+strata-primitives.workspace = true
 strata-reth-primitives.workspace = true
 
 alloy-sol-types.workspace = true
 reth-primitives.workspace = true
 revm.workspace = true
 revm-primitives.workspace = true
+
+[dev-dependencies]
+secp256k1 = { workspace = true }
+strata-crypto = { workspace = true, features = ["rand"] }
