@@ -4,12 +4,14 @@ mod constants;
 mod drt;
 mod error;
 mod parse;
+mod schnorr;
 mod taproot;
 
 use drt::{
     deposit_request_transaction, get_balance, get_balance_recovery, get_recovery_address,
     take_back_transaction,
 };
+use schnorr::{sign_schnorr_sig, verify_schnorr_sig};
 use taproot::{
     convert_to_xonly_pk, drain_wallet, extract_p2tr_pubkey, get_address, get_change_address,
     musig_aggregate_pks, unspendable_address,
@@ -32,6 +34,8 @@ fn strata_utils(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_recovery_address, m)?)?;
     m.add_function(wrap_pyfunction!(get_balance, m)?)?;
     m.add_function(wrap_pyfunction!(get_balance_recovery, m)?)?;
+    m.add_function(wrap_pyfunction!(sign_schnorr_sig, m)?)?;
+    m.add_function(wrap_pyfunction!(verify_schnorr_sig, m)?)?;
 
     Ok(())
 }

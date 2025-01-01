@@ -13465,7 +13465,10 @@ dependencies = [
  "reth-primitives",
  "revm",
  "revm-primitives",
+ "strata-crypto",
+ "strata-primitives",
  "strata-reth-primitives",
+ "thiserror",
 ]
 
 [[package]]
