@@ -95,6 +95,19 @@ impl ProofReceipt {
     pub fn public_values(&self) -> &PublicValues {
         &self.public_values
     }
+
+    /// Check if the proof receipt is empty
+    pub fn is_empty(&self) -> bool {
+        self.public_values.is_empty() && self.proof.is_empty()
+    }
+}
+
+impl Default for ProofReceipt {
+    fn default() -> Self {
+        let proof = Proof::new(vec![]);
+        let public_values = PublicValues::new(vec![]);
+        ProofReceipt::new(proof, public_values)
+    }
 }
 
 /// An input to the aggregation program.
