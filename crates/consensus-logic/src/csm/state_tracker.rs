@@ -73,7 +73,7 @@ impl<D: Database> StateTracker<D> {
         debug!(?ev, "Processing event");
 
         #[cfg(feature = "debug-utils")]
-        handle_bail_context!(BailContext::SyncEvent, 9);
+        handle_bail_context!(BailContext::SyncEvent);
 
         // Compute the state transition.
         let outp = client_transition::process_event(&self.cur_state, &ev, db, &self.params)?;

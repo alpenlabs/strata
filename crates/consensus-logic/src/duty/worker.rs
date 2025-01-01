@@ -382,7 +382,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
     match duty {
         Duty::SignBlock(data) => {
             #[cfg(feature = "debug-utils")]
-            handle_bail_context!(BailContext::SignBlock, 9);
+            handle_bail_context!(BailContext::SignBlock);
 
             let target_slot = data.target_slot();
             let parent = data.parent();

@@ -35,11 +35,12 @@ pub static BAIL_RECEIVER: LazyLock<watch::Receiver<Option<BailContext>>> =
 
 #[macro_export]
 macro_rules! handle_bail_context {
-    ($ctx_to_match:expr, $exit_code:expr) => {{
+    ($ctx_to_match:expr) => {{
         let recv = *BAIL_RECEIVER.borrow();
         if let Some(ctx) = recv {
             if ctx == $ctx_to_match {
-                std::process::exit($exit_code);
+                // Error code is success because it is user initiated
+                std::process::exit(0);
             }
         }
     }};

@@ -317,7 +317,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
     match msg {
         ForkChoiceMessage::NewBlock(blkid) => {
             #[cfg(feature = "debug-utils")]
-            handle_bail_context!(BailContext::FcmNewBlock, 9);
+            handle_bail_context!(BailContext::FcmNewBlock);
 
             let block_bundle = fcm_state
                 .get_block_data(&blkid)?
