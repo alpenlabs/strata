@@ -27,6 +27,8 @@ use strata_primitives::params::{Params, SyncParams};
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, DbOpsConfig, RBSeqBlobDb,
 };
+#[cfg(feature = "debug-utils")]
+use strata_rpc_api::StrataDebugApiServer;
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
@@ -41,9 +43,6 @@ use tokio::{
 use tracing::*;
 
 use crate::{args::Args, helpers::*};
-
-#[cfg(feature="debug-utils")]
-use strata_rpc_api::StrataDebugApiServer;
 
 mod args;
 mod config;
@@ -550,9 +549,9 @@ async fn start_rpc(
         .await
         .expect("init: build rpc server");
 
-   #[cfg(feature = "debug-utils")]
-   {
-        let debug_rpc = rpc_server::DebugServerImpl::new();
+    #[cfg(feature = "debug-utils")]
+    {
+        let debug_rpc = rpc_server::DebugServerImpl;
         methods.merge(debug_rpc.into_rpc())?;
     }
 

@@ -19,7 +19,7 @@ strata-evmexec.workspace = true
 strata-key-derivation.workspace = true
 strata-primitives.workspace = true
 strata-rocksdb.workspace = true
-strata-rpc-api.workspace = true
+strata-rpc-api = { workspace = true, default-features = true }
 strata-rpc-types.workspace = true
 strata-rpc-utils.workspace = true
 strata-state.workspace = true
@@ -60,4 +60,4 @@ strata-mmr.workspace = true
 strata-test-utils.workspace = true
 
 [features]
-debug-utils = ["strata-common/debug-utils", "strata-consensus-logic/debug-utils"]
+debug-utils = ["strata-common/debug-utils", "strata-consensus-logic/debug-utils", "strata-rpc-api/debug-utils"]

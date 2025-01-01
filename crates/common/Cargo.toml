@@ -11,7 +11,8 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
 tokio = {workspace = true, optional = true}
+serde = {workspace = true, optional = true}
 thiserror = {workspace = true, optional = true}
 
 [features]
-debug-utils = ["tokio", "thiserror"]
+debug-utils = ["tokio", "thiserror", "serde"]

@@ -3,5 +3,5 @@
 
 pub mod logging;
 
-#[cfg(feature="debug-utils")]
+#[cfg(feature = "debug-utils")]
 pub mod bail_manager;

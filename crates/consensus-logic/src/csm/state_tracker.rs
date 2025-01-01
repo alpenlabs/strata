@@ -3,6 +3,11 @@
 
 use std::sync::Arc;
 
+#[cfg(feature = "debug-utils")]
+use strata_common::{
+    bail_manager::{BailContext, BAIL_RECEIVER},
+    handle_bail_context,
+};
 use strata_db::traits::*;
 use strata_primitives::params::Params;
 use strata_state::{
@@ -10,9 +15,6 @@ use strata_state::{
     operation::{self, ClientUpdateOutput},
 };
 use tracing::*;
-
-#[cfg(feature="debug-utils")]
-use strata_common::bail_manager::BAIL_RECEIVER;
 
 use super::client_transition;
 use crate::errors::Error;
@@ -70,14 +72,8 @@ impl<D: Database> StateTracker<D> {
 
         debug!(?ev, "Processing event");
 
-        // get the BAIL_receiver here
         #[cfg(feature = "debug-utils")]
-        {
-            let recv = BAIL_RECEIVER.borrow().clone();
-            if recv == "test" {
-                std::process::exit(9);
-            }
-        }
+        handle_bail_context!(BailContext::SyncEvent, 9);
 
         // Compute the state transition.
         let outp = client_transition::process_event(&self.cur_state, &ev, db, &self.params)?;

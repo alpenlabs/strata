@@ -7,6 +7,11 @@ use std::{
 };
 
 use strata_btcio::writer::InscriptionHandle;
+#[cfg(feature = "debug-utils")]
+use strata_common::{
+    bail_manager::{BailContext, BAIL_RECEIVER},
+    handle_bail_context,
+};
 use strata_crypto::sign_schnorr_sig;
 use strata_db::traits::*;
 use strata_eectl::engine::ExecEngineCtl;
@@ -376,6 +381,9 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 ) -> Result<(), Error> {
     match duty {
         Duty::SignBlock(data) => {
+            #[cfg(feature = "debug-utils")]
+            handle_bail_context!(BailContext::SignBlock, 9);
+
             let target_slot = data.target_slot();
             let parent = data.parent();
 

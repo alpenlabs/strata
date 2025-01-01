@@ -10,6 +10,7 @@ strata-db.workspace = true
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
 strata-state.workspace = true
+strata-common = {workspace = true, optional = true, features = ["debug-utils"]}
 
 bitcoin.workspace = true
 hex.workspace = true
@@ -21,3 +22,4 @@ thiserror.workspace = true
 [features]
 client = ["jsonrpsee/client"]
 default = []
+debug-utils = ["strata-common"]

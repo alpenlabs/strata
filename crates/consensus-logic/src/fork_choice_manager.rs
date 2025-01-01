@@ -3,6 +3,11 @@
 use std::sync::Arc;
 
 use strata_chaintsn::transition::process_block;
+#[cfg(feature = "debug-utils")]
+use strata_common::{
+    bail_manager::{BailContext, BAIL_RECEIVER},
+    handle_bail_context,
+};
 use strata_db::{
     errors::DbError,
     traits::{BlockStatus, ChainstateDatabase, Database},
@@ -311,6 +316,9 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     match msg {
         ForkChoiceMessage::NewBlock(blkid) => {
+            #[cfg(feature = "debug-utils")]
+            handle_bail_context!(BailContext::FcmNewBlock, 9);
+
             let block_bundle = fcm_state
                 .get_block_data(&blkid)?
                 .ok_or(Error::MissingL2Block(blkid))?;
