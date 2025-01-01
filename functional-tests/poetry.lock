@@ -311,13 +311,13 @@ files = [
 
 [[package]]
 name = "bitcoinlib"
-version = "0.7.0"
+version = "0.7.1"
 description = "Bitcoin cryptocurrency Library"
 optional = false
 python-versions = "*"
 files = [
-    {file = "bitcoinlib-0.7.0-py3-none-any.whl", hash = "sha256:ec826633018bd080f526b98d80494da1beeb42cc87faf64c0041d86a054afc94"},
-    {file = "bitcoinlib-0.7.0.tar.gz", hash = "sha256:a2b0092223a31e54b46efe6fab5128484921632d7d24aea0f00d1653485ff68e"},
+    {file = "bitcoinlib-0.7.1-py3-none-any.whl", hash = "sha256:f1874ed5f7ce6abc95728301feeb445743cc529f36348d41831d793c6c6f10b7"},
+    {file = "bitcoinlib-0.7.1.tar.gz", hash = "sha256:f8caa1388dc57f79050ccda21628b2927ad3d60d20433299e35fc44c8986a767"},
 ]
 
 [package.dependencies]
@@ -329,7 +329,7 @@ requests = ">=2.25.0"
 SQLAlchemy = ">=2.0.20"
 
 [package.extras]
-dev = ["Cython (>=3.0.8)", "coveralls (>=4.0.1)", "mysql-connector-python (>=8.4.0)", "mysqlclient (>=2.2.0)", "psycopg (>=3.1.16)", "scrypt (>=0.8.20)", "sphinx (>=7.1.0)", "sphinx-rtd-theme (>=2.0.0)", "win-unicode-console"]
+dev = ["Cython (>=3.0.8)", "coveralls (>=4.0.1)", "mysql-connector-python (>=8.4.0)", "mysqlclient (>=2.2.0)", "psycopg (>=3.1.16)", "scrypt (>=0.8.20)", "sphinx (>=7.1.0)", "sphinx_rtd_theme (>=2.0.0)", "win-unicode-console"]
 
 [[package]]
 name = "certifi"
@@ -2208,4 +2208,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "d26f40e589c594968b60020846bdb9536837a43fa6481c7ba547de89903b4a31"
+content-hash = "f7a07af464c8de8588e70457ab2fd6d8737387419c1266e50c97395a016f9318"
