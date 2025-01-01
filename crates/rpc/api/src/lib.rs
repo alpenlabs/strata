@@ -152,7 +152,7 @@ pub trait StrataSequencerApi {
     #[method(name = "strata_getLastBroadcastEntry")]
     async fn get_last_broadcast_entry(&self) -> RpcResult<Option<L1TxEntry>>;
 
-    /// Get the broadcast entry by its id
+    /// Get the broadcast entry by its idx
     #[method(name = "strata_getBroadcastEntryByIdx")]
     async fn get_broadcast_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>>;
 

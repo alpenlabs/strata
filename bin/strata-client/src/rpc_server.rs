@@ -719,7 +719,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 
     async fn get_broadcast_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>> {
-        let broadcast_handle = self.broadcast_handle.clone();
+        let broadcast_handle = &self.broadcast_handle;
         let txentry = broadcast_handle.get_tx_entry_by_idx_async(idx).await;
         Ok(txentry.map_err(|e| Error::Other(e.to_string()))?)
     }
@@ -816,7 +816,7 @@ impl StrataDebugRpcImpl {
 #[async_trait]
 impl StrataDebugApiServer for StrataDebugRpcImpl {
     async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>> {
-        let l2_block_manager = self.l2_block_manager.clone();
+        let l2_block_manager = &self.l2_block_manager;
         let l2_block = l2_block_manager
             .get_block_async(&block_id)
             .await

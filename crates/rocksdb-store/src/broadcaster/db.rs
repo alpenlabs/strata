@@ -131,7 +131,19 @@ mod tests {
         let txentry = L1TxEntry::from_tx(&txns[0]);
         (txid, txentry)
     }
+    #[test]
+    fn test_get_last_broadcast_entry() {
+        let db = setup_db();
 
+        for _ in 0..2 {
+            let (txid, txentry) = generate_l1_tx_entry();
+
+            let _ = db.put_tx_entry(txid, txentry.clone()).unwrap();
+            let last_entry = db.get_last_broadcast_entry().unwrap();
+
+            assert_eq!(last_entry, Some(txentry));
+        }
+    }
     #[test]
     fn test_add_tx_new_entry() {
         let db = setup_db();
