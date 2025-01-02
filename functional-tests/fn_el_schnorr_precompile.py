@@ -15,6 +15,15 @@ class SchnorrPrecompileTest(testenv.StrataTester):
         ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
+        """
+        Schnorr Precompile is available at address
+        `0x5400000000000000000000000000000000000002`
+
+        The format required is concatenation of
+        `public_key` , `message_hash` and `schnorr signature` in order
+
+        This test checks for the valid and invalid input for this precompile
+        """
         reth = ctx.get_service("reth")
         self.web3: Web3 = reth.create_web3()
 

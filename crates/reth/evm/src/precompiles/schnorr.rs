@@ -57,7 +57,8 @@ pub fn schnorr_precompile(input: &Bytes, _gas_limit: u64) -> PrecompileResult {
     };
 
     // currently we can use [ecrecover hack](https://hackmd.io/@nZ-twauPRISEa6G9zg3XRw/SyjJzSLt9)
-    // which costs around ~3000 gas. Currently setting it as 0
+    // which costs around ~3000 gas.
+    // setting it as 0, as this requires further discussion
     let gas_cost = 0;
 
     Ok(PrecompileOutput::new(gas_cost, verification_byte))

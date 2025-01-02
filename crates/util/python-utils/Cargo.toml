@@ -13,8 +13,10 @@ name = "strata_utils"
 crate-type = ["cdylib"]
 
 [dependencies]
-shrex = { version = "0.1.0", path = "../shrex", features = ["serde"] }
+strata-primitives.workspace = true
+strata-crypto.workspace = true
 
+shrex = { version = "0.1.0", path = "../shrex", features = ["serde"] }
 bdk_bitcoind_rpc = "0.16.0"
 # TODO: once bdk_wallet 1.0 is released, update this and don't change!
 bdk_wallet = "1.0.0-beta.5"
@@ -25,7 +27,6 @@ reth-primitives.workspace = true
 # TODO: secp256k1 is not used directly in this crate, but through the chain of re-imports from bdk.
 # However, removing this from the dependency list makes it fail to build.
 secp256k1.workspace = true
-strata-primitives.workspace = true
 
 [target.'cfg(target_os = "macos")'.build-dependencies]
 pyo3-build-config = "0.22.6"

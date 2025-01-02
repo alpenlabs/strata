@@ -1,7 +1,9 @@
 use std::str::FromStr;
 
 use pyo3::{pyfunction, PyResult};
-use secp256k1::{schnorr::Signature, Keypair, Message, SecretKey, XOnlyPublicKey, SECP256K1};
+use secp256k1::{schnorr::Signature, Keypair, Message, SecretKey, SECP256K1};
+use strata_crypto::{verify_schnorr_sig as schnorr_sig_verify, sign_schnorr_sig as schnorr_sig_sign};
+use strata_primitives::buf::{Buf32, Buf64};
 
 /// Signs a message using the Schnorr signature scheme.
 ///
@@ -18,15 +20,16 @@ use secp256k1::{schnorr::Signature, Keypair, Message, SecretKey, XOnlyPublicKey,
 /// - The public key corresponding to the secret key, encoded in hexadecimal format.
 #[pyfunction]
 pub(crate) fn sign_schnorr_sig(message: String, secret_key: String) -> PyResult<(String, String)> {
+    let message = Buf32::from_str(&message).expect("invalid message hash");
+    let sk = Buf32::from_str(&secret_key).expect("invalid secret key");
+
+    let sig = schnorr_sig_sign(&message, &sk);
+
+    // get the public key
     let sk = SecretKey::from_str(&secret_key).expect("Invalid secret key");
     let keypair = Keypair::from_secret_key(SECP256K1, &sk);
-    let mut message_hash: [u8; 32] = [0; 32];
-    shrex::decode(&message, &mut message_hash).expect("invalid message hash");
-
-    let message = Message::from_digest(message_hash);
-    let signature = SECP256K1.sign_schnorr(&message, &keypair);
     Ok((
-        shrex::encode(&signature.serialize()),
+        shrex::encode(sig.as_slice()),
         shrex::encode(&keypair.x_only_public_key().0.serialize()),
     ))
 }
@@ -49,12 +52,9 @@ pub(crate) fn sign_schnorr_sig(message: String, secret_key: String) -> PyResult<
 /// A boolean indicating whether the signature is valid (`true`) or invalid (`false`).
 #[pyfunction]
 pub fn verify_schnorr_sig(sig: String, msg: String, pk: String) -> bool {
-    let mut message_hash: [u8; 32] = [0; 32];
-    shrex::decode(&msg, &mut message_hash).expect("invalid message hash");
+    let msg = Buf32::from_str(&msg).expect("invalid message hash");
+    let pk = Buf32::from_str(&pk).expect("invalid public key");
+    let sig = Buf64::from(Signature::from_str(&sig).expect("invalid signature"));
 
-    let msg = Message::from_digest(message_hash);
-    let pk = XOnlyPublicKey::from_str(&pk).expect("invalid public key");
-    let sig = Signature::from_str(&sig).expect("invalid signature");
-
-    sig.verify(&msg, &pk).is_ok()
+    schnorr_sig_verify(&sig, &msg, &pk)
 }

@@ -13401,6 +13401,7 @@ dependencies = [
  "shrex",
  "strata-btcio",
  "strata-common",
+ "strata-crypto",
  "strata-primitives",
  "tokio",
  "tracing",
