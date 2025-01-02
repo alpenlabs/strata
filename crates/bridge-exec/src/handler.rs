@@ -295,13 +295,16 @@ where
             .filter_map(move |msg| {
                 let msg = borsh::from_slice::<BridgeMessage>(&msg.0);
                 if let Ok(msg) = msg {
-                    let payload = msg.payload();
-                    let parsed_payload = borsh::from_slice::<Payload>(payload);
+                    let raw_payload = msg.payload();
+                    let payload = borsh::from_slice::<Payload>(raw_payload);
+                    let raw_scope = msg.scope();
+                    let scope = borsh::from_slice::<Scope>(raw_scope);
+                    debug!(?msg, ?payload, ?scope, "got message from the L2 Client");
 
-                    match parsed_payload {
+                    match payload {
                         Ok(payload) => Some((msg.source_id(), payload)),
-                        Err(err) => {
-                            warn!(?scope, ?payload, error=?err, "skipping faulty message payload");
+                        Err(ref error) => {
+                            warn!(?scope, ?payload, ?error, "skipping faulty message payload");
                             None
                         }
                     }

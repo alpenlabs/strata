@@ -322,6 +322,7 @@ class BridgeClientFactory(flexitest.Factory):
         bitcoind_config: dict,
         ctx: flexitest.EnvContext,
         message_interval: int,
+        duty_timeout_duration: int,
     ):
         idx = self.next_idx()
         name = f"bridge.{idx}"
@@ -343,6 +344,7 @@ class BridgeClientFactory(flexitest.Factory):
             "--btc-pass", bitcoind_config["bitcoind_pass"],
             "--rollup-url", node_url,
             "--message-interval", str(message_interval),
+            "--duty-timeout-duration", str(duty_timeout_duration),
         ]
         # fmt: on
 
