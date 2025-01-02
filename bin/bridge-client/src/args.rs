@@ -76,7 +76,7 @@ pub(crate) struct Cli {
         option,
         description = "max retries for when rpc server fails during duty polling"
     )]
-    pub max_rpc_retry_count: Option<u16>
+    pub max_rpc_retry_count: Option<u16>,
 }
 
 #[derive(Debug, Clone)]

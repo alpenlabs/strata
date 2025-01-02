@@ -14,4 +14,3 @@ pub enum PollDutyError {
     #[error("fetching websocket client from pool failed")]
     WsPool,
 }
-

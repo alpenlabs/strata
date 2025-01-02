@@ -17,7 +17,9 @@ use strata_rpc_types::RpcBridgeDuties;
 use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
 use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeDutyIndexOps};
 use tokio::{task::JoinSet, time::sleep};
-use tracing::{error, info, trace, warn}; use crate::errors::PollDutyError;
+use tracing::{error, info, trace, warn};
+
+use crate::errors::PollDutyError;
 
 pub(super) struct TaskManager<TxBuildContext, Bcast>
 where
@@ -35,15 +37,19 @@ where
     TxBuildContext: BuildContext + Sync + Send + 'static,
     Bcast: Broadcaster + Sync + Send + 'static,
 {
-    pub(super) async fn start(&self, duty_polling_interval: Duration, max_retries: u16) -> anyhow::Result<()> {
+    pub(super) async fn start(
+        &self,
+        duty_polling_interval: Duration,
+        max_retries: u16,
+    ) -> anyhow::Result<()> {
         let mut retries = 0;
         loop {
             match self.poll_duties().await {
                 Ok(RpcBridgeDuties {
-                            duties,
-                            start_index,
-                            stop_index,
-                        }) => {
+                    duties,
+                    start_index,
+                    stop_index,
+                }) => {
                     let mut handles = JoinSet::new();
                     for duty in duties {
                         let exec_handler = self.exec_handler.clone();
@@ -77,7 +83,7 @@ where
                         PollDutyError::RpcError(err) => {
                             error!(%err, "could not get rpc response");
                             retries += 1;
-                            if retries >=  max_retries {
+                            if retries >= max_retries {
                                 error!(%err, "Exceeded maximum retries to acquire client. Failing gracefully");
 
                                 bail!("Exceeded maximum retries to acquire client")
@@ -86,12 +92,12 @@ where
                             // Exponential backoff
                             let delay = Duration::from_secs(1) * 2u32.pow(retries as u32 - 1);
                             sleep(delay).await;
-                        },
+                        }
                         _ => {
                             bail!(err.to_string());
-                        },
+                        }
                     }
-                },
+                }
             }
 
             sleep(duty_polling_interval).await;
