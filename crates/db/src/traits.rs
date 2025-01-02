@@ -333,7 +333,7 @@ pub trait L1BroadcastDatabase {
     fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;
 
     /// Get last broadcast entry
-    fn get_last_broadcast_entry(&self) -> DbResult<Option<L1TxEntry>>;
+    fn get_last_tx_entry(&self) -> DbResult<Option<L1TxEntry>>;
 }
 
 /// Provides access to the implementers of provider and store traits for interacting with the

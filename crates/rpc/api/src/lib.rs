@@ -20,14 +20,6 @@ pub trait StrataApi {
     #[method(name = "getBlocksAtIdx")]
     async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>>;
 
-    /// Get the ChainState at a certain index
-    #[method(name = "getChainstateAtIdx")]
-    async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>>;
-
-    /// Get the ClientState at a certain index
-    #[method(name = "getClientStateAtIdx")]
-    async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>>;
-
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
@@ -149,12 +141,12 @@ pub trait StrataAdminApi {
 #[cfg_attr(feature = "client", rpc(server, client))]
 pub trait StrataSequencerApi {
     /// Get the last broadcast entry
-    #[method(name = "strata_getLastBroadcastEntry")]
-    async fn get_last_broadcast_entry(&self) -> RpcResult<Option<L1TxEntry>>;
+    #[method(name = "strata_getLastTxEntry")]
+    async fn get_last_tx_entry(&self) -> RpcResult<Option<L1TxEntry>>;
 
     /// Get the broadcast entry by its idx
-    #[method(name = "strata_getBroadcastEntryByIdx")]
-    async fn get_broadcast_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>>;
+    #[method(name = "strata_getTxEntryByIdx")]
+    async fn get_tx_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>>;
 
     /// Adds L1Write sequencer duty which will be executed by sequencer
     #[method(name = "strataadmin_submitDABlob")]
@@ -183,4 +175,12 @@ pub trait StrataDebugApi {
     /// Get the block by its id
     #[method(name = "debug_getBlockById")]
     async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>>;
+
+    /// Get the ChainState at a certain index
+    #[method(name = "debug_getChainstateAtIdx")]
+    async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>>;
+
+    /// Get the ClientState at a certain index
+    #[method(name = "debug_getClientStateAtIdx")]
+    async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>>;
 }

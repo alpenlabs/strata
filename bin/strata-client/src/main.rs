@@ -530,7 +530,7 @@ async fn start_rpc(
     // Init RPC impls.
     let strata_rpc = rpc_server::StrataRpcImpl::new(
         status_channel.clone(),
-        database,
+        database.clone(),
         sync_manager,
         l2_block_manager.clone(),
         checkpoint_handle,
@@ -541,7 +541,7 @@ async fn start_rpc(
     let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
     methods.merge(admin_rpc.into_rpc())?;
 
-    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(l2_block_manager);
+    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(l2_block_manager, database);
     methods.merge(debug_rpc.into_rpc())?;
 
     let rpc_host = config.client.rpc_host;

@@ -83,7 +83,7 @@ impl L1BroadcastDatabase for L1BroadcastDb {
         }
     }
 
-    fn get_last_broadcast_entry(&self) -> DbResult<Option<L1TxEntry>> {
+    fn get_last_tx_entry(&self) -> DbResult<Option<L1TxEntry>> {
         if let Some((_, txentry)) = get_last::<BcastL1TxSchema>(self.db.as_ref())? {
             Ok(Some(txentry))
         } else {
@@ -132,14 +132,14 @@ mod tests {
         (txid, txentry)
     }
     #[test]
-    fn test_get_last_broadcast_entry() {
+    fn test_get_last_tx_entry() {
         let db = setup_db();
 
         for _ in 0..2 {
             let (txid, txentry) = generate_l1_tx_entry();
 
             let _ = db.put_tx_entry(txid, txentry.clone()).unwrap();
-            let last_entry = db.get_last_broadcast_entry().unwrap();
+            let last_entry = db.get_last_tx_entry().unwrap();
 
             assert_eq!(last_entry, Some(txentry));
         }

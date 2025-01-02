@@ -123,40 +123,6 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         Ok(block_ids)
     }
 
-    async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
-        let db = self.database.clone();
-        let chain_state = wait_blocking("chain_state_at_idx", move || {
-            db.chain_state_db()
-                .get_toplevel_state(idx)
-                .map_err(Error::Db)
-        })
-        .await?;
-        match chain_state {
-            Some(cs) => Ok(Some(RpcChainState {
-                tip_blkid: cs.chain_tip_blockid(),
-                tip_slot: cs.chain_tip_slot(),
-                cur_epoch: cs.epoch(),
-            })),
-            None => Ok(None),
-        }
-    }
-
-    async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
-        let database = self.database.clone();
-        let cs = wait_blocking("clientstate_at_idx", move || {
-            let client_state_db = database.client_state_db();
-            match reconstruct_state(client_state_db.as_ref(), idx) {
-                Ok(client_state) => Ok(Some(client_state)),
-                Err(e) => {
-                    error!(%idx, %e, "failed to reconstruct client state");
-                    Err(Error::Other(e.to_string()))
-                }
-            }
-        })
-        .await?;
-        Ok(cs)
-    }
-
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
     }
@@ -712,13 +678,13 @@ impl SequencerServerImpl {
 
 #[async_trait]
 impl StrataSequencerApiServer for SequencerServerImpl {
-    async fn get_last_broadcast_entry(&self) -> RpcResult<Option<L1TxEntry>> {
+    async fn get_last_tx_entry(&self) -> RpcResult<Option<L1TxEntry>> {
         let broadcast_handle: Arc<L1BroadcastHandle> = self.broadcast_handle.clone();
-        let txentry = broadcast_handle.get_last_broadcast_entry().await;
+        let txentry = broadcast_handle.get_last_tx_entry().await;
         Ok(txentry.map_err(|e| Error::Other(e.to_string()))?)
     }
 
-    async fn get_broadcast_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>> {
+    async fn get_tx_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>> {
         let broadcast_handle = &self.broadcast_handle;
         let txentry = broadcast_handle.get_tx_entry_by_idx_async(idx).await;
         Ok(txentry.map_err(|e| Error::Other(e.to_string()))?)
@@ -803,18 +769,22 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 }
 
-pub struct StrataDebugRpcImpl {
+pub struct StrataDebugRpcImpl<D> {
     l2_block_manager: Arc<L2BlockManager>,
+    database: Arc<D>,
 }
 
-impl StrataDebugRpcImpl {
-    pub fn new(l2_block_manager: Arc<L2BlockManager>) -> Self {
-        Self { l2_block_manager }
+impl<D: Database + Sync + Send + 'static> StrataDebugRpcImpl<D> {
+    pub fn new(l2_block_manager: Arc<L2BlockManager>, database: Arc<D>) -> Self {
+        Self {
+            l2_block_manager,
+            database,
+        }
     }
 }
 
 #[async_trait]
-impl StrataDebugApiServer for StrataDebugRpcImpl {
+impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRpcImpl<D> {
     async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>> {
         let l2_block_manager = &self.l2_block_manager;
         let l2_block = l2_block_manager
@@ -823,5 +793,38 @@ impl StrataDebugApiServer for StrataDebugRpcImpl {
             .map_err(Error::Db)?
             .map(|b| b.block().clone());
         Ok(l2_block)
+    }
+    async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
+        let db = self.database.clone();
+        let chain_state = wait_blocking("chain_state_at_idx", move || {
+            db.chain_state_db()
+                .get_toplevel_state(idx)
+                .map_err(Error::Db)
+        })
+        .await?;
+        match chain_state {
+            Some(cs) => Ok(Some(RpcChainState {
+                tip_blkid: cs.chain_tip_blockid(),
+                tip_slot: cs.chain_tip_slot(),
+                cur_epoch: cs.epoch(),
+            })),
+            None => Ok(None),
+        }
+    }
+
+    async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
+        let database = self.database.clone();
+        let cs = wait_blocking("clientstate_at_idx", move || {
+            let client_state_db = database.client_state_db();
+            match reconstruct_state(client_state_db.as_ref(), idx) {
+                Ok(client_state) => Ok(Some(client_state)),
+                Err(e) => {
+                    error!(%idx, %e, "failed to reconstruct client state");
+                    Err(Error::Other(e.to_string()))
+                }
+            }
+        })
+        .await?;
+        Ok(cs)
     }
 }
