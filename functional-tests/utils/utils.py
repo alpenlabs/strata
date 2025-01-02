@@ -196,11 +196,8 @@ def submit_checkpoint(
     last_published_txid = seqrpc.strata_l1status()["last_published_txid"]
 
     # Post checkpoint proof
-    # FIXME/NOTE: Since operating in timeout mode is supported, i.e. sequencer
-    # will post empty post if prover doesn't submit proofs in time, we can send
-    # empty proof hex.
-    # NOTE: The functional tests for verifying proofs need to provide non-empty
-    # proofs
+    # NOTE: Since operating in timeout mode is supported, i.e. sequencer
+    # will post empty proof if prover doesn't submit proofs in time.
     proof_keys = prover_rpc.dev_strata_proveCheckpoint(idx)
     proof_key = proof_keys[0]
     wait_for_proof_with_time_out(prover_rpc, proof_key, time_out=100)
