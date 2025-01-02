@@ -2,6 +2,7 @@ use std::io::{self, Cursor, Write};
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::{
     buf::{Buf32, Buf64},
     hash,
@@ -20,7 +21,9 @@ pub trait L2Header {
 }
 
 /// Block header that forms the chain we use to reach consensus.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Serialize, Deserialize,
+)]
 pub struct L2BlockHeader {
     /// Block index, obviously.
     pub(crate) block_idx: u64,
