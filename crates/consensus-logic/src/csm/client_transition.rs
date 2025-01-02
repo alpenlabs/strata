@@ -410,11 +410,12 @@ pub fn filter_verified_checkpoints(
 
     for checkpoint in checkpoints {
         let curr_idx = checkpoint.batch_info().idx;
+        let proof_receipt = checkpoint.get_proof_receipt();
         if curr_idx != expected_idx {
             warn!(%expected_idx, %curr_idx, "Received invalid checkpoint idx, ignoring.");
             continue;
         }
-        if expected_idx == 0 && verify_proof(checkpoint, params).is_ok() {
+        if expected_idx == 0 && verify_proof(checkpoint, &proof_receipt, params).is_ok() {
             result_checkpoints.push(checkpoint.clone());
             last_valid_checkpoint = Some(checkpoint.batch_info());
         } else if expected_idx == 0 {
@@ -437,7 +438,7 @@ pub fn filter_verified_checkpoints(
                 warn!(obtained = ?l2_tsn.0, expected = ?last_l2_tsn.1, "Received invalid checkpoint l2 transition, ignoring.");
                 continue;
             }
-            if verify_proof(checkpoint, params).is_ok() {
+            if verify_proof(checkpoint, &proof_receipt, params).is_ok() {
                 result_checkpoints.push(checkpoint.clone());
                 last_valid_checkpoint = Some(checkpoint.batch_info());
             } else {
