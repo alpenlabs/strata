@@ -30,7 +30,7 @@ pub fn get_host(id: &ProofContext) -> NativeHost {
         },
         ProofContext::L1Batch(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_l1_batch_proof(zkvm, &MOCK_VK);
+                process_l1_batch_proof(zkvm);
                 Ok(())
             })),
         },

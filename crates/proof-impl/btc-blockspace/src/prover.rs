@@ -20,15 +20,13 @@ impl ZkVmProver for BtcBlockspaceProver {
     where
         B: ZkVmInputBuilder<'a>,
     {
-        let mut input_builder = B::new();
-        input_builder.write_serde(&input.rollup_params)?;
-        input_builder.write_serde(&input.blocks.len())?;
+        let serialized_block = serialize(&input.block);
+        let zkvm_input = B::new()
+            .write_serde(&input.rollup_params)?
+            .write_buf(&serialized_block)?
+            .build()?;
 
-        for block in &input.blocks {
-            input_builder.write_buf(&serialize(block))?;
-        }
-
-        input_builder.build()
+        Ok(zkvm_input)
     }
 
     fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>

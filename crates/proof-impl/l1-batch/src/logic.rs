@@ -1,7 +1,7 @@
-use bitcoin::{block::Header, consensus::deserialize};
+use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::buf::Buf32;
-use strata_proofimpl_btc_blockspace::logic::BlockScanProofOutput;
+use strata_primitives::{buf::Buf32, params::RollupParams};
+use strata_proofimpl_btc_blockspace::scan::process_blockscan;
 use strata_state::{
     batch::BatchCheckpoint,
     l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot},
@@ -25,34 +25,26 @@ impl L1BatchProofOutput {
     }
 }
 
-pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv, btc_blockspace_vk: &[u32; 8]) {
+pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
     let mut state: HeaderVerificationState = zkvm.read_borsh();
 
+    let rollup_params: RollupParams = zkvm.read_serde();
     let num_inputs: u32 = zkvm.read_serde();
     assert!(num_inputs > 0);
 
     let initial_snapshot = state.compute_snapshot();
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
-    let mut rollup_params_commitment = None;
 
     for _ in 0..num_inputs {
-        let blkpo: BlockScanProofOutput = zkvm.read_verified_borsh(btc_blockspace_vk);
-
-        for blockscan_result in blkpo.blockscan_results {
-            let header: Header = deserialize(&blockscan_result.header_raw).unwrap();
-            state.check_and_update_continuity(&header, &get_btc_params());
-            deposits.extend(blockscan_result.deposits);
-            prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);
-        }
-
-        // Ensure that the rollup parameters used are same for all blocks
-        if let Some(filters_comm) = rollup_params_commitment {
-            assert_eq!(blkpo.rollup_params_commitment, filters_comm);
-        } else {
-            rollup_params_commitment = Some(blkpo.rollup_params_commitment);
-        }
+        let serialized_block = zkvm.read_buf();
+        let block: Block = deserialize(&serialized_block).unwrap();
+        let blockscan_result = process_blockscan(&block, &rollup_params);
+        state.check_and_update_continuity(&block.header, &get_btc_params());
+        deposits.extend(blockscan_result.deposits);
+        prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);
     }
+
     let final_snapshot = state.compute_snapshot();
 
     let output = L1BatchProofOutput {
@@ -60,7 +52,7 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv, btc_blockspace_vk: &[u32; 8])
         prev_checkpoint,
         initial_snapshot,
         final_snapshot,
-        rollup_params_commitment: rollup_params_commitment.unwrap(),
+        rollup_params_commitment: rollup_params.compute_hash(),
     };
 
     zkvm.commit_borsh(&output);
