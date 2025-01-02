@@ -65,18 +65,16 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         # We need to wait for the tx to be published to L1
         time.sleep(0.5)
         # Test reorg, without pruning anything, let mempool and wallet retain the txs
-        check_nth_checkpoint_finalized_on_reorg(idx + 1, seq, btc, prover)
+        check_nth_checkpoint_finalized_on_reorg(ctx, idx + 1, seq, btcrpc, prover_rpc)
 
 
 def check_nth_checkpoint_finalized_on_reorg(
-    checkpt_idx: int, seq: Service, btc: Service, prover: Service
+    ctx: flexitest.RunContext, checkpt_idx: int, seq: Service, btcrpc, prover_rpc
 ):
     # Now submit another checkpoint proof and produce a couple of blocks(less than reorg depth)
     seqrpc = seq.create_rpc()
-    btcrpc = btc.create_rpc()
-    prover_rpc = prover.create_rpc()
-
     seq_addr = seq.get_prop("address")
+
     cfg: RollupConfig = ctx.env.rollup_cfg()
     finality_depth = cfg.l1_reorg_safe_depth
     manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth, seq_addr)

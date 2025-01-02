@@ -6,6 +6,6 @@ pub mod reader;
 pub mod rpc;
 pub mod status;
 
-// #[cfg(feature = "test_utils")]
+#[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod writer;

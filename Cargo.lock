@@ -13031,7 +13031,6 @@ dependencies = [
  "strata-crypto",
  "strata-db",
  "strata-eectl",
- "strata-native-zkvm-adapter",
  "strata-primitives",
  "strata-risc0-adapter",
  "strata-rocksdb",
