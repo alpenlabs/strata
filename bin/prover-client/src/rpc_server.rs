@@ -173,7 +173,9 @@ impl StrataProverClientApiServer for ProverClientRpc {
         match proof {
             // If proof is in DB, it was completed
             Some(_) => Ok(format!("{:?}", ProvingTaskStatus::Completed)),
-            // If proof is in not in DB, task_tracker should know it, or it doesn't exist
+            // If proof is in not in DB:
+            // - Either the status of the task is in task_tracker
+            // - Or the task is invalid
             None => {
                 let status = self
                     .task_tracker
