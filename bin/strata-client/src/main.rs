@@ -32,9 +32,7 @@ use strata_rocksdb::{
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
-    managers::{create_db_manager, DbManager},
-    ops::bridge_relay::BridgeMsgOps,
-    L2BlockManager,
+    create_node_storage, ops::bridge_relay::BridgeMsgOps, L2BlockManager, NodeStorage,
 };
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
@@ -100,7 +98,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Initialize core databases
     let database = init_core_dbs(rbdb.clone(), ops_config);
-    let manager = create_db_manager(database.clone(), pool.clone());
+    let manager = create_node_storage(database.clone(), pool.clone());
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
@@ -300,7 +298,7 @@ fn start_core_tasks(
     config: &Config,
     params: Arc<Params>,
     database: Arc<CommonDb>,
-    managers: &DbManager,
+    storage: &NodeStorage,
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
@@ -311,7 +309,7 @@ fn start_core_tasks(
         config,
         database.clone(),
         params.as_ref(),
-        managers.l2().clone(),
+        storage.l2().clone(),
         executor.handle(),
     )?;
 
@@ -327,7 +325,7 @@ fn start_core_tasks(
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
         database.clone(),
-        managers,
+        storage,
         engine.clone(),
         pool.clone(),
         params.clone(),
@@ -359,7 +357,7 @@ fn start_core_tasks(
         pool,
         params,
         sync_manager,
-        l2_block_manager: managers.l2().clone(),
+        l2_block_manager: storage.l2().clone(),
         status_channel,
         engine,
         relayer_handle,
