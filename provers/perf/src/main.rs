@@ -227,7 +227,8 @@ async fn post_to_github_pr(
         let comment_url = existing_comment["url"].as_str().unwrap();
         let response = client
             .patch(comment_url)
-            .header("Authorization", format!("token {}", &args.github_token))
+            .header("Authorization", format!("Bearer {}", &args.github_token))
+            .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "strata-perf-bot")
             .json(&json!({
                 "body": message
@@ -242,7 +243,8 @@ async fn post_to_github_pr(
         // Create a new comment
         let response = client
             .post(&comments_url)
-            .header("Authorization", format!("token {}", &args.github_token))
+            .header("Authorization", format!("Bearer {}", &args.github_token))
+            .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "strata-perf-bot")
             .json(&json!({
                 "body": message
