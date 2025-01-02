@@ -2,7 +2,9 @@ use std::str::FromStr;
 
 use pyo3::{pyfunction, PyResult};
 use secp256k1::{schnorr::Signature, Keypair, Message, SecretKey, SECP256K1};
-use strata_crypto::{verify_schnorr_sig as schnorr_sig_verify, sign_schnorr_sig as schnorr_sig_sign};
+use strata_crypto::{
+    sign_schnorr_sig as schnorr_sig_sign, verify_schnorr_sig as schnorr_sig_verify,
+};
 use strata_primitives::buf::{Buf32, Buf64};
 
 /// Signs a message using the Schnorr signature scheme.

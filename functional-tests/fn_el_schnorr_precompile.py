@@ -38,17 +38,17 @@ class SchnorrPrecompileTest(testenv.StrataTester):
         (signature, public_key) = sign_schnorr_sig(message_hash, secret_key)
 
         valid_precompile_input = public_key + message_hash + signature
-        data = self.call_precompile_and_get_return_data(valid_precompile_input)
+        data = self.wait_for_precompile_response(valid_precompile_input)
         assert data == "0x01", f"Schnorr verification failed: expected '0x01', got '{data}'."
 
         invalid_message = hashlib.sha256(b"MakaluStrata").hexdigest()
         invalid_precompile_input = public_key + invalid_message + signature
-        data = self.call_precompile_and_get_return_data(invalid_precompile_input)
+        data = self.wait_for_precompile_response(invalid_precompile_input)
         assert data == "0x00", f"Schnorr verification failed: expected '0x00', got '{data}'."
 
         return True
 
-    def call_precompile_and_get_return_data(self, precompile_input: str):
+    def wait_for_precompile_response(self, precompile_input: str):
         assert self.web3.is_connected(), "cannot connect to reth"
         txid = self.schnorr_precompile(precompile_input)
 
