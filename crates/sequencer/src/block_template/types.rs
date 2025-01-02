@@ -1,17 +1,13 @@
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "debug-utils")]
+use strata_common::bail_manager::{check_bail_trigger, BAIL_DUTY_SIGN_BLOCK};
 use strata_primitives::{buf::Buf64, l2::L2BlockId};
 use strata_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SequencerDuty {
-    SignBlock(u64, L2BlockId),
-    // SignCheckpoint(..)
-    // ..
-}
-
+/// Block template with header, body, and accessory.
 #[derive(Debug, Clone)]
 pub struct BlockTemplateFull {
     header: L2BlockHeader,
@@ -37,6 +33,8 @@ impl BlockTemplateFull {
     }
 
     pub fn complete_block_template(self, completion: BlockCompletionData) -> L2BlockBundle {
+        #[cfg(feature = "debug-utils")]
+        check_bail_trigger(BAIL_DUTY_SIGN_BLOCK);
         let BlockTemplateFull {
             header,
             body,
@@ -50,6 +48,7 @@ impl BlockTemplateFull {
     }
 }
 
+/// Block template with only sufficient info for signing to be passed for signing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockTemplate {
     header: L2BlockHeader,

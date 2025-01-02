@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use strata_block_assembly::{BlockCompletionData, BlockGenerationConfig, SequencerDuty};
-use strata_consensus_logic::duty::types::IdentityData;
 use strata_rpc_api::StrataSequencerApiClient;
-use strata_state::id::L2BlockId;
+use strata_sequencer::{
+    block_template::{BlockCompletionData, BlockGenerationConfig},
+    types::{BlockSigningDuty, Duty, IdentityData},
+};
 use thiserror::Error;
 use tokio::{runtime::Handle, sync::mpsc};
 use tracing::error;
@@ -20,7 +21,7 @@ enum DutyExecError {
 
 pub(crate) async fn duty_executor_worker<R>(
     rpc: Arc<R>,
-    mut duty_rx: mpsc::Receiver<SequencerDuty>,
+    mut duty_rx: mpsc::Receiver<Duty>,
     handle: Handle,
     idata: IdentityData,
 ) -> anyhow::Result<()>
@@ -34,14 +35,13 @@ where
     Ok(())
 }
 
-async fn handle_duty<R>(rpc: Arc<R>, duty: SequencerDuty, idata: IdentityData)
+async fn handle_duty<R>(rpc: Arc<R>, duty: Duty, idata: IdentityData)
 where
     R: StrataSequencerApiClient + Send + Sync,
 {
     let duty_fut = match duty.clone() {
-        SequencerDuty::SignBlock(slot, parent_blockid) => {
-            handle_sign_block_duty(rpc, slot, parent_blockid, idata)
-        }
+        Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, idata),
+        Duty::CommitBatch(_duty) => todo!(),
     };
 
     if let Err(e) = duty_fut.await {
@@ -51,8 +51,7 @@ where
 
 async fn handle_sign_block_duty<R>(
     rpc: Arc<R>,
-    _slot: u64,
-    parent_blockid: L2BlockId,
+    duty: BlockSigningDuty,
     idata: IdentityData,
 ) -> Result<(), DutyExecError>
 where
@@ -60,7 +59,7 @@ where
 {
     // should this keep track of previously signed slots and dont sign conflicting blocks ?
     let template = rpc
-        .get_block_template(BlockGenerationConfig::from_parent_block_id(parent_blockid))
+        .get_block_template(BlockGenerationConfig::from_parent_block_id(duty.parent()))
         .await
         .map_err(DutyExecError::GenerateTemplate)?;
 

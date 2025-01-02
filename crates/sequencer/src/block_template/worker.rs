@@ -1,6 +1,5 @@
 use std::time;
 
-use strata_consensus_logic::duty::block_assembly::prepare_block;
 use strata_db::traits::{Database, L2BlockDatabase};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
@@ -9,14 +8,18 @@ use strata_status::StatusChannel;
 use tokio::sync::mpsc;
 
 use crate::{
-    BlockGenerationConfig, BlockTemplate, BlockTemplateFull, BlockTemplateManager, Error,
-    TemplateManagerRequest,
+    block_assembly::prepare_block,
+    block_template::{
+        BlockGenerationConfig, BlockTemplate, BlockTemplateFull, BlockTemplateManager, Error,
+        TemplateManagerRequest,
+    },
 };
 
 fn now_millis() -> u64 {
     time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64
 }
 
+/// Worker task for block template manager.
 pub async fn template_manager_worker<D, E>(
     mut manager: BlockTemplateManager<D, E>,
     mut rx: mpsc::Receiver<TemplateManagerRequest>,
@@ -95,16 +98,8 @@ fn generate_block_template_inner<D: Database, E: ExecEngineCtl>(
     // latest l1 view from client state
     let l1_state = status_channel.l1_view();
 
-    let (header, body, accessory) = prepare_block(
-        slot,
-        parent_block_id,
-        parent,
-        &l1_state,
-        ts,
-        database,
-        engine,
-        params,
-    )?;
+    let (header, body, accessory) =
+        prepare_block(slot, parent, &l1_state, ts, database, engine, params)?;
 
     Ok(BlockTemplateFull::new(header, body, accessory))
 }

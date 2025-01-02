@@ -20,7 +20,7 @@ use strata_state::{
 };
 use strata_status::StatusChannel;
 
-use crate::{BlockCompletionData, BlockTemplate, BlockTemplateFull, Error};
+use crate::block_template::{BlockCompletionData, BlockTemplate, BlockTemplateFull, Error};
 
 #[derive(Debug)]
 pub struct BlockTemplateManager<D, E> {
@@ -54,20 +54,20 @@ where
         }
     }
 
-    pub fn insert_template(&mut self, block_id: L2BlockId, template: BlockTemplateFull) {
+    pub(crate) fn insert_template(&mut self, block_id: L2BlockId, template: BlockTemplateFull) {
         let parent = *template.header().parent();
         self.pending_templates.insert(block_id, template);
         self.pending_by_parent.insert(parent, block_id);
     }
 
-    pub fn get_block_template(&self, block_id: L2BlockId) -> Result<BlockTemplate, Error> {
+    pub(crate) fn get_block_template(&self, block_id: L2BlockId) -> Result<BlockTemplate, Error> {
         self.pending_templates
             .get(&block_id)
             .map(BlockTemplate::from_full_ref)
             .ok_or(Error::UnknownBlockId(block_id))
     }
 
-    pub fn get_block_template_by_parent(
+    pub(crate) fn get_block_template_by_parent(
         &self,
         parent_block_id: L2BlockId,
     ) -> Result<BlockTemplate, Error> {
@@ -79,7 +79,7 @@ where
         self.get_block_template(*block_id)
     }
 
-    pub fn complete_block_template(
+    pub(crate) fn complete_block_template(
         &mut self,
         block_id: L2BlockId,
         completion: BlockCompletionData,

@@ -1,0 +1,44 @@
+[package]
+edition = "2021"
+name = "strata-sequencer"
+version = "0.1.0"
+
+[dependencies]
+strata-chaintsn.workspace = true
+strata-common = { workspace = true, optional = true }
+strata-consensus-logic.workspace = true
+strata-crypto = { workspace = true, default-features = true }
+strata-db.workspace = true
+strata-eectl.workspace = true
+strata-primitives.workspace = true
+strata-state.workspace = true
+strata-status.workspace = true
+strata-storage.workspace = true
+strata-tasks.workspace = true
+
+anyhow.workspace = true
+borsh.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+threadpool.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+# rand = { version = "0.8.5", features = ["getrandom", "std_rng"] }
+# strata-db = { workspace = true, features = ["stubs"] }
+# strata-rocksdb = { workspace = true, features = ["test_utils"] }
+strata-test-utils.workspace = true
+
+[lints]
+rust.missing_debug_implementations = "warn"
+# rust.missing_docs = "warn"
+rust.rust_2018_idioms = { level = "deny", priority = -1 }
+rust.unreachable_pub = "warn"
+rust.unused_crate_dependencies = "deny"
+rust.unused_must_use = "deny"
+# rustdoc.all = "warn"
+
+[features]
+debug-utils = ["strata-common/debug-utils"]

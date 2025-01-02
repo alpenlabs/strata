@@ -2,8 +2,8 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Address, BlockHash};
 use jsonrpsee::Methods;
+use parking_lot::lock_api::RwLock;
 use rpc_client::sync_client;
-use strata_block_assembly::{template_manager_worker, BlockTemplateManager, TemplateManagerHandle};
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
@@ -14,7 +14,6 @@ use strata_common::logging;
 use strata_config::{ClientMode, Config, SequencerConfig};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle,
-    duty::{types::DutyBatch, worker as duty_worker},
     genesis,
     sync_manager::{self, SyncManager},
 };
@@ -32,6 +31,11 @@ use strata_rocksdb::{
 use strata_rpc_api::{
     StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
 };
+use strata_sequencer::{
+    block_template::{template_manager_worker, BlockTemplateManager, TemplateManagerHandle},
+    types::DutyTracker,
+    worker as duty_worker,
+};
 use strata_status::StatusChannel;
 use strata_storage::{
     create_node_storage, ops::bridge_relay::BridgeMsgOps, L2BlockManager, NodeStorage,
@@ -40,7 +44,7 @@ use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{
     runtime::Handle,
-    sync::{broadcast, mpsc, oneshot},
+    sync::{mpsc, oneshot},
 };
 use tracing::*;
 
@@ -386,16 +390,12 @@ fn start_sequencer_tasks(
         sync_manager,
         l2_block_manager,
         status_channel,
-        engine,
         bitcoin_client,
         ..
     } = ctx.clone();
 
     info!(seqkey_path = ?sequencer_config.sequencer_key, "initing sequencer duties task");
     let idata = load_seqkey(&sequencer_config.sequencer_key)?;
-
-    // Set up channel and clone some things.
-    let (duties_tx, duties_rx) = broadcast::channel::<DutyBatch>(8);
 
     // Use provided address or generate an address owned by the sequencer's bitcoin wallet
     let sequencer_bitcoin_address = match sequencer_config.sequencer_bitcoin_address.as_ref() {
@@ -425,6 +425,7 @@ fn start_sequencer_tasks(
     )?;
 
     let template_manager_handle = start_template_manager_task(ctx, executor);
+    let duty_tracker = Arc::new(RwLock::new(DutyTracker::new_empty()));
 
     let admin_rpc = rpc_server::SequencerServerImpl::new(
         envelope_handle.clone(),
@@ -434,6 +435,7 @@ fn start_sequencer_tasks(
         template_manager_handle,
         sync_manager.clone(),
         l2_block_manager.clone(),
+        duty_tracker.clone(),
     );
     methods.merge(admin_rpc.into_rpc())?;
 
@@ -445,31 +447,14 @@ fn start_sequencer_tasks(
     executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
         duty_worker::duty_tracker_task(
             shutdown,
+            duty_tracker,
             cupdate_rx,
-            duties_tx,
             idata.ident,
             t_database,
             t_l2_block_manager,
             t_params,
         )
         .map_err(Into::into)
-    });
-
-    let d_executor = executor.clone();
-    executor.spawn_critical("duty_worker::duty_dispatch_task", move |shutdown| {
-        duty_worker::duty_dispatch_task(
-            shutdown,
-            d_executor,
-            duties_rx,
-            idata.key,
-            sync_manager,
-            database,
-            engine,
-            envelope_handle,
-            pool,
-            params,
-            checkpoint_handle,
-        )
     });
 
     Ok(())

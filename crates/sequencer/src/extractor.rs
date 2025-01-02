@@ -1,10 +1,12 @@
+//! Extracts new duties for sequencer for a given consensus state.
+
 use strata_db::traits::ChainstateDatabase;
 use strata_primitives::{buf::Buf32, params::Params};
 use strata_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
 use tracing::*;
 
 use super::types::{BlockSigningDuty, Duty, Identity};
-use crate::{duty::types::BatchCheckpointDuty, errors::Error};
+use crate::{errors::Error, types::BatchCheckpointDuty};
 
 /// Extracts new duties given a consensus state and a identity.
 pub fn extract_duties(

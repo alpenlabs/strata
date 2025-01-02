@@ -1,30 +1,21 @@
-//! Impl logic for the block assembly duties.
-#![allow(unused)]
+use std::{thread, time};
 
-use std::{sync::Arc, thread, time};
-
-use bitcoin::Transaction;
-use strata_crypto::sign_schnorr_sig;
-use strata_db::traits::{
-    ChainstateDatabase, ClientStateDatabase, Database, L1Database, L2BlockDatabase,
-};
+use strata_consensus_logic::errors::Error;
+use strata_db::traits::{ChainstateDatabase, Database, L1Database};
 use strata_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
     errors::EngineError,
     messages::{ExecPayloadData, PayloadEnv},
 };
 use strata_primitives::{
-    buf::{Buf32, Buf64},
+    buf::Buf32,
     params::{Params, RollupParams},
 };
 use strata_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
-    bridge_ops::DepositIntent,
     chain_state::Chainstate,
-    client_state::{ClientState, LocalL1State},
-    exec_update::{
-        construct_ops_from_deposit_intents, ELDepositData, ExecUpdate, Op, UpdateOutput,
-    },
+    client_state::LocalL1State,
+    exec_update::construct_ops_from_deposit_intents,
     header::L2BlockHeader,
     l1::{DepositUpdateTx, L1HeaderPayload, L1HeaderRecord},
     prelude::*,
@@ -33,89 +24,15 @@ use strata_state::{
 };
 use tracing::*;
 
-use super::types::*;
-use crate::errors::Error;
-
 /// Max number of L1 block entries to include per L2Block.
 /// This is relevant when sequencer starts at L1 height >> genesis height
 /// to prevent L2Block from becoming very large in size.
 const MAX_L1_ENTRIES_PER_BLOCK: usize = 100;
 
-/// Signs and stores a block in the database.  Does not submit it to the
-/// forkchoice manager.
-// TODO pass in the CSM state we're using to assemble this
-pub(super) fn sign_and_store_block<D: Database, E: ExecEngineCtl>(
-    slot: u64,
-    prev_block_id: L2BlockId,
-    l1_state: &LocalL1State,
-    ik: &IdentityKey,
-    database: &D,
-    engine: &E,
-    params: &Arc<Params>,
-) -> Result<Option<(L2BlockId, L2Block)>, Error> {
-    let l2_db = database.l2_db();
-
-    // Check the block we were supposed to build isn't already in the database,
-    // if so then just republish that.  This checks that there just if we have a
-    // block at that height, which for now is the same thing.
-    let blocks_at_slot = l2_db.get_blocks_at_height(slot)?;
-    if !blocks_at_slot.is_empty() {
-        // FIXME Should we be more verbose about this?
-        warn!(%slot, "was turn to propose block, but found block in database already");
-        return Ok(None);
-    }
-
-    // Figure out some general data about the slot and the previous state.
-    let ts = now_millis();
-
-    let prev_block = l2_db
-        .get_block_data(prev_block_id)?
-        .ok_or(Error::MissingL2Block(prev_block_id))?;
-
-    // TODO: get from rollup config
-    let block_time = params.rollup().block_time;
-    let target_ts = prev_block.block().header().timestamp() + block_time;
-    let current_ts = now_millis();
-
-    // If it's too early to produce the block, wait a bit.
-    if current_ts < target_ts {
-        let sleep_dur = target_ts - current_ts;
-        trace!(%current_ts, %target_ts, sleep_dur, "too early, waiting to produce block");
-        thread::sleep(time::Duration::from_millis(sleep_dur));
-    }
-
-    let ts = now_millis();
-
-    let (header, body, block_acc) = prepare_block(
-        slot,
-        prev_block_id,
-        prev_block,
-        l1_state,
-        ts,
-        database,
-        engine,
-        params.as_ref(),
-    )?;
-
-    let header_sig = sign_header(&header, ik);
-    let signed_header = SignedL2BlockHeader::new(header, header_sig);
-
-    let blkid = signed_header.get_blockid();
-    let final_block = L2Block::new(signed_header, body);
-    let final_bundle = L2BlockBundle::new(final_block.clone(), block_acc);
-    info!(?blkid, "finished building new block");
-
-    // Store the block in the database.
-    let l2_db = database.l2_db();
-    l2_db.put_block_data(final_bundle)?;
-    debug!(?blkid, "wrote block to datastore");
-    todo!()
-}
-
-#[allow(clippy::too_many_arguments)]
+/// Build contents for a new L2 block with the provided configuration.
+/// Needs to be signed to be a valid L2Block.
 pub fn prepare_block<D: Database, E: ExecEngineCtl>(
     slot: u64,
-    prev_block_id: L2BlockId,
     prev_block: L2BlockBundle,
     l1_state: &LocalL1State,
     ts: u64,
@@ -123,6 +40,7 @@ pub fn prepare_block<D: Database, E: ExecEngineCtl>(
     engine: &E,
     params: &Params,
 ) -> Result<(L2BlockHeader, L2BlockBody, L2BlockAccessory), Error> {
+    let prev_block_id = prev_block.header().get_blockid();
     debug!("preparing block");
     let l1_db = database.l1_db();
     let chs_db = database.chain_state_db();
@@ -171,7 +89,7 @@ pub fn prepare_block<D: Database, E: ExecEngineCtl>(
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
-    let (post_state, wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
+    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
 
     let new_state_root = post_state.compute_state_root();
 
@@ -185,7 +103,7 @@ fn prepare_l1_segment(
     prev_chstate: &Chainstate,
     l1_db: &impl L1Database,
     max_l1_entries: usize,
-    params: &RollupParams,
+    _params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     let unacc_blocks = local_l1_state.unacc_blocks_iter().collect::<Vec<_>>();
     trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
@@ -279,7 +197,7 @@ fn fetch_deposit_update_txs(
     for tx_ref in relevant_tx_ref {
         let tx = l1_db.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
 
-        if let Deposit(dep) = tx.protocol_operation() {
+        if let Deposit(_dep) = tx.protocol_operation() {
             deposit_update_txs.push(DepositUpdateTx::new(tx, tx_ref.position()));
         }
     }
@@ -358,10 +276,10 @@ fn find_pivot_block_height<'c>(
 /// Prepares the execution segment for the block.
 #[allow(clippy::too_many_arguments)]
 fn prepare_exec_data<E: ExecEngineCtl>(
-    slot: u64,
+    _slot: u64,
     timestamp: u64,
     prev_l2_blkid: L2BlockId,
-    prev_global_sr: Buf32,
+    _prev_global_sr: Buf32,
     prev_chstate: &Chainstate,
     safe_l1_block: Buf32,
     engine: &E,
@@ -391,7 +309,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
 
     // Reassemble it into an exec update.
     let exec_update = payload_data.exec_update().clone();
-    let applied_ops = payload_data.ops();
+    let _applied_ops = payload_data.ops();
     let exec_seg = ExecSegment::new(exec_update);
 
     // And the accessory.
@@ -440,21 +358,6 @@ fn compute_post_state(
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
     let (post_state, wb) = state_cache.finalize();
     Ok((post_state, wb))
-}
-
-/// Signs the L2BlockHeader and returns the signature
-fn sign_header(header: &L2BlockHeader, ik: &IdentityKey) -> Buf64 {
-    let msg = header.get_sighash();
-    match ik {
-        IdentityKey::Sequencer(sk) => sign_schnorr_sig(&msg, sk),
-    }
-}
-
-/// Returns the current unix time as milliseconds.
-// TODO maybe we should use a time source that is possibly more consistent with
-// the rest of the network for this?
-fn now_millis() -> u64 {
-    time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64
 }
 
 #[cfg(test)]

@@ -8,7 +8,6 @@ name = "strata-client"
 path = "src/main.rs"
 
 [dependencies]
-strata-block-assembly.workspace = true
 strata-bridge-relay.workspace = true
 strata-bridge-tx-builder.workspace = true
 strata-btcio.workspace = true
@@ -25,6 +24,7 @@ strata-rocksdb.workspace = true
 strata-rpc-api = { workspace = true, default-features = true }
 strata-rpc-types.workspace = true
 strata-rpc-utils.workspace = true
+strata-sequencer.workspace = true
 strata-state.workspace = true
 strata-status.workspace = true
 strata-storage.workspace = true
