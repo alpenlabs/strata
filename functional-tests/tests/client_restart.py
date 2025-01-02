@@ -25,6 +25,12 @@ class BlockFinalizationSeqRestartTest(testenv.StrataTester):
         prover = ctx.get_service("prover_client")
         prover_rpc = prover.create_rpc()
 
+        # Wait for prover
+        wait_until(
+            lambda: prover_rpc.dev_strata_getReport() is not None,
+            error_with="Prover did not start on time",
+        )
+
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
         # Check for first 2 checkpoints
