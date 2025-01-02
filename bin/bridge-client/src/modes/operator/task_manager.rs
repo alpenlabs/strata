@@ -4,6 +4,7 @@
 
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
+use anyhow::bail;
 use bitcoin::Txid;
 use strata_bridge_exec::{
     errors::{ExecError, ExecResult},
@@ -16,7 +17,7 @@ use strata_rpc_types::RpcBridgeDuties;
 use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
 use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeDutyIndexOps};
 use tokio::{task::JoinSet, time::sleep};
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, trace, warn}; use crate::errors::PollDutyError;
 
 pub(super) struct TaskManager<TxBuildContext, Bcast>
 where
@@ -34,41 +35,63 @@ where
     TxBuildContext: BuildContext + Sync + Send + 'static,
     Bcast: Broadcaster + Sync + Send + 'static,
 {
-    pub(super) async fn start(&self, duty_polling_interval: Duration) -> anyhow::Result<()> {
+    pub(super) async fn start(&self, duty_polling_interval: Duration, max_retries: u16) -> anyhow::Result<()> {
+        let mut retries = 0;
         loop {
-            if let Ok(RpcBridgeDuties {
-                duties,
-                start_index,
-                stop_index,
-            }) = self.poll_duties().await
-            {
-                let mut handles = JoinSet::new();
-                for duty in duties {
-                    let exec_handler = self.exec_handler.clone();
-                    let bridge_duty_ops = self.bridge_duty_db_ops.clone();
-                    let broadcaster = self.broadcaster.clone();
-                    handles.spawn(async move {
-                        process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
-                    });
-                }
+            match self.poll_duties().await {
+                Ok(RpcBridgeDuties {
+                            duties,
+                            start_index,
+                            stop_index,
+                        }) => {
+                    let mut handles = JoinSet::new();
+                    for duty in duties {
+                        let exec_handler = self.exec_handler.clone();
+                        let bridge_duty_ops = self.bridge_duty_db_ops.clone();
+                        let broadcaster = self.broadcaster.clone();
+                        handles.spawn(async move {
+                            process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
+                        });
+                    }
 
-                let any_failed = handles.join_all().await.iter().any(|res| res.is_err());
+                    let any_failed = handles.join_all().await.iter().any(|res| res.is_err());
 
-                // if none of the duties failed, update the duty index so that the
-                // next batch is fetched in the next poll.
-                //
-                // otherwise, don't update the index so that the current batch is refetched and
-                // ones that were not executed successfully are executed again.
-                if !any_failed {
-                    info!(%start_index, %stop_index, "updating duty index");
-                    if let Err(e) = self
-                        .bridge_duty_idx_db_ops
-                        .set_index_async(stop_index)
-                        .await
-                    {
-                        error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                    // if none of the duties failed, update the duty index so that the
+                    // next batch is fetched in the next poll.
+                    //
+                    // otherwise, don't update the index so that the current batch is refetched and
+                    // ones that were not executed successfully are executed again.
+                    if !any_failed {
+                        info!(%start_index, %stop_index, "updating duty index");
+                        if let Err(e) = self
+                            .bridge_duty_idx_db_ops
+                            .set_index_async(stop_index)
+                            .await
+                        {
+                            error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                        }
                     }
                 }
+                Err(err) => {
+                    match err {
+                        PollDutyError::RpcError(err) => {
+                            error!(%err, "could not get rpc response");
+                            retries += 1;
+                            if retries >=  max_retries {
+                                error!(%err, "Exceeded maximum retries to acquire client. Failing gracefully");
+
+                                bail!("Exceeded maximum retries to acquire client")
+                            }
+
+                            // Exponential backoff
+                            let delay = Duration::from_secs(1) * 2u32.pow(retries as u32 - 1);
+                            sleep(delay).await;
+                        },
+                        _ => {
+                            bail!(err.to_string());
+                        },
+                    }
+                },
             }
 
             sleep(duty_polling_interval).await;
@@ -76,7 +99,7 @@ where
     }
 
     /// Polls for [`BridgeDuty`]s.
-    pub(crate) async fn poll_duties(&self) -> anyhow::Result<RpcBridgeDuties> {
+    pub(crate) async fn poll_duties(&self) -> Result<RpcBridgeDuties, PollDutyError> {
         let start_index = self
             .bridge_duty_idx_db_ops
             .get_index_async()
@@ -89,14 +112,16 @@ where
             .l2_rpc_client_pool
             .get()
             .await
-            .expect("cannot get rpc client");
+            .map_err(|_| PollDutyError::WsPool)?;
+
         let RpcBridgeDuties {
             duties,
             start_index,
             stop_index,
         } = l2_rpc_client
             .get_bridge_duties(self.exec_handler.own_index, start_index)
-            .await?;
+            .await
+            .map_err(|err| PollDutyError::RpcError(err.to_string()))?;
 
         // check which duties this operator should do something
         let mut todo_duties: Vec<BridgeDuty> = Vec::with_capacity(duties.len());

@@ -126,7 +126,7 @@ where
             .l2_rpc_client_pool
             .get()
             .await
-            .map_err(|err| ExecError::WsPool(err))?;
+            .map_err(|_| ExecError::WsPool)?;
 
         l2_rpc_client.submit_bridge_msg(raw_message.into()).await?;
 
@@ -294,7 +294,7 @@ where
 
         let l2_rpc_client = self.l2_rpc_client_pool.get()
             .await
-            .map_err(|err| ExecError::WsPool(err))?;
+            .map_err(|_| ExecError::WsPool)?;
 
         let received_payloads = l2_rpc_client
             .get_msgs_by_scope(raw_scope)
