@@ -49,6 +49,12 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
             error_with="Sequencer did not start on time",
         )
 
+        # Wait for prover
+        wait_until(
+            lambda: prover_rpc.dev_strata_getReport() is not None,
+            error_with="Prover did not start on time",
+        )
+
         # First generate blocks to seq address
         btcrpc.proxy.generatetoaddress(101, seq_addr)
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)

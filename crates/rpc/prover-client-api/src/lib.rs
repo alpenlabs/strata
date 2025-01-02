@@ -1,5 +1,7 @@
 //! Provides prover-client related APIs for the RPC server.
 
+use std::collections::HashMap;
+
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use strata_primitives::{buf::Buf32, l2::L2BlockId};
 use strata_rpc_types::ProofKey;
@@ -60,4 +62,8 @@ pub trait StrataProverClientApi {
     /// Get proof with the given `key`
     #[method(name = "getProof")]
     async fn get_proof(&self, key: ProofKey) -> RpcResult<Option<ProofReceipt>>;
+
+    /// Get report of the current prover-client
+    #[method(name = "getReport")]
+    async fn get_report(&self) -> RpcResult<HashMap<String, usize>>;
 }
