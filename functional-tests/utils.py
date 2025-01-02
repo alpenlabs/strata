@@ -200,7 +200,7 @@ def submit_checkpoint(
     # will post empty proof if prover doesn't submit proofs in time.
     proof_keys = prover_rpc.dev_strata_proveCheckpoint(idx)
     proof_key = proof_keys[0]
-    wait_for_proof_with_time_out(prover_rpc, proof_key, time_out=100)
+    wait_for_proof_with_time_out(prover_rpc, proof_key)
     proof = prover_rpc.dev_strata_getProof(proof_key)
 
     seqrpc.strataadmin_submitCheckpointProof(idx, proof)
