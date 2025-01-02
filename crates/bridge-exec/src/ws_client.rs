@@ -71,6 +71,7 @@ impl Manager for WsClientManager {
         let client = WsClientBuilder::default()
             .build(self.config.url.clone())
             .await;
+
         let bl = match client {
             Ok(cl) => WsClientState::Working(cl),
             Err(_) => WsClientState::NotWorking,
@@ -107,6 +108,10 @@ impl Manager for WsClientManager {
     }
 }
 
+fn make_not_working_error() -> ClientError {
+    ClientError::Transport(BoxError::from("Client is Not Working".to_string()))
+}
+
 /// Implements the `ClientT` trait for `WsClient`.
 ///
 /// This implementation allows `WsClient` to perform JSON-RPC operations,
@@ -122,9 +127,7 @@ impl ClientT for WsClient {
     {
         match &self.0 {
             WsClientState::Working(inner) => inner.notification(method, params).await,
-            WsClientState::NotWorking => Err(ClientError::Transport(BoxError::from(
-                "Client is Not Working".to_string(),
-            ))),
+            WsClientState::NotWorking => Err(make_not_working_error()),
         }
     }
 
@@ -138,9 +141,7 @@ impl ClientT for WsClient {
     {
         match &self.0 {
             WsClientState::Working(inner) => inner.request(method, params).await,
-            WsClientState::NotWorking => Err(ClientError::Transport(BoxError::from(
-                "Client is Not Working".to_string(),
-            ))),
+            WsClientState::NotWorking => Err(make_not_working_error()),
         }
     }
 
@@ -154,9 +155,7 @@ impl ClientT for WsClient {
     {
         match &self.0 {
             WsClientState::Working(inner) => inner.batch_request(batch).await,
-            WsClientState::NotWorking => Err(ClientError::Transport(BoxError::from(
-                "Client is Not Working".to_string(),
-            ))),
+            WsClientState::NotWorking => Err(make_not_working_error()),
         }
     }
 }

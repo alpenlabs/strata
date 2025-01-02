@@ -4,7 +4,7 @@ use std::{fmt::Debug, time::Duration};
 
 use bitcoin::{key::Keypair, Transaction, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
-use deadpool::managed::Pool;
+use deadpool::managed::{Object, Pool};
 use jsonrpsee::tokio::time::sleep;
 use strata_bridge_sig_manager::manager::SignatureManager;
 use strata_bridge_tx_builder::{context::BuildContext, TxKind};
@@ -25,6 +25,9 @@ use crate::{
     ws_client::WsClientManager,
 };
 
+/// Websocket client pool
+pub type WsClientPool = Pool<WsClientManager>;
+
 /// The execution context for handling bridge-related signing activities.
 #[derive(Clone)]
 pub struct ExecHandler<TxBuildContext: BuildContext + Sync + Send> {
@@ -35,7 +38,7 @@ pub struct ExecHandler<TxBuildContext: BuildContext + Sync + Send> {
     pub sig_manager: SignatureManager,
 
     /// The RPC client to connect to the RPC full node.
-    pub l2_rpc_client_pool: Pool<WsClientManager>,
+    pub l2_rpc_client_pool: WsClientPool,
 
     /// The keypair for this client used to sign bridge-related messages.
     pub keypair: Keypair,
@@ -122,11 +125,7 @@ where
         let raw_message = borsh::to_vec::<BridgeMessage>(&signed_message)
             .expect("should be able to borsh serialize raw message");
 
-        let l2_rpc_client = self
-            .l2_rpc_client_pool
-            .get()
-            .await
-            .map_err(|_| ExecError::WsPool)?;
+        let l2_rpc_client = self.get_ready_rpc_client().await?;
 
         l2_rpc_client.submit_bridge_msg(raw_message.into()).await?;
 
@@ -290,13 +289,9 @@ where
         Payload: BorshDeserialize + Debug,
     {
         let raw_scope: HexBytes = scope.into();
-        info!(scope = ?scope, "getting messages from the L2 Client");
+        info!(?scope, "getting messages from the L2 Client");
 
-        let l2_rpc_client = self
-            .l2_rpc_client_pool
-            .get()
-            .await
-            .map_err(|_| ExecError::WsPool)?;
+        let l2_rpc_client = self.get_ready_rpc_client().await?;
 
         let received_payloads = l2_rpc_client
             .get_msgs_by_scope(raw_scope)
@@ -325,6 +320,14 @@ where
             });
 
         Ok(received_payloads)
+    }
+
+    /// Retrieves a ready-to-use RPC client from the client pool.
+    async fn get_ready_rpc_client(&self) -> Result<Object<WsClientManager>, ExecError> {
+        self.l2_rpc_client_pool
+            .get()
+            .await
+            .map_err(|_| ExecError::WsPool)
     }
 }
 

@@ -6,7 +6,7 @@ use bitcoin::{
     key::{Keypair, Parity},
     secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
 };
-use deadpool::managed::{self, Pool};
+use deadpool::managed;
 use strata_bridge_exec::{
     handler::ExecHandler,
     ws_client::{WsClientConfig, WsClientManager},
@@ -73,11 +73,10 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         url: args.rollup_url.clone(),
     };
     let manager = WsClientManager { config };
-    let l2_rpc_client_pool: Pool<WsClientManager> =
-        managed::Pool::<WsClientManager>::builder(manager)
-            .max_size(5)
-            .build()
-            .unwrap();
+    let l2_rpc_client_pool = managed::Pool::<WsClientManager>::builder(manager)
+        .max_size(5)
+        .build()
+        .unwrap();
 
     let l2_rpc_client = l2_rpc_client_pool
         .get()
