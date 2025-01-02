@@ -5,7 +5,7 @@ use strata_primitives::{
     params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
-use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
+use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_state::l1::L1BlockId;
 use tokio::sync::Mutex;
@@ -47,15 +47,19 @@ impl BtcBlockspaceOperator {
 
 impl ProvingOp for BtcBlockspaceOperator {
     type Prover = BtcBlockspaceProver;
-    type Params = u64;
+    type Params = (u64, u64);
 
     async fn create_task(
         &self,
-        block_num: u64,
+        block_range: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let context = ProofContext::BtcBlockspace(self.get_id(block_num).await?);
+        let (start_height, end_height) = block_range;
+        let start_block_id = self.get_id(start_height).await?;
+        let end_block_id = self.get_id(end_height).await?;
+
+        let context = ProofContext::BtcBlockspace(start_block_id, end_block_id);
         let mut task_tracker = task_tracker.lock().await;
         task_tracker.create_tasks(context, vec![])
     }
@@ -64,17 +68,21 @@ impl ProvingOp for BtcBlockspaceOperator {
         &self,
         task_id: &ProofKey,
         _db: &ProofDb,
-    ) -> Result<BlockspaceProofInput, ProvingTaskError> {
-        let blkid = match task_id.context() {
-            ProofContext::BtcBlockspace(id) => *id,
-            _ => return Err(ProvingTaskError::InvalidInput("BtcBlockspace".to_string())),
+    ) -> Result<BlockScanProofInput, ProvingTaskError> {
+        let _blkids = match task_id.context() {
+            ProofContext::BtcBlockspace(start_block_id, end_block_id) => {
+                (start_block_id, end_block_id)
+            }
+            _ => return Err(ProvingTaskError::InvalidInput("BtcBlockscan".to_string())),
         };
 
-        let block = self.btc_client.get_block(&blkid.into()).await.unwrap();
+        // TODO: Fetch blocks from the BTC client.
+        // let block = self.btc_client.get_block(&blkid.into()).await.unwrap();
+        let blocks = vec![];
 
-        Ok(BlockspaceProofInput {
+        Ok(BlockScanProofInput {
             rollup_params: self.rollup_params.as_ref().clone(),
-            block,
+            blocks,
         })
     }
 }

@@ -3,13 +3,13 @@ use strata_zkvm::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };
 
-use crate::logic::{BlockspaceProofInput, BlockspaceProofOutput};
+use crate::logic::{BlockScanProofInput, BlockScanProofOutput};
 
 pub struct BtcBlockspaceProver;
 
 impl ZkVmProver for BtcBlockspaceProver {
-    type Input = BlockspaceProofInput;
-    type Output = BlockspaceProofOutput;
+    type Input = BlockScanProofInput;
+    type Output = BlockScanProofOutput;
 
     fn proof_type() -> ProofType {
         ProofType::Compressed
@@ -20,13 +20,15 @@ impl ZkVmProver for BtcBlockspaceProver {
     where
         B: ZkVmInputBuilder<'a>,
     {
-        let serialized_block = serialize(&input.block);
-        let zkvm_input = B::new()
-            .write_serde(&input.rollup_params)?
-            .write_buf(&serialized_block)?
-            .build()?;
+        let mut input_builder = B::new();
+        input_builder.write_serde(&input.rollup_params)?;
+        input_builder.write_serde(&input.blocks.len())?;
 
-        Ok(zkvm_input)
+        for block in &input.blocks {
+            input_builder.write_buf(&serialize(block))?;
+        }
+
+        input_builder.build()
     }
 
     fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>

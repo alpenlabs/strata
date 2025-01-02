@@ -189,8 +189,9 @@ mod tests {
         let start: L1BlockId = gen.generate();
         let end: L1BlockId = gen.generate();
         for _ in 0..n {
-            let blkid: L1BlockId = gen.generate();
-            let id = ProofContext::BtcBlockspace(blkid);
+            let st_blkid: L1BlockId = gen.generate();
+            let end_blkid: L1BlockId = gen.generate();
+            let id = ProofContext::BtcBlockspace(st_blkid, end_blkid);
             let key = ProofKey::new(id, host);
             deps.push(key);
         }

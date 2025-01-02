@@ -119,7 +119,7 @@ impl ProofOperator {
         let host = resolve_host(proof_key);
 
         match proof_key.context() {
-            ProofContext::BtcBlockspace(_) => {
+            ProofContext::BtcBlockspace(_, _) => {
                 Self::prove(&self.btc_blockspace_operator, proof_key, db, host).await
             }
             ProofContext::L1Batch(_, _) => {

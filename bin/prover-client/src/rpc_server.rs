@@ -80,11 +80,11 @@ impl ProverClientRpc {
 
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
-    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_btc_blocks(&self, block_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
         Ok(self
             .operator
             .btc_operator()
-            .create_task(btc_block_num, self.task_tracker.clone(), &self.db)
+            .create_task(block_range, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }

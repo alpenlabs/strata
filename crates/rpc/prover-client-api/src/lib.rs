@@ -9,8 +9,8 @@ use strata_rpc_types::ProofKey;
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "dev_strata"))]
 pub trait StrataProverClientApi {
     /// Start proving the given btc block
-    #[method(name = "proveBtcBlock")]
-    async fn prove_btc_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>>;
+    #[method(name = "proveBtcBlocks")]
+    async fn prove_btc_blocks(&self, block_range: (u64, u64)) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given el block
     #[method(name = "proveElBlocks")]
