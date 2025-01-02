@@ -4,6 +4,7 @@
 
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
+use anyhow::bail;
 use bitcoin::Txid;
 use strata_bridge_exec::{
     errors::{ExecError, ExecResult},
@@ -18,57 +19,84 @@ use strata_storage::ops::{bridge_duty::BridgeDutyOps, bridge_duty_index::BridgeD
 use tokio::{task::JoinSet, time::sleep};
 use tracing::{error, info, trace, warn};
 
-pub(super) struct TaskManager<L2Client, TxBuildContext, Bcast>
+use crate::errors::PollDutyError;
+
+pub(super) struct TaskManager<TxBuildContext, Bcast>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {
-    pub(super) exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
+    pub(super) exec_handler: Arc<ExecHandler<TxBuildContext>>,
     pub(super) broadcaster: Arc<Bcast>,
     pub(super) bridge_duty_db_ops: Arc<BridgeDutyOps>,
     pub(super) bridge_duty_idx_db_ops: Arc<BridgeDutyIndexOps>,
 }
 
-impl<L2Client, TxBuildContext, Bcast> TaskManager<L2Client, TxBuildContext, Bcast>
+impl<TxBuildContext, Bcast> TaskManager<TxBuildContext, Bcast>
 where
-    L2Client: StrataApiClient + Sync + Send + 'static,
     TxBuildContext: BuildContext + Sync + Send + 'static,
     Bcast: Broadcaster + Sync + Send + 'static,
 {
-    pub(super) async fn start(&self, duty_polling_interval: Duration) -> anyhow::Result<()> {
+    pub(super) async fn start(
+        &self,
+        duty_polling_interval: Duration,
+        max_retries: u16,
+    ) -> anyhow::Result<()> {
+        let mut retries = 0;
         loop {
-            let RpcBridgeDuties {
-                duties,
-                start_index,
-                stop_index,
-            } = self.poll_duties().await?;
+            match self.poll_duties().await {
+                Ok(RpcBridgeDuties {
+                    duties,
+                    start_index,
+                    stop_index,
+                }) => {
+                    let mut handles = JoinSet::new();
+                    for duty in duties {
+                        let exec_handler = self.exec_handler.clone();
+                        let bridge_duty_ops = self.bridge_duty_db_ops.clone();
+                        let broadcaster = self.broadcaster.clone();
+                        handles.spawn(async move {
+                            process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
+                        });
+                    }
 
-            let mut handles = JoinSet::new();
-            for duty in duties {
-                let exec_handler = self.exec_handler.clone();
-                let bridge_duty_ops = self.bridge_duty_db_ops.clone();
-                let broadcaster = self.broadcaster.clone();
-                handles.spawn(async move {
-                    process_duty(exec_handler, bridge_duty_ops, broadcaster, &duty).await
-                });
-            }
+                    let any_failed = handles.join_all().await.iter().any(|res| res.is_err());
 
-            let any_failed = handles.join_all().await.iter().any(|res| res.is_err());
+                    // if none of the duties failed, update the duty index so that the
+                    // next batch is fetched in the next poll.
+                    //
+                    // otherwise, don't update the index so that the current batch is refetched and
+                    // ones that were not executed successfully are executed again.
+                    if !any_failed {
+                        info!(%start_index, %stop_index, "updating duty index");
+                        if let Err(e) = self
+                            .bridge_duty_idx_db_ops
+                            .set_index_async(stop_index)
+                            .await
+                        {
+                            error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                        }
+                    }
+                }
+                Err(err) => {
+                    match err {
+                        PollDutyError::RpcError(err) => {
+                            error!(%err, "could not get rpc response");
+                            retries += 1;
+                            if retries >= max_retries {
+                                error!(%err, "Exceeded maximum retries to acquire client. Failing gracefully");
 
-            // if none of the duties failed, update the duty index so that the
-            // next batch is fetched in the next poll.
-            //
-            // otherwise, don't update the index so that the current batch is refetched and
-            // ones that were not executed successfully are executed again.
-            if !any_failed {
-                info!(%start_index, %stop_index, "updating duty index");
-                if let Err(e) = self
-                    .bridge_duty_idx_db_ops
-                    .set_index_async(stop_index)
-                    .await
-                {
-                    error!(error = %e, %start_index, %stop_index, "could not update duty index");
+                                bail!("Exceeded maximum retries to acquire client")
+                            }
+
+                            // Exponential backoff
+                            let delay = Duration::from_secs(1) * 2u32.pow(retries as u32 - 1);
+                            sleep(delay).await;
+                        }
+                        _ => {
+                            bail!(err.to_string());
+                        }
+                    }
                 }
             }
 
@@ -77,7 +105,7 @@ where
     }
 
     /// Polls for [`BridgeDuty`]s.
-    pub(crate) async fn poll_duties(&self) -> anyhow::Result<RpcBridgeDuties> {
+    pub(crate) async fn poll_duties(&self) -> Result<RpcBridgeDuties, PollDutyError> {
         let start_index = self
             .bridge_duty_idx_db_ops
             .get_index_async()
@@ -85,15 +113,21 @@ where
             .unwrap_or(Some(0))
             .unwrap_or(0);
 
+        let l2_rpc_client = self
+            .exec_handler
+            .l2_rpc_client_pool
+            .get()
+            .await
+            .map_err(|_| PollDutyError::WsPool)?;
+
         let RpcBridgeDuties {
             duties,
             start_index,
             stop_index,
-        } = self
-            .exec_handler
-            .l2_rpc_client
+        } = l2_rpc_client
             .get_bridge_duties(self.exec_handler.own_index, start_index)
-            .await?;
+            .await
+            .map_err(|err| PollDutyError::RpcError(err.to_string()))?;
 
         // check which duties this operator should do something
         let mut todo_duties: Vec<BridgeDuty> = Vec::with_capacity(duties.len());
@@ -150,14 +184,13 @@ where
 /// # Errors
 ///
 /// If the duty fails to be processed.
-async fn process_duty<L2Client, TxBuildContext, Bcast>(
-    exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
+async fn process_duty<TxBuildContext, Bcast>(
+    exec_handler: Arc<ExecHandler<TxBuildContext>>,
     duty_status_ops: Arc<BridgeDutyOps>,
     broadcaster: Arc<Bcast>,
     duty: &BridgeDuty,
 ) -> ExecResult<()>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {
@@ -212,15 +245,14 @@ where
 /// # Errors
 ///
 /// If there is an error during the execution of the duty.
-async fn execute_duty<L2Client, TxBuildContext, Tx, Bcast>(
-    exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
+async fn execute_duty<TxBuildContext, Tx, Bcast>(
+    exec_handler: Arc<ExecHandler<TxBuildContext>>,
     broadcaster: Arc<Bcast>,
     duty_status_ops: Arc<BridgeDutyOps>,
     tracker_txid: Txid,
     tx_info: Tx,
 ) -> ExecResult<()>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Tx: TxKind + Debug,
     Bcast: Broadcaster,
@@ -280,13 +312,12 @@ where
 
 /// Aggregates nonces and signatures for a given [`Txid`] and then, broadcasts the fully signed
 /// transaction to Bitcoin.
-async fn aggregate_and_broadcast<L2Client, TxBuildContext, Bcast>(
-    exec_handler: Arc<ExecHandler<L2Client, TxBuildContext>>,
+async fn aggregate_and_broadcast<TxBuildContext, Bcast>(
+    exec_handler: Arc<ExecHandler<TxBuildContext>>,
     broadcaster: Arc<Bcast>,
     txid: &Txid,
 ) -> ExecResult<()>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
     Bcast: Broadcaster,
 {

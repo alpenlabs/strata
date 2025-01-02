@@ -22,6 +22,7 @@ strata-rpc-types.workspace = true
 
 bitcoin = { workspace = true, features = ["rand-std"] }
 borsh.workspace = true
+deadpool.workspace = true
 format_serde_error.workspace = true
 jsonrpsee.workspace = true
 serde.workspace = true

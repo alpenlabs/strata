@@ -32,6 +32,7 @@ argh.workspace = true
 async-trait.workspace = true
 bitcoin.workspace = true
 chrono.workspace = true
+deadpool.workspace = true
 directories = "5.0.1"
 jsonrpsee.workspace = true
 rockbound.workspace = true

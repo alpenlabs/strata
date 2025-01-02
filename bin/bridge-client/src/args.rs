@@ -71,6 +71,12 @@ pub(crate) struct Cli {
         description = "retry count for the rocksdb database (default: 3)"
     )]
     pub retry_count: Option<u16>,
+
+    #[argh(
+        option,
+        description = "max retries for when rpc server fails during duty polling"
+    )]
+    pub max_rpc_retry_count: Option<u16>,
 }
 
 #[derive(Debug, Clone)]
