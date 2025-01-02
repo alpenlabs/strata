@@ -1,9 +1,6 @@
 //! Macro trait def for the `strata_` RPC namespace using jsonrpsee.
 use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use strata_block_assembly::{
-    BlockCompletionData, BlockGenerationConfig, BlockTemplate, SequencerDuty,
-};
 use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
@@ -11,11 +8,16 @@ use strata_rpc_types::{
     HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus,
     RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
 };
+use strata_sequencer::{
+    block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate},
+    types::Duty,
+};
 use strata_state::{
     block::L2Block, client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput,
     sync_event::SyncEvent,
 };
 use strata_zkvm::ProofReceipt;
+
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
 pub trait StrataApi {
@@ -178,7 +180,7 @@ pub trait StrataSequencerApi {
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
 
     #[method(name = "strata_getSequencerDuties")]
-    async fn get_sequencer_duties(&self) -> RpcResult<Vec<SequencerDuty>>;
+    async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>>;
 
     #[method(name = "strata_getBlockTemplate")]
     async fn get_block_template(&self, config: BlockGenerationConfig) -> RpcResult<BlockTemplate>;

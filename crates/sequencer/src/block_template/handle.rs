@@ -2,8 +2,9 @@ use strata_primitives::l2::L2BlockId;
 use strata_state::block::L2BlockBundle;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error};
+use crate::block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error};
 
+#[derive(Debug)]
 pub enum TemplateManagerRequest {
     GenerateBlockTemplate(
         BlockGenerationConfig,

@@ -1,12 +1,13 @@
 use std::{sync::Arc, thread, time::Duration};
 
+use strata_consensus_logic::checkpoint::CheckpointHandle;
 use strata_db::types::{CheckpointEntry, CheckpointProvingStatus};
 use strata_primitives::params::{Params, ProofPublishMode};
 use strata_state::batch::BatchCheckpoint;
 use tracing::*;
 
 use super::types::BatchCheckpointDuty;
-use crate::{checkpoint::CheckpointHandle, errors::Error};
+use crate::errors::Error;
 
 pub(crate) fn check_and_get_batch_checkpoint(
     duty: &BatchCheckpointDuty,

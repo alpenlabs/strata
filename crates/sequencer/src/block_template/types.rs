@@ -5,13 +5,7 @@ use strata_state::{
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SequencerDuty {
-    SignBlock(u64, L2BlockId),
-    // SignCheckpoint(..)
-    // ..
-}
-
+/// Block template with header, body, and accessory.
 #[derive(Debug, Clone)]
 pub struct BlockTemplateFull {
     header: L2BlockHeader,
@@ -50,6 +44,7 @@ impl BlockTemplateFull {
     }
 }
 
+/// Block template with only sufficient info for signing to be passed for signing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockTemplate {
     header: L2BlockHeader,

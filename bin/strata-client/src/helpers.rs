@@ -5,10 +5,7 @@ use bitcoin::{base58, bip32::Xpriv, Address, Network};
 use format_serde_error::SerdeError;
 use strata_btcio::rpc::{traits::WalletRpc, BitcoinClient};
 use strata_config::Config;
-use strata_consensus_logic::{
-    csm::state_tracker,
-    duty::types::{Identity, IdentityData, IdentityKey},
-};
+use strata_consensus_logic::csm::state_tracker;
 use strata_db::traits::Database;
 use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
 use strata_key_derivation::sequencer::SequencerKeys;
@@ -19,6 +16,7 @@ use strata_primitives::{
     params::{Params, RollupParams, SyncParams},
 };
 use strata_rocksdb::CommonDb;
+use strata_sequencer::types::{Identity, IdentityData, IdentityKey};
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;

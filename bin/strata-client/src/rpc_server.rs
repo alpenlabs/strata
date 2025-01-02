@@ -10,9 +10,7 @@ use bitcoin::{
 };
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
-use strata_block_assembly::{
-    BlockCompletionData, BlockGenerationConfig, BlockTemplate, SequencerDuty, TemplateManagerHandle,
-};
+use parking_lot::RwLock;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 use strata_consensus_logic::{
@@ -41,6 +39,12 @@ use strata_rpc_types::{
     RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::{to_jsonrpsee_error, to_jsonrpsee_error_object};
+use strata_sequencer::{
+    block_template::{
+        BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
+    },
+    types::{Duty, DutyEntry, DutyTracker},
+};
 use strata_state::{
     block::{L2Block, L2BlockBundle},
     bridge_duties::BridgeDuty,
@@ -720,6 +724,7 @@ pub struct SequencerServerImpl {
     sync_manager: Arc<SyncManager>,
     l2_block_manager: Arc<L2BlockManager>,
     params: Arc<Params>,
+    duty_tracker: Arc<RwLock<DutyTracker>>,
 }
 
 impl SequencerServerImpl {
@@ -731,6 +736,7 @@ impl SequencerServerImpl {
         template_manager_handle: TemplateManagerHandle,
         sync_manager: Arc<SyncManager>,
         l2_block_manager: Arc<L2BlockManager>,
+        duty_tracker: Arc<RwLock<DutyTracker>>,
     ) -> Self {
         Self {
             envelope_handle,
@@ -740,6 +746,7 @@ impl SequencerServerImpl {
             template_manager_handle,
             sync_manager,
             l2_block_manager,
+            duty_tracker,
         }
     }
 }
@@ -833,8 +840,16 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .map_err(|e| Error::Other(e.to_string()))?)
     }
 
-    async fn get_sequencer_duties(&self) -> RpcResult<Vec<SequencerDuty>> {
-        Ok(vec![])
+    async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>> {
+        let duties = self
+            .duty_tracker
+            .read()
+            .duties()
+            .iter()
+            .map(DutyEntry::duty)
+            .cloned()
+            .collect();
+        Ok(duties)
     }
 
     async fn get_block_template(&self, config: BlockGenerationConfig) -> RpcResult<BlockTemplate> {

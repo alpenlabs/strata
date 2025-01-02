@@ -19,9 +19,9 @@ use duty_executor::duty_executor_worker;
 use errors::{AppError, Result};
 use helpers::load_seqkey;
 use rpc_client::rpc_client;
-use strata_block_assembly::SequencerDuty;
 use strata_common::logging;
 use strata_rpc_api::StrataSequencerApiClient;
+use strata_sequencer::types::Duty;
 use strata_tasks::TaskManager;
 use tokio::{runtime::Handle, sync::mpsc};
 use tracing::{error, info, warn};
@@ -73,10 +73,7 @@ fn main_inner(args: Args) -> Result<()> {
     Ok(())
 }
 
-async fn duty_fetcher_worker<R>(
-    rpc: Arc<R>,
-    duty_tx: mpsc::Sender<SequencerDuty>,
-) -> anyhow::Result<()>
+async fn duty_fetcher_worker<R>(rpc: Arc<R>, duty_tx: mpsc::Sender<Duty>) -> anyhow::Result<()>
 where
     R: StrataSequencerApiClient + Send + Sync + 'static,
 {

@@ -12458,26 +12458,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "strata-block-assembly"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rand",
- "serde",
- "strata-consensus-logic",
- "strata-crypto",
- "strata-db",
- "strata-eectl",
- "strata-primitives",
- "strata-state",
- "strata-status",
- "strata-test-utils",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "strata-bridge-client"
 version = "0.1.0"
 dependencies = [
@@ -12699,7 +12679,6 @@ dependencies = [
  "rockbound",
  "serde",
  "serde_json",
- "strata-block-assembly",
  "strata-bridge-relay",
  "strata-bridge-tx-builder",
  "strata-btcio",
@@ -12717,6 +12696,7 @@ dependencies = [
  "strata-rpc-api",
  "strata-rpc-types",
  "strata-rpc-utils",
+ "strata-sequencer",
  "strata-state",
  "strata-status",
  "strata-storage",
@@ -13427,12 +13407,12 @@ dependencies = [
  "jsonrpsee",
  "serde",
  "serde_with",
- "strata-block-assembly",
  "strata-bridge-sig-manager",
  "strata-bridge-tx-builder",
  "strata-db",
  "strata-primitives",
  "strata-rpc-types",
+ "strata-sequencer",
  "strata-state",
  "strata-zkvm",
  "thiserror 1.0.69",
@@ -13466,20 +13446,44 @@ name = "strata-sequencer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "borsh",
+ "parking_lot 0.12.3",
+ "serde",
+ "strata-chaintsn",
+ "strata-consensus-logic",
+ "strata-crypto",
+ "strata-db",
+ "strata-eectl",
+ "strata-primitives",
+ "strata-state",
+ "strata-status",
+ "strata-storage",
+ "strata-tasks",
+ "strata-test-utils",
+ "thiserror 1.0.69",
+ "threadpool",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-sequencer-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "argh",
  "bitcoin",
  "jsonrpsee",
  "serde",
- "strata-block-assembly",
  "strata-common",
- "strata-consensus-logic",
  "strata-crypto",
  "strata-key-derivation",
  "strata-primitives",
  "strata-rpc-api",
+ "strata-sequencer",
  "strata-state",
  "strata-tasks",
- "thiserror",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
  "zeroize",

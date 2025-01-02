@@ -3,6 +3,7 @@
 use std::time;
 
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use strata_state::{
     batch::{BatchInfo, BootstrapState},
@@ -29,7 +30,7 @@ pub enum Expiry {
 }
 
 /// Duties the sequencer might carry out.
-#[derive(Clone, Debug, BorshSerialize)]
+#[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum Duty {
     /// Goal to sign a block.
@@ -47,6 +48,7 @@ impl Duty {
         }
     }
 
+    /// Returns a unique identifier for the duty.
     pub fn id(&self) -> Buf32 {
         match self {
             // We want Batch commitment duty to be unique by the checkpoint idx
@@ -57,7 +59,7 @@ impl Duty {
 }
 
 /// Describes information associated with signing a block.
-#[derive(Clone, Debug, BorshSerialize)]
+#[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 pub struct BlockSigningDuty {
     /// Slot to sign for.
     slot: u64,
@@ -82,7 +84,7 @@ impl BlockSigningDuty {
 /// This duty is created whenever a previous batch is found on L1 and verified.
 /// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
 /// batch proof in the proof db.
-#[derive(Clone, Debug, BorshSerialize)]
+#[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 pub struct BatchCheckpointDuty {
     /// Checkpoint/batch info which needs to be proven
     batch_info: BatchInfo,

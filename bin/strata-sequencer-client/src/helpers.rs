@@ -1,13 +1,13 @@
 use std::{fs, path::Path};
 
 use bitcoin::{base58, bip32::Xpriv};
-use strata_consensus_logic::duty::types::{Identity, IdentityData, IdentityKey};
 use strata_crypto::sign_schnorr_sig;
 use strata_key_derivation::sequencer::SequencerKeys;
 use strata_primitives::{
     buf::{Buf32, Buf64},
     keys::ZeroizableXpriv,
 };
+use strata_sequencer::types::{Identity, IdentityData, IdentityKey};
 use strata_state::header::L2BlockHeader;
 use tracing::debug;
 use zeroize::Zeroize;

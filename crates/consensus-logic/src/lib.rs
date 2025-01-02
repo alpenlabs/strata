@@ -3,7 +3,6 @@
 
 pub mod checkpoint;
 pub mod csm;
-pub mod duty;
 pub mod fork_choice_manager;
 pub mod genesis;
 pub mod l1_handler;
