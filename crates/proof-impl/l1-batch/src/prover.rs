@@ -1,17 +1,16 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use bitcoin::{consensus::serialize, Block};
+use strata_primitives::params::RollupParams;
 use strata_state::l1::HeaderVerificationState;
-use strata_zkvm::{
-    AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
-    ZkVmResult,
-};
+use strata_zkvm::{PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
 
 use crate::logic::L1BatchProofOutput;
 
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
+// #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofInput {
-    pub batch: Vec<ProofReceipt>,
+    pub blocks: Vec<Block>,
     pub state: HeaderVerificationState,
-    pub blockspace_vk: VerificationKey,
+    pub rollup_params: RollupParams,
 }
 
 pub struct L1BatchProver;
@@ -30,15 +29,11 @@ impl ZkVmProver for L1BatchProver {
     {
         let mut input_builder = B::new();
         input_builder.write_borsh(&input.state)?;
+        input_builder.write_serde(&input.rollup_params)?;
 
-        let len = input.batch.len() as u32;
-        input_builder.write_serde(&len)?;
-
-        for proof in &input.batch {
-            input_builder.write_proof(&AggregationInput::new(
-                proof.clone(),
-                input.blockspace_vk.clone(),
-            ))?;
+        input_builder.write_serde(&input.blocks.len())?;
+        for block in &input.blocks {
+            input_builder.write_buf(&serialize(block))?;
         }
 
         input_builder.build()

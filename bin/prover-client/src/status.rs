@@ -76,10 +76,9 @@ mod tests {
         let mut deps = HashSet::with_capacity(n);
         let mut gen = ArbitraryGenerator::new();
         for _ in 0..n {
-            let st_blkid: L1BlockId = gen.generate();
-            let end_blkid: L1BlockId = gen.generate();
+            let blkid: L1BlockId = gen.generate();
             let host = ProofZkVm::Native;
-            let id = ProofContext::BtcBlockspace(st_blkid, end_blkid);
+            let id = ProofContext::BtcBlockspace(blkid);
             let key = ProofKey::new(id, host);
             deps.insert(key);
         }

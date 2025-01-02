@@ -64,10 +64,7 @@ impl ProofOperator {
         // Create each operator using the respective clients.
         let btc_blockspace_operator =
             BtcBlockspaceOperator::new(btc_client.clone(), rollup_params.clone());
-        let l1_batch_operator = L1BatchOperator::new(
-            btc_client.clone(),
-            Arc::new(btc_blockspace_operator.clone()),
-        );
+        let l1_batch_operator = L1BatchOperator::new(btc_client.clone(), rollup_params.clone());
         let evm_ee_operator = EvmEeOperator::new(evm_ee_client.clone());
         let cl_stf_operator = ClStfOperator::new(
             cl_client.clone(),
@@ -119,7 +116,7 @@ impl ProofOperator {
         let host = resolve_host(proof_key);
 
         match proof_key.context() {
-            ProofContext::BtcBlockspace(_, _) => {
+            ProofContext::BtcBlockspace(_) => {
                 Self::prove(&self.btc_blockspace_operator, proof_key, db, host).await
             }
             ProofContext::L1Batch(_, _) => {

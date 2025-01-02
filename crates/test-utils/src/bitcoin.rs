@@ -68,16 +68,6 @@ impl BtcChainSegment {
         self.custom_blocks.get(&height).unwrap()
     }
 
-    /// Retrieves the blocks at the specified height.
-    pub fn get_blocks(&self, from: u32, count: u32) -> Vec<Block> {
-        let mut blocks = Vec::with_capacity(count as usize);
-        for i in 0..count {
-            let block = self.get_block(from + i);
-            blocks.push(block.clone());
-        }
-        blocks
-    }
-
     /// Retrieves the timestamps of a specified number of blocks from a given height in a
     /// descending order.
     pub fn get_last_timestamps(&self, from: u32, count: u32) -> Vec<u32> {

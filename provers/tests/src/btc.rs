@@ -16,28 +16,23 @@ impl<H: ZkVmHost> BtcBlockProofGenerator<H> {
     }
 }
 
-pub type Blocks = Vec<Block>;
 impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
-    type Input = Blocks;
+    type Input = Block;
     type P = BtcBlockspaceProver;
     type H = H;
 
-    fn get_input(&self, blocks: &Blocks) -> ZkVmResult<BlockScanProofInput> {
+    fn get_input(&self, block: &Block) -> ZkVmResult<BlockScanProofInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
         let input = BlockScanProofInput {
-            blocks: blocks.clone(),
+            block: block.clone(),
             rollup_params: rollup_params.clone(),
         };
         Ok(input)
     }
 
-    fn get_proof_id(&self, blocks: &Blocks) -> String {
-        if let (Some(first), Some(last)) = (blocks.first(), blocks.last()) {
-            format!("btc_block_{}_{}", first.block_hash(), last.block_hash())
-        } else {
-            "btc_block_empty".to_string()
-        }
+    fn get_proof_id(&self, block: &Block) -> String {
+        format!("btc_block_{}", block.block_hash())
     }
 
     fn get_host(&self) -> H {
@@ -53,12 +48,8 @@ mod tests {
 
     fn test_proof<H: ZkVmHost>(generator: &BtcBlockProofGenerator<H>) {
         let btc_chain = get_btc_chain();
-        let block_1 = btc_chain.get_block(40321);
-        let block_2 = btc_chain.get_block(40322);
-
-        let blocks = vec![block_1.clone(), block_2.clone()];
-
-        let _ = generator.get_proof(&blocks).unwrap();
+        let block = btc_chain.get_block(40321);
+        let _ = generator.get_proof(block).unwrap();
     }
 
     #[test]

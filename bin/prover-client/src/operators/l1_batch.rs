@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bitcoin::params::MAINNET;
+use bitcoin::{params::MAINNET, Block};
 use strata_btcio::{
     reader::query::get_verification_state,
     rpc::{
@@ -8,15 +8,18 @@ use strata_btcio::{
         BitcoinClient,
     },
 };
-use strata_db::traits::ProofDatabase;
-use strata_primitives::proof::{ProofContext, ProofKey};
+use strata_primitives::{
+    params::RollupParams,
+    proof::{ProofContext, ProofKey},
+};
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
+use strata_state::l1::L1BlockId;
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{btc::BtcBlockspaceOperator, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
+use super::ProvingOp;
+use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] trait for L1 Batch Proof generation.
 ///
@@ -30,18 +33,66 @@ use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 #[derive(Debug, Clone)]
 pub struct L1BatchOperator {
     btc_client: Arc<BitcoinClient>,
-    btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
+    rollup_params: Arc<RollupParams>,
 }
 
 impl L1BatchOperator {
-    pub fn new(
-        btc_client: Arc<BitcoinClient>,
-        btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
-    ) -> Self {
+    pub fn new(btc_client: Arc<BitcoinClient>, rollup_params: Arc<RollupParams>) -> Self {
         Self {
             btc_client,
-            btc_blockspace_operator,
+            rollup_params,
         }
+    }
+
+    async fn get_block_at(&self, height: u64) -> Result<bitcoin::Block, ProvingTaskError> {
+        self.btc_client
+            .get_block_at(height)
+            .await
+            .inspect_err(|_| error!(%height, "Failed to fetch BTC block"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))
+    }
+
+    async fn get_block(&self, block_id: L1BlockId) -> Result<bitcoin::Block, ProvingTaskError> {
+        self.btc_client
+            .get_block(&block_id.into())
+            .await
+            .inspect_err(|_| error!(%block_id, "Failed to fetch BTC block"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))
+    }
+
+    async fn get_block_height(&self, block_id: L1BlockId) -> Result<u64, ProvingTaskError> {
+        let block = self
+            .btc_client
+            .get_block(&block_id.into())
+            .await
+            .inspect_err(|_| error!(%block_id, "Failed to fetch BTC block"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+
+        let block_height = self
+            .btc_client
+            .get_transaction(&block.coinbase().expect("expect coinbase tx").compute_txid())
+            .await
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
+            .block_height();
+
+        Ok(block_height)
+    }
+
+    /// Retrieves the specified number of ancestor block IDs for the given block ID.
+    pub async fn get_block_ancestors(
+        &self,
+        block_id: L1BlockId,
+        n_ancestors: u64,
+    ) -> Result<Vec<Block>, ProvingTaskError> {
+        let mut ancestors = Vec::with_capacity(n_ancestors as usize);
+        let mut block_id = block_id;
+        for _ in 0..=n_ancestors {
+            let block = self.get_block(block_id).await?;
+            block_id = block.header.prev_blockhash.into();
+            ancestors.push(block);
+        }
+
+        Ok(ancestors)
     }
 }
 
@@ -53,77 +104,35 @@ impl ProvingOp for L1BatchOperator {
         &self,
         params: (u64, u64),
         task_tracker: Arc<Mutex<TaskTracker>>,
-        db: &ProofDb,
+        _db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let (start_height, end_height) = params;
 
-        let len = (end_height - start_height) as usize + 1;
-        let mut btc_deps = Vec::with_capacity(len);
-
-        let start_blkid = self.btc_blockspace_operator.get_id(start_height).await?;
-        let end_blkid = self.btc_blockspace_operator.get_id(end_height).await?;
+        let start_blkid = self.get_block_at(start_height).await?.block_hash().into();
+        let end_blkid = self.get_block_at(end_height).await?.block_hash().into();
         let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
 
-        for height in start_height..=end_height {
-            // TODO: Use mini batch of sizes > 1
-            let blkid = self.btc_blockspace_operator.get_id(height).await?;
-            let proof_id = ProofContext::BtcBlockspace(blkid, blkid);
-            self.btc_blockspace_operator
-                .create_task((height, height), task_tracker.clone(), db)
-                .await?;
-            btc_deps.push(proof_id);
-        }
-
-        db.put_proof_deps(l1_batch_proof_id, btc_deps.clone())
-            .map_err(ProvingTaskError::DatabaseError)?;
-
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(l1_batch_proof_id, btc_deps)
+        task_tracker.create_tasks(l1_batch_proof_id, vec![])
     }
 
     async fn fetch_input(
         &self,
         task_id: &ProofKey,
-        db: &ProofDb,
+        _db: &ProofDb,
     ) -> Result<L1BatchProofInput, ProvingTaskError> {
-        let (start_blkid, _) = match task_id.context() {
-            ProofContext::L1Batch(start, end) => (*start, end),
+        let (start_block_id, end_block_id) = match task_id.context() {
+            ProofContext::L1Batch(start, end) => (*start, *end),
             _ => return Err(ProvingTaskError::InvalidInput("L1Batch".to_string())),
         };
 
-        let deps = db
-            .get_proof_deps(*task_id.context())
-            .map_err(ProvingTaskError::DatabaseError)?
-            .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
+        let start_height = self.get_block_height(start_block_id).await?;
+        let end_height = self.get_block_height(end_block_id).await?;
+        let num_blocks = end_height - start_height;
 
-        let mut batch = Vec::new();
-        for proof_id in deps {
-            let proof_key = ProofKey::new(proof_id, *task_id.host());
-            let proof = db
-                .get_proof(proof_key)
-                .map_err(ProvingTaskError::DatabaseError)?
-                .ok_or(ProvingTaskError::ProofNotFound(proof_key))?;
-            batch.push(proof);
-        }
-
-        let start_block = self
-            .btc_client
-            .get_block(&start_blkid.into())
-            .await
-            .inspect_err(|_| error!(%start_blkid, "Failed to fetch BTC block"))
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
-
-        let start_height = self
-            .btc_client
-            .get_transaction(
-                &start_block
-                    .coinbase()
-                    .expect("expect coinbase tx")
-                    .compute_txid(),
-            )
-            .await
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
-            .block_height();
+        // Get ancestor blocks and reverse to oldest-first order
+        let mut blocks = self.get_block_ancestors(end_block_id, num_blocks).await?;
+        blocks.reverse();
 
         let state = get_verification_state(
             self.btc_client.as_ref(),
@@ -133,15 +142,10 @@ impl ProvingOp for L1BatchOperator {
         .await
         .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
-        let blockspace_vk = hosts::get_verification_key(&ProofKey::new(
-            ProofContext::BtcBlockspace(start_blkid, start_blkid),
-            *task_id.host(),
-        ));
-
         Ok(L1BatchProofInput {
-            batch,
+            blocks,
             state,
-            blockspace_vk,
+            rollup_params: self.rollup_params.as_ref().clone(),
         })
     }
 }

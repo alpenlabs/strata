@@ -22,7 +22,7 @@ const MOCK_VK: [u32; 8] = [0u32; 8];
 /// allowing for efficient host selection for different proof types.
 pub fn get_host(id: &ProofContext) -> NativeHost {
     match id {
-        ProofContext::BtcBlockspace(_, _) => NativeHost {
+        ProofContext::BtcBlockspace(_) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_blockspace_proof_outer(zkvm);
                 Ok(())
@@ -30,7 +30,7 @@ pub fn get_host(id: &ProofContext) -> NativeHost {
         },
         ProofContext::L1Batch(_, _) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_l1_batch_proof(zkvm, &MOCK_VK);
+                process_l1_batch_proof(zkvm);
                 Ok(())
             })),
         },
