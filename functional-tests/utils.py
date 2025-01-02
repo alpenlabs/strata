@@ -201,14 +201,11 @@ def submit_checkpoint(
     # empty proof hex.
     # NOTE: The functional tests for verifying proofs need to provide non-empty
     # proofs
-    time.sleep(5)
     proof_keys = prover_rpc.dev_strata_proveCheckpoint(idx)
-    print(proof_keys)
     proof_key = proof_keys[0]
     wait_for_proof_with_time_out(prover_rpc, proof_key, time_out=100)
     proof = prover_rpc.dev_strata_getProof(proof_key)
 
-    # This is arbitrary
     seqrpc.strataadmin_submitCheckpointProof(idx, proof)
 
     # Wait a while for it to be posted to l1. This will happen when there
@@ -279,8 +276,7 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
         assert proof_status is not None
         print(f"Got the proof status {proof_status}")
         if proof_status == "Completed":
-            proof = prover_client_rpc.dev_strata_getProof(task_id)
-            print(f"Completed the proof generation for {task_id}: {proof}")
+            print(f"Completed the proof generation for {task_id}")
             break
 
         time.sleep(2)
