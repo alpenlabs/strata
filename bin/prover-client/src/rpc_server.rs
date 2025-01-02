@@ -1,6 +1,6 @@
 //! Bootstraps an RPC server for the prover client.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Context;
 use async_trait::async_trait;
@@ -191,5 +191,10 @@ impl StrataProverClientApiServer for ProverClientRpc {
         self.db
             .get_proof(key)
             .map_err(to_jsonrpsee_error("proof not found in db"))
+    }
+
+    async fn get_report(&self) -> RpcResult<HashMap<String, usize>> {
+        let task_tracker = self.task_tracker.lock().await;
+        Ok(task_tracker.generate_report())
     }
 }

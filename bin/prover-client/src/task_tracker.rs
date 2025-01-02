@@ -181,6 +181,25 @@ impl TaskTracker {
             })
             .collect()
     }
+
+    /// Generates a report of task statuses and their counts across all tasks.
+    pub fn generate_report(&self) -> HashMap<String, usize> {
+        let mut report: HashMap<String, usize> = HashMap::new();
+
+        for status in self.tasks.values() {
+            let status_str = match status {
+                ProvingTaskStatus::WaitingForDependencies(_) => "WaitingForDependencies",
+                ProvingTaskStatus::Pending => "Pending",
+                ProvingTaskStatus::ProvingInProgress => "ProvingInProgress",
+                ProvingTaskStatus::Completed => "Completed",
+                ProvingTaskStatus::Failed => "Failed",
+            };
+
+            *report.entry(status_str.to_string()).or_insert(0) += 1;
+        }
+
+        report
+    }
 }
 
 #[cfg(test)]
