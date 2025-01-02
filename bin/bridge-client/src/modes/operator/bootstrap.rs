@@ -31,7 +31,8 @@ use super::{constants::DB_THREAD_COUNT, task_manager::TaskManager};
 use crate::{
     args::Cli,
     constants::{
-        DEFAULT_DUTY_TIMEOUT_SEC, DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, ROCKSDB_RETRY_COUNT,
+        DEFAULT_DUTY_TIMEOUT_SEC, DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, MAX_RPC_RETRY_COUNT,
+        ROCKSDB_RETRY_COUNT,
     },
     db::open_rocksdb_database,
     rpc_server::{self, BridgeRpc},
@@ -169,10 +170,16 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
             .unwrap_or(DEFAULT_DUTY_TIMEOUT_SEC),
     );
 
+    let max_retry_count = args.max_rpc_retry_count.unwrap_or(MAX_RPC_RETRY_COUNT);
+
     // TODO: wrap these in `strata-tasks`
     let duty_task = tokio::spawn(async move {
         if let Err(e) = task_manager
-            .start(duty_polling_interval, duty_timeout_duration)
+            .start(
+                duty_polling_interval,
+                duty_timeout_duration,
+                max_retry_count,
+            )
             .await
         {
             error!(error = %e, "could not start task manager");

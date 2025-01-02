@@ -1,7 +1,5 @@
 //! Defines the error types associated with executing the transaction duties.
 
-use std::fmt;
-use deadpool::managed::{Manager::Error, PoolError};
 use jsonrpsee::core::ClientError as L2ClientError;
 use strata_bridge_tx_builder::errors::BridgeTxBuilderError;
 use strata_btcio::rpc::error::ClientError as L1ClientError;
@@ -51,8 +49,8 @@ pub enum ExecError {
     Xpriv,
 
     /// Error getting the web socket client from pool
-    #[error("fetching websocket client from pool failed: {0}")]
-    WsPool(#[from] PoolError<Error>),
+    #[error("fetching websocket client from pool failed")]
+    WsPool,
 }
 
 /// Result of a execution that may produce an [`ExecError`].
