@@ -73,17 +73,15 @@ fn extract_batch_duties(
                 .tip_verification_state()
                 .ok_or(Error::ChainInactive)?;
 
-            // Include blocks after genesis l1 height to current seen height
+            // Include blocks after genesis l1 height to last verified height
             let l1_range = (
                 state.genesis_l1_height() + 1,
                 current_l1_state.last_verified_block_num as u64,
             );
-            dbg!(l1_range);
 
             let genesis_l1_state_hash = state
                 .genesis_verification_hash()
                 .ok_or(Error::ChainInactive)?;
-            dbg!(current_l1_state);
             let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
             let l1_transition = (genesis_l1_state_hash, current_l1_state_hash);
 
