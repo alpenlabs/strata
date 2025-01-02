@@ -48,8 +48,8 @@ pub enum RollupVerifyingKey {
     Deserialize,
 )]
 pub enum ProofContext {
-    /// Identifier for the L1 block height used in a Bitcoin blockspace proof.
-    BtcBlockspace(L1BlockId),
+    /// Identifier representing a Bitcoin L1 block range (start, end) for blockscan proofs
+    BtcBlockspace(L1BlockId, L1BlockId),
 
     /// Identifier for a batch of L1 blocks being proven.
     /// Includes the starting and ending block heights.

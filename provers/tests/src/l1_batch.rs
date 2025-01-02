@@ -34,8 +34,8 @@ impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
 
         let mut batch = vec![];
         for height in start_height..=end_height {
-            let block = btc_chain.get_block(height);
-            let btc_proof = self.btc_proof_generator.get_proof(block)?;
+            let blocks = vec![btc_chain.get_block(height).clone()];
+            let btc_proof = self.btc_proof_generator.get_proof(&blocks)?;
             batch.push(btc_proof);
         }
 

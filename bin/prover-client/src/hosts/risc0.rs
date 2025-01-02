@@ -32,7 +32,7 @@ static CHECKPOINT_HOST: LazyLock<Risc0Host> =
 /// instance, allowing for efficient host selection for different proof types.
 pub fn get_host(id: &ProofContext) -> &'static Risc0Host {
     match id {
-        ProofContext::BtcBlockspace(_) => &BTC_BLOCKSPACE_HOST,
+        ProofContext::BtcBlockspace(_, _) => &BTC_BLOCKSPACE_HOST,
         ProofContext::L1Batch(_, _) => &L1_BATCH_HOST,
         ProofContext::EvmEeStf(_, _) => &EVM_EE_STF_HOST,
         ProofContext::ClStf(_) => &CL_STF_HOST,

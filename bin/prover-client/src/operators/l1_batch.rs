@@ -65,10 +65,11 @@ impl ProvingOp for L1BatchOperator {
         let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
 
         for height in start_height..=end_height {
+            // TODO: Use mini batch of sizes > 1
             let blkid = self.btc_blockspace_operator.get_id(height).await?;
-            let proof_id = ProofContext::BtcBlockspace(blkid);
+            let proof_id = ProofContext::BtcBlockspace(blkid, blkid);
             self.btc_blockspace_operator
-                .create_task(height, task_tracker.clone(), db)
+                .create_task((height, height), task_tracker.clone(), db)
                 .await?;
             btc_deps.push(proof_id);
         }
@@ -133,7 +134,7 @@ impl ProvingOp for L1BatchOperator {
         .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
         let blockspace_vk = hosts::get_verification_key(&ProofKey::new(
-            ProofContext::BtcBlockspace(start_blkid),
+            ProofContext::BtcBlockspace(start_blkid, start_blkid),
             *task_id.host(),
         ));
 

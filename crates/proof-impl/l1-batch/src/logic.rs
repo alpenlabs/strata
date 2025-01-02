@@ -1,7 +1,7 @@
 use bitcoin::{block::Header, consensus::deserialize};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::buf::Buf32;
-use strata_proofimpl_btc_blockspace::logic::BlockspaceProofOutput;
+use strata_proofimpl_btc_blockspace::logic::BlockScanProofOutput;
 use strata_state::{
     batch::BatchCheckpoint,
     l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot},
@@ -9,6 +9,7 @@ use strata_state::{
 };
 use strata_zkvm::ZkVmEnv;
 
+/// Represents the public parameters of the L1BlockScan batch proof.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
@@ -36,12 +37,14 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv, btc_blockspace_vk: &[u32; 8])
     let mut rollup_params_commitment = None;
 
     for _ in 0..num_inputs {
-        let blkpo: BlockspaceProofOutput = zkvm.read_verified_borsh(btc_blockspace_vk);
-        let header: Header = deserialize(&blkpo.header_raw).unwrap();
+        let blkpo: BlockScanProofOutput = zkvm.read_verified_borsh(btc_blockspace_vk);
 
-        state.check_and_update_continuity(&header, &get_btc_params());
-        deposits.extend(blkpo.deposits);
-        prev_checkpoint = prev_checkpoint.or(blkpo.prev_checkpoint);
+        for blockscan_result in blkpo.blockscan_results {
+            let header: Header = deserialize(&blockscan_result.header_raw).unwrap();
+            state.check_and_update_continuity(&header, &get_btc_params());
+            deposits.extend(blockscan_result.deposits);
+            prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);
+        }
 
         // Ensure that the rollup parameters used are same for all blocks
         if let Some(filters_comm) = rollup_params_commitment {
