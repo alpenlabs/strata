@@ -6,7 +6,6 @@ use bitcoin::{
     Block, Wtxid,
 };
 use secp256k1::XOnlyPublicKey;
-use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
@@ -19,6 +18,7 @@ use strata_sp1_adapter;
 use strata_state::{
     batch::BatchCheckpoint, l1::L1Tx, sync_event::SyncEvent, tx::ProtocolOperation,
 };
+use strata_storage::managers::l1::L1BlockManager;
 use strata_tx_parser::messages::{BlockData, L1Event};
 use strata_zkvm::ZkVmResult;
 use tokio::sync::mpsc;
@@ -27,8 +27,8 @@ use tracing::*;
 use crate::csm::ctl::CsmController;
 
 /// Consumes L1 events and reflects them in the database.
-pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
-    l1db: Arc<D::L1DB>,
+pub fn bitcoin_data_handler_task(
+    l1_manager: Arc<L1BlockManager>,
     csm_ctl: Arc<CsmController>,
     mut event_rx: mpsc::Receiver<L1Event>,
     params: Arc<Params>,
@@ -45,9 +45,13 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     };
 
     while let Some(event) = event_rx.blocking_recv() {
-        if let Err(e) =
-            handle_bitcoin_event(event, l1db.as_ref(), csm_ctl.as_ref(), &params, seq_pubkey)
-        {
+        if let Err(e) = handle_bitcoin_event(
+            event,
+            l1_manager.as_ref(),
+            csm_ctl.as_ref(),
+            &params,
+            seq_pubkey,
+        ) {
             error!(err = %e, "failed to handle L1 event");
         }
     }
@@ -56,21 +60,18 @@ pub fn bitcoin_data_handler_task<D: Database + Send + Sync + 'static>(
     Ok(())
 }
 
-fn handle_bitcoin_event<L1D>(
+fn handle_bitcoin_event(
     event: L1Event,
-    l1db: &L1D,
+    l1_manager: &L1BlockManager,
     csm_ctl: &CsmController,
     params: &Arc<Params>,
     seq_pubkey: Option<XOnlyPublicKey>,
-) -> anyhow::Result<()>
-where
-    L1D: L1Database + Sync + Send + 'static,
-{
+) -> anyhow::Result<()> {
     match event {
         L1Event::RevertTo(revert_blk_num) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
-            l1db.revert_to_height(revert_blk_num)?;
+            l1_manager.revert_to_height(revert_blk_num)?;
             debug!(%revert_blk_num, "wrote revert");
 
             // Write to sync event db.
@@ -95,7 +96,7 @@ where
             let manifest = generate_block_manifest(blockdata.block(), epoch);
             let l1txs: Vec<_> = generate_l1txs(&blockdata);
             let num_txs = l1txs.len();
-            l1db.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
+            l1_manager.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
             info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
             // Write to sync event db if it's something we care about.

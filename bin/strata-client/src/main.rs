@@ -30,7 +30,9 @@ use strata_rocksdb::{
 use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
 use strata_status::StatusChannel;
 use strata_storage::{
-    managers::checkpoint::CheckpointDbManager, ops::bridge_relay::BridgeMsgOps, L2BlockManager,
+    managers::{checkpoint::CheckpointDbManager, l1::L1BlockManager},
+    ops::bridge_relay::BridgeMsgOps,
+    L2BlockManager,
 };
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
@@ -124,6 +126,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
 
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), database.clone()));
+    let l1_block_manager = Arc::new(L1BlockManager::new(pool.clone(), database.clone()));
 
     // Check if we have to do genesis.
     if genesis::check_needs_client_init(database.as_ref())? {
@@ -141,6 +144,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         params.clone(),
         database,
         l2_block_manager,
+        l1_block_manager,
         checkpoint_manager,
         bridge_msg_ops,
         bitcoin_client,
@@ -317,6 +321,7 @@ fn start_core_tasks(
     params: Arc<Params>,
     database: Arc<CommonDb>,
     l2_block_manager: Arc<L2BlockManager>,
+    l1_block_manager: Arc<L1BlockManager>,
     checkpoint_manager: Arc<CheckpointDbManager>,
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
@@ -360,7 +365,7 @@ fn start_core_tasks(
         sync_manager.get_params(),
         config,
         bitcoin_client.clone(),
-        database.clone(),
+        l1_block_manager,
         sync_manager.get_csm_ctl(),
         status_channel.clone(),
     )?;
