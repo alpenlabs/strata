@@ -9,7 +9,6 @@ strata-chaintsn.workspace = true
 strata-crypto = { workspace = true, default-features = true }
 strata-db.workspace = true
 strata-eectl.workspace = true
-strata-native-zkvm-adapter.workspace = true
 strata-primitives.workspace = true
 strata-risc0-adapter.workspace = true
 strata-rpc-types.workspace = true
