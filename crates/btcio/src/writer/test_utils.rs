@@ -7,13 +7,13 @@ use strata_rocksdb::{
     L1BroadcastDb, RBSeqBlobDb,
 };
 use strata_storage::ops::{
-    inscription::{Context, InscriptionDataOps},
+    envelope::{Context, EnvelopeDataOps},
     l1tx_broadcast::Context as BContext,
 };
 
 use crate::{
     broadcaster::L1BroadcastHandle,
-    writer::config::{InscriptionFeePolicy, WriterConfig},
+    writer::config::{FeePolicy, WriterConfig},
 };
 
 /// Returns `Arc` of `SequencerDB` for testing
@@ -23,8 +23,8 @@ pub fn get_db() -> Arc<SequencerDB<RBSeqBlobDb>> {
     Arc::new(SequencerDB::new(seqdb))
 }
 
-/// Returns `Arc` of `InscriptionDataOps` for testing
-pub fn get_inscription_ops() -> Arc<InscriptionDataOps> {
+/// Returns `Arc` of `EnvelopeDataOps` for testing
+pub fn get_envelope_ops() -> Arc<EnvelopeDataOps> {
     let pool = threadpool::Builder::new().num_threads(2).build();
     let db = get_db();
     let ops = Context::new(db).into_ops(pool);
@@ -58,7 +58,7 @@ pub fn get_config() -> WriterConfig {
     WriterConfig {
         sequencer_address: addr,
         rollup_name: "strata".to_string(),
-        inscription_fee_policy: InscriptionFeePolicy::Fixed(100),
+        fee_policy: FeePolicy::Fixed(100),
         poll_duration_ms: 1000,
         amount_for_reveal_txn: 1000,
     }

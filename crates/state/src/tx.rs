@@ -49,12 +49,12 @@ pub struct DepositRequestInfo {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct InscriptionData {
-    /// payload present in inscription transaction (either batchTx or checkpointTx)
+pub struct EnvelopeData {
+    /// payload present in envelope transaction (either batchTx or checkpointTx)
     batch_data: Vec<u8>,
 }
 
-impl InscriptionData {
+impl EnvelopeData {
     pub fn new(batch_data: Vec<u8>) -> Self {
         Self { batch_data }
     }

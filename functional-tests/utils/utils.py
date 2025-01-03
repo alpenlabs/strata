@@ -221,7 +221,7 @@ def submit_checkpoint(
         wait_until(
             lambda: manual_gen.btcrpc.proxy.gettransaction(published_txid)["confirmations"] > 0,
             timeout=5,
-            error_with="Published inscription not confirmed",
+            error_with="Published envelope not confirmed",
         )
 
 

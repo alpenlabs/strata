@@ -1,4 +1,4 @@
-//! Operations for reading/writing inscription related data from/to Database
+//! Operations for reading/writing envelope related data from/to Database
 
 use std::sync::Arc;
 
@@ -18,19 +18,19 @@ pub struct Context<D> {
 }
 
 impl<D: SequencerDatabase + Sync + Send + 'static> Context<D> {
-    /// Create a `Context` for [`InscriptionDataOps`]
+    /// Create a `Context` for [`EnvelopeDataOps`]
     pub fn new(db: Arc<D>) -> Self {
         Self { db }
     }
 
-    /// Convert to [`InscriptionDataOps`] using a [`ThreadPool`]
-    pub fn into_ops(self, pool: ThreadPool) -> InscriptionDataOps {
-        InscriptionDataOps::new(pool, Arc::new(self))
+    /// Convert to [`EnvelopeDataOps`] using a [`ThreadPool`]
+    pub fn into_ops(self, pool: ThreadPool) -> EnvelopeDataOps {
+        EnvelopeDataOps::new(pool, Arc::new(self))
     }
 }
 
 inst_ops! {
-    (InscriptionDataOps, Context<D: SequencerDatabase>) {
+    (EnvelopeDataOps, Context<D: SequencerDatabase>) {
         get_blob_entry(id: Buf32) => Option<BlobEntry>;
         get_blob_entry_by_idx(idx: u64) => Option<BlobEntry>;
         get_blob_entry_id(idx: u64) => Option<Buf32>;

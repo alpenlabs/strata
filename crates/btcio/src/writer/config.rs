@@ -11,8 +11,8 @@ pub struct WriterConfig {
     /// Time between each processing queue item, in millis
     pub(super) poll_duration_ms: u64,
 
-    /// How should the inscription fee be determined
-    pub(super) inscription_fee_policy: InscriptionFeePolicy,
+    /// How should the envelope fee be determined
+    pub(super) fee_policy: FeePolicy,
 
     /// How much amount(in sats) to send to reveal address
     pub(super) amount_for_reveal_txn: u64,
@@ -24,7 +24,7 @@ impl WriterConfig {
             sequencer_address,
             rollup_name,
             // TODO: get these from config as well
-            inscription_fee_policy: InscriptionFeePolicy::Smart,
+            fee_policy: FeePolicy::Smart,
             poll_duration_ms: 1_000,
             amount_for_reveal_txn: 1_000,
         })
@@ -32,7 +32,7 @@ impl WriterConfig {
 }
 
 #[derive(Debug, Clone)]
-pub enum InscriptionFeePolicy {
+pub enum FeePolicy {
     /// Use estimatesmartfee.
     Smart,
 

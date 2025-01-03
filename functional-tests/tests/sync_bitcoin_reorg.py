@@ -115,7 +115,7 @@ def check_nth_checkpoint_finalized_on_reorg(
     time.sleep(4)
 
     new_addr = btcrpc.proxy.getnewaddress()
-    # Create a block so that the inscription is included
+    # Create a block so that the envelope is included
     btcrpc.proxy.generatetoaddress(1, new_addr)
 
     # Create enough blocks to finalize

@@ -12,7 +12,7 @@ use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, Commitment
 use strata_zkvm::ProofReceipt;
 
 /// Represents data for a blob we're still planning to inscribe.
-// TODO rename to `BlockInscriptionEntry` to emphasize this isn't just about *all* blobs
+// TODO rename to `BlockEnvelopeEntry` to emphasize this isn't just about *all* blobs
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct BlobEntry {
     pub blob: Vec<u8>,
