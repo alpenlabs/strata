@@ -62,7 +62,7 @@ pub enum ClientStateWrite {
     /// Accept an L2 block and its height and update tip state.
     AcceptL2Block(L2BlockId, u64),
 
-    /// Rolls back L1 blocks to this block height.
+    /// Rolls back checkpoints to whatever was present at this block height.
     RollbackL1BlocksTo(u64),
 
     /// Sets the L1 tip, performing no validation.

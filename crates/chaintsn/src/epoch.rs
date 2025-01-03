@@ -292,7 +292,11 @@ fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use rand_core::SeedableRng;
-    use strata_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
+    use strata_primitives::{
+        buf::Buf32,
+        l1::{BitcoinAmount, L1BlockCommitment},
+        params::OperatorConfig,
+    };
     use strata_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
         bridge_state::OperatorTable,
@@ -327,7 +331,13 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_with_deposit_update_tx() {
-        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
+        let mut ag = ArbitraryGenerator::new();
+        let mut chs: Chainstate = ag.generate();
+
+        // Setting this to a sane value.
+        let safe_block = L1BlockCommitment::new(0, ag.generate());
+        chs.epoch_state_mut().set_safe_l1_block(safe_block);
+
         // get the l1 view state of the chain state
         let params = gen_params();
         // TODO refactor
@@ -338,29 +348,30 @@ mod tests {
 
         let epoch_state = chs.epoch_state().clone(); // TODO refactor
         let mut state_cache = StateCache::new(chs, epoch_state);
-        let amt: BitcoinAmount = ArbitraryGenerator::new().generate();
+        let amt: BitcoinAmount = BitcoinAmount::from_int_btc(10);
 
         let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> =
             (1..=params.rollup().l1_reorg_safe_depth + 1)
                 .map(|idx| {
-                    let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
-                    let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
-                    let tx = ArbitraryGenerator::new_with_size(1 << 8).generate();
+                    let mut ag = ArbitraryGenerator::new_with_size(1 << 16);
+                    let record = ag.generate();
+                    let proof = ag.generate();
+                    let tx = ag.generate();
 
-                    let l1tx = if idx == 1 {
+                    let mut deposit_update_txs = Vec::new();
+
+                    if idx == 1 {
                         let protocol_op = ProtocolOperation::Deposit(DepositInfo {
                             amt,
-                            outpoint: ArbitraryGenerator::new().generate(),
+                            outpoint: ag.generate(),
                             address: [0; 20].to_vec(),
                         });
-                        L1Tx::new(proof, tx, protocol_op)
-                    } else {
-                        ArbitraryGenerator::new_with_size(1 << 15).generate()
+                        let tx = DepositUpdateTx::new(L1Tx::new(proof, tx, protocol_op), idx);
+                        deposit_update_txs.push(tx);
                     };
 
-                    let deposit_update_tx = DepositUpdateTx::new(l1tx, idx);
                     L1HeaderPayload::new(tip_height + idx as u64, record)
-                        .with_deposit_update_txs(vec![deposit_update_tx])
+                        .with_deposit_update_txs(deposit_update_txs)
                         .build()
                 })
                 .collect();
@@ -395,7 +406,13 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update() {
-        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
+        let mut ag = ArbitraryGenerator::new();
+        let mut chs: Chainstate = ag.generate();
+
+        // Setting this to a sane value.
+        let safe_block = L1BlockCommitment::new(0, ag.generate());
+        chs.epoch_state_mut().set_safe_l1_block(safe_block);
+
         let params = gen_params();
         //let header_record = chs.l1_view();
         let old_safe_height = chs.epoch_state().safe_l1_height();
@@ -419,7 +436,7 @@ mod tests {
 
         assert_eq!(new_payloads.len() as u64, blocks_range_end - 1);
 
-        let mut l1_segment = L1Segment::new(new_payloads.clone());
+        let l1_segment = L1Segment::new(new_payloads.clone());
 
         // Process the L1 view update for matured blocks
         let result = process_l1_segment(&mut state_cache, &l1_segment, params.rollup());

@@ -206,7 +206,7 @@ mod tests {
         assert!(!validate_block_segments(&arb_exec_block));
 
         // mutate the l2Block's body to create a new block with arbitrary l1 segment
-        let blk_body = L2BlockBody::new(arb_l1_segment, block.body().exec_segment().clone());
+        let blk_body = L2BlockBody::new(Some(arb_l1_segment), block.body().exec_segment().clone());
         let arb_l1_block = L2Block::new(block.header().clone(), blk_body);
         assert!(!validate_block_segments(&arb_l1_block));
     }

@@ -537,6 +537,7 @@ mod tests {
         let l1_verification_state =
             chain.get_verification_state(genesis as u32 + 1, &MAINNET.clone().into());
 
+        let horizon_block = L1BlockCommitment::new(horizon, l1_chain[0].block_hash().into());
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();
 
@@ -557,17 +558,17 @@ mod tests {
                 description: "At horizon block",
                 events: &[TestEvent {
                     event: SyncEvent::L1Block(horizon, l1_chain[0].block_hash()),
-                    expected_writes: &[ClientStateWrite::AcceptL1Block(l1_chain[0].block_hash())],
+                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
+                        horizon,
+                        l1_chain[0].block_hash().into(),
+                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
                     let l1_chain = l1_chain.clone();
                     move |state| {
                         assert!(!state.is_chain_active());
-                        assert_eq!(
-                            state.most_recent_l1_block(),
-                            Some(&l1_chain[0].block_hash())
-                        );
+                        assert_eq!(state.tip_l1_blkid(), &l1_chain[0].block_hash().into());
                         assert_eq!(state.next_exp_l1_block(), horizon + 1);
                     }
                 }),
@@ -575,18 +576,18 @@ mod tests {
             TestCase {
                 description: "At horizon block + 1",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Block(horizon + 1, l1_chain[1].block_hash()),
-                    expected_writes: &[ClientStateWrite::AcceptL1Block(l1_chain[1].block_hash())],
+                    event: SyncEvent::L1Block(horizon + 1, l1_chain[1].block_hash().into()),
+                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
+                        horizon + 1,
+                        l1_chain[1].block_hash().into(),
+                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
                     let l1_chain = l1_chain.clone();
                     move |state| {
                         assert!(!state.is_chain_active());
-                        assert_eq!(
-                            state.most_recent_l1_block(),
-                            Some(&l1_chain[1].block_hash())
-                        );
+                        assert_eq!(state.tip_l1_blkid(), &l1_chain[1].block_hash().into());
                         // Because values for horizon is 40318, genesis is 40320
                         assert_eq!(state.next_exp_l1_block(), genesis);
                     }
@@ -597,11 +598,12 @@ mod tests {
                 events: &[TestEvent {
                     event: SyncEvent::L1Block(
                         genesis,
-                        l1_chain[(genesis - horizon) as usize].block_hash(),
+                        l1_chain[(genesis - horizon) as usize].block_hash().into(),
                     ),
-                    expected_writes: &[ClientStateWrite::AcceptL1Block(
-                        l1_chain[(genesis - horizon) as usize].block_hash(),
-                    )],
+                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
+                        genesis,
+                        l1_chain[(genesis - horizon) as usize].block_hash().into(),
+                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new(move |state| {
@@ -616,9 +618,13 @@ mod tests {
                         genesis + 1,
                         l1_chain[(genesis + 1 - horizon) as usize].block_hash(),
                     ),
-                    expected_writes: &[ClientStateWrite::AcceptL1Block(
-                        l1_chain[(genesis + 1 - horizon) as usize].block_hash(),
-                    )],
+
+                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
+                        genesis + 1,
+                        l1_chain[(genesis + 1 - horizon) as usize]
+                            .block_hash()
+                            .into(),
+                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -627,14 +633,12 @@ mod tests {
                     move |state| {
                         assert!(!state.is_chain_active());
                         assert_eq!(
-                            state.most_recent_l1_block(),
-                            Some(&l1_chain[(genesis + 1 - horizon) as usize].block_hash(),)
+                            state.tip_l1_blkid(),
+                            &l1_chain[(genesis + 1 - horizon) as usize]
+                                .block_hash()
+                                .into()
                         );
                         assert_eq!(state.next_exp_l1_block(), genesis + 2);
-                        assert_eq!(
-                            state.l1_view().local_unaccepted_blocks(),
-                            &blkids[0..(genesis + 1 - horizon + 1) as usize]
-                        );
                     }
                 }),
             },
@@ -645,9 +649,12 @@ mod tests {
                         genesis + 2,
                         l1_chain[(genesis + 2 - horizon) as usize].block_hash(),
                     ),
-                    expected_writes: &[ClientStateWrite::AcceptL1Block(
-                        l1_chain[(genesis + 2 - horizon) as usize].block_hash(),
-                    )],
+                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
+                        genesis + 2,
+                        l1_chain[(genesis + 2 - horizon) as usize]
+                            .block_hash()
+                            .into(),
+                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -656,14 +663,12 @@ mod tests {
                     move |state| {
                         assert!(!state.is_chain_active());
                         assert_eq!(
-                            state.most_recent_l1_block(),
-                            Some(&l1_chain[(genesis + 2 - horizon) as usize].block_hash())
+                            state.tip_l1_blkid(),
+                            &l1_chain[(genesis + 2 - horizon) as usize]
+                                .block_hash()
+                                .into()
                         );
                         assert_eq!(state.next_exp_l1_block(), genesis + 3);
-                        assert_eq!(
-                            state.l1_view().local_unaccepted_blocks(),
-                            &blkids[0..(genesis + 2 - horizon + 1) as usize]
-                        );
                     }
                 }),
             },
@@ -693,9 +698,12 @@ mod tests {
                             genesis + 3,
                             l1_chain[(genesis + 3 - horizon) as usize].block_hash(),
                         ),
-                        expected_writes: &[ClientStateWrite::AcceptL1Block(
-                            l1_chain[(genesis + 3 - horizon) as usize].block_hash(),
-                        )],
+                        expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
+                            genesis + 3,
+                            l1_chain[(genesis + 3 - horizon) as usize]
+                                .block_hash()
+                                .into(),
+                        ))],
                         expected_actions: &[],
                     },
                 ],
@@ -711,7 +719,13 @@ mod tests {
                 description: "Rollback to genesis height",
                 events: &[TestEvent {
                     event: SyncEvent::L1Revert(genesis),
-                    expected_writes: &[ClientStateWrite::RollbackL1BlocksTo(genesis)],
+                    expected_writes: &[
+                        ClientStateWrite::RollbackL1BlocksTo(genesis),
+                        ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
+                            genesis,
+                            l1_chain[(genesis - horizon) as usize].block_hash().into(),
+                        )),
+                    ],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({ move |state| {} }),
