@@ -111,9 +111,25 @@ impl ProvingOp for CheckpointOperator {
 
         let ckp_proof_id = ProofContext::Checkpoint(ckp_idx);
 
+        // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
+        // include the range in terms of block_id.
+        // https://alpenlabs.atlassian.net/browse/STR-756
+        let start_l1_block_id = self
+            .l1_batch_operator
+            .get_block_at(checkpoint_info.l1_range.0)
+            .await?;
+        let end_l1_block_id = self
+            .l1_batch_operator
+            .get_block_at(checkpoint_info.l1_range.1)
+            .await?;
+
         let l1_batch_keys = self
             .l1_batch_operator
-            .create_task(checkpoint_info.l1_range, task_tracker.clone(), db)
+            .create_task(
+                (start_l1_block_id, end_l1_block_id),
+                task_tracker.clone(),
+                db,
+            )
             .await?;
         let l1_batch_id = l1_batch_keys
             .first()

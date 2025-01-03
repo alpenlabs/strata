@@ -23,12 +23,9 @@ use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] trait for L1 Batch Proof generation.
 ///
-/// It is responsible for managing the data and tasks required to generate proofs for L1 Batch. It
+/// It is responsible for managing the data to generate proofs for L1 Batch. It
 /// fetches the necessary inputs for the [`L1BatchProver`] by:
-///
-/// - Utilizing the [`BtcBlockspaceOperator`] to create and manage proving tasks for BTC Blockspace.
-///   The resulting BTC Blockspace proofs are incorporated as part of the input for the CL STF
-///   proof.
+/// - Fetching the Bitcoin blocks and verification state for the given block range.
 /// - Interfacing with the Bitcoin Client to fetch additional required information for batch proofs.
 #[derive(Debug, Clone)]
 pub struct L1BatchOperator {
@@ -44,14 +41,6 @@ impl L1BatchOperator {
         }
     }
 
-    async fn get_block_at(&self, height: u64) -> Result<bitcoin::Block, ProvingTaskError> {
-        self.btc_client
-            .get_block_at(height)
-            .await
-            .inspect_err(|_| error!(%height, "Failed to fetch BTC block"))
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))
-    }
-
     async fn get_block(&self, block_id: L1BlockId) -> Result<bitcoin::Block, ProvingTaskError> {
         self.btc_client
             .get_block(&block_id.into())
@@ -61,12 +50,7 @@ impl L1BatchOperator {
     }
 
     async fn get_block_height(&self, block_id: L1BlockId) -> Result<u64, ProvingTaskError> {
-        let block = self
-            .btc_client
-            .get_block(&block_id.into())
-            .await
-            .inspect_err(|_| error!(%block_id, "Failed to fetch BTC block"))
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+        let block = self.get_block(block_id).await?;
 
         let block_height = self
             .btc_client
@@ -79,7 +63,7 @@ impl L1BatchOperator {
     }
 
     /// Retrieves the specified number of ancestor block IDs for the given block ID.
-    pub async fn get_block_ancestors(
+    async fn get_block_ancestors(
         &self,
         block_id: L1BlockId,
         n_ancestors: u64,
@@ -94,22 +78,33 @@ impl L1BatchOperator {
 
         Ok(ancestors)
     }
+
+    /// Retrieves the block ID at the specified height.
+    ///
+    /// Note: This function will be removed once checkpoint_info includes the block ID range.
+    /// Currently, it requires a manual L1 block index-to-ID conversion by the checkpoint operator.
+    // https://alpenlabs.atlassian.net/browse/STR-756
+    pub async fn get_block_at(&self, height: u64) -> Result<L1BlockId, ProvingTaskError> {
+        let block_hash = self
+            .btc_client
+            .get_block_hash(height)
+            .await
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+        Ok(block_hash.into())
+    }
 }
 
 impl ProvingOp for L1BatchOperator {
     type Prover = L1BatchProver;
-    type Params = (u64, u64);
+    type Params = (L1BlockId, L1BlockId);
 
     async fn create_task(
         &self,
-        params: (u64, u64),
+        params: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let (start_height, end_height) = params;
-
-        let start_blkid = self.get_block_at(start_height).await?.block_hash().into();
-        let end_blkid = self.get_block_at(end_height).await?.block_hash().into();
+        let (start_blkid, end_blkid) = params;
         let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
 
         let mut task_tracker = task_tracker.lock().await;

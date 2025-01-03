@@ -518,3 +518,8 @@ def cl_slot_to_block_id(seqrpc, slot):
 def el_slot_to_block_id(rethrpc, block_num):
     """Get EL block hash from block number using Ethereum RPC."""
     return rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]
+
+
+def bytes_to_big_endian(hash):
+    """Reverses the byte order of a hexadecimal string to produce big-endian format."""
+    return "".join(reversed([hash[i : i + 2] for i in range(0, len(hash), 2)]))

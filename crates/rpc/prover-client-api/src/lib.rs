@@ -26,7 +26,7 @@ pub trait StrataProverClientApi {
 
     /// Start proving the given l1 Batch
     #[method(name = "proveL1Batch")]
-    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Vec<ProofKey>>;
+    async fn prove_l1_batch(&self, l1_range: (L1BlockId, L1BlockId)) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given l2 batch
     #[method(name = "proveL2Batch")]

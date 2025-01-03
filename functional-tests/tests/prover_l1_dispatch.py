@@ -4,7 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
-from utils import wait_for_proof_with_time_out
+from utils import bytes_to_big_endian, wait_for_proof_with_time_out
 
 
 @flexitest.register
@@ -27,7 +27,7 @@ class ProverClientTest(testenv.StrataTester):
         blockhash = btcrpc.proxy.getblockhash(block_height)
         print(block_height, blockhash)
 
-        task_ids = prover_client_rpc.dev_strata_proveBtcBlock(fix_reversed_blockhash(blockhash))
+        task_ids = prover_client_rpc.dev_strata_proveBtcBlock(bytes_to_big_endian(blockhash))
         self.debug(f"got task ids: {task_ids}")
         task_id = task_ids[0]
         self.debug(f"using task id: {task_id}")
@@ -35,7 +35,3 @@ class ProverClientTest(testenv.StrataTester):
 
         time_out = 10 * 60
         wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
-
-
-def fix_reversed_blockhash(reversed_hash):
-    return "".join(reversed([reversed_hash[i : i + 2] for i in range(0, len(reversed_hash), 2)]))

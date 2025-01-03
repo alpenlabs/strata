@@ -111,7 +111,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .expect("failed to create task"))
     }
 
-    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_l1_batch(&self, l1_range: (L1BlockId, L1BlockId)) -> RpcResult<Vec<ProofKey>> {
         Ok(self
             .operator
             .l1_batch_operator()
