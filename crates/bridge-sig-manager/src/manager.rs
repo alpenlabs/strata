@@ -23,6 +23,7 @@ use strata_primitives::{
         Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig, PublickeyTable,
         TxSigningData,
     },
+    buf::Buf32,
     l1::TaprootSpendPath,
 };
 use strata_storage::ops::bridge::BridgeTxStateOps;
@@ -77,7 +78,12 @@ impl SignatureManager {
         // fixed.
         //
         // A collision between `Txid`'s is practically impossible.
-        if self.db_ops.get_tx_state_async(txid).await?.is_some() {
+        if self
+            .db_ops
+            .get_tx_state_async(Buf32::from(txid))
+            .await?
+            .is_some()
+        {
             info!(%txid, "not replacing tx_state that is already present in the tx_db");
             return Ok(txid);
         }
@@ -99,7 +105,9 @@ impl SignatureManager {
 
         tx_state.add_nonce(&self.index, pub_nonce.into())?;
 
-        self.db_ops.put_tx_state_async(txid, tx_state).await?;
+        self.db_ops
+            .put_tx_state_async(Buf32::from(txid), tx_state)
+            .await?;
 
         Ok(txid)
     }
@@ -113,7 +121,7 @@ impl SignatureManager {
     /// ([`BridgeSigError::TransactionNotFound`]). Or, if there is an error in the persistence layer
     /// itself ([`BridgeSigError::Storage`]).
     pub async fn get_tx_state(&self, txid: &Txid) -> BridgeSigResult<BridgeTxState> {
-        let entry = self.db_ops.get_tx_state_async(*txid).await?;
+        let entry = self.db_ops.get_tx_state_async(Buf32::from(txid)).await?;
 
         entry.ok_or(BridgeSigError::TransactionNotFound)
     }
@@ -177,7 +185,9 @@ impl SignatureManager {
         let mut tx_state = self.get_tx_state(txid).await?;
 
         let is_complete = tx_state.add_nonce(&operator_index, pub_nonce.clone())?;
-        self.db_ops.put_tx_state_async(*txid, tx_state).await?;
+        self.db_ops
+            .put_tx_state_async(Buf32::from(txid), tx_state)
+            .await?;
 
         Ok(is_complete)
     }
@@ -244,7 +254,9 @@ impl SignatureManager {
 
         let is_fully_signed = tx_state.add_signature(own_signature_info)?;
 
-        self.db_ops.put_tx_state_async(*txid, tx_state).await?;
+        self.db_ops
+            .put_tx_state_async(Buf32::from(txid), tx_state)
+            .await?;
 
         Ok(is_fully_signed)
     }
@@ -301,7 +313,7 @@ impl SignatureManager {
 
         tx_state.add_signature(signature_info)?;
         self.db_ops
-            .put_tx_state_async(*txid, tx_state.clone())
+            .put_tx_state_async(Buf32::from(txid), tx_state.clone())
             .await?;
 
         Ok(tx_state.is_fully_signed())
@@ -621,7 +633,7 @@ mod tests {
 
         let state = sig_manager
             .db_ops
-            .get_tx_state_async(txid)
+            .get_tx_state_async(Buf32::from(txid))
             .await
             .expect("should be able to access stored state")
             .expect("state should be present");
@@ -644,7 +656,7 @@ mod tests {
 
         let updated_state = sig_manager
             .db_ops
-            .get_tx_state_async(txid)
+            .get_tx_state_async(Buf32::from(txid))
             .await
             .expect("should be able to access state")
             .expect("state should be defined");
@@ -733,7 +745,7 @@ mod tests {
         // Verify that the signature was added
         let stored_tx_state = signature_manager
             .db_ops
-            .get_tx_state_async(txid)
+            .get_tx_state_async(Buf32::from(txid))
             .await
             .expect("read state from db")
             .expect("state should be present");
