@@ -146,7 +146,7 @@ impl ProvingOp for ClStfOperator {
             .map_err(ProvingTaskError::DatabaseError)?;
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(cl_stf_id, vec![*evm_ee_id])
+        task_tracker.create_tasks(cl_stf_id, vec![*evm_ee_id], db)
     }
 
     async fn fetch_input(

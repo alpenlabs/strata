@@ -53,11 +53,11 @@ impl ProvingOp for BtcBlockspaceOperator {
         &self,
         block_num: u64,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        _db: &ProofDb,
+        db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let context = ProofContext::BtcBlockspace(self.get_id(block_num).await?);
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(context, vec![])
+        task_tracker.create_tasks(context, vec![], db)
     }
 
     async fn fetch_input(

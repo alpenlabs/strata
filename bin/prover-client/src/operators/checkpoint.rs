@@ -146,7 +146,7 @@ impl ProvingOp for CheckpointOperator {
             .map_err(ProvingTaskError::DatabaseError)?;
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(ckp_proof_id, deps)
+        task_tracker.create_tasks(ckp_proof_id, deps, db)
     }
 
     async fn fetch_input(
