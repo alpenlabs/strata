@@ -13429,6 +13429,7 @@ dependencies = [
  "shrex",
  "strata-btcio",
  "strata-common",
+ "strata-crypto",
  "strata-primitives",
  "tokio",
  "tracing",
@@ -13493,7 +13494,10 @@ dependencies = [
  "reth-primitives",
  "revm",
  "revm-primitives",
+ "strata-crypto",
+ "strata-primitives",
  "strata-reth-primitives",
+ "thiserror",
 ]
 
 [[package]]
