@@ -12,7 +12,7 @@ use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::SyncAction};
 use strata_status::StatusChannel;
-use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
+use strata_storage::{CheckpointDbManager, L2BlockManager};
 use strata_tasks::ShutdownGuard;
 use tokio::{
     sync::{broadcast, mpsc},
