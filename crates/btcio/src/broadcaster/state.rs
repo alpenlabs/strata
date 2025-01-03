@@ -88,10 +88,7 @@ async fn filter_unfinalized_from_db(
 #[cfg(test)]
 mod test {
     use bitcoin::{consensus, Transaction};
-    use strata_db::{
-        traits::{BroadcastDatabase, L1BroadcastDatabase},
-        types::L1TxStatus,
-    };
+    use strata_db::{traits::BroadcastDatabase, types::L1TxStatus};
     use strata_rocksdb::{
         broadcaster::db::{BroadcastDb, L1BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
