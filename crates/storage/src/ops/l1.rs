@@ -11,8 +11,8 @@ use strata_state::l1::L1Tx;
 
 use crate::exec::*;
 
-inst_ops_auto! {
-    (L1DataOps, Context<D: L1Database>) {
+inst_ops_simple! {
+    (<D: L1Database> => L1DataOps) {
         put_block_data(idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) => ();
         revert_to_height(idx: u64) => ();
         get_chain_tip() => Option<u64>;

@@ -5,8 +5,8 @@ use strata_primitives::buf::Buf32;
 
 use crate::exec::*;
 
-inst_ops_auto! {
-    (BroadcastDbOps, Context<D: L1BroadcastDatabase>) {
+inst_ops_simple! {
+    (<D: L1BroadcastDatabase> => BroadcastDbOps) {
         get_tx_entry(idx: u64) => Option<L1TxEntry>;
         get_tx_entry_by_id(id: Buf32) => Option<L1TxEntry>;
         get_txid(idx: u64) => Option<Buf32>;
