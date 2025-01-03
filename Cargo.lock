@@ -13389,6 +13389,7 @@ name = "strata-prover-client-rpc-api"
 version = "0.1.0"
 dependencies = [
  "jsonrpsee",
+ "strata-primitives",
  "strata-rpc-types",
 ]
 

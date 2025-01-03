@@ -59,9 +59,9 @@ pub enum ProofContext {
     /// Transition Function (STF) proof.
     EvmEeStf(Buf32, Buf32),
 
-    /// Identifier for the Consensus Layer (CL) block used in generating the State Transition
+    /// Identifier for the Consensus Layer (CL) blocks used in generating the State Transition
     /// Function (STF) proof.
-    ClStf(L2BlockId),
+    ClStf(L2BlockId, L2BlockId),
 
     /// Identifier for a batch of Consensus Layer (CL) blocks being proven.
     /// Includes the starting and ending block heights.

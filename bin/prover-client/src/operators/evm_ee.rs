@@ -58,22 +58,15 @@ impl EvmEeOperator {
 
 impl ProvingOp for EvmEeOperator {
     type Prover = EvmEeProver;
-    type Params = (u64, u64);
+    type Params = (Buf32, Buf32);
 
     async fn create_task(
         &self,
-        block_range: (u64, u64),
+        block_range: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let (start_block_num, end_block_num) = block_range;
-
-        let start_block = self.get_block(start_block_num).await?;
-        let start_blkid: Buf32 = start_block.header.hash.into();
-
-        let end_block = self.get_block(end_block_num).await?;
-        let end_blkid: Buf32 = end_block.header.hash.into();
-
+        let (start_blkid, end_blkid) = block_range;
         let context = ProofContext::EvmEeStf(start_blkid, end_blkid);
 
         let mut task_tracker = task_tracker.lock().await;
