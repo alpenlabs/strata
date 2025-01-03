@@ -112,12 +112,19 @@ macro_rules! inst_ops_simple {
         }
 
         $(
-            fn $iname < $tparam : $tpconstr > (context: &Context<$tparam>, $($aname : $aty),* ) -> DbResult<$ret> {
-                context.db.as_ref(). $iname ( $($aname),* )
-            }
+            inst_ops_ctx_shim!($iname<$tparam: $tpconstr>($($aname: $aty),*) -> $ret);
         )*
     }
 }
 
+macro_rules! inst_ops_ctx_shim {
+    ($iname:ident<$tparam: ident : $tpconstr:tt>($($aname:ident: $aty:ty),*) -> $ret:ty) => {
+        fn $iname < $tparam : $tpconstr > (context: &Context<$tparam>, $($aname : $aty),* ) -> DbResult<$ret> {
+            context.db.as_ref(). $iname ( $($aname),* )
+        }
+    }
+}
+
 pub(crate) use inst_ops;
+pub(crate) use inst_ops_ctx_shim;
 pub(crate) use inst_ops_simple;
