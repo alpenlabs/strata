@@ -9,7 +9,7 @@ pub use tracing::*;
 /// Handle for receiving a result from a database operation on another thread.
 pub type DbRecv<T> = tokio::sync::oneshot::Receiver<DbResult<T>>;
 
-macro_rules! inst_ops_common {
+macro_rules! inst_ops {
     {
         ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
             $($iname:ident($($aname:ident: $aty:ty),*) => $ret:ty;)*
@@ -59,24 +59,7 @@ macro_rules! inst_ops_common {
             pub struct Inner $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? {
                 ctx: Arc<$ctx $(<$($tparam),+>)?>,
             }
-        }
-    }
-}
 
-macro_rules! inst_ops {
-    {
-        ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
-            $($iname:ident($($aname:ident: $aty:ty),*) => $ret:ty;)*
-        }
-    } => {
-
-        inst_ops_common!{
-            ($base, $ctx $(<$($tparam: $tpconstr),+>)?) {
-                $( $iname($($aname: $aty),*) => $ret; )*
-            }
-        }
-
-        paste::paste! {
             impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
@@ -102,22 +85,18 @@ macro_rules! inst_ops {
     }
 }
 
-/// Same as `inst_ops` but calls the methods on context db. The function name must exist
-/// in the database instance
-macro_rules! inst_ops_auto {
+macro_rules! inst_ops_simple {
     {
-        ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
+        (< $tparam:ident: $tpconstr:tt > => $base:ident) {
             $($iname:ident($($aname:ident: $aty:ty),*) => $ret:ty;)*
         }
     } => {
-        /// Database context for an database operation interface.
-        pub struct Context$(<$($tparam: $tpconstr), +>)? {
-            db: Arc<$($($tparam),+)?>
-
+        pub struct Context<$tparam : $tpconstr> {
+            db: Arc<$tparam>,
         }
 
-        impl$(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? Context$(<$($tparam),+>)? {
-            pub fn new(db: Arc<$($($tparam),+)?>) -> Self {
+        impl<$tparam : $tpconstr + Sync + Send + 'static> Context<$tparam> {
+            pub fn new(db: Arc<$tparam>) -> Self {
                 Self { db }
             }
 
@@ -126,38 +105,19 @@ macro_rules! inst_ops_auto {
             }
         }
 
-        inst_ops_common!{
-            ($base, $ctx $(<$($tparam: $tpconstr),+>)?) {
-                $( $iname($($aname: $aty),*) => $ret; )*
+        inst_ops! {
+            ($base, Context<$tparam : $tpconstr>) {
+                $($iname ($($aname : $aty ),*) => $ret ;)*
             }
         }
 
-        paste::paste! {
-            impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
-                $(
-                    fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
-                        self.ctx.db.$iname($($aname),*)
-                    }
-
-                    fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbRecv<$ret> {
-                        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
-                        let ctx = self.ctx.clone();
-
-                        pool.execute(move || {
-                            let res = ctx.db.$iname($($aname),*);
-                            if resp_tx.send(res).is_err() {
-                                warn!("failed to send response");
-                            }
-                        });
-
-                        resp_rx
-                    }
-                )*
+        $(
+            fn $iname < $tparam : $tpconstr > (context: &Context<$tparam>, $($aname : $aty),* ) -> DbResult<$ret> {
+                context.db.as_ref(). $iname ( $($aname),* )
             }
-        }
+        )*
     }
 }
 
 pub(crate) use inst_ops;
-pub(crate) use inst_ops_auto;
-pub(crate) use inst_ops_common;
+pub(crate) use inst_ops_simple;
