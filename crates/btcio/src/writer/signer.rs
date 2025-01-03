@@ -6,7 +6,7 @@ use strata_primitives::buf::Buf32;
 use tracing::*;
 
 use super::{
-    builder::{build_inscription_txs, InscriptionError},
+    builder::{build_envelope_txs, EnvelopeError},
     config::WriterConfig,
 };
 use crate::{
@@ -16,20 +16,20 @@ use crate::{
 
 type BlobIdx = u64;
 
-/// Create inscription transactions corresponding to a [`BlobEntry`].
+/// Create envelope transactions corresponding to a [`BlobEntry`].
 ///
 /// This is used during one of the cases:
 /// 1. A new blob intent needs to be signed
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
-pub async fn create_and_sign_blob_inscriptions(
+pub async fn create_and_sign_blob_envelopes(
     blobentry: &BlobEntry,
     broadcast_handle: &L1BroadcastHandle,
     client: Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
-) -> Result<(Buf32, Buf32), InscriptionError> {
-    trace!("Creating and signing blob inscriptions");
-    let (commit, reveal) = build_inscription_txs(&blobentry.blob, &client, config).await?;
+) -> Result<(Buf32, Buf32), EnvelopeError> {
+    trace!("Creating and signing blob envelopes");
+    let (commit, reveal) = build_envelope_txs(&blobentry.blob, &client, config).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");
@@ -52,11 +52,11 @@ pub async fn create_and_sign_blob_inscriptions(
     let _ = broadcast_handle
         .put_tx_entry(cid, centry)
         .await
-        .map_err(|e| InscriptionError::Other(e.into()))?;
+        .map_err(|e| EnvelopeError::Other(e.into()))?;
     let _ = broadcast_handle
         .put_tx_entry(rid, rentry)
         .await
-        .map_err(|e| InscriptionError::Other(e.into()))?;
+        .map_err(|e| EnvelopeError::Other(e.into()))?;
     Ok((cid, rid))
 }
 
@@ -70,12 +70,12 @@ mod test {
     use super::*;
     use crate::{
         test_utils::TestBitcoinClient,
-        writer::test_utils::{get_broadcast_handle, get_config, get_inscription_ops},
+        writer::test_utils::{get_broadcast_handle, get_config, get_envelope_ops},
     };
 
     #[tokio::test]
-    async fn test_create_and_sign_blob_inscriptions() {
-        let iops = get_inscription_ops();
+    async fn test_create_and_sign_blob_envelopes() {
+        let iops = get_envelope_ops();
         let bcast_handle = get_broadcast_handle();
         let client = Arc::new(TestBitcoinClient::new(1));
         let config = get_config();
@@ -93,7 +93,7 @@ mod test {
             .unwrap();
 
         let (cid, rid) =
-            create_and_sign_blob_inscriptions(&entry, bcast_handle.as_ref(), client, &config)
+            create_and_sign_blob_envelopes(&entry, bcast_handle.as_ref(), client, &config)
                 .await
                 .unwrap();
 

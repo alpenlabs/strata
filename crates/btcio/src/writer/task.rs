@@ -6,7 +6,7 @@ use strata_db::{
 };
 use strata_state::da_blob::{BlobDest, BlobIntent};
 use strata_status::StatusChannel;
-use strata_storage::ops::inscription::{Context, InscriptionDataOps};
+use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;
 use tracing::*;
 
@@ -15,16 +15,16 @@ use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::traits::{Reader, Signer, Wallet},
     status::{apply_status_updates, L1StatusUpdate},
-    writer::{builder::InscriptionError, signer::create_and_sign_blob_inscriptions},
+    writer::{builder::EnvelopeError, signer::create_and_sign_blob_envelopes},
 };
 
-/// A handle to the Inscription task.
-pub struct InscriptionHandle {
-    ops: Arc<InscriptionDataOps>,
+/// A handle to the Envelope task.
+pub struct EnvelopeHandle {
+    ops: Arc<EnvelopeDataOps>,
 }
 
-impl InscriptionHandle {
-    pub fn new(ops: Arc<InscriptionDataOps>) -> Self {
+impl EnvelopeHandle {
+    pub fn new(ops: Arc<EnvelopeDataOps>) -> Self {
         Self { ops }
     }
 
@@ -75,15 +75,15 @@ impl InscriptionHandle {
     }
 }
 
-/// Starts the inscription task.
+/// Starts the envelope task.
 ///
-/// This creates an [`InscriptionHandle`] and spawns a watcher task that watches the status of
+/// This creates an [`EnvelopeHandle`] and spawns a watcher task that watches the status of
 /// incriptions in bitcoin.
 ///
 /// # Returns
 ///
-/// [`Result<InscriptionHandle>`](anyhow::Result)
-pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
+/// [`Result<EnvelopeHandle>`](anyhow::Result)
+pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<impl Reader + Wallet + Signer + Send + Sync + 'static>,
     config: WriterConfig,
@@ -91,30 +91,30 @@ pub fn start_inscription_task<D: SequencerDatabase + Send + Sync + 'static>(
     status_channel: StatusChannel,
     pool: threadpool::ThreadPool,
     broadcast_handle: Arc<L1BroadcastHandle>,
-) -> anyhow::Result<Arc<InscriptionHandle>> {
-    let inscription_data_ops = Arc::new(Context::new(db).into_ops(pool));
-    let next_watch_blob_idx = get_next_blobidx_to_watch(inscription_data_ops.as_ref())?;
+) -> anyhow::Result<Arc<EnvelopeHandle>> {
+    let envelope_data_ops = Arc::new(Context::new(db).into_ops(pool));
+    let next_watch_blob_idx = get_next_blobidx_to_watch(envelope_data_ops.as_ref())?;
 
-    let inscription_handle = Arc::new(InscriptionHandle::new(inscription_data_ops.clone()));
+    let envelope_handle = Arc::new(EnvelopeHandle::new(envelope_data_ops.clone()));
 
     executor.spawn_critical_async("btcio::watcher_task", async move {
         watcher_task(
             next_watch_blob_idx,
             bitcoin_client,
             config,
-            inscription_data_ops,
+            envelope_data_ops,
             broadcast_handle,
             status_channel,
         )
         .await
     });
 
-    Ok(inscription_handle)
+    Ok(envelope_handle)
 }
 
 /// Looks into the database from descending index order till it reaches 0 or `Finalized`
 /// [`BlobEntry`] from which the rest of the [`BlobEntry`]s should be watched.
-fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u64> {
+fn get_next_blobidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u64> {
     let mut next_idx = insc_ops.get_next_blob_idx_blocking()?;
 
     while next_idx > 0 {
@@ -129,19 +129,19 @@ fn get_next_blobidx_to_watch(insc_ops: &InscriptionDataOps) -> anyhow::Result<u6
     Ok(next_idx)
 }
 
-/// Watches for inscription transactions status in bitcoin. Note that this watches for each
-/// inscription until it is confirmed
-/// Watches for inscription transactions status in the Bitcoin blockchain.
+/// Watches for envelope transactions status in bitcoin. Note that this watches for each
+/// envelope until it is confirmed
+/// Watches for envelope transactions status in the Bitcoin blockchain.
 ///
 /// # Note
 ///
-/// The inscription will be monitored until it acquires the status of
+/// The envelope will be monitored until it acquires the status of
 /// [`BlobL1Status::Finalized`]
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
     bitcoin_client: Arc<impl Reader + Wallet + Signer>,
     config: WriterConfig,
-    insc_ops: Arc<InscriptionDataOps>,
+    insc_ops: Arc<EnvelopeDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
@@ -159,7 +159,7 @@ pub async fn watcher_task(
                 // entry
                 BlobL1Status::Unsigned | BlobL1Status::NeedsResign => {
                     debug!(?blobentry.status, %curr_blobidx, "Processing unsigned blobentry");
-                    match create_and_sign_blob_inscriptions(
+                    match create_and_sign_blob_envelopes(
                         &blobentry,
                         &broadcast_handle,
                         bitcoin_client.clone(),
@@ -176,7 +176,7 @@ pub async fn watcher_task(
 
                             debug!(%curr_blobidx, "Signed blob");
                         }
-                        Err(InscriptionError::NotEnoughUtxos(required, available)) => {
+                        Err(EnvelopeError::NotEnoughUtxos(required, available)) => {
                             // Just wait till we have enough utxos and let the status be `Unsigned`
                             // or `NeedsResign`
                             // Maybe send an alert
@@ -246,7 +246,7 @@ async fn update_l1_status(
     {
         let status_updates = [
             L1StatusUpdate::LastPublishedTxid(blobentry.reveal_txid.into()),
-            L1StatusUpdate::IncrementInscriptionCount,
+            L1StatusUpdate::IncrementEnvelopeCount,
         ];
         apply_status_updates(&status_updates, status_channel).await;
     }
@@ -255,7 +255,7 @@ async fn update_l1_status(
 async fn update_existing_entry(
     idx: u64,
     updated_entry: BlobEntry,
-    insc_ops: &InscriptionDataOps,
+    insc_ops: &EnvelopeDataOps,
 ) -> anyhow::Result<()> {
     let msg = format!("Expect to find blobentry {idx} in db");
     let id = insc_ops.get_blob_entry_id_async(idx).await?.expect(&msg);
@@ -293,11 +293,11 @@ mod test {
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
-    use crate::writer::test_utils::get_inscription_ops;
+    use crate::writer::test_utils::get_envelope_ops;
 
     #[test]
     fn test_initialize_writer_state_no_last_blob_idx() {
-        let iops = get_inscription_ops();
+        let iops = get_envelope_ops();
 
         let nextidx = iops.get_next_blob_idx_blocking().unwrap();
         assert_eq!(nextidx, 0);
@@ -309,7 +309,7 @@ mod test {
 
     #[test]
     fn test_initialize_writer_state_with_existing_blobs() {
-        let iops = get_inscription_ops();
+        let iops = get_envelope_ops();
 
         let mut e1: BlobEntry = ArbitraryGenerator::new().generate();
         e1.status = BlobL1Status::Finalized;

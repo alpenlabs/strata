@@ -11,7 +11,7 @@ use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct TxFilterConfig {
-    /// For checkpoint update inscriptions.
+    /// For checkpoint update envelopes.
     pub rollup_name: String,
 
     /// For addresses that are expected to be spent to.
