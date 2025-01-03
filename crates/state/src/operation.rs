@@ -4,6 +4,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use strata_primitives::l1::L1BlockCommitment;
 use tracing::*;
 
 use crate::{
@@ -61,14 +62,11 @@ pub enum ClientStateWrite {
     /// Accept an L2 block and its height and update tip state.
     AcceptL2Block(L2BlockId, u64),
 
-    /// Rolls back L1 blocks to this block height.
+    /// Rolls back checkpoints to whatever was present at this block height.
     RollbackL1BlocksTo(u64),
 
-    /// Insert L1 blocks into the pending queue.
-    AcceptL1Block(L1BlockId),
-
-    /// Updates the buried block index to a higher index.
-    UpdateBuried(u64),
+    /// Sets the L1 tip, performing no validation.
+    SetL1Tip(L1BlockCommitment),
 
     /// Update the checkpoints
     CheckpointsReceived(Vec<L1Checkpoint>),
@@ -144,35 +142,10 @@ pub fn apply_writes_to_state(
 
             RollbackL1BlocksTo(height) => {
                 let l1v = state.l1_view_mut();
-                let buried_height = l1v.buried_l1_height();
-
-                if height < buried_height {
-                    error!(%height, %buried_height, "unable to roll back past buried height");
-                    panic!("operation: emitted invalid write");
-                }
-
-                let new_unacc_len = (height - buried_height) as usize;
-                let l1_vs = l1v.tip_verification_state();
-                if let Some(l1_vs) = l1_vs {
-                    // TODO: handle other things
-                    let mut rollbacked_l1_vs = l1_vs.clone();
-                    rollbacked_l1_vs.last_verified_block_num = height as u32;
-                    rollbacked_l1_vs.last_verified_block_hash =
-                        l1v.local_unaccepted_blocks[new_unacc_len];
-                }
-                l1v.local_unaccepted_blocks.truncate(new_unacc_len);
 
                 // Keep pending checkpoints whose l1 height is less than or equal to rollback height
                 l1v.verified_checkpoints
                     .retain(|ckpt| ckpt.height <= height);
-            }
-
-            AcceptL1Block(l1blkid) => {
-                debug!(?l1blkid, "received AcceptL1Block");
-                // TODO make this also do something
-                let l1v = state.l1_view_mut();
-                l1v.local_unaccepted_blocks.push(l1blkid);
-                l1v.next_expected_block += 1;
             }
 
             AcceptL2Block(blkid, height) => {
@@ -180,33 +153,12 @@ pub fn apply_writes_to_state(
                 debug!(%height, %blkid, "received AcceptL2Block");
                 let ss = state.expect_sync_mut();
                 ss.tip_blkid = blkid;
-                ss.tip_height = height;
+                ss.tip_slot = height;
             }
 
-            UpdateBuried(new_idx) => {
+            SetL1Tip(l1blk) => {
                 let l1v = state.l1_view_mut();
-
-                // Check that it's increasing.
-                let old_idx = l1v.buried_l1_height();
-
-                if new_idx < old_idx {
-                    panic!("operation: emitted non-greater buried height");
-                }
-
-                // Check that it's not higher than what we know about.
-                if new_idx > l1v.tip_height() {
-                    panic!("operation: new buried height above known L1 tip");
-                }
-
-                // If everything checks out we can just remove them.
-                let diff = (new_idx - old_idx) as usize;
-                let _blocks = l1v
-                    .local_unaccepted_blocks
-                    .drain(..diff)
-                    .collect::<Vec<_>>();
-
-                // TODO merge these blocks into the L1 MMR in the client state if
-                // we haven't already
+                l1v.tip_l1_block = l1blk;
             }
 
             CheckpointsReceived(checkpts) => {
@@ -231,20 +183,20 @@ pub fn apply_writes_to_state(
                 // checkpoint
                 l1v.verified_checkpoints.drain(..total_finalized);
 
-                if let Some(checkpt) = new_finalized {
+                if let Some(ckpt) = new_finalized {
                     // Check if heights match accordingly
                     if !l1v
                         .last_finalized_checkpoint
                         .as_ref()
-                        .is_none_or(|prev_chp| {
-                            checkpt.batch_info.idx() == prev_chp.batch_info.idx() + 1
+                        .is_none_or(|prev_ckpt| {
+                            ckpt.batch_info.epoch() == prev_ckpt.batch_info.epoch() + 1
                         })
                     {
                         panic!("operation: mismatched indices of pending checkpoint");
                     }
 
-                    let fin_blockid = *checkpt.batch_info.l2_blockid();
-                    l1v.last_finalized_checkpoint = Some(checkpt);
+                    let fin_blockid = *ckpt.batch_info.l2_blockid();
+                    l1v.last_finalized_checkpoint = Some(ckpt);
 
                     // Update finalized blockid in StateSync
                     state.expect_sync_mut().finalized_blkid = fin_blockid;

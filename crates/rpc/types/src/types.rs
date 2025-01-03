@@ -120,12 +120,18 @@ pub struct RpcClientStatus {
     #[serde(with = "hex::serde")]
     pub chain_tip: [u8; 32],
 
-    /// L1 chain tip slot.
+    /// L2 chain tip slot.
     pub chain_tip_slot: u64,
+
+    /// Current L2 epoch that the tip block is a part of.
+    pub cur_epoch: u64,
 
     /// L2 block that's been finalized and proven on L1.
     #[serde(with = "hex::serde")]
     pub finalized_blkid: [u8; 32],
+
+    /// Epoch that's been finalized on L1.
+    pub finalized_epoch: u64,
 
     /// Recent L1 block that we might still reorg.
     #[serde(with = "hex::serde")]
@@ -166,7 +172,8 @@ pub struct RpcBlockHeader {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DaBlob {
-    /// The destination or identifier for the blob.
+    /// The intended destination for the blob.
+    // TODO make into enum
     pub dest: u8,
 
     ///  The commitment hash for blob
@@ -175,11 +182,11 @@ pub struct DaBlob {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcExecUpdate {
-    /// The index of the update, used to track or sequence updates.
+    /// The index of the exec update, used to sequence update updates.
     pub update_idx: u64,
 
     /// Merkle tree root of the contents of the EL payload, in the order it was
-    /// strataed in the block.
+    /// stored in the block.
     #[serde(with = "hex::serde")]
     pub entries_root: [u8; 32],
 
@@ -204,14 +211,27 @@ pub struct RpcExecUpdate {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcSyncStatus {
-    /// Current head L2 slot known to this node
-    pub tip_height: u64,
+    /// Current head L2 slot known to this node.
+    pub cur_epoch: u64,
+
+    /// Current slot known to this node.
+    pub tip_slot: u64,
+
+    /// Current L2 blockid known to this node.
+    pub tip_blkid: L2BlockId,
+
+    /// Current head L2 slot known to this node.
+    // TODO rename to "slot"
+    pub csm_tip_height: u64,
 
     /// Last L2 block we've chosen as the current tip.
-    pub tip_block_id: strata_state::id::L2BlockId,
+    pub csm_tip_block_id: L2BlockId,
 
     /// L2 block that's been finalized and proven on L1.
     pub finalized_block_id: L2BlockId,
+
+    /// L2 epoch that's been finalized and proven on L1.
+    pub finalized_epoch: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -223,11 +243,14 @@ pub struct RawBlockWitness {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcCheckpointInfo {
     /// The index of the checkpoint
-    pub idx: u64,
+    pub epoch: u64,
+
     /// L1 height  the checkpoint covers
     pub l1_range: (u64, u64),
+
     /// L2 height the checkpoint covers
     pub l2_range: (u64, u64),
+
     /// L2 block that this checkpoint covers
     pub l2_blockid: L2BlockId,
 }
@@ -235,7 +258,7 @@ pub struct RpcCheckpointInfo {
 impl From<BatchInfo> for RpcCheckpointInfo {
     fn from(value: BatchInfo) -> Self {
         Self {
-            idx: value.idx,
+            epoch: value.epoch(),
             l1_range: value.l1_range,
             l2_range: value.l2_range,
             l2_blockid: value.l2_blockid,
@@ -277,14 +300,6 @@ pub struct RpcDepositEntry {
     /// Deposit amount, in the native asset.
     amt: BitcoinAmount,
 
-    /// Refs to txs in the maturation queue that will update the deposit entry
-    /// when they mature.  This is here so that we don't have to scan a
-    /// potentially very large set of pending transactions to reason about the
-    /// state of the deposits.  This must be kept in sync when we do things
-    /// though.
-    // TODO probably removing this actually
-    pending_update_txs: Vec<L1TxRef>,
-
     /// Deposit state.
     state: DepositState,
 }
@@ -296,7 +311,6 @@ impl RpcDepositEntry {
             output: ent.output().clone(),
             notary_operators: ent.notary_operators().to_vec(),
             amt: ent.amt(),
-            pending_update_txs: ent.pending_update_txs().to_vec(),
             state: ent.deposit_state().clone(),
         }
     }
@@ -304,13 +318,17 @@ impl RpcDepositEntry {
 
 /// status of L2 Block
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum L2BlockStatus {
-    /// Unknown block height
+    /// Unknown block height.
     Unknown,
-    /// Block is received and present in the longest chain
-    Confirmed,
-    /// Block is now conformed on L1, and present at certain L1 height
-    Verified(u64),
-    /// Block is now finalized, certain depth has been reached in L1
+
+    /// Block is received and present in the longest chain.
+    Accepted,
+
+    /// Block is now confirmed on L1, and present at certain L1 height.
+    Committed(u64),
+
+    /// Block is now finalized, certain depth has been reached in L1.
     Finalized(u64),
 }

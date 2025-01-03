@@ -84,7 +84,7 @@ impl RelayerState {
             // Otherwise it's better for network health to relay them
             // unconditionally.
             // TODO make it configurable if we relay or not without chainstate?
-            if let Some(op_table) = self.status_channel.operator_table() {
+            if let Some(op_table) = self.status_channel.get_cur_operator_table() {
                 let sig_res =
                     strata_primitives::relay::util::verify_bridge_msg_sig(&message, &op_table);
 
