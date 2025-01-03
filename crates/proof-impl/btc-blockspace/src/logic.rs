@@ -1,6 +1,9 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use bitcoin::{consensus::deserialize, Block};
+use bitcoin::{
+    consensus::{deserialize, serialize},
+    Block,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::params::RollupParams;
 use strata_state::{batch::BatchCheckpoint, tx::DepositInfo};
