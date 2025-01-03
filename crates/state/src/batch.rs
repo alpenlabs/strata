@@ -69,7 +69,9 @@ impl BatchCheckpoint {
     }
 }
 
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize, Arbitrary, PartialEq, Eq)]
+#[derive(
+    Clone, Debug, BorshDeserialize, BorshSerialize, Arbitrary, PartialEq, Eq, Serialize, Deserialize,
+)]
 pub struct SignedBatchCheckpoint {
     inner: BatchCheckpoint,
     signature: Buf64,

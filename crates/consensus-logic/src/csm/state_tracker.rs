@@ -131,7 +131,7 @@ pub fn reconstruct_cur_state(
 /// Reconstructs the
 /// [`ClientStateWrite`](strata_state::operation::ClientStateWrite)
 ///
-/// Under the hood fetches the last available checkpoint
+/// Under the hood fetches the nearest checkpoint before the reuested idx
 /// and then replays all the [`ClientStateWrite`](strata_state::operation::ClientStateWrite)s
 /// from that checkpoint up to the requested index `idx`
 /// such that we have accurate [`ClientState`].

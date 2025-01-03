@@ -282,7 +282,7 @@ pub trait ProofDatabase {
     /// Deletes a proof by its key.
     ///
     /// Tries to delete a proof by its key, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool>;
 
     /// Inserts dependencies for a given [`ProofContext`] into the database.
@@ -298,7 +298,7 @@ pub trait ProofDatabase {
     /// Deletes dependencies for a given [`ProofContext`].
     ///
     /// Tries to delete dependencies of by its context, returning if it really
-    /// existed or not.  
+    /// existed or not.
     fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool>;
 }
 
@@ -331,6 +331,9 @@ pub trait L1BroadcastDatabase {
 
     /// get txentry by idx
     fn get_tx_entry(&self, idx: u64) -> DbResult<Option<L1TxEntry>>;
+
+    /// Get last broadcast entry
+    fn get_last_tx_entry(&self) -> DbResult<Option<L1TxEntry>>;
 }
 
 /// Provides access to the implementers of provider and store traits for interacting with the

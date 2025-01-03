@@ -108,7 +108,9 @@ impl From<(u64, u32)> for L1TxRef {
 /// TODO: This is duplicate with state::l1::L1TxProof
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
-#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct L1TxProof {
     position: u32,
     cohashes: Vec<Buf32>,

@@ -55,6 +55,12 @@ impl From<HexBytes> for Vec<u8> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes32(#[serde(with = "hex::serde")] pub [u8; 32]);
 
+impl From<&L2BlockId> for HexBytes32 {
+    fn from(value: &L2BlockId) -> Self {
+        Self(*value.as_ref())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcL1Status {
     /// If the last time we tried to poll the client (as of `last_update`)
@@ -313,4 +319,15 @@ pub enum L2BlockStatus {
     Verified(u64),
     /// Block is now finalized, certain depth has been reached in L1
     Finalized(u64),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RpcChainState {
+    /// Most recent seen block.
+    pub tip_blkid: L2BlockId,
+
+    /// The slot of the last produced block.
+    pub tip_slot: u64,
+
+    pub cur_epoch: u64,
 }
