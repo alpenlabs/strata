@@ -66,7 +66,7 @@ impl ProvingOp for ClAggOperator {
             .map_err(ProvingTaskError::DatabaseError)?;
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(cl_agg_proof_id, cl_stf_deps)
+        task_tracker.create_tasks(cl_agg_proof_id, cl_stf_deps, db)
     }
 
     async fn fetch_input(
