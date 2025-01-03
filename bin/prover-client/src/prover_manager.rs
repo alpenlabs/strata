@@ -1,13 +1,13 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use strata_primitives::proof::{ProofKey, ProofZkVm};
+use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::{spawn, sync::Mutex, time::sleep};
 use tracing::{error, info};
 
 use crate::{
-    errors::ProvingTaskError, operators::ProofOperator, status::ProvingTaskStatus,
-    task_tracker::TaskTracker,
+    checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError,
+    operators::ProofOperator, status::ProvingTaskStatus, task_tracker::TaskTracker,
 };
 
 #[derive(Debug, Clone)]
@@ -67,8 +67,19 @@ impl ProverManager {
 
                 // Spawn a new task
                 spawn(async move {
-                    if let Err(err) = make_proof(operator, task_tracker, task, db).await {
-                        error!(?err, "Failed to process task");
+                    match make_proof(operator.clone(), task_tracker, task, db.clone()).await {
+                        Ok(_) => {
+                            // If checkpoint proving; submit proof to sequencer
+                            if let ProofContext::Checkpoint(checkpoint_index) = task.context() {
+                                let cl_client = operator.checkpoint_operator().cl_client();
+                                let _ =
+                                    submit_checkpoint_proof(*checkpoint_index, cl_client, task, db)
+                                        .await;
+                            }
+                        }
+                        Err(err) => {
+                            error!(?err, "Failed to process task");
+                        }
                     }
                 });
             }
