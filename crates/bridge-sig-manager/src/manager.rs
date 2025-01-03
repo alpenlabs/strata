@@ -492,7 +492,10 @@ mod tests {
 
         let txid = result.unwrap();
 
-        let stored_tx_state = signature_manager.db_ops.get_tx_state_async(txid).await;
+        let stored_tx_state = signature_manager
+            .db_ops
+            .get_tx_state_async(Buf32::from(txid))
+            .await;
         assert!(stored_tx_state.is_ok(), "should retrieve saved state");
 
         let stored_tx_state = stored_tx_state.unwrap();
@@ -586,7 +589,7 @@ mod tests {
         assert!(
             sig_manager
                 .db_ops
-                .get_tx_state_async(txid)
+                .get_tx_state_async(txid.into())
                 .await
                 .expect("storage should be accessible")
                 .expect("state should be present")
@@ -633,7 +636,7 @@ mod tests {
 
         let state = sig_manager
             .db_ops
-            .get_tx_state_async(Buf32::from(txid))
+            .get_tx_state_async(txid.into())
             .await
             .expect("should be able to access stored state")
             .expect("state should be present");
@@ -837,7 +840,7 @@ mod tests {
 
         let tx_state = signature_manager
             .db_ops
-            .get_tx_state_async(txid)
+            .get_tx_state_async(txid.into())
             .await
             .expect("storage should be accessible")
             .expect("state should be present");
@@ -909,7 +912,7 @@ mod tests {
         // Verify that the signature was added
         let stored_tx_state = signature_manager
             .db_ops
-            .get_tx_state_async(txid)
+            .get_tx_state_async(txid.into())
             .await
             .expect("should be able to load state")
             .expect("state should be present");
@@ -1000,7 +1003,7 @@ mod tests {
 
         let tx_state = signature_manager
             .db_ops
-            .get_tx_state_async(txid)
+            .get_tx_state_async(txid.into())
             .await
             .expect("should be able to access storage")
             .expect("state should be available in the storage");
@@ -1066,7 +1069,7 @@ mod tests {
             // Verify that the signature has been added
             let stored_state = signature_manager
                 .db_ops
-                .get_tx_state_async(txid)
+                .get_tx_state_async(txid.into())
                 .await
                 .expect("should be able to access storage")
                 .expect("should have tx state in the storage");
