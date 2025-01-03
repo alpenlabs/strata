@@ -60,10 +60,6 @@ impl ProvingOp for L1BatchOperator {
         let len = (end_height - start_height) as usize + 1;
         let mut btc_deps = Vec::with_capacity(len);
 
-        let start_blkid = self.btc_blockspace_operator.get_id(start_height).await?;
-        let end_blkid = self.btc_blockspace_operator.get_id(end_height).await?;
-        let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
-
         for height in start_height..=end_height {
             let blkid = self.btc_blockspace_operator.get_id(height).await?;
             let proof_id = ProofContext::BtcBlockspace(blkid);
@@ -73,11 +69,15 @@ impl ProvingOp for L1BatchOperator {
             btc_deps.push(proof_id);
         }
 
+        let start_blkid = self.btc_blockspace_operator.get_id(start_height).await?;
+        let end_blkid = self.btc_blockspace_operator.get_id(end_height).await?;
+        let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
+
         db.put_proof_deps(l1_batch_proof_id, btc_deps.clone())
             .map_err(ProvingTaskError::DatabaseError)?;
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(l1_batch_proof_id, btc_deps)
+        task_tracker.create_tasks(l1_batch_proof_id, btc_deps, db)
     }
 
     async fn fetch_input(

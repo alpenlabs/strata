@@ -271,7 +271,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
         pre_generate_blocks: int = 0,
         rollup_settings: Optional[RollupParamsSettings] = None,
         auto_generate_blocks: bool = True,
-        enable_prover_client: bool = False,
         pre_fund_addrs: bool = True,
         n_operators: int = 2,
         message_interval: int = 0,
@@ -282,7 +281,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
         self.pre_generate_blocks = pre_generate_blocks
         self.rollup_settings = rollup_settings
         self.auto_generate_blocks = auto_generate_blocks
-        self.enable_prover_client = enable_prover_client
         self.pre_fund_addrs = pre_fund_addrs
         self.n_operators = n_operators
         self.message_interval = message_interval
@@ -418,18 +416,17 @@ class BasicEnvConfig(flexitest.EnvConfig):
             name = f"bridge.{i}"
             svcs[name] = br
 
-        if self.enable_prover_client:
-            seq_port = sequencer.get_prop("rpc_port")
-            reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
+        seq_port = sequencer.get_prop("rpc_port")
+        reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
 
-            prover_client_fac = ctx.get_factory("prover_client")
-            prover_client = prover_client_fac.create_prover_client(
-                bitcoind_config,
-                f"http://localhost:{seq_port}",
-                f"http://localhost:{reth_rpc_http_port}",
-                params,
-            )
-            svcs["prover_client"] = prover_client
+        prover_client_fac = ctx.get_factory("prover_client")
+        prover_client = prover_client_fac.create_prover_client(
+            bitcoind_config,
+            f"http://localhost:{seq_port}",
+            f"http://localhost:{reth_rpc_http_port}",
+            params,
+        )
+        svcs["prover_client"] = prover_client
 
         return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)
 

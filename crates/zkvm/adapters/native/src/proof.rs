@@ -3,6 +3,12 @@ use strata_zkvm::{ProofReceipt, ZkVmProofError};
 #[derive(Debug, Clone)]
 pub struct NativeProofReceipt(ProofReceipt);
 
+impl NativeProofReceipt {
+    pub fn inner(self) -> ProofReceipt {
+        self.0
+    }
+}
+
 impl TryFrom<ProofReceipt> for NativeProofReceipt {
     type Error = ZkVmProofError;
     fn try_from(value: ProofReceipt) -> Result<Self, Self::Error> {
