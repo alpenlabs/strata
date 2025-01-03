@@ -88,7 +88,10 @@ async fn filter_unfinalized_from_db(
 #[cfg(test)]
 mod test {
     use bitcoin::{consensus, Transaction};
-    use strata_db::{traits::BroadcastDatabase, types::L1TxStatus};
+    use strata_db::{
+        traits::{BroadcastDatabase, L1BroadcastDatabase},
+        types::L1TxStatus,
+    };
     use strata_rocksdb::{
         broadcaster::db::{BroadcastDb, L1BroadcastDb},
         test_utils::get_rocksdb_tmp_instance,
@@ -107,7 +110,7 @@ mod test {
     fn get_ops() -> Arc<BroadcastDbOps> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let ops = Context::new(db).into_ops(pool);
+        let ops = Context::new(db.l1_broadcast_db().clone()).into_ops(pool);
         Arc::new(ops)
     }
 
