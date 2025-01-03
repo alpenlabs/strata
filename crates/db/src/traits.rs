@@ -303,8 +303,9 @@ pub trait ProofDatabase {
     fn del_proof_deps(&self, proof_context: ProofContext) -> DbResult<bool>;
 }
 
+// TODO remove this trait, just like the high level `Database` trait
 pub trait BroadcastDatabase {
-    type L1BroadcastDB: L1BroadcastDatabase;
+    type L1BroadcastDB: L1BroadcastDatabase + Sync + Send;
 
     /// Return a reference to the L1 broadcast db implementation
     fn l1_broadcast_db(&self) -> &Arc<Self::L1BroadcastDB>;
