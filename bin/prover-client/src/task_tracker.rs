@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
+use strata_rocksdb::prover::db::ProofDb;
 
 use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 
@@ -50,6 +52,7 @@ impl TaskTracker {
         &mut self,
         proof_id: ProofContext,
         deps: Vec<ProofContext>,
+        db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let mut tasks = Vec::with_capacity(self.vms.len());
         // Insert tasks for each configured host
@@ -58,7 +61,7 @@ impl TaskTracker {
             let task = ProofKey::new(proof_id, *host);
             tasks.push(task);
             let dep_tasks: Vec<_> = deps.iter().map(|&dep| ProofKey::new(dep, *host)).collect();
-            self.insert_task(task, &dep_tasks)?;
+            self.insert_task(task, &dep_tasks, db)?;
         }
 
         Ok(tasks)
@@ -70,7 +73,12 @@ impl TaskTracker {
     /// - If dependencies are provided, the task is marked as `WaitingForDependencies`.
     ///
     /// Returns an error if the task already exists.
-    pub fn insert_task(&mut self, id: ProofKey, deps: &[ProofKey]) -> Result<(), ProvingTaskError> {
+    pub fn insert_task(
+        &mut self,
+        id: ProofKey,
+        deps: &[ProofKey],
+        db: &ProofDb,
+    ) -> Result<(), ProvingTaskError> {
         if self.tasks.contains_key(&id) {
             return Err(ProvingTaskError::TaskAlreadyFound(id));
         }
@@ -78,17 +86,16 @@ impl TaskTracker {
         // Gather dependencies that are not completed
         let mut pending_deps = Vec::with_capacity(deps.len());
         for &dep in deps {
-            let status = self
-                .tasks
-                .get(&dep)
-                .ok_or_else(|| ProvingTaskError::DependencyNotFound(dep))?;
-
-            if *status != ProvingTaskStatus::Completed {
-                pending_deps.push(dep);
+            let proof = db.get_proof(dep).map_err(ProvingTaskError::DatabaseError)?;
+            match proof {
+                Some(_) => {}
+                None => {
+                    pending_deps.push(dep);
+                }
             }
         }
 
-        let status = if deps.is_empty() {
+        let status = if pending_deps.is_empty() {
             ProvingTaskStatus::Pending
         } else {
             ProvingTaskStatus::WaitingForDependencies(HashSet::from_iter(pending_deps))
@@ -142,13 +149,7 @@ impl TaskTracker {
                     }
                 }
 
-                // TODO: Develop a strategy to remove completed tasks from the task tracker.
-                // The naive approach of simply calling self.tasks.remove(&id) is not sufficient
-                // because there are cases where the task is still a dependency for tasks that have
-                // not yet been created. For example, in the case of L1 Batch
-                // proofs, while dependent tasks for BTC Blockspaces are being created,
-                // some proofs for BTC Blockspace might already be generated. Removing them from the
-                // task tracker prematurely would result in a TaskNotFound error.
+                self.tasks.remove(&id);
             }
             Ok(())
         } else {
@@ -205,6 +206,7 @@ impl TaskTracker {
 #[cfg(test)]
 mod tests {
     use strata_primitives::proof::{ProofContext, ProofZkVm};
+    use strata_rocksdb::test_utils::get_rocksdb_tmp_instance_for_prover;
     use strata_state::l1::L1BlockId;
     use strata_test_utils::ArbitraryGenerator;
 
@@ -231,12 +233,18 @@ mod tests {
         (key, deps)
     }
 
+    fn setup_db() -> ProofDb {
+        let (db, db_ops) = get_rocksdb_tmp_instance_for_prover().unwrap();
+        ProofDb::new(db, db_ops)
+    }
+
     #[test]
     fn test_insert_task_no_dependencies() {
         let mut tracker = TaskTracker::new();
         let (id, _) = gen_task_with_deps(0);
+        let db = setup_db();
 
-        tracker.insert_task(id, &[]).unwrap();
+        tracker.insert_task(id, &[], &db).unwrap();
         assert!(
             matches!(tracker.get_task(id), Ok(&ProvingTaskStatus::Pending)),
             "Task with no dependencies should be Pending"
@@ -247,11 +255,12 @@ mod tests {
     fn test_insert_task_with_dependencies() {
         let mut tracker = TaskTracker::new();
         let (id, deps) = gen_task_with_deps(2);
+        let db = setup_db();
 
         for dep in &deps {
-            tracker.insert_task(*dep, &[]).unwrap();
+            tracker.insert_task(*dep, &[], &db).unwrap();
         }
-        tracker.insert_task(id, &deps.clone()).unwrap();
+        tracker.insert_task(id, &deps.clone(), &db).unwrap();
         assert!(
             matches!(
                 tracker.get_task(id),
@@ -274,10 +283,12 @@ mod tests {
     fn test_dependency_resolution() {
         let mut tracker = TaskTracker::new();
         let (id, deps) = gen_task_with_deps(2);
+        let db = setup_db();
+
         for dep in &deps {
-            tracker.insert_task(*dep, &[]).unwrap();
+            tracker.insert_task(*dep, &[], &db).unwrap();
         }
-        tracker.insert_task(id, &deps).unwrap();
+        tracker.insert_task(id, &deps, &db).unwrap();
 
         for dep in &deps {
             tracker

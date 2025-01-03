@@ -77,7 +77,7 @@ impl ProvingOp for L1BatchOperator {
             .map_err(ProvingTaskError::DatabaseError)?;
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(l1_batch_proof_id, btc_deps)
+        task_tracker.create_tasks(l1_batch_proof_id, btc_deps, db)
     }
 
     async fn fetch_input(
