@@ -25,7 +25,6 @@ const CHECKPOINT: &str = "guest-checkpoint";
 /// Returns a map of program dependencies.
 fn get_program_dependencies() -> HashMap<&'static str, Vec<&'static str>> {
     let mut dependencies = HashMap::new();
-    dependencies.insert(L1_BATCH, vec![BTC_BLOCKSPACE]);
     dependencies.insert(CL_STF, vec![EVM_EE_STF]);
     dependencies.insert(CL_AGG, vec![CL_STF]);
     dependencies.insert(CHECKPOINT, vec![L1_BATCH, CL_AGG]);
