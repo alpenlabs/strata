@@ -11,6 +11,8 @@ use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 pub struct TaskTracker {
     /// A map of task IDs to their statuses.
     tasks: HashMap<ProofKey, ProvingTaskStatus>,
+    /// A map of task IDs to their dependencies that have not yet been proven.
+    pending_dependencies: HashMap<ProofKey, HashSet<ProofKey>>,
     /// Count of the tasks that are in progress
     in_progress_tasks: HashMap<ProofZkVm, usize>,
     /// List of ZkVm for which the task is created
@@ -39,6 +41,7 @@ impl TaskTracker {
 
         TaskTracker {
             tasks: HashMap::new(),
+            pending_dependencies: HashMap::new(),
             in_progress_tasks: HashMap::new(),
             vms,
         }
@@ -95,13 +98,14 @@ impl TaskTracker {
             }
         }
 
-        let status = if pending_deps.is_empty() {
-            ProvingTaskStatus::Pending
+        if pending_deps.is_empty() {
+            self.tasks.insert(id, ProvingTaskStatus::Pending);
         } else {
-            ProvingTaskStatus::WaitingForDependencies(HashSet::from_iter(pending_deps))
+            self.pending_dependencies
+                .insert(id, HashSet::from_iter(pending_deps));
+            self.tasks
+                .insert(id, ProvingTaskStatus::WaitingForDependencies);
         };
-
-        self.tasks.insert(id, status);
 
         Ok(())
     }
@@ -139,13 +143,18 @@ impl TaskTracker {
                 // Decrement value if key exists, or insert with a default value of 1
                 *self.in_progress_tasks.entry(*id.host()).or_insert(0) -= 1;
 
-                // Resolve dependencies if a task is completed
-                for task_status in self.tasks.values_mut() {
-                    if let ProvingTaskStatus::WaitingForDependencies(deps) = task_status {
-                        deps.remove(&id);
-                        if deps.is_empty() {
-                            task_status.transition(ProvingTaskStatus::Pending)?;
-                        }
+                // Resolve dependencies for other tasks
+                let mut tasks_to_update = vec![];
+                for (dependent_task, deps) in self.pending_dependencies.iter_mut() {
+                    if deps.remove(&id) && deps.is_empty() {
+                        tasks_to_update.push(*dependent_task);
+                    }
+                }
+
+                for task in tasks_to_update {
+                    self.pending_dependencies.remove(&task);
+                    if let Some(task_status) = self.tasks.get_mut(&task) {
+                        task_status.transition(ProvingTaskStatus::Pending)?;
                     }
                 }
 
@@ -188,15 +197,7 @@ impl TaskTracker {
         let mut report: HashMap<String, usize> = HashMap::new();
 
         for status in self.tasks.values() {
-            let status_str = match status {
-                ProvingTaskStatus::WaitingForDependencies(_) => "WaitingForDependencies",
-                ProvingTaskStatus::Pending => "Pending",
-                ProvingTaskStatus::ProvingInProgress => "ProvingInProgress",
-                ProvingTaskStatus::Completed => "Completed",
-                ProvingTaskStatus::Failed => "Failed",
-            };
-
-            *report.entry(status_str.to_string()).or_insert(0) += 1;
+            *report.entry(format!("{:?}", status)).or_insert(0) += 1;
         }
 
         report
@@ -264,7 +265,7 @@ mod tests {
         assert!(
             matches!(
                 tracker.get_task(id),
-                Ok(&ProvingTaskStatus::WaitingForDependencies(_))
+                Ok(&ProvingTaskStatus::WaitingForDependencies)
             ),
             "Task with dependencies should be WaitingForDependencies"
         );
