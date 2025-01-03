@@ -22,7 +22,7 @@ pub struct L1BlockManager {
 
 impl L1BlockManager {
     pub fn new<D: Database + Sync + Send + 'static>(pool: ThreadPool, db: Arc<D>) -> Self {
-        let ops = ops::l1::Context::new(db).into_ops(pool);
+        let ops = ops::l1::Context::new(db.l1_db().clone()).into_ops(pool);
         let manifest_cache = cache::CacheTable::new(64.try_into().unwrap());
         let txs_cache = cache::CacheTable::new(64.try_into().unwrap());
         Self {
