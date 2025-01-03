@@ -32,30 +32,19 @@ impl BtcBlockspaceOperator {
             rollup_params,
         }
     }
-
-    /// Retrieves the [`L1BlockId`] for a given block number.
-    pub async fn get_id(&self, block_num: u64) -> Result<L1BlockId, ProvingTaskError> {
-        Ok(self
-            .btc_client
-            .get_block_hash(block_num)
-            .await
-            .inspect_err(|_| error!(%block_num, "Failed to fetch BTC BlockId"))
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
-            .into())
-    }
 }
 
 impl ProvingOp for BtcBlockspaceOperator {
     type Prover = BtcBlockspaceProver;
-    type Params = u64;
+    type Params = L1BlockId;
 
     async fn create_task(
         &self,
-        block_num: u64,
+        block_id: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
         _db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let context = ProofContext::BtcBlockspace(self.get_id(block_num).await?);
+        let context = ProofContext::BtcBlockspace(block_id);
         let mut task_tracker = task_tracker.lock().await;
         task_tracker.create_tasks(context, vec![])
     }
@@ -65,12 +54,17 @@ impl ProvingOp for BtcBlockspaceOperator {
         task_id: &ProofKey,
         _db: &ProofDb,
     ) -> Result<BlockScanProofInput, ProvingTaskError> {
-        let blkid = match task_id.context() {
+        let block_id = match task_id.context() {
             ProofContext::BtcBlockspace(id) => *id,
             _ => return Err(ProvingTaskError::InvalidInput("BtcBlockspace".to_string())),
         };
 
-        let block = self.btc_client.get_block(&blkid.into()).await.unwrap();
+        let block = self
+            .btc_client
+            .get_block(&block_id.into())
+            .await
+            .inspect_err(|_| error!(%block_id, "Failed to fetch BTC BlockId"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
         Ok(BlockScanProofInput {
             rollup_params: self.rollup_params.as_ref().clone(),
