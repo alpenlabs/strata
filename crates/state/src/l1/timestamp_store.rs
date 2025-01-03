@@ -89,12 +89,14 @@ impl TimestampStore {
 
 #[cfg(test)]
 mod tests {
+    use std::array;
+
     use super::TimestampStore;
 
     #[test]
     fn test_timestamp_buffer() {
         // Initialize the buffer with timestamps from 1 to 11
-        let initial_timestamps: [u32; 11] = std::array::from_fn(|i| (i + 1) as u32);
+        let initial_timestamps: [u32; 11] = array::from_fn(|i| (i + 1) as u32);
         let mut timestamps = TimestampStore::new(initial_timestamps);
 
         // Insert a new timestamp and test buffer state

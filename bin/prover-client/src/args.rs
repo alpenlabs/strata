@@ -111,11 +111,11 @@ pub struct Args {
     /// The wait time, in milliseconds, for the prover manager loop.
     ///
     /// Adjust this value to control how frequently the prover manager checks for jobs.
-    /// Defaults to 1000 milliseconds.
+    /// Defaults to 1,000 milliseconds.
     #[argh(
         option,
         description = "wait time in milliseconds for the prover manager loop",
-        default = "1000"
+        default = "1_000"
     )]
     pub loop_interval: u64,
 

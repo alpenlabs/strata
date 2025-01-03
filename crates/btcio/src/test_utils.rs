@@ -239,6 +239,8 @@ pub fn build_reveal_transaction_test(
 
 #[cfg(test)]
 pub mod corepc_node_helpers {
+    use std::env;
+
     use bitcoin::{Address, BlockHash};
     use corepc_node::BitcoinD;
 
@@ -251,7 +253,7 @@ pub mod corepc_node_helpers {
         (cookie_values.user, cookie_values.password)
     }
 
-    /// Mine a number of blocks of a given size `count`, which may be specified to a given coinbase
+    /// Mine a number of blocks of a given size `count`, which may be speified to a given coinbase
     /// `address`.
     pub fn mine_blocks(
         bitcoind: &BitcoinD,
@@ -274,7 +276,7 @@ pub mod corepc_node_helpers {
 
     pub fn get_bitcoind_and_client() -> (BitcoinD, BitcoinClient) {
         // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
-        std::env::set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
+        env::set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
