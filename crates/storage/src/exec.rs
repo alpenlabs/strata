@@ -110,6 +110,22 @@ macro_rules! inst_ops_auto {
             $($iname:ident($($aname:ident: $aty:ty),*) => $ret:ty;)*
         }
     } => {
+        /// Database context for an database operation interface.
+        pub struct Context$(<$($tparam: $tpconstr), +>)? {
+            db: Arc<$($($tparam),+)?>
+
+        }
+
+        impl$(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? Context$(<$($tparam),+>)? {
+            pub fn new(db: Arc<$($($tparam),+)?>) -> Self {
+                Self { db }
+            }
+
+            pub fn into_ops(self, pool: threadpool::ThreadPool) -> $base {
+                $base::new(pool, Arc::new(self))
+            }
+        }
+
         inst_ops_common!{
             ($base, $ctx $(<$($tparam: $tpconstr),+>)?) {
                 $( $iname($($aname: $aty),*) => $ret; )*
@@ -120,7 +136,7 @@ macro_rules! inst_ops_auto {
             impl $(<$($tparam: $tpconstr + Sync + Send + 'static),+>)? ShimTrait for Inner $(<$($tparam),+>)? {
                 $(
                     fn [<$iname _blocking>] (&self, $($aname: $aty),*) -> DbResult<$ret> {
-                        self.ctx.db().$iname($($aname),*)
+                        self.ctx.db.$iname($($aname),*)
                     }
 
                     fn [<$iname _chan>] (&self, pool: &threadpool::ThreadPool, $($aname: $aty),*) -> DbRecv<$ret> {
@@ -128,7 +144,7 @@ macro_rules! inst_ops_auto {
                         let ctx = self.ctx.clone();
 
                         pool.execute(move || {
-                            let res = ctx.db().$iname($($aname),*);
+                            let res = ctx.db.$iname($($aname),*);
                             if resp_tx.send(res).is_err() {
                                 warn!("failed to send response");
                             }
