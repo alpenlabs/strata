@@ -90,7 +90,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .btc_operator()
             .create_task(block_id, self.task_tracker.clone(), &self.db)
             .await
-            .map_err(|e| to_jsonrpsee_error_object(e, "failed to create task for btc block"))
+            .map_err(to_jsonrpsee_error("failed to create task for btc block"))
     }
 
     async fn prove_el_blocks(&self, el_block_range: (Buf32, Buf32)) -> RpcResult<Vec<ProofKey>> {
@@ -98,7 +98,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .evm_ee_operator()
             .create_task(el_block_range, self.task_tracker.clone(), &self.db)
             .await
-            .map_err(|e| to_jsonrpsee_error_object(e, "failed to create task for el block"))
+            .map_err(to_jsonrpsee_error("failed to create task for el block"))
     }
 
     async fn prove_cl_blocks(
@@ -109,7 +109,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .cl_stf_operator()
             .create_task(cl_block_range, self.task_tracker.clone(), &self.db)
             .await
-            .map_err(|e| to_jsonrpsee_error_object(e, "failed to create task for cl block"))
+            .map_err(to_jsonrpsee_error("failed to create task for cl block"))
     }
 
     async fn prove_l1_batch(&self, l1_range: (L1BlockId, L1BlockId)) -> RpcResult<Vec<ProofKey>> {
@@ -118,7 +118,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .l1_batch_operator()
             .create_task(l1_range, self.task_tracker.clone(), &self.db)
             .await
-            .map_err(|e| to_jsonrpsee_error_object(e, "failed to create task for l1 batch"))
+            .map_err(to_jsonrpsee_error("failed to create task for l1 batch"))
     }
 
     async fn prove_l2_batch(
@@ -129,7 +129,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .cl_agg_operator()
             .create_task(l2_range, self.task_tracker.clone(), &self.db)
             .await
-            .map_err(|e| to_jsonrpsee_error_object(e, "failed to create task for l2 batch"))
+            .map_err(to_jsonrpsee_error("failed to create task for l2 batch"))
     }
 
     async fn prove_checkpoint(&self, ckp_idx: u64) -> RpcResult<Vec<ProofKey>> {
@@ -137,7 +137,9 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .checkpoint_operator()
             .create_task(ckp_idx, self.task_tracker.clone(), &self.db)
             .await
-            .map_err(|e| to_jsonrpsee_error_object(e, "failed to create task for given checkpoint"))
+            .map_err(to_jsonrpsee_error(
+                "failed to create task for given checkpoint",
+            ))
     }
 
     async fn prove_latest_checkpoint(&self) -> RpcResult<Vec<ProofKey>> {
@@ -146,15 +148,15 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .checkpoint_operator()
             .fetch_latest_ckp_idx()
             .await
-            .map_err(|e| to_jsonrpsee_error_object(e, "failed to fetch latest checkpoint idx"))?;
+            .map_err(to_jsonrpsee_error("failed to fetch latest checkpoint idx"))?;
         info!(%latest_ckp_idx);
         self.operator
             .checkpoint_operator()
             .create_task(latest_ckp_idx, self.task_tracker.clone(), &self.db)
             .await
-            .map_err(|e| {
-                to_jsonrpsee_error_object(e, "failed to create task for latest checkpoint")
-            })
+            .map_err(to_jsonrpsee_error(
+                "failed to create task for latest checkpoint",
+            ))
     }
 
     async fn prove_checkpoint_raw(
@@ -186,7 +188,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
                     .get_task(key)
                     .cloned()
                     .map_err(to_jsonrpsee_error("invalid task"))?;
-                Ok(format!("{:?}", status))
+                Ok(format!("{status:?}"))
             }
         }
     }
