@@ -87,6 +87,14 @@ impl Chainstate {
         &self.epoch_state
     }
 
+    /// Returns a mut ref to the epoch state.
+    ///
+    /// Beacuse of dumb testing reasons we have to expose this.  Should ONLY be
+    /// used in tests.
+    pub fn epoch_state_mut(&mut self) -> &mut EpochState {
+        &mut self.epoch_state
+    }
+
     pub fn pending_withdrawals(&self) -> &[WithdrawalIntent] {
         self.pending_withdraws.entries()
     }
@@ -103,6 +111,8 @@ impl Chainstate {
         &self.epoch_state.deposits_table
     }
 
+    /// Beacuse of dumb testing reasons we have to expose this.  Should ONLY be
+    /// used in tests.
     pub fn deposits_table_mut(&mut self) -> &mut DepositsTable {
         &mut self.epoch_state.deposits_table
     }
@@ -207,6 +217,11 @@ impl EpochState {
 
     pub fn finalized_last_blkid(&self) -> &L2BlockId {
         self.finalized_epoch.last_blkid()
+    }
+
+    /// Only exposed because of testing reasons.
+    pub fn set_safe_l1_block(&mut self, commitment: L1BlockCommitment) {
+        self.safe_l1_block = commitment;
     }
 
     pub fn safe_l1_blkid(&self) -> &L1BlockId {

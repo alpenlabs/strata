@@ -86,6 +86,10 @@ impl ClientState {
         &mut self.local_l1_view
     }
 
+    pub fn tip_l1_blkid(&self) -> &L1BlockId {
+        self.l1_view().tip_l1_blkid()
+    }
+
     /// Overwrites the sync state.
     pub fn set_sync_state(&mut self, ss: SyncState) {
         self.sync_state = Some(ss);
