@@ -1,5 +1,5 @@
 use bitcoin::Block;
-use strata_proofimpl_btc_blockspace::{logic::BlockspaceProofInput, prover::BtcBlockspaceProver};
+use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
 use strata_test_utils::l2::gen_params;
 use strata_zkvm::{ZkVmHost, ZkVmResult};
 
@@ -21,10 +21,10 @@ impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
     type P = BtcBlockspaceProver;
     type H = H;
 
-    fn get_input(&self, block: &Block) -> ZkVmResult<BlockspaceProofInput> {
+    fn get_input(&self, block: &Block) -> ZkVmResult<BlockScanProofInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
-        let input = BlockspaceProofInput {
+        let input = BlockScanProofInput {
             block: block.clone(),
             rollup_params: rollup_params.clone(),
         };
@@ -49,7 +49,6 @@ mod tests {
     fn test_proof<H: ZkVmHost>(generator: &BtcBlockProofGenerator<H>) {
         let btc_chain = get_btc_chain();
         let block = btc_chain.get_block(40321);
-
         let _ = generator.get_proof(block).unwrap();
     }
 

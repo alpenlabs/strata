@@ -39,8 +39,7 @@ impl<H: ZkVmHost> TestProverGenerators<H> {
         // TODO: refactor deeper to remove clones.
         // Likely not critical right now due to its being used in tests and perf CI.
         let btc_prover = BtcBlockProofGenerator::new(host_provider(ProofVm::BtcProving));
-        let l1_batch_prover =
-            L1BatchProofGenerator::new(btc_prover.clone(), host_provider(ProofVm::L1Batch));
+        let l1_batch_prover = L1BatchProofGenerator::new(host_provider(ProofVm::L1Batch));
         let el_prover = ElProofGenerator::new(host_provider(ProofVm::ELProving));
         let cl_prover = ClProofGenerator::new(el_prover.clone(), host_provider(ProofVm::CLProving));
         let l2_batch_prover =

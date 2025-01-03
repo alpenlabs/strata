@@ -8,6 +8,7 @@ use jsonrpsee::{core::RpcResult, RpcModule};
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
+use strata_state::l1::L1BlockId;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
 
@@ -78,11 +79,11 @@ impl ProverClientRpc {
 
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
-    async fn prove_btc_block(&self, btc_block_num: u64) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_btc_block(&self, block_id: L1BlockId) -> RpcResult<Vec<ProofKey>> {
         Ok(self
             .operator
             .btc_operator()
-            .create_task(btc_block_num, self.task_tracker.clone(), &self.db)
+            .create_task(block_id, self.task_tracker.clone(), &self.db)
             .await
             .expect("failed to create task"))
     }
@@ -105,7 +106,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .expect("failed to create task"))
     }
 
-    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_l1_batch(&self, l1_range: (L1BlockId, L1BlockId)) -> RpcResult<Vec<ProofKey>> {
         Ok(self
             .operator
             .l1_batch_operator()

@@ -13390,6 +13390,7 @@ version = "0.1.0"
 dependencies = [
  "jsonrpsee",
  "strata-rpc-types",
+ "strata-state",
 ]
 
 [[package]]
