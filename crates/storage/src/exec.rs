@@ -3,61 +3,11 @@
 //! This manages the indirection to spawn async requests onto a threadpool and execute blocking
 //! calls locally.
 
-use std::sync::Arc;
-
 pub use strata_db::{errors::DbError, DbResult};
 pub use tracing::*;
 
 /// Handle for receiving a result from a database operation on another thread.
 pub type DbRecv<T> = tokio::sync::oneshot::Receiver<DbResult<T>>;
-
-/// Shim to opaquely execute the operation without being aware of the underlying impl.
-#[allow(dead_code)] // FIXME: remove this
-pub struct OpShim<T, R> {
-    executor_fn: Arc<dyn Fn(T) -> DbResult<R> + Sync + Send + 'static>,
-}
-
-impl<T, R> OpShim<T, R>
-where
-    T: Sync + Send + 'static,
-    R: Sync + Send + 'static,
-{
-    #[allow(dead_code)] // FIXME: remove this
-    pub fn wrap<F>(op: F) -> Self
-    where
-        F: Fn(T) -> DbResult<R> + Sync + Send + 'static,
-    {
-        Self {
-            executor_fn: Arc::new(op),
-        }
-    }
-
-    /// Executes the operation on the provided thread pool and returns the result over.
-    #[allow(dead_code)] // FIXME: remove this
-    pub async fn exec_async(&self, pool: &threadpool::ThreadPool, arg: T) -> DbResult<R> {
-        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
-
-        let exec_fn = self.executor_fn.clone();
-
-        pool.execute(move || {
-            let res = exec_fn(arg);
-            if resp_tx.send(res).is_err() {
-                tracing::warn!("failed to send response");
-            }
-        });
-
-        match resp_rx.await {
-            Ok(v) => v,
-            Err(e) => Err(DbError::Other(format!("{e}"))),
-        }
-    }
-
-    /// Executes the operation directly.
-    #[allow(dead_code)] // FIXME: remove this
-    pub fn exec_blocking(&self, arg: T) -> DbResult<R> {
-        (self.executor_fn)(arg)
-    }
-}
 
 macro_rules! inst_ops {
     {
@@ -135,4 +85,46 @@ macro_rules! inst_ops {
     }
 }
 
+macro_rules! inst_ops_simple {
+    {
+        (< $tparam:ident: $tpconstr:tt > => $base:ident) {
+            $($iname:ident($($aname:ident: $aty:ty),*) => $ret:ty;)*
+        }
+    } => {
+        pub struct Context<$tparam : $tpconstr> {
+            db: Arc<$tparam>,
+        }
+
+        impl<$tparam : $tpconstr + Sync + Send + 'static> Context<$tparam> {
+            pub fn new(db: Arc<$tparam>) -> Self {
+                Self { db }
+            }
+
+            pub fn into_ops(self, pool: threadpool::ThreadPool) -> $base {
+                $base::new(pool, Arc::new(self))
+            }
+        }
+
+        inst_ops! {
+            ($base, Context<$tparam : $tpconstr>) {
+                $($iname ($($aname : $aty ),*) => $ret ;)*
+            }
+        }
+
+        $(
+            inst_ops_ctx_shim!($iname<$tparam: $tpconstr>($($aname: $aty),*) -> $ret);
+        )*
+    }
+}
+
+macro_rules! inst_ops_ctx_shim {
+    ($iname:ident<$tparam: ident : $tpconstr:tt>($($aname:ident: $aty:ty),*) -> $ret:ty) => {
+        fn $iname < $tparam : $tpconstr > (context: &Context<$tparam>, $($aname : $aty),* ) -> DbResult<$ret> {
+            context.db.as_ref(). $iname ( $($aname),* )
+        }
+    }
+}
+
 pub(crate) use inst_ops;
+pub(crate) use inst_ops_ctx_shim;
+pub(crate) use inst_ops_simple;

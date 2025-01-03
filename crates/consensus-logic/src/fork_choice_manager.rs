@@ -79,7 +79,7 @@ impl<D: Database> ForkChoiceManager<D> {
 
     fn set_block_status(&self, id: &L2BlockId, status: BlockStatus) -> Result<(), DbError> {
         self.l2_block_manager
-            .put_block_status_blocking(id, status)?;
+            .set_block_status_blocking(id, status)?;
         Ok(())
     }
 
@@ -88,7 +88,7 @@ impl<D: Database> ForkChoiceManager<D> {
     }
 
     fn get_block_data(&self, id: &L2BlockId) -> Result<Option<L2BlockBundle>, DbError> {
-        self.l2_block_manager.get_block_blocking(id)
+        self.l2_block_manager.get_block_data_blocking(id)
     }
 
     fn get_block_index(&self, blkid: &L2BlockId) -> anyhow::Result<u64> {
@@ -120,7 +120,7 @@ pub fn init_forkchoice_manager<D: Database>(
 
     let finalized_blockid = *sync_state.finalized_blkid();
     let finalized_block = l2_block_manager
-        .get_block_blocking(&finalized_blockid)?
+        .get_block_data_blocking(&finalized_blockid)?
         .ok_or(Error::MissingL2Block(finalized_blockid))?;
     let finalized_height = finalized_block.header().blockidx();
 
@@ -162,7 +162,7 @@ fn determine_start_tip(
 
     let mut best = iter.next().expect("fcm: no chain tips");
     let mut best_height = l2_block_manager
-        .get_block_blocking(best)?
+        .get_block_data_blocking(best)?
         .ok_or(Error::MissingL2Block(*best))?
         .header()
         .blockidx();
@@ -170,7 +170,7 @@ fn determine_start_tip(
     // Iterate through the remaining elements and choose.
     for blkid in iter {
         let blkid_height = l2_block_manager
-            .get_block_blocking(blkid)?
+            .get_block_data_blocking(blkid)?
             .ok_or(Error::MissingL2Block(*best))?
             .header()
             .blockidx();
@@ -487,7 +487,7 @@ fn pick_best_block<'t>(
 ) -> Result<&'t L2BlockId, Error> {
     let mut best_tip = cur_tip;
     let mut best_block = l2_block_manager
-        .get_block_blocking(best_tip)?
+        .get_block_data_blocking(best_tip)?
         .ok_or(Error::MissingL2Block(*best_tip))?;
 
     // The implementation of this will only switch to a new tip if it's a higher
@@ -499,7 +499,7 @@ fn pick_best_block<'t>(
         }
 
         let other_block = l2_block_manager
-            .get_block_blocking(other_tip)?
+            .get_block_data_blocking(other_tip)?
             .ok_or(Error::MissingL2Block(*other_tip))?;
 
         let best_header = best_block.header();

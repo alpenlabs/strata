@@ -24,7 +24,11 @@ impl L1BroadcastHandle {
     }
 
     pub async fn get_tx_status(&self, txid: Buf32) -> DbResult<Option<L1TxStatus>> {
-        self.ops.get_tx_status_async(txid).await
+        Ok(self
+            .ops
+            .get_tx_entry_by_id_async(txid)
+            .await?
+            .map(|e| e.status))
     }
 
     /// Insert an entry to the database
@@ -34,6 +38,8 @@ impl L1BroadcastHandle {
     /// This function is infallible. If the entry already exists it will update with the new
     /// `txentry`.
     pub async fn put_tx_entry(&self, txid: Buf32, txentry: L1TxEntry) -> DbResult<Option<u64>> {
+        trace!(%txid, "insert_new_tx_entry");
+        assert!(txentry.try_to_tx().is_ok(), "invalid tx entry {txentry:?}");
         let Some(idx) = self.ops.put_tx_entry_async(txid, txentry.clone()).await? else {
             return Ok(None);
         };

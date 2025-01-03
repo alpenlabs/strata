@@ -13,7 +13,7 @@ use threadpool::ThreadPool;
 use crate::exec::*;
 
 /// Database context for an database operation interface.
-pub struct Context<D: SequencerDatabase> {
+pub struct Context<D> {
     db: Arc<D>,
 }
 

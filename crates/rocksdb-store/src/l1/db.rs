@@ -159,6 +159,7 @@ impl L1Database for L1Db {
         Ok(self.db.get::<MmrSchema>(&idx)?)
     }
 
+    // TODO: This should not exist in database level and should be handled by downstream manager
     fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>> {
         let mut options = ReadOptions::default();
         options.set_iterate_lower_bound(
