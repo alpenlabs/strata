@@ -7,7 +7,12 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  eval_perf:
+    permissions:
+      # Needed to install the toolchain.
+      contents: write
+      # Needed to post the performance report comments.
+      issues: write
     runs-on: ubuntu-latest
 
     steps:
@@ -44,8 +49,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build prover guest code
-        run: cargo build --profile prover-ci -F "prover"
-        working-directory: provers/sp1
+      - name: Run performance evaluation
+        run: |
+          cargo run --profile prover-ci -- \
+          --post-to-gh \
+          --github-token "${{ secrets.GITHUB_TOKEN }}" \
+          --pr-number "${{ github.event.pull_request.number }}" \
+          --commit-hash "${{ github.sha }}" \
+        working-directory: provers/perf
         env:
-          RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+          RUSTFLAGS: "-C target-cpu=native -C link-arg=-fuse-ld=lld"
+

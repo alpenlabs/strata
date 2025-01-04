@@ -47,6 +47,7 @@ use strata_state::{
 };
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
+use strata_zkvm::ProofReceipt;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 
@@ -752,7 +753,11 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         Ok(txid)
     }
 
-    async fn submit_checkpoint_proof(&self, idx: u64, proofbytes: HexBytes) -> RpcResult<()> {
+    async fn submit_checkpoint_proof(
+        &self,
+        idx: u64,
+        proof_receipt: ProofReceipt,
+    ) -> RpcResult<()> {
         debug!(%idx, "received checkpoint proof request");
         let mut entry = self
             .checkpoint_handle
@@ -767,7 +772,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             return Err(Error::ProofAlreadyCreated(idx))?;
         }
 
-        entry.proof = strata_zkvm::Proof::new(proofbytes.into_inner());
+        entry.proof = proof_receipt;
         entry.proving_status = CheckpointProvingStatus::ProofReady;
 
         let checkpoint = entry.clone().into_batch_checkpoint();

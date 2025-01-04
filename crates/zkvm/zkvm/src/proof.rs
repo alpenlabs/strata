@@ -77,12 +77,6 @@ pub struct ProofReceipt {
     public_values: PublicValues,
 }
 
-/// A proof report containing a performance stats about proof generation.
-#[derive(Debug, Clone)]
-pub struct ProofReport {
-    pub cycles: u64,
-}
-
 impl ProofReceipt {
     /// Creates a new [`ProofReceipt`] from proof and it's associated public values
     pub fn new(proof: Proof, public_values: PublicValues) -> Self {
@@ -100,6 +94,19 @@ impl ProofReceipt {
     /// Returns the public values associated with the proof.
     pub fn public_values(&self) -> &PublicValues {
         &self.public_values
+    }
+
+    /// Check if the proof receipt is empty
+    pub fn is_empty(&self) -> bool {
+        self.public_values.is_empty() && self.proof.is_empty()
+    }
+}
+
+impl Default for ProofReceipt {
+    fn default() -> Self {
+        let proof = Proof::new(vec![]);
+        let public_values = PublicValues::new(vec![]);
+        ProofReceipt::new(proof, public_values)
     }
 }
 

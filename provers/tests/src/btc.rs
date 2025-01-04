@@ -16,8 +16,11 @@ impl<H: ZkVmHost> BtcBlockProofGenerator<H> {
     }
 }
 
-impl<H: ZkVmHost> ProofGenerator<BtcBlockspaceProver> for BtcBlockProofGenerator<H> {
+impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
     type Input = Block;
+    type P = BtcBlockspaceProver;
+    type H = H;
+
     fn get_input(&self, block: &Block) -> ZkVmResult<BlockspaceProofInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
@@ -32,18 +35,18 @@ impl<H: ZkVmHost> ProofGenerator<BtcBlockspaceProver> for BtcBlockProofGenerator
         format!("btc_block_{}", block.block_hash())
     }
 
-    fn get_host(&self) -> impl ZkVmHost {
+    fn get_host(&self) -> H {
         self.host.clone()
     }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use strata_test_utils::bitcoin::get_btc_chain;
 
     use super::*;
 
-    fn test_proof<H: ZkVmHost>(generator: BtcBlockProofGenerator<H>) {
+    fn test_proof<H: ZkVmHost>(generator: &BtcBlockProofGenerator<H>) {
         let btc_chain = get_btc_chain();
         let block = btc_chain.get_block(40321);
 
@@ -51,23 +54,20 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(any(feature = "risc0", feature = "sp1")))]
+    #[cfg(feature = "native")]
     fn test_native() {
-        use crate::provers::TEST_NATIVE_GENERATORS;
-        test_proof(TEST_NATIVE_GENERATORS.btc_blockspace());
+        test_proof(crate::TEST_NATIVE_GENERATORS.btc_blockspace());
     }
 
     #[test]
-    #[cfg(feature = "risc0")]
+    #[cfg(all(feature = "risc0", feature = "test"))]
     fn test_risc0() {
-        use crate::provers::TEST_RISC0_GENERATORS;
-        test_proof(TEST_RISC0_GENERATORS.btc_blockspace());
+        test_proof(crate::TEST_RISC0_GENERATORS.btc_blockspace());
     }
 
     #[test]
-    #[cfg(feature = "sp1")]
+    #[cfg(all(feature = "sp1", feature = "test"))]
     fn test_sp1() {
-        use crate::provers::TEST_SP1_GENERATORS;
-        test_proof(TEST_SP1_GENERATORS.btc_blockspace());
+        test_proof(crate::TEST_SP1_GENERATORS.btc_blockspace());
     }
 }

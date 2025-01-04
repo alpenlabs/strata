@@ -12,7 +12,7 @@ use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::SyncAction};
 use strata_status::StatusChannel;
-use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
+use strata_storage::{CheckpointDbManager, L2BlockManager};
 use strata_tasks::ShutdownGuard;
 use tokio::{
     sync::{broadcast, mpsc},
@@ -316,7 +316,7 @@ fn apply_action<D: Database>(
                 let entry = CheckpointEntry::new(
                     batch_ckp.batch_info().clone(),
                     batch_ckp.bootstrap_state().clone(),
-                    batch_ckp.proof().clone(),
+                    batch_ckp.get_proof_receipt(),
                     pstatus,
                     cstatus,
                     Some(c.commitment.clone().into()),
@@ -336,7 +336,7 @@ fn apply_action<D: Database>(
                 let entry = CheckpointEntry::new(
                     batch_ckp.batch_info().clone(),
                     batch_ckp.bootstrap_state().clone(),
-                    batch_ckp.proof().clone(),
+                    batch_ckp.get_proof_receipt(),
                     pstatus,
                     cstatus,
                     Some(c.commitment.clone().into()),

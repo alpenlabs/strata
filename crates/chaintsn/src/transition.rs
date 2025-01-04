@@ -297,10 +297,13 @@ fn process_deposit_updates(
                 // Check if the deposit is past the threshold.
                 if cur_block_height >= dstate.exec_deadline() {
                     // Pick the next assignee, if there are any.
-                    let new_op_pos = if num_operators > 0 {
-                        let op_off = rng.next_u32() % (num_operators - 1);
-                        (dstate.assignee() + op_off) % num_operators
+                    let new_op_pos = if num_operators > 1 {
+                        // Compute a random offset from 1 to (num_operators - 1),
+                        // ensuring we pick a different operator than the current one.
+                        let offset = 1 + (rng.next_u32() % (num_operators - 1));
+                        (dstate.assignee() + offset) % num_operators
                     } else {
+                        // If there is only a single operator, we remain with the current assignee.
                         dstate.assignee()
                     };
 

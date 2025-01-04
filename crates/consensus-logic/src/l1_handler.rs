@@ -199,6 +199,9 @@ pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) 
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
             strata_sp1_adapter::verify_groth16(proof, vk.as_ref(), &public_params_raw)
         }
+        // In Native Execution mode, we do not actually generate the proof to verify. Checking
+        // public parameters is sufficient.
+        RollupVerifyingKey::NativeVerifyingKey(_) => Ok(()),
     }
 }
 

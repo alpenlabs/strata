@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_crypto::verify_schnorr_sig;
 use strata_primitives::buf::{Buf32, Buf64};
-use strata_zkvm::Proof;
+use strata_zkvm::{Proof, ProofReceipt, PublicValues};
 
 use crate::{id::L2BlockId, l1::L1BlockId};
 
@@ -42,6 +42,19 @@ impl BatchCheckpoint {
 
     pub fn proof(&self) -> &Proof {
         &self.proof
+    }
+
+    pub fn get_proof_output(&self) -> CheckpointProofOutput {
+        CheckpointProofOutput::new(self.batch_info().clone(), self.bootstrap_state().clone())
+    }
+
+    pub fn get_proof_receipt(&self) -> ProofReceipt {
+        let proof = self.proof().clone();
+        let output = self.get_proof_output();
+        let public_values = PublicValues::new(
+            borsh::to_vec(&output).expect("could not serialize checkpoint proof output"),
+        );
+        ProofReceipt::new(proof, public_values)
     }
 
     pub fn get_sighash(&self) -> Buf32 {

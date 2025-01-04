@@ -62,6 +62,15 @@ Finally, install all test dependencies (without installing the root package):
 poetry install --no-root
 ```
 
+### Rosetta
+
+On macOS, you must have Rosetta emulation installed in order to compile the `solx` dependency:
+
+```bash
+# macOS only
+softwareupdate --install-rosetta
+```
+
 ## Running tests
 
 You can run all tests:

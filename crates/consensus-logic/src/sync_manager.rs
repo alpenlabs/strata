@@ -8,12 +8,9 @@ use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
-use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
+use strata_storage::NodeStorage;
 use strata_tasks::TaskExecutor;
-use tokio::{
-    runtime::Runtime,
-    sync::{broadcast, mpsc},
-};
+use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     csm::{
@@ -81,14 +78,12 @@ pub fn start_sync_tasks<
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
     executor: &TaskExecutor,
-    runtime: &Runtime,
     database: Arc<D>,
-    l2_block_manager: Arc<L2BlockManager>,
+    storage: &NodeStorage,
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
     status_channel: StatusChannel,
-    checkpoint_manager: Arc<CheckpointDbManager>,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
@@ -102,11 +97,11 @@ pub fn start_sync_tasks<
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
     let fcm_database = database.clone();
-    let fcm_l2_block_manager = l2_block_manager.clone();
+    let fcm_l2_block_manager = storage.l2().clone();
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
     let fcm_params = params.clone();
-    let handle = runtime.handle().clone();
+    let handle = executor.handle().clone();
     let st_ch = status_channel.clone();
     executor.spawn_critical("fork_choice_manager::tracker_task", move |shutdown| {
         // TODO this should be simplified into a builder or something
@@ -127,9 +122,9 @@ pub fn start_sync_tasks<
     let client_worker_state = worker::WorkerState::open(
         params.clone(),
         database,
-        l2_block_manager,
+        storage.l2().clone(),
         cupdate_tx,
-        checkpoint_manager,
+        storage.checkpoint().clone(),
     )?;
 
     let csm_engine = engine.clone();
