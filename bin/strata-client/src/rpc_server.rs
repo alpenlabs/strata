@@ -105,29 +105,9 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
             return Ok((cs, None));
         }
 
-        let ss = cs.sync().unwrap();
-        let tip_blkid = *ss.chain_tip_blkid();
+        let chs = self.status_channel.chain_state().map(Arc::new);
 
-        let db = self.database.clone();
-        let chs = wait_blocking("load_chainstate", move || {
-            // FIXME this is horrible, the sync state should have the block
-            // number in it somewhere
-            let l2_db = db.l2_db();
-            let tip_block = l2_db
-                .get_block_data(tip_blkid)?
-                .ok_or(Error::MissingL2Block(tip_blkid))?;
-            let idx = tip_block.header().blockidx();
-
-            let chs_db = db.chain_state_db();
-            let toplevel_st = chs_db
-                .get_toplevel_state(idx)?
-                .ok_or(Error::MissingChainstate(idx))?;
-
-            Ok(Arc::new(toplevel_st))
-        })
-        .await?;
-
-        Ok((cs, Some(chs)))
+        Ok((cs, chs))
     }
 
     async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
