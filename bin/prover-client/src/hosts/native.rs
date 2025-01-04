@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
 use strata_primitives::proof::ProofContext;
-use strata_proofimpl_btc_blockspace::logic::process_blockspace_proof_outer;
+use strata_proofimpl_btc_blockspace::logic::process_blockspace_proof;
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
 use strata_proofimpl_cl_agg::process_cl_agg;
 use strata_proofimpl_cl_stf::batch_process_cl_stf;
@@ -24,7 +24,7 @@ pub fn get_host(id: &ProofContext) -> NativeHost {
     match id {
         ProofContext::BtcBlockspace(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_blockspace_proof_outer(zkvm);
+                process_blockspace_proof(zkvm);
                 Ok(())
             })),
         },

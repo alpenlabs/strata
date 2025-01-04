@@ -1,7 +1,5 @@
 use bitcoin::{block::Header, consensus::Encodable, hashes::Hash, Block, Wtxid};
-use strata_primitives::{
-    buf::Buf32, hash::sha256d, l1::L1TxProof, utils::get_cohashes_from_wtxids,
-};
+use strata_primitives::{buf::Buf32, hash::sha256d, l1::L1TxProof, utils::get_cohashes};
 
 use crate::{l1::L1Tx, tx::ProtocolOperation};
 
@@ -53,7 +51,7 @@ pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation)
             }
         })
         .collect::<Vec<_>>();
-    let (cohashes, _wtxroot) = get_cohashes_from_wtxids(wtxids, idx);
+    let (cohashes, _wtxroot) = get_cohashes(wtxids, idx);
 
     let proof = L1TxProof::new(idx, cohashes);
     let tx = bitcoin::consensus::serialize(tx);
