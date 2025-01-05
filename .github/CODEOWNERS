@@ -45,7 +45,9 @@ tests/                 @alpenlabs/rust @alpenlabs/ci
 # Binaries/CLIs
 bin/                @alpenlabs/bin                   # catch all
 bin/bridge-client/  @alpenlabs/bin @alpenlabs/bridge
+bin/datatool/       @alpenlabs/bin @alpenlabs/bin-datatool
 bin/prover*/        @alpenlabs/bin @alpenlabs/prover
+bin/strata-client/  @alpenlabs/bin @alpenlabs/bin-strata-client
 bin/strata-reth/    @alpenlabs/bin @alpenlabs/evm
 
 # Functional tests
