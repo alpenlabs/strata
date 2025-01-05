@@ -9,8 +9,7 @@ use strata_primitives::buf::Buf32;
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
-use strata_state::id::L2BlockId;
-use strata_state::l1::L1BlockId;
+use strata_state::{id::L2BlockId, l1::L1BlockId};
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
 

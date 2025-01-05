@@ -98,8 +98,6 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     let btc_chain = get_btc_chain();
     let btc_block = btc_chain.get_block(btc_block_id);
     let evmee_block_range = (1, 1);
-    let btc_blocks = btc_chain.get_blocks(btc_block_id, btc_mini_batch_size);
-    let strata_block_id = 1;
 
     // btc_blockspace
     println!("Generating a report for BTC_BLOCKSPACE");
