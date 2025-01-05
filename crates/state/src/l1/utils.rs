@@ -29,12 +29,12 @@ pub fn compute_block_hash(header: &Header) -> Buf32 {
 /// Generates an L1 transaction with proof for a given transaction index in a block.
 ///
 /// # Parameters
+/// - `block`: The block containing the transactions.
 /// - `idx`: The index of the transaction within the block's transaction data.
 /// - `proto_op_data`: Relevant information gathered after parsing.
-/// - `block`: The block containing the transactions.
 ///
 /// # Returns
-/// - An `L1Tx` struct containing the proof and the serialized transaction.
+/// - An [`L1Tx`] struct containing the proof and the serialized transaction.
 ///
 /// # Panics
 /// - If the `idx` is out of bounds for the block's transaction data.

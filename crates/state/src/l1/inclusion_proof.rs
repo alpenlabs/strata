@@ -6,9 +6,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::sha256d, utils::get_cohashes};
 
-/// A generic proof structure that can handle any kind of transaction ID
-/// (e.g., txid or wtxid) by delegating the ID computation to the
-/// provided type `T` that implements [`TxIdComputer`].
+/// A generic proof structure that can handle any kind of transaction ID (e.g., txid or wtxid) by
+/// delegating the ID computation to the provided type `T` that implements [`TxIdComputer`].
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
@@ -77,7 +76,7 @@ impl TxIdComputer for WtxId {
 }
 
 impl<T: TxIdComputer> L1TxInclusionProof<T> {
-    /// Generates an `L1TxInclusionProof` for a transaction at the specified index in the list of
+    /// Generates the proof for a transaction at the specified index in the list of
     /// transactions, using `T` to compute the transaction IDs.
     pub fn generate(transactions: &[Transaction], idx: u32) -> Self {
         let txids = transactions

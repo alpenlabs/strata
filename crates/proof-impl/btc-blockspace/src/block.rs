@@ -94,12 +94,30 @@ pub fn compute_witness_commitment(
     })
 }
 
-/// Checks a block's integrity.
+/// Checks the integrity of a block using the provided coinbase inclusion proof.
 ///
-/// We define valid as:
+/// We pass the `inclusion_proof` for the coinbase transaction to avoid recalculating
+/// the entire Merkle root for verifying coinbase inclusion. This optimization
+/// simplifies the verification logic and improves performance, for blocks containing SegWit
+/// transactions.
 ///
-/// * The Merkle root of the header matches Merkle root of the transaction list.
-/// * The witness commitment in coinbase matches the transaction list.
+/// This function applies different validation paths depending on whether the block
+/// includes segwit transactions:
+///
+/// 1. **Blocks with segwit transactions**
+///    - Verifies that the witness commitment in the coinbase transaction matches the aggregated
+///      witness data of the block’s segwit transactions.
+///    - Checks the coinbase transaction's inclusion in the block's Merkle tree using the provided
+///      `inclusion_proof`.
+///
+/// 2. **Blocks without segwit transactions**
+///    - Validates the Merkle root by comparing the block header's Merkle root with the Merkle root
+///      computed from all transactions.
+///
+/// # Returns
+///
+/// * `true` if all integrity checks pass.
+/// * `false` otherwise.
 pub fn check_integrity(block: &Block, inclusion_proof: &L1TxProof) -> bool {
     let Block { header, txdata } = block;
     if txdata.is_empty() {
