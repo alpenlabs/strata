@@ -58,11 +58,11 @@ pub static CHECKPOINT_HOST: LazyLock<SP1Host> = std::sync::LazyLock::new(|| {
 /// instance, allowing for efficient host selection for different proof types.
 pub fn get_host(id: &ProofContext) -> &'static SP1Host {
     match id {
-        ProofContext::BtcBlockspace(_) => &BTC_BLOCKSPACE_HOST,
-        ProofContext::L1Batch(_, _) => &L1_BATCH_HOST,
-        ProofContext::EvmEeStf(_, _) => &EVM_EE_STF_HOST,
-        ProofContext::ClStf(_) => &CL_STF_HOST,
-        ProofContext::ClAgg(_, _) => &CL_AGG_HOST,
-        ProofContext::Checkpoint(_) => &CHECKPOINT_HOST,
+        ProofContext::BtcBlockspace(..) => &BTC_BLOCKSPACE_HOST,
+        ProofContext::L1Batch(..) => &L1_BATCH_HOST,
+        ProofContext::EvmEeStf(..) => &EVM_EE_STF_HOST,
+        ProofContext::ClStf(..) => &CL_STF_HOST,
+        ProofContext::ClAgg(..) => &CL_AGG_HOST,
+        ProofContext::Checkpoint(..) => &CHECKPOINT_HOST,
     }
 }

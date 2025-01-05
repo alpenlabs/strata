@@ -507,3 +507,14 @@ def submit_da_blob(btcrpc: BitcoindClient, seqrpc: JsonrpcClient, blobdata: str)
         timeout=10,
     )
     return tx
+
+
+def cl_slot_to_block_id(seqrpc, slot):
+    """Convert L2 slot number to block ID."""
+    l2_blocks = seqrpc.strata_getHeadersAtIdx(slot)
+    return l2_blocks[0]["block_id"]
+
+
+def el_slot_to_block_id(rethrpc, block_num):
+    """Get EL block hash from block number using Ethereum RPC."""
+    return rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]
