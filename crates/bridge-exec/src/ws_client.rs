@@ -1,5 +1,5 @@
-//! Wrapper for managing a WebSocket client that allows recycling or restarting
-//! the client without restarting the entire program.
+//! Wrapper for managing a WebSocket client that supports connection recycling and client
+//! restarting.
 
 use core::fmt;
 
@@ -17,7 +17,7 @@ use jsonrpsee::{
 
 /// Configuration for the WebSocket client.
 ///
-/// settings that are necessary to initialize and configure
+/// Settings that are necessary to initialize and configure
 /// the WebSocket client, ie. URL of the WebSocket server.
 #[derive(Clone, Debug)]
 pub struct WsClientConfig {
@@ -27,7 +27,7 @@ pub struct WsClientConfig {
 
 /// Manager for creating and recycling WebSocket clients.
 ///
-/// This struct manages the lifecycle of WebSocket clients, including creating
+/// Manages the lifecycle of WebSocket clients, including creating
 /// new clients and determining whether existing clients are still valid.
 #[derive(Clone, Debug)]
 pub struct WsClientManager {
@@ -35,18 +35,16 @@ pub struct WsClientManager {
     pub config: WsClientConfig,
 }
 
-/// Wrapper for the WebSocket client state.
-///
-/// This struct encapsulates the `WsClientState`, enabling unified management of
-/// both connected and failed client states.
+/// Wrapper for the WebSocket client.
 #[derive(Debug)]
 pub struct WsClient {
+    /// WebSocket client
     inner: WebsocketClient,
 }
 
-/// Implements the `Manager` trait for managing WebSocket clients.
+/// Implements the [`Manager`] trait for managing WebSocket clients.
 ///
-/// The `WsClientManager` provides methods to create new clients and recycle
+/// The [`WsClientManager`] provides methods to create new clients and recycle
 /// existing ones, ensuring that clients remain in a valid state.
 impl Manager for WsClientManager {
     type Type = WsClient;
@@ -55,8 +53,7 @@ impl Manager for WsClientManager {
     /// Creates a new WebSocket client.
     ///
     /// Attempts to initialize a new WebSocket client using the provided configuration.
-    /// Returns a `WsClient` wrapped in a `Working` or `NotWorking` state depending on
-    /// the success of the operation.
+    /// Returns a [`WsClient`]
     async fn create(&self) -> Result<Self::Type, Self::Error> {
         let client = WsClientBuilder::default()
             .build(self.config.url.clone())
@@ -65,7 +62,7 @@ impl Manager for WsClientManager {
         Ok(WsClient { inner: client })
     }
 
-    /// Recycles an existing WebSocket client.
+    /// Recycles an existing [`WsClient`]
     ///
     /// Checks whether the provided client is still valid. If the client is connected,
     /// it is retained. Otherwise, an error is returned, indicating the need to recreate
@@ -85,9 +82,9 @@ impl Manager for WsClientManager {
     }
 }
 
-/// Implements the `ClientT` trait for `WsClient`.
+/// Implements the [`ClientT`] trait for [`WsClient`].
 ///
-/// This implementation allows `WsClient` to perform JSON-RPC operations,
+/// This implementation allows `[WsClient`] to perform JSON-RPC operations,
 /// including notifications, method calls, and batch requests.
 #[async_trait]
 impl ClientT for WsClient {

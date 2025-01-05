@@ -17,9 +17,6 @@ pub enum PollDutyError {
 
 #[derive(Debug, Clone, Error)]
 pub enum TaskManagerError {
-    #[error("Polling Duty Failed: {0}")]
-    Poll(#[from] PollDutyError),
-
     #[error("Maximum retries exceeded. Num retries {0}")]
     MaxRetry(u16),
 }

@@ -89,24 +89,25 @@ where
                     }
                 }
                 Err(err) => {
-                    match err {
+                    match &err {
                         PollDutyError::Rpc(err) => {
                             error!(%err, "could not get RPC response");
-                            retries += 1;
-                            if retries >= max_retries {
-                                error!(%err, "Exceeded maximum retries to acquire client. Failing gracefully");
-
-                                return Err(TaskManagerError::MaxRetry(max_retries));
-                            }
-
-                            // Exponential backoff
-                            let delay = Duration::from_secs(1) * 2u32.pow(retries as u32 - 1);
-                            sleep(delay).await;
                         }
-                        _ => {
-                            return Err(TaskManagerError::Poll(err));
+                        PollDutyError::WsPool => {
+                            error!(%err, "cannot get workable RPC WebSocket client ");
                         }
                     }
+
+                    retries += 1;
+                    if retries >= max_retries {
+                        error!(%err, "Exceeded maximum retries to acquire client. Failing gracefully");
+
+                        return Err(TaskManagerError::MaxRetry(max_retries));
+                    }
+
+                    // Exponential backoff
+                    let delay = Duration::from_secs(1) * 2u32.pow(retries as u32 - 1);
+                    sleep(delay).await;
                 }
             }
             sleep(duty_polling_interval).await;
