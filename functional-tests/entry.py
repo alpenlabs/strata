@@ -5,15 +5,15 @@ import sys
 
 import flexitest
 
-import factory
-import net_settings
-import testenv
-from constants import *
-from utils import *
+from envs import net_settings, testenv
+from factory import factory
+from utils.constants import *
+from utils.utils import *
 
 
 def main(argv):
-    test_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    test_dir = os.path.join(root_dir, "tests")
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
     all_tests = flexitest.runtime.load_candidate_modules(modules)
 
@@ -60,7 +60,7 @@ def main(argv):
     }
 
     setup_root_logger()
-    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
+    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(root_dir, DD_ROOT))
     rt = testenv.StrataTestRuntime(global_envs, datadir_root, factories)
     rt.prepare_registered_tests()
 
