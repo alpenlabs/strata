@@ -144,6 +144,33 @@ impl L1TxProof {
         let (cohashes, _txroot) = get_cohashes(&txids, idx);
         L1TxProof::new(idx, cohashes)
     }
+
+    /// Computes the merkle root from corresponding given `tx`
+    pub fn compute_root(&self, transaction: &Transaction) -> Buf32 {
+        // `cur_hash` represents the intermediate hash at each step. After all cohashes are
+        // processed `cur_hash` becomes the root hash
+        let mut cur_hash = transaction.compute_txid().to_byte_array();
+
+        let mut pos = self.position();
+        for cohash in self.cohashes() {
+            let mut buf = [0u8; 64];
+            if pos & 1 == 0 {
+                buf[0..32].copy_from_slice(&cur_hash);
+                buf[32..64].copy_from_slice(cohash.as_ref());
+            } else {
+                buf[0..32].copy_from_slice(cohash.as_ref());
+                buf[32..64].copy_from_slice(&cur_hash);
+            }
+            cur_hash = *crate::hash::sha256d(&buf).as_ref();
+            pos >>= 1;
+        }
+        Buf32::from(cur_hash)
+    }
+
+    /// Verifies the inclusion proof of the given transaction against the given root
+    pub fn verify(&self, transaction: &Transaction, root: Buf32) -> bool {
+        self.compute_root(transaction) == root
+    }
 }
 
 /// Includes [`L1BlockManifest`] along with scan rules that it is applied to
@@ -995,12 +1022,17 @@ mod tests {
         Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
     use rand::{rngs::OsRng, Rng};
-    use strata_test_utils::ArbitraryGenerator;
+    use strata_test_utils::{
+        bitcoin::{get_btc_chain, get_btc_mainnet_block},
+        ArbitraryGenerator,
+    };
 
     use super::{
-        BitcoinAddress, BitcoinAmount, BitcoinTxid, BorshDeserialize, BorshSerialize, XOnlyPk,
+        BitcoinAddress, BitcoinAmount, BitcoinTxid, BorshDeserialize, BorshSerialize, L1TxProof,
+        XOnlyPk,
     };
     use crate::{
+        buf::Buf32,
         errors::ParseError,
         l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath},
     };
@@ -1429,5 +1461,33 @@ mod tests {
             deserialized_txid, txid,
             "original and deserialized txid must be the same"
         );
+    }
+
+    #[test]
+    fn test_l1_tx_proof() {
+        let btc_chain = get_btc_chain();
+        let block = btc_chain.get_block(40321);
+        let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
+        let txs = &block.txdata;
+
+        for (idx, tx) in txs.iter().enumerate() {
+            let proof = L1TxProof::generate(txs, idx as u32);
+            assert!(proof.verify(tx, merkle_root));
+        }
+    }
+
+    #[test]
+    #[ignore]
+    // This test is ignored because it takes ~190s to run. Run with `cargo test --ignored` for
+    // validation.
+    fn test_l1_tx_proof_2() {
+        let block = get_btc_mainnet_block();
+        let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
+        let txs = &block.txdata;
+
+        for (idx, tx) in txs.iter().enumerate() {
+            let proof = L1TxProof::generate(txs, idx as u32);
+            assert!(proof.verify(tx, merkle_root));
+        }
     }
 }

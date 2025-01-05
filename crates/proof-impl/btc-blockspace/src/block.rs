@@ -67,28 +67,6 @@ pub fn compute_witness_commitment(
     })
 }
 
-/// Computes the block merkle root from corresponding given `tx` and it's corresponding `proof`
-pub fn compute_merkle_root_from_inclusion(tx: &Transaction, proof: &L1TxProof) -> Buf32 {
-    // `cur_hash` represents the intermediate hash at each step. After all cohashes are processed
-    // `cur_hash` becomes the root hash
-    let mut cur_hash = *compute_txid(tx).as_ref();
-
-    let mut pos = proof.position();
-    for cohash in proof.cohashes() {
-        let mut buf = [0u8; 64];
-        if pos & 1 == 0 {
-            buf[0..32].copy_from_slice(&cur_hash);
-            buf[32..64].copy_from_slice(cohash.as_ref());
-        } else {
-            buf[0..32].copy_from_slice(cohash.as_ref());
-            buf[32..64].copy_from_slice(&cur_hash);
-        }
-        cur_hash = *sha256d(&buf).as_ref();
-        pos >>= 1;
-    }
-    Buf32::from(cur_hash)
-}
-
 pub fn witness_commitment_from_coinbase(coinbase: &Transaction) -> Option<WitnessCommitment> {
     // Consists of OP_RETURN, OP_PUSHBYTES_36, and four "witness header" bytes.
     const MAGIC: [u8; 6] = [0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed];
@@ -133,8 +111,8 @@ pub fn check_integrity(block: &Block, inclusion_proof: &L1TxProof) -> bool {
             let is_valid_commitment = compute_witness_commitment(txdata, witness_vec[0])
                 .is_some_and(|value| commitment == value);
 
-            let is_valid_inclusion = compute_merkle_root_from_inclusion(coinbase, inclusion_proof)
-                == header.merkle_root.to_byte_array().into();
+            let is_valid_inclusion =
+                inclusion_proof.verify(coinbase, header.merkle_root.to_byte_array().into());
 
             is_valid_commitment && is_valid_inclusion
         }
