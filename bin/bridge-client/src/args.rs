@@ -103,7 +103,7 @@ pub(crate) struct Cli {
     /// Max retries for when rpc server fails during duty polling
     #[argh(
         option,
-        description = "max retries for when rpc server fails during duty polling"
+        description = "max retries for when RPC server fails during duty polling"
     )]
     pub max_rpc_retry_count: Option<u16>,
 }

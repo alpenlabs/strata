@@ -81,7 +81,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let l2_rpc_client = l2_rpc_client_pool
         .get()
         .await
-        .expect("cannot get rpc client from pool");
+        .expect("cannot get RPC client from pool");
 
     // Get the keypair after deriving the wallet xpriv.
     let operator_keys = resolve_xpriv(args.master_xpriv, args.master_xpriv_path)?;

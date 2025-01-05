@@ -48,7 +48,7 @@ pub enum ExecError {
     #[error("bitcoin signer do not have access to the private keys, i.e. xpriv")]
     Xpriv,
 
-    /// Error getting the web socket client from pool
+    /// Error getting the WebSocket client from pool
     #[error("fetching websocket client from pool failed")]
     WsPool,
 }

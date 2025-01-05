@@ -25,7 +25,7 @@ use crate::{
     ws_client::WsClientManager,
 };
 
-/// Websocket client pool
+/// WebSocket client pool
 pub type WsClientPool = Pool<WsClientManager>;
 
 /// The execution context for handling bridge-related signing activities.

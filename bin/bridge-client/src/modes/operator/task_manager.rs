@@ -4,7 +4,6 @@
 
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
-use anyhow::bail;
 use bitcoin::Txid;
 use strata_bridge_exec::{
     errors::{ExecError, ExecResult},
@@ -22,7 +21,7 @@ use tokio::{
 };
 use tracing::{error, info, trace, warn};
 
-use crate::errors::PollDutyError;
+use crate::errors::{PollDutyError, TaskManagerError};
 
 pub(super) struct TaskManager<TxBuildContext, Bcast>
 where
@@ -45,7 +44,7 @@ where
         duty_polling_interval: Duration,
         duty_timeout_duration: Duration,
         max_retries: u16,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), TaskManagerError> {
         info!(?duty_polling_interval, "Starting to poll for duties");
         let mut retries = 0;
         loop {
@@ -91,13 +90,13 @@ where
                 }
                 Err(err) => {
                     match err {
-                        PollDutyError::RpcError(err) => {
-                            error!(%err, "could not get rpc response");
+                        PollDutyError::Rpc(err) => {
+                            error!(%err, "could not get RPC response");
                             retries += 1;
                             if retries >= max_retries {
                                 error!(%err, "Exceeded maximum retries to acquire client. Failing gracefully");
 
-                                bail!("Exceeded maximum retries to acquire client")
+                                return Err(TaskManagerError::MaxRetry(max_retries));
                             }
 
                             // Exponential backoff
@@ -105,7 +104,7 @@ where
                             sleep(delay).await;
                         }
                         _ => {
-                            bail!(err.to_string());
+                            return Err(TaskManagerError::Poll(err));
                         }
                     }
                 }
@@ -136,7 +135,7 @@ where
         } = l2_rpc_client
             .get_bridge_duties(self.exec_handler.own_index, start_index)
             .await
-            .map_err(|err| PollDutyError::RpcError(err.to_string()))?;
+            .map_err(|err| PollDutyError::Rpc(err.to_string()))?;
 
         // check which duties this operator should do something
         let mut todo_duties: Vec<BridgeDuty> = Vec::with_capacity(duties.len());

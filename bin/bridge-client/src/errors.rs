@@ -8,9 +8,18 @@ pub enum InitError {
 
 #[derive(Debug, Clone, Error)]
 pub enum PollDutyError {
-    #[error("Rpc client: {0}")]
-    RpcError(String),
+    #[error("RPC client: {0}")]
+    Rpc(String),
 
-    #[error("fetching websocket client from pool failed")]
+    #[error("fetching WebSocket client from pool failed")]
     WsPool,
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum TaskManagerError {
+    #[error("Polling Duty Failed: {0}")]
+    Poll(#[from] PollDutyError),
+
+    #[error("Maximum retries exceeded. Num retries {0}")]
+    MaxRetry(u16),
 }
