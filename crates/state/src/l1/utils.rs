@@ -1,5 +1,9 @@
-use bitcoin::{block::Header, consensus::Encodable, hashes::Hash, Block, Wtxid};
-use strata_primitives::{buf::Buf32, hash::sha256d, utils::get_cohashes};
+use bitcoin::{
+    block::Header,
+    consensus::{serialize, Encodable},
+    Block,
+};
+use strata_primitives::{buf::Buf32, hash::sha256d};
 
 use crate::{
     l1::{L1Tx, L1TxProof},
@@ -41,23 +45,8 @@ pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation)
     );
     let tx = &block.txdata[idx as usize];
 
-    // Get all witness ids for txs
-    let wtxids = &block
-        .txdata
-        .iter()
-        .enumerate()
-        .map(|(i, x)| {
-            if i == 0 {
-                Wtxid::all_zeros() // Coinbase's wtxid is all zeros
-            } else {
-                x.compute_wtxid()
-            }
-        })
-        .collect::<Vec<_>>();
-    let (cohashes, _wtxroot) = get_cohashes(wtxids, idx);
-
-    let proof = L1TxProof::new(idx, cohashes);
-    let tx = bitcoin::consensus::serialize(tx);
+    let proof = L1TxProof::generate(&block.txdata, idx);
+    let tx = serialize(tx);
 
     L1Tx::new(proof, tx, proto_op_data)
 }

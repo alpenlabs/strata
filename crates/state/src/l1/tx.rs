@@ -10,6 +10,7 @@ use crate::tx::ProtocolOperation;
     Clone, Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary, Serialize, Deserialize,
 )]
 pub struct L1Tx {
+    // TODO: verify if we need L1TxProof or L1WtxProof
     proof: L1TxProof,
     tx: Vec<u8>,
     protocol_operation: ProtocolOperation,
