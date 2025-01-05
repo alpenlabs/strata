@@ -2,6 +2,7 @@ use std::{
     fmt::Display,
     io::{self, Read, Write},
     iter::Sum,
+    marker::PhantomData,
     ops::Add,
 };
 
@@ -107,19 +108,54 @@ impl From<(u64, u32)> for L1TxRef {
     }
 }
 
-/// Merkle proof for a TXID within a block.
+/// A trait for computing some kind of transaction ID (e.g., `txid` or `wtxid`)
+/// from a [`Transaction`].
+///
+/// By implementing this trait for different "marker" types, you can
+/// handle multiple ID computations without duplicating your proof
+/// generation logic. For instance, `TxId` uses `Transaction::compute_txid`,
+/// while `WtxId` uses `Transaction::compute_wtxid`.
+pub trait TxIdComputer {
+    /// Computes the transaction ID for the given transaction.
+    fn compute_id(tx: &Transaction) -> Buf32;
+}
+
+pub struct TxId; // Marker type for txid
+pub struct WtxId; // Marker type for wtxid
+
+impl TxIdComputer for TxId {
+    fn compute_id(tx: &Transaction) -> Buf32 {
+        tx.compute_txid().into()
+    }
+}
+
+impl TxIdComputer for WtxId {
+    fn compute_id(tx: &Transaction) -> Buf32 {
+        tx.compute_wtxid().into()
+    }
+}
+
+/// A generic proof structure that can handle any kind of transaction ID
+/// (e.g., txid or wtxid) by delegating the ID computation to the
+/// provided type `T` that implements [`TxIdComputer`].
 // TODO rework this, make it possible to generate proofs, etc.
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
-pub struct L1TxProof {
+pub struct L1TxInclusionProof<T> {
     position: u32,
     cohashes: Vec<Buf32>,
+    // Marker so Rust remembers this struct is generic on T
+    _marker: PhantomData<T>,
 }
 
-impl L1TxProof {
+impl<T> L1TxInclusionProof<T> {
     pub fn new(position: u32, cohashes: Vec<Buf32>) -> Self {
-        Self { position, cohashes }
+        Self {
+            position,
+            cohashes,
+            _marker: PhantomData,
+        }
     }
 
     pub fn cohashes(&self) -> &[Buf32] {
@@ -129,27 +165,27 @@ impl L1TxProof {
     pub fn position(&self) -> u32 {
         self.position
     }
+}
 
-    /// Generates an `L1TxProof` for a transaction at the specified index in the list of
-    /// transactions.
-    ///
-    /// This function computes the `txid` (transaction ID) for each transaction in the provided
-    /// slice, calculates the cohashes for the transaction at the given index, and constructs
-    /// the proof.
+impl<T: TxIdComputer> L1TxInclusionProof<T> {
+    /// Generates an `L1TxInclusionProof` for a transaction at the specified index in the list of
+    /// transactions, using `T` to compute the transaction IDs.
     pub fn generate(transactions: &[Transaction], idx: u32) -> Self {
         let txids = transactions
             .iter()
-            .map(|tx| tx.compute_txid())
+            .map(|tx| T::compute_id(tx))
             .collect::<Vec<_>>();
         let (cohashes, _txroot) = get_cohashes(&txids, idx);
-        L1TxProof::new(idx, cohashes)
+        L1TxInclusionProof::new(idx, cohashes)
     }
 
-    /// Computes the merkle root from corresponding given `tx`
+    /// Computes the merkle root for the given `transaction` using the proof's cohashes.
+    /// This will use `T::compute_id` internally, so it can compute either a txid or wtxid
+    /// depending on the marker type.
     pub fn compute_root(&self, transaction: &Transaction) -> Buf32 {
         // `cur_hash` represents the intermediate hash at each step. After all cohashes are
         // processed `cur_hash` becomes the root hash
-        let mut cur_hash = transaction.compute_txid().to_byte_array();
+        let mut cur_hash = T::compute_id(transaction).0;
 
         let mut pos = self.position();
         for cohash in self.cohashes() {
@@ -167,11 +203,17 @@ impl L1TxProof {
         Buf32::from(cur_hash)
     }
 
-    /// Verifies the inclusion proof of the given transaction against the given root
+    /// Verifies the inclusion proof of the given `transaction` against the provided merkle `root`.
     pub fn verify(&self, transaction: &Transaction, root: Buf32) -> bool {
         self.compute_root(transaction) == root
     }
 }
+
+/// Convenience type alias for the "legacy" txid-based proof.
+pub type L1TxProof = L1TxInclusionProof<TxId>;
+
+/// Convenience type alias for the "witness" wtxid-based proof.
+pub type L1WtxProof = L1TxInclusionProof<WtxId>;
 
 /// Includes [`L1BlockManifest`] along with scan rules that it is applied to
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -1028,13 +1070,13 @@ mod tests {
     };
 
     use super::{
-        BitcoinAddress, BitcoinAmount, BitcoinTxid, BorshDeserialize, BorshSerialize, L1TxProof,
-        XOnlyPk,
+        BitcoinAddress, BitcoinAmount, BitcoinTxid, BorshDeserialize, BorshSerialize,
+        L1TxInclusionProof, XOnlyPk,
     };
     use crate::{
         buf::Buf32,
         errors::ParseError,
-        l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath},
+        l1::{BitcoinPsbt, BitcoinTxOut, L1TxProof, TaprootSpendPath},
     };
 
     #[test]
