@@ -5,8 +5,8 @@ use bitcoin::{
     Block,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, l1::L1TxProof, params::RollupParams};
-use strata_state::{batch::BatchCheckpoint, tx::DepositInfo};
+use strata_primitives::{buf::Buf32, params::RollupParams};
+use strata_state::{batch::BatchCheckpoint, l1::L1TxProof, tx::DepositInfo};
 use strata_zkvm::ZkVmEnv;
 
 <<<<<<< HEAD

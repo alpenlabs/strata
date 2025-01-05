@@ -2,7 +2,6 @@ use std::{
     fmt::Display,
     io::{self, Read, Write},
     iter::Sum,
-    marker::PhantomData,
     ops::Add,
 };
 
@@ -24,9 +23,7 @@ use rand::rngs::OsRng;
 use reth_primitives::revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::{
-    buf::Buf32, constants::HASH_SIZE, errors::ParseError, impl_buf_wrapper, utils::get_cohashes,
-};
+use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError, impl_buf_wrapper};
 
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
@@ -107,113 +104,6 @@ impl From<(u64, u32)> for L1TxRef {
         Self(value.0, value.1)
     }
 }
-
-/// A trait for computing some kind of transaction ID (e.g., `txid` or `wtxid`)
-/// from a [`Transaction`].
-///
-/// By implementing this trait for different "marker" types, you can
-/// handle multiple ID computations without duplicating your proof
-/// generation logic. For instance, `TxId` uses `Transaction::compute_txid`,
-/// while `WtxId` uses `Transaction::compute_wtxid`.
-pub trait TxIdComputer {
-    /// Computes the transaction ID for the given transaction.
-    fn compute_id(tx: &Transaction) -> Buf32;
-}
-
-pub struct TxId; // Marker type for txid
-pub struct WtxId; // Marker type for wtxid
-
-impl TxIdComputer for TxId {
-    fn compute_id(tx: &Transaction) -> Buf32 {
-        tx.compute_txid().into()
-    }
-}
-
-impl TxIdComputer for WtxId {
-    fn compute_id(tx: &Transaction) -> Buf32 {
-        tx.compute_wtxid().into()
-    }
-}
-
-/// A generic proof structure that can handle any kind of transaction ID
-/// (e.g., txid or wtxid) by delegating the ID computation to the
-/// provided type `T` that implements [`TxIdComputer`].
-// TODO rework this, make it possible to generate proofs, etc.
-#[derive(
-    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct L1TxInclusionProof<T> {
-    position: u32,
-    cohashes: Vec<Buf32>,
-    // Marker so Rust remembers this struct is generic on T
-    _marker: PhantomData<T>,
-}
-
-impl<T> L1TxInclusionProof<T> {
-    pub fn new(position: u32, cohashes: Vec<Buf32>) -> Self {
-        Self {
-            position,
-            cohashes,
-            _marker: PhantomData,
-        }
-    }
-
-    pub fn cohashes(&self) -> &[Buf32] {
-        &self.cohashes
-    }
-
-    pub fn position(&self) -> u32 {
-        self.position
-    }
-}
-
-impl<T: TxIdComputer> L1TxInclusionProof<T> {
-    /// Generates an `L1TxInclusionProof` for a transaction at the specified index in the list of
-    /// transactions, using `T` to compute the transaction IDs.
-    pub fn generate(transactions: &[Transaction], idx: u32) -> Self {
-        let txids = transactions
-            .iter()
-            .map(|tx| T::compute_id(tx))
-            .collect::<Vec<_>>();
-        let (cohashes, _txroot) = get_cohashes(&txids, idx);
-        L1TxInclusionProof::new(idx, cohashes)
-    }
-
-    /// Computes the merkle root for the given `transaction` using the proof's cohashes.
-    /// This will use `T::compute_id` internally, so it can compute either a txid or wtxid
-    /// depending on the marker type.
-    pub fn compute_root(&self, transaction: &Transaction) -> Buf32 {
-        // `cur_hash` represents the intermediate hash at each step. After all cohashes are
-        // processed `cur_hash` becomes the root hash
-        let mut cur_hash = T::compute_id(transaction).0;
-
-        let mut pos = self.position();
-        for cohash in self.cohashes() {
-            let mut buf = [0u8; 64];
-            if pos & 1 == 0 {
-                buf[0..32].copy_from_slice(&cur_hash);
-                buf[32..64].copy_from_slice(cohash.as_ref());
-            } else {
-                buf[0..32].copy_from_slice(cohash.as_ref());
-                buf[32..64].copy_from_slice(&cur_hash);
-            }
-            cur_hash = *crate::hash::sha256d(&buf).as_ref();
-            pos >>= 1;
-        }
-        Buf32::from(cur_hash)
-    }
-
-    /// Verifies the inclusion proof of the given `transaction` against the provided merkle `root`.
-    pub fn verify(&self, transaction: &Transaction, root: Buf32) -> bool {
-        self.compute_root(transaction) == root
-    }
-}
-
-/// Convenience type alias for the "legacy" txid-based proof.
-pub type L1TxProof = L1TxInclusionProof<TxId>;
-
-/// Convenience type alias for the "witness" wtxid-based proof.
-pub type L1WtxProof = L1TxInclusionProof<WtxId>;
 
 /// Includes [`L1BlockManifest`] along with scan rules that it is applied to
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -1064,19 +954,14 @@ mod tests {
         Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
     };
     use rand::{rngs::OsRng, Rng};
-    use strata_test_utils::{
-        bitcoin::{get_btc_chain, get_btc_mainnet_block},
-        ArbitraryGenerator,
-    };
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::{
-        BitcoinAddress, BitcoinAmount, BitcoinTxid, BorshDeserialize, BorshSerialize,
-        L1TxInclusionProof, XOnlyPk,
+        BitcoinAddress, BitcoinAmount, BitcoinTxid, BorshDeserialize, BorshSerialize, XOnlyPk,
     };
     use crate::{
-        buf::Buf32,
         errors::ParseError,
-        l1::{BitcoinPsbt, BitcoinTxOut, L1TxProof, TaprootSpendPath},
+        l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath},
     };
 
     #[test]
@@ -1503,33 +1388,5 @@ mod tests {
             deserialized_txid, txid,
             "original and deserialized txid must be the same"
         );
-    }
-
-    #[test]
-    fn test_l1_tx_proof() {
-        let btc_chain = get_btc_chain();
-        let block = btc_chain.get_block(40321);
-        let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
-        let txs = &block.txdata;
-
-        for (idx, tx) in txs.iter().enumerate() {
-            let proof = L1TxProof::generate(txs, idx as u32);
-            assert!(proof.verify(tx, merkle_root));
-        }
-    }
-
-    #[test]
-    #[ignore]
-    // This test is ignored because it takes ~190s to run. Run with `cargo test --ignored` for
-    // validation.
-    fn test_l1_tx_proof_2() {
-        let block = get_btc_mainnet_block();
-        let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
-        let txs = &block.txdata;
-
-        for (idx, tx) in txs.iter().enumerate() {
-            let proof = L1TxProof::generate(txs, idx as u32);
-            assert!(proof.verify(tx, merkle_root));
-        }
     }
 }

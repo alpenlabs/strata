@@ -1,12 +1,12 @@
 use bitcoin::consensus::serialize;
-use strata_primitives::l1::L1TxProof;
+use strata_state::l1::{witness_commitment_from_coinbase, L1TxProof};
 use strata_zkvm::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };
 
 use crate::{
     block::{witness_commitment_from_coinbase, MAGIC},
-    logic::{BlockScanProofInput, BlockScanResult},
+    logic::{BlockScanProofInput, BlockScanResult, BlockspaceProofInput, BlockspaceProofOutput},
 };
 
 pub struct BtcBlockspaceProver;

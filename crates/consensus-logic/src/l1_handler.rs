@@ -10,7 +10,7 @@ use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{L1BlockManifest, L1BlockRecord, L1TxProof},
+    l1::{L1BlockManifest, L1BlockRecord},
     params::{Params, RollupParams},
     proof::RollupVerifyingKey,
 };
@@ -18,8 +18,11 @@ use strata_risc0_adapter;
 use strata_sp1_adapter;
 use strata_state::{
     batch::{BatchCheckpoint, CheckpointProofOutput},
-    l1::L1Tx,
+   
+    l1::{L1Tx,
+    L1TxProof},
     sync_event::SyncEvent,
+   
     tx::ProtocolOperation,
 };
 use strata_tx_parser::messages::{BlockData, L1Event};

@@ -23,3 +23,6 @@ pub use utils::*;
 
 mod params;
 pub use params::*;
+
+mod inclusion_proof;
+pub use inclusion_proof::*;
