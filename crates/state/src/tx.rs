@@ -1,11 +1,14 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::l1::{BitcoinAmount, OutputRef};
 
 use crate::batch::SignedBatchCheckpoint;
 
 /// Information related to relevant transactions to be stored in L1Tx
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
 #[allow(clippy::large_enum_variant)]
 pub enum ProtocolOperation {
     /// Deposit Transaction
@@ -17,7 +20,9 @@ pub enum ProtocolOperation {
     // TODO: add other kinds like Proofs and statediffs
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
 pub struct DepositInfo {
     /// Bitcoin amount
     pub amt: BitcoinAmount,
@@ -29,7 +34,9 @@ pub struct DepositInfo {
     pub address: Vec<u8>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
 pub struct DepositRequestInfo {
     /// amount in satoshis
     pub amt: u64,

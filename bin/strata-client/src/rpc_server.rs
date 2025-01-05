@@ -13,7 +13,8 @@ use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
 use strata_consensus_logic::{
-    checkpoint::CheckpointHandle, l1_handler::verify_proof, sync_manager::SyncManager,
+    checkpoint::CheckpointHandle, csm::state_tracker::reconstruct_state, l1_handler::verify_proof,
+    sync_manager::SyncManager,
 };
 use strata_db::{
     traits::*,
@@ -25,18 +26,21 @@ use strata_primitives::{
     hash,
     params::Params,
 };
-use strata_rpc_api::{StrataAdminApiServer, StrataApiServer, StrataSequencerApiServer};
+use strata_rpc_api::{
+    StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
+};
 use strata_rpc_types::{
     errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockHeader,
-    RpcBridgeDuties, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcExecUpdate,
-    RpcL1Status, RpcSyncStatus,
+    RpcBridgeDuties, RpcChainState, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry,
+    RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
     batch::BatchCheckpoint,
-    block::L2BlockBundle,
+    block::{L2Block, L2BlockBundle},
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
+    client_state::ClientState,
     da_blob::{BlobDest, BlobIntent},
     header::L2Header,
     id::L2BlockId,
@@ -106,6 +110,19 @@ fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> RpcBlockHeader {
 
 #[async_trait]
 impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
+    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>> {
+        let l2_block_manager = self.l2_block_manager.clone();
+        let l2_blocks = l2_block_manager
+            .get_blocks_at_height_async(idx)
+            .await
+            .map_err(Error::Db)?;
+        let block_ids = l2_blocks
+            .iter()
+            .map(HexBytes32::from)
+            .collect::<Vec<HexBytes32>>();
+        Ok(block_ids)
+    }
+
     async fn protocol_version(&self) -> RpcResult<u64> {
         Ok(1)
     }
@@ -647,6 +664,18 @@ impl SequencerServerImpl {
 
 #[async_trait]
 impl StrataSequencerApiServer for SequencerServerImpl {
+    async fn get_last_tx_entry(&self) -> RpcResult<Option<L1TxEntry>> {
+        let broadcast_handle: Arc<L1BroadcastHandle> = self.broadcast_handle.clone();
+        let txentry = broadcast_handle.get_last_tx_entry().await;
+        Ok(txentry.map_err(|e| Error::Other(e.to_string()))?)
+    }
+
+    async fn get_tx_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>> {
+        let broadcast_handle = &self.broadcast_handle;
+        let txentry = broadcast_handle.get_tx_entry_by_idx_async(idx).await;
+        Ok(txentry.map_err(|e| Error::Other(e.to_string()))?)
+    }
+
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
         let commitment = hash::raw(&blob.0);
         let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
@@ -723,5 +752,65 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .get_tx_status(id)
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
+    }
+}
+
+pub struct StrataDebugRpcImpl<D> {
+    l2_block_manager: Arc<L2BlockManager>,
+    database: Arc<D>,
+}
+
+impl<D: Database + Sync + Send + 'static> StrataDebugRpcImpl<D> {
+    pub fn new(l2_block_manager: Arc<L2BlockManager>, database: Arc<D>) -> Self {
+        Self {
+            l2_block_manager,
+            database,
+        }
+    }
+}
+
+#[async_trait]
+impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRpcImpl<D> {
+    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>> {
+        let l2_block_manager = &self.l2_block_manager;
+        let l2_block = l2_block_manager
+            .get_block_async(&block_id)
+            .await
+            .map_err(Error::Db)?
+            .map(|b| b.block().clone());
+        Ok(l2_block)
+    }
+    async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
+        let db = self.database.clone();
+        let chain_state = wait_blocking("chain_state_at_idx", move || {
+            db.chain_state_db()
+                .get_toplevel_state(idx)
+                .map_err(Error::Db)
+        })
+        .await?;
+        match chain_state {
+            Some(cs) => Ok(Some(RpcChainState {
+                tip_blkid: cs.chain_tip_blockid(),
+                tip_slot: cs.chain_tip_slot(),
+                cur_epoch: cs.epoch(),
+            })),
+            None => Ok(None),
+        }
+    }
+
+    async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
+        let database = self.database.clone();
+        let cs = wait_blocking("clientstate_at_idx", move || {
+            let client_state_db = database.client_state_db();
+            match reconstruct_state(client_state_db.as_ref(), idx) {
+                Ok(client_state) => Ok(Some(client_state)),
+                Err(e) => {
+                    error!(%idx, %e, "failed to reconstruct client state");
+                    Err(Error::Other(e.to_string()))
+                }
+            }
+        })
+        .await?;
+        Ok(cs)
     }
 }

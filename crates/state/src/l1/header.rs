@@ -1,16 +1,16 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
 
 use super::{DaTx, DepositUpdateTx, L1BlockId};
-
 /// Header and the wtxs root.
 ///
 /// This is the core data we need to make proof against a L1 block.  We could
 /// omit the wtxs root, but we'd need to re-prove it every time, and that would
 /// waste space.  So we treat this like you would an "extended header" or
 /// something.
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct L1HeaderRecord {
     /// L1 block ID here so that we don't have to recompute it too much, which
     /// is expensive in proofs.
@@ -85,7 +85,9 @@ impl<'a> Arbitrary<'a> for L1HeaderRecord {
 }
 
 /// Represents a serialized L1 header.
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct L1HeaderPayload {
     /// Index in the L1 chain.  This helps us in case there's reorgs that the L2
     /// chain observes.

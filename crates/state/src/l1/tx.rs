@@ -1,11 +1,14 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::l1::L1TxProof;
 
 use crate::tx::ProtocolOperation;
 
 /// Tx body with a proof.
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary)]
+#[derive(
+    Clone, Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary, Serialize, Deserialize,
+)]
 pub struct L1Tx {
     proof: L1TxProof,
     tx: Vec<u8>,
@@ -34,7 +37,9 @@ impl L1Tx {
     }
 }
 
-#[derive(Clone, Debug, Arbitrary, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
+#[derive(
+    Clone, Debug, Arbitrary, BorshDeserialize, BorshSerialize, PartialEq, Eq, Serialize, Deserialize,
+)]
 pub struct DepositUpdateTx {
     /// The transaction in the block.
     tx: L1Tx,
@@ -59,7 +64,9 @@ impl DepositUpdateTx {
     }
 }
 
-#[derive(Clone, Debug, Arbitrary, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
+#[derive(
+    Clone, Debug, Arbitrary, BorshDeserialize, BorshSerialize, PartialEq, Eq, Serialize, Deserialize,
+)]
 pub struct DaTx {
     // TODO other fields that we need to be able to identify the DA
     /// The transaction in the block.
