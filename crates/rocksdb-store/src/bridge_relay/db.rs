@@ -106,7 +106,7 @@ impl BridgeMessageDb for BridgeMsgDb {
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use strata_primitives::{l1::L1TxProof, relay::types::BridgeMessage};
+    use strata_primitives::relay::types::BridgeMessage;
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;

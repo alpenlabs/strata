@@ -1,5 +1,5 @@
 use bitcoin::consensus::serialize;
-use strata_state::l1::{witness_commitment_from_coinbase, L1TxProof};
+use strata_state::l1::L1TxProof;
 use strata_zkvm::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };

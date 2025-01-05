@@ -1,7 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::l1::L1TxProof;
 
 use super::L1TxProof;
 use crate::tx::ProtocolOperation;

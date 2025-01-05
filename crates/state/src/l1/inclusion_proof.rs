@@ -3,12 +3,15 @@ use std::marker::PhantomData;
 use arbitrary::Arbitrary;
 use bitcoin::Transaction;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::sha256d, utils::get_cohashes};
 
 /// A generic proof structure that can handle any kind of transaction ID
 /// (e.g., txid or wtxid) by delegating the ID computation to the
 /// provided type `T` that implements [`TxIdComputer`].
-#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct L1TxInclusionProof<T> {
     position: u32,
     cohashes: Vec<Buf32>,
@@ -46,11 +49,15 @@ pub trait TxIdComputer {
 }
 
 /// Marker type for computing the "legacy" txid.
-#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct TxId;
 
 /// Marker type for computing the "witness" wtxid.
-#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct WtxId;
 
 impl TxIdComputer for TxId {
@@ -61,7 +68,7 @@ impl TxIdComputer for TxId {
 
 impl TxIdComputer for WtxId {
     fn compute_id(tx: &Transaction, idx: usize) -> Buf32 {
-        // Coinbase
+        // Coinbase transaction wtxid is hash with zeroes
         if idx == 0 {
             return Buf32::zero();
         }
@@ -121,6 +128,7 @@ pub type L1WtxProof = L1TxInclusionProof<WtxId>;
 #[cfg(test)]
 mod tests {
     use bitcoin::hashes::Hash;
+    use rand::{thread_rng, Rng};
     use strata_primitives::buf::Buf32;
     use strata_test_utils::bitcoin::{get_btc_chain, get_btc_mainnet_block};
 
@@ -129,7 +137,7 @@ mod tests {
     #[test]
     fn test_l1_tx_proof() {
         let btc_chain = get_btc_chain();
-        let block = btc_chain.get_block(40321);
+        let block = btc_chain.get_block(40_321);
         let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
         let txs = &block.txdata;
 
@@ -140,30 +148,30 @@ mod tests {
     }
 
     #[test]
-    fn test_l1_wtx_proof() {
-        let btc_chain = get_btc_chain();
-        let block = btc_chain.get_block(40321);
-        let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
-        let txs = &block.txdata;
-
-        for (idx, tx) in txs.iter().enumerate() {
-            let proof = L1WtxProof::generate(txs, idx as u32);
-            assert!(proof.verify(tx, merkle_root));
-        }
-    }
-
-    #[test]
-    #[ignore]
-    // This test is ignored because it takes ~190s to run. Run with `cargo test --ignored` for
-    // validation.
     fn test_l1_tx_proof_2() {
         let block = get_btc_mainnet_block();
         let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
         let txs = &block.txdata;
 
-        for (idx, tx) in txs.iter().enumerate() {
-            let proof = L1TxProof::generate(txs, idx as u32);
-            assert!(proof.verify(tx, merkle_root));
-        }
+        let mut rng = thread_rng();
+        let idx = rng.gen_range(0..=txs.len());
+        let proof = L1TxProof::generate(txs, idx as u32);
+        assert!(proof.verify(&txs[idx], merkle_root));
+    }
+
+    #[test]
+    fn test_l1_wtx_proof() {
+        let block = get_btc_mainnet_block();
+        let txs = &block.txdata;
+        let wtx_root = block.witness_root().unwrap().to_byte_array().into();
+
+        let idx = 0;
+        let proof = L1WtxProof::generate(txs, idx as u32);
+        assert!(proof.verify(&txs[idx], wtx_root));
+
+        let mut rng = thread_rng();
+        let idx = rng.gen_range(1..=txs.len());
+        let proof = L1WtxProof::generate(txs, idx as u32);
+        assert!(proof.verify(&txs[idx], wtx_root));
     }
 }
