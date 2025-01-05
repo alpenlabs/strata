@@ -323,7 +323,7 @@ where
     }
 
     /// Retrieves a ready-to-use RPC client from the client pool.
-    async fn get_ready_rpc_client(&self) -> Result<Object<WsClientManager>, ExecError> {
+    pub async fn get_ready_rpc_client(&self) -> Result<Object<WsClientManager>, ExecError> {
         self.l2_rpc_client_pool
             .get()
             .await

@@ -125,8 +125,7 @@ where
 
         let l2_rpc_client = self
             .exec_handler
-            .l2_rpc_client_pool
-            .get()
+            .get_ready_rpc_client()
             .await
             .map_err(|_| PollDutyError::WsPool)?;
 

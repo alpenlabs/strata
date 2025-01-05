@@ -10,7 +10,7 @@ use jsonrpsee::{
         client::{BatchResponse, ClientT},
         params::BatchRequestBuilder,
         traits::ToRpcParams,
-        BoxError, ClientError, DeserializeOwned,
+        ClientError, DeserializeOwned,
     },
     ws_client::{WsClient as WebsocketClient, WsClientBuilder},
 };
@@ -35,24 +35,14 @@ pub struct WsClientManager {
     pub config: WsClientConfig,
 }
 
-/// Represents the state of a WebSocket client.
-///
-/// - `Working`: The client is connected and operational.
-/// - `NotWorking`: The client is not connected or has encountered an error.
-#[derive(Debug)]
-pub enum WsClientState {
-    /// The WebSocket client is connected and operational.
-    Working(WebsocketClient),
-    /// The WebSocket client is not connected or is in a failed state.
-    NotWorking,
-}
-
 /// Wrapper for the WebSocket client state.
 ///
 /// This struct encapsulates the `WsClientState`, enabling unified management of
 /// both connected and failed client states.
 #[derive(Debug)]
-pub struct WsClient(WsClientState);
+pub struct WsClient {
+    inner: WebsocketClient,
+}
 
 /// Implements the `Manager` trait for managing WebSocket clients.
 ///
@@ -70,13 +60,9 @@ impl Manager for WsClientManager {
     async fn create(&self) -> Result<Self::Type, Self::Error> {
         let client = WsClientBuilder::default()
             .build(self.config.url.clone())
-            .await;
+            .await?;
 
-        let bl = match client {
-            Ok(cl) => WsClientState::Working(cl),
-            Err(_) => WsClientState::NotWorking,
-        };
-        Ok(WsClient(bl))
+        Ok(WsClient { inner: client })
     }
 
     /// Recycles an existing WebSocket client.
@@ -89,27 +75,14 @@ impl Manager for WsClientManager {
         obj: &mut Self::Type,
         _metrics: &managed::Metrics,
     ) -> RecycleResult<Self::Error> {
-        match &obj.0 {
-            WsClientState::Working(cl) => {
-                if cl.is_connected() {
-                    Ok(())
-                } else {
-                    Err(RecycleError::Message(
-                        "Connection lost, recreate client".to_string().into(),
-                    ))
-                }
-            }
-            WsClientState::NotWorking => Err(RecycleError::Message(
-                "Connection still not found, recreate client"
-                    .to_string()
-                    .into(),
-            )),
+        if obj.inner.is_connected() {
+            Ok(())
+        } else {
+            Err(RecycleError::Message(
+                "Connection lost, recreate client".to_string().into(),
+            ))
         }
     }
-}
-
-fn make_not_working_error() -> ClientError {
-    ClientError::Transport(BoxError::from("Client is Not Working".to_string()))
 }
 
 /// Implements the `ClientT` trait for `WsClient`.
@@ -125,10 +98,7 @@ impl ClientT for WsClient {
     where
         Params: ToRpcParams + Send,
     {
-        match &self.0 {
-            WsClientState::Working(inner) => inner.notification(method, params).await,
-            WsClientState::NotWorking => Err(make_not_working_error()),
-        }
+        self.inner.notification(method, params).await
     }
 
     /// Send a [method call request](https://www.jsonrpc.org/specification#request_object).
@@ -139,10 +109,7 @@ impl ClientT for WsClient {
         R: DeserializeOwned,
         Params: ToRpcParams + Send,
     {
-        match &self.0 {
-            WsClientState::Working(inner) => inner.request(method, params).await,
-            WsClientState::NotWorking => Err(make_not_working_error()),
-        }
+        self.inner.request(method, params).await
     }
 
     /// Sends a batch request.
@@ -153,9 +120,6 @@ impl ClientT for WsClient {
     where
         R: DeserializeOwned + fmt::Debug + 'a,
     {
-        match &self.0 {
-            WsClientState::Working(inner) => inner.batch_request(batch).await,
-            WsClientState::NotWorking => Err(make_not_working_error()),
-        }
+        self.inner.batch_request(batch).await
     }
 }
