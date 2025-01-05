@@ -23,8 +23,8 @@ def main(argv):
         # Run the specific test file passed as the first argument (without .py extension)
         tests = [str(tst).removesuffix(".py") for tst in argv[1:]]
     else:
-        # Run all tests, excluding those containing "fn_prover", unless explicitly passed in argv
-        tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
+        # Run all tests, excluding those containing "prover_", unless explicitly passed in argv
+        tests = [test for test in all_tests if "prover_" not in test or test in argv]
 
     btc_fac = factory.BitcoinFactory([12300 + i for i in range(30)])
     seq_fac = factory.StrataFactory([12400 + i for i in range(30)])
