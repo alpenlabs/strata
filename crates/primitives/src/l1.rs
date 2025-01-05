@@ -23,7 +23,9 @@ use rand::rngs::OsRng;
 use reth_primitives::revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError, impl_buf_wrapper};
+use crate::{
+    buf::Buf32, constants::HASH_SIZE, errors::ParseError, impl_buf_wrapper, utils::get_cohashes,
+};
 
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
@@ -105,7 +107,6 @@ impl From<(u64, u32)> for L1TxRef {
     }
 }
 
-/// TODO: This is duplicate with state::l1::L1TxProof
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
 #[derive(
@@ -127,6 +128,21 @@ impl L1TxProof {
 
     pub fn position(&self) -> u32 {
         self.position
+    }
+
+    /// Generates an `L1TxProof` for a transaction at the specified index in the list of
+    /// transactions.
+    ///
+    /// This function computes the `txid` (transaction ID) for each transaction in the provided
+    /// slice, calculates the cohashes for the transaction at the given index, and constructs
+    /// the proof.
+    pub fn generate(transactions: &[Transaction], idx: u32) -> Self {
+        let txids = transactions
+            .iter()
+            .map(|tx| tx.compute_txid())
+            .collect::<Vec<_>>();
+        let (cohashes, _txroot) = get_cohashes(&txids, idx);
+        L1TxProof::new(idx, cohashes)
     }
 }
 
