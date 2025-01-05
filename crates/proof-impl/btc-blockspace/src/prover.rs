@@ -1,11 +1,11 @@
 use bitcoin::consensus::serialize;
-use strata_primitives::{l1::L1TxProof, utils::get_cohashes};
+use strata_primitives::l1::L1TxProof;
 use strata_zkvm::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };
 
 use crate::{
-    block::MAGIC,
+    block::{witness_commitment_from_coinbase, MAGIC},
     logic::{BlockScanProofInput, BlockScanResult},
 };
 
@@ -24,30 +24,17 @@ impl ZkVmProver for BtcBlockspaceProver {
     where
         B: ZkVmInputBuilder<'a>,
     {
-        // Get all witness ids for txs
-        let txids = &input
-            .block
-            .txdata
-            .iter()
-            .map(|x| x.compute_txid())
-            .collect::<Vec<_>>();
-        let (cohashes, _txroot) = get_cohashes(txids, 0);
-        let inclusion_proof = L1TxProof::new(0, cohashes);
+        let block = &input.block;
 
-        let coinbase = input.block.coinbase().expect("expect coinbase tx");
-
-        let idx_in_coinbase = coinbase
-            .output
-            .iter()
-            .rposition(|o| o.script_pubkey.len() >= 38 && o.script_pubkey.as_bytes()[0..6] == MAGIC)
-            .expect("witness tx");
-
+        let inclusion_proof = match witness_commitment_from_coinbase(&block.txdata[0]) {
+            Some(_) => L1TxProof::generate(&block.txdata, 0),
+            None => L1TxProof::new(0, vec![]),
+        };
         let serialized_block = serialize(&input.block);
         let zkvm_input = B::new()
             .write_serde(&input.rollup_params)?
             .write_buf(&serialized_block)?
             .write_borsh(&inclusion_proof)?
-            .write_serde(&idx_in_coinbase)?
             .build()?;
 
         Ok(zkvm_input)

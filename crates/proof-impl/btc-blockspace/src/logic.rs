@@ -9,9 +9,13 @@ use strata_primitives::{buf::Buf32, l1::L1TxProof, params::RollupParams};
 use strata_state::{batch::BatchCheckpoint, tx::DepositInfo};
 use strata_zkvm::ZkVmEnv;
 
+<<<<<<< HEAD
 use crate::{
     block::check_witness_commitment, filter::extract_relevant_info, scan::process_blockscan,
 };
+=======
+use crate::{block::check_integrity, filter::extract_relevant_info};
+>>>>>>> 5707845f (feat: check block integrity)
 
 #[derive(Debug)]
 pub struct BlockspaceProofInput {
@@ -40,7 +44,6 @@ pub fn process_blockspace_proof_outer(zkvm: &impl ZkVmEnv) {
     let rollup_params: RollupParams = zkvm.read_serde();
     let serialized_block = zkvm.read_buf();
     let inclusion_proof: L1TxProof = zkvm.read_borsh();
-    let idx: usize = zkvm.read_serde();
     let block: Block = deserialize(&serialized_block).unwrap();
     let output = process_blockscan(&block, &rollup_params);
     zkvm.commit_borsh(&output);
