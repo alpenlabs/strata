@@ -2,7 +2,7 @@ import flexitest
 from web3 import Web3
 
 from envs import testenv
-from utils.utils import wait_until
+from utils import wait_until
 
 
 @flexitest.register

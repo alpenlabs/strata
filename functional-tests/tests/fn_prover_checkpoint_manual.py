@@ -3,7 +3,7 @@ import time
 import flexitest
 
 from envs import testenv
-from utils.utils import wait_for_proof_with_time_out
+from utils import wait_for_proof_with_time_out
 
 
 @flexitest.register

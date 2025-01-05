@@ -6,7 +6,7 @@ from flexitest.service import Service
 
 from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
-from utils.utils import (
+from utils import (
     ManualGenBlocksConfig,
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,

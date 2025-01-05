@@ -8,8 +8,8 @@ from strata_utils import (
 )
 
 from envs import testenv
+from utils import get_bridge_pubkey, wait_until
 from utils.constants import DEFAULT_TAKEBACK_TIMEOUT, UNSPENDABLE_ADDRESS
-from utils.utils import get_bridge_pubkey, wait_until
 
 # Local constants
 # Fee for the take back path at 2 sat/vbyte

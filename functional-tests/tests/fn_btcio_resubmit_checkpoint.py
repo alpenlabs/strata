@@ -2,7 +2,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
-from utils.utils import (
+from utils import (
     generate_n_blocks,
     get_envelope_pushdata,
     submit_da_blob,

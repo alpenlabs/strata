@@ -3,8 +3,8 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
+from utils import broadcast_tx, wait_until
 from utils.constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
-from utils.utils import broadcast_tx, wait_until
 
 
 @flexitest.register

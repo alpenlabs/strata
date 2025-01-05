@@ -5,8 +5,8 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
 from envs.testenv import BasicEnvConfig
+from utils import wait_until
 from utils.constants import BLOCK_GENERATION_INTERVAL_SECS, SEQ_SLACK_TIME_SECS
-from utils.utils import wait_until
 
 REORG_DEPTH = 3
 

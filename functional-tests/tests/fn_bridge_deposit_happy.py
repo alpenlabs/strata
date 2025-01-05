@@ -5,7 +5,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
 from envs import testenv
-from utils.utils import get_bridge_pubkey
+from utils import get_bridge_pubkey
 
 
 @flexitest.register

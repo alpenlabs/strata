@@ -9,11 +9,11 @@ from strata_utils import (
 
 from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
+from utils import get_bridge_pubkey, wait_until
 from utils.constants import (
     DEFAULT_TAKEBACK_TIMEOUT,
     UNSPENDABLE_ADDRESS,
 )
-from utils.utils import get_bridge_pubkey, wait_until
 
 # Fee for the take back path at 2 sat/vbyte
 TAKE_BACK_FEE = 17_243

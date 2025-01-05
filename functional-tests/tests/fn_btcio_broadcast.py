@@ -2,7 +2,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
-from utils.utils import wait_until
+from utils import wait_until
 
 
 @flexitest.register

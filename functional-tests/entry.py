@@ -7,8 +7,8 @@ import flexitest
 
 from envs import net_settings, testenv
 from factory import factory
+from utils import *
 from utils.constants import *
-from utils.utils import *
 
 
 def main(argv):

@@ -5,8 +5,8 @@ from strata_utils import get_balance
 
 from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
+from utils import get_bridge_pubkey, wait_until, wait_until_with_value
 from utils.constants import UNSPENDABLE_ADDRESS
-from utils.utils import get_bridge_pubkey, wait_until, wait_until_with_value
 
 
 @flexitest.register

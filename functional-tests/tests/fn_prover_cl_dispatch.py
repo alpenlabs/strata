@@ -3,7 +3,7 @@ import time
 import flexitest
 
 from envs import testenv
-from utils.utils import cl_slot_to_block_id, wait_for_proof_with_time_out
+from utils import cl_slot_to_block_id, wait_for_proof_with_time_out
 
 # Parameters defining the range of Execution Engine (EE) blocks to be proven.
 CL_PROVER_PARAMS = {

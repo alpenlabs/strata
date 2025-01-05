@@ -3,7 +3,7 @@ import time
 import flexitest
 
 from envs import testenv
-from utils.utils import wait_until
+from utils import wait_until
 
 REORG_DEPTH = 3
 

@@ -3,7 +3,7 @@ from functools import partial
 import flexitest
 
 from envs import testenv
-from utils.utils import wait_until_with_value
+from utils import wait_until_with_value
 
 
 @flexitest.register

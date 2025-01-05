@@ -1,4 +1,4 @@
-from utils.utils import RollupParamsSettings
+from utils import RollupParamsSettings
 
 
 def get_fast_batch_settings() -> RollupParamsSettings:

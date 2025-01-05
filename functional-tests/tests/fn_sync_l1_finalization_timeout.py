@@ -1,7 +1,7 @@
 import flexitest
 
 from envs import net_settings, testenv
-from utils.utils import (
+from utils import (
     check_already_sent_proof,
     check_nth_checkpoint_finalized,
     check_submit_proof_fails_for_nonexistent_batch,

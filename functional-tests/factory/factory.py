@@ -7,8 +7,8 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from factory import seqrpc
+from utils import *
 from utils.constants import *
-from utils.utils import *
 
 
 class BitcoinRpcConfig(TypedDict):

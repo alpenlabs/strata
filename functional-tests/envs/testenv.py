@@ -12,8 +12,8 @@ from strata_utils import (
 from web3 import Web3, middleware
 
 from envs.rollup_params_cfg import RollupConfig
+from utils import *
 from utils.constants import *
-from utils.utils import *
 
 # Local constants
 # Ethereum Private Key
