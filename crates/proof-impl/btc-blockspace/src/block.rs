@@ -40,7 +40,7 @@ pub fn compute_witness_root(transactions: &[Transaction]) -> Option<WitnessMerkl
 
 /// Checks if Merkle root of header matches Merkle root of the transaction list.
 ///
-/// Equivalent to [`check_merkle_root`](Block::check_merkle_root)
+/// Equivalent to [`check_merkle_root`](Block::check_merkle_root).
 pub fn check_merkle_root(block: &Block) -> bool {
     match compute_merkle_root(block) {
         Some(merkle_root) => {
@@ -56,9 +56,9 @@ pub fn check_merkle_root(block: &Block) -> bool {
 /// towards the beginning, looking for an output whose `script_pubkey` starts with the “magic” bytes
 /// `[0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed]`. This pattern indicates an `OP_RETURN` with an
 /// embedded witness commitment header. If such an output is found, the function extracts the
-/// following 32 bytes as the witness commitment and returns a `WitnessCommitment`.
+/// following 32 bytes as the witness commitment and returns a [`WitnessCommitment`].
 ///
-/// Based on: [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/b97be3d4974d40cf348b280718d1367b8148d1ba/bitcoin/src/blockdata/block.rs#L190-L210)
+/// Based on: [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/b97be3d4974d40cf348b280718d1367b8148d1ba/bitcoin/src/blockdata/block.rs#L190-L210).
 pub fn witness_commitment_from_coinbase(coinbase: &Transaction) -> Option<WitnessCommitment> {
     // Consists of OP_RETURN, OP_PUSHBYTES_36, and four "witness header" bytes.
     const MAGIC: [u8; 6] = [0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed];
@@ -79,7 +79,7 @@ pub fn witness_commitment_from_coinbase(coinbase: &Transaction) -> Option<Witnes
 
 /// Computes the witness commitment for the block's transaction list.
 ///
-/// Equivalent to [`compute_witness_commitment`](Block::compute_witness_commitment)
+/// Equivalent to [`compute_witness_commitment`](Block::compute_witness_commitment).
 pub fn compute_witness_commitment(
     transactions: &[Transaction],
     witness_reserved_value: &[u8],

@@ -3,19 +3,22 @@ use serde::{Deserialize, Serialize};
 use crate::{hash::sha256d, prelude::Buf32};
 
 /// Generates cohashes and computes the Merkle root for a transaction ID at a specific index
-/// within a given slice of elements that can be converted to `Buf32`.
+/// within a given slice of elements that can be converted to [`Buf32`].
 ///
 /// This function supports any type that implements the `Into<Buf32>` trait, such as `txids` or
 /// `wtxids`.
 ///
 /// # Parameters
+///
 /// - `elements`: A slice of elements (`txids` or `wtxids`) that can be converted into `Buf32`.
 /// - `index`: The index of the transaction for which we want the cohashes.
 ///
 /// # Returns
+///
 /// - A tuple `(Vec<Buf32>, Buf32)` containing the cohashes and the Merkle root.
 ///
 /// # Panics
+///
 /// - If the `index` is out of bounds for the `elements` length.
 pub fn get_cohashes<T>(ids: &[T], index: u32) -> (Vec<Buf32>, Buf32)
 where
