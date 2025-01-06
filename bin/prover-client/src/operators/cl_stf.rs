@@ -164,16 +164,13 @@ impl ProvingOp for ClStfOperator {
         let start_block = self.get_l2_block_header(start_block_hash).await?;
         let end_block = self.get_l2_block_header(end_block_hash).await?;
         let num_blocks = end_block.block_idx - start_block.block_idx;
-        dbg!(num_blocks);
 
         // Get ancestor blocks and reverse to oldest-first order
         let mut l2_block_ids = self.get_block_ancestors(end_block_hash, num_blocks).await?;
         l2_block_ids.reverse();
-        dbg!(&l2_block_ids);
 
         let mut stf_witness_payloads = Vec::new();
         for l2_block_id in l2_block_ids.clone() {
-            dbg!(&l2_block_id);
             let raw_witness: Vec<u8> = self
                 .cl_client
                 .get_cl_block_witness_raw(l2_block_id)
