@@ -43,7 +43,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     println!("Fetching challenge from faucet");
 
     #[cfg(feature = "strata_faucet")]
-    let network_type = net_type_or_exit(&args.network_type, &term);
+    let network_type = net_type_or_exit(&args.network_type);
 
     let client = reqwest::Client::new();
     let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
