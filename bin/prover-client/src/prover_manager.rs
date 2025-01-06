@@ -38,6 +38,7 @@ impl ProverManager {
 
     pub async fn process_pending_tasks(&self) {
         loop {
+            dbg!(&self.task_tracker);
             // Step 1: Fetch pending tasks without holding the lock
             let (pending_tasks, in_progress_tasks) = {
                 let task_tracker = self.task_tracker.lock().await;

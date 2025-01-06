@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
+use tracing::info;
 
 use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 
@@ -57,6 +58,7 @@ impl TaskTracker {
         deps: Vec<ProofContext>,
         db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        info!(?proof_id, "Creating task for");
         let mut tasks = Vec::with_capacity(self.vms.len());
         // Insert tasks for each configured host
         let vms = &self.vms.clone();
