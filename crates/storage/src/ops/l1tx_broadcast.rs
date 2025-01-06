@@ -33,7 +33,15 @@ inst_ops! {
         get_next_tx_idx() => u64;
         put_tx_entry(id: Buf32, entry: L1TxEntry) => Option<u64>;
         put_tx_entry_by_idx(idx: u64, entry: L1TxEntry) => ();
+        get_last_tx_entry() => Option<L1TxEntry>;
     }
+}
+
+fn get_last_tx_entry<D: BroadcastDatabase + Sync + Send + 'static>(
+    context: &Context<D>,
+) -> DbResult<Option<L1TxEntry>> {
+    let bcast_db = context.db.l1_broadcast_db();
+    bcast_db.get_last_tx_entry()
 }
 
 fn get_tx_entry<D: BroadcastDatabase + Sync + Send + 'static>(

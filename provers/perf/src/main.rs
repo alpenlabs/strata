@@ -97,7 +97,7 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     let btc_block_id = 40321;
     let btc_chain = get_btc_chain();
     let btc_block = btc_chain.get_block(btc_block_id);
-    let strata_block_id = 1;
+    let evmee_block_range = (1, 1);
 
     // btc_blockspace
     println!("Generating a report for BTC_BLOCKSPACE");
@@ -112,7 +112,7 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     println!("Generating a report for EL_BLOCK");
     let el_block = generator.el_block();
     let el_block_report = el_block
-        .gen_proof_report(&strata_block_id, "EL_BLOCK".to_owned())
+        .gen_proof_report(&evmee_block_range, "EL_BLOCK".to_owned())
         .unwrap();
 
     reports.push(el_block_report.into());
@@ -121,7 +121,7 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     println!("Generating a report for CL_BLOCK");
     let cl_block = generator.cl_block();
     let cl_block_report = cl_block
-        .gen_proof_report(&strata_block_id, "CL_BLOCK".to_owned())
+        .gen_proof_report(&evmee_block_range, "CL_BLOCK".to_owned())
         .unwrap();
 
     reports.push(cl_block_report.into());
@@ -138,8 +138,9 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     // l2_block
     println!("Generating a report for L2_BATCH");
     let l2_block = generator.l2_batch();
+    let l2_mini_batches = vec![(l2_start_height, l2_end_height)];
     let l2_block_report = l2_block
-        .gen_proof_report(&(l2_start_height, l2_end_height), "L2_BATCH".to_owned())
+        .gen_proof_report(&l2_mini_batches, "L2_BATCH".to_owned())
         .unwrap();
 
     reports.push(l2_block_report.into());
@@ -227,7 +228,8 @@ async fn post_to_github_pr(
         let comment_url = existing_comment["url"].as_str().unwrap();
         let response = client
             .patch(comment_url)
-            .header("Authorization", format!("token {}", &args.github_token))
+            .header("Authorization", format!("Bearer {}", &args.github_token))
+            .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "strata-perf-bot")
             .json(&json!({
                 "body": message
@@ -242,7 +244,8 @@ async fn post_to_github_pr(
         // Create a new comment
         let response = client
             .post(&comments_url)
-            .header("Authorization", format!("token {}", &args.github_token))
+            .header("Authorization", format!("Bearer {}", &args.github_token))
+            .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "strata-perf-bot")
             .json(&json!({
                 "body": message
