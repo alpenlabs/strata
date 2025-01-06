@@ -7,10 +7,10 @@ use strata_btcio::{
 use strata_config::Config;
 use strata_consensus_logic::{csm::ctl::CsmController, l1_handler::bitcoin_data_handler_task};
 use strata_db::traits::{Database, L1Database};
+use strata_l1tx::messages::L1Event;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
 use strata_tasks::TaskExecutor;
-use strata_l1tx::messages::L1Event;
 use tokio::sync::mpsc;
 
 pub fn start_reader_tasks<D>(

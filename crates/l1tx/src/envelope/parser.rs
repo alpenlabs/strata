@@ -7,7 +7,7 @@ use strata_state::tx::EnvelopeData;
 use thiserror::Error;
 use tracing::debug;
 
-use super::utils::{next_bytes, next_int, next_op};
+use crate::utils::{next_bytes, next_int, next_op};
 
 pub const ROLLUP_NAME_TAG: &[u8] = &[1];
 pub const VERSION_TAG: &[u8] = &[2];

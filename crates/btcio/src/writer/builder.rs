@@ -7,11 +7,6 @@ use bitcoin::{
     blockdata::{opcodes::all::OP_CHECKSIG, script},
     hashes::Hash,
     key::{TapTweak, TweakedPublicKey, UntweakedKeypair},
-    opcodes::{
-        all::{OP_ENDIF, OP_IF},
-        OP_FALSE,
-    },
-    script::PushBytesBuf,
     secp256k1::{
         constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Message, XOnlyPublicKey, SECP256K1,
     },
@@ -25,10 +20,9 @@ use bitcoin::{
     Witness,
 };
 use rand::{rngs::OsRng, RngCore};
+use strata_l1tx::envelope::builder::build_envelope_script;
 use strata_state::tx::EnvelopeData;
-use strata_l1tx::envelope::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
 use thiserror::Error;
-use tracing::trace;
 
 use crate::{
     rpc::{
@@ -408,7 +402,7 @@ fn build_reveal_script(
         .push_opcode(OP_CHECKSIG)
         .into_script()
         .into_bytes();
-    let script = generate_envelope_script(insc_data, rollup_name, version)?;
+    let script = build_envelope_script(insc_data, rollup_name, version)?;
     script_bytes.extend(script.into_bytes());
     Ok(ScriptBuf::from(script_bytes))
 }
@@ -489,32 +483,6 @@ fn assert_correct_address(
         ),
         *commit_tx_address
     );
-}
-
-// Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
-pub fn generate_envelope_script(
-    envelope_data: EnvelopeData,
-    rollup_name: &str,
-    version: u8,
-) -> anyhow::Result<ScriptBuf> {
-    let mut builder = script::Builder::new()
-        .push_opcode(OP_FALSE)
-        .push_opcode(OP_IF)
-        .push_slice(PushBytesBuf::try_from(ROLLUP_NAME_TAG.to_vec())?)
-        .push_slice(PushBytesBuf::try_from(rollup_name.as_bytes().to_vec())?)
-        .push_slice(PushBytesBuf::try_from(VERSION_TAG.to_vec())?)
-        .push_slice(PushBytesBuf::from([version]))
-        .push_slice(PushBytesBuf::try_from(BATCH_DATA_TAG.to_vec())?)
-        .push_int(envelope_data.batch_data().len() as i64);
-
-    trace!(batchdata_size = %envelope_data.batch_data().len(), "Inserting batch data");
-    for chunk in envelope_data.batch_data().chunks(520) {
-        trace!(size=%chunk.len(), "inserting chunk");
-        builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
-    }
-    builder = builder.push_opcode(OP_ENDIF);
-
-    Ok(builder.into_script())
 }
 
 #[cfg(test)]

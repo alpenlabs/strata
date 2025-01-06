@@ -8,7 +8,7 @@ use super::messages::ProtocolOpTxRef;
 pub use crate::filter_types::TxFilterConfig;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
-    envelope::parse_envelope_data,
+    envelope::parser::parse_envelope_data,
 };
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
