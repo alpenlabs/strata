@@ -5,6 +5,7 @@ use strata_primitives::params::RollupParams;
 
 use crate::{block::check_merkle_root, filter::extract_relevant_info, logic::BlockScanResult};
 
+/// Scans a Bitcoin block to extract rollup-relevant data, including checkpoints and deposits.
 pub fn process_blockscan(block: &Block, rollup_params: &RollupParams) -> BlockScanResult {
     assert!(check_merkle_root(block));
 
