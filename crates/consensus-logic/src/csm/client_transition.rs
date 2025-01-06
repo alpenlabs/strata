@@ -162,24 +162,26 @@ pub fn process_event<D: Database>(
 
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
-                writes.push(ClientStateWrite::CheckpointsReceived(
-                    checkpoints
-                        .iter()
-                        .map(|x| {
-                            L1Checkpoint::new(
-                                x.batch_info().clone(),
-                                x.bootstrap_state().clone(),
-                                !x.proof().is_empty(),
-                                *height,
-                            )
-                        })
-                        .collect(),
-                ));
+                if !proof_verified_checkpoints.is_empty() {
+                    writes.push(ClientStateWrite::CheckpointsReceived(
+                        proof_verified_checkpoints
+                            .iter()
+                            .map(|x| {
+                                L1Checkpoint::new(
+                                    x.batch_info().clone(),
+                                    x.bootstrap_state().clone(),
+                                    !x.proof().is_empty(),
+                                    *height,
+                                )
+                            })
+                            .collect(),
+                    ));
 
-                actions.push(SyncAction::WriteCheckpoints(
-                    *height,
-                    proof_verified_checkpoints,
-                ));
+                    actions.push(SyncAction::WriteCheckpoints(
+                        *height,
+                        proof_verified_checkpoints,
+                    ));
+                }
             } else {
                 // TODO we can expand this later to make more sense
                 return Err(Error::MissingClientSyncState);
@@ -429,11 +431,11 @@ pub fn filter_verified_checkpoints(
             let l1_tsn = checkpoint.batch_info().l1_transition;
             let l2_tsn = checkpoint.batch_info().l2_transition;
 
-            if l1_tsn.0 == last_l1_tsn.1 {
+            if l1_tsn.0 != last_l1_tsn.1 {
                 warn!(obtained = ?l1_tsn.0, expected = ?last_l1_tsn.1, "Received invalid checkpoint l1 transition, ignoring.");
                 continue;
             }
-            if l2_tsn.0 == last_l2_tsn.1 {
+            if l2_tsn.0 != last_l2_tsn.1 {
                 warn!(obtained = ?l2_tsn.0, expected = ?last_l2_tsn.1, "Received invalid checkpoint l2 transition, ignoring.");
                 continue;
             }
@@ -454,7 +456,7 @@ pub fn filter_verified_checkpoints(
 mod tests {
     use bitcoin::params::MAINNET;
     use strata_db::traits::L1Database;
-    use strata_primitives::{block_credential, l1::L1BlockManifest};
+    use strata_primitives::{block_credential, l1::L1BlockRecord};
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{l1::L1BlockId, operation};
     use strata_test_utils::{
@@ -535,7 +537,11 @@ mod tests {
         let l1_db = database.l1_db();
         for (i, b) in l1_chain.iter().enumerate() {
             l1_db
-                .put_block_data(i as u64 + horizon, b.clone(), Vec::new())
+                .put_block_data(
+                    i as u64 + horizon,
+                    L1BlockManifest::new(b.clone(), 0),
+                    Vec::new(),
+                )
                 .expect("test: insert blocks");
         }
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash().into()).collect();

@@ -1,85 +1,42 @@
 use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use alloy_rpc_types::engine::JwtSecret;
-use anyhow::Context;
 use bitcoin::{base58, bip32::Xpriv, Address, Network};
 use format_serde_error::SerdeError;
-use rockbound::{rocksdb, OptimisticTransactionDB};
 use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
+use strata_config::Config;
 use strata_consensus_logic::{
     csm::state_tracker,
     duty::types::{Identity, IdentityData, IdentityKey},
 };
-use strata_db::{database::CommonDatabase, traits::Database};
+use strata_db::traits::Database;
 use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
 use strata_key_derivation::sequencer::SequencerKeys;
 use strata_primitives::{
     buf::Buf32,
     keys::ZeroizableXpriv,
     l1::L1Status,
-    params::{Params, RollupParams},
+    params::{Params, RollupParams, SyncParams},
 };
-use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, l2::db::L2Db, sequencer::db::SequencerDB, ChainstateDb,
-    ClientStateDb, DbOpsConfig, L1BroadcastDb, L1Db, RBCheckpointDB, RBSeqBlobDb, SyncEventDb,
-};
+use strata_rocksdb::CommonDb;
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 use tracing::*;
 use zeroize::Zeroize;
 
-use crate::{args::Args, config::Config, errors::InitError, network};
-
-pub type CommonDb =
-    CommonDatabase<L1Db, L2Db, SyncEventDb, ClientStateDb, ChainstateDb, RBCheckpointDB>;
-
-pub fn init_core_dbs(rbdb: Arc<OptimisticTransactionDB>, ops_config: DbOpsConfig) -> Arc<CommonDb> {
-    // Initialize databases.
-    let l1_db: Arc<_> = L1Db::new(rbdb.clone(), ops_config).into();
-    let l2_db: Arc<_> = L2Db::new(rbdb.clone(), ops_config).into();
-    let sync_ev_db: Arc<_> = strata_rocksdb::SyncEventDb::new(rbdb.clone(), ops_config).into();
-    let clientstate_db: Arc<_> = ClientStateDb::new(rbdb.clone(), ops_config).into();
-    let chainstate_db: Arc<_> = ChainstateDb::new(rbdb.clone(), ops_config).into();
-    let checkpoint_db: Arc<_> = RBCheckpointDB::new(rbdb.clone(), ops_config).into();
-    let database = CommonDatabase::new(
-        l1_db,
-        l2_db,
-        sync_ev_db,
-        clientstate_db,
-        chainstate_db,
-        checkpoint_db,
-    );
-
-    database.into()
-}
-
-pub fn init_broadcaster_database(
-    rbdb: Arc<OptimisticTransactionDB>,
-    ops_config: DbOpsConfig,
-) -> Arc<BroadcastDb> {
-    let l1_broadcast_db = L1BroadcastDb::new(rbdb.clone(), ops_config);
-    BroadcastDb::new(l1_broadcast_db.into()).into()
-}
-
-pub fn init_sequencer_database(
-    rbdb: Arc<OptimisticTransactionDB>,
-    ops_config: DbOpsConfig,
-) -> Arc<SequencerDB<RBSeqBlobDb>> {
-    let seqdb = RBSeqBlobDb::new(rbdb, ops_config).into();
-    SequencerDB::new(seqdb).into()
-}
+use crate::{args::Args, errors::InitError, network};
 
 pub fn get_config(args: Args) -> Result<Config, InitError> {
     match args.config.as_ref() {
         Some(config_path) => {
             // Values passed over arguments get the precedence over the configuration files
             let mut config = load_configuration(config_path)?;
-            config.update_from_args(&args);
+            args.update_config(&mut config);
             Ok(config)
         }
-        None => match Config::from_args(&args) {
+        None => match args.derive_config() {
             Err(msg) => {
                 eprintln!("Error: {}", msg);
                 std::process::exit(1);
@@ -103,9 +60,23 @@ pub fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
 
 /// Resolves the rollup params file to use, possibly from a path, and validates
 /// it to ensure it passes sanity checks.
-pub fn resolve_and_validate_rollup_params(path: Option<&Path>) -> Result<RollupParams, InitError> {
-    let params = resolve_rollup_params(path)?;
-    params.check_well_formed()?;
+pub fn resolve_and_validate_params(
+    path: Option<&Path>,
+    config: &Config,
+) -> Result<Arc<Params>, InitError> {
+    let rollup_params = resolve_rollup_params(path)?;
+    rollup_params.check_well_formed()?;
+
+    let params = Params {
+        rollup: rollup_params,
+        run: SyncParams {
+            // FIXME these shouldn't be configurable here
+            l1_follow_distance: config.sync.l1_follow_distance,
+            client_checkpoint_interval: config.sync.client_checkpoint_interval,
+            l2_blocks_fetch_limit: config.client.l2_blocks_fetch_limit,
+        },
+    }
+    .into();
     Ok(params)
 }
 
@@ -132,6 +103,7 @@ fn load_rollup_params(path: &Path) -> Result<RollupParams, InitError> {
     Ok(rollup_params)
 }
 
+// TODO: remove this after builder is done
 pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinClient>> {
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
@@ -147,33 +119,6 @@ pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinC
         warn!("network not set to regtest, ignoring");
     }
     Ok(btc_rpc.into())
-}
-
-pub fn open_rocksdb_database(
-    config: &Config,
-) -> anyhow::Result<Arc<rockbound::OptimisticTransactionDB>> {
-    let mut database_dir = config.client.datadir.clone();
-    database_dir.push("rocksdb");
-
-    if !database_dir.exists() {
-        fs::create_dir_all(&database_dir)?;
-    }
-
-    let dbname = strata_rocksdb::ROCKSDB_NAME;
-    let cfs = strata_rocksdb::STORE_COLUMN_FAMILIES;
-    let mut opts = rocksdb::Options::default();
-    opts.create_if_missing(true);
-    opts.create_missing_column_families(true);
-
-    let rbdb = rockbound::OptimisticTransactionDB::open(
-        &database_dir,
-        dbname,
-        cfs.iter().map(|s| s.to_string()),
-        &opts,
-    )
-    .context("opening database")?;
-
-    Ok(Arc::new(rbdb))
 }
 
 /// Loads sequencer identity data from the root key at the specified path.
@@ -230,7 +175,7 @@ pub fn init_engine_controller(
     db: Arc<CommonDb>,
     params: &Params,
     l2_block_manager: Arc<L2BlockManager>,
-    runtime: &Runtime,
+    handle: &Handle,
 ) -> anyhow::Result<Arc<RpcExecEngineCtl<EngineRpcClient>>> {
     let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
     let client = EngineRpcClient::from_url_secret(
@@ -242,8 +187,8 @@ pub fn init_engine_controller(
     let eng_ctl = strata_evmexec::engine::RpcExecEngineCtl::new(
         client,
         initial_fcs,
-        runtime.handle().clone(),
-        l2_block_manager.clone(),
+        handle.clone(),
+        l2_block_manager,
     );
     let eng_ctl = Arc::new(eng_ctl);
     Ok(eng_ctl)

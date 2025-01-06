@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use argh::FromArgs;
 use bitcoin::Network;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 
 /// Args.
 #[derive(FromArgs)]

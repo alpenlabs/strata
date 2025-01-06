@@ -1,10 +1,14 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use strata_consensus_logic::genesis::make_genesis_block;
 use strata_primitives::buf::{Buf32, Buf64};
-use strata_proofimpl_cl_stf::{reconstruct_exec_segment, Chainstate, StateCache};
+use strata_proofimpl_cl_stf::{Chainstate, StateCache};
 use strata_proofimpl_evm_ee_stf::{
-    process_block_transaction, processor::EvmConfig, ELProofInput, ELProofPublicParams,
+    primitives::{EvmEeProofInput, EvmEeProofOutput},
+    process_block_transaction,
+    processor::EvmConfig,
+    utils::generate_exec_update,
+    EvmBlockStfInput,
 };
 use strata_state::{
     block::{L1Segment, L2Block, L2BlockBody},
@@ -18,13 +22,13 @@ use crate::l2::{gen_params, get_genesis_chainstate};
 /// generation and processing for testing STF proofs.
 #[derive(Debug, Clone)]
 pub struct EvmSegment {
-    inputs: HashMap<u64, ELProofInput>,
-    outputs: HashMap<u64, ELProofPublicParams>,
+    inputs: EvmEeProofInput,
+    outputs: EvmEeProofOutput,
 }
 
 impl EvmSegment {
-    /// Initializes the EvmSegment by loading existing [`ELProofInput`] data from the specified
-    /// range of block heights and generating corresponding ELProofPublicParams.
+    /// Initializes the EvmSegment by loading existing [`EvmBlockStfInput`] data from the specified
+    /// range of block heights and generating corresponding ElBlockStfOutput.
     ///
     /// This function reads witness data from JSON files, processes them, and stores the results
     /// for testing purposes of the STF proofs.
@@ -38,36 +42,33 @@ impl EvmSegment {
             spec_id: SpecId::SHANGHAI,
         };
 
-        let mut inputs = HashMap::new();
-        let mut outputs = HashMap::new();
+        let mut inputs = Vec::new();
+        let mut outputs = Vec::new();
 
         let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/evm_ee/");
         for height in start_height..=end_height {
             let witness_path = dir.join(format!("witness_{}.json", height));
             let json_file = std::fs::read_to_string(witness_path).expect("Expected JSON file");
-            let el_proof_input: ELProofInput =
+            let el_proof_input: EvmBlockStfInput =
                 serde_json::from_str(&json_file).expect("Invalid JSON file");
-            inputs.insert(height, el_proof_input.clone());
+            inputs.push(el_proof_input.clone());
 
-            let output = process_block_transaction(el_proof_input, EVM_CONFIG);
-            outputs.insert(height, output);
+            let block_stf_output = process_block_transaction(el_proof_input, EVM_CONFIG);
+            let exec_output = generate_exec_update(&block_stf_output);
+            outputs.push(exec_output);
         }
 
         Self { inputs, outputs }
     }
 
-    /// Retrieves the [`ELProofInput`] associated with the given block height.
-    ///
-    /// Panics if no input is found for the specified height.
-    pub fn get_input(&self, height: &u64) -> &ELProofInput {
-        self.inputs.get(height).expect("No input found at height")
+    /// Retrieves the [`EvmEeProofInput`]
+    pub fn get_inputs(&self) -> &EvmEeProofInput {
+        &self.inputs
     }
 
-    /// Retrieves the [`ELProofPublicParams`] associated with the given block height.
-    ///
-    /// Panics if no output is found for the specified height.
-    pub fn get_output(&self, height: &u64) -> &ELProofPublicParams {
-        self.outputs.get(height).expect("No output found at height")
+    /// Retrieves the [`EvmEeProofOutput`]
+    pub fn get_outputs(&self) -> &EvmEeProofOutput {
+        &self.outputs
     }
 }
 
@@ -75,9 +76,9 @@ impl EvmSegment {
 /// This struct stores L2 blocks, pre-state, and post-state data, simulating
 /// the block processing for testing STF proofs.
 pub struct L2Segment {
-    blocks: HashMap<u64, L2Block>,
-    pre_states: HashMap<u64, Chainstate>,
-    post_states: HashMap<u64, Chainstate>,
+    pub blocks: Vec<L2Block>,
+    pub pre_states: Vec<Chainstate>,
+    pub post_states: Vec<Chainstate>,
 }
 
 impl L2Segment {
@@ -87,23 +88,23 @@ impl L2Segment {
     ///
     /// This function ensures that valid L2 segments and blocks are generated for testing
     /// the STF proofs by simulating state transitions from a starting genesis state.
-    pub fn initialize_from_saved_evm_ee_data(end_height: u64) -> Self {
-        let evm_segment = EvmSegment::initialize_from_saved_ee_data(1, 4);
+    pub fn initialize_from_saved_evm_ee_data(start_block: u64, end_block: u64) -> Self {
+        let evm_segment = EvmSegment::initialize_from_saved_ee_data(start_block, end_block);
 
         let params = gen_params();
-        let mut blocks = HashMap::new();
-        let mut pre_states = HashMap::new();
-        let mut post_states = HashMap::new();
+        let mut blocks = Vec::new();
+        let mut pre_states = Vec::new();
+        let mut post_states = Vec::new();
 
         let mut prev_block = make_genesis_block(&params).block().clone();
         let mut prev_chainstate = get_genesis_chainstate();
 
-        for height in 1..=end_height {
-            let el_proof_in = evm_segment.get_input(&height);
-            let el_proof_out = evm_segment.get_output(&height);
-            let evm_ee_segment = reconstruct_exec_segment(el_proof_out);
+        let el_proof_ins = evm_segment.get_inputs();
+        let el_proof_outs = evm_segment.get_outputs();
+
+        for (el_proof_in, el_proof_out) in el_proof_ins.iter().zip(el_proof_outs.iter()) {
             let l1_segment = L1Segment::new_empty();
-            let body = L2BlockBody::new(l1_segment, evm_ee_segment);
+            let body = L2BlockBody::new(l1_segment, el_proof_out.clone());
 
             let slot = prev_block.header().blockidx() + 1;
             let ts = el_proof_in.timestamp;
@@ -138,9 +139,9 @@ impl L2Segment {
             .unwrap();
             let (post_state, _) = state_cache.finalize();
 
-            blocks.insert(height, block.clone());
-            pre_states.insert(height, pre_state);
-            post_states.insert(height, post_state.clone());
+            blocks.push(block.clone());
+            pre_states.push(pre_state);
+            post_states.push(post_state.clone());
 
             prev_block = block;
             prev_chainstate = post_state;
@@ -152,31 +153,6 @@ impl L2Segment {
             post_states,
         }
     }
-
-    /// Retrieves the L2Block associated with the given block height.
-    ///
-    /// Panics if no block is found for the specified height.
-    pub fn get_block(&self, height: u64) -> &L2Block {
-        self.blocks.get(&height).expect("Not block found at height")
-    }
-
-    /// Retrieves the pre-state Chainstate for the given block height.
-    ///
-    /// Panics if no pre-state is found for the specified height.
-    pub fn get_pre_state(&self, height: u64) -> &Chainstate {
-        self.pre_states
-            .get(&height)
-            .expect("Not chain state found at height")
-    }
-
-    /// Retrieves the post-state Chainstate for the given block height.
-    ///
-    /// Panics if no post-state is found for the specified height.
-    pub fn get_post_state(&self, height: u64) -> &Chainstate {
-        self.post_states
-            .get(&height)
-            .expect("Not chain state found at height")
-    }
 }
 
 #[cfg(test)]
@@ -185,12 +161,13 @@ mod tests {
 
     #[test]
     fn test_chaintsn() {
+        let start_height = 1;
         let end_height = 4;
-        let l2_segment = L2Segment::initialize_from_saved_evm_ee_data(end_height);
+        let l2_segment = L2Segment::initialize_from_saved_evm_ee_data(start_height, end_height);
 
-        for height in 1..end_height {
-            let pre_state = l2_segment.get_pre_state(height + 1);
-            let post_state = l2_segment.get_post_state(height);
+        for height in start_height..end_height - 1 {
+            let pre_state = &l2_segment.pre_states[height as usize + 1];
+            let post_state = &l2_segment.post_states[height as usize];
             assert_eq!(pre_state, post_state);
         }
     }

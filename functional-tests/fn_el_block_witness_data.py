@@ -4,9 +4,11 @@ import flexitest
 from solcx import compile_source, install_solc, set_solc_version
 from web3 import Web3
 
+import testenv
+
 
 @flexitest.register
-class ElBlockWitnessDataGenerationTest(flexitest.Test):
+class ElBlockWitnessDataGenerationTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         install_solc(version="0.8.16")
         set_solc_version("0.8.16")
@@ -37,7 +39,7 @@ class ElBlockWitnessDataGenerationTest(flexitest.Test):
         witness_data = rethrpc.strataee_getBlockWitness(blockhash, True)
         assert witness_data is not None, "non empty witness"
 
-        print(witness_data)
+        self.debug(witness_data)
 
 
 def get_contract():

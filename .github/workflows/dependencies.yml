@@ -6,12 +6,11 @@ on:
   schedule:
     # Run at the first of every month
     - cron: "0 0 1 * *"
-  workflow_dispatch:
-    # Needed so we can run it manually
+  workflow_dispatch: # Needed so we can run it manually
 
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  BRANCH: cargo-update
+  AUTHOR: Update Cargo.lock Bot <no-reply@alpenlabs.io>
+  BRANCH: create-pull-request/automated-cargo-update
   TITLE: "chore(deps): monthly `cargo update`"
   BODY: |
     Automation to keep dependencies in `Cargo.lock` current.
@@ -30,8 +29,13 @@ jobs:
   update:
     name: Update
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create commits
+      pull-requests: write # Needed to create a PR
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: nightly-2024-07-27
@@ -43,21 +47,30 @@ jobs:
       - name: craft commit message and PR body
         id: msg
         run: |
-          export cargo_update_log="$(cat cargo_update.log)"
+          cargo_update_log="$(cat cargo_update.log)"
+          export cargo_update_log
 
-          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-          printf "$TITLE\n\n$cargo_update_log\n" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "commit_message<<EOF"
+            echo "$TITLE"
+            echo ""
+            echo "$cargo_update_log"
+            echo ""
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          echo "$BODY" | envsubst >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "body<<EOF"
+            echo "$BODY" | envsubst
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
           add-paths: ./Cargo.lock
           commit-message: ${{ steps.msg.outputs.commit_message }}
+          author: ${{ env.AUTHOR }}
           title: ${{ env.TITLE }}
           body: ${{ steps.msg.outputs.body }}
           branch: ${{ env.BRANCH }}

@@ -22,6 +22,8 @@ jobs:
     timeout-minutes: 60 # better fail-safe than the default 360 in github actions
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Cleanup space
         uses: ./.github/actions/cleanup
@@ -52,7 +54,7 @@ jobs:
         with:
           paths: "target/nextest/ci/junit.xml"
       - name: Publish Test Coverage
-        uses: codecov/codecov-action@v5.0.7
+        uses: codecov/codecov-action@v5.1.2
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
@@ -65,6 +67,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Cleanup space
         uses: ./.github/actions/cleanup

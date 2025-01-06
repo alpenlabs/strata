@@ -3,7 +3,7 @@ use strata_zkvm::{Proof, ZkVmError, ZkVmResult};
 
 pub fn verify_groth16(
     proof: &Proof,
-    vkey_hash: &[u8],
+    vkey_hash: &[u8; 32],
     committed_values_raw: &[u8],
 ) -> ZkVmResult<()> {
     let vk_hash_str = hex::encode(vkey_hash);
@@ -45,7 +45,7 @@ mod tests {
         let proof = Proof::new(sp1_proof_with_public_values.bytes());
         let sp1_public_inputs = sp1_proof_with_public_values.public_values.to_vec();
 
-        verify_groth16(&proof, vk_buf32.as_bytes(), &sp1_public_inputs)
+        verify_groth16(&proof, &vk_buf32.0, &sp1_public_inputs)
             .expect("proof verification must succeed");
     }
 }

@@ -73,7 +73,7 @@ impl ZkVmEnv for NativeMachine {
     fn verify_groth16_proof(
         &self,
         _proof: &Proof,
-        _verification_key: &[u8],
+        _verification_key: &[u8; 32],
         _public_params_raw: &[u8],
     ) {
     }

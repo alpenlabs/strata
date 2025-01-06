@@ -9,7 +9,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
 use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState};
-use strata_zkvm::Proof;
+use strata_zkvm::ProofReceipt;
 
 /// Represents data for a blob we're still planning to inscribe.
 // TODO rename to `BlockInscriptionEntry` to emphasize this isn't just about *all* blobs
@@ -73,7 +73,9 @@ pub enum BlobL1Status {
 
 /// This is the entry that gets saved to the database corresponding to a bitcoin transaction that
 /// the broadcaster will publish and watches for until finalization
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
 pub struct L1TxEntry {
     /// Raw serialized transaction. This is basically `consensus::serialize()` of [`Transaction`]
     tx_raw: Vec<u8>,
@@ -149,8 +151,8 @@ pub struct CheckpointEntry {
     /// `L2StateTransition` that happened in this batch
     pub bootstrap: BootstrapState,
 
-    /// Proof
-    pub proof: Proof,
+    /// Proof with public values
+    pub proof: ProofReceipt,
 
     /// Proving Status
     pub proving_status: CheckpointProvingStatus,
@@ -163,7 +165,7 @@ impl CheckpointEntry {
     pub fn new(
         batch_info: BatchInfo,
         bootstrap: BootstrapState,
-        proof: Proof,
+        proof: ProofReceipt,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
     ) -> Self {
@@ -177,7 +179,7 @@ impl CheckpointEntry {
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        BatchCheckpoint::new(self.batch_info, self.bootstrap, self.proof)
+        BatchCheckpoint::new(self.batch_info, self.bootstrap, self.proof.proof().clone())
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
@@ -185,7 +187,7 @@ impl CheckpointEntry {
         Self::new(
             info,
             bootstrap,
-            Proof::new(vec![]),
+            ProofReceipt::default(),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
         )

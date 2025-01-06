@@ -2,9 +2,11 @@ import time
 
 import flexitest
 
+import testenv
+
 
 @flexitest.register
-class ProverClientTest(flexitest.Test):
+class ProverClientTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
 
@@ -13,7 +15,7 @@ class ProverClientTest(flexitest.Test):
         time.sleep(60)
 
         # Test on with the latest checkpoint
-        print("Waiting for checkpoint runner")
+        self.debug("Waiting for checkpoint runner")
 
         time_out = 10 * 60
         time.sleep(time_out)

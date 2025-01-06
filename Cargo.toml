@@ -7,6 +7,7 @@ members = [
   "crates/btcio",
   "crates/chaintsn",
   "crates/common",
+  "crates/config",
   "crates/consensus-logic",
   "crates/crypto",
   "crates/db",
@@ -24,6 +25,7 @@ members = [
   "crates/proof-impl/evm-ee-stf",
   "crates/proof-impl/l1-batch",
   "crates/zkvm/zkvm",
+  "crates/zkvm/hosts",
   "crates/reth/db",
   "crates/reth/evm",
   "crates/reth/exex",
@@ -55,6 +57,7 @@ members = [
   "bin/strata-client",
   "bin/strata-reth",
   "bin/prover-client",
+  "provers/perf",
 
   # integration tests
   "tests",
@@ -80,6 +83,7 @@ strata-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 strata-btcio = { path = "crates/btcio" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }
+strata-config = { path = "crates/config" }
 strata-consensus-logic = { path = "crates/consensus-logic" }
 strata-crypto = { path = "crates/crypto", default-features = false }
 strata-db = { path = "crates/db" }
@@ -116,6 +120,7 @@ strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
 strata-tx-parser = { path = "crates/tx-parser" }
 strata-zkvm = { path = "crates/zkvm/zkvm" }
+strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 # reth dependencies:
@@ -185,6 +190,7 @@ bincode = "1.3"
 bitcoin = { version = "=0.32.5", features = ["serde"] }
 borsh = { version = "1.5.0", features = ["derive"] }
 bytes = "1.6.0"
+cfg-if = "1.0.0"
 chrono = "0.4.38"
 clap = "4"
 digest = "0.10"
@@ -243,6 +249,6 @@ opt-level = 3
 # This shall be used only in the CI for the prover to optimize the build time.
 [profile.prover-ci]
 inherits = "release"
-opt-level = 0
 lto = "off"
+opt-level = 0
 strip = true

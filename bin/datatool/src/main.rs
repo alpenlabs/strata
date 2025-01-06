@@ -10,7 +10,7 @@ mod util;
 use std::path::PathBuf;
 
 use args::CmdContext;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use util::{exec_subc, resolve_network};
 
 fn main() {

@@ -114,4 +114,24 @@ mod tests {
         let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap();
         assert_eq!(last_idx, 100);
     }
+
+    /// Tests a peculiar issue with `default_codec` in rockbound schema. If it is used instead of
+    /// `seek_key_codec`, the last_idx won't grow beyond 255.
+    #[test]
+    fn test_256_checkpoints() {
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = RBCheckpointDB::new(db, db_ops);
+
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
+
+        for expected_idx in 0..=256 {
+            let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap_or(0);
+            assert_eq!(last_idx, expected_idx);
+
+            // Insert one to db
+            seq_db
+                .put_batch_checkpoint(last_idx + 1, checkpoint.clone())
+                .unwrap();
+        }
+    }
 }

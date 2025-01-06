@@ -268,6 +268,7 @@ class ProverClientFactory(flexitest.Factory):
         bitcoind_config: BitcoinRpcConfig,
         sequencer_url: str,
         reth_url: str,
+        rollup_params: str,
         ctx: flexitest.EnvContext,
     ):
         datadir = ctx.make_service_dir("prover_client")
@@ -285,8 +286,16 @@ class ProverClientFactory(flexitest.Factory):
             "--bitcoind-url", bitcoind_config["bitcoind_sock"],
             "--bitcoind-user", bitcoind_config["bitcoind_user"],
             "--bitcoind-password", bitcoind_config["bitcoind_pass"],
+            "--datadir", datadir
         ]
         # fmt: on
+
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        with open(rollup_params_file, "w") as f:
+            f.write(rollup_params)
+
+        cmd.extend(["--rollup-params", rollup_params_file])
+
         props = {"rpc_port": rpc_port}
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
@@ -312,7 +321,8 @@ class BridgeClientFactory(flexitest.Factory):
         node_url: str,
         bitcoind_config: dict,
         ctx: flexitest.EnvContext,
-        message_interval: int = DEFAULT_ROLLUP_PARAMS["message_interval"],
+        message_interval: int,
+        duty_timeout_duration: int,
     ):
         idx = self.next_idx()
         name = f"bridge.{idx}"
@@ -334,6 +344,7 @@ class BridgeClientFactory(flexitest.Factory):
             "--btc-pass", bitcoind_config["bitcoind_pass"],
             "--rollup-url", node_url,
             "--message-interval", str(message_interval),
+            "--duty-timeout-duration", str(duty_timeout_duration),
         ]
         # fmt: on
 

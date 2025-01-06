@@ -3,9 +3,11 @@ import time
 import flexitest
 from web3 import Web3
 
+import testenv
+
 
 @flexitest.register
-class ElBalanceTransferTest(flexitest.Test):
+class ElBalanceTransferTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
@@ -19,14 +21,14 @@ class ElBalanceTransferTest(flexitest.Test):
         basefee_address = web3.to_checksum_address("5400000000000000000000000000000000000010")
         beneficiary_address = web3.to_checksum_address("5400000000000000000000000000000000000011")
 
-        print(web3.is_connected())
+        self.debug(f"{web3.is_connected()}")
         original_block_no = web3.eth.block_number
         dest_original_balance = web3.eth.get_balance(dest)
         source_original_balance = web3.eth.get_balance(source)
         basefee_original_balance = web3.eth.get_balance(basefee_address)
         beneficiary_original_balance = web3.eth.get_balance(beneficiary_address)
 
-        print(original_block_no, dest_original_balance)
+        self.debug(f"{original_block_no}, {dest_original_balance}")
 
         to_transfer = 1_000_000_000_000_000_000
 
@@ -42,7 +44,7 @@ class ElBalanceTransferTest(flexitest.Test):
         basefee_final_balance = web3.eth.get_balance(basefee_address)
         beneficiary_final_balance = web3.eth.get_balance(beneficiary_address)
 
-        print(final_block_no, dest_final_balance)
+        self.debug(f"{final_block_no}, {dest_final_balance}")
 
         assert original_block_no < final_block_no
         assert dest_original_balance + to_transfer == dest_final_balance

@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 strata-bridge-tx-builder.workspace = true
+strata-config.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
@@ -34,11 +35,12 @@ tracing.workspace = true
 [dev-dependencies]
 strata-common.workspace = true
 strata-rocksdb = { workspace = true, features = ["test_utils"] }
+strata-state = { workspace = true, features = ["test_utils"] }
 strata-test-utils.workspace = true
 
 arbitrary.workspace = true
-mockall.workspace = true
 corepc-node = { version = "0.4.0", features = ["28_0"] }
+mockall.workspace = true
 
 [features]
 test_utils = []

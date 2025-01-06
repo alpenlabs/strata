@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// A vector wrapper that ensures the elements are sorted
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SortedVec<T> {
     inner: Vec<T>,
 }

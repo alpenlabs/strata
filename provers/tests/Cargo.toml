@@ -4,7 +4,6 @@ name = "strata-zkvm-tests"
 version = "0.1.0"
 
 [dependencies]
-strata-native-zkvm-adapter.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
@@ -15,13 +14,7 @@ strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
 strata-zkvm.workspace = true
-
-anyhow.workspace = true
-bincode.workspace = true
-bitcoin.workspace = true
-borsh.workspace = true
-hex.workspace = true
-serde_json.workspace = true
+strata-zkvm-hosts.workspace = true
 
 # sp1
 strata-sp1-adapter = { workspace = true, optional = true, features = [
@@ -39,12 +32,33 @@ strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
   "prover",
 ] }
 
+# native
+strata-native-zkvm-adapter = { workspace = true, optional = true }
+
+anyhow.workspace = true
+bincode.workspace = true
+bitcoin.workspace = true
+borsh.workspace = true
+cfg-if.workspace = true
+hex.workspace = true
+serde_json.workspace = true
+
 [features]
-default = []
+default = ["native"]
 mock = [
   "strata-sp1-guest-builder/mock",
   "strata-sp1-adapter/mock",
   "strata-risc0-adapter/mock",
 ]
-risc0 = ["strata-risc0-adapter", "strata-risc0-guest-builder"]
-sp1 = ["strata-sp1-adapter", "strata-sp1-guest-builder"]
+native = ["strata-native-zkvm-adapter", "strata-zkvm-hosts/native"]
+risc0 = [
+  "strata-risc0-adapter",
+  "strata-risc0-guest-builder",
+  "strata-zkvm-hosts/risc0",
+]
+sp1 = [
+  "strata-sp1-adapter",
+  "strata-sp1-guest-builder",
+  "strata-zkvm-hosts/sp1",
+]
+test = []

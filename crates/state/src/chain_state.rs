@@ -94,6 +94,10 @@ impl Chainstate {
         &self.l1_state
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
@@ -124,6 +128,16 @@ impl Chainstate {
 
     pub fn exec_env_state(&self) -> &ExecEnvState {
         &self.exec_env_state
+    }
+}
+
+// NOTE: This is a helper setter that is supposed to be used only in tests.
+// This is being used in `strata_btcio::reader` to test the reader's behaviour when the epoch
+// changes.
+#[cfg(any(test, feature = "test_utils"))]
+impl Chainstate {
+    pub fn set_epoch(&mut self, ep: u64) {
+        self.epoch = ep;
     }
 }
 

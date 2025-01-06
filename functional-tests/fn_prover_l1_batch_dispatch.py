@@ -2,11 +2,12 @@ import time
 
 import flexitest
 
+import testenv
 from utils import wait_for_proof_with_time_out
 
 
 @flexitest.register
-class ProverClientTest(flexitest.Test):
+class ProverClientTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("prover")
 
@@ -15,10 +16,11 @@ class ProverClientTest(flexitest.Test):
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the some block building
-        time.sleep(60)
+        time.sleep(5)
 
-        task_id = prover_client_rpc.dev_strata_proveL1Batch((1, 2))
-        print("got the task id: {}", task_id)
+        task_ids = prover_client_rpc.dev_strata_proveL1Batch((1, 2))
+        task_id = task_ids[0]
+        self.debug(f"using task id: {task_id}")
         assert task_id is not None
 
         time_out = 10 * 60

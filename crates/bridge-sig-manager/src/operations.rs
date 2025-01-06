@@ -113,6 +113,21 @@ pub fn sign_state_partial(
 }
 
 /// Verify that a partial MuSig2 signature is correct.
+///
+/// # Warning
+///
+/// It is possible for an adversary to forge a partial signature under certain conditions.
+/// You _must not_ rely on this verification to imply that a partial signature is unforgeable.
+///
+/// See the footnote in section 4.2 of <https://eprint.iacr.org/archive/2020/1261/20231020:081535> or
+/// <https://gist.github.com/AdamISZ/ca974ed67889cedc738c4a1f65ff620b> for details.
+///
+/// It is _only_ safe to assume that:
+///
+/// - failed verification of _any_ partial signature represents a fault, and the signing session
+///   should be aborted
+/// - successful verification of _all_ partial signatures for a signing session will result in a
+///   successful signing session
 pub fn verify_partial_sig(
     tx_state: &BridgeTxState,
     signature_info: &OperatorPartialSig,

@@ -1,24 +1,17 @@
 use risc0_zkvm::{Groth16Receipt, MaybePruned, ReceiptClaim};
 use sha2::Digest;
-use strata_zkvm::{Proof, ZkVmError, ZkVmResult};
+use strata_zkvm::{Proof, ZkVmResult};
 
 pub fn verify_groth16(
     proof: &Proof,
-    verification_key: &[u8],
+    verification_key: &[u8; 32],
     public_params_raw: &[u8],
 ) -> ZkVmResult<()> {
-    // Ensure the verification key is exactly 32 bytes long
-    if verification_key.len() != 32 {
-        return Err(ZkVmError::InvalidVerificationKey);
-    }
-    let mut vkey = [0u8; 32];
-    vkey.copy_from_slice(verification_key);
-
     let public_params_hash: [u8; 32] = sha2::Sha256::digest(public_params_raw).into();
     let public_params_digest = risc0_zkvm::sha::Digest::from_bytes(public_params_hash);
 
     let claim = ReceiptClaim::ok(
-        risc0_zkvm::sha::Digest::from_bytes(vkey),
+        risc0_zkvm::sha::Digest::from_bytes(*verification_key),
         MaybePruned::from(public_params_raw.to_vec()),
     );
 
@@ -38,8 +31,8 @@ pub fn verify_groth16(
 
 #[cfg(test)]
 mod tests {
-    use risc0_zkvm::{serde::to_vec, Receipt};
-    use strata_zkvm::Proof;
+    use risc0_zkvm::{serde::to_vec, InnerReceipt};
+    use strata_zkvm::{Proof, ProofReceipt};
 
     use super::verify_groth16;
     #[test]
@@ -47,7 +40,7 @@ mod tests {
         let input: u32 = 1;
 
         // Note: This is generated in prover.rs
-        let vk = vec![
+        let vk = [
             48, 77, 52, 1, 100, 95, 109, 135, 223, 56, 83, 146, 244, 21, 237, 63, 198, 105, 2, 75,
             135, 48, 52, 165, 178, 24, 200, 186, 174, 191, 212, 184,
         ];
@@ -55,9 +48,9 @@ mod tests {
         // Note: This is written in prover.rs
         let raw_proof = include_bytes!("../tests/proofs/proof-groth16.bin");
 
-        let proof = Proof::new(raw_proof.to_vec());
-        let receipt: Receipt = bincode::deserialize(proof.as_bytes()).unwrap();
-        let seal = Proof::new(receipt.inner.groth16().unwrap().clone().seal);
+        let receipt: ProofReceipt = bincode::deserialize(raw_proof).unwrap();
+        let inner_receipt: InnerReceipt = bincode::deserialize(receipt.proof().as_bytes()).unwrap();
+        let seal = Proof::new(inner_receipt.groth16().unwrap().clone().seal);
 
         let public_params_raw: Vec<u8> = to_vec(&input)
             .unwrap()

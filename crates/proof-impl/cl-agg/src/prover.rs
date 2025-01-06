@@ -1,6 +1,7 @@
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_zkvm::{
-    AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmProver, ZkVmResult,
+    AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
+    ZkVmResult,
 };
 
 pub struct ClAggInput {
@@ -18,7 +19,7 @@ impl ZkVmProver for ClAggProver {
         strata_zkvm::ProofType::Compressed
     }
 
-    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmResult<B::Input>
+    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
         B: strata_zkvm::ZkVmInputBuilder<'a>,
     {

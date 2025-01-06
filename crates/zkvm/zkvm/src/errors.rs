@@ -1,103 +1,145 @@
 use thiserror::Error;
 
+use crate::{ProofType, ZkVm};
+
+/// A convenient alias for results in the ZkVM.
 pub type ZkVmResult<T> = Result<T, ZkVmError>;
 
-/// Represents different types of errors that can occur in the ZkVM system
 #[derive(Debug, Error)]
 pub enum ZkVmError {
-    /// Error during serialization of input or output
-    #[error("Serialization failed")]
-    SerializationError {
-        /// Specific serialization error type
-        #[source]
-        source: SerializationErrorSource,
-    },
-
-    /// Error during deserialization of input or output
-    #[error("Deserialization failed")]
-    DeserializationError {
-        /// Specific deserialization error type
-        #[source]
-        source: DeserializationErrorSource,
-    },
-    /// Error during proof generation
-    #[error("Proof generation failed")]
+    #[error("Proof generation failed: {0}")]
     ProofGenerationError(String),
 
-    /// Error during proof verification
-    #[error("Proof verification failed")]
+    #[error("Proof verification failed: {0}")]
     ProofVerificationError(String),
 
-    /// Input-related errors
-    #[error("Input validation failed")]
-    InputError(String),
+    #[error("Input validation failed: {0}")]
+    InvalidInput(#[from] ZkVmInputError),
 
-    /// ELF-related errors
-    #[error("ELF validation failed")]
+    #[error("ELF validation failed: {0}")]
     InvalidELF(String),
 
-    /// Verification Key related errors
     #[error("Invalid Verification Key")]
-    InvalidVerificationKey,
+    InvalidVerificationKey(#[from] ZkVmVerificationKeyError),
 
-    /// Generic error for other cases
-    #[error("An unexpected error occurred")]
+    #[error("Invalid proof receipt")]
+    InvalidProofReceipt(#[from] ZkVmProofError),
+
+    #[error("Output extraction failed")]
+    OutputExtractionError {
+        #[source]
+        source: DataFormatError,
+    },
+
+    #[error("{0}")]
     Other(String),
 }
 
-/// Enum to statically handle different serialization error sources
 #[derive(Debug, Error)]
-pub enum SerializationErrorSource {
-    /// Bincode serialization error
-    #[error("Bincode serialization error")]
-    Bincode(#[from] bincode::Error),
+pub enum DataFormatError {
+    #[error("{source}")]
+    Bincode {
+        #[source]
+        source: bincode::Error,
+    },
 
-    /// Borsh serialization error
-    #[error("Borsh serialization error")]
-    Borsh(#[from] borsh::io::Error),
+    #[error("{source}")]
+    Borsh {
+        #[source]
+        source: borsh::io::Error,
+    },
 
-    /// Serde serialization error
-    #[error("Serde serialization error: {0}")]
+    #[error("{0}")]
     Serde(String),
 
-    /// Other serialization errors
-    #[error("Other serialization error: {0}")]
+    #[error("error: {0}")]
     Other(String),
 }
 
-/// Enum to statically handle different deserialization error sources
 #[derive(Debug, Error)]
-pub enum DeserializationErrorSource {
-    /// Bincode deserialization error
-    #[error("Bincode deserialization error")]
-    Bincode(#[from] bincode::Error),
+pub enum ZkVmInputError {
+    #[error("Input data format error")]
+    DataFormat(#[source] DataFormatError),
 
-    /// Borsh deserialization error
-    #[error("Borsh deserialization error")]
-    Borsh(#[from] borsh::io::Error),
+    #[error("Input proof receipt error")]
+    ProofReceipt(#[source] ZkVmProofError),
 
-    /// Serde deserialization error
-    #[error("Serde deserialization error: {0}")]
-    Serde(String),
+    #[error("Input verification key error")]
+    VerificationKey(#[source] ZkVmVerificationKeyError),
 
-    /// Other deserialization errors
-    #[error("Other deserialization error: {0}")]
-    Other(String),
+    #[error("Input build error: {0}")]
+    InputBuild(String),
 }
 
-impl From<borsh::io::Error> for ZkVmError {
-    fn from(err: borsh::io::Error) -> Self {
-        ZkVmError::SerializationError {
-            source: SerializationErrorSource::Borsh(err),
-        }
+#[derive(Debug, Error)]
+pub enum ZkVmVerificationKeyError {
+    #[error("Verification Key format error")]
+    DataFormat(#[source] DataFormatError),
+
+    #[error("Verification Key size error")]
+    InvalidVerificationKeySize,
+}
+
+#[derive(Debug, Error)]
+pub enum ZkVmProofError {
+    #[error("Input data format error")]
+    DataFormat(#[source] DataFormatError),
+
+    #[error("Invalid ProofType: expected {0:?}")]
+    InvalidProofType(ProofType),
+
+    #[error("Invalid ZkVm: expected {0:?}, found {1:?}")]
+    InvalidZkVm(ZkVm, ZkVm),
+}
+
+#[derive(Debug, Error)]
+pub enum InvalidVerificationKeySource {
+    #[error("Verification Key format error")]
+    DataFormat(#[from] DataFormatError),
+}
+
+/// Implement automatic conversion for `bincode::Error` to `DataFormatError`
+impl From<bincode::Error> for DataFormatError {
+    fn from(err: bincode::Error) -> Self {
+        DataFormatError::Bincode { source: err }
     }
 }
 
-// Automatic From implementations
-impl From<bincode::Error> for ZkVmError {
+/// Implement automatic conversion for `borsh::io::Error` to `DataFormatError`
+impl From<borsh::io::Error> for DataFormatError {
+    fn from(err: borsh::io::Error) -> Self {
+        DataFormatError::Borsh { source: err }
+    }
+}
+
+/// Implement automatic conversion for `bincode::Error` to `InvalidProofReceipt`
+impl From<bincode::Error> for ZkVmProofError {
     fn from(err: bincode::Error) -> Self {
-        ZkVmError::SerializationError {
-            source: SerializationErrorSource::Bincode(err),
-        }
+        let source = DataFormatError::Bincode { source: err };
+        ZkVmProofError::DataFormat(source)
+    }
+}
+
+/// Implement automatic conversion for `borsh::io::Error` to `InvalidProofReceiptSource`
+impl From<borsh::io::Error> for ZkVmProofError {
+    fn from(err: borsh::io::Error) -> Self {
+        let source = DataFormatError::Borsh { source: err };
+        ZkVmProofError::DataFormat(source)
+    }
+}
+
+/// Implement automatic conversion for `bincode::Error` to `ZkVmInputError`
+impl From<bincode::Error> for ZkVmInputError {
+    fn from(err: bincode::Error) -> Self {
+        let source = DataFormatError::Bincode { source: err };
+        ZkVmInputError::DataFormat(source)
+    }
+}
+
+/// Implement automatic conversion for `borsh::io::Error` to `ZkVmInputError`
+impl From<borsh::io::Error> for ZkVmInputError {
+    fn from(err: borsh::io::Error) -> Self {
+        let source = DataFormatError::Borsh { source: err };
+        ZkVmInputError::DataFormat(source)
     }
 }

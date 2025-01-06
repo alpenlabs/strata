@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 strata-btcio.workspace = true
+strata-config.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
 strata-status.workspace = true

@@ -118,6 +118,10 @@ impl TaskManager {
         )
     }
 
+    pub fn handle(&self) -> &Handle {
+        &self.tokio_handle
+    }
+
     /// waits until any tasks panic, returns `Err(first_panic_error)`
     /// returns `Ok(())` if shutdown message is received instead
     fn wait_for_task_panic(&mut self, shutdown: Shutdown) -> Result<(), TaskError> {
@@ -233,6 +237,10 @@ impl TaskExecutor {
             shutdown_signal,
             pending_tasks_counter,
         }
+    }
+
+    pub fn handle(&self) -> &Handle {
+        &self.tokio_handle
     }
 
     /// Spawn task in new thread.

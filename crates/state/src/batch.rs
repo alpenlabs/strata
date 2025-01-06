@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_crypto::verify_schnorr_sig;
 use strata_primitives::buf::{Buf32, Buf64};
-use strata_zkvm::Proof;
+use strata_zkvm::{Proof, ProofReceipt, PublicValues};
 
 use crate::id::L2BlockId;
 
@@ -44,6 +44,19 @@ impl BatchCheckpoint {
         &self.proof
     }
 
+    pub fn get_proof_output(&self) -> CheckpointProofOutput {
+        CheckpointProofOutput::new(self.batch_info().clone(), self.bootstrap_state().clone())
+    }
+
+    pub fn get_proof_receipt(&self) -> ProofReceipt {
+        let proof = self.proof().clone();
+        let output = self.get_proof_output();
+        let public_values = PublicValues::new(
+            borsh::to_vec(&output).expect("could not serialize checkpoint proof output"),
+        );
+        ProofReceipt::new(proof, public_values)
+    }
+
     pub fn get_sighash(&self) -> Buf32 {
         let mut buf = vec![];
         let checkpoint_sighash =
@@ -56,7 +69,9 @@ impl BatchCheckpoint {
     }
 }
 
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize, Arbitrary, PartialEq, Eq)]
+#[derive(
+    Clone, Debug, BorshDeserialize, BorshSerialize, Arbitrary, PartialEq, Eq, Serialize, Deserialize,
+)]
 pub struct SignedBatchCheckpoint {
     inner: BatchCheckpoint,
     signature: Buf64,
@@ -249,6 +264,21 @@ impl BootstrapState {
             start_l2_height,
             initial_l2_state,
             total_acc_pow,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
+pub struct CheckpointProofOutput {
+    pub batch_info: BatchInfo,
+    pub bootstrap_state: BootstrapState,
+}
+
+impl CheckpointProofOutput {
+    pub fn new(batch_info: BatchInfo, bootstrap_state: BootstrapState) -> CheckpointProofOutput {
+        Self {
+            batch_info,
+            bootstrap_state,
         }
     }
 }

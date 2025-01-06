@@ -1,4 +1,4 @@
-import logging as log
+import logging
 import math
 import os
 import subprocess
@@ -11,6 +11,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, musig_aggregate_pks
 
 from constants import *
+from seqrpc import JsonrpcClient
 
 
 def generate_jwt_secret() -> str:
@@ -40,7 +41,7 @@ def generate_task(rpc: BitcoindClient, wait_dur, addr):
         try:
             rpc.proxy.generatetoaddress(1, addr)
         except Exception as ex:
-            log.warning(f"{ex} while generating to address {addr}")
+            logging.warning(f"{ex} while generating to address {addr}")
             return
 
 
@@ -49,9 +50,9 @@ def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
     print(f"generating {n} blocks to address", addr)
     try:
         blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
-        print("made blocks", blk)
+        print(f"made blocks {blk}")
     except Exception as ex:
-        log.warning(f"{ex} while generating address")
+        logging.warning(f"{ex} while generating address")
         return
 
 
@@ -114,6 +115,7 @@ class RollupParamsSettings:
     block_time_sec: int
     epoch_slots: int
     genesis_trigger: int
+    message_interval: int
     proof_timeout: Optional[int] = None
 
     # NOTE: type annotation: Ideally we would use `Self` but couldn't use it
@@ -124,6 +126,7 @@ class RollupParamsSettings:
             block_time_sec=DEFAULT_BLOCK_TIME_SEC,
             epoch_slots=DEFAULT_EPOCH_SLOTS,
             genesis_trigger=DEFAULT_GENESIS_TRIGGER_HT,
+            message_interval=DEFAULT_MESSAGE_INTERVAL_MSEC,
             proof_timeout=DEFAULT_PROOF_TIMEOUT,
         )
 
@@ -195,10 +198,10 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
     # empty proof hex.
     # NOTE: The functional tests for verifying proofs need to provide non-empty
     # proofs
-    proof_hex = ""
+    empty_proof_receipt = {"proof": [], "public_values": []}
 
     # This is arbitrary
-    seqrpc.strataadmin_submitCheckpointProof(idx, proof_hex)
+    seqrpc.strataadmin_submitCheckpointProof(idx, empty_proof_receipt)
 
     # Wait a while for it to be posted to l1. This will happen when there
     # is a new published txid in l1status
@@ -222,12 +225,12 @@ def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None
 
 def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: int):
     """
-    This check requires that subnitting nonexistent batch proof fails
+    Requires that submitting nonexistent batch proof fails
     """
-    proof_hex = ""
+    empty_proof_receipt = {"proof": [], "public_values": []}
 
     try:
-        seqrpc.strataadmin_submitCheckpointProof(nonexistent_batch, proof_hex)
+        seqrpc.strataadmin_submitCheckpointProof(nonexistent_batch, empty_proof_receipt)
     except Exception as e:
         if hasattr(e, "code"):
             assert e.code == ERROR_CHECKPOINT_DOESNOT_EXIST
@@ -238,21 +241,18 @@ def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: in
         raise AssertionError("Expected rpc error")
 
 
-def get_logger(name: str, level=log.DEBUG) -> log.Logger:
-    logger = log.getLogger(name)
-
-    if not logger.handlers:
-        handler = log.StreamHandler()
-        logger.setLevel(level)
-        formatter = log.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
-        )
-        handler.setFormatter(formatter)
-
-        # Add the handler to the logger
-        logger.addHandler(handler)
-
-    return logger
+def check_already_sent_proof(seqrpc, sent_batch: int):
+    """
+    Requires that submitting proof that was already sent fails
+    """
+    empty_proof_receipt = {"proof": [], "public_values": []}
+    try:
+        # Proof for checkpoint 0 is already sent
+        seqrpc.strataadmin_submitCheckpointProof(sent_batch, empty_proof_receipt)
+    except Exception as e:
+        assert e.code == ERROR_PROOF_ALREADY_CREATED
+    else:
+        raise AssertionError("Expected rpc error")
 
 
 def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
@@ -307,13 +307,13 @@ def generate_seqpubkey_from_seed(path: str) -> str:
     # fmt: on
 
     with open(path) as f:
-        print("sequencer root privkey", f.read())
+        print(f"sequencer root privkey {f.read()}")
 
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
     res.check_returncode()
     res = str(res.stdout, "utf8").strip()
     assert len(res) > 0, "no output generated"
-    print("SEQ PUBKEY", res)
+    print(f"SEQ PUBKEY {res}")
     return res
 
 
@@ -381,7 +381,7 @@ def generate_simple_params(
     opxpubs = [generate_opxpub_from_seed(p) for p in opseedpaths]
 
     params = generate_params(settings, seqkey, opxpubs)
-    print("Params", params)
+    print(f"Params {params}")
     return {"params": params, "opseedpaths": opseedpaths}
 
 
@@ -432,3 +432,89 @@ def get_bridge_pubkey_from_cfg(cfg_params) -> str:
     op_x_only_pks = [convert_to_xonly_pk(pk) for pk in op_pks]
     agg_pubkey = musig_aggregate_pks(op_x_only_pks)
     return agg_pubkey
+
+
+def setup_root_logger():
+    """
+    reads `LOG_LEVEL` from the environment. Defaults to `WARNING` if not provided.
+    """
+    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+    log_level = getattr(logging, log_level, logging.NOTSET)
+    # Configure the root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+
+
+def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
+    """
+    Set up loggers for a list of test names, with log files in a logs directory.
+    - Configures both file and stream handlers for each test logger.
+    - Logs are stored in `<datadir_root>/logs/<test_name>.log`.
+
+    Parameters:
+        datadir_root (str): Root directory for logs.
+        tests (list of str): List of test names to create loggers for.
+
+    Returns:
+        logging.Logger
+    """
+    # Create the logs directory
+    log_dir = os.path.join(datadir_root, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Common formatter
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
+    )
+    # Set up individual loggers for each test
+    logger = logging.getLogger(test_name)
+    # File handler
+    log_path = os.path.join(log_dir, f"{test_name}.log")
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setFormatter(formatter)
+    # Stream handler
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+
+    # Add handlers to the logger
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+
+    return logger
+
+
+def get_envelope_pushdata(inp: str):
+    op_if = "63"
+    op_endif = "68"
+    op_pushbytes_33 = "21"
+    op_false = "00"
+    start_position = inp.index(f"{op_false}{op_if}")
+    end_position = inp.index(f"{op_endif}{op_pushbytes_33}", start_position)
+    op_if_block = inp[start_position + 3 : end_position]
+    op_pushdata = "4d"
+    pushdata_position = op_if_block.index(f"{op_pushdata}")
+    # we don't want PUSHDATA + num bytes b401
+    return op_if_block[pushdata_position + 2 + 4 :]
+
+
+def submit_da_blob(btcrpc: BitcoindClient, seqrpc: JsonrpcClient, blobdata: str):
+    _ = seqrpc.strataadmin_submitDABlob(blobdata)
+
+    # if blob data is present in tx witness then return the transaction
+    tx = wait_until_with_value(
+        lambda: btcrpc.gettransaction(seqrpc.strata_l1status()["last_published_txid"]),
+        predicate=lambda tx: blobdata in tx.witness_data().hex(),
+        timeout=10,
+    )
+    return tx
+
+
+def cl_slot_to_block_id(seqrpc, slot):
+    """Convert L2 slot number to block ID."""
+    l2_blocks = seqrpc.strata_getHeadersAtIdx(slot)
+    return l2_blocks[0]["block_id"]
+
+
+def el_slot_to_block_id(rethrpc, block_num):
+    """Get EL block hash from block number using Ethereum RPC."""
+    return rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]

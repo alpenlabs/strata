@@ -11,7 +11,7 @@ use bdk_wallet::{
 use bip39::{Language, Mnemonic};
 use dialoguer::{Confirm, Input};
 use password::{HashVersion, IncorrectPassword, Password};
-use rand::{rngs::OsRng, CryptoRng, RngCore};
+use rand_core::{CryptoRngCore, OsRng};
 use sha2::{Digest, Sha256};
 use terrors::OneOf;
 use zeroize::Zeroizing;
@@ -30,7 +30,7 @@ impl BaseWallet {
 pub struct Seed(Zeroizing<[u8; SEED_LEN]>);
 
 impl Seed {
-    fn gen<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+    fn gen<R: CryptoRngCore>(rng: &mut R) -> Self {
         let mut bytes = Zeroizing::new([0u8; SEED_LEN]);
         rng.fill_bytes(bytes.as_mut());
         Self(bytes)
@@ -48,7 +48,7 @@ impl Seed {
         hasher.finalize().into()
     }
 
-    pub fn encrypt<R: CryptoRng + RngCore>(
+    pub fn encrypt<R: CryptoRngCore>(
         &self,
         password: &mut Password,
         rng: &mut R,
@@ -261,7 +261,7 @@ pub mod password;
 
 #[cfg(test)]
 mod test {
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
     use sha2::digest::generic_array::GenericArray;
 
     use super::*;

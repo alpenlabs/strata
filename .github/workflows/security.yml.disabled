@@ -16,13 +16,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@clippy
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
        # HACK: v0.21.0 fails during dependency resolution. Remove when this is resolved
-       # https://github.com/rustsec/rustsec/issues/1249#issuecomment-2423257490 
+       # https://github.com/rustsec/rustsec/issues/1249#issuecomment-2423257490
       - name: Install cargo-audit v0.20.0
         run: cargo install cargo-audit --version 0.20.0 --force
 

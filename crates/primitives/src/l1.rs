@@ -108,7 +108,9 @@ impl From<(u64, u32)> for L1TxRef {
 /// TODO: This is duplicate with state::l1::L1TxProof
 /// Merkle proof for a TXID within a block.
 // TODO rework this, make it possible to generate proofs, etc.
-#[derive(Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
 pub struct L1TxProof {
     position: u32,
     cohashes: Vec<Buf32>,
@@ -128,10 +130,45 @@ impl L1TxProof {
     }
 }
 
+/// Includes [`L1BlockManifest`] along with scan rules that it is applied to
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct L1BlockManifest {
+    /// The actual l1 record
+    record: L1BlockRecord,
+    /// Epoch, which was used to generate this manifest
+    epoch: u64,
+}
+
+impl L1BlockManifest {
+    pub fn new(record: L1BlockRecord, epoch: u64) -> Self {
+        Self { record, epoch }
+    }
+
+    pub fn header(&self) -> &[u8] {
+        self.record.header()
+    }
+
+    pub fn block_hash(&self) -> Buf32 {
+        self.record.block_hash()
+    }
+
+    pub fn txs_root(&self) -> Buf32 {
+        self.record.txs_root()
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn into_record(self) -> L1BlockRecord {
+        self.record
+    }
+}
+
 /// Describes an L1 block and associated data that we need to keep around.
 // TODO should we include the block index here?
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct L1BlockManifest {
+pub struct L1BlockRecord {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
     /// here.  This is what we use in the MMR.
     blockid: Buf32,
@@ -145,7 +182,7 @@ pub struct L1BlockManifest {
     txs_root: Buf32,
 }
 
-impl L1BlockManifest {
+impl L1BlockRecord {
     pub fn new(blockid: Buf32, header: Vec<u8>, txs_root: Buf32) -> Self {
         Self {
             blockid,
@@ -168,7 +205,7 @@ impl L1BlockManifest {
     }
 }
 
-impl From<Block> for L1BlockManifest {
+impl From<Block> for L1BlockRecord {
     fn from(block: Block) -> Self {
         let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array());
         let root = block
@@ -250,7 +287,7 @@ impl<'a> Arbitrary<'a> for OutputRef {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Arbitrary)]
 pub struct L1Status {
     /// If the last time we tried to poll the client (as of `last_update`)
     /// we were successful.
@@ -267,7 +304,7 @@ pub struct L1Status {
     pub cur_tip_blkid: String,
 
     /// Last published txid where L2 blob was present
-    pub last_published_txid: Option<Txid>,
+    pub last_published_txid: Option<Buf32>,
 
     /// UNIX millis time of the last time we got a new update from the L1 connector.
     pub last_update: u64,

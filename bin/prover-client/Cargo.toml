@@ -21,8 +21,10 @@ strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
 strata-prover-client-rpc-api.workspace = true
 strata-rocksdb.workspace = true
+strata-rpc-api = { workspace = true, features = ["client"] }
 strata-rpc-types.workspace = true
 strata-state.workspace = true
+strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
 alloy-rpc-types.workspace = true
@@ -39,7 +41,7 @@ rand.workspace = true
 rayon = "1.8.0"
 rockbound.workspace = true
 serde.workspace = true
-strata-tx-parser.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true

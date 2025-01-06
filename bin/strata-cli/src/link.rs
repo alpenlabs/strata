@@ -76,7 +76,7 @@ pub enum MaybeLink<'a, 'b> {
     Object(OnchainObject<'a>),
 }
 
-impl<'a, 'b> PrettyPrint for MaybeLink<'a, 'b> {
+impl PrettyPrint for MaybeLink<'_, '_> {
     fn pretty(&self) -> String {
         match self {
             MaybeLink::Link(l) => l.pretty(),
@@ -160,7 +160,7 @@ pub struct Link<'a, 'b> {
     explorer_ep: &'b str,
 }
 
-impl<'b, 'a> Display for Link<'a, 'b> {
+impl Display for Link<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.object {
             OnchainObject::Transaction(ref txid) => match txid {
@@ -179,7 +179,7 @@ impl<'b, 'a> Display for Link<'a, 'b> {
     }
 }
 
-impl<'a, 'b> PrettyPrint for Link<'a, 'b> {
+impl PrettyPrint for Link<'_, '_> {
     fn pretty(&self) -> String {
         match self.object {
             OnchainObject::Transaction(_) => format!("View transaction at {self}"),

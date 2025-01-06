@@ -29,13 +29,13 @@ use revm::{
 
 use crate::{
     mpt::{keccak, StateAccount, KECCAK_EMPTY},
-    ELProofInput,
+    EvmBlockStfInput,
 };
 
 /// A helper trait to extend [`InMemoryDB`] with additional functionality.
 pub trait InMemoryDBHelper {
-    /// Create an [`InMemoryDB`] from a given [`ELProofInput`].
-    fn initialize(input: &mut ELProofInput) -> Result<Self>
+    /// Create an [`InMemoryDB`] from a given [`EvmBlockStfInput`].
+    fn initialize(input: &mut EvmBlockStfInput) -> Result<Self>
     where
         Self: Sized;
 
@@ -53,7 +53,7 @@ pub trait InMemoryDBHelper {
 }
 
 impl InMemoryDBHelper for InMemoryDB {
-    fn initialize(input: &mut ELProofInput) -> Result<Self> {
+    fn initialize(input: &mut EvmBlockStfInput) -> Result<Self> {
         // For each contract's byte code, hash it and store it in a map.
         let contracts: HashMap<B256, Bytes> = input
             .contracts
@@ -63,12 +63,12 @@ impl InMemoryDBHelper for InMemoryDB {
 
         // For each account, load the information into the database.
         let mut accounts = HashMap::with_capacity_and_hasher(
-            input.parent_storage.len(),
+            input.pre_state_storage.len(),
             DefaultHashBuilder::default(),
         );
-        for (address, (storage_trie, slots)) in &mut input.parent_storage {
+        for (address, (storage_trie, slots)) in &mut input.pre_state_storage {
             let state_account = input
-                .parent_state_trie
+                .pre_state_trie
                 .get_rlp::<StateAccount>(&keccak(address))?
                 .unwrap_or_default();
 

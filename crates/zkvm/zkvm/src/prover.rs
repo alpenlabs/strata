@@ -1,5 +1,8 @@
+use tracing::error;
+
 use crate::{
-    host::ZkVmHost, input::ZkVmInputBuilder, ProofReceipt, ProofType, PublicValues, ZkVmResult,
+    host::ZkVmHost, input::ZkVmInputBuilder, ProofReceipt, ProofType, PublicValues,
+    ZkVmInputResult, ZkVmResult,
 };
 
 pub trait ZkVmProver {
@@ -9,7 +12,7 @@ pub trait ZkVmProver {
     fn proof_type() -> ProofType;
 
     /// Prepares the input for the zkVM.
-    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmResult<B::Input>
+    fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
         B: ZkVmInputBuilder<'a>;
 
@@ -25,13 +28,17 @@ pub trait ZkVmProver {
         H::Input<'a>: ZkVmInputBuilder<'a>,
     {
         // Prepare the input using the host's input builder.
-        let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)?;
+        let zkvm_input = Self::prepare_input::<H::Input<'a>>(input)
+            .inspect_err(|e| error!(%host, ?e, "Failed to prepare input"))?;
 
         // Use the host to prove.
-        let receipt = host.prove(zkvm_input, Self::proof_type())?;
+        let receipt = host
+            .prove(zkvm_input, Self::proof_type())
+            .inspect_err(|e| error!(%host, ?e, "Failed to generate proof receipt"))?;
 
         // Process output to see if we are getting the expected output.
-        let _ = Self::process_output::<H>(receipt.public_values())?;
+        let _ = Self::process_output::<H>(receipt.public_values())
+            .inspect_err(|e| error!(%host, ?e, "Failed to process output"))?;
 
         Ok(receipt)
     }

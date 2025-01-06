@@ -31,18 +31,21 @@ impl From<SequencerRpcError> for EthApiError {
 
 /// A client to interact with a Sequencer
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // FIXME: remove this
 pub struct SequencerClient {
     inner: Arc<SequencerClientInner>,
 }
 
 impl SequencerClient {
     /// Creates a new [`SequencerClient`].
+    #[allow(dead_code)] // FIXME: remove this
     pub fn new(sequencer_endpoint: impl Into<String>) -> Self {
         let client = Client::builder().use_rustls_tls().build().unwrap();
         Self::with_client(sequencer_endpoint, client)
     }
 
     /// Creates a new [`SequencerClient`].
+    #[allow(dead_code)] // FIXME: remove this
     pub fn with_client(sequencer_endpoint: impl Into<String>, http_client: Client) -> Self {
         let inner = SequencerClientInner {
             sequencer_endpoint: sequencer_endpoint.into(),
@@ -55,16 +58,19 @@ impl SequencerClient {
     }
 
     /// Returns the network of the client
+    #[allow(dead_code)] // FIXME: remove this
     pub fn endpoint(&self) -> &str {
         &self.inner.sequencer_endpoint
     }
 
     /// Returns the client
+    #[allow(dead_code)] // FIXME: remove this
     pub fn http_client(&self) -> &Client {
         &self.inner.http_client
     }
 
     /// Returns the next id for the request
+    #[allow(dead_code)] // FIXME: remove this
     fn next_request_id(&self) -> usize {
         self.inner
             .id
@@ -72,6 +78,7 @@ impl SequencerClient {
     }
 
     /// Forwards a transaction to the sequencer endpoint.
+    #[allow(dead_code)] // FIXME: remove this
     pub async fn forward_raw_transaction(&self, tx: &[u8]) -> Result<(), SequencerRpcError> {
         let body = serde_json::to_string(&serde_json::json!({
             "jsonrpc": "2.0",
@@ -107,6 +114,7 @@ impl SequencerClient {
 }
 
 #[derive(Debug, Default)]
+#[allow(dead_code)] // FIXME: remove this
 struct SequencerClientInner {
     /// The endpoint of the sequencer
     sequencer_endpoint: String,

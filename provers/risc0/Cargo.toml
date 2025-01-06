@@ -4,7 +4,7 @@ name = "strata-risc0-guest-builder"
 version = "0.1.0"
 
 [dependencies]
-risc0-zkvm = "1.1.2"
+risc0-zkvm = "1.2"
 strata-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
   "prover",
 ], optional = true }
@@ -41,5 +41,5 @@ methods = [
 ]
 
 [features]
-default = []
+default = ["prover"]
 prover = ["dep:strata-risc0-adapter"]

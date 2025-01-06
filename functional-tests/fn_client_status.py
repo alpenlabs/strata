@@ -1,10 +1,11 @@
 import flexitest
 
+import testenv
 from utils import wait_until
 
 
 @flexitest.register
-class L1ClientStatusTest(flexitest.Test):
+class L1ClientStatusTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env("basic")
 
@@ -20,10 +21,10 @@ class L1ClientStatusTest(flexitest.Test):
         )
 
         proto_ver = seqrpc.strata_protocolVersion()
-        print("protocol version", proto_ver)
+        self.debug(f"protocol version { proto_ver}")
         assert proto_ver == 1, "query protocol version"
 
         client_status = seqrpc.strata_clientStatus()
-        print("client status", client_status)
+        self.debug(f"client status { client_status}")
 
         return True

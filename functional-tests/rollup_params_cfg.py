@@ -1,13 +1,18 @@
-from pydantic import BaseModel
+from typing import Annotated, Union
+
+from pydantic import BaseModel, StringConstraints
+
+# A string that optionally starts with 0x, followed by exactly 64 hex characters
+StrBuf32 = Annotated[str, StringConstraints(pattern=r"^(0x)?[0-9A-Fa-f]{64}$")]
 
 
 class CredRule(BaseModel):
-    schnorr_key: str
+    schnorr_key: StrBuf32
 
 
 class OperatorConfigItem(BaseModel):
-    signing_pk: str
-    wallet_pk: str
+    signing_pk: StrBuf32
+    wallet_pk: StrBuf32
 
 
 class OperatorConfig(BaseModel):
@@ -17,8 +22,19 @@ class OperatorConfig(BaseModel):
         return [operator.wallet_pk for operator in self.static]
 
 
-class RollupVk(BaseModel):
-    sp1: str
+class Sp1RollupVk(BaseModel):
+    sp1: StrBuf32
+
+
+class Risc0RollupVk(BaseModel):
+    risc0: StrBuf32
+
+
+class NativeRollupVk(BaseModel):
+    native: StrBuf32
+
+
+RollupVk = Union[Sp1RollupVk, Risc0RollupVk, NativeRollupVk]
 
 
 class ProofPublishMode(BaseModel):
@@ -37,8 +53,8 @@ class RollupConfig(BaseModel):
     horizon_l1_height: int
     genesis_l1_height: int
     operator_config: OperatorConfig
-    evm_genesis_block_hash: str
-    evm_genesis_block_state_root: str
+    evm_genesis_block_hash: StrBuf32
+    evm_genesis_block_state_root: StrBuf32
     l1_reorg_safe_depth: int
     target_l2_batch_size: int
     address_length: int
@@ -48,3 +64,13 @@ class RollupConfig(BaseModel):
     proof_publish_mode: ProofPublishMode
     max_deposits_in_block: int
     network: str
+
+    # Additional fields that aren't coming from datatool config generation (yet)
+    # and has to be supplied manually.
+    # TODO(STR-816): make datatool return OPERATOR_FEE from bridge-tx-builder/src/constants.rs
+    operator_fee: int = 50_000_000
+    # TODO(STR-816): this is currently an inconsistent mess, figure it out.
+    # ANYONE_CAN_SPEND_OUTPUT_VALUE (330) in `bridge-tx-builder/src/constants.rs`
+    # + 5.5 sats/vB (200 vbytes) according to `MIN_RELAY_FEE`
+    # in `bridge-tx-builder/src/constants.rs`
+    withdraw_extra_fee: int = int(330 + 5.5 * 200)

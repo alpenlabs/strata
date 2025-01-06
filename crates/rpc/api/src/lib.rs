@@ -1,18 +1,25 @@
 //! Macro trait def for the `strata_` RPC namespace using jsonrpsee.
 use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use strata_db::types::L1TxStatus;
+use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
-    HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcCheckpointInfo, RpcDepositEntry,
-    RpcExecUpdate, RpcSyncStatus,
+    HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcChainState, RpcCheckpointInfo,
+    RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
 };
-use strata_state::{id::L2BlockId, operation::ClientUpdateOutput, sync_event::SyncEvent};
-
+use strata_state::{
+    block::L2Block, client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput,
+    sync_event::SyncEvent,
+};
+use strata_zkvm::ProofReceipt;
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
 pub trait StrataApi {
+    /// Get blocks at a certain height
+    #[method(name = "getBlocksAtIdx")]
+    async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>>;
+
     #[method(name = "protocolVersion")]
     async fn protocol_version(&self) -> RpcResult<u64>;
 
@@ -44,7 +51,7 @@ pub trait StrataApi {
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcExecUpdate>>;
 
     #[method(name = "getCLBlockWitness")]
-    async fn get_cl_block_witness_raw(&self, index: u64) -> RpcResult<Option<Vec<u8>>>;
+    async fn get_cl_block_witness_raw(&self, block_id: L2BlockId) -> RpcResult<Vec<u8>>;
 
     #[method(name = "getCurrentDeposits")]
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>>;
@@ -133,13 +140,21 @@ pub trait StrataAdminApi {
 #[cfg_attr(not(feature = "client"), rpc(server))]
 #[cfg_attr(feature = "client", rpc(server, client))]
 pub trait StrataSequencerApi {
+    /// Get the last broadcast entry
+    #[method(name = "strata_getLastTxEntry")]
+    async fn get_last_tx_entry(&self) -> RpcResult<Option<L1TxEntry>>;
+
+    /// Get the broadcast entry by its idx
+    #[method(name = "strata_getTxEntryByIdx")]
+    async fn get_tx_entry_by_idx(&self, idx: u64) -> RpcResult<Option<L1TxEntry>>;
+
     /// Adds L1Write sequencer duty which will be executed by sequencer
     #[method(name = "strataadmin_submitDABlob")]
     async fn submit_da_blob(&self, blobdata: HexBytes) -> RpcResult<()>;
 
     /// Verifies and adds the submitted proof to the checkpoint database
     #[method(name = "strataadmin_submitCheckpointProof")]
-    async fn submit_checkpoint_proof(&self, idx: u64, proof: HexBytes) -> RpcResult<()>;
+    async fn submit_checkpoint_proof(&self, idx: u64, proof: ProofReceipt) -> RpcResult<()>;
 
     // TODO: rpc endpoints that deal with L1 writes are currently limited to sequencer
     // due to l1 writer using wallet rpcs. Move these to common rpc once writer
@@ -151,4 +166,21 @@ pub trait StrataSequencerApi {
 
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
+}
+
+/// rpc endpoints that are only available for debugging purpose and subject to change.
+#[cfg_attr(not(feature = "client"), rpc(server))]
+#[cfg_attr(feature = "client", rpc(server, client))]
+pub trait StrataDebugApi {
+    /// Get the block by its id
+    #[method(name = "debug_getBlockById")]
+    async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>>;
+
+    /// Get the ChainState at a certain index
+    #[method(name = "debug_getChainstateAtIdx")]
+    async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>>;
+
+    /// Get the ClientState at a certain index
+    #[method(name = "debug_getClientStateAtIdx")]
+    async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>>;
 }

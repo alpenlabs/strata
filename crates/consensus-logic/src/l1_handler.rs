@@ -10,7 +10,7 @@ use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{L1BlockManifest, L1TxProof},
+    l1::{L1BlockManifest, L1BlockRecord, L1TxProof},
     params::{Params, RollupParams},
     proof::RollupVerifyingKey,
 };
@@ -80,7 +80,7 @@ where
             Ok(())
         }
 
-        L1Event::BlockData(blockdata) => {
+        L1Event::BlockData(blockdata, epoch) => {
             let height = blockdata.block_num();
 
             // Bail out fast if we don't have to care.
@@ -92,7 +92,7 @@ where
 
             let l1blkid = blockdata.block().block_hash();
 
-            let manifest = generate_block_manifest(blockdata.block());
+            let manifest = generate_block_manifest(blockdata.block(), epoch);
             let l1txs: Vec<_> = generate_l1txs(&blockdata);
             let num_txs = l1txs.len();
             l1db.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
@@ -187,12 +187,15 @@ pub fn verify_proof(checkpoint: &BatchCheckpoint, rollup_params: &RollupParams) 
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
             strata_sp1_adapter::verify_groth16(proof, vk.as_ref(), &public_params_raw)
         }
+        // In Native Execution mode, we do not actually generate the proof to verify. Checking
+        // public parameters is sufficient.
+        RollupVerifyingKey::NativeVerifyingKey(_) => Ok(()),
     }
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
-fn generate_block_manifest(block: &Block) -> L1BlockManifest {
+fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
     let blockid = Buf32::from(block.block_hash().to_raw_hash().to_byte_array());
     let root = block
         .witness_root()
@@ -200,7 +203,8 @@ fn generate_block_manifest(block: &Block) -> L1BlockManifest {
         .unwrap_or_default();
     let header = serialize(&block.header);
 
-    L1BlockManifest::new(blockid, header, Buf32::from(root))
+    let mf = L1BlockRecord::new(blockid, header, Buf32::from(root));
+    L1BlockManifest::new(mf, epoch)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {

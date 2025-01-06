@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -57,6 +59,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Cleanup Space
         uses: ./.github/actions/cleanup
@@ -67,12 +71,12 @@ jobs:
           BITCOIND_ARCH: "x86_64-linux-gnu"
           SHASUM: "7fe294b02b25b51acb8e8e0a0eb5af6bbafa7cd0c5b0e5fcbb61263104a82fbc"
         run: |
-          curl -fsSLO --proto "=https" --tlsv1.2 "https://bitcoincore.org/bin/bitcoin-core-${{ env.BITCOIND_VERSION }}/bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
-          sha256sum -c <<< "$SHASUM bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
-          tar xzf "bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
-          sudo install -m 0755 -t /usr/local/bin bitcoin-${{ env.BITCOIND_VERSION }}/bin/*
+          curl -fsSLO --proto "=https" --tlsv1.2 "https://bitcoincore.org/bin/bitcoin-core-$BITCOIND_VERSION/bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
+          sha256sum -c <<< "$SHASUM bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
+          tar xzf "bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
+          sudo install -m 0755 -t /usr/local/bin bitcoin-"$BITCOIND_VERSION"/bin/*
           bitcoind --version
-          rm -rf "bitcoin-${{ env.BITCOIND_VERSION }}" "bitcoin-${{ env.BITCOIND_VERSION }}-${{ env.BITCOIND_ARCH }}.tar.gz"
+          rm -rf "bitcoin-$BITCOIND_VERSION" "bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -112,19 +116,19 @@ jobs:
         id: funcTestsRun1
         continue-on-error: true
         run: |
-          export PATH=$(realpath target/debug/):$PATH
+          NEWPATH="$(realpath target/debug/)"
+          export PATH="${NEWPATH}:${PATH}"
           which strata-client
-          cd functional-tests && \
-          poetry run python entry.py
+          cd functional-tests && poetry run python entry.py
 
       # Run again just to be sure as some tests are flaky
       - name: Run functional tests (2)
         if: steps.funcTestsRun1.outcome == 'failure'
         run: |
-          export PATH=$(realpath target/debug/):$PATH
+          NEWPATH="$(realpath target/debug/)"
+          export PATH="${NEWPATH}:${PATH}"
           which strata-client
-          cd functional-tests && \
-          poetry run python entry.py
+          cd functional-tests && poetry run python entry.py
 
   functional-tests-success:
     name: Check that all checks pass

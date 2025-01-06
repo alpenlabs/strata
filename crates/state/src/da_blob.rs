@@ -5,8 +5,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
-
 /// DA destination identifier.   This will eventually be used to enable
 /// storing blobs on alternative availability schemes.
 #[derive(
@@ -22,6 +22,8 @@ use strata_primitives::buf::Buf32;
     BorshSerialize,
     IntoPrimitive,
     TryFromPrimitive,
+    Serialize,
+    Deserialize,
 )]
 #[borsh(use_discriminant = true)]
 #[repr(u8)]
@@ -41,7 +43,19 @@ impl<'a> Arbitrary<'a> for BlobDest {
 
 /// Summary of a DA blob to be included on a DA layer.  Specifies the target and
 /// a commitment to the blob.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+    Serialize,
+    Deserialize,
+)]
 pub struct BlobSpec {
     /// Target settlement layer we're expecting the DA on.
     dest: BlobDest,
