@@ -9,7 +9,6 @@ use bdk_wallet::{
     CreateParams, KeychainKind, LoadParams, Wallet,
 };
 use bip39::{Language, Mnemonic};
-use console::Term;
 use dialoguer::{Confirm, Input};
 use password::{HashVersion, IncorrectPassword, Password};
 use rand_core::{CryptoRngCore, OsRng};
@@ -38,9 +37,8 @@ impl Seed {
     }
 
     pub fn print_mnemonic(&self, language: Language) {
-        let term = Term::stdout();
         let mnemonic = Mnemonic::from_entropy_in(language, self.0.as_ref()).expect("valid entropy");
-        let _ = term.write_line(&mnemonic.to_string());
+        println!("{mnemonic}");
     }
 
     pub fn descriptor_recovery_key(&self) -> [u8; 32] {
@@ -144,21 +142,20 @@ impl EncryptedSeed {
 pub fn load_or_create(
     persister: &impl EncryptedSeedPersister,
 ) -> Result<Seed, OneOf<LoadOrCreateErr>> {
-    let term = Term::stdout();
-    let _ = term.write_line("Loading encrypted seed...");
+    println!("Loading encrypted seed...");
     let maybe_encrypted_seed = persister.load().map_err(OneOf::broaden)?;
     if let Some(encrypted_seed) = maybe_encrypted_seed {
-        let _ = term.write_line("Opening wallet...");
+        println!("Opening wallet...");
         let mut password = Password::read(false).map_err(OneOf::new)?;
         match encrypted_seed.decrypt(&mut password) {
             Ok(seed) => {
-                let _ = term.write_line("Wallet unlocked");
+                println!("Wallet unlocked");
                 Ok(seed)
             }
             Err(e) => {
                 let narrowed = e.narrow::<aes_gcm_siv::Error, _>();
                 if let Ok(_aes_error) = narrowed {
-                    let _ = term.write_line("Incorrect password");
+                    println!("Incorrect password");
                     return Err(OneOf::new(IncorrectPassword));
                 }
 
@@ -181,13 +178,13 @@ pub fn load_or_create(
                 let mnemonic = match Mnemonic::from_str(&mnemonic) {
                     Ok(m) => m,
                     Err(e) => {
-                        let _ = term.write_line(&format!("please try again: {e}"));
+                        println!("please try again: {e}");
                         continue;
                     }
                 };
                 let entropy = mnemonic.to_entropy();
                 if entropy.len() != SEED_LEN {
-                    let _ = term.write_line("incorrect entropy length");
+                    println!("incorrect entropy length");
                     continue;
                 }
                 let mut buf = Zeroizing::new([0u8; SEED_LEN]);
@@ -195,14 +192,14 @@ pub fn load_or_create(
                 break Seed(buf);
             }
         } else {
-            let _ = term.write_line("Creating new wallet");
+            println!("Creating new wallet");
             Seed::gen(&mut OsRng)
         };
 
         let mut password = Password::read(true).map_err(OneOf::new)?;
         let password_validation: Result<(), String> = password.validate();
         if let Err(feedback) = password_validation {
-            let _ = term.write_line(&format!("Password is weak. {}", feedback));
+            println!("Password is weak. {}", feedback);
         };
         let encrypted_seed = match seed.encrypt(&mut password, &mut OsRng) {
             Ok(es) => es,

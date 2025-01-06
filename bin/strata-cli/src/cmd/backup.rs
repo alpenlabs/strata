@@ -1,6 +1,5 @@
 use argh::FromArgs;
 use bip39::Language;
-use console::Term;
 
 use crate::seed::Seed;
 
@@ -17,7 +16,6 @@ pub struct BackupArgs {
 }
 
 pub async fn backup(args: BackupArgs, seed: Seed) {
-    let term = Term::stdout();
     let language = match args.language {
         Some(s) => s,
         None => "en".to_owned(),
@@ -33,7 +31,7 @@ pub async fn backup(args: BackupArgs, seed: Seed) {
         "kr" => Language::Korean,
         "es" => Language::Spanish,
         _ => {
-            let _ = term.write_line("invalid language. use --help to check available languages");
+            println!("invalid language. use --help to check available languages");
             std::process::exit(1);
         }
     };
