@@ -6,15 +6,25 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::sha256d, utils::get_cohashes};
 
-/// A generic proof structure that can handle any kind of transaction ID (e.g., txid or wtxid) by
-/// delegating the ID computation to the provided type `T` that implements [`TxIdComputer`].
+/// A generic proof structure that can handle any kind of transaction ID (e.g.,
+/// [txid](bitcoin::Txid) or [`wtxid`](bitcoin::Wtxid)) by delegating the ID computation to the
+/// provided type `T` that implements [`TxIdComputer`].
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
 pub struct L1TxInclusionProof<T> {
+    /// The 0-based position (index) of the transaction within the block's transaction list
+    /// for which this proof is generated.
     position: u32,
+    /// The intermediate hashes (sometimes called "siblings") needed to reconstruct the Merkle root
+    /// when combined with the target transaction's own ID. These are the Merkle tree nodes at
+    /// each step that pair with the current hash (either on the left or the right) to produce
+    /// the next level of the tree.
     cohashes: Vec<Buf32>,
-    // Marker so Rust remembers this struct is generic on T
+    /// A marker that preserves the association with type `T`, which implements
+    /// [`TxIdComputer`]. This ensures the proof logic depends on the correct
+    /// transaction ID computation ([`txid`](bitcoin::Txid) vs.[`wtxid`](bitcoin::Wtxid)) for the
+    /// lifetime of the proof.
     _marker: PhantomData<T>,
 }
 
@@ -36,24 +46,24 @@ impl<T> L1TxInclusionProof<T> {
     }
 }
 
-/// A trait for computing some kind of transaction ID (e.g., `txid` or `wtxid`) from a
-/// [`Transaction`].
+/// A trait for computing some kind of transaction ID (e.g., [`txid`](bitcoin::Txid) or
+/// [`wtxid`](bitcoin::Wtxid)) from a [`Transaction`].
 ///
 /// By implementing this trait for different "marker" types, multiple ID computations can be handled
-/// without duplicating your proofgeneration logic. For instance, `TxId` uses
-/// `Transaction::compute_txid`, while `WtxId` uses `Transaction::compute_wtxid`.
+/// without duplicating your proofgeneration logic. For instance, [`TxId`] uses
+/// [`Transaction::compute_txid`], while [`WtxId`] uses [`Transaction::compute_wtxid`].
 pub trait TxIdComputer {
     /// Computes the transaction ID for the given transaction.
     fn compute_id(tx: &Transaction, idx: usize) -> Buf32;
 }
 
-/// Marker type for computing the "legacy" txid.
+/// Marker type for computing the [`txid`](bitcoin::Txid).
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
 pub struct TxId;
 
-/// Marker type for computing the "witness" wtxid.
+/// Marker type for computing the [`wtxid`](bitcoin::Wtxid).
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
@@ -89,8 +99,6 @@ impl<T: TxIdComputer> L1TxInclusionProof<T> {
     }
 
     /// Computes the merkle root for the given `transaction` using the proof's cohashes.
-    /// This will use `T::compute_id` internally, so it can compute either a txid or wtxid
-    /// depending on the marker type.
     pub fn compute_root(&self, transaction: &Transaction) -> Buf32 {
         // `cur_hash` represents the intermediate hash at each step. After all cohashes are
         // processed `cur_hash` becomes the root hash
@@ -118,10 +126,10 @@ impl<T: TxIdComputer> L1TxInclusionProof<T> {
     }
 }
 
-/// Convenience type alias for the "legacy" txid-based proof.
+/// Convenience type alias for the [`txid`](bitcoin::Txid)-based proof.
 pub type L1TxProof = L1TxInclusionProof<TxId>;
 
-/// Convenience type alias for the "witness" wtxid-based proof.
+/// Convenience type alias for the [`wtxid`](bitcoin::Wtxid)-based proof.
 pub type L1WtxProof = L1TxInclusionProof<WtxId>;
 
 #[cfg(test)]
