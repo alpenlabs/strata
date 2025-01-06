@@ -37,7 +37,7 @@ check_wallet_exists() {
   # Check if the wallet name is in the list of wallets in the directory
   if echo "$ALL_WALLETS" | grep -q "\"name\": \"${1}\""; then
     echo "Wallet '$1' exists in the wallet directory."
-    bcli loadwallet $BITCOIND_WALLET
+    bcli loadwallet $1
   else
     echo "Wallet '$1' does not exist in the wallet directory."
     bcli -named createwallet wallet_name="${1}" descriptors=true
