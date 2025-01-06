@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{command, Parser};
 use num_format::{Locale, ToFormattedString};
-use reqwest::Client;
+use reqwest::{Client, RequestBuilder};
 use serde::Serialize;
 use serde_json::json;
 use strata_provers_perf::{ProofGeneratorPerf, ProofReport, ZkVmHostPerf};
@@ -205,11 +205,7 @@ async fn post_to_github_pr(
     // Get all comments on the PR
     const BASE_URL: &str = "https://api.github.com/repos/alpenlabs/strata";
     let comments_url = format!("{}/issues/{}/comments", BASE_URL, &args.pr_number);
-    let comments_response = client
-        .get(&comments_url)
-        .header("Authorization", format!("Bearer {}", &args.github_token))
-        .header("X-GitHub-Api-Version", "2022-11-28")
-        .header("User-Agent", "strata-perf-bot")
+    let comments_response = populate_gh_headers(client.get(&comments_url), args)
         .send()
         .await?;
 
@@ -226,11 +222,7 @@ async fn post_to_github_pr(
     if let Some(existing_comment) = bot_comment {
         // Update the existing comment
         let comment_url = existing_comment["url"].as_str().unwrap();
-        let response = client
-            .patch(comment_url)
-            .header("Authorization", format!("Bearer {}", &args.github_token))
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "strata-perf-bot")
+        let response = populate_gh_headers(client.patch(comment_url), args)
             .json(&json!({
                 "body": message
             }))
@@ -242,11 +234,7 @@ async fn post_to_github_pr(
         }
     } else {
         // Create a new comment
-        let response = client
-            .post(&comments_url)
-            .header("Authorization", format!("Bearer {}", &args.github_token))
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "strata-perf-bot")
+        let response = populate_gh_headers(client.post(&comments_url), args)
             .json(&json!({
                 "body": message
             }))
@@ -259,6 +247,15 @@ async fn post_to_github_pr(
     }
 
     Ok(())
+}
+
+/// Puts necessary headers onto the request.
+fn populate_gh_headers(request: RequestBuilder, args: &EvalArgs) -> RequestBuilder {
+    request
+        .header("Accept", "application/vnd.github+json")
+        .header("Authorization", format!("Bearer {}", &args.github_token))
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .header("User-Agent", "strata-perf-bot")
 }
 
 fn format_github_message(results_text: &[String]) -> String {
