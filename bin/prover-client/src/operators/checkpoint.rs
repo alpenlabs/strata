@@ -118,7 +118,7 @@ impl ProvingOp for CheckpointOperator {
             .await?;
         let l1_batch_id = l1_batch_keys
             .first()
-            .ok_or_else(|| ProvingTaskError::NoTasksFound)?
+            .ok_or(ProvingTaskError::NoTasksFound)?
             .context();
 
         // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
@@ -136,7 +136,7 @@ impl ProvingOp for CheckpointOperator {
 
         let l2_batch_id = l2_batch_keys
             .first()
-            .ok_or_else(|| ProvingTaskError::NoTasksFound)?
+            .ok_or(ProvingTaskError::NoTasksFound)?
             .context();
         info!(%ckp_idx, "Created tasks for L2 Batch");
 
