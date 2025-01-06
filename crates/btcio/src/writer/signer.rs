@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bitcoin::{consensus, Transaction};
-use strata_db::types::{BlobEntry, L1TxEntry};
+use strata_db::types::{L1TxEntry, PayloadEntry};
 use strata_primitives::buf::Buf32;
 use tracing::*;
 
@@ -19,17 +19,17 @@ type BlobIdx = u64;
 /// Create envelope transactions corresponding to a [`BlobEntry`].
 ///
 /// This is used during one of the cases:
-/// 1. A new blob intent needs to be signed
+/// 1. A new payload intent needs to be signed
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
-pub async fn create_and_sign_blob_envelopes(
-    blobentry: &BlobEntry,
+pub async fn create_and_sign_payload_envelopes(
+    blobentry: &PayloadEntry,
     broadcast_handle: &L1BroadcastHandle,
     client: Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
 ) -> Result<(Buf32, Buf32), EnvelopeError> {
-    trace!("Creating and signing blob envelopes");
-    let (commit, reveal) = build_envelope_txs(&blobentry.blob, &client, config).await?;
+    trace!("Creating and signing payload envelopes");
+    let (commit, reveal) = build_envelope_txs(&blobentry.payload, &client, config).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");
@@ -64,7 +64,7 @@ pub async fn create_and_sign_blob_envelopes(
 mod test {
     use std::sync::Arc;
 
-    use strata_db::types::{BlobEntry, BlobL1Status};
+    use strata_db::types::{PayloadEntry, PayloadL1Status};
     use strata_primitives::hash;
 
     use super::*;
@@ -81,19 +81,19 @@ mod test {
         let config = get_config();
 
         // First insert an unsigned blob
-        let entry = BlobEntry::new_unsigned([1; 100].to_vec());
+        let entry = PayloadEntry::new_unsigned([1; 100].to_vec());
 
-        assert_eq!(entry.status, BlobL1Status::Unsigned);
+        assert_eq!(entry.status, PayloadL1Status::Unsigned);
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
-        let intent_hash = hash::raw(&entry.blob);
+        let intent_hash = hash::raw(&entry.payload);
         iops.put_blob_entry_async(intent_hash, entry.clone())
             .await
             .unwrap();
 
         let (cid, rid) =
-            create_and_sign_blob_envelopes(&entry, bcast_handle.as_ref(), client, &config)
+            create_and_sign_payload_envelopes(&entry, bcast_handle.as_ref(), client, &config)
                 .await
                 .unwrap();
 

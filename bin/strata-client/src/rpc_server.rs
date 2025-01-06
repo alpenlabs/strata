@@ -41,7 +41,7 @@ use strata_state::{
     bridge_ops::WithdrawalIntent,
     chain_state::Chainstate,
     client_state::ClientState,
-    da_blob::{BlobDest, BlobIntent},
+    da_blob::{PayloadDest, PayloadIntent},
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
@@ -735,7 +735,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
 
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
         let commitment = hash::raw(&blob.0);
-        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
+        let blobintent = PayloadIntent::new(PayloadDest::L1, commitment, blob.0);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
         if let Err(e) = self.envelope_handle.submit_intent_async(blobintent).await {

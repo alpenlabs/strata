@@ -90,10 +90,11 @@ pub fn create_envelope_transactions(
     let key_pair = generate_key_pair()?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
-    let insc_data = EnvelopeData::new(write_intent.to_vec());
+    let envelope_data = EnvelopeData::new(write_intent.to_vec());
 
     // Start creating envelope content
-    let reveal_script = build_reveal_script(rollup_name, &public_key, insc_data, ENVELOPE_VERSION)?;
+    let reveal_script =
+        build_reveal_script(rollup_name, &public_key, envelope_data, ENVELOPE_VERSION)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -394,7 +395,7 @@ pub fn generate_key_pair() -> Result<UntweakedKeypair, anyhow::Error> {
 fn build_reveal_script(
     rollup_name: &str,
     taproot_public_key: &XOnlyPublicKey,
-    insc_data: EnvelopeData,
+    envelope_data: EnvelopeData,
     version: u8,
 ) -> Result<ScriptBuf, anyhow::Error> {
     let mut script_bytes = script::Builder::new()
@@ -402,7 +403,7 @@ fn build_reveal_script(
         .push_opcode(OP_CHECKSIG)
         .into_script()
         .into_bytes();
-    let script = build_envelope_script(insc_data, rollup_name, version)?;
+    let script = build_envelope_script(envelope_data, rollup_name, version)?;
     script_bytes.extend(script.into_bytes());
     Ok(ScriptBuf::from(script_bytes))
 }
@@ -709,11 +710,11 @@ mod tests {
 
         assert_eq!(
             commit.input[0].previous_output.txid, utxos[2].txid,
-            "utxo to inscribe should be chosen correctly"
+            "utxo  should be chosen correctly"
         );
         assert_eq!(
             commit.input[0].previous_output.vout, utxos[2].vout,
-            "utxo to inscribe should be chosen correctly"
+            "utxo should be chosen correctly"
         );
 
         assert_eq!(
