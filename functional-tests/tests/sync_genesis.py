@@ -28,16 +28,16 @@ class SyncGenesisTest(testenv.StrataTester):
         while True:
             assert tries <= MAX_GENESIS_TRIES, "did not observe genesis before timeout"
 
-            print("waiting for genesis")
+            self.info("waiting for genesis")
             stat = seqrpc.strata_clientStatus()
             self.debug(stat)
             if stat["finalized_blkid"] != UNSET_ID:
                 last_slot = stat["chain_tip_slot"]
-                print(f"observed genesis, now at slot {last_slot}")
+                self.info(f"observed genesis, now at slot {last_slot}")
                 break
 
             time.sleep(0.5)
-            print(f"waiting for genesis... -- tries {tries}")
+            self.info(f"waiting for genesis... -- tries {tries}")
             tries += 1
 
         assert last_slot is not None, "last slot never set"
@@ -49,7 +49,7 @@ class SyncGenesisTest(testenv.StrataTester):
             stat = seqrpc.strata_clientStatus()
             tip_slot = stat["chain_tip_slot"]
             tip_blkid = stat["chain_tip"]
-            print(f"cur tip slot {tip_slot} blkid { tip_blkid}")
+            self.info(f"cur tip slot {tip_slot} blkid { tip_blkid}")
             assert tip_slot >= last_slot, "cur slot went backwards"
             assert tip_slot > last_slot, "seem to not be making progress"
             last_slot = tip_slot
