@@ -9,8 +9,8 @@ strata-test-utils.workspace = true
 strata-zkvm.workspace = true
 strata-zkvm-tests = { path = "../tests/", features = ["mock", "sp1"] }
 
-sp1-prover = "3.0.0"
-sp1-sdk = "3.0.0"
+sp1-prover = "=4.0.0-rc.3"
+sp1-sdk = "=4.0.0-rc.3"
 
 anyhow = "1.0.83"
 bincode = "1.3.3"
