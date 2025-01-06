@@ -105,7 +105,7 @@ def check_nth_checkpoint_finalized_on_reorg(
     # inputs changed after reorg, or else the tx will be the same.
     # NOTE: This would ideally be done using `wait_until` but due to some issues with tracking
     # `last_published_txid` in L1Status, need to do this sleep wait hack
-    time.sleep(4)
+    time.sleep(20)
 
     new_addr = btcrpc.proxy.getnewaddress()
     # Create a block so that the inscription is included
@@ -121,5 +121,5 @@ def check_nth_checkpoint_finalized_on_reorg(
     wait_until(
         lambda: seqrpc.strata_syncStatus()["finalized_block_id"] == to_finalize_blkid,
         error_with="Block not finalized",
-        timeout=120,
+        timeout=20,
     )
