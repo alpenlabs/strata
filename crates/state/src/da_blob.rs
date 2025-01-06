@@ -77,6 +77,40 @@ impl PayloadSpec {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub struct L1Payload {
+    data: Vec<u8>,
+    payload_type: L1PayloadType,
+}
+
+impl L1Payload {
+    pub fn new(data: Vec<u8>, payload_type: L1PayloadType) -> Self {
+        Self { data, payload_type }
+    }
+
+    pub fn new_checkpoint(data: Vec<u8>) -> Self {
+        Self::new(data, L1PayloadType::Checkpoint)
+    }
+
+    pub fn new_da(data: Vec<u8>) -> Self {
+        Self::new(data, L1PayloadType::Da)
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub fn payload_type(&self) -> &L1PayloadType {
+        &self.payload_type
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+pub enum L1PayloadType {
+    Checkpoint,
+    Da,
+}
+
 /// Intent produced by the EE on a "full" verification, but if we're just
 /// verifying a proof we may not have access to this but still want to reason
 /// about it.
@@ -91,11 +125,11 @@ pub struct PayloadIntent {
     commitment: Buf32,
 
     /// Blob payload.
-    payload: Vec<u8>,
+    payload: L1Payload,
 }
 
 impl PayloadIntent {
-    pub fn new(dest: PayloadDest, commitment: Buf32, payload: Vec<u8>) -> Self {
+    pub fn new(dest: PayloadDest, commitment: Buf32, payload: L1Payload) -> Self {
         Self {
             dest,
             commitment,
@@ -116,7 +150,7 @@ impl PayloadIntent {
     }
 
     /// The payload that matches the commitment.
-    pub fn payload(&self) -> &[u8] {
+    pub fn payload(&self) -> &L1Payload {
         &self.payload
     }
 

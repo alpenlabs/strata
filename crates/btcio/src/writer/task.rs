@@ -34,7 +34,7 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = PayloadEntry::new_unsigned(intent.payload().to_vec());
+        let entry = PayloadEntry::new_unsigned(intent.payload().clone());
         debug!(commitment = %intent.commitment(), "Received intent");
         if self
             .ops
@@ -56,7 +56,7 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = PayloadEntry::new_unsigned(intent.payload().to_vec());
+        let entry = PayloadEntry::new_unsigned(intent.payload().clone());
         debug!(commitment = %intent.commitment(), "Received intent");
 
         if self

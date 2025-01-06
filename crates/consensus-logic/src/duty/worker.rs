@@ -17,7 +17,7 @@ use strata_primitives::{
 use strata_state::{
     batch::SignedBatchCheckpoint,
     client_state::ClientState,
-    da_blob::{PayloadDest, PayloadIntent},
+    da_blob::{L1Payload, PayloadDest, PayloadIntent},
     prelude::*,
 };
 use strata_storage::L2BlockManager;
@@ -426,8 +426,9 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
 
             // serialize and send to l1 writer
 
-            let payload =
+            let payload_data =
                 borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?;
+            let payload = L1Payload::new_checkpoint(payload_data);
             let blob_intent = PayloadIntent::new(PayloadDest::L1, checkpoint_sighash, payload);
 
             info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");

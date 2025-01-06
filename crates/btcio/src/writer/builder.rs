@@ -21,7 +21,7 @@ use bitcoin::{
 };
 use rand::{rngs::OsRng, RngCore};
 use strata_l1tx::envelope::builder::build_envelope_script;
-use strata_state::tx::EnvelopeData;
+use strata_state::da_blob::L1Payload;
 use thiserror::Error;
 
 use crate::{
@@ -53,7 +53,7 @@ pub enum EnvelopeError {
 // dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
 // dependency doesn't happen
 pub async fn build_envelope_txs(
-    payload: &[u8],
+    payload: &L1Payload,
     rpc_client: &Arc<impl Reader + Wallet + Signer>,
     config: &WriterConfig,
 ) -> anyhow::Result<(Transaction, Transaction)> {
@@ -79,7 +79,7 @@ pub async fn build_envelope_txs(
 #[allow(clippy::too_many_arguments)]
 pub fn create_envelope_transactions(
     rollup_name: &str,
-    write_intent: &[u8],
+    payload: &L1Payload,
     utxos: Vec<ListUnspent>,
     recipient: Address,
     reveal_value: u64,
@@ -90,11 +90,8 @@ pub fn create_envelope_transactions(
     let key_pair = generate_key_pair()?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
-    let envelope_data = EnvelopeData::new(write_intent.to_vec());
-
     // Start creating envelope content
-    let reveal_script =
-        build_reveal_script(rollup_name, &public_key, envelope_data, ENVELOPE_VERSION)?;
+    let reveal_script = build_reveal_script(rollup_name, &public_key, payload, ENVELOPE_VERSION)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -395,7 +392,7 @@ pub fn generate_key_pair() -> Result<UntweakedKeypair, anyhow::Error> {
 fn build_reveal_script(
     rollup_name: &str,
     taproot_public_key: &XOnlyPublicKey,
-    envelope_data: EnvelopeData,
+    envelope_data: &L1Payload,
     version: u8,
 ) -> Result<ScriptBuf, anyhow::Error> {
     let mut script_bytes = script::Builder::new()

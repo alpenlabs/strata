@@ -8,14 +8,17 @@ use bitcoin::{
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
-use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
+use strata_state::{
+    batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo},
+    da_blob::L1Payload,
+};
 use strata_zkvm::ProofReceipt;
 
 /// Represents data for a payload we're still planning to post to L1.
 // TODO rename to `BlockEnvelopeEntry` to emphasize this isn't just about *all* payloads
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct PayloadEntry {
-    pub payload: Vec<u8>,
+    pub payload: L1Payload,
     pub commit_txid: Buf32,
     pub reveal_txid: Buf32,
     pub status: PayloadL1Status,
@@ -23,7 +26,7 @@ pub struct PayloadEntry {
 
 impl PayloadEntry {
     pub fn new(
-        payload: Vec<u8>,
+        payload: L1Payload,
         commit_txid: Buf32,
         reveal_txid: Buf32,
         status: PayloadL1Status,
@@ -41,7 +44,7 @@ impl PayloadEntry {
     /// NOTE: This won't have commit - reveal pairs associated with it.
     ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
     ///   by others. Those will be created and signed in a single step.
-    pub fn new_unsigned(payload: Vec<u8>) -> Self {
+    pub fn new_unsigned(payload: L1Payload) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();
         Self::new(payload, cid, rid, PayloadL1Status::Unsigned)
