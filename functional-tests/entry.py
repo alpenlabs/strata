@@ -5,15 +5,15 @@ import sys
 
 import flexitest
 
-import factory
-import net_settings
-import testenv
-from constants import *
+from envs import net_settings, testenv
+from factory import factory
 from utils import *
+from utils.constants import *
 
 
 def main(argv):
-    test_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    test_dir = os.path.join(root_dir, "tests")
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
     all_tests = flexitest.runtime.load_candidate_modules(modules)
 
@@ -23,8 +23,8 @@ def main(argv):
         # Run the specific test file passed as the first argument (without .py extension)
         tests = [str(tst).removesuffix(".py") for tst in argv[1:]]
     else:
-        # Run all tests, excluding those containing "fn_prover", unless explicitly passed in argv
-        tests = [test for test in all_tests if "fn_prover" not in test or test in argv]
+        # Run all tests, excluding those containing "prover_", unless explicitly passed in argv
+        tests = [test for test in all_tests if "prover_" not in test or test in argv]
 
     btc_fac = factory.BitcoinFactory([12300 + i for i in range(30)])
     seq_fac = factory.StrataFactory([12400 + i for i in range(30)])
@@ -60,7 +60,7 @@ def main(argv):
     }
 
     setup_root_logger()
-    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(test_dir, DD_ROOT))
+    datadir_root = flexitest.create_datadir_in_workspace(os.path.join(root_dir, DD_ROOT))
     rt = testenv.StrataTestRuntime(global_envs, datadir_root, factories)
     rt.prepare_registered_tests()
 
