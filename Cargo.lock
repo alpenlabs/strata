@@ -12540,6 +12540,7 @@ dependencies = [
  "strata-common",
  "strata-config",
  "strata-db",
+ "strata-l1tx",
  "strata-primitives",
  "strata-rocksdb",
  "strata-rpc-types",
@@ -12548,7 +12549,6 @@ dependencies = [
  "strata-storage",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
  "thiserror 1.0.69",
  "threadpool",
  "tokio",
@@ -12638,6 +12638,7 @@ dependencies = [
  "strata-eectl",
  "strata-evmexec",
  "strata-key-derivation",
+ "strata-l1tx",
  "strata-mmr",
  "strata-primitives",
  "strata-rocksdb",
@@ -12650,7 +12651,6 @@ dependencies = [
  "strata-sync",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
  "strata-zkvm",
  "thiserror 1.0.69",
  "threadpool",
@@ -12699,6 +12699,7 @@ dependencies = [
  "strata-crypto",
  "strata-db",
  "strata-eectl",
+ "strata-l1tx",
  "strata-primitives",
  "strata-risc0-adapter",
  "strata-rocksdb",
@@ -12709,7 +12710,6 @@ dependencies = [
  "strata-storage",
  "strata-tasks",
  "strata-test-utils",
- "strata-tx-parser",
  "strata-zkvm",
  "thiserror 1.0.69",
  "threadpool",
@@ -12836,6 +12836,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-l1tx"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "musig2",
+ "rand",
+ "strata-bridge-tx-builder",
+ "strata-btcio",
+ "strata-primitives",
+ "strata-state",
+ "strata-test-utils",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
 name = "strata-mmr"
 version = "0.1.0"
 dependencies = [
@@ -12894,10 +12914,10 @@ dependencies = [
  "sha2 0.10.8",
  "strata-bridge-tx-builder",
  "strata-native-zkvm-adapter",
+ "strata-l1tx",
  "strata-primitives",
  "strata-state",
  "strata-test-utils",
- "strata-tx-parser",
  "strata-zkvm",
 ]
 
@@ -13012,6 +13032,7 @@ dependencies = [
  "strata-btcio",
  "strata-common",
  "strata-db",
+ "strata-l1tx",
  "strata-native-zkvm-adapter",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
@@ -13031,7 +13052,6 @@ dependencies = [
  "strata-sp1-guest-builder",
  "strata-state",
  "strata-test-utils",
- "strata-tx-parser",
  "strata-zkvm",
  "thiserror 1.0.69",
  "tokio",
@@ -13503,33 +13523,13 @@ dependencies = [
  "strata-chaintsn",
  "strata-consensus-logic",
  "strata-db",
+ "strata-l1tx",
  "strata-primitives",
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "strata-storage",
- "strata-tx-parser",
  "threadpool",
-]
-
-[[package]]
-name = "strata-tx-parser"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "bitcoin",
- "borsh",
- "hex",
- "musig2",
- "rand",
- "strata-bridge-tx-builder",
- "strata-btcio",
- "strata-primitives",
- "strata-state",
- "strata-test-utils",
- "thiserror 1.0.69",
- "tracing",
 ]
 
 [[package]]

@@ -11,7 +11,7 @@ use strata_state::l1::{
     L1BlockId, TimestampStore,
 };
 use strata_status::StatusChannel;
-use strata_tx_parser::{
+use strata_l1tx::{
     filter::filter_protocol_op_tx_refs,
     filter_types::TxFilterConfig,
     messages::{BlockData, L1Event},

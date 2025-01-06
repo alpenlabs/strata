@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use secp256k1::XOnlyPublicKey;
 use strata_db::traits::{Database, L1Database};
+use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
@@ -19,7 +20,6 @@ use strata_state::{
     l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
 };
-use strata_tx_parser::messages::{BlockData, L1Event};
 use strata_zkvm::{ProofReceipt, ZkVmError, ZkVmResult};
 use tokio::sync::mpsc;
 use tracing::*;

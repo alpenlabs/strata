@@ -10,7 +10,7 @@ use strata_db::traits::{Database, L1Database};
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
 use strata_tasks::TaskExecutor;
-use strata_tx_parser::messages::L1Event;
+use strata_l1tx::messages::L1Event;
 use tokio::sync::mpsc;
 
 pub fn start_reader_tasks<D>(

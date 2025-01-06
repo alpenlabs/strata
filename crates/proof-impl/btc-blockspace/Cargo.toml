@@ -11,7 +11,7 @@ sha2.workspace = true
 strata-bridge-tx-builder.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
-strata-tx-parser.workspace = true
+strata-l1tx.workspace = true
 strata-zkvm.workspace = true
 
 [dev-dependencies]

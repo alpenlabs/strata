@@ -17,7 +17,7 @@ strata-state.workspace = true
 strata-status.workspace = true
 strata-storage.workspace = true
 strata-tasks.workspace = true
-strata-tx-parser.workspace = true
+strata-l1tx.workspace = true
 strata-zkvm.workspace = true
 
 anyhow.workspace = true

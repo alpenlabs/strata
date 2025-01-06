@@ -7,7 +7,7 @@ use strata_state::{
     batch::BatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
-use strata_tx_parser::filter::{filter_protocol_op_tx_refs, TxFilterConfig};
+use strata_l1tx::filter::{filter_protocol_op_tx_refs, TxFilterConfig};
 
 pub fn extract_relevant_info(
     block: &Block,

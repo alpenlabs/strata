@@ -26,7 +26,7 @@ use bitcoin::{
 };
 use rand::{rngs::OsRng, RngCore};
 use strata_state::tx::EnvelopeData;
-use strata_tx_parser::envelope::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
+use strata_l1tx::envelope::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
 use thiserror::Error;
 use tracing::trace;
 

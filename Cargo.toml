@@ -14,6 +14,7 @@ members = [
   "crates/eectl",
   "crates/evmexec",
   "crates/key-derivation",
+  "crates/l1tx",
   "crates/primitives",
   "crates/zkvm/adapters/risc0",
   "crates/zkvm/adapters/sp1",
@@ -42,7 +43,6 @@ members = [
   "crates/sync",
   "crates/tasks",
   "crates/test-utils",
-  "crates/tx-parser",
   "crates/util/mmr",
   "crates/util/shrex",
   "crates/vtxjmt",
@@ -118,7 +118,7 @@ strata-storage = { path = "crates/storage" }
 strata-sync = { path = "crates/sync" }
 strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
-strata-tx-parser = { path = "crates/tx-parser" }
+strata-l1tx = { path = "crates/l1tx" }
 strata-zkvm = { path = "crates/zkvm/zkvm" }
 strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 
