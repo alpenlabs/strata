@@ -326,7 +326,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         .await?;
         dbg!(&l2_blk_bundle.block().header());
 
-        let prev_slot = l2_blk_bundle.block().header().header().blockidx();
+        let prev_slot = l2_blk_bundle.block().header().header().blockidx() - 1;
 
         let chain_state_db = self.database.clone();
         let chain_state = wait_blocking("l2_chain_state", move || {

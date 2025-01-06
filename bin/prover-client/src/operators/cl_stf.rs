@@ -82,8 +82,10 @@ impl ClStfOperator {
         n_ancestors: u64,
     ) -> Result<Vec<L2BlockId>, ProvingTaskError> {
         let mut ancestors = Vec::with_capacity(n_ancestors as usize);
+        ancestors.push(blkid);
+
         let mut blkid = blkid;
-        for _ in 0..=n_ancestors {
+        for _ in 0..n_ancestors {
             blkid = self.get_prev_block_id(blkid).await?;
             ancestors.push(blkid);
         }
@@ -170,7 +172,7 @@ impl ProvingOp for ClStfOperator {
         dbg!(&l2_block_ids);
 
         let mut stf_witness_payloads = Vec::new();
-        for l2_block_id in l2_block_ids {
+        for l2_block_id in l2_block_ids.clone() {
             dbg!(&l2_block_id);
             let raw_witness: Vec<u8> = self
                 .cl_client
