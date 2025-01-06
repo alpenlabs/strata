@@ -1,7 +1,9 @@
-//! DB operation interface logic, primarily the macro defined to
+//! DB operation interface logic, primarily for generating database operation traits and shim
+//! functions.
 //!
-//! This manages the indirection to spawn async requests onto a threadpool and execute blocking
-//! calls locally.
+//! This module provides macros to simplify the creation of both asynchronous and synchronous
+//! interfaces for database operations. The macros manage the indirection required to spawn async
+//! requests onto a thread pool and execute blocking calls locally.
 
 pub use strata_db::{errors::DbError, DbResult};
 pub use tracing::*;
@@ -9,6 +11,47 @@ pub use tracing::*;
 /// Handle for receiving a result from a database operation on another thread.
 pub type DbRecv<T> = tokio::sync::oneshot::Receiver<DbResult<T>>;
 
+/// Macro to generate an `Ops` interface, which provides both asynchronous and synchronous
+/// methods for interacting with the underlying database. This is particularly useful for
+/// defining database operations in a consistent and reusable manner.
+///
+/// ### Usage
+///
+/// The macro defines an operations trait for a specified context and a list of methods.
+/// Each method in the generated interface will have both `async` and `sync` variants.
+///
+/// ```rust
+/// // inst_ops! {
+/// //     (InscriptionDataOps, Context<D: SequencerDatabase>) {
+/// //         get_blob_entry(id: Buf32) => Option<BlobEntry>;
+/// //         get_blob_entry_by_idx(idx: u64) => Option<BlobEntry>;
+/// //         get_blob_entry_id(idx: u64) => Option<Buf32>;
+/// //         get_next_blob_idx() => u64;
+/// //         put_blob_entry(id: Buf32, entry: BlobEntry) => ();
+/// //     }
+/// // }
+///
+/// // Definitions corresponding to above macro invocation
+///
+/// // fn get_blob_entry<D: Database>(ctx: Context<D>, id: u32) -> DbResult<Option<u32>> {
+/// //     ...
+/// // }
+///
+/// // fn put_blob_entry<D: Database>(ctx: Context<D>, id: Buf32) -> DbResult<()> {
+/// // }
+///
+/// // ... // Other definitions corresponding to above macro invocation
+/// ```
+///
+/// - **`InscriptionDataOps`**: The name of the operations interface being generated.
+/// - **`Context<D: SequencerDatabase>`**: The context type that the operations will act upon.This
+///   usually wraps the database or related dependencies.
+/// - **Method definitions**: Specify the function name, input parameters, and return type.The macro
+///   will automatically generate both async and sync variants of these methods.
+///
+/// This macro simplifies the definition and usage of database operations by reducing boilerplate
+/// code and ensuring uniformity in async/sync APIs and by allowing to avoid the generic `<D>`
+/// parameter.
 macro_rules! inst_ops {
     {
         ($base:ident, $ctx:ident $(<$($tparam:ident: $tpconstr:tt),+>)?) {
@@ -85,6 +128,28 @@ macro_rules! inst_ops {
     }
 }
 
+/// Automatically generates an `Ops` interface with shim functions for database operations within a
+/// context without having to define any extra functions.
+///
+/// ### Usage
+/// ```rust
+/// // inst_ops_simple! {
+/// //     (<D: L1BroadcastDatabase> => BroadcastDbOps) {
+/// //         get_tx_entry(idx: u64) => Option<()>;
+/// //         get_tx_entry_by_id(id: u32) => Option<()>;
+/// //         get_txid(idx: u64) => Option<u32>;
+/// //         get_next_tx_idx() => u64;
+/// //         put_tx_entry(id: u32, entry: u64) => Option<u64>;
+/// //         put_tx_entry_by_idx(idx: u64, entry: u32) => ();
+/// //         get_last_tx_entry() => Option<u32>;
+/// //     }
+/// // }
+/// ```
+///
+/// - **Context**: Defines the database type (e.g., `L1BroadcastDatabase`).
+/// - **Trait**: Maps to the generated interface (e.g., `BroadcastDbOps`).
+/// - **Methods**: Each operation is defined with its inputs and outputs, generating async and sync
+///   variants automatically.
 macro_rules! inst_ops_simple {
     {
         (< $tparam:ident: $tpconstr:tt > => $base:ident) {
@@ -117,6 +182,8 @@ macro_rules! inst_ops_simple {
     }
 }
 
+/// A macro that generates the context shim functions. This assumes that the `Context`
+/// struct has a `db` attribute and that the db object has all the methods defined.
 macro_rules! inst_ops_ctx_shim {
     ($iname:ident<$tparam: ident : $tpconstr:tt>($($aname:ident: $aty:ty),*) -> $ret:ty) => {
         fn $iname < $tparam : $tpconstr > (context: &Context<$tparam>, $($aname : $aty),* ) -> DbResult<$ret> {

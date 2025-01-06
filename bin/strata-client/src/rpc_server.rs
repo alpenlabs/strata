@@ -774,7 +774,7 @@ impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRp
     async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>> {
         let l2_block_manager = &self.l2_block_manager;
         let l2_block = l2_block_manager
-            .get_block_async(&block_id)
+            .get_block_data_async(&block_id)
             .await
             .map_err(Error::Db)?
             .map(|b| b.block().clone());
