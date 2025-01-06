@@ -25,7 +25,7 @@ class BridgeWithdrawReassignmentTest(testenv.BridgeTestBase):
                 n_operators=3,
                 pre_fund_addrs=True,
                 duty_timeout_duration=10,
-                rollup_settings=fast_batch_settings
+                rollup_settings=fast_batch_settings,
             )
         )
 
@@ -75,7 +75,7 @@ class BridgeWithdrawReassignmentTest(testenv.BridgeTestBase):
         withdraw_duty = wait_until_with_value(
             lambda: [d for d in get_duties(0, 0)["duties"] if d["type"] == "FulfillWithdrawal"],
             predicate=lambda v: len(v) > 0,
-            timeout=30
+            timeout=30,
         )[0]
         assigned_op_idx = withdraw_duty["payload"]["assigned_operator_idx"]
         assigned_operator = ctx.get_service(f"bridge.{assigned_op_idx}")
@@ -95,7 +95,7 @@ class BridgeWithdrawReassignmentTest(testenv.BridgeTestBase):
             lambda: [d for d in get_duties(0, 0)["duties"] if d["type"] == "FulfillWithdrawal"][0],
             predicate=lambda v: v["payload"]["assigned_operator_idx"] != assigned_op_idx,
             timeout=30,
-            error_with="No new operator was assigned"
+            error_with="No new operator was assigned",
         )["payload"]["assigned_operator_idx"]
 
         self.debug(f"new assigned operator: {new_assigned_op_idx}")

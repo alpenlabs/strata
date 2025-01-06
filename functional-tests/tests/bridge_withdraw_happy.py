@@ -82,6 +82,7 @@ class BridgeWithdrawHappyTest(testenv.BridgeTestBase):
 
         return True
 
+
 def check_initial_eth_balance(rethrpc, address, debug_fn=print):
     """Asserts that the initial ETH balance for `address` is zero."""
     balance = int(rethrpc.eth_getBalance(address), 16)
