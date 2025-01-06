@@ -1,7 +1,6 @@
 use alloy::providers::WalletProvider;
 use argh::FromArgs;
 use bdk_wallet::KeychainKind;
-use console::Term;
 
 use crate::{
     net_type::{net_type_or_exit, NetworkType},
@@ -21,17 +20,16 @@ pub struct ReceiveArgs {
 }
 
 pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) {
-    let term = Term::stdout();
-    let network_type = net_type_or_exit(&args.network_type, &term);
+    let network_type = net_type_or_exit(&args.network_type);
 
     let address = match network_type {
         NetworkType::Signet => {
             let mut l1w =
                 SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
                     .unwrap();
-            let _ = term.write_line("Syncing signet wallet");
+            println!("Syncing signet wallet");
             l1w.sync().await.unwrap();
-            let _ = term.write_line("Wallet synced");
+            println!("Wallet synced");
             let address_info = l1w.reveal_next_address(KeychainKind::External);
             l1w.persist().unwrap();
             address_info.address.to_string()
@@ -42,5 +40,5 @@ pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) {
         }
     };
 
-    let _ = term.write_line(&address);
+    println!("{address}");
 }

@@ -6,7 +6,6 @@ use alloy::{
 };
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
-use console::Term;
 use indicatif::ProgressBar;
 
 use crate::{
@@ -48,12 +47,7 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
             info.address
         }
     };
-
-    let term = Term::stdout();
-    let _ = term.write_line(&format!(
-        "Bridging out {} to {}",
-        BRIDGE_OUT_AMOUNT, address
-    ));
+    println!("Bridging out {BRIDGE_OUT_AMOUNT} to {address}");
 
     let tx = l2w
         .transaction_request()
@@ -71,8 +65,9 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
     pb.enable_steady_tick(Duration::from_millis(100));
     let res = l2w.send_transaction(tx).await.unwrap();
     pb.finish_with_message("Broadcast successful");
-    let _ = term.write_line(
-        &OnchainObject::from(res.tx_hash())
+    println!(
+        "{}",
+        OnchainObject::from(res.tx_hash())
             .with_maybe_explorer(settings.blockscout_endpoint.as_deref())
             .pretty(),
     );

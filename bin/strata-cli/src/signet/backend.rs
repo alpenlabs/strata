@@ -20,7 +20,6 @@ use bdk_wallet::{
     },
     KeychainKind,
 };
-use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use terrors::OneOf;
 use tokio::sync::mpsc::UnboundedSender;
@@ -102,8 +101,7 @@ impl SignetBackend for EsploraClient {
         _last_cp: CheckPoint,
         send_update: UpdateSender,
     ) -> Result<(), SyncError> {
-        let term = Term::stdout();
-        let _ = term.write_line("Syncing wallet...");
+        println!("Syncing wallet...");
         let sty = ProgressStyle::with_template(
             "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
         )
@@ -145,9 +143,9 @@ impl SignetBackend for EsploraClient {
         ops2.finish();
         spks2.finish();
         txids2.finish();
-        let _ = term.write_line("Updating wallet");
+        println!("Updating wallet");
         send_update.send(WalletUpdate::SpkSync(update)).unwrap();
-        let _ = term.write_line("Wallet synced");
+        println!("Wallet synced");
         Ok(())
     }
 

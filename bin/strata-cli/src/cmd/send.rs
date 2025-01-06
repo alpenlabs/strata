@@ -8,7 +8,6 @@ use alloy::{
 };
 use argh::FromArgs;
 use bdk_wallet::bitcoin::{Address, Amount};
-use console::Term;
 
 use crate::{
     constants::SATS_TO_WEI,
@@ -42,8 +41,7 @@ pub struct SendArgs {
 }
 
 pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
-    let term = Term::stdout();
-    let network_type = net_type_or_exit(&args.network_type, &term);
+    let network_type = net_type_or_exit(&args.network_type);
 
     match network_type {
         NetworkType::Signet => {
@@ -57,7 +55,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                     .expect("valid wallet");
             l1w.sync().await.unwrap();
             let fee_rate = get_fee_rate(args.fee_rate, settings.signet_backend.as_ref()).await;
-            log_fee_rate(&term, &fee_rate);
+            log_fee_rate(&fee_rate);
             let mut psbt = l1w
                 .build_tx()
                 .add_recipient(address.script_pubkey(), amount)
@@ -74,8 +72,9 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                 .await
                 .expect("successful broadcast");
             let txid = tx.compute_txid();
-            let _ = term.write_line(
-                &OnchainObject::from(&txid)
+            println!(
+                "{}",
+                OnchainObject::from(&txid)
                     .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
                     .pretty(),
             );
@@ -90,17 +89,14 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                 .send_transaction(tx)
                 .await
                 .expect("successful broadcast");
-            let _ = term.write_line(
-                &OnchainObject::from(res.tx_hash())
+            println!(
+                "{}",
+                OnchainObject::from(res.tx_hash())
                     .with_maybe_explorer(settings.blockscout_endpoint.as_deref())
                     .pretty(),
             );
         }
     };
 
-    let _ = term.write_line(&format!(
-        "Sent {} to {}",
-        Amount::from_sat(args.amount),
-        args.address,
-    ));
+    println!("Sent {} to {}", Amount::from_sat(args.amount), args.address,);
 }

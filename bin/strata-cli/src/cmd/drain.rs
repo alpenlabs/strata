@@ -6,7 +6,7 @@ use alloy::{
 };
 use argh::FromArgs;
 use bdk_wallet::bitcoin::{Address, Amount};
-use console::{style, Term};
+use colored::Colorize;
 
 use crate::{
     constants::SATS_TO_WEI,
@@ -44,9 +44,8 @@ pub async fn drain(
     seed: Seed,
     settings: Settings,
 ) {
-    let term = Term::stdout();
     if strata_address.is_none() && signet_address.is_none() {
-        let _ = term.write_line("Either signet or Strata address should be provided");
+        println!("Either signet or Strata address should be provided");
     }
 
     let signet_address = signet_address.map(|a| {
@@ -64,14 +63,13 @@ pub async fn drain(
         l1w.sync().await.unwrap();
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {
-            let _ = term.write_line(
-                &style("You have pending funds on signet that won't be included in the drain")
-                    .yellow()
-                    .to_string(),
+            println!(
+                "{}",
+                "You have pending funds on signet that won't be included in the drain".yellow()
             );
         }
         let fee_rate = get_fee_rate(fee_rate, settings.signet_backend.as_ref()).await;
-        log_fee_rate(&term, &fee_rate);
+        log_fee_rate(&fee_rate);
 
         let mut psbt = l1w
             .build_tx()
@@ -85,19 +83,20 @@ pub async fn drain(
         let tx = psbt.extract_tx().expect("fully signed tx");
         settings.signet_backend.broadcast_tx(&tx).await.unwrap();
         let txid = tx.compute_txid();
-        let _ = term.write_line(
-            &OnchainObject::from(&txid)
+        println!(
+            "{}",
+            OnchainObject::from(&txid)
                 .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
-                .pretty(),
+                .pretty()
         );
-        let _ = term.write_line(&format!("Drained signet wallet to {}", address,));
+        println!("Drained signet wallet to {}", address,);
     }
 
     if let Some(address) = strata_address {
         let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         if balance == U256::ZERO {
-            let _ = term.write_line("No Strata bitcoin to send");
+            println!("No Strata bitcoin to send");
         }
 
         let estimate_tx = l2w
@@ -116,16 +115,17 @@ pub async fn drain(
 
         let res = l2w.send_transaction(tx).await.unwrap();
 
-        let _ = term.write_line(
-            &OnchainObject::from(res.tx_hash())
+        println!(
+            "{}",
+            OnchainObject::from(res.tx_hash())
                 .with_maybe_explorer(settings.blockscout_endpoint.as_deref())
-                .pretty(),
+                .pretty()
         );
 
-        let _ = term.write_line(&format!(
+        println!(
             "Drained {} from Strata wallet to {}",
             Amount::from_sat((max_send_amount / U256::from(SATS_TO_WEI)).wrapping_to()),
             address,
-        ));
+        );
     }
 }
