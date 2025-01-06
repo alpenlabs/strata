@@ -137,7 +137,7 @@ impl ProvingOp for ClStfOperator {
 
         let evm_ee_id = evm_ee_tasks
             .first()
-            .ok_or_else(|| ProvingTaskError::NoTasksFound)?
+            .ok_or(ProvingTaskError::NoTasksFound)?
             .context();
 
         let cl_stf_id = ProofContext::ClStf(start_block_id, end_block_id);
@@ -181,9 +181,7 @@ impl ProvingOp for ClStfOperator {
             .get_proof_deps(*task_id.context())
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
-        let evm_ee_id = evm_ee_ids
-            .first()
-            .ok_or_else(|| ProvingTaskError::NoTasksFound)?;
+        let evm_ee_id = evm_ee_ids.first().ok_or(ProvingTaskError::NoTasksFound)?;
         let evm_ee_key = ProofKey::new(*evm_ee_id, *task_id.host());
         let evm_ee_proof = db
             .get_proof(evm_ee_key)
