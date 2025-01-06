@@ -1,5 +1,5 @@
 use argh::FromArgs;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 
 use crate::seed::{password::Password, EncryptedSeedPersister, Seed};
 
