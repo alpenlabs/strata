@@ -13,7 +13,7 @@ websockets = "^13.1"
 web3 = "^7.6.1"
 py-solc-x = "^2.0.3"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 ruff = "0.8.4"
 maturin = "1.8.1"
 
