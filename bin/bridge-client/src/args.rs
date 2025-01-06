@@ -100,7 +100,7 @@ pub(crate) struct Cli {
     )]
     pub duty_timeout_duration: Option<u64>,
 
-    /// Max retries for when rpc server fails during duty polling
+    /// Max retries for when RPC server fails during duty polling
     #[argh(
         option,
         description = "max retries for when RPC server fails during duty polling"

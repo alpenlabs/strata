@@ -49,7 +49,7 @@ pub enum ExecError {
     Xpriv,
 
     /// Error getting the WebSocket client from pool
-    #[error("fetching websocket client from pool failed")]
+    #[error("fetching WebSocket client from pool failed")]
     WsPool,
 }
 

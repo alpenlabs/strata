@@ -1,9 +1,9 @@
 import flexitest
 
-import testenv
-from constants import SATS_TO_WEI
-from rollup_params_cfg import RollupConfig
+from envs import testenv
+from envs.rollup_params_cfg import RollupConfig
 from utils import get_bridge_pubkey, wait_until, wait_until_with_value
+from utils.constants import SATS_TO_WEI
 
 
 @flexitest.register
