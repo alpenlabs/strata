@@ -757,37 +757,38 @@ impl StrataSequencerApiServer for SequencerServerImpl {
 
     async fn submit_checkpoint_proof(
         &self,
-        idx: u64,
+        checkpoint_idx: u64,
         proof_receipt: ProofReceipt,
     ) -> RpcResult<()> {
-        debug!(%idx, "received checkpoint proof request");
+        debug!(%checkpoint_idx, "received checkpoint proof request");
         let mut entry = self
             .checkpoint_handle
-            .get_checkpoint(idx)
+            .get_checkpoint(checkpoint_idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?
-            .ok_or(Error::MissingCheckpointInDb(idx))?;
-        debug!(%idx, "found checkpoint in db");
+            .ok_or(Error::MissingCheckpointInDb(checkpoint_idx))?;
 
         // If proof is not pending error out
         if entry.proving_status != CheckpointProvingStatus::PendingProof {
-            return Err(Error::ProofAlreadyCreated(idx))?;
+            warn!(%checkpoint_idx, "checkpoint proof submitted but we already had one?");
+            return Err(Error::ProofAlreadyCreated(checkpoint_idx))?;
         }
 
         let checkpoint = entry.clone().into_batch_checkpoint();
         verify_proof(&checkpoint, &proof_receipt, self.params.rollup())
-            .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
+            .map_err(|e| Error::InvalidProof(checkpoint_idx, e.to_string()))?;
 
         entry.proof = proof_receipt;
         entry.proving_status = CheckpointProvingStatus::ProofReady;
 
-        debug!(%idx, "Proof is pending, setting proof reaedy");
+        debug!(%checkpoint_idx, "Proof is pending, setting proof reaedy");
+        let checkpoint = entry.clone().into_batch_checkpoint();
 
         self.checkpoint_handle
-            .put_checkpoint_and_notify(idx, entry)
+            .put_checkpoint_and_notify(checkpoint_idx, entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
-        debug!(%idx, "Success");
+        trace!(%checkpoint_idx, "found checkpoint and notified");
 
         Ok(())
     }
@@ -829,6 +830,7 @@ impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRp
             .map(|b| b.block().clone());
         Ok(l2_block)
     }
+
     async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
         let db = self.database.clone();
         let chain_state = wait_blocking("chain_state_at_idx", move || {
