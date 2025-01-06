@@ -317,14 +317,16 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
+        dbg!("get_cl_block_witness", blkid);
         let l2_blk_db = self.database.clone();
         let l2_blk_bundle = wait_blocking("l2_block", move || {
             let l2_db = l2_blk_db.l2_db();
             fetch_l2blk::<D>(l2_db, blkid).map_err(|_| Error::MissingL2Block(blkid))
         })
         .await?;
+        dbg!(&l2_blk_bundle.block().header());
 
-        let prev_slot = l2_blk_bundle.block().header().header().blockidx() - 1;
+        let prev_slot = l2_blk_bundle.block().header().header().blockidx();
 
         let chain_state_db = self.database.clone();
         let chain_state = wait_blocking("l2_chain_state", move || {
@@ -338,8 +340,10 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         .await?;
 
         let cl_block_witness = (chain_state, l2_blk_bundle.block());
+        dbg!("cl_block_witness");
         let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
             .map_err(|_| Error::Other("Failed to get raw cl block witness".to_string()))?;
+        dbg!("return");
 
         Ok(raw_cl_block_witness)
     }
