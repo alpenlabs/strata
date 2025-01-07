@@ -29,7 +29,7 @@ reth-primitives.workspace = true
 secp256k1.workspace = true
 
 [target.'cfg(target_os = "macos")'.build-dependencies]
-pyo3-build-config = "0.22.6"
+pyo3-build-config = "0.23.3"
 
 [dev-dependencies]
 strata-btcio.workspace = true

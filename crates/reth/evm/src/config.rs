@@ -8,8 +8,11 @@ use revm::{
 use revm_primitives::Precompile;
 
 use crate::{
-    constants::{BASEFEE_ADDRESS, FIXED_WITHDRAWAL_WEI},
-    precompiles::schnorr::verify_schnorr_precompile,
+    constants::{BASEFEE_ADDRESS, FIXED_WITHDRAWAL_WEI, SCHNORR_ADDRESS},
+    precompiles::{
+        bridge::{BridgeoutPrecompile, BRIDGEOUT_ADDRESS},
+        schnorr::verify_schnorr_precompile,
+    },
 };
 
 /// Add rollup specific customizations to EVM
@@ -25,13 +28,13 @@ where
         let mut precompiles = prev_handle();
         precompiles.extend([
             (
-                crate::precompiles::bridge::BRIDGEOUT_ADDRESS,
-                ContextPrecompile::ContextStateful(Arc::new(
-                    crate::precompiles::bridge::BridgeoutPrecompile::new(FIXED_WITHDRAWAL_WEI),
-                )),
+                BRIDGEOUT_ADDRESS,
+                ContextPrecompile::ContextStateful(Arc::new(BridgeoutPrecompile::new(
+                    FIXED_WITHDRAWAL_WEI,
+                ))),
             ),
             (
-                crate::constants::SCHNORR_ADDRESS,
+                SCHNORR_ADDRESS,
                 ContextPrecompile::Ordinary(Precompile::Standard(verify_schnorr_precompile)),
             ),
         ]);

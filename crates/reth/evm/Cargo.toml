@@ -14,5 +14,5 @@ revm.workspace = true
 revm-primitives.workspace = true
 
 [dev-dependencies]
-secp256k1 = { workspace = true }
+secp256k1.workspace = true
 strata-crypto = { workspace = true, features = ["rand"] }

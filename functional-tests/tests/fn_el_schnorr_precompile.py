@@ -17,7 +17,7 @@ class SchnorrPrecompileTest(testenv.StrataTester):
     def main(self, ctx: flexitest.RunContext):
         """
         Schnorr Precompile is available at address
-        `0x5400000000000000000000000000000000000002`
+        `{PRECOMPILE_SCHNORR_ADDRESS}`
 
         The format required is concatenation of
         `public_key` , `message_hash` and `schnorr signature` in order
