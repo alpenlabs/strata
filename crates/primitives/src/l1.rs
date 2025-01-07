@@ -599,6 +599,7 @@ impl XOnlyPk {
     }
 }
 
+/// [Borsh](borsh)-friendly Bitcoin [`Psbt`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BitcoinPsbt(Psbt);
 
