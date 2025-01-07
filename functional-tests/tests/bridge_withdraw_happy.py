@@ -70,7 +70,6 @@ class BridgeWithdrawHappyTest(testenv.BridgeTestBase):
         # We expect final BTC balance to be D BTC minus operator fees
         difference = deposit_amount - operator_fee - withdraw_extra_fee
         confirm_btc_withdrawal(
-            self.btcrpc,
             withdraw_address,
             btc_url,
             btc_user,
@@ -91,7 +90,6 @@ def check_initial_eth_balance(rethrpc, address, debug_fn=print):
 
 
 def confirm_btc_withdrawal(
-    btcrpc,
     withdraw_address,
     btc_url,
     btc_user,
