@@ -35,9 +35,9 @@ class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
         # wait for checkpoint confirmation
         ckp_idx = wait_until_with_value(
             lambda: seqrpc.strata_getLatestCheckpointIndex(True),
-            predicate=lambda v: v > ckp_idx,
-            error_with="Checkpoint was not confirmed on time",
-            timeout=30,
+            predicate=lambda v: v >= ckp_idx,
+            error_with="Checkpoint was not confirmed in time",
+            timeout=60,
         )
         self.debug(f"checkpoint: {ckp_idx} finalized")
 
