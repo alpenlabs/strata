@@ -105,7 +105,7 @@ impl From<(u64, u32)> for L1TxRef {
     }
 }
 
-/// A trait for computing some kind of transaction ID (e.g., [`Txid`](bitcoin::Txid) or
+/// A trait for computing some kind of transaction ID (e.g., [`Txid`] or
 /// [`Wtxid`](bitcoin::Wtxid)) from a [`Transaction`].
 ///
 /// This trait is designed to be implemented by "marker" types that define how a transaction ID
@@ -121,7 +121,7 @@ pub trait TxIdComputable {
     fn compute_id(tx: &Transaction, idx: usize) -> Buf32;
 }
 
-/// Marker type for computing the [`Txid`](bitcoin::Txid).
+/// Marker type for computing the [`Txid`].
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]

@@ -14,6 +14,13 @@ use crate::{hash::sha256d, prelude::Buf32};
 ///   converted into [`Buf32`].
 /// - `index`: The index of the transaction for which we want the cohashes.
 ///
+/// # Notes
+///
+/// Cohashes refer to the intermediate hashes (sometimes called "siblings") needed to
+/// reconstruct the Merkle path for a given transaction. These intermediate hashes, along with
+/// the transaction's hash itself, can be used to compute the Merkle root, thus verifying the
+/// transaction’s membership in the Merkle tree.
+///
 /// # Returns
 ///
 /// - A tuple `(Vec<Buf32>, Buf32)` containing the cohashes and the Merkle root.

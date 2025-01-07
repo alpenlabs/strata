@@ -21,11 +21,13 @@ pub struct L1TxInclusionProof<T> {
     /// The 0-based position (index) of the transaction within the block's transaction list
     /// for which this proof is generated.
     position: u32,
+
     /// The intermediate hashes (sometimes called "siblings") needed to reconstruct the Merkle root
     /// when combined with the target transaction's own ID. These are the Merkle tree nodes at
     /// each step that pair with the current hash (either on the left or the right) to produce
     /// the next level of the tree.
     cohashes: Vec<Buf32>,
+
     /// A marker that preserves the association with type `T`, which implements
     /// [`TxIdComputable`]. This ensures the proof logic depends on the correct
     /// transaction ID computation ([`Txid`](bitcoin::Txid) vs.[`Wtxid`](bitcoin::Wtxid)) for the
