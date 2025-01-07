@@ -70,22 +70,29 @@ impl ZkVmHost for SP1Host {
             std::env::set_var("SP1_PROVER", "mock");
         }
 
-        if std::env::var("SP1_PROVER").unwrap() == "network" {
-            let proof_info = ProverClient::builder()
-                .network()
-                .build()
+        // Prover network
+        if std::env::var("SP1_PROVER").unwrap_or_default() == "network" {
+            let prover_client = ProverClient::builder().network().build();
+
+            let network_prover_builder = prover_client
                 .prove(&self.proving_key, &prover_input)
-                .strategy(FulfillmentStrategy::Reserved)
-                .compressed()
+                .strategy(FulfillmentStrategy::Reserved);
+
+            let network_prover = match proof_type {
+                ProofType::Compressed => network_prover_builder.compressed(),
+                ProofType::Core => network_prover_builder.core(),
+                ProofType::Groth16 => network_prover_builder.groth16(),
+            };
+
+            let proof_info = network_prover
                 .run()
-                .unwrap();
+                .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
 
             return Ok(proof_info.into());
         }
 
+        // Local proving
         let client = ProverClient::from_env();
-
-        // Start proving
         let mut prover = client.prove(&self.proving_key, &prover_input);
         prover = match proof_type {
             ProofType::Compressed => prover.compressed(),

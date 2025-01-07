@@ -2511,6 +2511,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo_metadata"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8769706aad5d996120af43197bf46ef6ad0fda35216b4505f926a365a232d924"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver 1.0.24",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.9",
+]
+
+[[package]]
 name = "cassowary"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10932,7 +10946,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f99fb40aeeaf59dddd6b6c3a177c95e8b3c7f0fb6de7d25a0687d12398323292"
 dependencies = [
  "anyhow",
- "cargo_metadata",
+ "cargo_metadata 0.18.1",
  "dirs",
  "docker-generate",
  "hex",
@@ -12117,7 +12131,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e58e5f49cf1481363abb74b55104e215f3b6e58dc2adb748bde7a6e4ea61b51d"
 dependencies = [
  "anyhow",
- "cargo_metadata",
+ "cargo_metadata 0.18.1",
  "chrono",
  "clap",
  "dirs",
@@ -13585,6 +13599,7 @@ name = "strata-sp1-guest-builder"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "cargo_metadata 0.19.1",
  "once_cell",
  "sha2 0.10.8",
  "sp1-helper",
@@ -15012,7 +15027,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2990d9ea5967266ea0ccf413a4aa5c42a93dbcfda9cb49a97de6931726b12566"
 dependencies = [
  "anyhow",
- "cargo_metadata",
+ "cargo_metadata 0.18.1",
  "cfg-if",
  "git2",
  "regex",

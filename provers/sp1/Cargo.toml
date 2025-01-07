@@ -11,6 +11,7 @@ strata-sp1-adapter = { path = "../../crates/zkvm/adapters/sp1", features = [
 
 [build-dependencies]
 bincode.workspace = true
+cargo_metadata = "0.19.1"
 sha2.workspace = true
 sp1-helper = "=4.0.0-rc.8"
 sp1-sdk = "=4.0.0-rc.8"

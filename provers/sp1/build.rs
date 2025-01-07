@@ -5,14 +5,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
-// #[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
 use bincode::{deserialize, serialize};
-// #[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
+use cargo_metadata::MetadataCommand;
+#[cfg(not(debug_assertions))]
 use sha2::{Digest, Sha256};
-// #[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
 use sp1_helper::{build_program_with_args, BuildArgs};
-// #[cfg(debug_assertions)]
-use sp1_sdk::{HashableKey, Prover, ProverClient, SP1VerifyingKey};
+#[cfg(not(debug_assertions))]
+use sp1_sdk::{HashableKey, ProverClient, SP1VerifyingKey};
 
 // Guest program names
 const EVM_EE_STF: &str = "guest-evm-ee-stf";
@@ -166,7 +168,7 @@ fn get_output_dir() -> PathBuf {
 }
 
 /// Checks if the cache is valid by comparing the expected ID with the saved ID.
-// #[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
 fn is_cache_valid(expected_id: &[u8; 32], paths: &[PathBuf; 4]) -> bool {
     // Check if any required files are missing
     if paths.iter().any(|path| !path.exists()) {
@@ -182,33 +184,8 @@ fn is_cache_valid(expected_id: &[u8; 32], paths: &[PathBuf; 4]) -> bool {
     expected_id == saved_id.as_slice()
 }
 
-/// Temp function to transform the filename.
-fn transform_filename(input: &str) -> String {
-    // Trim whitespace and newline characters
-    let trimmed = input.trim();
-
-    // Remove the ".elf" suffix if present
-    let without_suffix = if trimmed.ends_with(".elf") {
-        &trimmed[..trimmed.len() - 4] // Remove last 4 characters
-    } else {
-        trimmed
-    };
-
-    // Define the prefix to look for
-    let prefix = "guest-";
-
-    // Check if the input starts with the expected prefix
-    if without_suffix.starts_with(prefix) {
-        // Insert "sp1-" after "guest-"
-        format!("{}sp1-{}", prefix, &without_suffix[prefix.len()..])
-    } else {
-        // If the prefix is not found, return the string as is
-        without_suffix.to_string()
-    }
-}
-
 /// Ensures the cache is valid and returns the ELF contents and SP1 Verifying Key.
-// #[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
 fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
     let cache_dir = format!("{}/cache", program);
     let paths = ["elf", "id", "vk", "pk"]
@@ -221,7 +198,7 @@ fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
 
     if !is_cache_valid(&elf_hash, &paths) {
         // Cache is invalid, need to generate vk and pk
-        let client = ProverClient::builder().mock().build();
+        let client = ProverClient::from_env();
         let (pk, vk) = client.setup(&elf);
 
         fs::write(&paths[1], elf_hash)
@@ -245,7 +222,7 @@ fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
 }
 
 /// Generates the ELF contents and VK hash for a given program.
-// #[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
 fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     let features = {
         #[cfg(feature = "mock")]
@@ -265,24 +242,11 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
         ..Default::default()
     };
 
-    // Build the program
+    // Build the program with the specified arguments
+    // Note: SP1_v4's build_programs_with_args does not handle ELF migration
+    // Applying a temporary workaround; remove once SP1 supports ELF migration internally
     build_program_with_args(program, build_args);
-
-    // Copy the elf file
-    let desination_elf_path = Path::new(program)
-        .join("cache")
-        .join(format!("{}.elf", program));
-
-    let end_elf_name = transform_filename(program);
-    let built_elf_path = format!(
-        "{}/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/{}",
-        program, end_elf_name
-    );
-
-    eprintln!("source path = {:?}", built_elf_path);
-    eprint!("destination path = {:?}", desination_elf_path);
-    fs::copy(&built_elf_path, &desination_elf_path)
-        .expect("Failed to copy the built ELF file to the cache directory");
+    migrate_elf(program);
 
     // Now, ensure cache validity
     let vk = ensure_cache_validity(program)
@@ -290,11 +254,39 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     (vk.hash_u32(), vk.bytes32())
 }
 
-// #[cfg(debug_assertions)]
-// fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
-//     (
-//         [0u32; 8],
-//         "0x0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
-//     )
-// }
-// .
+#[cfg(debug_assertions)]
+fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
+    (
+        [0u32; 8],
+        "0x0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
+    )
+}
+
+/// Copies the compiled ELF file of the specified program to its cache directory.
+#[cfg(not(debug_assertions))]
+fn migrate_elf(program: &str) {
+    let metadata = MetadataCommand::new()
+        .manifest_path(format!("{}/Cargo.toml", program))
+        .exec()
+        .expect("Failed to get metadata");
+
+    // Build the elf name same as the program name
+    let built_elf_name = metadata
+        .root_package()
+        .expect("Failed to get root package")
+        .name
+        .clone();
+
+    // Copy the elf file
+    let desination_elf_path = Path::new(program)
+        .join("cache")
+        .join(format!("{}.elf", program));
+
+    let built_elf_path = format!(
+        "{}/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/{}",
+        program, built_elf_name
+    );
+
+    fs::copy(&built_elf_path, &desination_elf_path)
+        .expect("Failed to copy the built ELF file to the cache directory");
+}

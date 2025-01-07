@@ -1,4 +1,4 @@
-use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1PublicValues };
+use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1PublicValues};
 use strata_zkvm::{Proof, ProofReceipt, PublicValues, ZkVmProofError};
 
 #[derive(Debug, Clone)]
