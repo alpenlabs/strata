@@ -134,6 +134,7 @@ class RollupParamsSettings:
 def check_nth_checkpoint_finalized(
     idx,
     seqrpc,
+    prover_rpc,
     manual_gen: ManualGenBlocksConfig | None = None,
     proof_timeout: int | None = None,
 ):
@@ -166,7 +167,7 @@ def check_nth_checkpoint_finalized(
 
     # Submit checkpoint if proof_timeout is not set
     if proof_timeout is None:
-        submit_checkpoint(idx, seqrpc, manual_gen)
+        submit_checkpoint(idx, seqrpc, prover_rpc, manual_gen)
     else:
         # Just wait until timeout period instead of submitting so that sequencer submits empty proof
         delta = 1
@@ -186,22 +187,23 @@ def check_nth_checkpoint_finalized(
     )
 
 
-def submit_checkpoint(idx: int, seqrpc, manual_gen: ManualGenBlocksConfig | None = None):
+def submit_checkpoint(
+    idx: int, seqrpc, prover_rpc, manual_gen: ManualGenBlocksConfig | None = None
+):
     """
     Submits checkpoint and if manual_gen, waits till it is present in l1
     """
     last_published_txid = seqrpc.strata_l1status()["last_published_txid"]
 
     # Post checkpoint proof
-    # FIXME/NOTE: Since operating in timeout mode is supported, i.e. sequencer
-    # will post empty post if prover doesn't submit proofs in time, we can send
-    # empty proof hex.
-    # NOTE: The functional tests for verifying proofs need to provide non-empty
-    # proofs
-    empty_proof_receipt = {"proof": [], "public_values": []}
+    # NOTE: Since operating in timeout mode is supported, i.e. sequencer
+    # will post empty proof if prover doesn't submit proofs in time.
+    proof_keys = prover_rpc.dev_strata_proveCheckpoint(idx)
+    proof_key = proof_keys[0]
+    wait_for_proof_with_time_out(prover_rpc, proof_key)
+    proof = prover_rpc.dev_strata_getProof(proof_key)
 
-    # This is arbitrary
-    seqrpc.strataadmin_submitCheckpointProof(idx, empty_proof_receipt)
+    seqrpc.strataadmin_submitCheckpointProof(idx, proof)
 
     # Wait a while for it to be posted to l1. This will happen when there
     # is a new published txid in l1status
@@ -518,3 +520,8 @@ def cl_slot_to_block_id(seqrpc, slot):
 def el_slot_to_block_id(rethrpc, block_num):
     """Get EL block hash from block number using Ethereum RPC."""
     return rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]
+
+
+def bytes_to_big_endian(hash):
+    """Reverses the byte order of a hexadecimal string to produce big-endian format."""
+    return "".join(reversed([hash[i : i + 2] for i in range(0, len(hash), 2)]))

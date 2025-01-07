@@ -64,13 +64,13 @@ impl ProvingOp for EvmEeOperator {
         &self,
         block_range: Self::Params,
         task_tracker: Arc<Mutex<TaskTracker>>,
-        _db: &ProofDb,
+        db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let (start_blkid, end_blkid) = block_range;
         let context = ProofContext::EvmEeStf(start_blkid, end_blkid);
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(context, vec![])
+        task_tracker.create_tasks(context, vec![], db)
     }
 
     async fn fetch_input(

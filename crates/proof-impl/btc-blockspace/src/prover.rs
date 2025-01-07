@@ -3,13 +3,13 @@ use strata_zkvm::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };
 
-use crate::logic::{BlockspaceProofInput, BlockspaceProofOutput};
+use crate::logic::{BlockScanProofInput, BlockScanResult};
 
 pub struct BtcBlockspaceProver;
 
 impl ZkVmProver for BtcBlockspaceProver {
-    type Input = BlockspaceProofInput;
-    type Output = BlockspaceProofOutput;
+    type Input = BlockScanProofInput;
+    type Output = BlockScanResult;
 
     fn proof_type() -> ProofType {
         ProofType::Compressed

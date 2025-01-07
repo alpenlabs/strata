@@ -56,16 +56,14 @@ pub fn process_event<D: Database>(
             if let Some(l1_vs) = l1_vs {
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
                 let mut updated_l1vs = l1_vs.clone();
-                if l1_vs_height < l1v.tip_height() {
-                    for height in (l1_vs_height..l1v.tip_height()) {
-                        let block_mf = l1_db
-                            .get_block_manifest(height)?
-                            .ok_or(Error::MissingL1BlockHeight(height))?;
-                        let header: Header =
-                            bitcoin::consensus::deserialize(block_mf.header()).unwrap();
-                        updated_l1vs = updated_l1vs
-                            .check_and_update_continuity_new(&header, &get_btc_params());
-                    }
+                for height in (l1_vs_height + 1..l1v.tip_height()) {
+                    let block_mf = l1_db
+                        .get_block_manifest(height)?
+                        .ok_or(Error::MissingL1BlockHeight(height))?;
+                    let header: Header =
+                        bitcoin::consensus::deserialize(block_mf.header()).unwrap();
+                    updated_l1vs =
+                        updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
                 }
                 writes.push(ClientStateWrite::UpdateVerificationState(updated_l1vs))
             }
@@ -414,11 +412,14 @@ pub fn filter_verified_checkpoints(
 
     for checkpoint in checkpoints {
         let curr_idx = checkpoint.batch_checkpoint.batch_info().idx;
+        let proof_receipt = checkpoint.batch_checkpoint.get_proof_receipt();
         if curr_idx != expected_idx {
             warn!(%expected_idx, %curr_idx, "Received invalid checkpoint idx, ignoring.");
             continue;
         }
-        if expected_idx == 0 && verify_proof(&checkpoint.batch_checkpoint, params).is_ok() {
+        if expected_idx == 0
+            && verify_proof(&checkpoint.batch_checkpoint, &proof_receipt, params).is_ok()
+        {
             result_checkpoints.push(checkpoint.clone());
             last_valid_checkpoint = Some(checkpoint.batch_checkpoint.batch_info());
         } else if expected_idx == 0 {
@@ -441,7 +442,7 @@ pub fn filter_verified_checkpoints(
                 warn!(obtained = ?l2_tsn.0, expected = ?last_l2_tsn.1, "Received invalid checkpoint l2 transition, ignoring.");
                 continue;
             }
-            if verify_proof(&checkpoint.batch_checkpoint, params).is_ok() {
+            if verify_proof(&checkpoint.batch_checkpoint, &proof_receipt, params).is_ok() {
                 result_checkpoints.push(checkpoint.clone());
                 last_valid_checkpoint = Some(checkpoint.batch_checkpoint.batch_info());
             } else {

@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
+use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
+use strata_rocksdb::prover::db::ProofDb;
+use tracing::info;
 
 use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 
@@ -9,6 +12,8 @@ use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 pub struct TaskTracker {
     /// A map of task IDs to their statuses.
     tasks: HashMap<ProofKey, ProvingTaskStatus>,
+    /// A map of task IDs to their dependencies that have not yet been proven.
+    pending_dependencies: HashMap<ProofKey, HashSet<ProofKey>>,
     /// Count of the tasks that are in progress
     in_progress_tasks: HashMap<ProofZkVm, usize>,
     /// List of ZkVm for which the task is created
@@ -37,6 +42,7 @@ impl TaskTracker {
 
         TaskTracker {
             tasks: HashMap::new(),
+            pending_dependencies: HashMap::new(),
             in_progress_tasks: HashMap::new(),
             vms,
         }
@@ -50,15 +56,17 @@ impl TaskTracker {
         &mut self,
         proof_id: ProofContext,
         deps: Vec<ProofContext>,
+        db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        info!(?proof_id, "Creating task for");
         let mut tasks = Vec::with_capacity(self.vms.len());
         // Insert tasks for each configured host
         let vms = &self.vms.clone();
         for host in vms {
             let task = ProofKey::new(proof_id, *host);
             tasks.push(task);
-            let dep_tasks = deps.iter().map(|&dep| ProofKey::new(dep, *host)).collect();
-            self.insert_task(task, dep_tasks)?;
+            let dep_tasks: Vec<_> = deps.iter().map(|&dep| ProofKey::new(dep, *host)).collect();
+            self.insert_task(task, &dep_tasks, db)?;
         }
 
         Ok(tasks)
@@ -73,25 +81,33 @@ impl TaskTracker {
     pub fn insert_task(
         &mut self,
         id: ProofKey,
-        deps: Vec<ProofKey>,
+        deps: &[ProofKey],
+        db: &ProofDb,
     ) -> Result<(), ProvingTaskError> {
         if self.tasks.contains_key(&id) {
             return Err(ProvingTaskError::TaskAlreadyFound(id));
         }
 
-        for dep in &deps {
-            if !self.tasks.contains_key(dep) {
-                return Err(ProvingTaskError::DependencyNotFound(*dep));
+        // Gather dependencies that are not completed
+        let mut pending_deps = Vec::with_capacity(deps.len());
+        for &dep in deps {
+            let proof = db.get_proof(dep).map_err(ProvingTaskError::DatabaseError)?;
+            match proof {
+                Some(_) => {}
+                None => {
+                    pending_deps.push(dep);
+                }
             }
         }
 
-        let status = if deps.is_empty() {
-            ProvingTaskStatus::Pending
+        if pending_deps.is_empty() {
+            self.tasks.insert(id, ProvingTaskStatus::Pending);
         } else {
-            ProvingTaskStatus::WaitingForDependencies(HashSet::from_iter(deps))
+            self.pending_dependencies
+                .insert(id, HashSet::from_iter(pending_deps));
+            self.tasks
+                .insert(id, ProvingTaskStatus::WaitingForDependencies);
         };
-
-        self.tasks.insert(id, status);
 
         Ok(())
     }
@@ -129,15 +145,22 @@ impl TaskTracker {
                 // Decrement value if key exists, or insert with a default value of 1
                 *self.in_progress_tasks.entry(*id.host()).or_insert(0) -= 1;
 
-                // Resolve dependencies if a task is completed
-                for task_status in self.tasks.values_mut() {
-                    if let ProvingTaskStatus::WaitingForDependencies(deps) = task_status {
-                        deps.remove(&id);
-                        if deps.is_empty() {
-                            task_status.transition(ProvingTaskStatus::Pending)?;
-                        }
+                // Resolve dependencies for other tasks
+                let mut tasks_to_update = vec![];
+                for (dependent_task, deps) in self.pending_dependencies.iter_mut() {
+                    if deps.remove(&id) && deps.is_empty() {
+                        tasks_to_update.push(*dependent_task);
                     }
                 }
+
+                for task in tasks_to_update {
+                    self.pending_dependencies.remove(&task);
+                    if let Some(task_status) = self.tasks.get_mut(&task) {
+                        task_status.transition(ProvingTaskStatus::Pending)?;
+                    }
+                }
+
+                self.tasks.remove(&id);
             }
             Ok(())
         } else {
@@ -170,11 +193,23 @@ impl TaskTracker {
             })
             .collect()
     }
+
+    /// Generates a report of task statuses and their counts across all tasks.
+    pub fn generate_report(&self) -> HashMap<String, usize> {
+        let mut report: HashMap<String, usize> = HashMap::new();
+
+        for status in self.tasks.values() {
+            *report.entry(format!("{:?}", status)).or_insert(0) += 1;
+        }
+
+        report
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use strata_primitives::proof::{ProofContext, ProofZkVm};
+    use strata_rocksdb::test_utils::get_rocksdb_tmp_instance_for_prover;
     use strata_state::l1::L1BlockId;
     use strata_test_utils::ArbitraryGenerator;
 
@@ -201,12 +236,18 @@ mod tests {
         (key, deps)
     }
 
+    fn setup_db() -> ProofDb {
+        let (db, db_ops) = get_rocksdb_tmp_instance_for_prover().unwrap();
+        ProofDb::new(db, db_ops)
+    }
+
     #[test]
     fn test_insert_task_no_dependencies() {
         let mut tracker = TaskTracker::new();
         let (id, _) = gen_task_with_deps(0);
+        let db = setup_db();
 
-        tracker.insert_task(id, vec![]).unwrap();
+        tracker.insert_task(id, &[], &db).unwrap();
         assert!(
             matches!(tracker.get_task(id), Ok(&ProvingTaskStatus::Pending)),
             "Task with no dependencies should be Pending"
@@ -217,15 +258,16 @@ mod tests {
     fn test_insert_task_with_dependencies() {
         let mut tracker = TaskTracker::new();
         let (id, deps) = gen_task_with_deps(2);
+        let db = setup_db();
 
         for dep in &deps {
-            tracker.insert_task(*dep, vec![]).unwrap();
+            tracker.insert_task(*dep, &[], &db).unwrap();
         }
-        tracker.insert_task(id, deps.clone()).unwrap();
+        tracker.insert_task(id, &deps.clone(), &db).unwrap();
         assert!(
             matches!(
                 tracker.get_task(id),
-                Ok(&ProvingTaskStatus::WaitingForDependencies(_))
+                Ok(&ProvingTaskStatus::WaitingForDependencies)
             ),
             "Task with dependencies should be WaitingForDependencies"
         );
@@ -244,10 +286,12 @@ mod tests {
     fn test_dependency_resolution() {
         let mut tracker = TaskTracker::new();
         let (id, deps) = gen_task_with_deps(2);
+        let db = setup_db();
+
         for dep in &deps {
-            tracker.insert_task(*dep, vec![]).unwrap();
+            tracker.insert_task(*dep, &[], &db).unwrap();
         }
-        tracker.insert_task(id, deps.clone()).unwrap();
+        tracker.insert_task(id, &deps, &db).unwrap();
 
         for dep in &deps {
             tracker

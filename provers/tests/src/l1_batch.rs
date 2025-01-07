@@ -1,22 +1,18 @@
 use bitcoin::params::MAINNET;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
-use strata_test_utils::bitcoin::get_btc_chain;
+use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params};
 use strata_zkvm::{ZkVmHost, ZkVmResult};
 
-use super::{btc::BtcBlockProofGenerator, ProofGenerator};
+use super::ProofGenerator;
 
 #[derive(Clone)]
 pub struct L1BatchProofGenerator<H: ZkVmHost> {
-    btc_proof_generator: BtcBlockProofGenerator<H>,
     host: H,
 }
 
 impl<H: ZkVmHost> L1BatchProofGenerator<H> {
-    pub fn new(btc_proof_generator: BtcBlockProofGenerator<H>, host: H) -> Self {
-        Self {
-            btc_proof_generator,
-            host,
-        }
+    pub fn new(host: H) -> Self {
+        Self { host }
     }
 }
 
@@ -27,24 +23,24 @@ impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
 
     fn get_input(&self, heights: &(u32, u32)) -> ZkVmResult<L1BatchProofInput> {
         let (start_height, end_height) = *heights;
-
         let btc_chain = get_btc_chain();
 
+        let params = gen_params();
+        let rollup_params = params.rollup().clone();
         let state = btc_chain.get_verification_state(start_height, &MAINNET.clone().into());
 
-        let mut batch = vec![];
+        let mut blocks = Vec::new();
         for height in start_height..=end_height {
-            let block = btc_chain.get_block(height);
-            let btc_proof = self.btc_proof_generator.get_proof(block)?;
-            batch.push(btc_proof);
+            let block = btc_chain.get_block(height).clone();
+            blocks.push(block);
         }
 
         let input = L1BatchProofInput {
+            blocks,
             state,
-            batch,
-            blockspace_vk: self.btc_proof_generator.get_host().get_verification_key(),
+            rollup_params,
         };
-        // dbg!(&input.blockspace_vk);
+
         Ok(input)
     }
 

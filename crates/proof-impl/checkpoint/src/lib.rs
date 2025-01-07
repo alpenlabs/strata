@@ -3,10 +3,10 @@
 //! chain and that all L1-L2 transactions were processed.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, params::RollupParams, proof::RollupVerifyingKey};
+use strata_primitives::{params::RollupParams, proof::RollupVerifyingKey};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
-use strata_state::batch::{BatchInfo, BootstrapState};
+use strata_state::batch::{BatchInfo, CheckpointProofOutput};
 use strata_zkvm::{Proof, ZkVmEnv};
 
 pub mod prover;
@@ -20,27 +20,6 @@ pub struct CheckpointProofInput {
     /// Cannot be hardcoded as any change to the program or proof implementation
     /// will change verifying_key.
     pub vk: Vec<u8>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
-pub struct CheckpointProofOutput {
-    pub info: BatchInfo,
-    pub bootstrap_state: BootstrapState,
-    pub rollup_params_commitment: Buf32,
-}
-
-impl CheckpointProofOutput {
-    pub fn new(
-        info: BatchInfo,
-        bootstrap: BootstrapState,
-        rollup_params_commitment: Buf32,
-    ) -> CheckpointProofOutput {
-        Self {
-            info,
-            bootstrap_state: bootstrap,
-            rollup_params_commitment,
-        }
-    }
 }
 
 pub fn process_checkpoint_proof(
@@ -117,7 +96,6 @@ pub fn process_checkpoint_proof(
                 let prev_checkpoint_output = CheckpointProofOutput::new(
                     prev_checkpoint.batch_info().clone(),
                     bootstrap.clone(),
-                    l1_batch_output.rollup_params_commitment,
                 );
                 let prev_checkpoint_proof = prev_checkpoint.proof().clone();
                 (
@@ -127,11 +105,7 @@ pub fn process_checkpoint_proof(
             }
         }
     };
-    let output = CheckpointProofOutput::new(
-        batch_info,
-        bootstrap,
-        l1_batch_output.rollup_params_commitment,
-    );
+    let output = CheckpointProofOutput::new(batch_info, bootstrap);
     (output, opt_prev_output)
 }
 
@@ -143,7 +117,8 @@ pub fn process_checkpoint_proof_outer(
     let rollup_params: RollupParams = zkvm.read_serde();
     let rollup_vk = match rollup_params.rollup_vk() {
         RollupVerifyingKey::SP1VerifyingKey(sp1_vk) => sp1_vk,
-        _ => panic!("Need SP1VerifyingKey"),
+        RollupVerifyingKey::Risc0VerifyingKey(risc0_vk) => risc0_vk,
+        RollupVerifyingKey::NativeVerifyingKey(native_vk) => native_vk,
     };
 
     // verify l1 proof

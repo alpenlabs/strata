@@ -74,7 +74,7 @@ impl ProverManager {
             }
 
             // Step 3: Sleep before the next loop iteration
-            sleep(Duration::from_secs(self.loop_interval)).await;
+            sleep(Duration::from_millis(self.loop_interval)).await;
         }
     }
 }
