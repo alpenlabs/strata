@@ -27,5 +27,5 @@ zeroize.workspace = true
 
 [features]
 default = []
-sp1 = ["strata-sp1-guest-builder"]
 risc0 = ["strata-risc0-guest-builder", "bytemuck"]
+sp1 = ["strata-sp1-guest-builder"]
