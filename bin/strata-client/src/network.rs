@@ -41,6 +41,8 @@ fn get_deprecated_fallback() -> RollupParams {
     // TODO: load default params from a json during compile time
     RollupParams {
         rollup_name: "strata".to_string(),
+        da_tag: "strata-da".to_string(),
+        checkpoint_tag: "strata-ckpt".to_string(),
         block_time: 1000,
         cred_rule: CredRule::Unchecked,
         horizon_l1_height: 3,
