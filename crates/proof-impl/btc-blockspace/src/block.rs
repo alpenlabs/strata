@@ -169,23 +169,20 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_block_with_invalid_coinbase_inclusion_proof() {
         let block = get_btc_mainnet_block();
         let empty_inclusion_proof = L1TxProof::new(0, vec![]);
-        assert!(check_integrity(&block, &empty_inclusion_proof));
+        assert!(!check_integrity(&block, &empty_inclusion_proof));
     }
 
     #[test]
-    #[should_panic]
     fn test_block_with_valid_inclusion_proof_of_other_tx() {
         let block = get_btc_mainnet_block();
         let non_coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 1);
-        assert!(check_integrity(&block, &non_coinbase_inclusion_proof));
+        assert!(!check_integrity(&block, &non_coinbase_inclusion_proof));
     }
 
     #[test]
-    #[should_panic]
     fn test_block_with_witness_removed() {
         let mut block = get_btc_mainnet_block();
         let empty_witness = Witness::new();
@@ -198,11 +195,10 @@ mod tests {
         }
 
         let empty_inclusion_proof = L1TxProof::new(0, vec![]);
-        assert!(check_integrity(&block, &empty_inclusion_proof));
+        assert!(!check_integrity(&block, &empty_inclusion_proof));
     }
 
     #[test]
-    #[should_panic]
     fn test_block_with_removed_witness_but_valid_inclusion_proof() {
         let mut block = get_btc_mainnet_block();
         let empty_witness = Witness::new();
@@ -215,7 +211,7 @@ mod tests {
         }
 
         let valid_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
-        assert!(check_integrity(&block, &valid_inclusion_proof));
+        assert!(!check_integrity(&block, &valid_inclusion_proof));
     }
 
     #[test]
