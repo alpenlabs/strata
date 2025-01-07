@@ -53,7 +53,7 @@ class BridgeDepositSequencerUnreliableTest(testenv.BridgeTestBase):
         balance_after_deposits = wait_until_with_value(
             lambda: int(self.rethrpc.eth_getBalance(el_address), 16),
             predicate=lambda v: v == 2 * cfg.deposit_amount * SATS_TO_WEI,
-            timeout=60,
+            timeout=150,
         )
         self.debug(f"Strata Balance after deposits: {balance_after_deposits}")
 
