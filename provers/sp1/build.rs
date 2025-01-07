@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 #[cfg(not(debug_assertions))]
 use sp1_helper::{build_program_with_args, BuildArgs};
 #[cfg(not(debug_assertions))]
-use sp1_sdk::{HashableKey, MockProver, Prover, SP1VerifyingKey};
+use sp1_sdk::{HashableKey, Prover, ProverClient, SP1VerifyingKey};
 
 // Guest program names
 const EVM_EE_STF: &str = "guest-evm-ee-stf";
@@ -35,11 +35,11 @@ fn main() {
     // List of guest programs to build
     let guest_programs = [
         BTC_BLOCKSPACE,
-        L1_BATCH,
-        EVM_EE_STF,
-        CL_STF,
-        CL_AGG,
-        CHECKPOINT,
+        // L1_BATCH,
+        // EVM_EE_STF,
+        // CL_STF,
+        // CL_AGG,
+        // CHECKPOINT,
     ];
 
     // HashSet to keep track of programs that have been built
@@ -196,7 +196,7 @@ fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
 
     if !is_cache_valid(&elf_hash, &paths) {
         // Cache is invalid, need to generate vk and pk
-        let client = MockProver::new();
+        let client = ProverClient::builder().mock().build();
         let (pk, vk) = client.setup(&elf);
 
         fs::write(&paths[1], elf_hash)

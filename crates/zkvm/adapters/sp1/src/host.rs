@@ -40,7 +40,7 @@ impl SP1Host {
     }
 
     pub fn init(guest_code: &[u8]) -> Self {
-        let client = ProverClient::new();
+        let client = ProverClient::from_env();
         let (proving_key, verifying_key) = client.setup(guest_code);
         Self {
             elf: guest_code.to_vec(),
@@ -68,10 +68,10 @@ impl ZkVmHost for SP1Host {
             std::env::set_var("SP1_PROVER", "mock");
         }
 
-        let client = ProverClient::new();
+        let client = ProverClient::from_env();
 
         // Start proving
-        let mut prover = client.prove(&self.proving_key, prover_input);
+        let mut prover = client.prove(&self.proving_key, &prover_input);
         prover = match proof_type {
             ProofType::Compressed => prover.compressed(),
             ProofType::Core => prover.core(),
@@ -99,7 +99,7 @@ impl ZkVmHost for SP1Host {
     }
 
     fn verify_inner(&self, proof: &SP1ProofReceipt) -> ZkVmResult<()> {
-        let client = ProverClient::new();
+        let client = ProverClient::from_env();
         client
             .verify(proof.as_ref(), &self.verifying_key)
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
