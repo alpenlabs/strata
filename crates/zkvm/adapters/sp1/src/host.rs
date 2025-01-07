@@ -1,7 +1,9 @@
 use std::fmt;
 
 use serde::{de::DeserializeOwned, Serialize};
-use sp1_sdk::{HashableKey, ProverClient, SP1ProvingKey, SP1VerifyingKey};
+use sp1_sdk::{
+    network::FulfillmentStrategy, HashableKey, ProverClient, SP1ProvingKey, SP1VerifyingKey,
+};
 use strata_zkvm::{
     ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
 };
@@ -68,6 +70,19 @@ impl ZkVmHost for SP1Host {
             std::env::set_var("SP1_PROVER", "mock");
         }
 
+        if std::env::var("SP1_PROVER").unwrap() == "network" {
+            let proof_info = ProverClient::builder()
+                .network()
+                .build()
+                .prove(&self.proving_key, &prover_input)
+                .strategy(FulfillmentStrategy::Reserved)
+                .compressed()
+                .run()
+                .unwrap();
+
+            return Ok(proof_info.into());
+        }
+
         let client = ProverClient::from_env();
 
         // Start proving
@@ -81,11 +96,6 @@ impl ZkVmHost for SP1Host {
         let proof_info = prover
             .run()
             .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
-
-        let mut network_prover = ProverClient::builder().network().build();
-        network_prover.prove(&self.proving_key, &prover_input);
-
-        let p2 = client.prove(&self.proving_key, &prover_input);
 
         Ok(proof_info.into())
     }
