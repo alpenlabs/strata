@@ -5,7 +5,7 @@ use strata_crypto::verify_schnorr_sig;
 use strata_primitives::buf::{Buf32, Buf64};
 use strata_zkvm::{Proof, ProofReceipt, PublicValues};
 
-use crate::{id::L2BlockId, l1::L1BlockId};
+use crate::id::L2BlockId;
 
 /// Public parameters for batch proof to be posted to DA.
 /// Will be updated as prover specs evolve.
@@ -134,9 +134,6 @@ pub struct BatchInfo {
     /// The last L2 block upto which this checkpoint covers since the previous checkpoint
     pub l2_blockid: L2BlockId,
 
-    /// The last L1 block upto which this checkpoint covers since the previous checkpoint
-    pub l1_blockid: L1BlockId,
-
     /// PoW transition in the given `l1_range`
     pub l1_pow_transition: (u128, u128),
 
@@ -154,7 +151,6 @@ impl BatchInfo {
         l1_transition: (Buf32, Buf32),
         l2_transition: (Buf32, Buf32),
         l2_blockid: L2BlockId,
-        l1_blockid: L1BlockId,
         l1_pow_transition: (u128, u128),
         rollup_params_commitment: Buf32,
     ) -> Self {
@@ -165,7 +161,6 @@ impl BatchInfo {
             l1_transition,
             l2_transition,
             l2_blockid,
-            l1_blockid,
             l1_pow_transition,
             rollup_params_commitment,
         }
@@ -177,10 +172,6 @@ impl BatchInfo {
 
     pub fn l2_blockid(&self) -> &L2BlockId {
         &self.l2_blockid
-    }
-
-    pub fn l1_blockid(&self) -> &L1BlockId {
-        &self.l1_blockid
     }
 
     pub fn initial_l1_state_hash(&self) -> &Buf32 {

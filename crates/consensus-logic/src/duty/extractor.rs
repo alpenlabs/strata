@@ -52,13 +52,6 @@ fn extract_batch_duties(
         return Ok(vec![]);
     };
 
-    // BlockHash of last L1 block covered by the checkpoint
-    let Some(tip_blockid) = state.l1_view().tip_blkid() else {
-        debug!("no blocks read from L1");
-        // Cannot create checkpoint without L1 blocks
-        return Ok(vec![]);
-    };
-
     match state.l1_view().last_finalized_checkpoint() {
         // Cool, we are producing first batch!
         None => {
@@ -113,7 +106,6 @@ fn extract_batch_duties(
                 l1_transition,
                 l2_transition,
                 tip_id,
-                *tip_blockid,
                 (0, current_l1_state.total_accumulated_pow),
                 rollup_params_commitment,
             );
@@ -152,7 +144,6 @@ fn extract_batch_duties(
                 l1_transition,
                 l2_transition,
                 tip_id,
-                *tip_blockid,
                 (
                     checkpoint.l1_pow_transition.1,
                     current_l1_state.total_accumulated_pow,

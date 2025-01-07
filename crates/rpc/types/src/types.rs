@@ -268,8 +268,6 @@ pub struct RpcCheckpointInfo {
     pub l2_range: (u64, u64),
     /// L2 block that this checkpoint covers
     pub l2_blockid: L2BlockId,
-    /// Last L1 block covered by this checkpoint
-    pub l1_blockid: L1BlockId,
     /// Info on txn where checkpoint is committed on chain
     pub commitment: Option<RpcCheckpointCommitmentInfo>,
 }
@@ -281,7 +279,6 @@ impl From<BatchInfo> for RpcCheckpointInfo {
             l1_range: value.l1_range,
             l2_range: value.l2_range,
             l2_blockid: value.l2_blockid,
-            l1_blockid: value.l1_blockid,
             commitment: None,
         }
     }
