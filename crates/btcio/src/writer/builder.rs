@@ -20,16 +20,15 @@ use bitcoin::{
     Witness,
 };
 use rand::{rngs::OsRng, RngCore};
+use strata_config::btcio::FeePolicy;
 use strata_l1tx::envelope::builder::build_envelope_script;
 use strata_state::da_blob::L1Payload;
 use thiserror::Error;
 
-use crate::{
-    rpc::{
-        traits::{Reader, Signer, Wallet},
-        types::ListUnspent,
-    },
-    writer::config::{FeePolicy, WriterConfig},
+use super::context::WriterContext;
+use crate::rpc::{
+    traits::{Reader, Signer, Wallet},
+    types::ListUnspent,
 };
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
@@ -55,21 +54,21 @@ pub enum EnvelopeError {
 pub async fn build_envelope_txs(
     payload: &L1Payload,
     rpc_client: &Arc<impl Reader + Wallet + Signer>,
-    config: &WriterConfig,
+    ctx: Arc<WriterContext>,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     let network = rpc_client.network().await?;
     let utxos = rpc_client.get_utxos().await?;
 
-    let fee_rate = match config.fee_policy {
+    let fee_rate = match ctx.config.fee_policy {
         FeePolicy::Smart => rpc_client.estimate_smart_fee(1).await? * 2,
         FeePolicy::Fixed(val) => val,
     };
     create_envelope_transactions(
-        &config.rollup_name,
+        &ctx.params.rollup().rollup_name,
         payload,
         utxos,
-        config.sequencer_address.clone(),
-        config.amount_for_reveal_txn,
+        ctx.sequencer_address.clone(),
+        ctx.config.reveal_amount,
         fee_rate,
         network,
     )

@@ -15,7 +15,6 @@ use strata_state::{
 use strata_zkvm::ProofReceipt;
 
 /// Represents data for a payload we're still planning to post to L1.
-// TODO rename to `BlockEnvelopeEntry` to emphasize this isn't just about *all* payloads
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct PayloadEntry {
     pub payload: L1Payload,

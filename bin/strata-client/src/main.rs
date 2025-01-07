@@ -7,7 +7,7 @@ use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     rpc::{traits::Reader, BitcoinClient},
-    writer::{config::WriterConfig, start_envelope_task},
+    writer::start_envelope_task,
 };
 use strata_common::logging;
 use strata_config::{ClientMode, Config, SequencerConfig};
@@ -408,17 +408,15 @@ fn start_sequencer_tasks(
         ))?,
     };
 
-    // Spawn up writer
-    let writer_config = WriterConfig::new(
-        sequencer_bitcoin_address,
-        params.rollup().rollup_name.clone(),
-    )?;
+    let btcio_config = Arc::new(config.btcio.clone());
 
     // Start envelope tasks
     let envelope_handle = start_envelope_task(
         executor,
         bitcoin_client,
-        writer_config,
+        btcio_config,
+        params.clone(),
+        sequencer_bitcoin_address,
         seq_db,
         status_channel.clone(),
         pool.clone(),

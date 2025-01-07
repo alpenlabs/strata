@@ -1,21 +1,25 @@
 use std::{sync::Arc, time::Duration};
 
+use bitcoin::Address;
+use strata_config::btcio::BtcIOConfig;
 use strata_db::{
     traits::SequencerDatabase,
     types::{L1TxStatus, PayloadEntry, PayloadL1Status},
 };
+use strata_primitives::params::Params;
 use strata_state::da_blob::{PayloadDest, PayloadIntent};
 use strata_status::StatusChannel;
 use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;
 use tracing::*;
 
-use super::config::WriterConfig;
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::traits::{Reader, Signer, Wallet},
+    rpc::BitcoinClient,
     status::{apply_status_updates, L1StatusUpdate},
-    writer::{builder::EnvelopeError, signer::create_and_sign_payload_envelopes},
+    writer::{
+        builder::EnvelopeError, context::WriterContext, signer::create_and_sign_payload_envelopes,
+    },
 };
 
 /// A handle to the Envelope task.
@@ -85,8 +89,10 @@ impl EnvelopeHandle {
 /// [`Result<EnvelopeHandle>`](anyhow::Result)
 pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
-    bitcoin_client: Arc<impl Reader + Wallet + Signer + Send + Sync + 'static>,
-    config: WriterConfig,
+    bitcoin_client: Arc<BitcoinClient>,
+    config: Arc<BtcIOConfig>,
+    params: Arc<Params>,
+    sequencer_address: Address,
     db: Arc<D>,
     status_channel: StatusChannel,
     pool: threadpool::ThreadPool,
@@ -96,15 +102,20 @@ pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
     let next_watch_payload_idx = get_next_payloadidx_to_watch(envelope_data_ops.as_ref())?;
 
     let envelope_handle = Arc::new(EnvelopeHandle::new(envelope_data_ops.clone()));
+    let ctx = Arc::new(WriterContext::new(
+        params,
+        config,
+        sequencer_address,
+        bitcoin_client,
+        status_channel,
+    ));
 
     executor.spawn_critical_async("btcio::watcher_task", async move {
         watcher_task(
             next_watch_payload_idx,
-            bitcoin_client,
-            config,
+            ctx,
             envelope_data_ops,
             broadcast_handle,
-            status_channel,
         )
         .await
     });
@@ -139,14 +150,12 @@ fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u6
 /// [`BlobL1Status::Finalized`]
 pub async fn watcher_task(
     next_blbidx_to_watch: u64,
-    bitcoin_client: Arc<impl Reader + Wallet + Signer>,
-    config: WriterConfig,
+    context: Arc<WriterContext>,
     insc_ops: Arc<EnvelopeDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
-    status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
     info!("Starting L1 writer's watcher task");
-    let interval = tokio::time::interval(Duration::from_millis(config.poll_duration_ms));
+    let interval = tokio::time::interval(Duration::from_millis(context.config.write_poll_dur_ms));
     tokio::pin!(interval);
 
     let mut curr_payloadidx = next_blbidx_to_watch;
@@ -165,8 +174,8 @@ pub async fn watcher_task(
                     match create_and_sign_payload_envelopes(
                         &payloadentry,
                         &broadcast_handle,
-                        bitcoin_client.clone(),
-                        &config,
+                        context.client.clone(),
+                        context.clone(),
                     )
                     .await
                     {
@@ -213,7 +222,8 @@ pub async fn watcher_task(
                                 determine_payload_next_status(&ctx.status, &rtx.status);
                             debug!(?new_status, "The next status for payload");
 
-                            update_l1_status(&payloadentry, &new_status, &status_channel).await;
+                            update_l1_status(&payloadentry, &new_status, &context.status_channel)
+                                .await;
 
                             // Update payloadentry with new status
                             let mut updated_entry = payloadentry.clone();

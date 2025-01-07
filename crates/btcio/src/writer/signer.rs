@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use bitcoin::{consensus, Transaction};
+use strata_config::btcio::BtcIOConfig;
 use strata_db::types::{L1TxEntry, PayloadEntry};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, params::RollupParams};
 use tracing::*;
 
 use super::{
     builder::{build_envelope_txs, EnvelopeError},
-    config::WriterConfig,
+    context::WriterContext,
 };
 use crate::{
     broadcaster::L1BroadcastHandle,
@@ -23,13 +24,13 @@ type BlobIdx = u64;
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
 pub async fn create_and_sign_payload_envelopes(
-    blobentry: &PayloadEntry,
+    payloadentry: &PayloadEntry,
     broadcast_handle: &L1BroadcastHandle,
     client: Arc<impl Reader + Wallet + Signer>,
-    config: &WriterConfig,
+    ctx: Arc<WriterContext>,
 ) -> Result<(Buf32, Buf32), EnvelopeError> {
     trace!("Creating and signing payload envelopes");
-    let (commit, reveal) = build_envelope_txs(&blobentry.payload, &client, config).await?;
+    let (commit, reveal) = build_envelope_txs(&payloadentry.payload, &client, ctx).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");

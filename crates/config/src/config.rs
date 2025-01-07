@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bitcoin::Network;
 use serde::Deserialize;
 
-use crate::RelayerConfig;
+use crate::{bridge::RelayerConfig, btcio::BtcIOConfig};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SequencerConfig {
@@ -40,8 +40,6 @@ pub struct ClientConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct SyncConfig {
     pub l1_follow_distance: u64,
-    pub max_reorg_depth: u32,
-    pub client_poll_dur_ms: u32,
     pub client_checkpoint_interval: u32,
 }
 
@@ -68,6 +66,7 @@ pub struct ExecConfig {
 pub struct Config {
     pub client: ClientConfig,
     pub bitcoind_rpc: BitcoindConfig,
+    pub btcio: BtcIOConfig,
     pub sync: SyncConfig,
     pub exec: ExecConfig,
     pub relayer: RelayerConfig,
@@ -98,7 +97,6 @@ mod test {
 
             [sync]
             l1_follow_distance = 6
-            max_reorg_depth = 4
             client_poll_dur_ms = 200
             client_checkpoint_interval = 10
 
@@ -138,7 +136,6 @@ mod test {
 
             [sync]
             l1_follow_distance = 6
-            max_reorg_depth = 4
             client_poll_dur_ms = 200
             client_checkpoint_interval = 10
 

@@ -3,8 +3,10 @@ use std::path::PathBuf;
 use argh::FromArgs;
 use bitcoin::Network;
 use strata_config::{
-    BitcoindConfig, ClientConfig, ClientMode, Config, ExecConfig, FullNodeConfig, RelayerConfig,
-    RethELConfig, SequencerConfig, SyncConfig,
+    bridge::RelayerConfig,
+    btcio::{BtcIOConfig, FeePolicy},
+    BitcoindConfig, ClientConfig, ClientMode, Config, ExecConfig, FullNodeConfig, RethELConfig,
+    SequencerConfig, SyncConfig,
 };
 
 #[derive(Debug, Clone, FromArgs)]
@@ -99,8 +101,6 @@ impl Args {
             },
             sync: SyncConfig {
                 l1_follow_distance: 6,
-                max_reorg_depth: 4,
-                client_poll_dur_ms: 200,
                 client_checkpoint_interval: 10,
             },
             exec: ExecConfig {
@@ -113,6 +113,13 @@ impl Args {
                 refresh_interval: 10,
                 stale_duration: 120,
                 relay_misc: true,
+            },
+            btcio: BtcIOConfig {
+                // TODO: actually get these from args
+                client_poll_dur_ms: 200,
+                write_poll_dur_ms: 1_000,
+                fee_policy: FeePolicy::Smart,
+                reveal_amount: 1_000,
             },
         })
     }

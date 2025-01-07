@@ -5,22 +5,24 @@ use std::{
 };
 
 use anyhow::bail;
-use bitcoin::{Block, BlockHash};
-use strata_state::l1::{
-    get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
-    L1BlockId, TimestampStore,
-};
-use strata_status::StatusChannel;
+use bitcoin::{hashes::Hash, Block, BlockHash};
+use strata_config::btcio::BtcIOConfig;
 use strata_l1tx::{
     filter::filter_protocol_op_tx_refs,
     filter_types::TxFilterConfig,
     messages::{BlockData, L1Event},
 };
+use strata_primitives::{buf::Buf32, params::Params};
+use strata_state::l1::{
+    get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
+    L1BlockId, TimestampStore,
+};
+use strata_status::StatusChannel;
 use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    reader::{config::ReaderConfig, state::ReaderState},
+    reader::state::ReaderState,
     rpc::traits::Reader,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -32,7 +34,9 @@ struct ReaderContext<R: Reader> {
     /// L1Event sender
     event_tx: mpsc::Sender<L1Event>,
     /// Config
-    config: Arc<ReaderConfig>,
+    config: Arc<BtcIOConfig>,
+    /// Params
+    params: Arc<Params>,
     /// Status transmitter
     status_channel: StatusChannel,
 }
@@ -42,13 +46,15 @@ pub async fn bitcoin_data_reader_task(
     client: Arc<impl Reader>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
-    config: Arc<ReaderConfig>,
+    config: Arc<BtcIOConfig>,
+    params: Arc<Params>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
     let ctx = ReaderContext {
         client,
         event_tx,
         config,
+        params,
         status_channel,
     };
     do_reader_task(ctx, target_next_block).await
@@ -150,7 +156,7 @@ async fn update_epoch_and_filter_config<R: Reader>(
     if curr_epoch != new_epoch {
         state.set_epoch(new_epoch);
         // TODO: pass in chainstate to `derive_from`
-        let new_config = TxFilterConfig::derive_from(ctx.config.params.rollup())?;
+        let new_config = TxFilterConfig::derive_from(ctx.params.rollup())?;
         let curr_filter_config = state.filter_config().clone();
 
         if new_config != curr_filter_config {
@@ -170,9 +176,9 @@ async fn init_reader_state<R: Reader>(
     debug!(%target_next_block, "initializing reader state");
     let mut init_queue = VecDeque::new();
 
-    let lookback = ctx.config.max_reorg_depth as usize * 2;
+    let lookback = ctx.params.rollup().l1_reorg_safe_depth as usize * 2;
     let client = ctx.client.as_ref();
-    let hor_height = ctx.config.params.rollup().horizon_l1_height;
+    let hor_height = ctx.params.rollup().horizon_l1_height;
     let pre_hor = hor_height.saturating_sub(1);
     let target = target_next_block as i64;
 
@@ -196,7 +202,7 @@ async fn init_reader_state<R: Reader>(
         real_cur_height = height;
     }
 
-    let params = ctx.config.params.clone();
+    let params = ctx.params.clone();
     let filter_config = TxFilterConfig::derive_from(params.rollup())?;
     let epoch = ctx.status_channel.epoch().unwrap_or(0);
     let state = ReaderState::new(
@@ -317,7 +323,7 @@ async fn process_block<R: Reader>(
 ) -> anyhow::Result<(L1Event, BlockHash)> {
     let txs = block.txdata.len();
 
-    let params = ctx.config.params.clone();
+    let params = ctx.params.clone();
     let filtered_txs = filter_protocol_op_tx_refs(&block, state.filter_config());
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
