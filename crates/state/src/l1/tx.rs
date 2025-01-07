@@ -1,8 +1,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::l1::L1TxProof;
 
+use super::L1TxProof;
 use crate::tx::ProtocolOperation;
 
 /// Tx body with a proof.
@@ -10,6 +10,7 @@ use crate::tx::ProtocolOperation;
     Clone, Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Arbitrary, Serialize, Deserialize,
 )]
 pub struct L1Tx {
+    // TODO: verify if we need L1TxProof or L1WtxProof
     proof: L1TxProof,
     tx: Vec<u8>,
     protocol_operation: ProtocolOperation,

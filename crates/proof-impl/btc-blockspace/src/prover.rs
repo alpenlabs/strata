@@ -1,9 +1,13 @@
 use bitcoin::consensus::serialize;
+use strata_state::l1::L1TxProof;
 use strata_zkvm::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };
 
-use crate::logic::{BlockScanProofInput, BlockScanResult};
+use crate::{
+    block::witness_commitment_from_coinbase,
+    logic::{BlockScanProofInput, BlockScanResult},
+};
 
 pub struct BtcBlockspaceProver;
 
@@ -20,10 +24,16 @@ impl ZkVmProver for BtcBlockspaceProver {
     where
         B: ZkVmInputBuilder<'a>,
     {
+        let block = &input.block;
+
+        let inclusion_proof = witness_commitment_from_coinbase(&block.txdata[0])
+            .map(|_| L1TxProof::generate(&block.txdata, 0));
+
         let serialized_block = serialize(&input.block);
         let zkvm_input = B::new()
             .write_serde(&input.rollup_params)?
             .write_buf(&serialized_block)?
+            .write_borsh(&inclusion_proof)?
             .build()?;
 
         Ok(zkvm_input)

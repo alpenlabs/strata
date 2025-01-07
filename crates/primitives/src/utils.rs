@@ -1,33 +1,43 @@
-use bitcoin::{
-    hashes::{sha256d, Hash},
-    Wtxid,
-};
 use serde::{Deserialize, Serialize};
 
-use crate::prelude::Buf32;
+use crate::{hash::sha256d, prelude::Buf32};
 
-/// Generates cohashes for an wtxid in particular index with in given slice of wtxids.
+/// Generates cohashes and computes the Merkle root for a transaction ID at a specific index
+/// within a given slice of elements that can be converted to [`Buf32`].
+///
+/// This function supports any type that implements the [`Into<Buf32>`] trait, such as
+/// [`Txid`s](bitcoin::Txid) or [`Wtxid`s](bitcoin::Wtxid).
 ///
 /// # Parameters
-/// - `wtxids`: The witness txids slice
-/// - `index`: The index of the txn for which we want the cohashes
+///
+/// - `ids`: A slice of ids ([`Txid`s](bitcoin::Txid) or [`Wtxid`s](bitcoin::Wtxid)) that can be
+///   converted into [`Buf32`].
+/// - `index`: The index of the transaction for which we want the cohashes.
+///
+/// # Notes
+///
+/// Cohashes refer to the intermediate hashes (sometimes called "siblings") needed to
+/// reconstruct the Merkle path for a given transaction. These intermediate hashes, along with
+/// the transaction's hash itself, can be used to compute the Merkle root, thus verifying the
+/// transaction’s membership in the Merkle tree.
 ///
 /// # Returns
-/// - A tuple `(Vec<Buf32>, Buf32)` containing the cohashes and the merkle root
+///
+/// - A tuple `(Vec<Buf32>, Buf32)` containing the cohashes and the Merkle root.
 ///
 /// # Panics
-/// - If the `index` is out of bounds for the `wtxids` length
-pub fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32) {
+///
+/// - If the `index` is out of bounds for the `elements` length.
+pub fn get_cohashes<T>(ids: &[T], index: u32) -> (Vec<Buf32>, Buf32)
+where
+    T: Into<Buf32> + Clone,
+{
     assert!(
-        (index as usize) < wtxids.len(),
+        (index as usize) < ids.len(),
         "The transaction index should be within the txids length"
     );
+    let mut curr_level: Vec<Buf32> = ids.iter().cloned().map(Into::into).collect();
 
-    let mut curr_level: Vec<_> = wtxids
-        .iter()
-        .cloned()
-        .map(|x| x.to_raw_hash().to_byte_array())
-        .collect();
     let mut curr_index = index;
     let mut proof = Vec::new();
 
@@ -44,7 +54,7 @@ pub fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Bu
         };
 
         let item = curr_level[proof_item_index as usize];
-        proof.push(Buf32(item));
+        proof.push(item);
 
         // construct pairwise hash
         curr_level = curr_level
@@ -54,14 +64,14 @@ pub fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Bu
                     panic!("utils: cohash chunk should be a pair");
                 };
                 let mut arr = [0u8; 64];
-                arr[..32].copy_from_slice(a);
-                arr[32..].copy_from_slice(b);
-                *sha256d::Hash::hash(&arr).as_byte_array()
+                arr[..32].copy_from_slice(a.as_bytes());
+                arr[32..].copy_from_slice(b.as_bytes());
+                sha256d(&arr)
             })
             .collect::<Vec<_>>();
         curr_index >>= 1;
     }
-    (proof, Buf32(curr_level[0]))
+    (proof, curr_level[0])
 }
 
 /// Temporary schnorr keypair.
@@ -109,7 +119,7 @@ pub fn get_test_schnorr_keys() -> [SchnorrKeypair; 2] {
 
 #[cfg(test)]
 mod tests {
-    use bitcoin::consensus::deserialize;
+    use bitcoin::{consensus::deserialize, Wtxid};
 
     use super::*;
 
@@ -130,7 +140,7 @@ mod tests {
         let txids: Vec<Wtxid> = get_test_wtxids();
         let index = 2;
 
-        let (proof, root) = get_cohashes_from_wtxids(&txids, index);
+        let (proof, root) = get_cohashes(&txids, index);
         // Validate the proof length
         assert_eq!(proof.len(), 3);
 
@@ -165,7 +175,7 @@ mod tests {
 
         let index = 5;
 
-        let (proof, root) = get_cohashes_from_wtxids(&txids, index);
+        let (proof, root) = get_cohashes(&txids, index);
 
         // Validate the proof length
         assert_eq!(proof.len(), 3);

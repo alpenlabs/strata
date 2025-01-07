@@ -4,13 +4,11 @@
 //! [`bitcoin`](bitcoin::Block), providing custom implementations where necessary.
 
 use bitcoin::{
-    block::Header,
-    consensus::{self, Encodable},
-    hashes::Hash,
-    Block, BlockHash, Transaction, TxMerkleNode, WitnessCommitment, WitnessMerkleNode,
+    block::Header, consensus::Encodable, hashes::Hash, Block, BlockHash, Transaction, TxMerkleNode,
+    WitnessCommitment, WitnessMerkleNode,
 };
 use strata_primitives::{buf::Buf32, hash::sha256d};
-use strata_state::l1::{compute_block_hash, L1Tx};
+use strata_state::l1::{compute_block_hash, L1TxProof};
 
 use crate::{
     merkle::calculate_root,
@@ -25,9 +23,24 @@ pub fn compute_merkle_root(block: &Block) -> Option<Buf32> {
     calculate_root(hashes)
 }
 
+/// Computes the witness root.
+///
+/// Equivalent to [`witness_root`](Block::witness_root)
+pub fn compute_witness_root(transactions: &[Transaction]) -> Option<WitnessMerkleNode> {
+    let hashes = transactions.iter().enumerate().map(|(i, t)| {
+        if i == 0 {
+            // Replace the first hash with zeroes.
+            Buf32::zero()
+        } else {
+            compute_wtxid(t)
+        }
+    });
+    calculate_root(hashes).map(|root| WitnessMerkleNode::from_byte_array(root.0))
+}
+
 /// Checks if Merkle root of header matches Merkle root of the transaction list.
 ///
-/// Equivalent to [`check_merkle_root`](Block::check_merkle_root)
+/// Equivalent to [`check_merkle_root`](Block::check_merkle_root).
 pub fn check_merkle_root(block: &Block) -> bool {
     match compute_merkle_root(block) {
         Some(merkle_root) => {
@@ -37,63 +50,17 @@ pub fn check_merkle_root(block: &Block) -> bool {
     }
 }
 
-/// Computes the witness commitment for the block's transaction list.
+/// Scans the given coinbase transaction for a witness commitment and returns it if found.
 ///
-/// Equivalent to [`compute_witness_commitment`](Block::compute_witness_commitment)
-pub fn compute_witness_commitment(
-    witness_root: &WitnessMerkleNode,
-    witness_reserved_value: &[u8],
-) -> WitnessCommitment {
-    let mut vec = Vec::new();
-    witness_root
-        .consensus_encode(&mut vec)
-        .expect("engines don't error");
-    vec.extend(witness_reserved_value);
-    WitnessCommitment::from_byte_array(*sha256d(&vec).as_ref())
-}
-
-/// Computes the block witness root from corresponding proof in [`L1Tx`]
-pub fn compute_witness_root(l1_tx: &L1Tx) -> Buf32 {
-    let tx: Transaction = consensus::deserialize(l1_tx.tx_data()).unwrap();
-
-    // `cur_hash` represents the intermediate hash at each step. After all cohashes are processed
-    // `cur_hash` becomes the root hash
-    let mut cur_hash = *compute_wtxid(&tx).as_ref();
-
-    let mut pos = l1_tx.proof().position();
-    for cohash in l1_tx.proof().cohashes() {
-        let mut buf = [0u8; 64];
-        if pos & 1 == 0 {
-            buf[0..32].copy_from_slice(&cur_hash);
-            buf[32..64].copy_from_slice(cohash.as_ref());
-        } else {
-            buf[0..32].copy_from_slice(cohash.as_ref());
-            buf[32..64].copy_from_slice(&cur_hash);
-        }
-        cur_hash = *sha256d(&buf).as_ref();
-        pos >>= 1;
-    }
-    Buf32::from(cur_hash)
-}
-
-/// Checks if witness commitment in coinbase matches the corresponding [`L1Tx`].
-pub fn check_witness_commitment(block: &Block, l1_tx: &L1Tx) -> bool {
-    if block.txdata.is_empty() {
-        return false;
-    }
-
-    let coinbase = &block.txdata[0];
-    if !coinbase.is_coinbase() {
-        return false;
-    }
-
-    // The commitment is recorded in a scriptPubKey of the coinbase transaction. It must be at least
-    // 38 bytes, with the first 6-byte of 0x6a24aa21a9ed, that is:
-    //
-    // 1-byte - OP_RETURN (0x6a)
-    // 1-byte - Push the following 36 bytes (0x24)
-    // 4-byte - Commitment header (0xaa21a9ed)
-    // 32-byte - Commitment hash: Double-SHA256(witness root hash|witness reserved value)
+/// This function iterates over the outputs of the provided `coinbase` transaction from the end
+/// towards the beginning, looking for an output whose `script_pubkey` starts with the "magic" bytes
+/// `[0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed]`. This pattern indicates an `OP_RETURN` with an
+/// embedded witness commitment header. If such an output is found, the function extracts the
+/// following 32 bytes as the witness commitment and returns a [`WitnessCommitment`].
+///
+/// Based on: [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/b97be3d4974d40cf348b280718d1367b8148d1ba/bitcoin/src/blockdata/block.rs#L190-L210).
+pub fn witness_commitment_from_coinbase(coinbase: &Transaction) -> Option<WitnessCommitment> {
+    // Consists of OP_RETURN, OP_PUSHBYTES_36, and four "witness header" bytes.
     const MAGIC: [u8; 6] = [0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed];
 
     // Commitment is in the last output that starts with magic bytes.
@@ -102,21 +69,90 @@ pub fn check_witness_commitment(block: &Block, l1_tx: &L1Tx) -> bool {
         .iter()
         .rposition(|o| o.script_pubkey.len() >= 38 && o.script_pubkey.as_bytes()[0..6] == MAGIC)
     {
-        let commitment =
-            WitnessCommitment::from_slice(&coinbase.output[pos].script_pubkey.as_bytes()[6..38])
-                .unwrap();
-        // Witness reserved value is in coinbase input witness.
-        let witness_vec: Vec<_> = coinbase.input[0].witness.iter().collect();
-        let witness_root = compute_witness_root(l1_tx);
-        if witness_vec.len() == 1 && witness_vec[0].len() == 32 {
-            return commitment
-                == compute_witness_commitment(
-                    &WitnessMerkleNode::from_byte_array(*witness_root.as_ref()),
-                    witness_vec[0],
-                );
-        }
+        let bytes =
+            <[u8; 32]>::try_from(&coinbase.output[pos].script_pubkey.as_bytes()[6..38]).unwrap();
+        Some(WitnessCommitment::from_byte_array(bytes))
+    } else {
+        None
     }
-    false
+}
+
+/// Computes the witness commitment for the block's transaction list.
+///
+/// Equivalent to [`compute_witness_commitment`](Block::compute_witness_commitment).
+pub fn compute_witness_commitment(
+    transactions: &[Transaction],
+    witness_reserved_value: &[u8],
+) -> Option<WitnessCommitment> {
+    compute_witness_root(transactions).map(|witness_root| {
+        let mut vec = vec![];
+        witness_root
+            .consensus_encode(&mut vec)
+            .expect("engines don't error");
+        vec.extend(witness_reserved_value);
+        WitnessCommitment::from_byte_array(*sha256d(&vec).as_ref())
+    })
+}
+
+/// Checks the integrity of a block using the provided coinbase inclusion proof.
+///
+/// We pass the `inclusion_proof` for the coinbase transaction to avoid recalculating
+/// the entire Merkle root for verifying coinbase inclusion. This optimization
+/// simplifies the verification logic and improves performance, for blocks containing SegWit
+/// transactions.
+///
+/// This function applies different validation paths depending on whether the block
+/// includes segwit transactions:
+///
+/// 1. **Blocks with segwit transactions**
+///    - Verifies that the witness commitment in the coinbase transaction matches the aggregated
+///      witness data of the block’s segwit transactions.
+///    - Checks the coinbase transaction's inclusion in the block's Merkle tree using the provided
+///      `inclusion_proof`.
+///
+/// 2. **Blocks without segwit transactions**
+///    - Validates the Merkle root by comparing the block header's Merkle root with the Merkle root
+///      computed from all transactions.
+///
+/// # Returns
+///
+/// * `true` if all integrity checks pass.
+/// * `false` otherwise.
+pub fn check_integrity(block: &Block, inclusion_proof: &Option<L1TxProof>) -> bool {
+    let Block { header, txdata } = block;
+    if txdata.is_empty() {
+        return false;
+    }
+
+    let coinbase = &txdata[0];
+    if !coinbase.is_coinbase() {
+        return false;
+    }
+
+    if let Some(commitment) = witness_commitment_from_coinbase(coinbase) {
+        // If we have a witness commitment, we also need an inclusion proof.
+        let proof = match inclusion_proof {
+            Some(proof) => proof,
+            None => return false,
+        };
+
+        // Gather the witness data; it must have exactly one element of length 32 bytes.
+        let witness_vec: Vec<_> = coinbase.input[0].witness.iter().collect();
+        if witness_vec.len() != 1 || witness_vec[0].len() != 32 {
+            return false;
+        }
+
+        // Check that the computed witness commitment matches and that the proof is valid.
+        let is_valid_commitment = compute_witness_commitment(txdata, witness_vec[0])
+            .is_some_and(|value| commitment == value);
+
+        let is_valid_inclusion = proof.verify(coinbase, header.merkle_root.to_byte_array().into());
+
+        is_valid_commitment && is_valid_inclusion
+    } else {
+        // If there's no witness commitment at all, fall back to a merkle root check.
+        check_merkle_root(block)
+    }
 }
 
 /// Checks that the proof-of-work for the block is valid.
@@ -128,53 +164,83 @@ pub fn check_pow(block: &Header) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use bitcoin::{hashes::Hash, TxMerkleNode, WitnessMerkleNode};
-    use rand::{rngs::OsRng, Rng};
-    use strata_state::{l1::generate_l1_tx, tx::ProtocolOperation};
-    use strata_test_utils::{bitcoin::get_btc_mainnet_block, ArbitraryGenerator};
+    use bitcoin::Witness;
+    use strata_test_utils::bitcoin::{get_btc_chain, get_btc_mainnet_block};
 
-    use super::compute_merkle_root;
-    use crate::block::{check_pow, check_witness_commitment, compute_witness_root};
+    use super::*;
 
     #[test]
-    fn test_tx_root() {
+    fn test_block_with_valid_witness() {
         let block = get_btc_mainnet_block();
-        assert_eq!(
-            block.compute_merkle_root().unwrap(),
-            TxMerkleNode::from_byte_array(*compute_merkle_root(&block).unwrap().as_ref())
-        );
+        let coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
+        assert!(check_integrity(&block, &Some(coinbase_inclusion_proof)));
     }
 
     #[test]
-    fn test_wtx_root() {
+    fn test_block_with_invalid_coinbase_inclusion_proof() {
         let block = get_btc_mainnet_block();
-
-        // Note: This takes longer than 60s
-        // for i in 1..block.txdata.len() {
-        //     let l1_tx = generate_l1_tx(i as u32, &block);
-        //     assert!(check_witness_commitment(&block, &l1_tx));
-
-        //     assert_eq!(
-        //         block.witness_root().unwrap(),
-        //         WitnessMerkleNode::from_byte_array(*compute_witness_root(&l1_tx).as_ref())
-        //     )
-        // }
-
-        let parsed_tx: ProtocolOperation = ArbitraryGenerator::new().generate();
-        let r = OsRng.gen_range(1..block.txdata.len()) as u32;
-        let l1_tx = generate_l1_tx(&block, r, parsed_tx);
-        assert!(check_witness_commitment(&block, &l1_tx));
-
-        assert_eq!(
-            block.witness_root().unwrap(),
-            WitnessMerkleNode::from_byte_array(*compute_witness_root(&l1_tx).as_ref())
-        )
+        assert!(!check_integrity(&block, &None));
     }
 
     #[test]
-    fn test_block() {
+    fn test_block_with_valid_inclusion_proof_of_other_tx() {
+        let block = get_btc_mainnet_block();
+        let non_coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 1);
+        assert!(!check_integrity(
+            &block,
+            &Some(non_coinbase_inclusion_proof)
+        ));
+    }
+
+    #[test]
+    fn test_block_with_witness_removed() {
+        let mut block = get_btc_mainnet_block();
+        let empty_witness = Witness::new();
+
+        // Remove witness data from all transactions.
+        for tx in &mut block.txdata {
+            for input in &mut tx.input {
+                input.witness = empty_witness.clone();
+            }
+        }
+
+        assert!(!check_integrity(&block, &None));
+    }
+
+    #[test]
+    fn test_block_with_removed_witness_but_valid_inclusion_proof() {
+        let mut block = get_btc_mainnet_block();
+        let empty_witness = Witness::new();
+
+        // Remove witness data from all transactions.
+        for tx in &mut block.txdata {
+            for input in &mut tx.input {
+                input.witness = empty_witness.clone();
+            }
+        }
+
+        let valid_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
+        assert!(!check_integrity(&block, &Some(valid_inclusion_proof)));
+    }
+
+    #[test]
+    fn test_block_without_witness_data() {
+        let btc_chain = get_btc_chain();
+        let block = btc_chain.get_block(40321);
+
+        // Verify with an empty inclusion proof.
+        assert!(check_integrity(block, &None));
+
+        // Verify with a valid inclusion proof.
+        let valid_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
+        assert!(check_integrity(block, &Some(valid_inclusion_proof)));
+    }
+
+    #[test]
+    fn test_proof_of_work() {
         let block = get_btc_mainnet_block();
 
+        // Validate the block's proof-of-work.
         assert!(block.header.validate_pow(block.header.target()).is_ok());
         assert!(check_pow(&block.header));
     }
