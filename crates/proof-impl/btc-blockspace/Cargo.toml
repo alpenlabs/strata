@@ -18,3 +18,4 @@ strata-zkvm.workspace = true
 hex.workspace = true
 rand.workspace = true
 strata-test-utils.workspace = true
+strata-native-zkvm-adapter.workspace = true

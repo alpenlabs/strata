@@ -3,7 +3,7 @@ use std::str::FromStr;
 use bitcoin::{
     hashes::Hash,
     secp256k1::{schnorr, SecretKey, XOnlyPublicKey},
-    BlockHash, Txid,
+    BlockHash, Txid, Wtxid,
 };
 use reth_primitives::revm_primitives::alloy_primitives::hex;
 #[cfg(feature = "zeroize")]
@@ -101,6 +101,21 @@ impl From<Buf32> for Txid {
         let mut bytes: [u8; 32] = [0; 32];
         bytes.copy_from_slice(value.0.as_slice());
         Txid::from_byte_array(bytes)
+    }
+}
+
+impl From<Wtxid> for Buf32 {
+    fn from(value: Wtxid) -> Self {
+        let bytes: [u8; 32] = *value.as_raw_hash().as_byte_array();
+        bytes.into()
+    }
+}
+
+impl From<Buf32> for Wtxid {
+    fn from(value: Buf32) -> Self {
+        let mut bytes: [u8; 32] = [0; 32];
+        bytes.copy_from_slice(value.0.as_slice());
+        Wtxid::from_byte_array(bytes)
     }
 }
 

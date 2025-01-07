@@ -1,16 +1,12 @@
-use std::{panic, sync::Arc};
+use std::sync::Arc;
 
-use bitcoin::{
-    consensus::serialize,
-    hashes::{sha256d, Hash},
-    Block, Wtxid,
-};
+use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use secp256k1::XOnlyPublicKey;
 use strata_db::traits::{Database, L1Database};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{L1BlockManifest, L1BlockRecord, L1TxProof},
+    l1::{L1BlockManifest, L1BlockRecord},
     params::{Params, RollupParams},
     proof::RollupVerifyingKey,
 };
@@ -20,9 +16,8 @@ use strata_state::{
     batch::{
         BatchCheckpoint, BatchCheckpointWithCommitment, CheckpointProofOutput, CommitmentInfo,
     },
-    l1::L1Tx,
+    l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
-    tx::ProtocolOperation,
 };
 use strata_tx_parser::messages::{BlockData, L1Event};
 use strata_zkvm::{ProofReceipt, ZkVmError, ZkVmResult};
@@ -248,110 +243,11 @@ fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
         .protocol_ops_txs()
         .iter()
         .map(|ops_txs| {
-            extract_l1tx_from_block(
+            generate_l1_tx(
                 blockdata.block(),
                 ops_txs.index(),
                 ops_txs.proto_op().clone(),
             )
         })
         .collect()
-}
-
-/// Generates an L1 transaction with proof for a given transaction index in a block.
-///
-/// # Parameters
-/// - `block`: The block containing the transactions.
-/// - `idx`: The index of the transaction within the block's transaction data.
-/// - `txid_bytes`: computed txid of the Tx in [u8;32] form
-/// - `proto_op`: Protocol operation data after parsing and gathering relevant tx
-///
-/// # Returns
-/// - An `L1Tx` struct containing the proof and the serialized transaction.
-///
-/// # Panics
-/// - If the `idx` is out of bounds for the block's transaction data.
-fn extract_l1tx_from_block(block: &Block, idx: u32, proto_op: ProtocolOperation) -> L1Tx {
-    assert!(
-        (idx as usize) < block.txdata.len(),
-        "utils: tx idx out of range of block txs"
-    );
-    let tx = &block.txdata[idx as usize];
-
-    // Get all witness ids for txs
-    let wtxids = &block
-        .txdata
-        .iter()
-        .enumerate()
-        .map(|(i, x)| {
-            if i == 0 {
-                Wtxid::all_zeros() // Coinbase's wtxid is all zeros
-            } else {
-                x.compute_wtxid()
-            }
-        })
-        .collect::<Vec<_>>();
-    let (cohashes, _wtxroot) = get_cohashes_from_wtxids(wtxids, idx);
-
-    let proof = L1TxProof::new(idx, cohashes);
-    let tx = serialize(tx);
-
-    L1Tx::new(proof, tx, proto_op)
-}
-
-/// Generates cohashes for an wtxid in particular index with in given slice of wtxids.
-///
-/// # Parameters
-/// - `wtxids`: The witness txids slice
-/// - `index`: The index of the txn for which we want the cohashes
-///
-/// # Returns
-/// - A tuple `(Vec<Buf32>, Buf32)` containing the cohashes and the merkle root
-///
-/// # Panics
-/// - If the `index` is out of bounds for the `wtxids` length
-fn get_cohashes_from_wtxids(wtxids: &[Wtxid], index: u32) -> (Vec<Buf32>, Buf32) {
-    assert!(
-        (index as usize) < wtxids.len(),
-        "The transaction index should be within the txids length"
-    );
-
-    let mut curr_level: Vec<_> = wtxids
-        .iter()
-        .cloned()
-        .map(|x| x.to_raw_hash().to_byte_array())
-        .collect();
-    let mut curr_index = index;
-    let mut proof = Vec::new();
-
-    while curr_level.len() > 1 {
-        let len = curr_level.len();
-        if len % 2 != 0 {
-            curr_level.push(curr_level[len - 1]);
-        }
-
-        let proof_item_index = if curr_index % 2 == 0 {
-            curr_index + 1
-        } else {
-            curr_index - 1
-        };
-
-        let item = curr_level[proof_item_index as usize];
-        proof.push(item.into());
-
-        // construct pairwise hash
-        curr_level = curr_level
-            .chunks(2)
-            .map(|pair| {
-                let [a, b] = pair else {
-                    panic!("utils: cohash chunk should be a pair");
-                };
-                let mut arr = [0u8; 64];
-                arr[..32].copy_from_slice(a);
-                arr[32..].copy_from_slice(b);
-                *sha256d::Hash::hash(&arr).as_byte_array()
-            })
-            .collect::<Vec<_>>();
-        curr_index >>= 1;
-    }
-    (proof, curr_level[0].into())
 }

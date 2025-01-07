@@ -223,8 +223,7 @@ impl L1Database for L1Db {
 mod tests {
     use bitcoin::key::rand::{self, Rng};
     use rand::rngs::OsRng;
-    use strata_primitives::l1::L1TxProof;
-    use strata_state::tx::ProtocolOperation;
+    use strata_state::{l1::L1TxProof, tx::ProtocolOperation};
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
