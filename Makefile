@@ -104,7 +104,7 @@ docker-up: ## docker compose up
 .PHONY: docker-down
 docker-down: ## docker compose down
 	cd $(DOCKER_DIR) && docker compose down && \
-	rm -rf $(DOCKER_DIR)/$(DOCKER_DATADIR) 2>/dev/null
+	rm -rf $(DOCKER_DATADIR) 2>/dev/null
 
 
 .PHONY: test-functional
