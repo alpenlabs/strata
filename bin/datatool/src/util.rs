@@ -77,7 +77,7 @@ pub(super) fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result
 /// # Panics
 ///
 /// Panics if both `sp1` and `risc0` features are enabled simultaneously, since
-/// only one ZKVM can be supported at a time.  
+/// only one ZKVM can be supported at a time.
 fn resolve_rollup_vk() -> RollupVerifyingKey {
     // Use SP1 if only `sp1` feature is enabled
     #[cfg(all(feature = "sp1", not(feature = "risc0")))]
@@ -125,6 +125,7 @@ fn exec_genxpriv(cmd: SubcXpriv, ctx: &mut CmdContext) -> anyhow::Result<()> {
     let xpriv = gen_priv(&mut ctx.rng, ctx.bitcoin_network);
     let mut buf = xpriv.encode();
     let mut s = base58::encode_check(&buf);
+
     let result = fs::write(&cmd.path, s.as_bytes());
 
     buf.zeroize();
@@ -166,7 +167,7 @@ fn exec_genseqprivkey(cmd: SubcSeqPrivkey, _ctx: &mut CmdContext) -> anyhow::Res
 
     let seq_keys = SequencerKeys::new(&xpriv)?;
     let seq_xpriv = seq_keys.derived_xpriv();
-    let mut raw_buf = seq_xpriv.to_priv().to_bytes();
+    let mut raw_buf = seq_xpriv.encode();
     let mut s = base58::encode_check(&raw_buf);
 
     println!("{s}");
