@@ -42,7 +42,7 @@ pub fn get_broadcast_db() -> Arc<impl BroadcastDatabase> {
 pub fn get_broadcast_handle() -> Arc<L1BroadcastHandle> {
     let pool = threadpool::Builder::new().num_threads(2).build();
     let db = get_broadcast_db();
-    let ops = BContext::new(db).into_ops(pool);
+    let ops = BContext::new(db.l1_broadcast_db().clone()).into_ops(pool);
     let (sender, _) = tokio::sync::mpsc::channel::<(u64, L1TxEntry)>(64);
     let handle = L1BroadcastHandle::new(sender, Arc::new(ops));
     Arc::new(handle)

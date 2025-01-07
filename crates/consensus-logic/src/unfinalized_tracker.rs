@@ -277,7 +277,7 @@ impl UnfinalizedBlockTracker {
             }
 
             for block_id in block_ids {
-                if let Some(block) = l2_block_manager.get_block_blocking(&block_id)? {
+                if let Some(block) = l2_block_manager.get_block_data_blocking(&block_id)? {
                     let header = block.header();
                     let _ = self.attach_block(block_id, header);
                 }

@@ -149,7 +149,7 @@ fn update_tracker(
     // TODO include the block slot in the consensus state
     let tip_blkid = *ss.chain_tip_blkid();
     let block = l2_block_manager
-        .get_block_blocking(&tip_blkid)?
+        .get_block_data_blocking(&tip_blkid)?
         .ok_or(Error::MissingL2Block(tip_blkid))?;
     let block_idx = block.header().blockidx();
     let ts = time::Instant::now(); // FIXME XXX use .timestamp()!!!
@@ -200,7 +200,7 @@ fn get_finalized_blocks(
 
         // else loop till we reach to the last finalized block or go all the way
         // as long as we get some block data
-        match l2_blkman.get_block_blocking(&finalized)? {
+        match l2_blkman.get_block_data_blocking(&finalized)? {
             Some(block) => new_finalized = Some(*block.header().parent()),
             None => break,
         }

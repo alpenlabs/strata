@@ -90,6 +90,12 @@ impl From<Txid> for Buf32 {
     }
 }
 
+impl From<&Txid> for Buf32 {
+    fn from(value: &Txid) -> Self {
+        Self::from(*value)
+    }
+}
+
 impl From<Buf32> for Txid {
     fn from(value: Buf32) -> Self {
         let mut bytes: [u8; 32] = [0; 32];

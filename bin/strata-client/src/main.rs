@@ -18,7 +18,7 @@ use strata_consensus_logic::{
     sync_manager::{self, SyncManager},
 };
 use strata_db::{
-    traits::{ChainstateDatabase, Database},
+    traits::{BroadcastDatabase, ChainstateDatabase, Database},
     DbError,
 };
 use strata_eectl::engine::ExecEngineCtl;
@@ -479,7 +479,9 @@ fn start_broadcaster_tasks(
     params: Arc<Params>,
 ) -> Arc<L1BroadcastHandle> {
     // Set up L1 broadcaster.
-    let broadcast_ctx = strata_storage::ops::l1tx_broadcast::Context::new(broadcast_database);
+    let broadcast_ctx = strata_storage::ops::l1tx_broadcast::Context::new(
+        broadcast_database.l1_broadcast_db().clone(),
+    );
     let broadcast_ops = Arc::new(broadcast_ctx.into_ops(pool));
     // start broadcast task
     let broadcast_handle =
