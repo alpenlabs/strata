@@ -15,8 +15,11 @@ if [ ! -z $PROVER_TEST ]; then
     cargo build --release -F sp1-mock
 	export PATH=$(realpath ../target/release/):$PATH
 else
-    echo "Running on seq mode"
-    cargo build
+    # echo "Running on seq mode"
+    # cargo build
+    echo "Running on sp1-mock mode"
+    cargo build --release -F sp1-mock
+	export PATH=$(realpath ../target/release/):$PATH
 fi
 
 poetry run python entry.py $@
