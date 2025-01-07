@@ -105,8 +105,8 @@ impl From<(u64, u32)> for L1TxRef {
     }
 }
 
-/// A trait for computing some kind of transaction ID (e.g., [`txid`](bitcoin::Txid) or
-/// [`wtxid`](bitcoin::Wtxid)) from a [`Transaction`].
+/// A trait for computing some kind of transaction ID (e.g., [`Txid`](bitcoin::Txid) or
+/// [`Wtxid`](bitcoin::Wtxid)) from a [`Transaction`].
 ///
 /// This trait is designed to be implemented by "marker" types that define how a transaction ID
 /// should be computed. For example, [`TxIdMarker`] invokes [`Transaction::compute_txid`], and
@@ -116,18 +116,18 @@ pub trait TxIdComputable {
     /// Computes the transaction ID for the given transaction.
     ///
     /// The `idx` parameter allows marker types to handle special cases such as the coinbase
-    /// transaction (which has a zero [`wtxid`](bitcoin::Wtxid)) by looking up the transaction
+    /// transaction (which has a zero [`Wtxid`](bitcoin::Wtxid)) by looking up the transaction
     /// index.
     fn compute_id(tx: &Transaction, idx: usize) -> Buf32;
 }
 
-/// Marker type for computing the [`txid`](bitcoin::Txid).
+/// Marker type for computing the [`Txid`](bitcoin::Txid).
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
 pub struct TxIdMarker;
 
-/// Marker type for computing the [`wtxid`](bitcoin::Wtxid).
+/// Marker type for computing the [`Wtxid`](bitcoin::Wtxid).
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]

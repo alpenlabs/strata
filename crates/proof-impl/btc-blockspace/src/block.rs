@@ -53,7 +53,7 @@ pub fn check_merkle_root(block: &Block) -> bool {
 /// Scans the given coinbase transaction for a witness commitment and returns it if found.
 ///
 /// This function iterates over the outputs of the provided `coinbase` transaction from the end
-/// towards the beginning, looking for an output whose `script_pubkey` starts with the “magic” bytes
+/// towards the beginning, looking for an output whose `script_pubkey` starts with the "magic" bytes
 /// `[0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed]`. This pattern indicates an `OP_RETURN` with an
 /// embedded witness commitment header. If such an output is found, the function extracts the
 /// following 32 bytes as the witness commitment and returns a [`WitnessCommitment`].

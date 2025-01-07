@@ -6,11 +6,11 @@ use crate::{hash::sha256d, prelude::Buf32};
 /// within a given slice of elements that can be converted to [`Buf32`].
 ///
 /// This function supports any type that implements the [`Into<Buf32>`] trait, such as
-/// [`txids`](bitcoin::Txid) or [`wtxids`](bitcoin::Wtxid).
+/// [`Txid`s](bitcoin::Txid) or [`Wtxid`s](bitcoin::Wtxid).
 ///
 /// # Parameters
 ///
-/// - `ids`: A slice of ids ([`txids`](bitcoin::Txid) or [`wtxids`](bitcoin::Wtxid)) that can be
+/// - `ids`: A slice of ids ([`Txid`s](bitcoin::Txid) or [`Wtxid`s](bitcoin::Wtxid)) that can be
 ///   converted into [`Buf32`].
 /// - `index`: The index of the transaction for which we want the cohashes.
 ///

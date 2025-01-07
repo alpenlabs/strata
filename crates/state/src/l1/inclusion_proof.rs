@@ -12,7 +12,7 @@ use strata_primitives::{
 };
 
 /// A generic proof structure that can handle any kind of transaction ID (e.g.,
-/// [txid](bitcoin::Txid) or [`wtxid`](bitcoin::Wtxid)) by delegating the ID computation to the
+/// [`Txid`](bitcoin::Txid) or [`Wtxid`](bitcoin::Wtxid)) by delegating the ID computation to the
 /// provided type `T` that implements [`TxIdComputable`].
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
@@ -28,7 +28,7 @@ pub struct L1TxInclusionProof<T> {
     cohashes: Vec<Buf32>,
     /// A marker that preserves the association with type `T`, which implements
     /// [`TxIdComputable`]. This ensures the proof logic depends on the correct
-    /// transaction ID computation ([`txid`](bitcoin::Txid) vs.[`wtxid`](bitcoin::Wtxid)) for the
+    /// transaction ID computation ([`Txid`](bitcoin::Txid) vs.[`Wtxid`](bitcoin::Wtxid)) for the
     /// lifetime of the proof.
     _marker: PhantomData<T>,
 }
@@ -92,10 +92,10 @@ impl<T: TxIdComputable> L1TxInclusionProof<T> {
     }
 }
 
-/// Convenience type alias for the [`txid`](bitcoin::Txid)-based proof.
+/// Convenience type alias for the [`Txid`](bitcoin::Txid)-based proof.
 pub type L1TxProof = L1TxInclusionProof<TxIdMarker>;
 
-/// Convenience type alias for the [`wtxid`](bitcoin::Wtxid)-based proof.
+/// Convenience type alias for the [`Wtxid`](bitcoin::Wtxid)-based proof.
 pub type L1WtxProof = L1TxInclusionProof<WtxIdMarker>;
 
 #[cfg(test)]
