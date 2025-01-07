@@ -118,7 +118,7 @@ pub fn compute_witness_commitment(
 ///
 /// * `true` if all integrity checks pass.
 /// * `false` otherwise.
-pub fn check_integrity(block: &Block, inclusion_proof: &L1TxProof) -> bool {
+pub fn check_integrity(block: &Block, inclusion_proof: &Option<L1TxProof>) -> bool {
     let Block { header, txdata } = block;
     if txdata.is_empty() {
         return false;
@@ -129,21 +129,29 @@ pub fn check_integrity(block: &Block, inclusion_proof: &L1TxProof) -> bool {
         return false;
     }
 
-    match witness_commitment_from_coinbase(coinbase) {
-        Some(commitment) => {
-            let witness_vec: Vec<_> = coinbase.input[0].witness.iter().collect();
-            if witness_vec.len() != 1 || witness_vec[0].len() != 32 {
-                return false;
-            }
-            let is_valid_commitment = compute_witness_commitment(txdata, witness_vec[0])
-                .is_some_and(|value| commitment == value);
+    if let Some(commitment) = witness_commitment_from_coinbase(coinbase) {
+        // If we have a witness commitment, we also need an inclusion proof.
+        let proof = match inclusion_proof {
+            Some(proof) => proof,
+            None => return false,
+        };
 
-            let is_valid_inclusion =
-                inclusion_proof.verify(coinbase, header.merkle_root.to_byte_array().into());
-
-            is_valid_commitment && is_valid_inclusion
+        // Gather the witness data; it must have exactly one element of length 32 bytes.
+        let witness_vec: Vec<_> = coinbase.input[0].witness.iter().collect();
+        if witness_vec.len() != 1 || witness_vec[0].len() != 32 {
+            return false;
         }
-        None => check_merkle_root(block),
+
+        // Check that the computed witness commitment matches and that the proof is valid.
+        let is_valid_commitment = compute_witness_commitment(txdata, witness_vec[0])
+            .is_some_and(|value| commitment == value);
+
+        let is_valid_inclusion = proof.verify(coinbase, header.merkle_root.to_byte_array().into());
+
+        is_valid_commitment && is_valid_inclusion
+    } else {
+        // If there's no witness commitment at all, fall back to a merkle root check.
+        check_merkle_root(block)
     }
 }
 
@@ -165,21 +173,23 @@ mod tests {
     fn test_block_with_valid_witness() {
         let block = get_btc_mainnet_block();
         let coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
-        assert!(check_integrity(&block, &coinbase_inclusion_proof));
+        assert!(check_integrity(&block, &Some(coinbase_inclusion_proof)));
     }
 
     #[test]
     fn test_block_with_invalid_coinbase_inclusion_proof() {
         let block = get_btc_mainnet_block();
-        let empty_inclusion_proof = L1TxProof::new(0, vec![]);
-        assert!(!check_integrity(&block, &empty_inclusion_proof));
+        assert!(!check_integrity(&block, &None));
     }
 
     #[test]
     fn test_block_with_valid_inclusion_proof_of_other_tx() {
         let block = get_btc_mainnet_block();
         let non_coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 1);
-        assert!(!check_integrity(&block, &non_coinbase_inclusion_proof));
+        assert!(!check_integrity(
+            &block,
+            &Some(non_coinbase_inclusion_proof)
+        ));
     }
 
     #[test]
@@ -194,8 +204,7 @@ mod tests {
             }
         }
 
-        let empty_inclusion_proof = L1TxProof::new(0, vec![]);
-        assert!(!check_integrity(&block, &empty_inclusion_proof));
+        assert!(!check_integrity(&block, &None));
     }
 
     #[test]
@@ -211,7 +220,7 @@ mod tests {
         }
 
         let valid_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
-        assert!(!check_integrity(&block, &valid_inclusion_proof));
+        assert!(!check_integrity(&block, &Some(valid_inclusion_proof)));
     }
 
     #[test]
@@ -220,12 +229,11 @@ mod tests {
         let block = btc_chain.get_block(40321);
 
         // Verify with an empty inclusion proof.
-        let empty_inclusion_proof = L1TxProof::new(0, vec![]);
-        assert!(check_integrity(block, &empty_inclusion_proof));
+        assert!(check_integrity(block, &None));
 
         // Verify with a valid inclusion proof.
         let valid_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
-        assert!(check_integrity(block, &valid_inclusion_proof));
+        assert!(check_integrity(block, &Some(valid_inclusion_proof)));
     }
 
     #[test]

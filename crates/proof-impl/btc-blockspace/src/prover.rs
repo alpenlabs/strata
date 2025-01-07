@@ -26,10 +26,9 @@ impl ZkVmProver for BtcBlockspaceProver {
     {
         let block = &input.block;
 
-        let inclusion_proof = match witness_commitment_from_coinbase(&block.txdata[0]) {
-            Some(_) => L1TxProof::generate(&block.txdata, 0),
-            None => L1TxProof::new(0, vec![]),
-        };
+        let inclusion_proof = witness_commitment_from_coinbase(&block.txdata[0])
+            .map(|_| L1TxProof::generate(&block.txdata, 0));
+
         let serialized_block = serialize(&input.block);
         let zkvm_input = B::new()
             .write_serde(&input.rollup_params)?
