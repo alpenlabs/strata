@@ -123,8 +123,8 @@ pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinC
 
 /// Loads sequencer identity data from the root key at the specified path.
 pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
-    let raw_buf = fs::read(path)?;
-    let str_buf = std::str::from_utf8(&raw_buf)?;
+    let str_buf = fs::read_to_string(path)?;
+    let str_buf = str_buf.trim();
     debug!(?path, "loading sequencer root key");
     let buf = base58::decode_check(str_buf)?;
     let master_xpriv = ZeroizableXpriv::new(Xpriv::decode(&buf)?);
