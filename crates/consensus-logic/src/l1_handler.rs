@@ -14,10 +14,6 @@ use strata_risc0_adapter;
 use strata_sp1_adapter;
 use strata_state::{
     batch::{BatchCheckpoint, CheckpointProofOutput},
-   
-    l1::{L1Tx,
-    L1TxProof},
-    batch::BatchCheckpoint,
     l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
 };
