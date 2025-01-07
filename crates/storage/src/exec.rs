@@ -20,27 +20,26 @@ pub type DbRecv<T> = tokio::sync::oneshot::Receiver<DbResult<T>>;
 /// The macro defines an operations trait for a specified context and a list of methods.
 /// Each method in the generated interface will have both `async` and `sync` variants.
 ///
-/// ```rust
-/// // inst_ops! {
-/// //     (InscriptionDataOps, Context<D: SequencerDatabase>) {
-/// //         get_blob_entry(id: Buf32) => Option<BlobEntry>;
-/// //         get_blob_entry_by_idx(idx: u64) => Option<BlobEntry>;
-/// //         get_blob_entry_id(idx: u64) => Option<Buf32>;
-/// //         get_next_blob_idx() => u64;
-/// //         put_blob_entry(id: Buf32, entry: BlobEntry) => ();
-/// //     }
-/// // }
+/// ```ignore
+/// inst_ops! {
+///     (InscriptionDataOps, Context<D: SequencerDatabase>) {
+///         get_blob_entry(id: Buf32) => Option<BlobEntry>;
+///         get_blob_entry_by_idx(idx: u64) => Option<BlobEntry>;
+///         get_blob_entry_id(idx: u64) => Option<Buf32>;
+///         get_next_blob_idx() => u64;
+///         put_blob_entry(id: Buf32, entry: BlobEntry) => ();
+///     }
+/// }
+/// ```
 ///
-/// // Definitions corresponding to above macro invocation
+/// Definitions corresponding to above macro invocation:
 ///
-/// // fn get_blob_entry<D: Database>(ctx: Context<D>, id: u32) -> DbResult<Option<u32>> {
-/// //     ...
-/// // }
+/// ```ignore
+/// fn get_blob_entry<D: Database>(ctx: Context<D>, id: u32) -> DbResult<Option<u32>> { ... }
 ///
-/// // fn put_blob_entry<D: Database>(ctx: Context<D>, id: Buf32) -> DbResult<()> {
-/// // }
+/// fn put_blob_entry<D: Database>(ctx: Context<D>, id: Buf32) -> DbResult<()> { ... }
 ///
-/// // ... // Other definitions corresponding to above macro invocation
+/// // ... Other definitions corresponding to above macro invocation
 /// ```
 ///
 /// - **`InscriptionDataOps`**: The name of the operations interface being generated.
@@ -132,18 +131,18 @@ macro_rules! inst_ops {
 /// context without having to define any extra functions.
 ///
 /// ### Usage
-/// ```rust
-/// // inst_ops_simple! {
-/// //     (<D: L1BroadcastDatabase> => BroadcastDbOps) {
-/// //         get_tx_entry(idx: u64) => Option<()>;
-/// //         get_tx_entry_by_id(id: u32) => Option<()>;
-/// //         get_txid(idx: u64) => Option<u32>;
-/// //         get_next_tx_idx() => u64;
-/// //         put_tx_entry(id: u32, entry: u64) => Option<u64>;
-/// //         put_tx_entry_by_idx(idx: u64, entry: u32) => ();
-/// //         get_last_tx_entry() => Option<u32>;
-/// //     }
-/// // }
+/// ```ignore
+/// inst_ops_simple! {
+///     (<D: L1BroadcastDatabase> => BroadcastDbOps) {
+///         get_tx_entry(idx: u64) => Option<()>;
+///         get_tx_entry_by_id(id: u32) => Option<()>;
+///         get_txid(idx: u64) => Option<u32>;
+///         get_next_tx_idx() => u64;
+///         put_tx_entry(id: u32, entry: u64) => Option<u64>;
+///         put_tx_entry_by_idx(idx: u64, entry: u32) => ();
+///         get_last_tx_entry() => Option<u32>;
+///     }
+/// }
 /// ```
 ///
 /// - **Context**: Defines the database type (e.g., `L1BroadcastDatabase`).
