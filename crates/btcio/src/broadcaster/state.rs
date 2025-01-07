@@ -107,7 +107,7 @@ mod test {
     fn get_ops() -> Arc<BroadcastDbOps> {
         let pool = threadpool::Builder::new().num_threads(2).build();
         let db = get_db();
-        let ops = Context::new(db).into_ops(pool);
+        let ops = Context::new(db.l1_broadcast_db().clone()).into_ops(pool);
         Arc::new(ops)
     }
 

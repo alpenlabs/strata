@@ -62,7 +62,7 @@ pub fn initialize_from_db(
     l2_block_manager: &L2BlockManager,
 ) -> Result<L2SyncState, L2SyncError> {
     let finalized_blockid = sync.finalized_blkid();
-    let finalized_block = l2_block_manager.get_block_blocking(finalized_blockid)?;
+    let finalized_block = l2_block_manager.get_block_data_blocking(finalized_blockid)?;
     let Some(finalized_block) = finalized_block else {
         return Err(L2SyncError::MissingBlock(*finalized_blockid));
     };

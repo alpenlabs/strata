@@ -5,7 +5,7 @@ pub mod ops;
 
 use std::sync::Arc;
 
-pub use managers::{checkpoint::CheckpointDbManager, l2::L2BlockManager};
+pub use managers::{checkpoint::CheckpointDbManager, l1::L1BlockManager, l2::L2BlockManager};
 pub use ops::l1tx_broadcast::BroadcastDbOps;
 use strata_db::traits::Database;
 
