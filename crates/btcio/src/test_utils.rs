@@ -253,7 +253,7 @@ pub mod corepc_node_helpers {
         (cookie_values.user, cookie_values.password)
     }
 
-    /// Mine a number of blocks of a given size `count`, which may be speified to a given coinbase
+    /// Mine a number of blocks of a given size `count`, which may be specified to a given coinbase
     /// `address`.
     pub fn mine_blocks(
         bitcoind: &BitcoinD,
