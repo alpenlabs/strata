@@ -299,14 +299,24 @@ pub struct CommitmentInfo {
     pub blockhash: Buf32,
     pub txid: Buf32,
     pub wtxid: Buf32,
+    pub block_height: u64,
+    pub position: u32,
 }
 
 impl CommitmentInfo {
-    pub fn new(blockhash: Buf32, txid: Buf32, wtxid: Buf32) -> Self {
+    pub fn new(
+        blockhash: Buf32,
+        txid: Buf32,
+        wtxid: Buf32,
+        block_height: u64,
+        position: u32,
+    ) -> Self {
         Self {
             blockhash,
             txid,
             wtxid,
+            block_height,
+            position,
         }
     }
 }

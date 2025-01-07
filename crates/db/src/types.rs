@@ -238,6 +238,8 @@ pub struct CheckpointCommitment {
     pub blockhash: Buf32,
     pub txid: Buf32,
     pub wtxid: Buf32,
+    pub block_height: u64,
+    pub position: u32,
 }
 
 impl From<CommitmentInfo> for CheckpointCommitment {
@@ -246,6 +248,8 @@ impl From<CommitmentInfo> for CheckpointCommitment {
             blockhash: value.blockhash,
             txid: value.txid,
             wtxid: value.wtxid,
+            block_height: value.block_height,
+            position: value.position,
         }
     }
 }

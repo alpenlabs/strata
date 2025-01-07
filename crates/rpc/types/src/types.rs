@@ -232,11 +232,18 @@ pub struct RawBlockWitness {
 pub struct RpcCheckpointCommitmentInfo {
     /// block where checkpoint was posted
     pub blockhash: L1BlockId,
+
     /// txid of txn for this checkpoint
     pub txid: Txid,
+
     /// wtxid of txn for this checkpoint
     pub wtxid: Wtxid,
-    // other info
+
+    /// The height of the block where the checkpoint was posted.
+    pub height: u64,
+
+    /// The position of the checkpoint in the block.
+    pub position: u32,
 }
 
 impl From<CheckpointCommitment> for RpcCheckpointCommitmentInfo {
@@ -245,6 +252,8 @@ impl From<CheckpointCommitment> for RpcCheckpointCommitmentInfo {
             blockhash: value.blockhash.into(),
             txid: Txid::from_byte_array(*value.txid.as_ref()),
             wtxid: Wtxid::from_byte_array(*value.wtxid.as_ref()),
+            height: value.block_height,
+            position: value.position,
         }
     }
 }

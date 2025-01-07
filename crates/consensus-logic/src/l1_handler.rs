@@ -161,7 +161,14 @@ fn check_for_da_batch(
         let blockhash = Buf32::from(*blockdata.block().block_hash().as_byte_array());
         let txid = Buf32::from(*tx.compute_txid().as_byte_array());
         let wtxid = Buf32::from(*tx.compute_wtxid().as_byte_array());
-        let commitment_info = CommitmentInfo::new(blockhash, txid, wtxid);
+        let block_height = blockdata.block_num();
+        let position = blockdata
+            .block()
+            .txdata
+            .iter()
+            .position(|x| x == tx)
+            .unwrap() as u32;
+        let commitment_info = CommitmentInfo::new(blockhash, txid, wtxid, block_height, position);
 
         Some(BatchCheckpointWithCommitment::new(
             checkpoint,
