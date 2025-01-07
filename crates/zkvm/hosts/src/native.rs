@@ -27,7 +27,7 @@ static BTC_BLOCKSPACE_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| N
 /// A native host for [`ProofVm::L1Batch`] prover.
 static L1_BATCH_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_l1_batch_proof(zkvm, &MOCK_VK);
+        process_l1_batch_proof(zkvm);
         Ok(())
     })),
 });

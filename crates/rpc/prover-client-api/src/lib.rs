@@ -3,6 +3,7 @@
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use strata_primitives::{buf::Buf32, l2::L2BlockId};
 use strata_rpc_types::ProofKey;
+use strata_state::l1::L1BlockId;
 
 /// RPCs related to information about the client itself.
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "dev_strata"))]
@@ -10,7 +11,7 @@ use strata_rpc_types::ProofKey;
 pub trait StrataProverClientApi {
     /// Start proving the given btc block
     #[method(name = "proveBtcBlock")]
-    async fn prove_btc_block(&self, el_block_num: u64) -> RpcResult<Vec<ProofKey>>;
+    async fn prove_btc_block(&self, block_id: L1BlockId) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given el block
     #[method(name = "proveElBlocks")]
@@ -25,7 +26,7 @@ pub trait StrataProverClientApi {
 
     /// Start proving the given l1 Batch
     #[method(name = "proveL1Batch")]
-    async fn prove_l1_batch(&self, l1_range: (u64, u64)) -> RpcResult<Vec<ProofKey>>;
+    async fn prove_l1_batch(&self, l1_range: (L1BlockId, L1BlockId)) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given l2 batch
     #[method(name = "proveL2Batch")]
