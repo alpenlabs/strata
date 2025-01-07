@@ -40,6 +40,10 @@ impl BatchCheckpoint {
         &self.bootstrap
     }
 
+    pub fn proof_output(&self) -> CheckpointProofOutput {
+        CheckpointProofOutput::new(self.batch_info().clone(), self.bootstrap_state().clone())
+    }
+
     pub fn proof(&self) -> &Proof {
         &self.proof
     }
@@ -90,9 +94,9 @@ impl SignedBatchCheckpoint {
         &self.inner
     }
 
-    pub fn verify_sig(&self, pub_key: Buf32) -> bool {
+    pub fn verify_sig(&self, pub_key: &Buf32) -> bool {
         let msg = self.checkpoint().get_sighash();
-        verify_schnorr_sig(&self.signature, &msg, &pub_key)
+        verify_schnorr_sig(&self.signature, &msg, pub_key)
     }
 }
 
@@ -201,7 +205,6 @@ impl BatchInfo {
     /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]
     pub fn get_initial_bootstrap_state(&self) -> BootstrapState {
         BootstrapState::new(
-            self.idx,
             self.l1_range.0,
             self.l1_transition.0,
             self.l2_range.0,
@@ -213,10 +216,9 @@ impl BatchInfo {
     /// Creates a [`BootstrapState`] by taking the final state of the [`BatchInfo`]
     pub fn get_final_bootstrap_state(&self) -> BootstrapState {
         BootstrapState::new(
-            self.idx,
-            self.l1_range.1,
+            self.l1_range.1 + 1, // because each batch is inclusive
             self.l1_transition.1,
-            self.l2_range.1,
+            self.l2_range.1 + 1, // because each batch is inclusive
             self.l2_transition.1,
             self.l1_pow_transition.1,
         )
@@ -239,7 +241,6 @@ impl BatchInfo {
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct BootstrapState {
-    pub idx: u64,
     pub start_l1_height: u64,
     // TODO is this a blkid?
     pub initial_l1_state: Buf32,
@@ -250,7 +251,6 @@ pub struct BootstrapState {
 
 impl BootstrapState {
     pub fn new(
-        idx: u64,
         start_l1_height: u64,
         initial_l1_state: Buf32,
         start_l2_height: u64,
@@ -258,7 +258,6 @@ impl BootstrapState {
         total_acc_pow: u128,
     ) -> Self {
         Self {
-            idx,
             start_l1_height,
             initial_l1_state,
             start_l2_height,

@@ -33,9 +33,11 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
         btc = ctx.get_service("bitcoin")
+        prover = ctx.get_service("prover_client")
 
         seqrpc = seq.create_rpc()
         btcrpc: BitcoindClient = btc.create_rpc()
+        prover_rpc = prover.create_rpc()
         seq_addr = seq.get_prop("address")
 
         cfg: RollupConfig = ctx.env.rollup_cfg()
@@ -47,6 +49,12 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
             error_with="Sequencer did not start on time",
         )
 
+        # Wait for prover
+        wait_until(
+            lambda: prover_rpc.dev_strata_getReport() is not None,
+            error_with="Prover did not start on time",
+        )
+
         # First generate blocks to seq address
         btcrpc.proxy.generatetoaddress(101, seq_addr)
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
@@ -55,23 +63,23 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
 
         # Sanity Check for first checkpoint
         idx = 0
-        check_nth_checkpoint_finalized(idx, seqrpc, manual_gen)
+        check_nth_checkpoint_finalized(idx, seqrpc, prover_rpc, manual_gen)
         self.debug(f"Pass checkpoint finalization for checkpoint {idx}")
 
         # TODO remove this after adding a proper config file
         # We need to wait for the tx to be published to L1
         time.sleep(0.5)
         # Test reorg, without pruning anything, let mempool and wallet retain the txs
-        check_nth_checkpoint_finalized_on_reorg(ctx, idx + 1, seq, btc)
+        check_nth_checkpoint_finalized_on_reorg(ctx, idx + 1, seq, btcrpc, prover_rpc)
 
 
 def check_nth_checkpoint_finalized_on_reorg(
-    ctx: flexitest.RunContext, checkpt_idx: int, seq: Service, btc: Service
+    ctx: flexitest.RunContext, checkpt_idx: int, seq: Service, btcrpc, prover_rpc
 ):
     # Now submit another checkpoint proof and produce a couple of blocks(less than reorg depth)
     seqrpc = seq.create_rpc()
-    btcrpc = btc.create_rpc()
     seq_addr = seq.get_prop("address")
+
     cfg: RollupConfig = ctx.env.rollup_cfg()
     finality_depth = cfg.l1_reorg_safe_depth
     manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth, seq_addr)
@@ -79,7 +87,7 @@ def check_nth_checkpoint_finalized_on_reorg(
     # gen some blocks
     btcrpc.proxy.generatetoaddress(3, seq_addr)
 
-    submit_checkpoint(checkpt_idx, seqrpc, manual_gen)
+    submit_checkpoint(checkpt_idx, seqrpc, prover_rpc, manual_gen)
     published_txid = seqrpc.strata_l1status()["last_published_txid"]
 
     # wait until it gets confirmed

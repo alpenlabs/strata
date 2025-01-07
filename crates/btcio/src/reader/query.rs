@@ -5,8 +5,7 @@ use std::{
 };
 
 use anyhow::bail;
-use bitcoin::{hashes::Hash, Block, BlockHash};
-use strata_primitives::buf::Buf32;
+use bitcoin::{Block, BlockHash};
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
@@ -368,36 +367,47 @@ pub async fn get_verification_state(
     let vh = height - 1; // verified_height
     let vb = client.get_block_at(vh).await?; // verified_block
 
-    // Fetch the previous timestamps of block from `vh`
-    // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
     const N: usize = 11;
-    let mut timestamps: [u32; 11] = [0u32; 11];
-    for i in (0..N).rev() {
-        if vh > i as u64 {
-            let h = client.get_block_at(vh - i as u64).await?;
-            timestamps[i] = h.header.time;
+    let mut timestamps: [u32; N] = [0u32; N];
+
+    // Fetch the previous timestamps of block from `vh`
+    // This fetches timestamps of `vh-10`,`vh-9`, ... `vh-1`, `vh`
+    for i in 0..N {
+        if vh >= i as u64 {
+            let height_to_fetch = vh - i as u64;
+            let h = client.get_block_at(height_to_fetch).await?;
+            timestamps[N - 1 - i] = h.header.time;
         } else {
-            timestamps[i] = 0;
+            // No more blocks to fetch; the rest remain zero
+            timestamps[N - 1 - i] = 0;
         }
     }
-    let last_11_blocks_timestamps = TimestampStore::new(timestamps);
 
-    let l1_blkid: L1BlockId =
-        Buf32::from(vb.header.block_hash().as_raw_hash().to_byte_array()).into();
-    Ok(HeaderVerificationState {
+    // Calculate the 'head' index for the ring buffer based on the current block height.
+    // The 'head' represents the position in the buffer where the next timestamp will be inserted.
+    let head = height as usize % N;
+    let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head);
+
+    let l1_blkid: L1BlockId = vb.header.block_hash().into();
+
+    let header_vs = HeaderVerificationState {
         last_verified_block_num: vh as u32,
         last_verified_block_hash: l1_blkid,
         next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
         interval_start_timestamp: b1.header.time,
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
-    })
+    };
+    trace!(%height, ?header_vs, "HeaderVerificationState");
+
+    Ok(header_vs)
 }
 
 #[cfg(test)]
 mod test {
-    use bitcoin::Network;
+    use bitcoin::{hashes::Hash, Network};
     use strata_primitives::{
+        buf::Buf32,
         l1::{BitcoinAddress, L1Status},
         params::DepositTxParams,
         sorted_vec::SortedVec,
@@ -409,7 +419,10 @@ mod test {
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::*;
-    use crate::test_utils::TestBitcoinClient;
+    use crate::test_utils::{
+        corepc_node_helpers::{get_bitcoind_and_client, mine_blocks},
+        TestBitcoinClient,
+    };
 
     const N_RECENT_BLOCKS: usize = 10;
 
@@ -525,5 +538,30 @@ mod test {
 
         // Check the reader state's next_height
         assert_eq!(state.next_height(), checkpoint_height + 1);
+    }
+
+    #[tokio::test()]
+    async fn test_header_verification_state() {
+        let (bitcoind, client) = get_bitcoind_and_client();
+
+        let _ = mine_blocks(&bitcoind, 115, None).unwrap();
+        let params = get_btc_params();
+
+        let len = 15;
+        let height = 100;
+        let mut header_vs = get_verification_state(&client, height, &params)
+            .await
+            .unwrap();
+
+        for h in height..height + len {
+            let block = client.get_block_at(h).await.unwrap();
+            header_vs.check_and_update_continuity(&block.header, &params);
+        }
+
+        let new_header_vs = get_verification_state(&client, height + len, &params)
+            .await
+            .unwrap();
+
+        assert_eq!(header_vs, new_header_vs);
     }
 }

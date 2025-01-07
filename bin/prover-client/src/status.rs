@@ -1,7 +1,3 @@
-use std::collections::HashSet;
-
-use strata_primitives::proof::ProofKey;
-
 use crate::errors::ProvingTaskError;
 
 /// Represents the status of a proving task.
@@ -15,7 +11,7 @@ use crate::errors::ProvingTaskError;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProvingTaskStatus {
     /// Waiting for dependencies to be resolved.
-    WaitingForDependencies(HashSet<ProofKey>), // TODO: decouple deps from here
+    WaitingForDependencies,
     /// Ready to be started
     Pending,
     /// Task is currently being executed.
@@ -40,12 +36,7 @@ impl ProvingTaskStatus {
             // Specific allowed state transitions
             (ProvingTaskStatus::Pending, ProvingTaskStatus::ProvingInProgress) => true,
             (ProvingTaskStatus::ProvingInProgress, &ProvingTaskStatus::Completed) => true,
-
-            // Special case: WaitingForDependencies can only become Pending if no dependencies
-            (
-                ProvingTaskStatus::WaitingForDependencies(dependencies),
-                &ProvingTaskStatus::Pending,
-            ) => dependencies.is_empty(),
+            (ProvingTaskStatus::WaitingForDependencies, &ProvingTaskStatus::Pending) => true,
 
             // All other transitions are invalid
             _ => false,
@@ -65,25 +56,8 @@ impl ProvingTaskStatus {
 
 #[cfg(test)]
 mod tests {
-    use strata_primitives::proof::{ProofContext, ProofZkVm};
-    use strata_state::l1::L1BlockId;
-    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
-
-    // Helper function to generate test L1 block IDs
-    fn gen_deps(n: usize) -> HashSet<ProofKey> {
-        let mut deps = HashSet::with_capacity(n);
-        let mut gen = ArbitraryGenerator::new();
-        for _ in 0..n {
-            let blkid: L1BlockId = gen.generate();
-            let host = ProofZkVm::Native;
-            let id = ProofContext::BtcBlockspace(blkid);
-            let key = ProofKey::new(id, host);
-            deps.insert(key);
-        }
-        deps
-    }
 
     #[test]
     fn test_transition_to_failed() {
@@ -92,7 +66,7 @@ mod tests {
             ProvingTaskStatus::Pending,
             ProvingTaskStatus::ProvingInProgress,
             ProvingTaskStatus::Completed,
-            ProvingTaskStatus::WaitingForDependencies(HashSet::new()),
+            ProvingTaskStatus::WaitingForDependencies,
             ProvingTaskStatus::Failed,
         ];
 
@@ -135,18 +109,11 @@ mod tests {
     #[test]
     fn test_waiting_for_dependencies_to_pending() {
         // Test transitioning from WaitingForDependencies to Pending with empty dependencies
-        let mut status = ProvingTaskStatus::WaitingForDependencies(HashSet::new());
+        let mut status = ProvingTaskStatus::WaitingForDependencies;
         let result = status.transition(ProvingTaskStatus::Pending);
 
         assert!(result.is_ok());
         assert_eq!(status, ProvingTaskStatus::Pending);
-
-        // Test transitioning from WaitingForDependencies to Pending with non-empty dependencies
-        let block_ids = gen_deps(3);
-        let mut status_with_deps = ProvingTaskStatus::WaitingForDependencies(block_ids);
-        let result_with_deps = status_with_deps.transition(ProvingTaskStatus::Pending);
-
-        assert!(result_with_deps.is_err());
     }
 
     #[test]
@@ -166,12 +133,7 @@ mod tests {
             // Pending cannot go back to WaitingForDependencies
             (
                 ProvingTaskStatus::Pending,
-                ProvingTaskStatus::WaitingForDependencies(HashSet::new()),
-            ),
-            // WaitingForDependencies with non-empty deps cannot go to Pending
-            (
-                ProvingTaskStatus::WaitingForDependencies(gen_deps(2)),
-                ProvingTaskStatus::Pending,
+                ProvingTaskStatus::WaitingForDependencies,
             ),
         ];
 

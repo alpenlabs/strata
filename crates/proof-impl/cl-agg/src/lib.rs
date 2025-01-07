@@ -11,7 +11,11 @@ pub fn process_cl_agg(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
         "At least one CL proof is required for aggregation"
     );
 
-    let cl_proof_pp_start: L2BatchProofOutput = zkvm.read_verified_borsh(cl_stf_vk);
+    let mut cl_proof_pp_start: L2BatchProofOutput = zkvm.read_verified_borsh(cl_stf_vk);
+    // `BatchInfo` has range which is inclusive. This makes it compatible and avoids off by 1 issue.
+    // TODO: Do this in a better way
+    cl_proof_pp_start.initial_snapshot.slot += 1;
+
     let mut cl_proof_pp_prev = cl_proof_pp_start.clone();
     let mut acc_deposits = cl_proof_pp_start.deposits.clone();
 

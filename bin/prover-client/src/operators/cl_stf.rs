@@ -82,8 +82,10 @@ impl ClStfOperator {
         n_ancestors: u64,
     ) -> Result<Vec<L2BlockId>, ProvingTaskError> {
         let mut ancestors = Vec::with_capacity(n_ancestors as usize);
+        ancestors.push(blkid);
+
         let mut blkid = blkid;
-        for _ in 0..=n_ancestors {
+        for _ in 0..n_ancestors {
             blkid = self.get_prev_block_id(blkid).await?;
             ancestors.push(blkid);
         }
@@ -137,7 +139,7 @@ impl ProvingOp for ClStfOperator {
 
         let evm_ee_id = evm_ee_tasks
             .first()
-            .ok_or_else(|| ProvingTaskError::NoTasksFound)?
+            .ok_or(ProvingTaskError::NoTasksFound)?
             .context();
 
         let cl_stf_id = ProofContext::ClStf(start_block_id, end_block_id);
@@ -146,7 +148,7 @@ impl ProvingOp for ClStfOperator {
             .map_err(ProvingTaskError::DatabaseError)?;
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(cl_stf_id, vec![*evm_ee_id])
+        task_tracker.create_tasks(cl_stf_id, vec![*evm_ee_id], db)
     }
 
     async fn fetch_input(
@@ -168,7 +170,7 @@ impl ProvingOp for ClStfOperator {
         l2_block_ids.reverse();
 
         let mut stf_witness_payloads = Vec::new();
-        for l2_block_id in l2_block_ids {
+        for l2_block_id in l2_block_ids.clone() {
             let raw_witness: Vec<u8> = self
                 .cl_client
                 .get_cl_block_witness_raw(l2_block_id)
@@ -181,9 +183,7 @@ impl ProvingOp for ClStfOperator {
             .get_proof_deps(*task_id.context())
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
-        let evm_ee_id = evm_ee_ids
-            .first()
-            .ok_or_else(|| ProvingTaskError::NoTasksFound)?;
+        let evm_ee_id = evm_ee_ids.first().ok_or(ProvingTaskError::NoTasksFound)?;
         let evm_ee_key = ProofKey::new(*evm_ee_id, *task_id.host());
         let evm_ee_proof = db
             .get_proof(evm_ee_key)

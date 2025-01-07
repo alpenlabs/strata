@@ -108,14 +108,14 @@ pub struct Args {
     )]
     pub native_workers: usize,
 
-    /// The wait time, in seconds, for the prover manager loop.
+    /// The wait time, in milliseconds, for the prover manager loop.
     ///
     /// Adjust this value to control how frequently the prover manager checks for jobs.
-    /// Defaults to `2`.
+    /// Defaults to 1,000 milliseconds.
     #[argh(
         option,
-        description = "wait time in seconds for the prover manager loop",
-        default = "2"
+        description = "wait time in milliseconds for the prover manager loop",
+        default = "1_000"
     )]
     pub loop_interval: u64,
 

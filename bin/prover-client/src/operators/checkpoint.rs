@@ -14,7 +14,7 @@ use strata_rpc_types::RpcCheckpointInfo;
 use strata_state::id::L2BlockId;
 use strata_zkvm::AggregationInput;
 use tokio::sync::Mutex;
-use tracing::error;
+use tracing::{error, info};
 
 use super::{cl_agg::ClAggOperator, l1_batch::L1BatchOperator, ProvingOp};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
@@ -107,6 +107,7 @@ impl ProvingOp for CheckpointOperator {
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        info!(%ckp_idx, "Start creating task");
         let checkpoint_info = self.fetch_ckp_info(ckp_idx).await?;
 
         let ckp_proof_id = ProofContext::Checkpoint(ckp_idx);
@@ -133,7 +134,7 @@ impl ProvingOp for CheckpointOperator {
             .await?;
         let l1_batch_id = l1_batch_keys
             .first()
-            .ok_or_else(|| ProvingTaskError::NoTasksFound)?
+            .ok_or(ProvingTaskError::NoTasksFound)?
             .context();
 
         // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
@@ -142,6 +143,7 @@ impl ProvingOp for CheckpointOperator {
         let start_l2_idx = self.get_l2id(checkpoint_info.l2_range.0).await?;
         let end_l2_idx = self.get_l2id(checkpoint_info.l2_range.1).await?;
         let l2_range = vec![(start_l2_idx, end_l2_idx)];
+        info!(%ckp_idx, "Created tasks for L1 Batch");
 
         let l2_batch_keys = self
             .l2_batch_operator
@@ -150,8 +152,9 @@ impl ProvingOp for CheckpointOperator {
 
         let l2_batch_id = l2_batch_keys
             .first()
-            .ok_or_else(|| ProvingTaskError::NoTasksFound)?
+            .ok_or(ProvingTaskError::NoTasksFound)?
             .context();
+        info!(%ckp_idx, "Created tasks for L2 Batch");
 
         let deps = vec![*l1_batch_id, *l2_batch_id];
 
@@ -159,7 +162,7 @@ impl ProvingOp for CheckpointOperator {
             .map_err(ProvingTaskError::DatabaseError)?;
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(ckp_proof_id, deps)
+        task_tracker.create_tasks(ckp_proof_id, deps, db)
     }
 
     async fn fetch_input(

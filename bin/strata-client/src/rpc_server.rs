@@ -725,12 +725,12 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             return Err(Error::ProofAlreadyCreated(idx))?;
         }
 
+        let checkpoint = entry.clone().into_batch_checkpoint();
+        verify_proof(&checkpoint, &proof_receipt, self.params.rollup())
+            .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
+
         entry.proof = proof_receipt;
         entry.proving_status = CheckpointProvingStatus::ProofReady;
-
-        let checkpoint = entry.clone().into_batch_checkpoint();
-        verify_proof(&checkpoint, self.params.rollup())
-            .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
 
         debug!(%idx, "Proof is pending, setting proof reaedy");
 
