@@ -71,14 +71,13 @@ pub async fn drain(
         let fee_rate = get_fee_rate(fee_rate, settings.signet_backend.as_ref()).await;
         log_fee_rate(&fee_rate);
 
-        let mut psbt = l1w
-            .build_tx()
-            .drain_wallet()
-            .drain_to(address.script_pubkey())
-            .fee_rate(fee_rate)
-            .clone()
-            .finish()
-            .expect("valid transaction");
+        let mut psbt = {
+            let mut builder = l1w.build_tx();
+            builder.drain_wallet();
+            builder.drain_to(address.script_pubkey());
+            builder.fee_rate(fee_rate);
+            builder.finish().expect("valid transaction")
+        };
         l1w.sign(&mut psbt, Default::default()).unwrap();
         let tx = psbt.extract_tx().expect("fully signed tx");
         settings.signet_backend.broadcast_tx(&tx).await.unwrap();

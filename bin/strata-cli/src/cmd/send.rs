@@ -56,13 +56,12 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
             l1w.sync().await.unwrap();
             let fee_rate = get_fee_rate(args.fee_rate, settings.signet_backend.as_ref()).await;
             log_fee_rate(&fee_rate);
-            let mut psbt = l1w
-                .build_tx()
-                .add_recipient(address.script_pubkey(), amount)
-                .fee_rate(fee_rate)
-                .clone()
-                .finish()
-                .expect("valid psbt");
+            let mut psbt = {
+                let mut builder = l1w.build_tx();
+                builder.add_recipient(address.script_pubkey(), amount);
+                builder.fee_rate(fee_rate);
+                builder.finish().expect("valid psbt")
+            };
             l1w.sign(&mut psbt, Default::default())
                 .expect("signable psbt");
             let tx = psbt.extract_tx().expect("signed tx");

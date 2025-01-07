@@ -251,14 +251,13 @@ fn drain_wallet_inner(
     // Before signing the transaction, we need to sync the wallet with bitcoind
     sync_wallet(&mut wallet, &client)?;
 
-    let mut psbt = wallet
-        .build_tx()
-        .drain_wallet()
-        .drain_to(address.script_pubkey())
-        .fee_rate(fee_rate)
-        .clone()
-        .finish()
-        .expect("valid psbt");
+    let mut psbt = {
+        let mut builder = wallet.build_tx();
+        builder.drain_wallet();
+        builder.drain_to(address.script_pubkey());
+        builder.fee_rate(fee_rate);
+        builder.finish().expect("valid psbt")
+    };
     wallet
         .sign(&mut psbt, Default::default())
         .expect("valid psbt");

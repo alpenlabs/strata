@@ -111,16 +111,15 @@ pub async fn deposit(
         .copy_from_slice(recovery_script_hash.as_raw_hash().as_byte_array());
     op_return_data[MBL + TNHL..].copy_from_slice(strata_address.as_slice());
 
-    let mut psbt = l1w
-        .build_tx()
+    let mut psbt = {
+        let mut builder = l1w.build_tx();
         // Important: the deposit won't be found by the sequencer if the order isn't correct.
-        .ordering(TxOrdering::Untouched)
-        .add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT)
-        .add_data(&op_return_data)
-        .fee_rate(fee_rate)
-        .clone()
-        .finish()
-        .expect("valid psbt");
+        builder.ordering(TxOrdering::Untouched);
+        builder.add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT);
+        builder.add_data(&op_return_data);
+        builder.fee_rate(fee_rate);
+        builder.finish().expect("valid psbt")
+    };
     l1w.sign(&mut psbt, Default::default()).unwrap();
     println!("Built transaction");
 
