@@ -4,11 +4,16 @@ use arbitrary::Arbitrary;
 use bitcoin::Transaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, hash::sha256d, utils::get_cohashes};
+use strata_primitives::{
+    buf::Buf32,
+    hash::sha256d,
+    l1::{TxIdComputable, TxIdMarker, WtxIdMarker},
+    utils::get_cohashes,
+};
 
 /// A generic proof structure that can handle any kind of transaction ID (e.g.,
 /// [txid](bitcoin::Txid) or [`wtxid`](bitcoin::Wtxid)) by delegating the ID computation to the
-/// provided type `T` that implements [`TxIdComputer`].
+/// provided type `T` that implements [`TxIdComputable`].
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
@@ -22,7 +27,7 @@ pub struct L1TxInclusionProof<T> {
     /// the next level of the tree.
     cohashes: Vec<Buf32>,
     /// A marker that preserves the association with type `T`, which implements
-    /// [`TxIdComputer`]. This ensures the proof logic depends on the correct
+    /// [`TxIdComputable`]. This ensures the proof logic depends on the correct
     /// transaction ID computation ([`txid`](bitcoin::Txid) vs.[`wtxid`](bitcoin::Wtxid)) for the
     /// lifetime of the proof.
     _marker: PhantomData<T>,
@@ -46,46 +51,7 @@ impl<T> L1TxInclusionProof<T> {
     }
 }
 
-/// A trait for computing some kind of transaction ID (e.g., [`txid`](bitcoin::Txid) or
-/// [`wtxid`](bitcoin::Wtxid)) from a [`Transaction`].
-///
-/// By implementing this trait for different "marker" types, multiple ID computations can be handled
-/// without duplicating your proofgeneration logic. For instance, [`TxId`] uses
-/// [`Transaction::compute_txid`], while [`WtxId`] uses [`Transaction::compute_wtxid`].
-pub trait TxIdComputer {
-    /// Computes the transaction ID for the given transaction.
-    fn compute_id(tx: &Transaction, idx: usize) -> Buf32;
-}
-
-/// Marker type for computing the [`txid`](bitcoin::Txid).
-#[derive(
-    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct TxId;
-
-/// Marker type for computing the [`wtxid`](bitcoin::Wtxid).
-#[derive(
-    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct WtxId;
-
-impl TxIdComputer for TxId {
-    fn compute_id(tx: &Transaction, _idx: usize) -> Buf32 {
-        tx.compute_txid().into()
-    }
-}
-
-impl TxIdComputer for WtxId {
-    fn compute_id(tx: &Transaction, idx: usize) -> Buf32 {
-        // Coinbase transaction wtxid is hash with zeroes
-        if idx == 0 {
-            return Buf32::zero();
-        }
-        tx.compute_wtxid().into()
-    }
-}
-
-impl<T: TxIdComputer> L1TxInclusionProof<T> {
+impl<T: TxIdComputable> L1TxInclusionProof<T> {
     /// Generates the proof for a transaction at the specified index in the list of
     /// transactions, using `T` to compute the transaction IDs.
     pub fn generate(transactions: &[Transaction], idx: u32) -> Self {
@@ -127,10 +93,10 @@ impl<T: TxIdComputer> L1TxInclusionProof<T> {
 }
 
 /// Convenience type alias for the [`txid`](bitcoin::Txid)-based proof.
-pub type L1TxProof = L1TxInclusionProof<TxId>;
+pub type L1TxProof = L1TxInclusionProof<TxIdMarker>;
 
 /// Convenience type alias for the [`wtxid`](bitcoin::Wtxid)-based proof.
-pub type L1WtxProof = L1TxInclusionProof<WtxId>;
+pub type L1WtxProof = L1TxInclusionProof<WtxIdMarker>;
 
 #[cfg(test)]
 mod tests {
