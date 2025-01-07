@@ -4,7 +4,7 @@ use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_proofimpl_btc_blockspace::scan::process_blockscan;
 use strata_state::{
     batch::BatchCheckpoint,
-    l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot},
+    l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot, L1TxProof},
     tx::DepositInfo,
 };
 use strata_zkvm::ZkVmEnv;
@@ -38,8 +38,10 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
 
     for _ in 0..num_inputs {
         let serialized_block = zkvm.read_buf();
+        let inclusion_proof: Option<L1TxProof> = zkvm.read_borsh();
+
         let block: Block = deserialize(&serialized_block).unwrap();
-        let blockscan_result = process_blockscan(&block, &rollup_params);
+        let blockscan_result = process_blockscan(&block, &inclusion_proof, &rollup_params);
         state.check_and_update_continuity(&block.header, &get_btc_params());
         deposits.extend(blockscan_result.deposits);
         prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);

@@ -5,8 +5,8 @@ use strata_zkvm::{
 };
 
 use crate::{
-    block::{witness_commitment_from_coinbase, MAGIC},
-    logic::{BlockScanProofInput, BlockScanResult, BlockspaceProofInput, BlockspaceProofOutput},
+    block::witness_commitment_from_coinbase,
+    logic::{BlockScanProofInput, BlockScanResult},
 };
 
 pub struct BtcBlockspaceProver;

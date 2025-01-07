@@ -1,6 +1,7 @@
 use bitcoin::{consensus::serialize, Block};
 use strata_primitives::params::RollupParams;
-use strata_state::l1::HeaderVerificationState;
+use strata_proofimpl_btc_blockspace::block::witness_commitment_from_coinbase;
+use strata_state::l1::{HeaderVerificationState, L1TxProof};
 use strata_zkvm::{PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
 
 use crate::logic::L1BatchProofOutput;
@@ -33,7 +34,11 @@ impl ZkVmProver for L1BatchProver {
 
         input_builder.write_serde(&input.blocks.len())?;
         for block in &input.blocks {
+            let inclusion_proof = witness_commitment_from_coinbase(&block.txdata[0])
+                .map(|_| L1TxProof::generate(&block.txdata, 0));
+
             input_builder.write_buf(&serialize(block))?;
+            input_builder.write_borsh(&inclusion_proof)?;
         }
 
         input_builder.build()

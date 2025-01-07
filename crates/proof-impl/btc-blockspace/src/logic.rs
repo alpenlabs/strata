@@ -1,28 +1,12 @@
 //! Core logic of the Bitcoin Blockspace proof that will be proven
 
-use bitcoin::{
-    consensus::{deserialize, serialize},
-    Block,
-};
+use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, params::RollupParams};
+use strata_primitives::params::RollupParams;
 use strata_state::{batch::BatchCheckpoint, l1::L1TxProof, tx::DepositInfo};
 use strata_zkvm::ZkVmEnv;
 
-<<<<<<< HEAD
-use crate::{
-    block::check_witness_commitment, filter::extract_relevant_info, scan::process_blockscan,
-};
-=======
-use crate::{block::check_integrity, filter::extract_relevant_info};
->>>>>>> 5707845f (feat: check block integrity)
-
-#[derive(Debug)]
-pub struct BlockspaceProofInput {
-    pub block: Block,
-    pub rollup_params: RollupParams,
-    // TODO: add hintings and other necessary params
-}
+use crate::scan::process_blockscan;
 
 /// Defines the result of scanning an L1 block.
 /// Includes protocol-relevant data posted on L1 block.
@@ -45,6 +29,54 @@ pub fn process_blockspace_proof_outer(zkvm: &impl ZkVmEnv) {
     let serialized_block = zkvm.read_buf();
     let inclusion_proof: Option<L1TxProof> = zkvm.read_borsh();
     let block: Block = deserialize(&serialized_block).unwrap();
-    let output = process_blockscan(&block, &rollup_params);
+    let output = process_blockscan(&block, &inclusion_proof, &rollup_params);
     zkvm.commit_borsh(&output);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
+    use strata_test_utils::{
+        bitcoin::{get_btc_chain, get_btc_mainnet_block},
+        l2::gen_params,
+    };
+    use strata_zkvm::ZkVmProver;
+
+    use super::*;
+    use crate::prover::BtcBlockspaceProver;
+
+    fn get_native_host() -> NativeHost {
+        NativeHost {
+            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+                process_blockspace_proof_outer(zkvm);
+                Ok(())
+            })),
+        }
+    }
+
+    #[test]
+    fn test_process_blockspace_proof_before_segwit() {
+        let params = gen_params();
+        let rollup_params = params.rollup();
+        let btc_block = get_btc_chain().get_block(40321).clone();
+        let input = BlockScanProofInput {
+            block: btc_block,
+            rollup_params: rollup_params.clone(),
+        };
+        BtcBlockspaceProver::prove(&input, &get_native_host()).unwrap();
+    }
+
+    #[test]
+    fn test_process_blockspace_proof_after_segwit() {
+        let params = gen_params();
+        let rollup_params = params.rollup();
+        let btc_block = get_btc_mainnet_block();
+        let input = BlockScanProofInput {
+            block: btc_block,
+            rollup_params: rollup_params.clone(),
+        };
+        BtcBlockspaceProver::prove(&input, &get_native_host()).unwrap();
+    }
 }
