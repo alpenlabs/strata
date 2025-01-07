@@ -53,7 +53,7 @@ where
     }
 
     /// Executes the operation directly.
-    #[allow(dead_code)] // #FIXME: remove this.
+    #[allow(dead_code)] // FIXME: remove this.
     pub fn exec_blocking(&self, arg: T) -> DbResult<R> {
         (self.executor_fn)(arg)
     }
