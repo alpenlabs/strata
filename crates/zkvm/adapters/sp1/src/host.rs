@@ -82,6 +82,11 @@ impl ZkVmHost for SP1Host {
             .run()
             .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
 
+        let mut network_prover = ProverClient::builder().network().build();
+        network_prover.prove(&self.proving_key, &prover_input);
+
+        let p2 = client.prove(&self.proving_key, &prover_input);
+
         Ok(proof_info.into())
     }
 
