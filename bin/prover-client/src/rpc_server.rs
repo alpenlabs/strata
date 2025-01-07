@@ -10,8 +10,8 @@ use strata_primitives::buf::Buf32;
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
+use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{id::L2BlockId, l1::L1BlockId};
-use strata_rpc_utils::{to_jsonrpsee_error, to_jsonrpsee_error_object};
 use strata_zkvm::ProofReceipt;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
@@ -85,8 +85,7 @@ impl ProverClientRpc {
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
     async fn prove_btc_block(&self, block_id: L1BlockId) -> RpcResult<Vec<ProofKey>> {
-        Ok(self
-            .operator
+        self.operator
             .btc_operator()
             .create_task(block_id, self.task_tracker.clone(), &self.db)
             .await
@@ -113,8 +112,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
     }
 
     async fn prove_l1_batch(&self, l1_range: (L1BlockId, L1BlockId)) -> RpcResult<Vec<ProofKey>> {
-        Ok(self
-            .operator
+        self.operator
             .l1_batch_operator()
             .create_task(l1_range, self.task_tracker.clone(), &self.db)
             .await
