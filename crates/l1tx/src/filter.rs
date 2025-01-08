@@ -70,7 +70,7 @@ fn parse_envelope_checkpoints<'a>(
         inp.witness
             .tapscript()
             .and_then(|scr| parse_envelope_data(&scr.into(), &filter_conf.rollup_name.clone()).ok())
-            .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.batch_data()).ok())
+            .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.data()).ok())
     })
 }
 
@@ -92,10 +92,7 @@ mod test {
     use rand::{rngs::OsRng, RngCore};
     use strata_btcio::test_utils::{build_reveal_transaction_test, generate_envelope_script_test};
     use strata_primitives::l1::BitcoinAmount;
-    use strata_state::{
-        batch::SignedBatchCheckpoint,
-        tx::{EnvelopeData, ProtocolOperation},
-    };
+    use strata_state::{batch::SignedBatchCheckpoint, da_blob::L1Payload, tx::ProtocolOperation};
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::TxFilterConfig;
@@ -162,7 +159,7 @@ mod test {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
         let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
-        let envelope_data = EnvelopeData::new(borsh::to_vec(&signed_checkpoint).unwrap());
+        let envelope_data = L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap());
 
         let script = generate_envelope_script_test(envelope_data, &rollup_name, 1).unwrap();
 

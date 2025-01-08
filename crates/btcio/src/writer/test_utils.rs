@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use bitcoin::{Address, Network};
 use strata_db::{traits::BroadcastDatabase, types::L1TxEntry};
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance,
@@ -11,10 +10,7 @@ use strata_storage::ops::{
     l1tx_broadcast::Context as BContext,
 };
 
-use crate::{
-    broadcaster::L1BroadcastHandle,
-    writer::config::{FeePolicy, WriterConfig},
-};
+use crate::broadcaster::L1BroadcastHandle;
 
 /// Returns `Arc` of `SequencerDB` for testing
 pub fn get_db() -> Arc<SequencerDB<RBSeqBlobDb>> {
@@ -46,20 +42,4 @@ pub fn get_broadcast_handle() -> Arc<L1BroadcastHandle> {
     let (sender, _) = tokio::sync::mpsc::channel::<(u64, L1TxEntry)>(64);
     let handle = L1BroadcastHandle::new(sender, Arc::new(ops));
     Arc::new(handle)
-}
-
-/// Returns an instance of [`WriterConfig`] with sensible defaults for testing
-pub fn get_config() -> WriterConfig {
-    let addr = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5"
-        .parse::<Address<_>>()
-        .unwrap()
-        .require_network(Network::Regtest)
-        .unwrap();
-    WriterConfig {
-        sequencer_address: addr,
-        rollup_name: "strata".to_string(),
-        fee_policy: FeePolicy::Fixed(100),
-        poll_duration_ms: 1000,
-        amount_for_reveal_txn: 1000,
-    }
 }

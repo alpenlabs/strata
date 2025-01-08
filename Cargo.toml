@@ -90,6 +90,7 @@ strata-db = { path = "crates/db" }
 strata-eectl = { path = "crates/eectl" }
 strata-evmexec = { path = "crates/evmexec" }
 strata-key-derivation = { path = "crates/key-derivation" }
+strata-l1tx = { path = "crates/l1tx" }
 strata-mmr = { path = "crates/util/mmr" }
 strata-native-zkvm-adapter = { path = "crates/zkvm/adapters/native" }
 strata-primitives = { path = "crates/primitives" }
@@ -118,7 +119,6 @@ strata-storage = { path = "crates/storage" }
 strata-sync = { path = "crates/sync" }
 strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
-strata-l1tx = { path = "crates/l1tx" }
 strata-zkvm = { path = "crates/zkvm/zkvm" }
 strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 

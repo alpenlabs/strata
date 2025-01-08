@@ -3,7 +3,7 @@ use bitcoin::{
     script::{Instruction, Instructions},
     ScriptBuf,
 };
-use strata_state::tx::EnvelopeData;
+use strata_state::da_blob::L1Payload;
 use thiserror::Error;
 use tracing::debug;
 
@@ -41,15 +41,15 @@ pub enum EnvelopParseError {
     InvalidFormat,
 }
 
-/// Parse [`EnvelopeData`]
+/// Parse [`L1Payload`]
 ///
 /// # Errors
 ///
-/// This function errors if it cannot parse the [`EnvelopeData`]
+/// This function errors if it cannot parse the [`L1Payload`]
 pub fn parse_envelope_data(
     script: &ScriptBuf,
     rollup_name: &str,
-) -> Result<EnvelopeData, EnvelopParseError> {
+) -> Result<L1Payload, EnvelopParseError> {
     let mut instructions = script.instructions();
 
     enter_envelope(&mut instructions)?;
@@ -81,7 +81,8 @@ pub fn parse_envelope_data(
     match (tag, size) {
         (BATCH_DATA_TAG, Some(size)) => {
             let batch_data = extract_n_bytes(size, &mut instructions)?;
-            Ok(EnvelopeData::new(batch_data))
+            Ok(L1Payload::new_checkpoint(batch_data)) // TODO: later this will discern checkpoint
+                                                      // and da and any other payload types
         }
         (BATCH_DATA_TAG, None) => Err(EnvelopParseError::InvalidBlob),
         _ => Err(EnvelopParseError::InvalidBlobTag),
@@ -149,13 +150,14 @@ fn extract_n_bytes(
 mod tests {
 
     use strata_btcio::test_utils::generate_envelope_script_test;
+    use strata_state::da_blob::L1Payload;
 
     use super::*;
 
     #[test]
     fn test_parse_envelope_data() {
         let bytes = vec![0, 1, 2, 3];
-        let envelope_data = EnvelopeData::new(bytes.clone());
+        let envelope_data = L1Payload::new_checkpoint(bytes.clone());
         let script = generate_envelope_script_test(envelope_data.clone(), "TestRollup", 1).unwrap();
 
         // Parse the rollup name
@@ -166,7 +168,7 @@ mod tests {
 
         // Try with larger size
         let bytes = vec![1; 2000];
-        let envelope_data = EnvelopeData::new(bytes.clone());
+        let envelope_data = L1Payload::new_checkpoint(bytes.clone());
         let script = generate_envelope_script_test(envelope_data.clone(), "TestRollup", 1).unwrap();
 
         // Parse the rollup name

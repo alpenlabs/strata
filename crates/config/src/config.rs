@@ -104,6 +104,12 @@ mod test {
             rpc_url = "http://localhost:8551"
             secret = "1234567890abcdef"
 
+            [btcio]
+            client_poll_dur_ms = 200
+            write_poll_dur_ms = 200
+            fee_policy = "Smart"
+            reveal_amount = 100
+
             [relayer]
             refresh_interval = 10
             stale_duration = 120
@@ -138,6 +144,12 @@ mod test {
             l1_follow_distance = 6
             client_poll_dur_ms = 200
             client_checkpoint_interval = 10
+
+            [btcio]
+            client_poll_dur_ms = 200
+            write_poll_dur_ms = 200
+            fee_policy = "Smart"
+            reveal_amount = 100
 
             [exec.reth]
             rpc_url = "http://localhost:8551"

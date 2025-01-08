@@ -1,5 +1,5 @@
 use core::{result::Result::Ok, str::FromStr};
-use std::{cmp::Reverse, sync::Arc};
+use std::cmp::Reverse;
 
 use anyhow::anyhow;
 use bitcoin::{
@@ -51,16 +51,15 @@ pub enum EnvelopeError {
 // Btcio depends on `tx-parser`. So this file is behind a feature flag 'test-utils' and on dev
 // dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
 // dependency doesn't happen
-pub async fn build_envelope_txs(
+pub async fn build_envelope_txs<T: Reader + Wallet + Signer>(
     payload: &L1Payload,
-    rpc_client: &Arc<impl Reader + Wallet + Signer>,
-    ctx: Arc<WriterContext>,
+    ctx: &WriterContext<T>,
 ) -> anyhow::Result<(Transaction, Transaction)> {
-    let network = rpc_client.network().await?;
-    let utxos = rpc_client.get_utxos().await?;
+    let network = ctx.client.network().await?;
+    let utxos = ctx.client.get_utxos().await?;
 
     let fee_rate = match ctx.config.fee_policy {
-        FeePolicy::Smart => rpc_client.estimate_smart_fee(1).await? * 2,
+        FeePolicy::Smart => ctx.client.estimate_smart_fee(1).await? * 2,
         FeePolicy::Fixed(val) => val,
     };
     create_envelope_transactions(
@@ -687,10 +686,10 @@ mod tests {
     fn test_create_envelope_transactions() {
         let (rollup_name, _, _, _, address, utxos) = get_mock_data();
 
-        let write_intent = vec![0u8; 100];
+        let payload = L1Payload::new_da(vec![0u8; 100]);
         let (commit, reveal) = super::create_envelope_transactions(
             rollup_name,
-            &write_intent,
+            &payload,
             utxos.to_vec(),
             address.clone(),
             REVEAL_OUTPUT_AMOUNT,

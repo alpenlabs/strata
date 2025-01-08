@@ -9,9 +9,9 @@ borsh.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true
 strata-bridge-tx-builder.workspace = true
+strata-l1tx.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
-strata-l1tx.workspace = true
 strata-zkvm.workspace = true
 
 [dev-dependencies]

@@ -15,7 +15,10 @@ use tracing::*;
 
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::BitcoinClient,
+    rpc::{
+        traits::{Reader, Signer, Wallet},
+        BitcoinClient,
+    },
     status::{apply_status_updates, L1StatusUpdate},
     writer::{
         builder::EnvelopeError, context::WriterContext, signer::create_and_sign_payload_envelopes,
@@ -87,6 +90,7 @@ impl EnvelopeHandle {
 /// # Returns
 ///
 /// [`Result<EnvelopeHandle>`](anyhow::Result)
+#[allow(clippy::too_many_arguments)]
 pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,
@@ -148,9 +152,9 @@ fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u6
 ///
 /// The envelope will be monitored until it acquires the status of
 /// [`BlobL1Status::Finalized`]
-pub async fn watcher_task(
+pub async fn watcher_task<T: Reader + Wallet + Signer>(
     next_blbidx_to_watch: u64,
-    context: Arc<WriterContext>,
+    context: Arc<WriterContext<T>>,
     insc_ops: Arc<EnvelopeDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
@@ -174,7 +178,6 @@ pub async fn watcher_task(
                     match create_and_sign_payload_envelopes(
                         &payloadentry,
                         &broadcast_handle,
-                        context.client.clone(),
                         context.clone(),
                     )
                     .await

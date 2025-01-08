@@ -2,12 +2,12 @@
 //! deposits, forced inclusion transactions as well as state updates
 
 use bitcoin::Block;
+use strata_l1tx::filter::{filter_protocol_op_tx_refs, TxFilterConfig};
 use strata_primitives::{block_credential::CredRule, params::RollupParams};
 use strata_state::{
     batch::BatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
-use strata_l1tx::filter::{filter_protocol_op_tx_refs, TxFilterConfig};
 
 pub fn extract_relevant_info(
     block: &Block,

@@ -20,3 +20,14 @@ pub enum FeePolicy {
     /// Fixed fee in sat/vB.
     Fixed(u64),
 }
+
+impl Default for BtcIOConfig {
+    fn default() -> Self {
+        Self {
+            client_poll_dur_ms: 200,
+            write_poll_dur_ms: 1_000,
+            fee_policy: FeePolicy::Smart,
+            reveal_amount: 1_000,
+        }
+    }
+}

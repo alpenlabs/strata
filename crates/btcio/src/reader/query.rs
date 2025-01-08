@@ -5,14 +5,14 @@ use std::{
 };
 
 use anyhow::bail;
-use bitcoin::{hashes::Hash, Block, BlockHash};
+use bitcoin::{Block, BlockHash};
 use strata_config::btcio::BtcIOConfig;
 use strata_l1tx::{
     filter::filter_protocol_op_tx_refs,
     filter_types::TxFilterConfig,
     messages::{BlockData, L1Event},
 };
-use strata_primitives::{buf::Buf32, params::Params};
+use strata_primitives::params::Params;
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
@@ -441,16 +441,13 @@ mod test {
         let l1status: L1Status = gen.generate();
         let status_channel = StatusChannel::new(cls, l1status, Some(chs));
         let params = Arc::new(gen_params());
-        let config = Arc::new(ReaderConfig {
-            max_reorg_depth: 4,
-            client_poll_dur_ms: 3000,
-            params,
-        });
+        let config = Arc::new(BtcIOConfig::default());
         let client = Arc::new(TestBitcoinClient::new(1));
         ReaderContext {
             event_tx,
             config,
             status_channel,
+            params,
             client,
         }
     }
