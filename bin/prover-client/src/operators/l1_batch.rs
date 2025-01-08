@@ -15,11 +15,10 @@ use strata_primitives::{
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_state::l1::L1BlockId;
-use tokio::sync::Mutex;
 use tracing::error;
 
 use super::ProvingOp;
-use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
+use crate::errors::ProvingTaskError;
 
 /// A struct that implements the [`ProvingOp`] trait for L1 Batch Proof generation.
 ///
@@ -98,17 +97,12 @@ impl ProvingOp for L1BatchOperator {
     type Prover = L1BatchProver;
     type Params = (L1BlockId, L1BlockId);
 
-    async fn create_task(
+    fn construct_proof_ctx(
         &self,
-        params: Self::Params,
-        task_tracker: Arc<Mutex<TaskTracker>>,
-        db: &ProofDb,
-    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let (start_blkid, end_blkid) = params;
-        let l1_batch_proof_id = ProofContext::L1Batch(start_blkid, end_blkid);
-
-        let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(l1_batch_proof_id, vec![], db)
+        block_range: &Self::Params,
+    ) -> Result<ProofContext, ProvingTaskError> {
+        let (start_blkid, end_blkid) = *block_range;
+        Ok(ProofContext::L1Batch(start_blkid, end_blkid))
     }
 
     async fn fetch_input(

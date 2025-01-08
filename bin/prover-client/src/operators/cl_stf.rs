@@ -117,38 +117,12 @@ impl ProvingOp for ClStfOperator {
     type Prover = ClStfProver;
     type Params = (L2BlockId, L2BlockId);
 
-    async fn create_task(
+    fn construct_proof_ctx(
         &self,
-        block_range: Self::Params,
-        task_tracker: Arc<Mutex<TaskTracker>>,
-        db: &ProofDb,
-    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let (start_block_id, end_block_id) = block_range;
-
-        let el_start_block_id = self.get_exec_id(start_block_id).await?;
-        let el_end_block_id = self.get_exec_id(end_block_id).await?;
-
-        let evm_ee_tasks = self
-            .evm_ee_operator
-            .create_task(
-                (el_start_block_id, el_end_block_id),
-                task_tracker.clone(),
-                db,
-            )
-            .await?;
-
-        let evm_ee_id = evm_ee_tasks
-            .first()
-            .ok_or(ProvingTaskError::NoTasksFound)?
-            .context();
-
-        let cl_stf_id = ProofContext::ClStf(start_block_id, end_block_id);
-
-        db.put_proof_deps(cl_stf_id, vec![*evm_ee_id])
-            .map_err(ProvingTaskError::DatabaseError)?;
-
-        let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(cl_stf_id, vec![*evm_ee_id], db)
+        block_range: &Self::Params,
+    ) -> Result<ProofContext, ProvingTaskError> {
+        let (start_block_id, end_block_id) = *block_range;
+        Ok(ProofContext::ClStf(start_block_id, end_block_id))
     }
 
     async fn fetch_input(
@@ -198,5 +172,24 @@ impl ProvingOp for ClStfOperator {
             evm_ee_proof,
             evm_ee_vk,
         })
+    }
+
+    async fn create_deps_tasks(
+        &self,
+        block_range: Self::Params,
+        db: &ProofDb,
+        task_tracker: Arc<Mutex<TaskTracker>>,
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        let (start_block_id, end_block_id) = block_range;
+        let el_start_block_id = self.get_exec_id(start_block_id).await?;
+        let el_end_block_id = self.get_exec_id(end_block_id).await?;
+
+        self.evm_ee_operator
+            .create_task(
+                (el_start_block_id, el_end_block_id),
+                task_tracker.clone(),
+                db,
+            )
+            .await
     }
 }

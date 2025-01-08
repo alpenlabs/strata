@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use alloy_rpc_types::{Block, Header};
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_primitives::{
@@ -10,11 +8,10 @@ use strata_proofimpl_evm_ee_stf::{
     primitives::EvmEeProofInput, prover::EvmEeProver, EvmBlockStfInput,
 };
 use strata_rocksdb::prover::db::ProofDb;
-use tokio::sync::Mutex;
 use tracing::error;
 
 use super::ProvingOp;
-use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
+use crate::errors::ProvingTaskError;
 
 /// A struct that implements the [`ProvingOp`] trait for EVM Execution Environment (EE) State
 /// Transition Function (STF) proofs.
@@ -60,17 +57,12 @@ impl ProvingOp for EvmEeOperator {
     type Prover = EvmEeProver;
     type Params = (Buf32, Buf32);
 
-    async fn create_task(
+    fn construct_proof_ctx(
         &self,
-        block_range: Self::Params,
-        task_tracker: Arc<Mutex<TaskTracker>>,
-        db: &ProofDb,
-    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let (start_blkid, end_blkid) = block_range;
-        let context = ProofContext::EvmEeStf(start_blkid, end_blkid);
-
-        let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(context, vec![], db)
+        block_range: &Self::Params,
+    ) -> Result<ProofContext, ProvingTaskError> {
+        let (start_blkid, end_blkid) = *block_range;
+        Ok(ProofContext::EvmEeStf(start_blkid, end_blkid))
     }
 
     async fn fetch_input(

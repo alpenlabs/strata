@@ -8,11 +8,10 @@ use strata_primitives::{
 use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_state::l1::L1BlockId;
-use tokio::sync::Mutex;
 use tracing::error;
 
 use super::ProvingOp;
-use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
+use crate::errors::ProvingTaskError;
 
 /// A struct that implements the [`ProvingOp`] trait for Bitcoin blockspace proof generation.
 ///
@@ -38,15 +37,11 @@ impl ProvingOp for BtcBlockspaceOperator {
     type Prover = BtcBlockspaceProver;
     type Params = L1BlockId;
 
-    async fn create_task(
+    fn construct_proof_ctx(
         &self,
-        block_id: Self::Params,
-        task_tracker: Arc<Mutex<TaskTracker>>,
-        db: &ProofDb,
-    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let context = ProofContext::BtcBlockspace(block_id);
-        let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(context, vec![], db)
+        block_id: &Self::Params,
+    ) -> Result<ProofContext, ProvingTaskError> {
+        Ok(ProofContext::BtcBlockspace(*block_id))
     }
 
     async fn fetch_input(
