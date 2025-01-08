@@ -103,7 +103,7 @@ pub trait StrataApi {
 
     /// Get latest checkpoint info
     #[method(name = "getLatestCheckpointIndex")]
-    async fn get_latest_checkpoint_index(&self) -> RpcResult<Option<u64>>;
+    async fn get_latest_checkpoint_index(&self, finalized: Option<bool>) -> RpcResult<Option<u64>>;
 
     /// Get nth checkpoint info if any
     #[method(name = "getCheckpointInfo")]

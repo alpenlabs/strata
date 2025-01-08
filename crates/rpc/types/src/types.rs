@@ -4,8 +4,9 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use bitcoin::{Network, Txid};
+use bitcoin::{hashes::Hash, Network, Txid, Wtxid};
 use serde::{Deserialize, Serialize};
+use strata_db::types::{CheckpointCommitment, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
     l1::{BitcoinAmount, L1TxRef, OutputRef},
@@ -17,6 +18,7 @@ use strata_state::{
     bridge_ops::WithdrawalIntent,
     bridge_state::{DepositEntry, DepositState},
     id::L2BlockId,
+    l1::L1BlockId,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -227,6 +229,36 @@ pub struct RawBlockWitness {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RpcCheckpointCommitmentInfo {
+    /// block where checkpoint was posted
+    pub blockhash: L1BlockId,
+
+    /// txid of txn for this checkpoint
+    pub txid: Txid,
+
+    /// wtxid of txn for this checkpoint
+    pub wtxid: Wtxid,
+
+    /// The height of the block where the checkpoint was posted.
+    pub height: u64,
+
+    /// The position of the checkpoint in the block.
+    pub position: u32,
+}
+
+impl From<CheckpointCommitment> for RpcCheckpointCommitmentInfo {
+    fn from(value: CheckpointCommitment) -> Self {
+        Self {
+            blockhash: value.blockhash.into(),
+            txid: Txid::from_byte_array(*value.txid.as_ref()),
+            wtxid: Wtxid::from_byte_array(*value.wtxid.as_ref()),
+            height: value.block_height,
+            position: value.position,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcCheckpointInfo {
     /// The index of the checkpoint
     pub idx: u64,
@@ -236,6 +268,8 @@ pub struct RpcCheckpointInfo {
     pub l2_range: (u64, u64),
     /// L2 block that this checkpoint covers
     pub l2_blockid: L2BlockId,
+    /// Info on txn where checkpoint is committed on chain
+    pub commitment: Option<RpcCheckpointCommitmentInfo>,
 }
 
 impl From<BatchInfo> for RpcCheckpointInfo {
@@ -245,7 +279,16 @@ impl From<BatchInfo> for RpcCheckpointInfo {
             l1_range: value.l1_range,
             l2_range: value.l2_range,
             l2_blockid: value.l2_blockid,
+            commitment: None,
         }
+    }
+}
+
+impl From<CheckpointEntry> for RpcCheckpointInfo {
+    fn from(value: CheckpointEntry) -> Self {
+        let mut item: Self = value.batch_info.into();
+        item.commitment = value.commitment.map(Into::into);
+        item
     }
 }
 

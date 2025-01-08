@@ -1,10 +1,9 @@
 import flexitest
 from strata_utils import get_balance
 
-from envs import testenv
+from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
 from utils import utils
-from utils.constants import UNSPENDABLE_ADDRESS
 
 # Local constants
 # Gas for the withdrawal transaction
@@ -24,7 +23,10 @@ class BridgeWithdrawHappyTest(testenv.BridgeTestBase):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        fast_batch_settings = net_settings.get_fast_batch_settings()
+        ctx.set_env(
+            testenv.BasicEnvConfig(pre_generate_blocks=101, rollup_settings=fast_batch_settings)
+        )
 
     def main(self, ctx: flexitest.RunContext):
         # Generate addresses
@@ -68,7 +70,6 @@ class BridgeWithdrawHappyTest(testenv.BridgeTestBase):
         # We expect final BTC balance to be D BTC minus operator fees
         difference = deposit_amount - operator_fee - withdraw_extra_fee
         confirm_btc_withdrawal(
-            self.btcrpc,
             withdraw_address,
             btc_url,
             btc_user,
@@ -81,28 +82,6 @@ class BridgeWithdrawHappyTest(testenv.BridgeTestBase):
         return True
 
 
-def mine_blocks_until_maturity(
-    btcrpc,
-    withdraw_address,
-    btc_url,
-    btc_user,
-    btc_password,
-    original_balance,
-    number_of_blocks=12,
-):
-    """
-    Mine blocks until the withdraw address has a positive balance
-    By default, the number of blocks to mine is 12:
-    - 6 blocks to mature the DRT
-    - 6 blocks to mature the DT
-    """
-    btcrpc.proxy.generatetoaddress(number_of_blocks, UNSPENDABLE_ADDRESS)
-    utils.wait_until(
-        lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > original_balance,
-        timeout=10,
-    )
-
-
 def check_initial_eth_balance(rethrpc, address, debug_fn=print):
     """Asserts that the initial ETH balance for `address` is zero."""
     balance = int(rethrpc.eth_getBalance(address), 16)
@@ -111,7 +90,6 @@ def check_initial_eth_balance(rethrpc, address, debug_fn=print):
 
 
 def confirm_btc_withdrawal(
-    btcrpc,
     withdraw_address,
     btc_url,
     btc_user,
@@ -124,9 +102,12 @@ def confirm_btc_withdrawal(
     Wait for the BTC balance to reflect the withdrawal and confirm the final balance
     equals `original_balance + expected_increase`.
     """
-    # Wait for the new balance (and presumably the maturity):
-    mine_blocks_until_maturity(
-        btcrpc, withdraw_address, btc_url, btc_user, btc_password, original_balance
+    # Wait for the new balance,
+    # this includes waiting for a new batch checkpoint,
+    # duty processing by the bridge clients and maturity of the withdrawal.
+    utils.wait_until(
+        lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > original_balance,
+        timeout=60,
     )
 
     # Check final BTC balance

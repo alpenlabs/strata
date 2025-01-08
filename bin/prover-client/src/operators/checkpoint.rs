@@ -89,7 +89,7 @@ impl CheckpointOperator {
     /// Retrieves the latest checkpoint index
     pub async fn fetch_latest_ckp_idx(&self) -> Result<u64, ProvingTaskError> {
         self.cl_client
-            .get_latest_checkpoint_index()
+            .get_latest_checkpoint_index(None)
             .await
             .inspect_err(|_| error!("Failed to fetch latest checkpoint"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?

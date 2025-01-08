@@ -309,15 +309,17 @@ fn apply_action<D: Database>(
 
         SyncAction::WriteCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
-                let idx = c.batch_info().idx();
+                let batch_ckp = &c.batch_checkpoint;
+                let idx = batch_ckp.batch_info().idx();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Confirmed;
                 let entry = CheckpointEntry::new(
-                    c.batch_info().clone(),
-                    c.bootstrap_state().clone(),
-                    c.get_proof_receipt(),
+                    batch_ckp.batch_info().clone(),
+                    batch_ckp.bootstrap_state().clone(),
+                    batch_ckp.get_proof_receipt(),
                     pstatus,
                     cstatus,
+                    Some(c.commitment.clone().into()),
                 );
 
                 // Store
@@ -327,15 +329,17 @@ fn apply_action<D: Database>(
 
         SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
-                let idx = c.batch_info().idx();
+                let batch_ckp = &c.batch_checkpoint;
+                let idx = batch_ckp.batch_info().idx();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Finalized;
                 let entry = CheckpointEntry::new(
-                    c.batch_info().clone(),
-                    c.bootstrap_state().clone(),
-                    c.get_proof_receipt(),
+                    batch_ckp.batch_info().clone(),
+                    batch_ckp.bootstrap_state().clone(),
+                    batch_ckp.get_proof_receipt(),
                     pstatus,
                     cstatus,
+                    Some(c.commitment.clone().into()),
                 );
 
                 // Update

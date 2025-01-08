@@ -264,3 +264,9 @@ provers/**/*.proof
 
 proving_keys/
 provers/sp1/proofs/
+
+*.trace
+*.*_proof
+
+# backup files
+*.bak

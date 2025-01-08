@@ -1,9 +1,7 @@
-import time
-
 import flexitest
 from strata_utils import get_balance
 
-from envs import testenv
+from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
 from utils import get_bridge_pubkey, wait_until, wait_until_with_value
 from utils.constants import UNSPENDABLE_ADDRESS
@@ -20,9 +18,14 @@ class BridgeWithdrawReassignmentTest(testenv.BridgeTestBase):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
+        fast_batch_settings = net_settings.get_fast_batch_settings()
         ctx.set_env(
             testenv.BasicEnvConfig(
-                101, n_operators=3, pre_fund_addrs=True, duty_timeout_duration=10
+                101,
+                n_operators=3,
+                pre_fund_addrs=True,
+                duty_timeout_duration=10,
+                rollup_settings=fast_batch_settings,
             )
         )
 
@@ -68,8 +71,12 @@ class BridgeWithdrawReassignmentTest(testenv.BridgeTestBase):
         self.debug(f"BTC balance after withdraw: {new_balance}")
 
         # Check assigned operator
-        duties = self.seqrpc.strata_getBridgeDuties(0, 0)["duties"]
-        withdraw_duty = [d for d in duties if d["type"] == "FulfillWithdrawal"][0]
+        get_duties = self.seqrpc.strata_getBridgeDuties
+        withdraw_duty = wait_until_with_value(
+            lambda: [d for d in get_duties(0, 0)["duties"] if d["type"] == "FulfillWithdrawal"],
+            predicate=lambda v: len(v) > 0,
+            timeout=30,
+        )[0]
         assigned_op_idx = withdraw_duty["payload"]["assigned_operator_idx"]
         assigned_operator = ctx.get_service(f"bridge.{assigned_op_idx}")
         self.debug(f"Assigned operator index: {assigned_op_idx}")
@@ -80,17 +87,20 @@ class BridgeWithdrawReassignmentTest(testenv.BridgeTestBase):
 
         # Let enough blocks pass so the assignment times out
         self.btcrpc.proxy.generatetoaddress(dispatch_assignment_duration, UNSPENDABLE_ADDRESS)
-        time.sleep(3)
 
         # Re-check duties
-        duties = self.seqrpc.strata_getBridgeDuties(0, 0)["duties"]
-        withdraw_duty = [d for d in duties if d["type"] == "FulfillWithdrawal"][0]
-        new_assigned_op_idx = withdraw_duty["payload"]["assigned_operator_idx"]
-        new_assigned_operator = ctx.get_service(f"bridge.{new_assigned_op_idx}")
-        self.debug(f"new assigned operator is {new_assigned_op_idx}")
+        get_duties = self.seqrpc.strata_getBridgeDuties
+
+        new_assigned_op_idx = wait_until_with_value(
+            lambda: [d for d in get_duties(0, 0)["duties"] if d["type"] == "FulfillWithdrawal"][0],
+            predicate=lambda v: v["payload"]["assigned_operator_idx"] != assigned_op_idx,
+            timeout=30,
+            error_with="No new operator was assigned",
+        )["payload"]["assigned_operator_idx"]
+
+        self.debug(f"new assigned operator: {new_assigned_op_idx}")
 
         # Ensure a new operator is assigned
-        assert new_assigned_operator != assigned_operator, "No new operator was assigned"
         assigned_operator.start()
         bridge_rpc = assigned_operator.create_rpc()
 

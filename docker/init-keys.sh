@@ -42,26 +42,24 @@ $DATATOOL_PATH -b regtest genxpriv -f $OP3_SEED_FILE
 $DATATOOL_PATH -b regtest genxpriv -f $OP4_SEED_FILE
 $DATATOOL_PATH -b regtest genxpriv -f $OP5_SEED_FILE
 
-seqkey=$($DATATOOL_PATH -b regtest genseqpubkey -f ${SEQ_SEED_FILE})
+seqprivkey=$($DATATOOL_PATH -b regtest genseqprivkey -f ${SEQ_SEED_FILE})
+echo -n $seqprivkey > $CONFIG_FILE/sequencer.key
+
 op1pubkey=$($DATATOOL_PATH -b regtest genopxpub -f ${OP1_SEED_FILE})
 op2pubkey=$($DATATOOL_PATH -b regtest genopxpub -f ${OP2_SEED_FILE})
 op3pubkey=$($DATATOOL_PATH -b regtest genopxpub -f ${OP3_SEED_FILE})
 op4pubkey=$($DATATOOL_PATH -b regtest genopxpub -f ${OP4_SEED_FILE})
 op5pubkey=$($DATATOOL_PATH -b regtest genopxpub -f ${OP5_SEED_FILE})
 
+seqpubkey=$($DATATOOL_PATH -b regtest genseqpubkey -f ${CONFIG_FILE}/sequencer.key)
+
 ROLLUP_PARAMS_FILE=$CONFIG_FILE/params.json
 $DATATOOL_PATH -b regtest genparams \
     -n "alpenstrata" \
-    -s $seqkey \
+    -s $seqpubkey \
     -b $op1pubkey \
     -b $op2pubkey \
     -b $op3pubkey \
     -b $op4pubkey \
     -b $op5pubkey \
     --output $ROLLUP_PARAMS_FILE
-
-echo "Decoding the xpriv to hex-encoded private key"
-seq_priv=$($DATATOOL_PATH -b regtest genseqprivkey -f ${SEQ_SEED_FILE})
-# decode in base58 => hex-encode => reverse => get the first 64 chars (32 bytes) = reverse again for the original (removing new lines along the way)
-SEQ_KEY_FILE=$CONFIG_FILE/sequencer.key.hex
-echo $seq_priv | base58 -dc | xxd -p | tr -d '\n' | rev | cut -c 1-64 | rev | tr -d '\n' | tee $SEQ_KEY_FILE
