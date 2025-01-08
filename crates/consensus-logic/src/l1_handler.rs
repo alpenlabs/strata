@@ -209,7 +209,7 @@ pub fn verify_proof(
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
 fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
-    let blockid = Buf32::from(block.block_hash().to_raw_hash().to_byte_array());
+    let blockid = block.block_hash().into();
     let root = block
         .witness_root()
         .map(|x| x.to_byte_array())

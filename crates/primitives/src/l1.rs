@@ -167,7 +167,7 @@ impl L1BlockManifest {
         self.record.header()
     }
 
-    pub fn block_hash(&self) -> Buf32 {
+    pub fn block_hash(&self) -> L1BlockId {
         self.record.block_hash()
     }
 
@@ -190,7 +190,7 @@ impl L1BlockManifest {
 pub struct L1BlockRecord {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
     /// here.  This is what we use in the MMR.
-    blockid: Buf32,
+    blockid: L1BlockId,
 
     /// Block header and whatever additional data we might want to query.
     header: Vec<u8>,
@@ -202,7 +202,7 @@ pub struct L1BlockRecord {
 }
 
 impl L1BlockRecord {
-    pub fn new(blockid: Buf32, header: Vec<u8>, txs_root: Buf32) -> Self {
+    pub fn new(blockid: L1BlockId, header: Vec<u8>, txs_root: Buf32) -> Self {
         Self {
             blockid,
             header,
@@ -210,7 +210,7 @@ impl L1BlockRecord {
         }
     }
 
-    pub fn block_hash(&self) -> Buf32 {
+    pub fn block_hash(&self) -> L1BlockId {
         self.blockid
     }
 
@@ -226,7 +226,7 @@ impl L1BlockRecord {
 
 impl From<Block> for L1BlockRecord {
     fn from(block: Block) -> Self {
-        let blockid = Buf32(block.block_hash().to_raw_hash().to_byte_array());
+        let blockid = block.block_hash().into();
         let root = block
             .witness_root()
             .map(|x| x.to_byte_array())

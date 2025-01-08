@@ -120,7 +120,7 @@ impl BtcChainSegment {
     pub fn get_block_manifest(&self, height: u32) -> L1BlockRecord {
         let header = self.get_header(height);
         L1BlockRecord::new(
-            Buf32::from(header.block_hash().as_raw_hash().to_byte_array()),
+            header.block_hash().into(),
             serialize(&header),
             Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
         )

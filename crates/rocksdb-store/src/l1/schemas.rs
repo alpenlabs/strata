@@ -1,14 +1,11 @@
 use strata_mmr::CompactMmr;
-use strata_primitives::{buf::Buf32, l1::L1BlockManifest};
-use strata_state::l1::L1Tx;
+use strata_primitives::l1::L1BlockManifest;
+use strata_state::l1::{L1BlockId, L1Tx};
 
 use crate::{
     define_table_with_default_codec, define_table_with_seek_key_codec, define_table_without_codec,
     impl_borsh_value_codec,
 };
-
-// Readability for header hash
-type HeaderHash = Buf32;
 
 // L1 Block Schema and corresponding codecs implementation
 define_table_with_seek_key_codec!(
@@ -19,7 +16,7 @@ define_table_with_seek_key_codec!(
 // L1 Txns Schema and corresponding codecs implementation
 define_table_with_default_codec!(
     /// A table to store L1 Txn data, maps block header hash to txns
-    (TxnSchema) HeaderHash => Vec<L1Tx>
+    (TxnSchema) L1BlockId => Vec<L1Tx>
 );
 
 // Mmr Schema and corresponding codecs implementation

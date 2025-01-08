@@ -6,11 +6,8 @@ use rockbound::{
 };
 use strata_db::{errors::DbError, traits::*, DbResult};
 use strata_mmr::CompactMmr;
-use strata_primitives::{
-    buf::Buf32,
-    l1::{L1BlockManifest, L1TxRef},
-};
-use strata_state::l1::L1Tx;
+use strata_primitives::l1::{L1BlockManifest, L1TxRef};
+use strata_state::l1::{L1BlockId, L1Tx};
 use tracing::*;
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
@@ -160,7 +157,7 @@ impl L1Database for L1Db {
     }
 
     // TODO: This should not exist in database level and should be handled by downstream manager
-    fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>> {
+    fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<L1BlockId>> {
         let mut options = ReadOptions::default();
         options.set_iterate_lower_bound(
             KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)
@@ -175,7 +172,7 @@ impl L1Database for L1Db {
             .db
             .iter_with_opts::<L1BlockSchema>(options)?
             .map(|item_result| item_result.map(|item| item.into_tuple().1.block_hash()))
-            .collect::<Result<Vec<Buf32>, anyhow::Error>>()?;
+            .collect::<Result<Vec<L1BlockId>, anyhow::Error>>()?;
 
         Ok(res)
     }
