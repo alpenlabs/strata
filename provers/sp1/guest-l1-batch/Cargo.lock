@@ -1410,7 +1410,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879952a81a83930934cbf1786752d6dedc3b1f29e8f8fb2ad1d0a36f377cf442"
 dependencies = [
  "memchr",
- "thiserror",
+ "thiserror 1.0.68",
  "ucd-trie",
 ]
 
@@ -2077,14 +2077,15 @@ dependencies = [
 
 [[package]]
 name = "sp1-verifier"
-version = "3.0.0"
-source = "git+https://github.com/succinctlabs/sp1?rev=2c7868364cb832531e8cafd258aa06fbab079459#2c7868364cb832531e8cafd258aa06fbab079459"
+version = "4.0.0-rc.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9b4e33b7cb6da3a9a19a91c2615e7a08d8806fd0cc1ca01fb9e05ed8dcae09c"
 dependencies = [
  "hex",
  "lazy_static",
  "sha2",
- "substrate-bn",
- "thiserror-no-std",
+ "substrate-bn-succinct",
+ "thiserror 2.0.9",
 ]
 
 [[package]]
@@ -2135,7 +2136,7 @@ dependencies = [
  "musig2",
  "serde",
  "strata-primitives",
- "thiserror",
+ "thiserror 1.0.68",
 ]
 
 [[package]]
@@ -2165,7 +2166,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "thiserror",
+ "thiserror 1.0.68",
  "tracing",
  "zeroize",
 ]
@@ -2249,7 +2250,7 @@ dependencies = [
  "strata-bridge-tx-builder",
  "strata-primitives",
  "strata-state",
- "thiserror",
+ "thiserror 1.0.68",
  "tracing",
 ]
 
@@ -2261,7 +2262,7 @@ dependencies = [
  "bincode",
  "borsh",
  "serde",
- "thiserror",
+ "thiserror 1.0.68",
  "tracing",
 ]
 
@@ -2288,9 +2289,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "substrate-bn"
+name = "substrate-bn-succinct"
 version = "0.6.0"
-source = "git+https://github.com/sp1-patches/bn?tag=substrate_bn-v0.6.0-patch-v2#8ef05d3969312eca34fa9f1f566a469022badda6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "114c855c26ad0594c830129cb868552fb41415603a6133276c2ecdd9e5ef4255"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -2368,7 +2370,16 @@ version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02dd99dc800bbb97186339685293e1cc5d9df1f8fae2d0aecd9ff1c77efea892"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.68",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f072643fd0190df67a8bab670c20ef5d8737177d6ac6b2e9a236cb096206b2cc"
+dependencies = [
+ "thiserror-impl 2.0.9",
 ]
 
 [[package]]
@@ -2376,6 +2387,17 @@ name = "thiserror-impl"
 version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7c61ec9a6f64d2793d8a45faba21efbe3ced62a886d44c36a009b2b519b4c7e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b50fa271071aae2e6ee85f842e2e28ba8cd2c5fb67f11fcb1fd70b276f9e7d4"
 dependencies = [
  "proc-macro2",
  "quote",

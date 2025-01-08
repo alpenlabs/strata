@@ -265,28 +265,45 @@ fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
 /// Copies the compiled ELF file of the specified program to its cache directory.
 #[cfg(not(debug_assertions))]
 fn migrate_elf(program: &str) {
+    // Get the build directory from the environment
+    let sp1_build_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set"));
+
+    // Form the path to the program directory
+    let program_path = sp1_build_dir.join(program);
+
+    // Fetch metadata for this program
     let metadata = MetadataCommand::new()
-        .manifest_path(format!("{}/Cargo.toml", program))
+        .manifest_path(program_path.join("Cargo.toml"))
         .exec()
         .expect("Failed to get metadata");
 
-    // Build the elf name same as the program name
+    // Use the root package name as the built ELF name
     let built_elf_name = metadata
         .root_package()
         .expect("Failed to get root package")
         .name
         .clone();
 
-    // Copy the elf file
-    let desination_elf_path = Path::new(program)
-        .join("cache")
-        .join(format!("{}.elf", program));
+    // Create the cache directory
+    let cache_dir = program_path.join("cache");
+    fs::create_dir_all(&cache_dir).expect("failed to create cache dir");
 
-    let built_elf_path = format!(
-        "{}/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/{}",
-        program, built_elf_name
-    );
+    // Destination path: cache/program.elf
+    let destination_elf_path = cache_dir.join(format!("{}.elf", program));
 
-    fs::copy(&built_elf_path, &desination_elf_path)
+    // Source path: program/target/elf-compilation/.../release/{built_elf_name}
+    let built_elf_path = program_path
+        .join("target")
+        .join("elf-compilation")
+        .join("riscv32im-succinct-zkvm-elf")
+        .join("release")
+        .join(&built_elf_name);
+
+    eprintln!("Got the source: {:?}", built_elf_path);
+    eprintln!("Got the destination: {:?}", destination_elf_path);
+
+    // Copy the file
+    fs::copy(&built_elf_path, &destination_elf_path)
         .expect("Failed to copy the built ELF file to the cache directory");
 }
