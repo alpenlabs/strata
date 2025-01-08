@@ -46,7 +46,7 @@ services:
     command:
       - "--enable-witness-gen"
     ports:
-      # - 8551:8551
+      - 8551:8551
       - 8545:8545
       - 8546:8546
 
@@ -83,7 +83,7 @@ services:
       # - ./configs/config.seq.toml:/app/config.toml
       # - ./configs/params.json:/app/params.json
       # - ./configs/params.devnet.json:/app/params.json
-      - ./configs/sequencer.key.hex:/app/sequencer.key
+      - ./configs/sequencer.key:/app/sequencer.key
       - ./configs/jwt.hex:/app/jwt.hex
     command: ["--reth-jwtsecret", "configs/jwt.hex"]
     depends_on:
