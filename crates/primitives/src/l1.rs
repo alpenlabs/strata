@@ -1,3 +1,5 @@
+//! Primitives related to L1 transactions.
+
 use std::{
     fmt::Display,
     io::{self, Read, Write},
