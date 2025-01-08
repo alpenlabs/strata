@@ -56,11 +56,13 @@ pub trait ProvingOp {
     /// Fetches the proof contexts and their dependencies for the specified parameters.
     ///
     /// # Arguments
+    ///
     /// - `params`: The parameters specific to the operation.
     /// - `task_tracker`: A shared task tracker for managing task dependencies.
     /// - `db`: A reference to the proof database.
     ///
     /// # Returns
+    ///
     /// A vector of [`ProofKey`] corresponding to a given proving operation.
     async fn create_task(
         &self,
@@ -103,15 +105,18 @@ pub trait ProvingOp {
     /// Creates a set of dependency tasks.
     ///
     /// # Important
+    ///
     /// The default impl defines no dependencies, so certain [`ProvingOp`] with dependencies
     /// should "override" it.  
     ///
     /// # Arguments
+    ///
     /// - `params`: The parameters specific to the operation.
     /// - `task_tracker`: A shared task tracker for managing task dependencies.
     /// - `db`: A reference to the proof database.
     ///
     /// # Returns
+    ///
     /// A [`Vec`] containing the [`ProofKey`] for the dependent proving operations.
     #[allow(unused_variables)]
     async fn create_deps_tasks(
@@ -126,10 +131,12 @@ pub trait ProvingOp {
     /// Fetches the input required for the proof computation.
     ///
     /// # Arguments
+    ///
     /// - `task_id`: The key representing the proof task.
     /// - `db`: A reference to the proof database.
     ///
     /// # Returns
+    ///
     /// The input required by the prover for the specified task.
     async fn fetch_input(
         &self,
@@ -140,10 +147,12 @@ pub trait ProvingOp {
     /// Executes the proof computation for the specified task.
     ///
     /// # Arguments
+    ///
     /// - `task_id`: The key representing the proof task.
     /// - `db`: A reference to the proof database.
     ///
     /// # Returns
+    ///
     /// An empty result if the proof computation is successful.
     #[instrument(skip(self, db, host), fields(task_id = ?task_id))]
     async fn prove(
