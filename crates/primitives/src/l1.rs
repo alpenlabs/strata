@@ -1037,11 +1037,10 @@ impl WithdrawalDestination for ScriptBuf {
 pub fn withdrawal_destination_from_str<D>(
     s: &str,
     network: Network,
-) -> Result<Box<dyn WithdrawalDestination<Inner = D>>, ParseError>
+) -> Result<Box<dyn for<'a> WithdrawalDestination<Inner = D>>, ParseError>
 where
-    D: 'static, // FIXME: can we remove this bound ?!
-    BitcoinAddress: WithdrawalDestination<Inner = D>,
-    ScriptBuf: WithdrawalDestination<Inner = D>,
+    BitcoinAddress: for<'a> WithdrawalDestination<Inner = D>,
+    ScriptBuf: for<'a> WithdrawalDestination<Inner = D>,
 {
     // First, try to parse as a Bitcoin address
     if let Ok(addr) = BitcoinAddress::parse(s, network) {
@@ -1066,11 +1065,10 @@ where
 pub fn withdrawal_destination_from_bytes<D>(
     bytes: &[u8],
     network: Network,
-) -> Result<Box<dyn WithdrawalDestination<Inner = D>>, ParseError>
+) -> Result<Box<dyn for<'a> WithdrawalDestination<Inner = D>>, ParseError>
 where
-    D: 'static, // FIXME: can we remove this bound ?!
-    BitcoinAddress: WithdrawalDestination<Inner = D>,
-    ScriptBuf: WithdrawalDestination<Inner = D>,
+    BitcoinAddress: for<'a> WithdrawalDestination<Inner = D>,
+    ScriptBuf: for<'a> WithdrawalDestination<Inner = D>,
 {
     // First, try to parse as a Bitcoin address
     if let Ok(addr) = BitcoinAddress::from_bytes(bytes, network) {
