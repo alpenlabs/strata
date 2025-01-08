@@ -526,6 +526,7 @@ def bytes_to_big_endian(hash):
     """Reverses the byte order of a hexadecimal string to produce big-endian format."""
     return "".join(reversed([hash[i : i + 2] for i in range(0, len(hash), 2)]))
 
+
 def check_sequencer_down(seqrpc):
     """
     Returns True if sequencer RPC is down
