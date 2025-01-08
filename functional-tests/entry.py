@@ -22,6 +22,7 @@ def main(argv):
     if len(argv) > 1:
         # Run the specific test file passed as the first argument (without .py extension)
         tests = [str(tst).removesuffix(".py") for tst in argv[1:]]
+
     else:
         # Run all tests, excluding those containing "prover_", unless explicitly passed in argv
         tests = [test for test in all_tests if "prover_" not in test or test in argv]

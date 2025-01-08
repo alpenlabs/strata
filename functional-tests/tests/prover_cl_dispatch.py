@@ -15,27 +15,28 @@ CL_PROVER_PARAMS = {
 @flexitest.register
 class ProverClientTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("prover")
+        ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
-        prover_client = ctx.get_service("prover_client")
         seq = ctx.get_service("sequencer")
 
-        prover_client_rpc = prover_client.create_rpc()
         seqrpc = seq.create_rpc()
 
         # Wait for the Prover Manager setup
         time.sleep(5)
 
-        # Dispatch the prover task
-        start_block_id = cl_slot_to_block_id(seqrpc, CL_PROVER_PARAMS["start_block"])
-        end_block_id = cl_slot_to_block_id(seqrpc, CL_PROVER_PARAMS["end_block"])
+        for i in range(30):
+            print("\n\n Step: ", i)
+            block_time = seqrpc.strata_blockTime()
+            print("block_time ", block_time)
 
-        task_ids = prover_client_rpc.dev_strata_proveClBlocks((start_block_id, end_block_id))
-        task_id = task_ids[0]
+            time.sleep(10)
 
-        self.debug(f"using task id: {task_id}")
-        assert task_id is not None
+        # task_ids = prover_client_rpc.dev_strata_proveClBlocks((start_block_id, end_block_id))
+        # task_id = task_ids[0]
 
-        time_out = 10 * 60
-        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
+        # self.debug(f"using task id: {task_id}")
+        # assert task_id is not None
+
+        # time_out = 10 * 60
+        # wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)

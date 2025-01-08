@@ -58,7 +58,7 @@ impl ClStfOperator {
             .cl_client
             .get_header_by_id(blkid)
             .await
-            .inspect_err(|_| error!(%blkid, "Failed to fetch corresponding ee data"))
+            .inspect_err(|_| error!(%blkid, "Failed to fetch corresponding CL data"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
             .ok_or_else(|| {
                 error!(%blkid, "L2 Block not found");
@@ -161,9 +161,18 @@ impl ProvingOp for ClStfOperator {
             _ => return Err(ProvingTaskError::InvalidInput("CL_STF".to_string())),
         };
 
+        println!(
+            "Abishek staring for start_block_hash: {:?} endblock hash {:?}",
+            start_block_hash, end_block_hash
+        );
         let start_block = self.get_l2_block_header(start_block_hash).await?;
+        println!("Abishek its some thing in middle");
         let end_block = self.get_l2_block_header(end_block_hash).await?;
         let num_blocks = end_block.block_idx - start_block.block_idx;
+        println!(
+            "Abishek proving the blocks {} {}",
+            start_block.block_idx, end_block.block_idx
+        );
 
         // Get ancestor blocks and reverse to oldest-first order
         let mut l2_block_ids = self.get_block_ancestors(end_block_hash, num_blocks).await?;
