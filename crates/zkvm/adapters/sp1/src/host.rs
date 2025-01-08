@@ -138,7 +138,7 @@ impl fmt::Display for SP1Host {
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
-#[cfg(not(debug_assertions))]
+// #[cfg(not(debug_assertions))]
 mod tests {
 
     use std::{fs::File, io::Write};
@@ -175,7 +175,7 @@ mod tests {
         zkvm.verify(&proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = SP1Host::extract_serde_public_output(&proof.public_values).expect(
+        let out: u32 = SP1Host::extract_serde_public_output(proof.public_values()).expect(
             "Failed to extract public
     outputs",
         );
@@ -204,12 +204,17 @@ mod tests {
         // Note: For the fixed ELF and fixed SP1 version, the vk is fixed
         assert_eq!(
             zkvm.verifying_key.bytes32(),
-            "0x00efb1120491119751e75bc55bc95b64d33f973ecf68fcf5cbff08506c5788f9"
+            "0x00bb534e86ded20a0b5608bae1879132a0e1c1ea324eabae095f336899a93e32"
         );
+
+        // Convert the proof to SP1ProofReceipt and extract inner proof data
+        let sp1_proof =
+            SP1ProofReceipt::try_from(proof).expect("Failed to convert to SP1ProofReceipt");
+        let proof_data = sp1_proof.inner();
 
         let filename = "proof-groth16.bin";
         let mut file = File::create(filename).unwrap();
-        file.write_all(&bincode::serialize(&proof).expect("bincode serialization failed"))
+        file.write_all(&bincode::serialize(&proof_data).expect("bincode serialization failed"))
             .unwrap();
     }
 }
