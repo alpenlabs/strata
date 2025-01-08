@@ -1,7 +1,9 @@
 use std::fmt;
 
 use serde::{de::DeserializeOwned, Serialize};
-use sp1_sdk::{HashableKey, ProverClient, SP1ProvingKey, SP1VerifyingKey};
+use sp1_sdk::{
+    network::FulfillmentStrategy, HashableKey, ProverClient, SP1ProvingKey, SP1VerifyingKey,
+};
 use strata_zkvm::{
     ProofType, PublicValues, VerificationKey, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmResult,
 };
@@ -40,7 +42,7 @@ impl SP1Host {
     }
 
     pub fn init(guest_code: &[u8]) -> Self {
-        let client = ProverClient::new();
+        let client = ProverClient::from_env();
         let (proving_key, verifying_key) = client.setup(guest_code);
         Self {
             elf: guest_code.to_vec(),
@@ -68,10 +70,30 @@ impl ZkVmHost for SP1Host {
             std::env::set_var("SP1_PROVER", "mock");
         }
 
-        let client = ProverClient::new();
+        // Prover network
+        if std::env::var("SP1_PROVER").unwrap_or_default() == "network" {
+            let prover_client = ProverClient::builder().network().build();
 
-        // Start proving
-        let mut prover = client.prove(&self.proving_key, prover_input);
+            let network_prover_builder = prover_client
+                .prove(&self.proving_key, &prover_input)
+                .strategy(FulfillmentStrategy::Reserved);
+
+            let network_prover = match proof_type {
+                ProofType::Compressed => network_prover_builder.compressed(),
+                ProofType::Core => network_prover_builder.core(),
+                ProofType::Groth16 => network_prover_builder.groth16(),
+            };
+
+            let proof_info = network_prover
+                .run()
+                .map_err(|e| ZkVmError::ProofGenerationError(e.to_string()))?;
+
+            return Ok(proof_info.into());
+        }
+
+        // Local proving
+        let client = ProverClient::from_env();
+        let mut prover = client.prove(&self.proving_key, &prover_input);
         prover = match proof_type {
             ProofType::Compressed => prover.compressed(),
             ProofType::Core => prover.core(),
@@ -99,7 +121,7 @@ impl ZkVmHost for SP1Host {
     }
 
     fn verify_inner(&self, proof: &SP1ProofReceipt) -> ZkVmResult<()> {
-        let client = ProverClient::new();
+        let client = ProverClient::from_env();
         client
             .verify(proof.as_ref(), &self.verifying_key)
             .map_err(|e| ZkVmError::ProofVerificationError(e.to_string()))?;
@@ -116,7 +138,7 @@ impl fmt::Display for SP1Host {
 
 // NOTE: SP1 prover runs in release mode only; therefore run the tests on release mode only
 #[cfg(test)]
-#[cfg(not(debug_assertions))]
+// #[cfg(not(debug_assertions))]
 mod tests {
 
     use std::{fs::File, io::Write};
@@ -153,7 +175,7 @@ mod tests {
         zkvm.verify(&proof).expect("Proof verification failed");
 
         // assert public outputs extraction from proof  works
-        let out: u32 = SP1Host::extract_serde_public_output(&proof.public_values).expect(
+        let out: u32 = SP1Host::extract_serde_public_output(proof.public_values()).expect(
             "Failed to extract public
     outputs",
         );
@@ -182,12 +204,17 @@ mod tests {
         // Note: For the fixed ELF and fixed SP1 version, the vk is fixed
         assert_eq!(
             zkvm.verifying_key.bytes32(),
-            "0x00efb1120491119751e75bc55bc95b64d33f973ecf68fcf5cbff08506c5788f9"
+            "0x00bb534e86ded20a0b5608bae1879132a0e1c1ea324eabae095f336899a93e32"
         );
+
+        // Convert the proof to SP1ProofReceipt and extract inner proof data
+        let sp1_proof =
+            SP1ProofReceipt::try_from(proof).expect("Failed to convert to SP1ProofReceipt");
+        let proof_data = sp1_proof.inner();
 
         let filename = "proof-groth16.bin";
         let mut file = File::create(filename).unwrap();
-        file.write_all(&bincode::serialize(&proof).expect("bincode serialization failed"))
+        file.write_all(&bincode::serialize(&proof_data).expect("bincode serialization failed"))
             .unwrap();
     }
 }

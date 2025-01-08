@@ -1,4 +1,4 @@
-use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1PublicValues, SP1Stdin};
+use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1PublicValues};
 use strata_zkvm::{Proof, ProofReceipt, PublicValues, ZkVmProofError};
 
 #[derive(Debug, Clone)]
@@ -39,7 +39,6 @@ impl TryFrom<&ProofReceipt> for SP1ProofReceipt {
         let proof_receipt = SP1ProofWithPublicValues {
             proof,
             public_values,
-            stdin: SP1Stdin::default(),
             sp1_version,
         };
         Ok(SP1ProofReceipt(proof_receipt))

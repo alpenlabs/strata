@@ -8,11 +8,13 @@ use std::{
 #[cfg(not(debug_assertions))]
 use bincode::{deserialize, serialize};
 #[cfg(not(debug_assertions))]
+use cargo_metadata::MetadataCommand;
+#[cfg(not(debug_assertions))]
 use sha2::{Digest, Sha256};
 #[cfg(not(debug_assertions))]
 use sp1_helper::{build_program_with_args, BuildArgs};
 #[cfg(not(debug_assertions))]
-use sp1_sdk::{HashableKey, MockProver, Prover, SP1VerifyingKey};
+use sp1_sdk::{HashableKey, ProverClient, SP1VerifyingKey};
 
 // Guest program names
 const EVM_EE_STF: &str = "guest-evm-ee-stf";
@@ -196,7 +198,7 @@ fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
 
     if !is_cache_valid(&elf_hash, &paths) {
         // Cache is invalid, need to generate vk and pk
-        let client = MockProver::new();
+        let client = ProverClient::from_env();
         let (pk, vk) = client.setup(&elf);
 
         fs::write(&paths[1], elf_hash)
@@ -240,8 +242,11 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
         ..Default::default()
     };
 
-    // Build the program
+    // Build the program with the specified arguments
+    // Note: SP1_v4's build_programs_with_args does not handle ELF migration
+    // Applying a temporary workaround; remove once SP1 supports ELF migration internally
     build_program_with_args(program, build_args);
+    migrate_elf(program);
 
     // Now, ensure cache validity
     let vk = ensure_cache_validity(program)
@@ -255,4 +260,50 @@ fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
         [0u32; 8],
         "0x0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
     )
+}
+
+/// Copies the compiled ELF file of the specified program to its cache directory.
+#[cfg(not(debug_assertions))]
+fn migrate_elf(program: &str) {
+    // Get the build directory from the environment
+    let sp1_build_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set"));
+
+    // Form the path to the program directory
+    let program_path = sp1_build_dir.join(program);
+
+    // Fetch metadata for this program
+    let metadata = MetadataCommand::new()
+        .manifest_path(program_path.join("Cargo.toml"))
+        .exec()
+        .expect("Failed to get metadata");
+
+    // Use the root package name as the built ELF name
+    let built_elf_name = metadata
+        .root_package()
+        .expect("Failed to get root package")
+        .name
+        .clone();
+
+    // Create the cache directory
+    let cache_dir = program_path.join("cache");
+    fs::create_dir_all(&cache_dir).expect("failed to create cache dir");
+
+    // Destination path: cache/program.elf
+    let destination_elf_path = cache_dir.join(format!("{}.elf", program));
+
+    // Source path: program/target/elf-compilation/.../release/{built_elf_name}
+    let built_elf_path = program_path
+        .join("target")
+        .join("elf-compilation")
+        .join("riscv32im-succinct-zkvm-elf")
+        .join("release")
+        .join(&built_elf_name);
+
+    eprintln!("Got the source: {:?}", built_elf_path);
+    eprintln!("Got the destination: {:?}", destination_elf_path);
+
+    // Copy the file
+    fs::copy(&built_elf_path, &destination_elf_path)
+        .expect("Failed to copy the built ELF file to the cache directory");
 }
