@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct BtcIOConfig {
+pub struct BtcioConfig {
     /// How often to poll btc client
     pub client_poll_dur_ms: u32,
     /// How often to invoke the writer
@@ -21,7 +21,7 @@ pub enum FeePolicy {
     Fixed(u64),
 }
 
-impl Default for BtcIOConfig {
+impl Default for BtcioConfig {
     fn default() -> Self {
         Self {
             client_poll_dur_ms: 200,

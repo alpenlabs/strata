@@ -23,11 +23,11 @@ pub type DbRecv<T> = tokio::sync::oneshot::Receiver<DbResult<T>>;
 /// ```ignore
 /// inst_ops! {
 ///     (InscriptionDataOps, Context<D: SequencerDatabase>) {
-///         get_blob_entry(id: Buf32) => Option<BlobEntry>;
-///         get_blob_entry_by_idx(idx: u64) => Option<BlobEntry>;
+///         get_blob_entry(id: Buf32) => Option<PayloadEntry>;
+///         get_blob_entry_by_idx(idx: u64) => Option<PayloadEntry>;
 ///         get_blob_entry_id(idx: u64) => Option<Buf32>;
 ///         get_next_blob_idx() => u64;
-///         put_blob_entry(id: Buf32, entry: BlobEntry) => ();
+///         put_blob_entry(id: Buf32, entry: PayloadEntry) => ();
 ///     }
 /// }
 /// ```

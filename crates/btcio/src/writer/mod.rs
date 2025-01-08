@@ -1,5 +1,5 @@
 pub mod builder;
-mod context;
+pub(crate) mod context;
 mod signer;
 mod task;
 

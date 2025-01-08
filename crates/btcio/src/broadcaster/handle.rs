@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use super::task::broadcaster_task;
-use crate::rpc::traits::{Broadcaster, Reader, Signer, Wallet};
+use crate::rpc::traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc};
 
 pub struct L1BroadcastHandle {
     ops: Arc<BroadcastDbOps>,
@@ -72,7 +72,7 @@ pub fn spawn_broadcaster_task<T>(
     params: Arc<Params>,
 ) -> L1BroadcastHandle
 where
-    T: Reader + Broadcaster + Wallet + Signer + Send + Sync + 'static,
+    T: ReaderRpc + BroadcasterRpc + WalletRpc + SignerRpc + Send + Sync + 'static,
 {
     let (broadcast_entry_tx, broadcast_entry_rx) = mpsc::channel::<(u64, L1TxEntry)>(64);
     let ops = broadcast_ops.clone();

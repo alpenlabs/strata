@@ -6,7 +6,7 @@ use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
-    rpc::{traits::Reader, BitcoinClient},
+    rpc::{traits::ReaderRpc, BitcoinClient},
     writer::start_envelope_task,
 };
 use strata_common::logging;
@@ -237,7 +237,7 @@ pub struct CoreContext {
 fn do_startup_checks(
     database: &impl Database,
     engine: &impl ExecEngineCtl,
-    bitcoin_client: &impl Reader,
+    bitcoin_client: &impl ReaderRpc,
     handle: &Handle,
 ) -> anyhow::Result<()> {
     let chain_state_db = database.chain_state_db();

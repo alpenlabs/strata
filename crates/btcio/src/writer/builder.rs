@@ -26,10 +26,7 @@ use strata_state::da_blob::L1Payload;
 use thiserror::Error;
 
 use super::context::WriterContext;
-use crate::rpc::{
-    traits::{Reader, Signer, Wallet},
-    types::ListUnspent,
-};
+use crate::rpc::{traits::WriterRpc, types::ListUnspent};
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
 const ENVELOPE_VERSION: u8 = 1;
@@ -51,9 +48,9 @@ pub enum EnvelopeError {
 // Btcio depends on `tx-parser`. So this file is behind a feature flag 'test-utils' and on dev
 // dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
 // dependency doesn't happen
-pub async fn build_envelope_txs<T: Reader + Wallet + Signer>(
+pub async fn build_envelope_txs<W: WriterRpc>(
     payload: &L1Payload,
-    ctx: &WriterContext<T>,
+    ctx: &WriterContext<W>,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     let network = ctx.client.network().await?;
     let utxos = ctx.client.get_utxos().await?;
@@ -62,34 +59,25 @@ pub async fn build_envelope_txs<T: Reader + Wallet + Signer>(
         FeePolicy::Smart => ctx.client.estimate_smart_fee(1).await? * 2,
         FeePolicy::Fixed(val) => val,
     };
-    create_envelope_transactions(
-        &ctx.params.rollup().rollup_name,
-        payload,
-        utxos,
-        ctx.sequencer_address.clone(),
-        ctx.config.reveal_amount,
-        fee_rate,
-        network,
-    )
-    .map_err(|e| anyhow::anyhow!(e.to_string()))
+    create_envelope_transactions(ctx, payload, utxos, fee_rate, network)
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn create_envelope_transactions(
-    rollup_name: &str,
+pub fn create_envelope_transactions<W: WriterRpc>(
+    ctx: &WriterContext<W>,
     payload: &L1Payload,
     utxos: Vec<ListUnspent>,
-    recipient: Address,
-    reveal_value: u64,
     fee_rate: u64,
     network: Network,
 ) -> Result<(Transaction, Transaction), EnvelopeError> {
     // Create commit key
     let key_pair = generate_key_pair()?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
+    let rollup_name = ctx.params.rollup().rollup_name.clone();
 
     // Start creating envelope content
-    let reveal_script = build_reveal_script(rollup_name, &public_key, payload, ENVELOPE_VERSION)?;
+    let reveal_script = build_reveal_script(&rollup_name, &public_key, payload, ENVELOPE_VERSION)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -107,8 +95,8 @@ pub fn create_envelope_transactions(
 
     // Calculate commit value
     let commit_value = calculate_commit_output_value(
-        &recipient,
-        reveal_value,
+        &ctx.sequencer_address,
+        ctx.config.reveal_amount,
         fee_rate,
         &reveal_script,
         &taproot_spend_info,
@@ -118,7 +106,7 @@ pub fn create_envelope_transactions(
     let (unsigned_commit_tx, _) = build_commit_transaction(
         utxos,
         reveal_address.clone(),
-        recipient.clone(),
+        ctx.sequencer_address.clone(),
         commit_value,
         fee_rate,
     )?;
@@ -128,8 +116,8 @@ pub fn create_envelope_transactions(
     // Build reveal tx
     let mut reveal_tx = build_reveal_transaction(
         unsigned_commit_tx.clone(),
-        recipient,
-        reveal_value,
+        ctx.sequencer_address.clone(),
+        ctx.config.reveal_amount,
         fee_rate,
         &reveal_script,
         &taproot_spend_info
@@ -483,7 +471,7 @@ fn assert_correct_address(
 
 #[cfg(test)]
 mod tests {
-    use core::str::FromStr;
+    use std::sync::Arc;
 
     use bitcoin::{
         absolute::LockTime, script, secp256k1::constants::SCHNORR_SIGNATURE_SIZE,
@@ -492,27 +480,25 @@ mod tests {
     };
 
     use super::*;
-    use crate::{rpc::types::ListUnspent, writer::builder::EnvelopeError};
+    use crate::{
+        rpc::types::ListUnspent,
+        test_utils::{test_context::get_writer_context, TestBitcoinClient},
+        writer::builder::EnvelopeError,
+    };
 
     const BTC_TO_SATS: u64 = 100_000_000;
-    const REVEAL_OUTPUT_AMOUNT: u64 = BITCOIN_DUST_LIMIT;
 
     #[allow(clippy::type_complexity)]
     fn get_mock_data() -> (
-        &'static str,
+        Arc<WriterContext<TestBitcoinClient>>,
         Vec<u8>,
         Vec<u8>,
-        Vec<u8>,
-        Address,
         Vec<ListUnspent>,
     ) {
-        let rollup_name = "test_rollup";
+        let ctx = get_writer_context();
         let body = vec![100; 1000];
         let signature = vec![100; 64];
-        let sequencer_public_key = vec![100; 33];
-        let address =
-            Address::from_str("bc1pp8qru0ve43rw9xffmdd8pvveths3cx6a5t6mcr0xfn9cpxx2k24qf70xq9")
-                .unwrap();
+        let address = ctx.sequencer_address.clone();
 
         let utxos = vec![
             ListUnspent {
@@ -520,7 +506,7 @@ mod tests {
                     .parse::<Txid>()
                     .unwrap(),
                 vout: 0,
-                address: address.clone(),
+                address: address.as_unchecked().clone(),
                 script_pubkey: "foo".to_string(),
                 amount: Amount::from_btc(100.0).unwrap(),
                 confirmations: 100,
@@ -534,7 +520,7 @@ mod tests {
                     .parse::<Txid>()
                     .unwrap(),
                 vout: 0,
-                address: address.clone(),
+                address: address.as_unchecked().clone(),
                 script_pubkey: "foo".to_string(),
                 amount: Amount::from_btc(50.0).unwrap(),
                 confirmations: 100,
@@ -548,7 +534,7 @@ mod tests {
                     .parse::<Txid>()
                     .unwrap(),
                 vout: 0,
-                address: address.clone(),
+                address: address.as_unchecked().clone(),
                 script_pubkey: "foo".to_string(),
                 amount: Amount::from_btc(10.0).unwrap(),
                 confirmations: 100,
@@ -559,19 +545,12 @@ mod tests {
             },
         ];
 
-        (
-            rollup_name,
-            body,
-            signature,
-            sequencer_public_key,
-            address.assume_checked(),
-            utxos,
-        )
+        (ctx, body, signature, utxos)
     }
 
     #[test]
     fn choose_utxos() {
-        let (_, _, _, _, _, utxos) = get_mock_data();
+        let (_, _, _, utxos) = get_mock_data();
 
         let (chosen_utxos, sum) = super::choose_utxos(&utxos, 500_000_000).unwrap();
 
@@ -633,7 +612,7 @@ mod tests {
 
     #[test]
     fn test_build_reveal_transaction() {
-        let (_, _, _, _, address, utxos) = get_mock_data();
+        let (ctx, _, _, utxos) = get_mock_data();
 
         let utxo = utxos.first().unwrap();
         let _script = ScriptBuf::from_hex("62a58f2674fd840b6144bea2e63ebd35c16d7fd40252a2f28b2a01a648df356343e47976d7906a0e688bf5e134b6fd21bd365c016b57b1ace85cf30bf1206e27").unwrap();
@@ -643,11 +622,11 @@ mod tests {
         ])
         .unwrap(); // should be 33 bytes
 
-        let inp_txn = get_txn_from_utxo(utxo, &address);
+        let inp_txn = get_txn_from_utxo(utxo, &ctx.sequencer_address);
         let mut tx = super::build_reveal_transaction(
             inp_txn,
-            address.clone(),
-            REVEAL_OUTPUT_AMOUNT,
+            ctx.sequencer_address.clone(),
+            ctx.config.reveal_amount,
             8,
             &_script,
             &control_block,
@@ -662,16 +641,19 @@ mod tests {
         assert_eq!(tx.input[0].previous_output.vout, utxo.vout);
 
         assert_eq!(tx.output.len(), 1);
-        assert_eq!(tx.output[0].value.to_sat(), REVEAL_OUTPUT_AMOUNT);
-        assert_eq!(tx.output[0].script_pubkey, address.script_pubkey());
+        assert_eq!(tx.output[0].value.to_sat(), ctx.config.reveal_amount);
+        assert_eq!(
+            tx.output[0].script_pubkey,
+            ctx.sequencer_address.script_pubkey()
+        );
 
         // Test not enough utxos
         let utxo = utxos.get(2).unwrap();
-        let inp_txn = get_txn_from_utxo(utxo, &address);
+        let inp_txn = get_txn_from_utxo(utxo, &ctx.sequencer_address);
         let inp_required = 5000000000;
         let tx = super::build_reveal_transaction(
             inp_txn,
-            address.clone(),
+            ctx.sequencer_address.clone(),
             inp_required,
             750,
             &_script,
@@ -684,15 +666,13 @@ mod tests {
 
     #[test]
     fn test_create_envelope_transactions() {
-        let (rollup_name, _, _, _, address, utxos) = get_mock_data();
+        let (ctx, _, _, utxos) = get_mock_data();
 
         let payload = L1Payload::new_da(vec![0u8; 100]);
         let (commit, reveal) = super::create_envelope_transactions(
-            rollup_name,
+            &ctx,
             &payload,
             utxos.to_vec(),
-            address.clone(),
-            REVEAL_OUTPUT_AMOUNT,
             10,
             bitcoin::Network::Bitcoin,
         )
@@ -724,7 +704,7 @@ mod tests {
 
         assert_eq!(
             reveal.output[0].script_pubkey,
-            address.script_pubkey(),
+            ctx.sequencer_address.script_pubkey(),
             "reveal should pay to the correct address"
         );
     }

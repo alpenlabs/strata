@@ -9,23 +9,20 @@ use super::{
     builder::{build_envelope_txs, EnvelopeError},
     context::WriterContext,
 };
-use crate::{
-    broadcaster::L1BroadcastHandle,
-    rpc::traits::{Reader, Signer, Wallet},
-};
+use crate::{broadcaster::L1BroadcastHandle, rpc::traits::WriterRpc};
 
 type BlobIdx = u64;
 
-/// Create envelope transactions corresponding to a [`BlobEntry`].
+/// Create envelope transactions corresponding to a [`PayloadEntry`].
 ///
 /// This is used during one of the cases:
 /// 1. A new payload intent needs to be signed
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
-pub async fn create_and_sign_payload_envelopes<T: Reader + Wallet + Signer>(
+pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
     payloadentry: &PayloadEntry,
     broadcast_handle: &L1BroadcastHandle,
-    ctx: Arc<WriterContext<T>>,
+    ctx: Arc<WriterContext<W>>,
 ) -> Result<(Buf32, Buf32), EnvelopeError> {
     trace!("Creating and signing payload envelopes");
     let (commit, reveal) = build_envelope_txs(&payloadentry.payload, ctx.as_ref()).await?;
@@ -62,39 +59,15 @@ pub async fn create_and_sign_payload_envelopes<T: Reader + Wallet + Signer>(
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-
-    use bitcoin::{Address, Network};
-    use strata_config::btcio::BtcIOConfig;
     use strata_db::types::{PayloadEntry, PayloadL1Status};
     use strata_primitives::hash;
     use strata_state::da_blob::L1Payload;
-    use strata_status::StatusChannel;
-    use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::*;
     use crate::{
-        test_utils::TestBitcoinClient,
+        test_utils::test_context::get_writer_context,
         writer::test_utils::{get_broadcast_handle, get_envelope_ops},
     };
-
-    fn get_writer_context() -> Arc<WriterContext<TestBitcoinClient>> {
-        let client = Arc::new(TestBitcoinClient::new(1));
-        let addr = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5"
-            .parse::<Address<_>>()
-            .unwrap()
-            .require_network(Network::Regtest)
-            .unwrap();
-        let cfg = Arc::new(BtcIOConfig::default());
-        let status_channel = StatusChannel::new(
-            ArbitraryGenerator::new().generate(),
-            ArbitraryGenerator::new().generate(),
-            None,
-        );
-        let params = Arc::new(gen_params());
-        let ctx = WriterContext::new(params, cfg, addr, client, status_channel);
-        Arc::new(ctx)
-    }
 
     #[tokio::test]
     async fn test_create_and_sign_blob_envelopes() {

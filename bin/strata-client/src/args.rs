@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use argh::FromArgs;
 use bitcoin::Network;
 use strata_config::{
-    bridge::RelayerConfig, btcio::BtcIOConfig, BitcoindConfig, ClientConfig, ClientMode, Config,
+    bridge::RelayerConfig, btcio::BtcioConfig, BitcoindConfig, ClientConfig, ClientMode, Config,
     ExecConfig, FullNodeConfig, RethELConfig, SequencerConfig, SyncConfig,
 };
 
@@ -113,7 +113,7 @@ impl Args {
                 stale_duration: 120,
                 relay_misc: true,
             },
-            btcio: BtcIOConfig::default(), // TODO: actually get this from args
+            btcio: BtcioConfig::default(), // TODO: actually get this from args
         })
     }
 

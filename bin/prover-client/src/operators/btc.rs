@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strata_btcio::rpc::{traits::Reader, BitcoinClient};
+use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
 use strata_primitives::{
     params::RollupParams,
     proof::{ProofContext, ProofKey},

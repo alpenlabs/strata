@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use bitcoin::Address;
-use strata_config::btcio::BtcIOConfig;
+use strata_config::btcio::BtcioConfig;
 use strata_db::{
     traits::SequencerDatabase,
     types::{L1TxStatus, PayloadEntry, PayloadL1Status},
@@ -15,10 +15,7 @@ use tracing::*;
 
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::{
-        traits::{Reader, Signer, Wallet},
-        BitcoinClient,
-    },
+    rpc::{traits::WriterRpc, BitcoinClient},
     status::{apply_status_updates, L1StatusUpdate},
     writer::{
         builder::EnvelopeError, context::WriterContext, signer::create_and_sign_payload_envelopes,
@@ -94,7 +91,7 @@ impl EnvelopeHandle {
 pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,
-    config: Arc<BtcIOConfig>,
+    config: Arc<BtcioConfig>,
     params: Arc<Params>,
     sequencer_address: Address,
     db: Arc<D>,
@@ -128,7 +125,7 @@ pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
 }
 
 /// Looks into the database from descending index order till it reaches 0 or `Finalized`
-/// [`BlobEntry`] from which the rest of the [`BlobEntry`]s should be watched.
+/// [`PayloadEntry`] from which the rest of the [`PayloadEntry`]s should be watched.
 fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u64> {
     let mut next_idx = insc_ops.get_next_payload_idx_blocking()?;
 
@@ -152,9 +149,9 @@ fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u6
 ///
 /// The envelope will be monitored until it acquires the status of
 /// [`BlobL1Status::Finalized`]
-pub async fn watcher_task<T: Reader + Wallet + Signer>(
+pub async fn watcher_task<W: WriterRpc>(
     next_blbidx_to_watch: u64,
-    context: Arc<WriterContext<T>>,
+    context: Arc<WriterContext<W>>,
     insc_ops: Arc<EnvelopeDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
@@ -284,7 +281,7 @@ async fn update_existing_entry(
     Ok(insc_ops.put_payload_entry_async(id, updated_entry).await?)
 }
 
-/// Determine the status of the `BlobEntry` based on the status of its commit and reveal
+/// Determine the status of the `PayloadEntry` based on the status of its commit and reveal
 /// transactions in bitcoin.
 fn determine_payload_next_status(
     commit_status: &L1TxStatus,

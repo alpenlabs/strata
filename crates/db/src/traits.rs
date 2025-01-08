@@ -246,20 +246,20 @@ pub trait CheckpointDatabase {
 
 /// NOTE: We might have to merge this with the [`Database`]
 /// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`BlobEntry`]
+/// [`PayloadEntry`]
 pub trait SequencerDatabase {
     type L1PayloadDB: L1PayloadDatabase;
 
     fn payload_db(&self) -> &Arc<Self::L1PayloadDB>;
 }
 
-/// A trait encapsulating provider and store traits to create/update [`BlobEntry`] in the database
-/// and to fetch [`PayloadEntry`] and indices from the database
+/// A trait encapsulating provider and store traits to create/update [`PayloadEntry`] in the
+/// database and to fetch [`PayloadEntry`] and indices from the database
 pub trait L1PayloadDatabase {
-    /// Store the [`BlobEntry`].
+    /// Store the [`PayloadEntry`].
     fn put_payload_entry(&self, payloadid: Buf32, payloadentry: PayloadEntry) -> DbResult<()>;
 
-    /// Get a [`BlobEntry`] by its hash
+    /// Get a [`PayloadEntry`] by its hash
     fn get_payload_by_id(&self, id: Buf32) -> DbResult<Option<PayloadEntry>>;
 
     /// Get the payload ID corresponding to the index

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strata_btcio::{reader::query::bitcoin_data_reader_task, rpc::traits::Reader};
+use strata_btcio::{reader::query::bitcoin_data_reader_task, rpc::traits::ReaderRpc};
 use strata_config::Config;
 use strata_consensus_logic::{csm::ctl::CsmController, l1_handler::bitcoin_data_handler_task};
 use strata_db::traits::{Database, L1Database};
@@ -14,7 +14,7 @@ pub fn start_reader_tasks<D>(
     executor: &TaskExecutor,
     params: Arc<Params>,
     config: &Config,
-    rpc_client: Arc<impl Reader + Send + Sync + 'static>,
+    rpc_client: Arc<impl ReaderRpc + Send + Sync + 'static>,
     db: Arc<D>,
     csm_ctl: Arc<CsmController>,
     status_channel: StatusChannel,

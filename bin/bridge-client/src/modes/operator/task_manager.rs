@@ -10,7 +10,7 @@ use strata_bridge_exec::{
     handler::ExecHandler,
 };
 use strata_bridge_tx_builder::{prelude::BuildContext, TxKind};
-use strata_btcio::rpc::traits::Broadcaster;
+use strata_btcio::rpc::traits::BroadcasterRpc;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcBridgeDuties;
 use strata_state::bridge_duties::{BridgeDuty, BridgeDutyStatus};
@@ -26,7 +26,7 @@ use crate::errors::{PollDutyError, TaskManagerError};
 pub(super) struct TaskManager<TxBuildContext, Bcast>
 where
     TxBuildContext: BuildContext + Sync + Send,
-    Bcast: Broadcaster,
+    Bcast: BroadcasterRpc,
 {
     pub(super) exec_handler: Arc<ExecHandler<TxBuildContext>>,
     pub(super) broadcaster: Arc<Bcast>,
@@ -37,7 +37,7 @@ where
 impl<TxBuildContext, Bcast> TaskManager<TxBuildContext, Bcast>
 where
     TxBuildContext: BuildContext + Sync + Send + 'static,
-    Bcast: Broadcaster + Sync + Send + 'static,
+    Bcast: BroadcasterRpc + Sync + Send + 'static,
 {
     pub(super) async fn start(
         &self,
@@ -201,7 +201,7 @@ async fn process_duty<TxBuildContext, Bcast>(
 ) -> ExecResult<()>
 where
     TxBuildContext: BuildContext + Sync + Send,
-    Bcast: Broadcaster,
+    Bcast: BroadcasterRpc,
 {
     match duty {
         BridgeDuty::SignDeposit(deposit_info) => {
@@ -264,7 +264,7 @@ async fn execute_duty<TxBuildContext, Tx, Bcast>(
 where
     TxBuildContext: BuildContext + Sync + Send,
     Tx: TxKind + Debug,
-    Bcast: Broadcaster,
+    Bcast: BroadcasterRpc,
 {
     if let Err(e) = duty_status_ops
         .put_duty_status_async(tracker_txid, BridgeDutyStatus::Received)
@@ -328,7 +328,7 @@ async fn aggregate_and_broadcast<TxBuildContext, Bcast>(
 ) -> ExecResult<()>
 where
     TxBuildContext: BuildContext + Sync + Send,
-    Bcast: Broadcaster,
+    Bcast: BroadcasterRpc,
 {
     exec_handler.collect_nonces(txid).await?;
     let signed_tx = exec_handler.collect_signatures(txid).await?;

@@ -13,7 +13,7 @@ use strata_bridge_exec::{
 };
 use strata_bridge_sig_manager::prelude::SignatureManager;
 use strata_bridge_tx_builder::prelude::TxBuildContext;
-use strata_btcio::rpc::{traits::Reader, BitcoinClient};
+use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
 use strata_primitives::bridge::OperatorIdx;
 use strata_rocksdb::{
     bridge::db::{BridgeDutyIndexRocksDb, BridgeDutyRocksDb, BridgeTxRocksDb},

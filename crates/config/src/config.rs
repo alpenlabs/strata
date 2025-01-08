@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bitcoin::Network;
 use serde::Deserialize;
 
-use crate::{bridge::RelayerConfig, btcio::BtcIOConfig};
+use crate::{bridge::RelayerConfig, btcio::BtcioConfig};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SequencerConfig {
@@ -66,7 +66,7 @@ pub struct ExecConfig {
 pub struct Config {
     pub client: ClientConfig,
     pub bitcoind_rpc: BitcoindConfig,
-    pub btcio: BtcIOConfig,
+    pub btcio: BtcioConfig,
     pub sync: SyncConfig,
     pub exec: ExecConfig,
     pub relayer: RelayerConfig,

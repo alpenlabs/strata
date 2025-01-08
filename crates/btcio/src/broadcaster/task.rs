@@ -12,14 +12,14 @@ use crate::{
         error::{BroadcasterError, BroadcasterResult},
         state::BroadcasterState,
     },
-    rpc::traits::{Broadcaster, Wallet},
+    rpc::traits::{BroadcasterRpc, WalletRpc},
 };
 
 const BROADCAST_POLL_INTERVAL: u64 = 1_000; // millis
 
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task(
-    rpc_client: Arc<impl Broadcaster + Wallet>,
+    rpc_client: Arc<impl BroadcasterRpc + WalletRpc>,
     ops: Arc<l1tx_broadcast::BroadcastDbOps>,
     mut entry_receiver: Receiver<(u64, L1TxEntry)>,
     params: Arc<Params>,
@@ -69,7 +69,7 @@ pub async fn broadcaster_task(
 async fn process_unfinalized_entries(
     unfinalized_entries: &BTreeMap<u64, L1TxEntry>,
     ops: Arc<BroadcastDbOps>,
-    rpc_client: &(impl Broadcaster + Wallet),
+    rpc_client: &(impl BroadcasterRpc + WalletRpc),
     params: &Params,
 ) -> BroadcasterResult<(BTreeMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
@@ -106,7 +106,7 @@ async fn process_unfinalized_entries(
 /// Takes in `[L1TxEntry]`, checks status and then either publishes or checks for confirmations and
 /// returns its updated status. Returns None if status is not changed
 async fn handle_entry(
-    rpc_client: &(impl Broadcaster + Wallet),
+    rpc_client: &(impl BroadcasterRpc + WalletRpc),
     txentry: &L1TxEntry,
     idx: u64,
     ops: &BroadcastDbOps,
