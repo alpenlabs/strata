@@ -69,7 +69,7 @@ pub trait L1Database {
     // TODO: This should not exist in database level and should be handled by downstream manager.
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.
-    fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>>;
+    fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<L1BlockId>>;
 
     /// Gets the relevant txs we stored in a block.
     fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>>;

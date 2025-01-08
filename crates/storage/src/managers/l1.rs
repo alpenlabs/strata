@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
 use strata_db::{traits::Database, DbResult};
-use strata_primitives::{
-    buf::Buf32,
-    l1::{L1BlockManifest, L1TxRef},
-};
-use strata_state::l1::L1Tx;
+use strata_primitives::l1::{L1BlockManifest, L1TxRef};
+use strata_state::l1::{L1BlockId, L1Tx};
 use threadpool::ThreadPool;
 
 use crate::{
@@ -95,7 +92,7 @@ impl L1BlockManager {
             .await
     }
 
-    pub fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<Buf32>> {
+    pub fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<L1BlockId>> {
         self.ops.get_blockid_range_blocking(start_idx, end_idx)
     }
 
@@ -103,7 +100,7 @@ impl L1BlockManager {
         &self,
         start_idx: u64,
         end_idx: u64,
-    ) -> DbResult<Vec<Buf32>> {
+    ) -> DbResult<Vec<L1BlockId>> {
         self.ops.get_blockid_range_async(start_idx, end_idx).await
     }
 

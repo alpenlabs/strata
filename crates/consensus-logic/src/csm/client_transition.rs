@@ -543,16 +543,14 @@ mod tests {
                 )
                 .expect("test: insert blocks");
         }
-        let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash().into()).collect();
+        let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash()).collect();
 
         let test_cases = [
             TestCase {
                 description: "At horizon block",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Block(horizon, l1_chain[0].block_hash().into()),
-                    expected_writes: &[ClientStateWrite::AcceptL1Block(
-                        l1_chain[0].block_hash().into(),
-                    )],
+                    event: SyncEvent::L1Block(horizon, l1_chain[0].block_hash()),
+                    expected_writes: &[ClientStateWrite::AcceptL1Block(l1_chain[0].block_hash())],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -561,7 +559,7 @@ mod tests {
                         assert!(!state.is_chain_active());
                         assert_eq!(
                             state.most_recent_l1_block(),
-                            Some(&l1_chain[0].block_hash().into())
+                            Some(&l1_chain[0].block_hash())
                         );
                         assert_eq!(state.next_exp_l1_block(), horizon + 1);
                     }
@@ -570,10 +568,8 @@ mod tests {
             TestCase {
                 description: "At horizon block + 1",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Block(horizon + 1, l1_chain[1].block_hash().into()),
-                    expected_writes: &[ClientStateWrite::AcceptL1Block(
-                        l1_chain[1].block_hash().into(),
-                    )],
+                    event: SyncEvent::L1Block(horizon + 1, l1_chain[1].block_hash()),
+                    expected_writes: &[ClientStateWrite::AcceptL1Block(l1_chain[1].block_hash())],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -582,7 +578,7 @@ mod tests {
                         assert!(!state.is_chain_active());
                         assert_eq!(
                             state.most_recent_l1_block(),
-                            Some(&l1_chain[1].block_hash().into())
+                            Some(&l1_chain[1].block_hash())
                         );
                         // Because values for horizon is 40318, genesis is 40320
                         assert_eq!(state.next_exp_l1_block(), genesis);
@@ -594,10 +590,10 @@ mod tests {
                 events: &[TestEvent {
                     event: SyncEvent::L1Block(
                         genesis,
-                        l1_chain[(genesis - horizon) as usize].block_hash().into(),
+                        l1_chain[(genesis - horizon) as usize].block_hash(),
                     ),
                     expected_writes: &[ClientStateWrite::AcceptL1Block(
-                        l1_chain[(genesis - horizon) as usize].block_hash().into(),
+                        l1_chain[(genesis - horizon) as usize].block_hash(),
                     )],
                     expected_actions: &[],
                 }],
@@ -611,14 +607,10 @@ mod tests {
                 events: &[TestEvent {
                     event: SyncEvent::L1Block(
                         genesis + 1,
-                        l1_chain[(genesis + 1 - horizon) as usize]
-                            .block_hash()
-                            .into(),
+                        l1_chain[(genesis + 1 - horizon) as usize].block_hash(),
                     ),
                     expected_writes: &[ClientStateWrite::AcceptL1Block(
-                        l1_chain[(genesis + 1 - horizon) as usize]
-                            .block_hash()
-                            .into(),
+                        l1_chain[(genesis + 1 - horizon) as usize].block_hash(),
                     )],
                     expected_actions: &[],
                 }],
@@ -629,11 +621,7 @@ mod tests {
                         assert!(!state.is_chain_active());
                         assert_eq!(
                             state.most_recent_l1_block(),
-                            Some(
-                                &l1_chain[(genesis + 1 - horizon) as usize]
-                                    .block_hash()
-                                    .into()
-                            )
+                            Some(&l1_chain[(genesis + 1 - horizon) as usize].block_hash(),)
                         );
                         assert_eq!(state.next_exp_l1_block(), genesis + 2);
                         assert_eq!(
@@ -648,14 +636,10 @@ mod tests {
                 events: &[TestEvent {
                     event: SyncEvent::L1Block(
                         genesis + 2,
-                        l1_chain[(genesis + 2 - horizon) as usize]
-                            .block_hash()
-                            .into(),
+                        l1_chain[(genesis + 2 - horizon) as usize].block_hash(),
                     ),
                     expected_writes: &[ClientStateWrite::AcceptL1Block(
-                        l1_chain[(genesis + 2 - horizon) as usize]
-                            .block_hash()
-                            .into(),
+                        l1_chain[(genesis + 2 - horizon) as usize].block_hash(),
                     )],
                     expected_actions: &[],
                 }],
@@ -666,11 +650,7 @@ mod tests {
                         assert!(!state.is_chain_active());
                         assert_eq!(
                             state.most_recent_l1_block(),
-                            Some(
-                                &l1_chain[(genesis + 2 - horizon) as usize]
-                                    .block_hash()
-                                    .into()
-                            )
+                            Some(&l1_chain[(genesis + 2 - horizon) as usize].block_hash())
                         );
                         assert_eq!(state.next_exp_l1_block(), genesis + 3);
                         assert_eq!(
@@ -698,20 +678,16 @@ mod tests {
                             ))),
                         ],
                         expected_actions: &[SyncAction::L2Genesis(
-                            l1_chain[(genesis - horizon) as usize].block_hash().into(),
+                            l1_chain[(genesis - horizon) as usize].block_hash(),
                         )],
                     },
                     TestEvent {
                         event: SyncEvent::L1Block(
                             genesis + 3,
-                            l1_chain[(genesis + 3 - horizon) as usize]
-                                .block_hash()
-                                .into(),
+                            l1_chain[(genesis + 3 - horizon) as usize].block_hash(),
                         ),
                         expected_writes: &[ClientStateWrite::AcceptL1Block(
-                            l1_chain[(genesis + 3 - horizon) as usize]
-                                .block_hash()
-                                .into(),
+                            l1_chain[(genesis + 3 - horizon) as usize].block_hash(),
                         )],
                         expected_actions: &[],
                     },
