@@ -1,6 +1,6 @@
 //! Errors during parsing/handling/conversion of primitives.
 
-use bitcoin::{address, secp256k1, AddressType};
+use bitcoin::{address, secp256k1, ScriptBuf};
 use thiserror::Error;
 
 use crate::buf::Buf32;
@@ -17,11 +17,19 @@ pub enum ParseError {
     #[error("supplied address is invalid")]
     InvalidAddress(#[from] address::ParseError),
 
-    /// The provided address is not a Taproot address.
-    #[error("only taproot addresses are supported but found {0:?}")]
-    UnsupportedAddress(Option<AddressType>),
+    /// The provided script is invalid.
+    #[error("supplied script is invalid")]
+    InvalidScript(#[from] address::FromScriptError),
 
     /// The provided 32-byte buffer is not a valid point on the curve.
     #[error("not a valid point on the curve: {0}")]
     InvalidPoint(Buf32),
+
+    /// The provided Script is not an `OP_RETURN` script.
+    #[error("not an OP_RETURN script: {0}")]
+    NotOpReturn(ScriptBuf),
+
+    /// Unsupported withdrawal destination.
+    #[error("unsupported withdrawal destination: {0}")]
+    UnsupportedDestination(String),
 }

@@ -348,6 +348,7 @@ pub struct BitcoinAddress {
 }
 
 impl BitcoinAddress {
+    /// Parses a [`BitcoinAddress`] from a string.
     pub fn parse(address_str: &str, network: Network) -> Result<Self, ParseError> {
         let address = address_str
             .parse::<Address<NetworkUnchecked>>()
@@ -361,6 +362,13 @@ impl BitcoinAddress {
             network,
             address: checked_address,
         })
+    }
+
+    /// Parses a [`BitcoinAddress`] from raw bytes representation of a bitcoin Script.
+    pub fn from_bytes(bytes: &[u8], network: Network) -> Result<Self, ParseError> {
+        let script_buf = ScriptBuf::from_bytes(bytes.to_vec());
+        let address = Address::from_script(&script_buf, network)?;
+        Ok(Self { network, address })
     }
 }
 
@@ -585,7 +593,9 @@ impl XOnlyPk {
 
             Ok(Self(Buf32(serialized_key.into())))
         } else {
-            Err(ParseError::UnsupportedAddress(checked_addr.address_type()))
+            Err(ParseError::InvalidPubkey(
+                secp256k1::Error::InvalidPublicKey,
+            ))
         }
     }
 
@@ -984,6 +994,99 @@ impl<'a> Arbitrary<'a> for TaprootSpendPath {
             _ => unreachable!(),
         }
     }
+}
+
+/// Possible withdrawal destinations.
+pub trait WithdrawalDestination {
+    /// The inner type of the withdrawal destination.
+    ///
+    /// Notable examples are [`Address`]/[`BitcoinAddress`] and `OP_RETURN` [`ScriptBuf`]s.
+    type Inner;
+
+    /// Returns the inner value of this withdrawal destination.
+    fn get_inner(&self) -> &Self::Inner;
+}
+
+impl WithdrawalDestination for BitcoinAddress {
+    type Inner = BitcoinAddress;
+
+    fn get_inner(&self) -> &Self::Inner {
+        self
+    }
+}
+
+impl WithdrawalDestination for Address {
+    type Inner = Address;
+
+    fn get_inner(&self) -> &Self::Inner {
+        self
+    }
+}
+
+impl WithdrawalDestination for ScriptBuf {
+    type Inner = ScriptBuf;
+
+    fn get_inner(&self) -> &Self::Inner {
+        self
+    }
+}
+
+/// Constructs anything that implements [`WithdrawalDestination`] from a string.
+///
+/// Notable examples are [`Address`]/[`BitcoinAddress`] and `OP_RETURN` [`ScriptBuf`]s.
+pub fn withdrawal_destination_from_str<D>(
+    s: &str,
+    network: Network,
+) -> Result<Box<dyn WithdrawalDestination<Inner = D>>, ParseError>
+where
+    D: 'static, // FIXME: can we remove this bound ?!
+    BitcoinAddress: WithdrawalDestination<Inner = D>,
+    ScriptBuf: WithdrawalDestination<Inner = D>,
+{
+    // First, try to parse as a Bitcoin address
+    if let Ok(addr) = BitcoinAddress::parse(s, network) {
+        return Ok(Box::new(addr));
+    }
+
+    // Second, try to parse as an OP_RETURN script
+    if s.starts_with("OP_RETURN ") {
+        let script = ScriptBuf::from(s.as_bytes().to_vec());
+        return Ok(Box::new(script));
+    }
+
+    // If none of the above, return an error
+    Err(ParseError::UnsupportedDestination(format!(
+        "Could not parse string as a valid address or OP_RETURN script: {s}"
+    )))
+}
+
+/// Constructs anything that implements [`WithdrawalDestination`] from raw bytes.
+///
+/// Notable examples are [`Address`]/[`BitcoinAddress`] and `OP_RETURN` [`ScriptBuf`]s.
+pub fn withdrawal_destination_from_bytes<D>(
+    bytes: &[u8],
+    network: Network,
+) -> Result<Box<dyn WithdrawalDestination<Inner = D>>, ParseError>
+where
+    D: 'static, // FIXME: can we remove this bound ?!
+    BitcoinAddress: WithdrawalDestination<Inner = D>,
+    ScriptBuf: WithdrawalDestination<Inner = D>,
+{
+    // First, try to parse as a Bitcoin address
+    if let Ok(addr) = BitcoinAddress::from_bytes(bytes, network) {
+        return Ok(Box::new(addr));
+    }
+
+    // Second, try to parse as an OP_RETURN script
+    let script = ScriptBuf::from_bytes(bytes.to_vec());
+    if script.is_op_return() {
+        return Ok(Box::new(script));
+    }
+
+    // If none of the above, return an error
+    Err(ParseError::UnsupportedDestination(format!(
+        "Could not parse bytes as a valid address or OP_RETURN script: {bytes:?}"
+    )))
 }
 
 #[cfg(test)]
