@@ -4,11 +4,14 @@ use serde::Deserialize;
 
 use crate::args::Args;
 
+const DEFAULT_DUTY_POLL_INTERVAL: u64 = 2000;
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct Config {
     pub sequencer_key: PathBuf,
     pub rpc_host: String,
     pub rpc_port: u16,
+    pub duty_poll_interval: u64,
 }
 
 impl Config {
@@ -24,6 +27,9 @@ impl Config {
             rpc_port: args
                 .rpc_port
                 .ok_or_else(|| "args: no --rpc-port provided".to_string())?,
+            duty_poll_interval: args
+                .duty_poll_interval
+                .unwrap_or(DEFAULT_DUTY_POLL_INTERVAL),
         })
     }
 

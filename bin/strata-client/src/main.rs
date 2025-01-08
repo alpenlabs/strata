@@ -1,6 +1,6 @@
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
-use bitcoin::{hashes::Hash, Address, BlockHash};
+use bitcoin::{hashes::Hash, BlockHash};
 use jsonrpsee::Methods;
 use parking_lot::lock_api::RwLock;
 use rpc_client::sync_client;
@@ -11,9 +11,8 @@ use strata_btcio::{
     writer::start_envelope_task,
 };
 use strata_common::logging;
-use strata_config::{ClientMode, Config, SequencerConfig};
+use strata_config::{ClientMode, Config};
 use strata_consensus_logic::{
-    checkpoint::CheckpointHandle,
     genesis,
     sync_manager::{self, SyncManager},
 };
@@ -23,7 +22,7 @@ use strata_db::{
 };
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
-use strata_primitives::params::Params;
+use strata_primitives::params::{Params, ProofPublishMode};
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, init_broadcaster_database, init_core_dbs, init_writer_database,
     open_rocksdb_database, CommonDb, DbOpsConfig, RBL1WriterDb, ROCKSDB_NAME,
@@ -33,6 +32,8 @@ use strata_rpc_api::{
 };
 use strata_sequencer::{
     block_template::{template_manager_worker, BlockTemplateManager, TemplateManagerHandle},
+    checkpoint::{checkpoint_expiry_worker, checkpoint_worker},
+    checkpoint_handle::CheckpointHandle,
     types::DutyTracker,
     worker as duty_worker,
 };
@@ -138,7 +139,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     match &config.client.client_mode {
         // If we're a sequencer, start the sequencer db and duties task.
-        ClientMode::Sequencer(sequencer_config) => {
+        ClientMode::Sequencer => {
             let broadcast_database = init_broadcaster_database(rbdb.clone(), ops_config);
             let broadcast_handle = start_broadcaster_tasks(
                 broadcast_database,
@@ -153,7 +154,6 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             start_sequencer_tasks(
                 ctx.clone(),
                 &config,
-                sequencer_config,
                 &executor,
                 writer_db,
                 checkpoint_handle.clone(),
@@ -376,7 +376,6 @@ fn start_core_tasks(
 fn start_sequencer_tasks(
     ctx: CoreContext,
     config: &Config,
-    sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
     writer_db: Arc<RBL1WriterDb>,
     checkpoint_handle: Arc<CheckpointHandle>,
@@ -394,20 +393,12 @@ fn start_sequencer_tasks(
         ..
     } = ctx.clone();
 
-    info!(seqkey_path = ?sequencer_config.sequencer_key, "initing sequencer duties task");
-    let idata = load_seqkey(&sequencer_config.sequencer_key)?;
-
     // Use provided address or generate an address owned by the sequencer's bitcoin wallet
-    let sequencer_bitcoin_address = match sequencer_config.sequencer_bitcoin_address.as_ref() {
-        Some(address) => {
-            Address::from_str(address)?.require_network(config.bitcoind_rpc.network)?
-        }
-        None => executor.handle().block_on(generate_sequencer_address(
-            &bitcoin_client,
-            SEQ_ADDR_GENERATION_TIMEOUT,
-            BITCOIN_POLL_INTERVAL,
-        ))?,
-    };
+    let sequencer_bitcoin_address = executor.handle().block_on(generate_sequencer_address(
+        &bitcoin_client,
+        SEQ_ADDR_GENERATION_TIMEOUT,
+        BITCOIN_POLL_INTERVAL,
+    ))?;
 
     let btcio_config = Arc::new(config.btcio.clone());
 
@@ -442,19 +433,35 @@ fn start_sequencer_tasks(
     // Spawn duty tasks.
     let cupdate_rx = sync_manager.create_cstate_subscription();
     let t_l2_block_manager = l2_block_manager.clone();
-    let t_params = params.clone();
     let t_database = database.clone();
+    let t_checkpoint_handle = checkpoint_handle.clone();
     executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
         duty_worker::duty_tracker_task(
             shutdown,
             duty_tracker,
             cupdate_rx,
-            idata.ident,
             t_database,
             t_l2_block_manager,
-            t_params,
+            t_checkpoint_handle,
         )
         .map_err(Into::into)
+    });
+
+    match params.rollup().proof_publish_mode {
+        ProofPublishMode::Strict => {}
+        ProofPublishMode::Timeout(proof_timeout) => {
+            let proof_timeout = Duration::from_secs(proof_timeout);
+            let checkpoint_expiry_handle = checkpoint_handle.clone();
+            executor.spawn_critical_async(
+                "checkpoint-expiry-tracker",
+                checkpoint_expiry_worker(checkpoint_expiry_handle, proof_timeout),
+            );
+        }
+    }
+
+    let cupdate_rx = sync_manager.create_cstate_subscription();
+    executor.spawn_critical("checkpoint-tracker", |shutdown| {
+        checkpoint_worker(shutdown, cupdate_rx, params, database, checkpoint_handle)
     });
 
     Ok(())

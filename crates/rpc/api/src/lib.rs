@@ -5,8 +5,8 @@ use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
-    HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus,
-    RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
+    HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcBridgeDuties, RpcChainState,
+    RpcCheckpointConfStatus, RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
 };
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate},
@@ -190,6 +190,9 @@ pub trait StrataSequencerApi {
         template_id: L2BlockId,
         completion: BlockCompletionData,
     ) -> RpcResult<L2BlockId>;
+
+    #[method(name = "strata_completeCheckpointSignature")]
+    async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()>;
 }
 
 /// rpc endpoints that are only available for debugging purpose and subject to change.

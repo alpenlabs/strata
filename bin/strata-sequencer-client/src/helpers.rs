@@ -8,7 +8,7 @@ use strata_primitives::{
     keys::ZeroizableXpriv,
 };
 use strata_sequencer::types::{Identity, IdentityData, IdentityKey};
-use strata_state::header::L2BlockHeader;
+use strata_state::{batch::BatchCheckpoint, header::L2BlockHeader};
 use tracing::debug;
 use zeroize::Zeroize;
 
@@ -43,6 +43,13 @@ pub(crate) fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
 /// Signs the L2BlockHeader and returns the signature
 pub(crate) fn sign_header(header: &L2BlockHeader, ik: &IdentityKey) -> Buf64 {
     let msg = header.get_sighash();
+    match ik {
+        IdentityKey::Sequencer(sk) => sign_schnorr_sig(&msg, sk),
+    }
+}
+
+pub(crate) fn sign_checkpoint(checkpoint: &BatchCheckpoint, ik: &IdentityKey) -> Buf64 {
+    let msg = checkpoint.hash();
     match ik {
         IdentityKey::Sequencer(sk) => sign_schnorr_sig(&msg, sk),
     }

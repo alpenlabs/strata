@@ -1,14 +1,11 @@
 //! Sequencer duties.
 
-use std::time;
+use std::{collections::HashSet, time};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use strata_state::{
-    batch::{BatchInfo, BootstrapState},
-    id::L2BlockId,
-};
+use strata_state::{batch::BatchCheckpoint, id::L2BlockId};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -86,31 +83,28 @@ impl BlockSigningDuty {
 /// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 pub struct BatchCheckpointDuty {
-    /// Checkpoint/batch info which needs to be proven
-    batch_info: BatchInfo,
-
-    /// Bootstrapping info based on which the `info` will be verified
-    bootstrap_state: BootstrapState,
+    checkpoint: BatchCheckpoint,
 }
 
 impl BatchCheckpointDuty {
-    pub fn new(batch_info: BatchInfo, bootstrap_state: BootstrapState) -> Self {
-        Self {
-            batch_info,
-            bootstrap_state,
-        }
+    pub fn new(checkpoint: BatchCheckpoint) -> Self {
+        Self { checkpoint }
     }
 
     pub fn idx(&self) -> u64 {
-        self.batch_info.idx()
+        self.checkpoint.batch_info().idx()
     }
 
-    pub fn batch_info(&self) -> &BatchInfo {
-        &self.batch_info
-    }
+    // pub fn batch_info(&self) -> &BatchInfo {
+    //     &self.batch_info
+    // }
 
-    pub fn bootstrap_state(&self) -> &BootstrapState {
-        &self.bootstrap_state
+    // pub fn bootstrap_state(&self) -> &BootstrapState {
+    //     &self.bootstrap_state
+    // }
+
+    pub fn checkpoint(&self) -> &BatchCheckpoint {
+        &self.checkpoint
     }
 }
 
@@ -118,6 +112,7 @@ impl BatchCheckpointDuty {
 #[derive(Clone, Debug)]
 pub struct DutyTracker {
     duties: Vec<DutyEntry>,
+    duty_ids: HashSet<Buf32>,
     finalized_block: Option<L2BlockId>,
 }
 
@@ -126,6 +121,7 @@ impl DutyTracker {
     pub fn new_empty() -> Self {
         Self {
             duties: Vec::new(),
+            duty_ids: HashSet::new(),
             finalized_block: None,
         }
     }
@@ -138,6 +134,7 @@ impl DutyTracker {
     /// Updates the tracker with a new world state, purging relevant duties.
     pub fn update(&mut self, update: &StateUpdate) -> usize {
         let mut kept_duties = Vec::new();
+        let mut duty_ids = HashSet::new();
 
         if update.latest_finalized_block.is_some() {
             self.set_finalized_block(update.latest_finalized_block);
@@ -177,20 +174,29 @@ impl DutyTracker {
                 }
             }
 
+            duty_ids.insert(d.id());
             kept_duties.push(d);
         }
 
         self.duties = kept_duties;
+        self.duty_ids = duty_ids;
         old_cnt - self.duties.len()
     }
 
     /// Adds some more duties.
     pub fn add_duties(&mut self, blkid: L2BlockId, slot: u64, duties: impl Iterator<Item = Duty>) {
-        self.duties.extend(duties.map(|d| DutyEntry {
-            id: d.id(),
-            duty: d,
-            created_blkid: blkid,
-            created_slot: slot,
+        self.duties.extend(duties.filter_map(|duty| {
+            let id = duty.id();
+            if self.duty_ids.contains(&id) {
+                return None;
+            }
+
+            Some(DutyEntry {
+                id,
+                duty,
+                created_blkid: blkid,
+                created_slot: slot,
+            })
         }));
     }
 

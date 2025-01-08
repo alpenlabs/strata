@@ -16,14 +16,13 @@ use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
 use strata_common::bail_manager::BAIL_SENDER;
 use strata_consensus_logic::{
-    checkpoint::CheckpointHandle,
     csm::{message::ForkChoiceMessage, state_tracker::reconstruct_state},
     l1_handler::verify_proof,
     sync_manager::SyncManager,
 };
 use strata_db::{
     traits::*,
-    types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
+    types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
@@ -36,18 +35,21 @@ use strata_rpc_api::{
     StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
 };
 use strata_rpc_types::{
-    errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockHeader,
-    RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo, RpcClientStatus,
-    RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
+    errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, HexBytes64, L2BlockStatus,
+    RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo,
+    RpcClientStatus, RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::{to_jsonrpsee_error, to_jsonrpsee_error_object};
 use strata_sequencer::{
     block_template::{
         BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
     },
+    checkpoint::verify_checkpoint_sig,
+    checkpoint_handle::CheckpointHandle,
     types::{Duty, DutyEntry, DutyTracker},
 };
 use strata_state::{
+    batch::{BatchCheckpoint, SignedBatchCheckpoint},
     block::{L2Block, L2BlockBundle},
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
@@ -893,6 +895,45 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         }
 
         Ok(template_id)
+    }
+
+    async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()> {
+        let entry = self
+            .checkpoint_handle
+            .get_checkpoint(idx)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?
+            .ok_or(Error::MissingCheckpointInDb(idx))?;
+
+        if entry.proving_status != CheckpointProvingStatus::ProofReady {
+            Err(Error::MissingCheckpointProof(idx))?;
+        }
+
+        if entry.confirmation_status == CheckpointConfStatus::Confirmed
+            || entry.confirmation_status == CheckpointConfStatus::Finalized
+        {
+            Err(Error::CheckpointAlreadyPosted(idx))?;
+        }
+
+        let checkpoint = BatchCheckpoint::from(entry);
+        let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, sig.0.into());
+
+        if !verify_checkpoint_sig(&signed_checkpoint, &self.params) {
+            Err(Error::InvalidCheckpointSignature(idx))?;
+        }
+
+        let payload = L1Payload::new_da(
+            borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?,
+        );
+        let sighash = signed_checkpoint.checkpoint().hash();
+
+        let blob_intent = PayloadIntent::new(PayloadDest::L1, sighash, payload);
+        self.envelope_handle
+            .submit_intent_async(blob_intent)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+
+        Ok(())
     }
 }
 
