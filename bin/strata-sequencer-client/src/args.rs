@@ -13,4 +13,7 @@ pub(crate) struct Args {
 
     #[argh(option, short = 'r', description = "JSON-RPC port")]
     pub rpc_port: Option<u16>,
+
+    #[argh(option, short = 'i', description = "poll interval for duties in ms")]
+    pub duty_poll_interval: Option<u64>,
 }

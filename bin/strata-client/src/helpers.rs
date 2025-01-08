@@ -1,28 +1,23 @@
 use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use alloy_rpc_types::engine::JwtSecret;
-use bitcoin::{base58, bip32::Xpriv, Address, Network};
+use bitcoin::{Address, Network};
 use format_serde_error::SerdeError;
 use strata_btcio::rpc::{traits::WalletRpc, BitcoinClient};
 use strata_config::Config;
 use strata_consensus_logic::csm::state_tracker;
 use strata_db::traits::Database;
 use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
-use strata_key_derivation::sequencer::SequencerKeys;
 use strata_primitives::{
-    buf::Buf32,
-    keys::ZeroizableXpriv,
     l1::L1Status,
     params::{Params, RollupParams, SyncParams},
 };
 use strata_rocksdb::CommonDb;
-use strata_sequencer::types::{Identity, IdentityData, IdentityKey};
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
 use tokio::runtime::Handle;
 use tracing::*;
-use zeroize::Zeroize;
 
 use crate::{args::Args, errors::InitError, network};
 
@@ -117,34 +112,6 @@ pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinC
         warn!("network not set to regtest, ignoring");
     }
     Ok(btc_rpc.into())
-}
-
-/// Loads sequencer identity data from the root key at the specified path.
-pub fn load_seqkey(path: &Path) -> anyhow::Result<IdentityData> {
-    let str_buf = fs::read_to_string(path)?;
-    let str_buf = str_buf.trim();
-    debug!(?path, "loading sequencer root key");
-    let buf = base58::decode_check(str_buf)?;
-    let master_xpriv = ZeroizableXpriv::new(Xpriv::decode(&buf)?);
-
-    // Actually do the key derivation from the root key and then derive the pubkey from that.
-    let seq_keys = SequencerKeys::new(&master_xpriv)?;
-    let seq_xpriv = seq_keys.derived_xpriv();
-    let mut seq_sk = Buf32::from(seq_xpriv.private_key.secret_bytes());
-    let seq_xpub = seq_keys.derived_xpub();
-    let seq_pk = seq_xpub.to_x_only_pub().serialize();
-
-    let ik = IdentityKey::Sequencer(seq_sk);
-    let ident = Identity::Sequencer(Buf32::from(seq_pk));
-
-    // Zeroize the Buf32 representation of the Xpriv.
-    seq_sk.zeroize();
-
-    // Changed this to the pubkey so that we don't just log our privkey.
-    debug!(?ident, "ready to sign as sequencer");
-
-    let idata = IdentityData::new(ident, ik);
-    Ok(idata)
 }
 
 // initializes the status bundle that we can pass around cheaply for status/metrics

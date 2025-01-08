@@ -20,7 +20,6 @@ borsh.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-threadpool.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 

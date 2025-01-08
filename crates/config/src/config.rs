@@ -6,14 +6,6 @@ use serde::Deserialize;
 use crate::{bridge::RelayerConfig, btcio::BtcioConfig};
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct SequencerConfig {
-    /// path to sequencer root key
-    pub sequencer_key: PathBuf,
-    /// address with funds for sequencer transactions
-    pub sequencer_bitcoin_address: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct FullNodeConfig {
     /// host:port of sequencer rpc
     pub sequencer_rpc: String,
@@ -22,7 +14,7 @@ pub struct FullNodeConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum ClientMode {
-    Sequencer(SequencerConfig),
+    Sequencer,
     FullNode(FullNodeConfig),
 }
 

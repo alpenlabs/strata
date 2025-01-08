@@ -13,6 +13,7 @@ strata-crypto.workspace = true
 strata-key-derivation.workspace = true
 strata-primitives.workspace = true
 strata-rpc-api.workspace = true
+strata-rpc-types.workspace = true
 strata-sequencer.workspace = true
 strata-state.workspace = true
 strata-tasks.workspace = true

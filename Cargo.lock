@@ -13461,7 +13461,6 @@ dependencies = [
  "strata-tasks",
  "strata-test-utils",
  "thiserror 1.0.69",
- "threadpool",
  "tokio",
  "tracing",
 ]
@@ -13480,6 +13479,7 @@ dependencies = [
  "strata-key-derivation",
  "strata-primitives",
  "strata-rpc-api",
+ "strata-rpc-types",
  "strata-sequencer",
  "strata-state",
  "strata-tasks",

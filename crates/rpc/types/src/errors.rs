@@ -49,6 +49,15 @@ pub enum RpcServerError {
     #[error("missing checkpoint in database for index {0}")]
     MissingCheckpointInDb(u64),
 
+    #[error("missing proof in checkpoint for index {0}")]
+    MissingCheckpointProof(u64),
+
+    #[error("invalid checkpoint signature for index {0}")]
+    InvalidCheckpointSignature(u64),
+
+    #[error("invalid checkpoint signature for index {0}")]
+    CheckpointAlreadyPosted(u64),
+
     #[error("Proof already created for checkpoint {0}")]
     ProofAlreadyCreated(u64),
 
@@ -87,6 +96,9 @@ impl RpcServerError {
             Self::InvalidProof(_, _) => -32612,
             Self::UnknownIdx(_) => -32613,
             Self::Checkpoint(_) => -32614,
+            Self::MissingCheckpointProof(_) => -32615,
+            Self::InvalidCheckpointSignature(_) => -32616,
+            Self::CheckpointAlreadyPosted(_) => -32617,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32001,
             Self::BlockingAbort(_) => -32002,

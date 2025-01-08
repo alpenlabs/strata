@@ -2,7 +2,7 @@
 //!
 //! Responsible for signing blocks and checkpoints
 //! Note: currently this only functions as a 'signer' and does not perform any
-//! sequencing duties.
+//! transaction sequencing or block building duties.
 
 mod args;
 mod config;
@@ -61,7 +61,10 @@ fn main_inner(args: Args) -> Result<()> {
 
     let (duty_tx, duty_rx) = mpsc::channel(64);
 
-    executor.spawn_critical_async("duty-fetcher", duty_fetcher_worker(rpc.clone(), duty_tx));
+    executor.spawn_critical_async(
+        "duty-fetcher",
+        duty_fetcher_worker(rpc.clone(), duty_tx, config.duty_poll_interval),
+    );
     executor.spawn_critical_async(
         "duty-runner",
         duty_executor_worker(rpc, duty_rx, handle.clone(), idata),
@@ -73,11 +76,17 @@ fn main_inner(args: Args) -> Result<()> {
     Ok(())
 }
 
-async fn duty_fetcher_worker<R>(rpc: Arc<R>, duty_tx: mpsc::Sender<Duty>) -> anyhow::Result<()>
+async fn duty_fetcher_worker<R>(
+    rpc: Arc<R>,
+    duty_tx: mpsc::Sender<Duty>,
+    poll_interval: u64,
+) -> anyhow::Result<()>
 where
     R: StrataSequencerApiClient + Send + Sync + 'static,
 {
+    let mut interval = tokio::time::interval(Duration::from_millis(poll_interval));
     'top: loop {
+        interval.tick().await;
         let duties = match rpc.get_sequencer_duties().await {
             Ok(duties) => duties,
             Err(err) => {

@@ -64,6 +64,9 @@ impl From<&L2BlockId> for HexBytes32 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexBytes64(#[serde(with = "hex::serde")] pub [u8; 64]);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcL1Status {
     /// If the last time we tried to poll the client (as of `last_update`)
     /// we were successful.

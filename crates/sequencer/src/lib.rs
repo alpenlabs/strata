@@ -2,7 +2,7 @@
 
 pub mod block_assembly;
 pub mod block_template;
-pub(crate) mod checkpoint;
+pub mod checkpoint;
 pub mod checkpoint_handle;
 pub mod errors;
 pub mod extractor;
