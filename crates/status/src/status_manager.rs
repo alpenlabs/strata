@@ -121,6 +121,7 @@ impl StatusChannel {
         self.receiver.cl.borrow().clone()
     }
 
+    /// Create a subscription to the client state watcher.
     pub fn subscribe_client_state(&self) -> watch::Receiver<ClientState> {
         self.sender.cl.subscribe()
     }
