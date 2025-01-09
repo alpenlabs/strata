@@ -31,12 +31,12 @@ pub fn next_bytes<'a>(instructions: &mut Instructions<'a>) -> Option<&'a [u8]> {
 }
 
 /// Extract next integer value(unsigned)
-pub fn next_int(instructions: &mut Instructions<'_>) -> Option<u32> {
+pub fn next_u32(instructions: &mut Instructions<'_>) -> Option<u32> {
     let n = instructions.next();
     match n {
         Some(Ok(Instruction::PushBytes(bytes))) => {
             // Convert the bytes to an integer
-            if bytes.len() > 4 {
+            if bytes.len() != 4 {
                 return None;
             }
             let mut buf = [0; 4];

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bitcoin::{
@@ -9,7 +10,7 @@ use bitcoin::{
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
 use strata_l1tx::envelope::builder::build_envelope_script;
-use strata_primitives::l1::payload::L1Payload;
+use strata_primitives::{l1::payload::L1Payload, params::Params};
 
 use crate::{
     rpc::{
@@ -282,10 +283,10 @@ impl SignerRpc for TestBitcoinClient {
 
 pub fn generate_envelope_script_test(
     envelope_data: L1Payload,
-    rollup_name: &str,
+    params: Arc<Params>,
     version: u8,
 ) -> anyhow::Result<ScriptBuf> {
-    build_envelope_script(&envelope_data, rollup_name, version)
+    build_envelope_script(params.as_ref(), &envelope_data, version)
 }
 
 pub fn build_reveal_transaction_test(

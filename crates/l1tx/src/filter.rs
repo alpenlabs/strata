@@ -1,4 +1,5 @@
 use bitcoin::{Block, Transaction};
+use strata_primitives::params::RollupParams;
 use strata_state::{
     batch::SignedBatchCheckpoint,
     tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
@@ -15,6 +16,7 @@ use crate::{
 /// [`TxFilterConfig`]s
 pub fn filter_protocol_op_tx_refs(
     block: &Block,
+    params: &RollupParams,
     filter_config: &TxFilterConfig,
 ) -> Vec<ProtocolOpTxRef> {
     block
@@ -22,7 +24,7 @@ pub fn filter_protocol_op_tx_refs(
         .iter()
         .enumerate()
         .flat_map(|(i, tx)| {
-            extract_protocol_ops(tx, filter_config)
+            extract_protocol_ops(tx, params, filter_config)
                 .into_iter()
                 .map(move |relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
         })
@@ -33,9 +35,13 @@ pub fn filter_protocol_op_tx_refs(
 /// info.
 //  TODO: make this function return multiple ops as a single tx can have multiple outpoints that's
 //  relevant
-fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
+fn extract_protocol_ops(
+    tx: &Transaction,
+    params: &RollupParams,
+    filter_conf: &TxFilterConfig,
+) -> Vec<ProtocolOperation> {
     // Currently all we have are envelope txs, deposits and deposit requests
-    parse_envelope_checkpoints(tx, filter_conf)
+    parse_envelope_checkpoints(tx, params)
         .map(ProtocolOperation::Checkpoint)
         .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
         .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
@@ -64,19 +70,20 @@ fn parse_deposits(
 // DA separately
 fn parse_envelope_checkpoints<'a>(
     tx: &'a Transaction,
-    filter_conf: &'a TxFilterConfig,
+    params: &'a RollupParams,
 ) -> impl Iterator<Item = SignedBatchCheckpoint> + 'a {
     tx.input.iter().filter_map(|inp| {
         inp.witness
             .tapscript()
-            .and_then(|scr| parse_envelope_data(&scr.into(), &filter_conf.rollup_name.clone()).ok())
+            .and_then(|scr| parse_envelope_data(&scr.into(), params).ok())
+            // TODO: get checkpoint or da
             .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.data()).ok())
     })
 }
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
+    use std::{str::FromStr, sync::Arc};
 
     use bitcoin::{
         absolute::{Height, LockTime},
@@ -91,7 +98,10 @@ mod test {
     };
     use rand::{rngs::OsRng, RngCore};
     use strata_btcio::test_utils::{build_reveal_transaction_test, generate_envelope_script_test};
-    use strata_primitives::l1::{payload::L1Payload, BitcoinAmount};
+    use strata_primitives::{
+        l1::{payload::L1Payload, BitcoinAmount},
+        params::Params,
+    };
     use strata_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
@@ -155,13 +165,13 @@ mod test {
 
     // Create an envelope transaction. The focus here is to create a tapscript, rather than a
     // completely valid control block
-    fn create_envelope_tx(rollup_name: String) -> Transaction {
+    fn create_checkpoint_envelope_tx(params: Arc<Params>) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
         let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
         let envelope_data = L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap());
 
-        let script = generate_envelope_script_test(envelope_data, &rollup_name, 1).unwrap();
+        let script = generate_envelope_script_test(envelope_data, params, 1).unwrap();
 
         // Create controlblock
         let mut rand_bytes = [0; 32];
@@ -189,22 +199,23 @@ mod test {
         // Test with valid name
         let filter_config = create_tx_filter_config();
 
-        let rollup_name = filter_config.rollup_name.clone();
-        let tx = create_envelope_tx(rollup_name.clone());
+        let params: Params = gen_params();
+        let tx = create_checkpoint_envelope_tx(params.clone().into());
         let block = create_test_block(vec![tx]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config)
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
 
         assert_eq!(txids[0], 0, "Should filter valid rollup name");
 
-        // Test with invalid name
-        let rollup_name = "invalidRollupName".to_string();
-        let tx = create_envelope_tx(rollup_name.clone());
+        // Test with invalid checkpoint tag
+        let mut new_params = params.clone();
+        new_params.rollup.checkpoint_tag = "invalid_checkpoint_tag".to_string();
+        let tx = create_checkpoint_envelope_tx(new_params.into());
         let block = create_test_block(vec![tx]);
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
         assert!(result.is_empty(), "Should filter out invalid name");
     }
 
@@ -212,10 +223,11 @@ mod test {
     fn test_filter_relevant_txs_no_match() {
         let tx1 = create_test_tx(vec![create_test_txout(1000, &parse_addr(OTHER_ADDR))]);
         let tx2 = create_test_tx(vec![create_test_txout(10000, &parse_addr(OTHER_ADDR))]);
+        let params = gen_params();
         let block = create_test_block(vec![tx1, tx2]);
         let filter_config = create_tx_filter_config();
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config)
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
@@ -225,13 +237,13 @@ mod test {
     #[test]
     fn test_filter_relevant_txs_multiple_matches() {
         let filter_config = create_tx_filter_config();
-        let rollup_name = filter_config.rollup_name.clone();
-        let tx1 = create_envelope_tx(rollup_name.clone());
+        let params: Params = gen_params();
+        let tx1 = create_checkpoint_envelope_tx(params.clone().into());
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_envelope_tx(rollup_name);
+        let tx3 = create_checkpoint_envelope_tx(params.clone().into());
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
+        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config)
             .iter()
             .map(|op_refs| op_refs.index())
             .collect();
@@ -245,6 +257,7 @@ mod test {
         let filter_config = create_tx_filter_config();
         let deposit_config = filter_config.deposit_config.clone();
         let ee_addr = vec![1u8; 20]; // Example EVM address
+        let params = gen_params();
         let deposit_script =
             build_test_deposit_script(deposit_config.magic_bytes.clone(), ee_addr.clone());
 
@@ -256,7 +269,7 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -281,6 +294,7 @@ mod test {
     fn test_filter_relevant_txs_deposit_request() {
         let filter_config = create_tx_filter_config();
         let mut deposit_config = filter_config.deposit_config.clone();
+        let params = gen_params();
         let extra_amt = 10000;
         deposit_config.deposit_amount += extra_amt;
         let dest_addr = vec![2u8; 20]; // Example EVM address
@@ -299,7 +313,7 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -326,6 +340,7 @@ mod test {
     fn test_filter_relevant_txs_no_deposit() {
         let filter_config = create_tx_filter_config();
         let deposit_config = filter_config.deposit_config.clone();
+        let params = gen_params();
         let irrelevant_tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
@@ -334,7 +349,7 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
 
         assert!(
             result.is_empty(),
@@ -346,6 +361,7 @@ mod test {
     fn test_filter_relevant_txs_multiple_deposits() {
         let filter_config = create_tx_filter_config();
         let deposit_config = filter_config.deposit_config.clone();
+        let params = gen_params();
         let dest_addr1 = vec![3u8; 20];
         let dest_addr2 = vec![4u8; 20];
 
@@ -367,7 +383,7 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let result = filter_protocol_op_tx_refs(&block, &filter_config);
+        let result = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
 
         assert_eq!(result.len(), 2, "Should find two relevant transactions");
         assert_eq!(

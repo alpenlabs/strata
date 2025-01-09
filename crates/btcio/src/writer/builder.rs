@@ -22,7 +22,7 @@ use bitcoin::{
 use rand::{rngs::OsRng, RngCore};
 use strata_config::btcio::FeePolicy;
 use strata_l1tx::envelope::builder::build_envelope_script;
-use strata_primitives::l1::payload::L1Payload;
+use strata_primitives::{l1::payload::L1Payload, params::Params};
 use thiserror::Error;
 
 use super::context::WriterContext;
@@ -77,10 +77,10 @@ pub fn create_envelope_transactions<W: WriterRpc>(
     // Create commit key
     let key_pair = generate_key_pair()?;
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
-    let rollup_name = ctx.params.rollup().rollup_name.clone();
 
     // Start creating envelope content
-    let reveal_script = build_reveal_script(&rollup_name, &public_key, payload, ENVELOPE_VERSION)?;
+    let reveal_script =
+        build_reveal_script(ctx.params.as_ref(), &public_key, payload, ENVELOPE_VERSION)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -379,7 +379,7 @@ pub fn generate_key_pair() -> Result<UntweakedKeypair, anyhow::Error> {
 /// Builds reveal script such that it contains opcodes for verifying the internal key as well as the
 /// envelope block
 fn build_reveal_script(
-    rollup_name: &str,
+    params: &Params,
     taproot_public_key: &XOnlyPublicKey,
     envelope_data: &L1Payload,
     version: u8,
@@ -389,7 +389,7 @@ fn build_reveal_script(
         .push_opcode(OP_CHECKSIG)
         .into_script()
         .into_bytes();
-    let script = build_envelope_script(envelope_data, rollup_name, version)?;
+    let script = build_envelope_script(params, envelope_data, version)?;
     script_bytes.extend(script.into_bytes());
     Ok(ScriptBuf::from(script_bytes))
 }
