@@ -22,6 +22,7 @@ class BridgeDepositHappyTest(testenv.StrataTester):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
+        # Note: using copy of basic env her to have independent sequencer for this test
         ctx.set_env(BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
