@@ -114,8 +114,28 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
         Ok((cs, chs))
     }
 
-    async fn get_last_checkpoint_chainstate(&self) -> Option<Arc<Chainstate>> {
-        self.status_channel.chain_state().map(Arc::new)
+    async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
+        let client_state = self.status_channel.client_state();
+
+        let Some(last_checkpoint) = client_state.l1_view().last_finalized_checkpoint() else {
+            return Ok(None);
+        };
+        let (_, l2_blockidx) = last_checkpoint.batch_info.l2_range;
+
+        // in current implementation, chainstate idx == l2 block idx
+        let idx = l2_blockidx;
+
+        let db = self.database.clone();
+
+        wait_blocking("load_checkpoint_chainstate", move || {
+            let chainstate_db = db.chain_state_db();
+            let chainstate = chainstate_db
+                .get_toplevel_state(idx)?
+                .ok_or(Error::MissingChainstate(idx))?;
+
+            Ok(Some(Arc::new(chainstate)))
+        })
+        .await
     }
 }
 
@@ -493,15 +513,18 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
         // withdrawal duties should only be generated from finalized checkpoint states
-        let withdrawal_duties = self
-            .get_last_checkpoint_chainstate()
-            .await
-            .map(|chainstate| {
-                extract_withdrawal_infos(chainstate.deposits_table())
-                    .map(BridgeDuty::from)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+        let withdrawal_duties =
+            self.get_last_checkpoint_chainstate()
+                .await
+                .map(|chainstate_opt| {
+                    chainstate_opt
+                        .map(|chainstate| {
+                            extract_withdrawal_infos(chainstate.deposits_table())
+                                .map(BridgeDuty::from)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
+                })?;
 
         let mut duties = vec![];
         duties.extend(deposit_duties);
