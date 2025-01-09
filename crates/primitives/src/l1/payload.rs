@@ -7,8 +7,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 
-use crate::buf::Buf32;
-/// DA destination identifier.   This will eventually be used to enable
+use crate::{buf::Buf32, hash};
+/// DA destination identifier. This will eventually be used to enable
 /// storing payloads on alternative availability schemes.
 #[derive(
     Copy,
@@ -29,7 +29,7 @@ use crate::buf::Buf32;
 #[borsh(use_discriminant = true)]
 #[repr(u8)]
 pub enum PayloadDest {
-    /// If we expect the DA to be on the L1 chain that we settle to.  This is
+    /// If we expect the DA to be on the L1 chain that we settle to. This is
     /// always the strongest DA layer we have access to.
     L1 = 0,
 }
@@ -42,7 +42,7 @@ impl<'a> Arbitrary<'a> for PayloadDest {
     }
 }
 
-/// Summary of a DA payload to be included on a DA layer.  Specifies the target and
+/// Summary of a DA payload to be included on a DA layer. Specifies the target and
 /// a commitment to the payload.
 #[derive(
     Copy,
@@ -76,8 +76,13 @@ impl PayloadSpec {
     pub fn commitment(&self) -> &Buf32 {
         &self.commitment
     }
+
+    fn new(dest: PayloadDest, commitment: Buf32) -> Self {
+        Self { dest, commitment }
+    }
 }
 
+/// Data that is submitted to L1. This can be DA, Checkpoint, etc.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct L1Payload {
     data: Vec<u8>,
@@ -103,6 +108,12 @@ impl L1Payload {
 
     pub fn payload_type(&self) -> &L1PayloadType {
         &self.payload_type
+    }
+
+    pub fn hash(&self) -> Buf32 {
+        let mut buf = self.data.clone();
+        buf.extend(borsh::to_vec(&self.payload_type).expect("Could not serialize payload type"));
+        hash::raw(&buf)
     }
 }
 
@@ -143,7 +154,7 @@ impl PayloadIntent {
         self.dest
     }
 
-    /// Commitment to the payload, which might be context-specific.  This
+    /// Commitment to the payload, which might be context-specific. This
     /// is conceptually unrelated to the payload ID that we use for tracking which
     /// payloads we've written in the L1 writer bookkeeping.
     pub fn commitment(&self) -> &Buf32 {
@@ -158,9 +169,6 @@ impl PayloadIntent {
     /// Generates the spec from the relevant parts of the payload intent that
     /// uniquely refers to the payload data.
     pub fn to_spec(&self) -> PayloadSpec {
-        PayloadSpec {
-            dest: self.dest,
-            commitment: self.commitment,
-        }
+        PayloadSpec::new(self.dest, self.commitment)
     }
 }

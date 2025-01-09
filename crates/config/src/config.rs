@@ -107,7 +107,7 @@ mod test {
             [btcio]
             client_poll_dur_ms = 200
             write_poll_dur_ms = 200
-            fee_policy = "Smart"
+            fee_policy = "smart"
             reveal_amount = 100
 
             [relayer]
@@ -148,7 +148,7 @@ mod test {
             [btcio]
             client_poll_dur_ms = 200
             write_poll_dur_ms = 200
-            fee_policy = "Smart"
+            fee_policy = "smart"
             reveal_amount = 100
 
             [exec.reth]

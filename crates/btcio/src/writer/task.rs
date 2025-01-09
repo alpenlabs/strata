@@ -267,7 +267,7 @@ async fn update_l1_status(
     {
         let status_updates = [
             L1StatusUpdate::LastPublishedTxid(payloadentry.reveal_txid.into()),
-            L1StatusUpdate::IncrementEnvelopeCount,
+            L1StatusUpdate::IncrementPublishedRevealCount,
         ];
         apply_status_updates(&status_updates, status_channel).await;
     }

@@ -13,6 +13,7 @@ pub const ROLLUP_NAME_TAG: &[u8] = &[1];
 pub const VERSION_TAG: &[u8] = &[2];
 pub const BATCH_DATA_TAG: &[u8] = &[3];
 
+/// Errors that can be generated while parsing envelopes.
 #[derive(Debug, Error)]
 pub enum EnvelopeParseError {
     /// Does not have an `OP_IF..OP_ENDIF` block

@@ -3,7 +3,7 @@ use bitcoin::{consensus::serialize, hashes::Hash, Block, BlockHash};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-use crate::{buf::Buf32, impl_buf_wrapper};
+use crate::{buf::Buf32, hash::sha256d, impl_buf_wrapper};
 
 /// ID of an L1 block, usually the hash of its header.
 #[derive(
@@ -24,10 +24,10 @@ use crate::{buf::Buf32, impl_buf_wrapper};
 pub struct L1BlockId(Buf32);
 
 impl L1BlockId {
-    /// Computes the blkid from the header buf.  This expensive in proofs and
+    /// Computes the [`L1BlockId`] from the header buf. This is expensive in proofs and
     /// should only be done when necessary.
     pub fn compute_from_header_buf(buf: &[u8]) -> L1BlockId {
-        Self::from(crate::hash::sha256d(buf))
+        Self::from(sha256d(buf))
     }
 }
 
@@ -85,7 +85,7 @@ impl From<(u64, u32)> for L1TxRef {
     }
 }
 
-/// Includes [`L1BlockManifest`] along with scan rules that it is applied to
+/// Includes [`L1BlockManifest`] along with scan rules that it is applied to.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockManifest {
     /// The actual l1 record
@@ -125,13 +125,13 @@ impl L1BlockManifest {
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockRecord {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function
-    /// here.  This is what we use in the MMR.
+    /// here. This is what we use in the MMR.
     blockid: L1BlockId,
 
     /// Block header and whatever additional data we might want to query.
     header: Vec<u8>,
 
-    /// Merkle root for the transactions in the block.  For Bitcoin, this is
+    /// Merkle root for the transactions in the block. For Bitcoin, this is
     /// actually the witness transactions root, since we care about the witness
     /// data.
     txs_root: Buf32,
@@ -198,6 +198,6 @@ pub struct L1Status {
     /// UNIX millis time of the last time we got a new update from the L1 connector.
     pub last_update: u64,
 
-    /// number of published transactions in current run (commit + reveal pair count as 1)
-    pub published_envelope_count: u64,
+    /// Number of published reveal transactions.
+    pub published_reveal_txs_count: u64,
 }

@@ -1,5 +1,6 @@
 use serde::Deserialize;
 
+/// Configuration for btcio tasks.
 #[derive(Debug, Clone, Deserialize)]
 pub struct BtcioConfig {
     /// How often to poll btc client
@@ -13,7 +14,9 @@ pub struct BtcioConfig {
     pub reveal_amount: u64,
 }
 
+/// Definition of how fees are determined while creating l1 transactions.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum FeePolicy {
     /// Use estimatesmartfee.
     Smart,

@@ -12,14 +12,14 @@ use strata_storage::ops::{
 
 use crate::broadcaster::L1BroadcastHandle;
 
-/// Returns `Arc` of `SequencerDB` for testing
+/// Returns [`Arc`] of [`SequencerDB`] for testing
 pub fn get_db() -> Arc<SequencerDB<RBSeqBlobDb>> {
     let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
     let seqdb = Arc::new(RBSeqBlobDb::new(db, db_ops));
     Arc::new(SequencerDB::new(seqdb))
 }
 
-/// Returns `Arc` of `EnvelopeDataOps` for testing
+/// Returns [`Arc`] of [`EnvelopeDataOps`] for testing
 pub fn get_envelope_ops() -> Arc<EnvelopeDataOps> {
     let pool = threadpool::Builder::new().num_threads(2).build();
     let db = get_db();
@@ -27,14 +27,14 @@ pub fn get_envelope_ops() -> Arc<EnvelopeDataOps> {
     Arc::new(ops)
 }
 
-/// Returns `Arc` of `BroadcastDatabase` for testing
+/// Returns [`Arc`] of [`BroadcastDatabase`] for testing
 pub fn get_broadcast_db() -> Arc<impl BroadcastDatabase> {
     let (db, dbops) = get_rocksdb_tmp_instance().unwrap();
     let bcastdb = Arc::new(L1BroadcastDb::new(db, dbops));
     Arc::new(BroadcastDb::new(bcastdb))
 }
 
-/// Returns `Arc` of `L1BroadcastHandle` for testing
+/// Returns [`Arc`] of [`L1BroadcastHandle`] for testing
 pub fn get_broadcast_handle() -> Arc<L1BroadcastHandle> {
     let pool = threadpool::Builder::new().num_threads(2).build();
     let db = get_broadcast_db();

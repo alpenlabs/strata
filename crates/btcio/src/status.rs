@@ -9,7 +9,7 @@ pub enum L1StatusUpdate {
     RpcError(String),
     CurTip(String),
     LastPublishedTxid(Txid),
-    IncrementEnvelopeCount,
+    IncrementPublishedRevealCount,
 }
 
 pub async fn apply_status_updates(st_updates: &[L1StatusUpdate], st_chan: &StatusChannel) {
@@ -26,7 +26,9 @@ pub async fn apply_status_updates(st_updates: &[L1StatusUpdate], st_chan: &Statu
             L1StatusUpdate::LastPublishedTxid(txid) => {
                 l1_status.last_published_txid = Some(Into::into(*txid))
             }
-            L1StatusUpdate::IncrementEnvelopeCount => l1_status.published_envelope_count += 1,
+            L1StatusUpdate::IncrementPublishedRevealCount => {
+                l1_status.published_reveal_txs_count += 1
+            }
         }
     }
 
