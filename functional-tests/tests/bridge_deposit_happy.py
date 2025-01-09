@@ -5,6 +5,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
 from envs import testenv
+from envs.testenv import BasicEnvConfig
 from utils import get_bridge_pubkey
 
 
@@ -21,7 +22,7 @@ class BridgeDepositHappyTest(testenv.StrataTester):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
         el_address_1 = ctx.env.gen_el_address()
