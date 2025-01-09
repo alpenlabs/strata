@@ -121,12 +121,9 @@ impl StatusChannel {
         self.receiver.cl.borrow().clone()
     }
 
-    /// Waits until there's a new client state and returns the client state.
-    pub async fn wait_for_client_change(&self) -> Result<ClientState, RecvError> {
-        let mut s = self.receiver.cl.clone();
-        s.changed().await?;
-        let state = s.borrow().clone();
-        Ok(state)
+    /// Create a subscription to the client state watcher.
+    pub fn subscribe_client_state(&self) -> watch::Receiver<ClientState> {
+        self.sender.cl.subscribe()
     }
 
     /// Waits until genesis and returns the client state.
