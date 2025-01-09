@@ -7,12 +7,15 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, l1::L1BlockCommitment};
+use tracing::*;
 
 use crate::{
     batch::{BatchInfo, BootstrapState},
     epoch::EpochCommitment,
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
+    operation::{ClientUpdateOutput, SyncAction},
+    sync_event::SyncEvent,
 };
 
 /// High level client's state of the network.  This is local to the client, not
@@ -133,14 +136,6 @@ pub struct SyncState {
     // TODO remove this
     pub(super) cur_epoch: u64,
 
-    /// Height of last L2 block we've chosen as the current tip.
-    // TODO remove this
-    pub(super) tip_slot: u64,
-
-    /// Last L2 block we've chosen as the current tip.
-    // TODO remove this
-    pub(super) tip_blkid: L2BlockId,
-
     /// L2 epoch that's been finalized on L1 and proven.
     pub(super) finalized_epoch: u64,
 
@@ -161,8 +156,6 @@ impl SyncState {
     pub fn from_genesis_blkid(gblkid: L2BlockId) -> Self {
         Self {
             cur_epoch: 0,
-            tip_slot: 0,
-            tip_blkid: gblkid,
             finalized_epoch: 0,
             finalized_slot: 0,
             finalized_blkid: gblkid,
@@ -172,12 +165,12 @@ impl SyncState {
 
     #[deprecated(note = "getting rid of CSM awareness of tip soon (STR-696)")]
     pub fn tip_height(&self) -> u64 {
-        self.tip_slot
+        panic!("csm: tip does not exist anymore");
     }
 
     #[deprecated(note = "getting rid of CSM awareness of tip soon (STR-696)")]
     pub fn chain_tip_blkid(&self) -> &L2BlockId {
-        &self.tip_blkid
+        panic!("csm: tip does not exist anymore");
     }
 
     pub fn finalized_epoch(&self) -> u64 {
@@ -336,5 +329,140 @@ impl L1Checkpoint {
             is_proved,
             height,
         }
+    }
+}
+
+/// Wrapper structure for constructing a new client state and tracking emitted
+/// actions while processing a sync event.
+pub struct ClientStateMut {
+    state: ClientState,
+    actions: Vec<SyncAction>,
+}
+
+impl ClientStateMut {
+    /// Constructs a new instance from a base client state.
+    pub fn new(state: ClientState) -> Self {
+        Self {
+            state,
+            actions: Vec::new(),
+        }
+    }
+
+    pub fn state(&self) -> &ClientState {
+        &self.state
+    }
+
+    pub fn actions(&self) -> &[SyncAction] {
+        &self.actions
+    }
+
+    pub fn into_output(self) -> ClientUpdateOutput {
+        ClientUpdateOutput::new(self.state, self.actions)
+    }
+
+    fn sync_state(&self) -> Option<&SyncState> {
+        self.state.sync_state.as_ref()
+    }
+
+    // Utility.
+
+    fn expect_sync_state(&self) -> &SyncState {
+        self.state
+            .sync_state
+            .as_ref()
+            .expect("client_state: missing sync state")
+    }
+
+    fn expect_sync_state_mut(&mut self) -> &mut SyncState {
+        self.state
+            .sync_state
+            .as_mut()
+            .expect("client_state: missing sync state")
+    }
+
+    fn l1_state_mut(&mut self) -> &mut LocalL1State {
+        self.state.l1_view_mut()
+    }
+
+    // Semantic mutator functions.
+
+    /// Sets the flag that the chain is now active, which will eventually allow
+    /// the FCM to start.
+    pub fn activate_chain(&mut self) {
+        self.state.chain_active = true;
+    }
+
+    /// Updates the L1 header verification state
+    pub fn update_l1_verif_state(&mut self, l1_vs: HeaderVerificationState) {
+        if self.state.genesis_verification_hash().is_none() {
+            info!(?l1_vs, "Setting genesis L1 verification state");
+            self.state.genesis_l1_verification_state_hash = Some(l1_vs.compute_hash().unwrap());
+        }
+
+        self.state.l1_view_mut().header_verification_state = Some(l1_vs);
+    }
+
+    /// Sets the L1 tip, performing no validation.
+    pub fn set_l1_tip(&mut self, l1bc: L1BlockCommitment) {
+        let l1view = self.l1_state_mut();
+        l1view.tip_l1_block = l1bc;
+    }
+
+    /// Rolls back our view of L1 blocks.
+    pub fn rollback_l1_tip(&mut self, l1_height: u64) {
+        let l1v = self.l1_state_mut();
+
+        // Keep pending checkpoints whose l1 height is less than or equal to
+        // rollback height
+        l1v.verified_checkpoints
+            .retain(|ckpt| ckpt.height <= l1_height);
+    }
+
+    /// Accepts a L1 checkpoint.
+    pub fn accept_pending_checkpoint(&mut self, ckpt: L1Checkpoint) {
+        let l1view = self.l1_state_mut();
+        l1view.verified_checkpoints.push(ckpt);
+    }
+
+    /// Finalizes a checkpoint by L1 height.
+    // TODO convert this to epoch index
+    pub fn finalized_checkpoint(&mut self, l1_height: u64) {
+        // TODO verify this is all actually correct, could we split some of this
+        // out into calling code?
+
+        let l1v = self.l1_state_mut();
+
+        let finalized_checkpts: Vec<_> = l1v
+            .verified_checkpoints
+            .iter()
+            .take_while(|ckpt| ckpt.height <= l1_height)
+            .collect();
+
+        let new_finalized = finalized_checkpts.last().cloned().cloned();
+        let total_finalized = finalized_checkpts.len();
+        debug!(?new_finalized, ?total_finalized, "Finalized checkpoints");
+
+        // Remove the finalized from pending and then mark the last one as last_finalized
+        // checkpoint
+        l1v.verified_checkpoints.drain(..total_finalized);
+
+        if let Some(ckpt) = new_finalized {
+            // Check if heights match accordingly
+            if !l1v
+                .last_finalized_checkpoint
+                .as_ref()
+                .is_none_or(|prev_ckpt| ckpt.batch_info.epoch() == prev_ckpt.batch_info.epoch() + 1)
+            {
+                panic!("operation: mismatched indices of pending checkpoint");
+            }
+
+            let fin_blockid = *ckpt.batch_info.l2_blockid();
+            l1v.last_finalized_checkpoint = Some(ckpt);
+
+            // Update finalized blockid in StateSync
+            self.expect_sync_state_mut().finalized_blkid = fin_blockid;
+        }
+
+        // TODO also write a `FinalizeBlock` sync action
     }
 }

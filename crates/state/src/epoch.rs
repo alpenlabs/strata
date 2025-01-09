@@ -2,6 +2,7 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, l1::L1BlockCommitment};
 
 use crate::id::L2BlockId;
@@ -36,7 +37,18 @@ pub struct EpochHeader {
 /// might be slightly different depending on the context and we'd want to name
 /// them explicitly.  So avoid returning this in RPC endpoints, instead copy the
 /// fields to an RPC type that's more contextual to avoid misinterpretation.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+    Deserialize,
+    Serialize,
+)]
 pub struct EpochCommitment {
     /// Epoch that this refers to.
     epoch: u64,
