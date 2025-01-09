@@ -81,10 +81,11 @@ class BridgeTestBase(StrataTester):
             layer=0,
         )
 
-    def deposit(self, ctx: flexitest.RunContext, el_address, bridge_pk):
+    def deposit(self, ctx: flexitest.RunContext, el_address, bridge_pk) -> str:
         """
-        Make two DRT deposits to ensure the EL address has enough funds for gas
-        and for subsequent withdrawals. Wait until the deposit is reflected on L2.
+        Make DRT deposit to the EL address. Wait until the deposit is reflected on L2.
+
+        Returns the transaction id of the DRT on the bitcoin regtest.
         """
         cfg: RollupConfig = ctx.env.rollup_cfg()
         # D BTC
@@ -97,7 +98,7 @@ class BridgeTestBase(StrataTester):
         initial_balance = int(self.rethrpc.eth_getBalance(el_address), 16)
         self.debug(f"Strata Balance right before deposit calls: {initial_balance}")
 
-        self.make_drt(ctx, el_address, bridge_pk)
+        tx_id = self.make_drt(el_address, bridge_pk)
 
         # Wait until the deposit is seen on L2
         expected_balance = initial_balance + deposit_amount * SATS_TO_WEI
@@ -105,6 +106,8 @@ class BridgeTestBase(StrataTester):
             lambda: int(self.rethrpc.eth_getBalance(el_address), 16) == expected_balance,
             error_with="Strata balance after deposit is not as expected",
         )
+
+        return tx_id
 
     def withdraw(
         self,
@@ -190,9 +193,11 @@ class BridgeTestBase(StrataTester):
         }
         return self.web3.eth.estimate_gas(transaction)
 
-    def make_drt(self, ctx: flexitest.RunContext, el_address, musig_bridge_pk):
+    def make_drt(self, el_address, musig_bridge_pk):
         """
         Deposit Request Transaction
+
+        Returns the transaction id of the DRT on the bitcoin regtest.
         """
         # Get relevant data
         btc_url = self.btcrpc.base_url
@@ -208,7 +213,8 @@ class BridgeTestBase(StrataTester):
         ).hex()
 
         # Send the transaction to the Bitcoin network
-        self.btcrpc.proxy.sendrawtransaction(tx)
+        drt_tx_id: str = self.btcrpc.proxy.sendrawtransaction(tx)
+
         time.sleep(1)
 
         # time to mature DRT
@@ -218,6 +224,7 @@ class BridgeTestBase(StrataTester):
         # time to mature DT
         self.btcrpc.proxy.generatetoaddress(6, seq_addr)
         time.sleep(3)
+        return drt_tx_id
 
 
 class BasicLiveEnv(flexitest.LiveEnv):
