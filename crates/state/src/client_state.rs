@@ -6,12 +6,16 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, l1::L1BlockCommitment};
+use tracing::*;
 
 use crate::{
     batch::{BatchInfo, BootstrapState},
+    epoch::EpochCommitment,
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
+    operation::{ClientUpdateOutput, SyncAction},
+    sync_event::SyncEvent,
 };
 
 /// High level client's state of the network.  This is local to the client, not
@@ -85,6 +89,10 @@ impl ClientState {
         &mut self.local_l1_view
     }
 
+    pub fn tip_l1_blkid(&self) -> &L1BlockId {
+        self.l1_view().tip_l1_blkid()
+    }
+
     /// Overwrites the sync state.
     pub fn set_sync_state(&mut self, ss: SyncState) {
         self.sync_state = Some(ss);
@@ -98,12 +106,8 @@ impl ClientState {
             .expect("clientstate: missing sync state")
     }
 
-    pub fn most_recent_l1_block(&self) -> Option<&L1BlockId> {
-        self.local_l1_view.local_unaccepted_blocks.last()
-    }
-
     pub fn next_exp_l1_block(&self) -> u64 {
-        self.local_l1_view.next_expected_block
+        self.local_l1_view.next_expected_l1_block()
     }
 
     pub fn genesis_l1_height(&self) -> u64 {
@@ -128,18 +132,22 @@ impl ClientState {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct SyncState {
-    /// Height of last L2 block we've chosen as the current tip.
-    pub(super) tip_height: u64,
+    /// Current epoch that we believe that we're in.
+    // TODO remove this
+    pub(super) cur_epoch: u64,
 
-    /// Last L2 block we've chosen as the current tip.
-    pub(super) tip_blkid: L2BlockId,
+    /// L2 epoch that's been finalized on L1 and proven.
+    pub(super) finalized_epoch: u64,
+
+    /// Final L2 slot that's been finalized on L1 and proven.
+    pub(super) finalized_slot: u64,
+
+    /// Final L2 block that's been finalized on L1 and proven.
+    pub(super) finalized_blkid: L2BlockId,
 
     /// L2 checkpoint blocks that have been confirmed on L1 and proven along with L1 block height.
     /// These are ordered by height
     pub(super) confirmed_checkpoint_blocks: Vec<(L1BlockHeight, L2BlockId)>,
-
-    /// L2 block that's been finalized on L1 and proven
-    pub(super) finalized_blkid: L2BlockId,
 }
 
 type L1BlockHeight = u64;
@@ -147,19 +155,43 @@ type L1BlockHeight = u64;
 impl SyncState {
     pub fn from_genesis_blkid(gblkid: L2BlockId) -> Self {
         Self {
-            tip_height: 0,
-            tip_blkid: gblkid,
-            confirmed_checkpoint_blocks: Vec::new(),
+            cur_epoch: 0,
+            finalized_epoch: 0,
+            finalized_slot: 0,
             finalized_blkid: gblkid,
+            confirmed_checkpoint_blocks: Vec::new(),
         }
     }
 
+    #[deprecated(note = "getting rid of CSM awareness of tip soon (STR-696)")]
+    pub fn tip_height(&self) -> u64 {
+        panic!("csm: tip does not exist anymore");
+    }
+
+    #[deprecated(note = "getting rid of CSM awareness of tip soon (STR-696)")]
     pub fn chain_tip_blkid(&self) -> &L2BlockId {
-        &self.tip_blkid
+        panic!("csm: tip does not exist anymore");
+    }
+
+    pub fn finalized_epoch(&self) -> u64 {
+        self.finalized_epoch
+    }
+
+    pub fn finalized_slot(&self) -> u64 {
+        self.finalized_slot
     }
 
     pub fn finalized_blkid(&self) -> &L2BlockId {
         &self.finalized_blkid
+    }
+
+    /// Returns the commitment for the finalized epoch.
+    pub fn get_epoch_commitment(&self) -> EpochCommitment {
+        EpochCommitment::new(
+            self.finalized_epoch(),
+            self.finalized_slot(),
+            *self.finalized_blkid(),
+        )
     }
 
     pub fn confirmed_checkpoint_blocks(&self) -> &[(u64, L2BlockId)] {
@@ -173,25 +205,14 @@ impl SyncState {
             .find(|(h, _)| *h == l1_height)
             .map(|e| e.1)
     }
-
-    pub fn chain_tip_height(&self) -> u64 {
-        self.tip_height
-    }
 }
 
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct LocalL1State {
-    /// Local sequence of blocks that should reorg blocks in the chainstate.
-    ///
-    /// This MUST be ordered by block height, so the first block here is the
-    /// buried height +1.
-    // TODO this needs more tracking to make it remember where we are properly
-    pub(super) local_unaccepted_blocks: Vec<L1BlockId>,
-
     /// Next L1 block height we expect to receive
-    pub(super) next_expected_block: u64,
+    pub(super) tip_l1_block: L1BlockCommitment,
 
     /// Last finalized checkpoint
     pub(super) last_finalized_checkpoint: Option<L1Checkpoint>,
@@ -209,53 +230,36 @@ impl LocalL1State {
     /// # Panics
     ///
     /// If we try to construct it in a way that implies we don't have the L1 genesis block.
-    pub fn new(next_expected_block: u64) -> Self {
-        if next_expected_block == 0 {
+    pub fn new(tip_l1_block: u64) -> Self {
+        if tip_l1_block == 0 {
             panic!("clientstate: tried to construct without known L1 genesis block");
         }
 
+        // TODO maybe avoid using a fake blkid
+        let fake_blkid = L1BlockId::from(Buf32::zero());
         Self {
-            local_unaccepted_blocks: Vec::new(),
-            next_expected_block,
+            tip_l1_block: L1BlockCommitment::new(tip_l1_block, fake_blkid),
             verified_checkpoints: Vec::new(),
             last_finalized_checkpoint: None,
             header_verification_state: None,
         }
     }
 
-    /// Returns a slice of the unaccepted blocks.
-    pub fn local_unaccepted_blocks(&self) -> &[L1BlockId] {
-        &self.local_unaccepted_blocks
-    }
-
     /// Returns the height of the next block we expected to receive.
-    pub fn next_expected_block(&self) -> u64 {
-        self.next_expected_block
+    pub fn next_expected_l1_block(&self) -> u64 {
+        self.tip_l1_block.height() + 1
     }
 
-    /// Returned the height of the buried L1 block, which we can't reorg to.
-    pub fn buried_l1_height(&self) -> u64 {
-        self.next_expected_block - self.local_unaccepted_blocks.len() as u64
+    pub fn tip_l1_blkid(&self) -> &L1BlockId {
+        self.tip_l1_block.blkid()
     }
 
-    /// Returns an iterator over the unaccepted L2 blocks, from the lowest up.
-    pub fn unacc_blocks_iter(&self) -> impl Iterator<Item = (u64, &L1BlockId)> {
-        self.local_unaccepted_blocks()
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (self.buried_l1_height() + i as u64, b))
-    }
-
-    pub fn tip_height(&self) -> u64 {
-        if self.next_expected_block == 0 {
+    pub fn tip_l1_block_height(&self) -> u64 {
+        if self.next_expected_l1_block() == 0 {
             panic!("clientstate: started without L1 genesis block somehow");
         }
 
-        self.next_expected_block - 1
-    }
-
-    pub fn tip_blkid(&self) -> Option<&L1BlockId> {
-        self.local_unaccepted_blocks().last()
+        self.tip_l1_block.height()
     }
 
     pub fn last_finalized_checkpoint(&self) -> Option<&L1Checkpoint> {
@@ -325,5 +329,140 @@ impl L1Checkpoint {
             is_proved,
             height,
         }
+    }
+}
+
+/// Wrapper structure for constructing a new client state and tracking emitted
+/// actions while processing a sync event.
+pub struct ClientStateMut {
+    state: ClientState,
+    actions: Vec<SyncAction>,
+}
+
+impl ClientStateMut {
+    /// Constructs a new instance from a base client state.
+    pub fn new(state: ClientState) -> Self {
+        Self {
+            state,
+            actions: Vec::new(),
+        }
+    }
+
+    pub fn state(&self) -> &ClientState {
+        &self.state
+    }
+
+    pub fn actions(&self) -> &[SyncAction] {
+        &self.actions
+    }
+
+    pub fn into_output(self) -> ClientUpdateOutput {
+        ClientUpdateOutput::new(self.state, self.actions)
+    }
+
+    fn sync_state(&self) -> Option<&SyncState> {
+        self.state.sync_state.as_ref()
+    }
+
+    // Utility.
+
+    fn expect_sync_state(&self) -> &SyncState {
+        self.state
+            .sync_state
+            .as_ref()
+            .expect("client_state: missing sync state")
+    }
+
+    fn expect_sync_state_mut(&mut self) -> &mut SyncState {
+        self.state
+            .sync_state
+            .as_mut()
+            .expect("client_state: missing sync state")
+    }
+
+    fn l1_state_mut(&mut self) -> &mut LocalL1State {
+        self.state.l1_view_mut()
+    }
+
+    // Semantic mutator functions.
+
+    /// Sets the flag that the chain is now active, which will eventually allow
+    /// the FCM to start.
+    pub fn activate_chain(&mut self) {
+        self.state.chain_active = true;
+    }
+
+    /// Updates the L1 header verification state
+    pub fn update_l1_verif_state(&mut self, l1_vs: HeaderVerificationState) {
+        if self.state.genesis_verification_hash().is_none() {
+            info!(?l1_vs, "Setting genesis L1 verification state");
+            self.state.genesis_l1_verification_state_hash = Some(l1_vs.compute_hash().unwrap());
+        }
+
+        self.state.l1_view_mut().header_verification_state = Some(l1_vs);
+    }
+
+    /// Sets the L1 tip, performing no validation.
+    pub fn set_l1_tip(&mut self, l1bc: L1BlockCommitment) {
+        let l1view = self.l1_state_mut();
+        l1view.tip_l1_block = l1bc;
+    }
+
+    /// Rolls back our view of L1 blocks.
+    pub fn rollback_l1_tip(&mut self, l1_height: u64) {
+        let l1v = self.l1_state_mut();
+
+        // Keep pending checkpoints whose l1 height is less than or equal to
+        // rollback height
+        l1v.verified_checkpoints
+            .retain(|ckpt| ckpt.height <= l1_height);
+    }
+
+    /// Accepts a L1 checkpoint.
+    pub fn accept_pending_checkpoint(&mut self, ckpt: L1Checkpoint) {
+        let l1view = self.l1_state_mut();
+        l1view.verified_checkpoints.push(ckpt);
+    }
+
+    /// Finalizes a checkpoint by L1 height.
+    // TODO convert this to epoch index
+    pub fn finalized_checkpoint(&mut self, l1_height: u64) {
+        // TODO verify this is all actually correct, could we split some of this
+        // out into calling code?
+
+        let l1v = self.l1_state_mut();
+
+        let finalized_checkpts: Vec<_> = l1v
+            .verified_checkpoints
+            .iter()
+            .take_while(|ckpt| ckpt.height <= l1_height)
+            .collect();
+
+        let new_finalized = finalized_checkpts.last().cloned().cloned();
+        let total_finalized = finalized_checkpts.len();
+        debug!(?new_finalized, ?total_finalized, "Finalized checkpoints");
+
+        // Remove the finalized from pending and then mark the last one as last_finalized
+        // checkpoint
+        l1v.verified_checkpoints.drain(..total_finalized);
+
+        if let Some(ckpt) = new_finalized {
+            // Check if heights match accordingly
+            if !l1v
+                .last_finalized_checkpoint
+                .as_ref()
+                .is_none_or(|prev_ckpt| ckpt.batch_info.epoch() == prev_ckpt.batch_info.epoch() + 1)
+            {
+                panic!("operation: mismatched indices of pending checkpoint");
+            }
+
+            let fin_blockid = *ckpt.batch_info.l2_blockid();
+            l1v.last_finalized_checkpoint = Some(ckpt);
+
+            // Update finalized blockid in StateSync
+            self.expect_sync_state_mut().finalized_blkid = fin_blockid;
+        }
+
+        // TODO also write a `FinalizeBlock` sync action
     }
 }

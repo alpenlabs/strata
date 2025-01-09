@@ -15,7 +15,7 @@ pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateC
 use strata_zkvm::ZkVmEnv;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct ChainStateSnapshot {
+pub struct ChainstateSnapshot {
     pub hash: Buf32,
     pub slot: u64,
     pub l2_blockid: L2BlockId,
@@ -24,8 +24,8 @@ pub struct ChainStateSnapshot {
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct L2BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
-    pub initial_snapshot: ChainStateSnapshot,
-    pub final_snapshot: ChainStateSnapshot,
+    pub initial_snapshot: ChainstateSnapshot,
+    pub final_snapshot: ChainstateSnapshot,
     pub rollup_params_commitment: Buf32,
 }
 
@@ -71,7 +71,9 @@ fn apply_state_transition(
     new_l2_block: &L2Block,
     chain_params: &RollupParams,
 ) -> Chainstate {
-    let mut state_cache = StateCache::new(prev_chstate);
+    // TODO make this passed in by arg
+    let epoch_state = prev_chstate.epoch_state().clone();
+    let mut state_cache = StateCache::new(prev_chstate, epoch_state);
 
     strata_chaintsn::transition::process_block(
         &mut state_cache,
@@ -95,13 +97,13 @@ fn process_cl_stf(
     let new_state =
         verify_and_transition(prev_state.clone(), new_block, exec_update, rollup_params);
 
-    let initial_snapshot = ChainStateSnapshot {
+    let initial_snapshot = ChainstateSnapshot {
         hash: prev_state.compute_state_root(),
         slot: prev_state.chain_tip_slot(),
         l2_blockid: prev_state.chain_tip_blockid(),
     };
 
-    let final_snapshot = ChainStateSnapshot {
+    let final_snapshot = ChainstateSnapshot {
         hash: new_state.compute_state_root(),
         slot: new_state.chain_tip_slot(),
         l2_blockid: new_state.chain_tip_blockid(),

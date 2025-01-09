@@ -186,7 +186,7 @@ pub fn verify_proof(
     rollup_params: &RollupParams,
 ) -> ZkVmResult<()> {
     let rollup_vk = rollup_params.rollup_vk;
-    let checkpoint_idx = checkpoint.batch_info().idx();
+    let checkpoint_idx = checkpoint.batch_info().epoch();
     let proof = checkpoint.proof();
     info!(%checkpoint_idx, "verifying proof");
 

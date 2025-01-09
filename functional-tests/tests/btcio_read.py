@@ -19,14 +19,17 @@ class L1StatusTest(testenv.StrataTester):
         # create both btc and sequencer RPC
         btcrpc: BitcoindClient = btc.create_rpc()
         seqrpc = seq.create_rpc()
-        # generate 5 btc blocks
-        generate_n_blocks(btcrpc, 5)
 
         # Wait for seq
         wait_until(
             lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
+
+        # generate 5 btc blocks
+        generate_n_blocks(btcrpc, 5)
+
+        time.sleep(2)
 
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
         l1stat = seqrpc.strata_l1status()
@@ -35,11 +38,13 @@ class L1StatusTest(testenv.StrataTester):
         cur_time = l1stat["last_update"] // 1000
 
         # check if height on bitcoin is same as, it is seen in sequencer
-        self.debug(f'L1 stat curr height: {l1stat["cur_height"]}')
-        self.debug(f'Received from bitcoin: {received_block["height"]}')
+        cur_height = l1stat["cur_height"]
+        received = received_block["height"]
+        self.debug(f"L1 stat curr height: {cur_height}")
+        self.debug(f"Received from bitcoin: {received}")
         assert (
-            l1stat["cur_height"] == received_block["height"]
-        ), "sequencer height doesn't match the bitcoin node height"
+            cur_height == received
+        ), f"sequencer height {cur_height} doesn't match the bitcoin node height {received}"
 
         # generate 2 more btc blocks
         generate_n_blocks(btcrpc, 2)

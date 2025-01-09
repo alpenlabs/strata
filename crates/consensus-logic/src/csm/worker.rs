@@ -240,7 +240,7 @@ fn handle_sync_event<D: Database>(
     // Make sure that the new state index is set as expected.
     assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
 
-    // Write the client state checkpoint periodically based on the event idx..
+    // Write the client state checkpoint periodically based on the event idx.
     if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
         let client_state_db = state.database.client_state_db();
         client_state_db.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
@@ -310,7 +310,7 @@ fn apply_action<D: Database>(
         SyncAction::WriteCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
                 let batch_ckp = &c.batch_checkpoint;
-                let idx = batch_ckp.batch_info().idx();
+                let idx = batch_ckp.batch_info().epoch();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Confirmed;
                 let entry = CheckpointEntry::new(
@@ -330,7 +330,7 @@ fn apply_action<D: Database>(
         SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
                 let batch_ckp = &c.batch_checkpoint;
-                let idx = batch_ckp.batch_info().idx();
+                let idx = batch_ckp.batch_info().epoch();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Finalized;
                 let entry = CheckpointEntry::new(

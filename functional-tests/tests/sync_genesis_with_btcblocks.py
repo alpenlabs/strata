@@ -11,7 +11,7 @@ MAX_GENESIS_TRIES = 10
 @flexitest.register
 class SyncGenesisTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(testenv.BasicEnvConfig(100))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")

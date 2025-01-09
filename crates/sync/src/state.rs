@@ -67,7 +67,7 @@ pub fn initialize_from_db(
         return Err(L2SyncError::MissingBlock(*finalized_blockid));
     };
     let finalized_height = finalized_block.header().blockidx();
-    let tip_height = sync.chain_tip_height();
+    let tip_height = sync.tip_height();
 
     debug!(finalized_blockid = ?finalized_blockid, finalized_height = finalized_height, tip_height = tip_height, "init unfinalized blocks");
 

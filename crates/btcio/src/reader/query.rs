@@ -490,7 +490,7 @@ mod test {
         let (event_tx, _event_rx) = mpsc::channel::<L1Event>(10);
         let mut chstate: Chainstate = ArbitraryGenerator::new().generate();
         let clstate: ClientState = ArbitraryGenerator::new().generate();
-        let curr_epoch = chstate.epoch();
+        let curr_epoch = chstate.cur_epoch();
 
         let ctx = get_reader_ctx(event_tx, chstate.clone(), clstate);
         let mut state = get_reader_state(&ctx);
