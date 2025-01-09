@@ -8,6 +8,7 @@ use strata_primitives::{
     params::RollupParams,
 };
 use thiserror::Error;
+use tracing::*;
 
 use crate::utils::{next_bytes, next_op};
 

@@ -188,7 +188,6 @@ mod test {
             })
             .collect();
         let script = generate_envelope_script_test(&payloads, params).unwrap();
-
         // Create controlblock
         let mut rand_bytes = [0; 32];
         OsRng.fill_bytes(&mut rand_bytes);
@@ -280,6 +279,7 @@ mod test {
         let filter_config = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
         let ee_addr = vec![1u8; 20]; // Example EVM address
+        let params = gen_params();
         let deposit_script =
             build_test_deposit_script(deposit_config.magic_bytes.clone(), ee_addr.clone());
 
@@ -317,6 +317,7 @@ mod test {
         let params = gen_params();
         let filter_config = create_tx_filter_config(&params);
         let mut deposit_config = filter_config.deposit_config.clone();
+        let params = gen_params();
         let extra_amt = 10000;
         deposit_config.deposit_amount += extra_amt;
         let dest_addr = vec![2u8; 20]; // Example EVM address
@@ -363,6 +364,7 @@ mod test {
         let params = gen_params();
         let filter_config = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
+        let params = gen_params();
         let irrelevant_tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
@@ -384,6 +386,7 @@ mod test {
         let params = gen_params();
         let filter_config = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
+        let params = gen_params();
         let dest_addr1 = vec![3u8; 20];
         let dest_addr2 = vec![4u8; 20];
 
