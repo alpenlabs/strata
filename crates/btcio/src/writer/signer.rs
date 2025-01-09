@@ -60,8 +60,7 @@ pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
 #[cfg(test)]
 mod test {
     use strata_db::types::{PayloadEntry, PayloadL1Status};
-    use strata_primitives::hash;
-    use strata_primitives::l1::payload::L1Payload;
+    use strata_primitives::{hash, l1::payload::L1Payload};
 
     use super::*;
     use crate::{

@@ -6,8 +6,10 @@ use strata_db::{
     traits::SequencerDatabase,
     types::{L1TxStatus, PayloadEntry, PayloadL1Status},
 };
-use strata_primitives::params::Params;
-use strata_primitives::l1::payload::{PayloadDest, PayloadIntent};
+use strata_primitives::{
+    l1::payload::{PayloadDest, PayloadIntent},
+    params::Params,
+};
 use strata_status::StatusChannel;
 use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;

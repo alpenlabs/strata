@@ -90,7 +90,7 @@ pub trait BroadcasterRpc {
 /// Wallet functionality that any Bitcoin client **without private keys** that
 /// interacts with the Bitcoin network should provide.
 ///
-/// For signing transactions, see [`Signer`].
+/// For signing transactions, see [`SignerRpc`].
 ///
 /// # Note
 ///
@@ -166,7 +166,7 @@ pub trait SignerRpc {
     ) -> ClientResult<Vec<ImportDescriptorResult>>;
 }
 
-/// Marker trait for [`Reader`], [`Signer`] and [`Wallet`]
+/// Marker trait for [`ReaderRpc`], [`SignerRpc`] and [`WalletRpc`]
 #[async_trait]
 pub trait WriterRpc: ReaderRpc + SignerRpc + WalletRpc {}
 
