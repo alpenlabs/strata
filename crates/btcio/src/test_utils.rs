@@ -7,7 +7,7 @@ use bitcoin::{
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
 };
 use strata_l1tx::envelope::builder::build_envelope_script;
-use strata_state::da_blob::L1Payload;
+use strata_primitives::l1::payload::L1Payload;
 
 use crate::{
     rpc::{

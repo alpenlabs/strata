@@ -22,7 +22,7 @@ use bitcoin::{
 use rand::{rngs::OsRng, RngCore};
 use strata_config::btcio::FeePolicy;
 use strata_l1tx::envelope::builder::build_envelope_script;
-use strata_state::da_blob::L1Payload;
+use strata_primitives::l1::payload::L1Payload;
 use thiserror::Error;
 
 use super::context::WriterContext;
@@ -36,6 +36,9 @@ const ENVELOPE_VERSION: u8 = 1;
 pub enum EnvelopeError {
     #[error("insufficient funds for tx (need {0} sats, have {1} sats)")]
     NotEnoughUtxos(u64, u64),
+
+    #[error("Could not sign raw transaction: {0}")]
+    SignRawTransaction(String),
 
     #[error("Error building taproot")]
     Taproot(#[from] TaprootBuilderError),

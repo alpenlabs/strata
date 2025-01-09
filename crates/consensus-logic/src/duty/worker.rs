@@ -12,14 +12,10 @@ use strata_db::traits::*;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::{
     buf::{Buf32, Buf64},
+    l1::payload::{L1Payload, PayloadDest, PayloadIntent},
     params::Params,
 };
-use strata_state::{
-    batch::SignedBatchCheckpoint,
-    client_state::ClientState,
-    da_blob::{L1Payload, PayloadDest, PayloadIntent},
-    prelude::*,
-};
+use strata_state::{batch::SignedBatchCheckpoint, client_state::ClientState, prelude::*};
 use strata_storage::L2BlockManager;
 use strata_tasks::{ShutdownGuard, TaskExecutor};
 use tokio::sync::broadcast;
@@ -420,16 +416,15 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
                 check_and_get_batch_checkpoint(data, checkpoint_handle, pool, params.as_ref())?;
             debug!("Got checkpoint proof from db, now signing and sending");
 
-            let checkpoint_sighash = checkpoint.get_sighash();
-            let signature = sign_with_identity_key(&checkpoint_sighash, identity_key);
+            let checkpoint_hash = checkpoint.hash();
+            let signature = sign_with_identity_key(&checkpoint_hash, identity_key);
             let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, signature);
 
             // serialize and send to l1 writer
-
             let payload_data =
                 borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?;
             let payload = L1Payload::new_checkpoint(payload_data);
-            let blob_intent = PayloadIntent::new(PayloadDest::L1, checkpoint_sighash, payload);
+            let blob_intent = PayloadIntent::new(PayloadDest::L1, checkpoint_hash, payload);
 
             info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
             info!(blob_intent = ?blob_intent, "sending blob intent");

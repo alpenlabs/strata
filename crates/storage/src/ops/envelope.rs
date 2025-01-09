@@ -67,11 +67,13 @@ fn get_payload_entry_by_idx<D: SequencerDatabase>(
     }
 }
 
+/// Returns zero if there are no elements else last index incremented by 1.
 fn get_next_payload_idx<D: SequencerDatabase>(ctx: &Context<D>) -> DbResult<u64> {
     let payload_db = ctx.db.payload_db();
-    payload_db
-        .get_last_payload_idx()
-        .map(|x| x.map(|i| i + 1).unwrap_or_default())
+    Ok(payload_db
+        .get_last_payload_idx()?
+        .map(|i| i + 1)
+        .unwrap_or_default())
 }
 
 fn put_payload_entry<D: SequencerDatabase>(

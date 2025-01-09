@@ -3,7 +3,7 @@ use bitcoin::{
     script::{Instruction, Instructions},
     ScriptBuf,
 };
-use strata_state::da_blob::L1Payload;
+use strata_primitives::l1::payload::L1Payload;
 use thiserror::Error;
 use tracing::debug;
 
@@ -14,7 +14,7 @@ pub const VERSION_TAG: &[u8] = &[2];
 pub const BATCH_DATA_TAG: &[u8] = &[3];
 
 #[derive(Debug, Error)]
-pub enum EnvelopParseError {
+pub enum EnvelopeParseError {
     /// Does not have an `OP_IF..OP_ENDIF` block
     #[error("Invalid/Missing envelope(NO OP_IF..OP_ENDIF): ")]
     InvalidEnvelope,
@@ -49,7 +49,7 @@ pub enum EnvelopParseError {
 pub fn parse_envelope_data(
     script: &ScriptBuf,
     rollup_name: &str,
-) -> Result<L1Payload, EnvelopParseError> {
+) -> Result<L1Payload, EnvelopeParseError> {
     let mut instructions = script.instructions();
 
     enter_envelope(&mut instructions)?;
@@ -58,25 +58,25 @@ pub fn parse_envelope_data(
 
     let extracted_rollup_name = match (tag, name) {
         (ROLLUP_NAME_TAG, namebytes) => {
-            String::from_utf8(namebytes.to_vec()).map_err(|_| EnvelopParseError::InvalidNameValue)
+            String::from_utf8(namebytes.to_vec()).map_err(|_| EnvelopeParseError::InvalidNameValue)
         }
-        _ => Err(EnvelopParseError::InvalidNameTag),
+        _ => Err(EnvelopeParseError::InvalidNameTag),
     }?;
 
     if extracted_rollup_name != rollup_name {
-        return Err(EnvelopParseError::InvalidNameTag);
+        return Err(EnvelopeParseError::InvalidNameTag);
     }
 
     // Parse version
     let (tag, ver) = parse_bytes_pair(&mut instructions)?;
     let _version = match (tag, ver) {
         (VERSION_TAG, [v]) => Ok(v),
-        (VERSION_TAG, _) => Err(EnvelopParseError::InvalidVersion),
-        _ => Err(EnvelopParseError::InvalidVersionTag),
+        (VERSION_TAG, _) => Err(EnvelopeParseError::InvalidVersion),
+        _ => Err(EnvelopeParseError::InvalidVersionTag),
     }?;
 
     // Parse bytes
-    let tag = next_bytes(&mut instructions).ok_or(EnvelopParseError::InvalidBlobTag)?;
+    let tag = next_bytes(&mut instructions).ok_or(EnvelopeParseError::InvalidBlobTag)?;
     let size = next_int(&mut instructions);
     match (tag, size) {
         (BATCH_DATA_TAG, Some(size)) => {
@@ -84,19 +84,19 @@ pub fn parse_envelope_data(
             Ok(L1Payload::new_checkpoint(batch_data)) // TODO: later this will discern checkpoint
                                                       // and da and any other payload types
         }
-        (BATCH_DATA_TAG, None) => Err(EnvelopParseError::InvalidBlob),
-        _ => Err(EnvelopParseError::InvalidBlobTag),
+        (BATCH_DATA_TAG, None) => Err(EnvelopeParseError::InvalidBlob),
+        _ => Err(EnvelopeParseError::InvalidBlobTag),
     }
 }
 
 /// Check for consecutive `OP_FALSE` and `OP_IF` that marks the beginning of an envelope
-fn enter_envelope(instructions: &mut Instructions) -> Result<(), EnvelopParseError> {
+fn enter_envelope(instructions: &mut Instructions) -> Result<(), EnvelopeParseError> {
     // loop until OP_FALSE is found
     loop {
         let next = instructions.next();
         match next {
             None => {
-                return Err(EnvelopParseError::InvalidEnvelope);
+                return Err(EnvelopeParseError::InvalidEnvelope);
             }
             // OP_FALSE is basically empty PushBytes
             Some(Ok(Instruction::PushBytes(bytes))) => {
@@ -113,16 +113,16 @@ fn enter_envelope(instructions: &mut Instructions) -> Result<(), EnvelopParseErr
     // Check if next opcode is OP_IF
     let op_if = next_op(instructions);
     if op_if != Some(OP_IF) {
-        return Err(EnvelopParseError::InvalidEnvelope);
+        return Err(EnvelopeParseError::InvalidEnvelope);
     }
     Ok(())
 }
 
 fn parse_bytes_pair<'a>(
     instructions: &mut Instructions<'a>,
-) -> Result<(&'a [u8], &'a [u8]), EnvelopParseError> {
-    let tag = next_bytes(instructions).ok_or(EnvelopParseError::InvalidFormat)?;
-    let name = next_bytes(instructions).ok_or(EnvelopParseError::InvalidFormat)?;
+) -> Result<(&'a [u8], &'a [u8]), EnvelopeParseError> {
+    let tag = next_bytes(instructions).ok_or(EnvelopeParseError::InvalidFormat)?;
+    let name = next_bytes(instructions).ok_or(EnvelopeParseError::InvalidFormat)?;
     Ok((tag, name))
 }
 
@@ -130,7 +130,7 @@ fn parse_bytes_pair<'a>(
 fn extract_n_bytes(
     size: u32,
     instructions: &mut Instructions,
-) -> Result<Vec<u8>, EnvelopParseError> {
+) -> Result<Vec<u8>, EnvelopeParseError> {
     debug!("Extracting {} bytes from instructions", size);
     let mut data = vec![];
     let mut curr_size: u32 = 0;
@@ -142,7 +142,7 @@ fn extract_n_bytes(
         Ok(data)
     } else {
         debug!("Extracting {} bytes from instructions", size);
-        Err(EnvelopParseError::InvalidBlob)
+        Err(EnvelopeParseError::InvalidBlob)
     }
 }
 
@@ -150,7 +150,7 @@ fn extract_n_bytes(
 mod tests {
 
     use strata_btcio::test_utils::generate_envelope_script_test;
-    use strata_state::da_blob::L1Payload;
+    use strata_primitives::l1::payload::L1Payload;
 
     use super::*;
 

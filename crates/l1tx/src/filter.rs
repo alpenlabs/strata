@@ -91,8 +91,8 @@ mod test {
     };
     use rand::{rngs::OsRng, RngCore};
     use strata_btcio::test_utils::{build_reveal_transaction_test, generate_envelope_script_test};
-    use strata_primitives::l1::BitcoinAmount;
-    use strata_state::{batch::SignedBatchCheckpoint, da_blob::L1Payload, tx::ProtocolOperation};
+    use strata_primitives::l1::{payload::L1Payload, BitcoinAmount};
+    use strata_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::TxFilterConfig;

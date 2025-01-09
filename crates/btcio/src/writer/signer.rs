@@ -33,7 +33,7 @@ pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
         .client
         .sign_raw_transaction_with_wallet(&commit)
         .await
-        .expect("could not sign commit tx")
+        .map_err(|e| EnvelopeError::SignRawTransaction(e.to_string()))?
         .hex;
 
     let signed_commit: Transaction = consensus::encode::deserialize_hex(&signed_commit)
@@ -61,7 +61,7 @@ pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
 mod test {
     use strata_db::types::{PayloadEntry, PayloadL1Status};
     use strata_primitives::hash;
-    use strata_state::da_blob::L1Payload;
+    use strata_primitives::l1::payload::L1Payload;
 
     use super::*;
     use crate::{

@@ -24,6 +24,7 @@ use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
     hash,
+    l1::payload::{L1Payload, PayloadDest, PayloadIntent},
     params::Params,
 };
 use strata_rpc_api::{
@@ -41,7 +42,6 @@ use strata_state::{
     bridge_ops::WithdrawalIntent,
     chain_state::Chainstate,
     client_state::ClientState,
-    da_blob::{L1Payload, PayloadDest, PayloadIntent},
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,

@@ -7,7 +7,7 @@ use bitcoin::{
     script::PushBytesBuf,
     ScriptBuf,
 };
-use strata_state::da_blob::{L1Payload, L1PayloadType};
+use strata_primitives::l1::payload::{L1Payload, L1PayloadType};
 use tracing::*;
 
 use crate::envelope::parser::{BATCH_DATA_TAG, ROLLUP_NAME_TAG, VERSION_TAG};
