@@ -16,7 +16,10 @@ use strata_state::{
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
 use strata_tasks::ShutdownGuard;
-use tokio::{runtime::Handle, sync::mpsc};
+use tokio::{
+    runtime::Handle,
+    sync::{mpsc, watch},
+};
 use tracing::*;
 
 use crate::{
@@ -259,13 +262,14 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
     csm_ctl: &CsmController,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
+    let mut cl_rx = status_channel.subscribe_client_state();
     loop {
         if shutdown.should_shutdown() {
             warn!("fcm task received shutdown signal");
             break;
         }
 
-        let fcm_ev = wait_for_fcm_event(&handle, &mut fcm_rx, &status_channel);
+        let fcm_ev = wait_for_fcm_event(&handle, &mut fcm_rx, &mut cl_rx);
 
         match fcm_ev {
             FcmEvent::NewFcmMsg(m) => {
@@ -282,7 +286,7 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
 fn wait_for_fcm_event(
     handle: &Handle,
     fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
-    status_channel: &StatusChannel,
+    cl_rx: &mut watch::Receiver<ClientState>,
 ) -> FcmEvent {
     handle.block_on(async {
         tokio::select! {
@@ -292,7 +296,7 @@ fn wait_for_fcm_event(
                     FcmEvent::Abort
                 })
             }
-            c = status_channel.wait_for_client_change() => {
+            c = wait_for_client_change(cl_rx) => {
                 c.map(FcmEvent::NewStateUpdate).unwrap_or_else(|_| {
                     warn!("ClientState update sender closed");
                     FcmEvent::Abort
@@ -300,6 +304,15 @@ fn wait_for_fcm_event(
             }
         }
     })
+}
+
+/// Waits until there's a new client state and returns the client state.
+pub async fn wait_for_client_change(
+    cl_rx: &mut watch::Receiver<ClientState>,
+) -> Result<ClientState, watch::error::RecvError> {
+    cl_rx.changed().await?;
+    let state = cl_rx.borrow().clone();
+    Ok(state)
 }
 
 fn process_fc_message<D: Database, E: ExecEngineCtl>(
