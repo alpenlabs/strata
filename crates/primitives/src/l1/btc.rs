@@ -104,6 +104,7 @@ pub struct BitcoinAddress {
 }
 
 impl BitcoinAddress {
+    /// Parses a [`BitcoinAddress`] from a string.
     pub fn parse(address_str: &str, network: Network) -> Result<Self, ParseError> {
         let address = address_str
             .parse::<Address<NetworkUnchecked>>()
@@ -117,6 +118,13 @@ impl BitcoinAddress {
             network,
             address: checked_address,
         })
+    }
+
+    /// Parses a [`BitcoinAddress`] from raw bytes representation of a bitcoin Script.
+    pub fn from_bytes(bytes: &[u8], network: Network) -> Result<Self, ParseError> {
+        let script_buf = ScriptBuf::from_bytes(bytes.to_vec());
+        let address = Address::from_script(&script_buf, network)?;
+        Ok(Self { network, address })
     }
 }
 
@@ -302,6 +310,7 @@ impl Sum for BitcoinAmount {
     }
 }
 
+/// [Borsh](borsh)-friendly Bitcoin [`Psbt`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BitcoinPsbt(Psbt);
 

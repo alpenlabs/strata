@@ -17,9 +17,9 @@ pub enum ParseError {
     #[error("supplied address is invalid")]
     InvalidAddress(#[from] address::ParseError),
 
-    /// The provided address is not a Taproot address.
-    #[error("only taproot addresses are supported but found {0:?}")]
-    UnsupportedAddress(Option<AddressType>),
+    /// The provided script is invalid.
+    #[error("supplied script is invalid")]
+    InvalidScript(#[from] address::FromScriptError),
 
     /// The provided 32-byte buffer is not a valid point on the curve.
     #[error("not a valid point on the curve: {0}")]
