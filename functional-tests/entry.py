@@ -72,10 +72,12 @@ def main(argv):
     reth_fac = factory.RethFactory([12600 + i for i in range(100 * 3)])
     prover_client_fac = factory.ProverClientFactory([12900 + i for i in range(100 * 3)])
     bridge_client_fac = factory.BridgeClientFactory([13200 + i for i in range(100)])
+    seq_signer_fac = factory.StrataSequencerFactory()
 
     factories = {
         "bitcoin": btc_fac,
         "sequencer": seq_fac,
+        "sequencer_signer": seq_signer_fac,
         "fullnode": fullnode_fac,
         "reth": reth_fac,
         "prover_client": prover_client_fac,
