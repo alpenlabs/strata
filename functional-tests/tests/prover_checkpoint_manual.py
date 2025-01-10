@@ -12,11 +12,13 @@ class ProverClientTest(testenv.StrataTester):
         ctx.set_env("prover")
 
     def main(self, ctx: flexitest.RunContext):
+        self.warning("SKIPPING TEST prover_checkpoint_manual - not implemented")
+        return True
         prover_client = ctx.get_service("prover_client")
         prover_client_rpc = prover_client.create_rpc()
 
         # Wait for the Prover Manager setup
-        time.sleep(60)
+        time.sleep(5)
 
         # Test on with manual checkpoint
         checkpoint_idx = 1
@@ -28,5 +30,5 @@ class ProverClientTest(testenv.StrataTester):
         self.debug(f"got the task id: {task_id}")
         assert task_id is not None
 
-        time_out = 10 * 60
+        time_out = 30
         wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)

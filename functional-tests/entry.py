@@ -17,14 +17,12 @@ def main(argv):
     modules = flexitest.runtime.scan_dir_for_modules(test_dir)
     all_tests = flexitest.runtime.load_candidate_modules(modules)
 
-    # Avoid running prover related tets while running all the tests
-    # Filter the prover test files if not present in argv
     if len(argv) > 1:
         # Run the specific test file passed as the first argument (without .py extension)
         tests = [str(tst).removesuffix(".py").removeprefix("tests/") for tst in argv[1:]]
     else:
-        # Run all tests, excluding those containing "prover_", unless explicitly passed in argv
-        tests = [test for test in all_tests if "prover_" not in test or test in argv]
+        # Run all tests
+        tests = all_tests
 
     btc_fac = factory.BitcoinFactory([12300 + i for i in range(100)])
     seq_fac = factory.StrataFactory([12400 + i for i in range(100)])
