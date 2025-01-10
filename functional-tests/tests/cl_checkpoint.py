@@ -24,10 +24,13 @@ class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
             error_with="Sequencer did not start on time",
         )
 
-        ckp_idx = seqrpc.strata_getLatestCheckpointIndex()
-        assert ckp_idx is not None
+        ckp_idx = wait_until_with_value(
+            lambda: seqrpc.strata_getLatestCheckpointIndex(),
+            predicate=lambda idx: idx is not None,
+            error_with="Checkpoint was not generated in time",
+        )
 
-        self.debug(f"checkpoint: {ckp_idx} finalized")
+        self.debug(f"checkpoint: {ckp_idx} found")
 
         ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
         assert ckp is not None
@@ -36,7 +39,7 @@ class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
         ckp_idx = wait_until_with_value(
             lambda: seqrpc.strata_getLatestCheckpointIndex(True),
             predicate=lambda v: v >= ckp_idx,
-            error_with="Checkpoint was not confirmed in time",
+            error_with="Checkpoint was not finalized in time",
             timeout=60,
         )
         self.debug(f"checkpoint: {ckp_idx} finalized")
