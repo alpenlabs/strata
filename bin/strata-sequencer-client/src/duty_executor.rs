@@ -6,6 +6,7 @@ use strata_rpc_types::HexBytes64;
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig},
     types::{BatchCheckpointDuty, BlockSigningDuty, Duty, IdentityData},
+    utils::now_millis,
 };
 use thiserror::Error;
 use tokio::{runtime::Handle, select, sync::mpsc};
@@ -90,6 +91,15 @@ async fn handle_sign_block_duty<R>(
 where
     R: StrataSequencerApiClient + Send + Sync,
 {
+    if now_millis() < duty.target_ts() {
+        // wait until target time
+        // TODO: ensure duration is within some bounds
+        tokio::time::sleep(tokio::time::Duration::from_millis(
+            duty.target_ts() - now_millis(),
+        ))
+        .await;
+    }
+
     // should this keep track of previously signed slots and dont sign conflicting blocks ?
     let template = rpc
         .get_block_template(BlockGenerationConfig::from_parent_block_id(duty.parent()))

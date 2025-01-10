@@ -4,6 +4,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("block timestamp too early: {0}")]
+    TimestampTooEarly(u64),
     #[error("unknown blockId: {0}")]
     UnknownBlockId(L2BlockId),
     #[error("invalid signature: {0}, {1}")]

@@ -90,11 +90,18 @@ fn generate_block_template_inner<D: Database, E: ExecEngineCtl>(
         .get_block_data(parent_block_id)?
         .ok_or(Error::UnknownBlockId(parent_block_id))?;
 
+    let parent_ts = parent.header().timestamp();
+
     // next slot idx
     let slot = parent.header().blockidx() + 1;
 
     // next block timestamp
     let ts = config.ts(now_millis());
+
+    // maintain min block_time
+    if ts < parent_ts + params.rollup().block_time {
+        Err(Error::TimestampTooEarly(ts))?;
+    }
 
     // latest l1 view from client state
     let l1_state = status_channel.l1_view();

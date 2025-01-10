@@ -102,6 +102,11 @@ impl BlockGenerationConfig {
         }
     }
 
+    pub fn with_ts(mut self, ts: u64) -> Self {
+        self.ts = Some(ts);
+        self
+    }
+
     pub fn parent_block_id(&self) -> L2BlockId {
         self.parent_block_id
     }
