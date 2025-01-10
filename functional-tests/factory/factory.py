@@ -75,11 +75,11 @@ class StrataFactory(flexitest.Factory):
         super().__init__(port_range)
 
     @flexitest.with_ectx("ctx")
-    def create_sequencer(
+    def create_sequencer_node(
         self,
         bitcoind_config: BitcoinRpcConfig,
         reth_config: RethConfig,
-        sequencer_address: str,
+        sequencer_address: str,  # TODO: remove this
         rollup_params: str,
         ctx: flexitest.EnvContext,
     ) -> flexitest.Service:
@@ -88,7 +88,6 @@ class StrataFactory(flexitest.Factory):
         rpc_host = "127.0.0.1"
         logfile = os.path.join(datadir, "service.log")
 
-        seqkey_path = os.path.join(ctx.envdd_path, "_init", "seqkey.bin")
         # fmt: off
         cmd = [
             "strata-client",
@@ -101,8 +100,7 @@ class StrataFactory(flexitest.Factory):
             "--reth-authrpc", reth_config["reth_socket"],
             "--reth-jwtsecret", reth_config["reth_secret_path"],
             "--network", "regtest",
-            "--sequencer-key", seqkey_path,
-            "--sequencer-bitcoin-address", sequencer_address,
+            "--sequencer"
         ]
         # fmt: on
 
@@ -117,13 +115,45 @@ class StrataFactory(flexitest.Factory):
             "rpc_host": rpc_host,
             "rpc_port": rpc_port,
             "rpc_url": rpc_url,
-            "seqkey": seqkey_path,
             "address": sequencer_address,
         }
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
         svc.start()
         _inject_service_create_rpc(svc, rpc_url, "sequencer")
+        return svc
+
+
+class StrataSequencerFactory(flexitest.Factory):
+    def __init__(self):
+        super().__init__([])
+
+    @flexitest.with_ectx("ctx")
+    def create_sequencer_signer(
+        self,
+        sequencer_rpc_host: str,
+        sequencer_rpc_port: str,
+        ctx: flexitest.EnvContext,
+    ) -> flexitest.Service:
+        datadir = ctx.make_service_dir("sequencer_signer")
+        seqkey_path = os.path.join(ctx.envdd_path, "_init", "seqkey.bin")
+        logfile = os.path.join(datadir, "service.log")
+
+        # fmt: off
+        cmd = [
+            "strata-sequencer-client",
+            "--sequencer-key", seqkey_path,
+            "--rpc-host", sequencer_rpc_host,
+            "--rpc-port", str(sequencer_rpc_port),
+        ]
+        # fmt: on
+
+        props = {
+            "seqkey": seqkey_path,
+        }
+        svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
+        svc.start()
+
         return svc
 
 
