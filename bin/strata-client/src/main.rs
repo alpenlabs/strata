@@ -561,10 +561,9 @@ fn start_template_manager_task(ctx: CoreContext, executor: &TaskExecutor) -> Tem
     let (tx, rx) = mpsc::channel(100);
 
     let manager = BlockTemplateManager::new(params, database, engine, status_channel);
-    executor.spawn_critical_async(
-        "template_manager_worker",
-        template_manager_worker(manager, rx),
-    );
+    executor.spawn_critical("template_manager_worker", |shutdown| {
+        template_manager_worker(shutdown, manager, rx)
+    });
 
     TemplateManagerHandle::new(tx)
 }

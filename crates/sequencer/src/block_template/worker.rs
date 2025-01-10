@@ -1,10 +1,9 @@
-use std::time;
-
 use strata_db::traits::{Database, L2BlockDatabase};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
 use strata_state::header::L2Header;
 use strata_status::StatusChannel;
+use strata_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
 
 use crate::{
@@ -13,14 +12,12 @@ use crate::{
         BlockGenerationConfig, BlockTemplate, BlockTemplateFull, BlockTemplateManager, Error,
         TemplateManagerRequest,
     },
+    utils::now_millis,
 };
 
-fn now_millis() -> u64 {
-    time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64
-}
-
 /// Worker task for block template manager.
-pub async fn template_manager_worker<D, E>(
+pub fn template_manager_worker<D, E>(
+    shutdown: ShutdownGuard,
     mut manager: BlockTemplateManager<D, E>,
     mut rx: mpsc::Receiver<TemplateManagerRequest>,
 ) -> anyhow::Result<()>
@@ -28,7 +25,7 @@ where
     D: Database,
     E: ExecEngineCtl,
 {
-    while let Some(request) = rx.recv().await {
+    while let Some(request) = rx.blocking_recv() {
         match request {
             TemplateManagerRequest::GenerateBlockTemplate(config, sender) => {
                 let _ = sender.send(generate_block_template(&mut manager, config));
@@ -40,6 +37,10 @@ where
                 let _ = sender.send(manager.get_block_template(block_id));
             }
         };
+
+        if shutdown.should_shutdown() {
+            break;
+        }
     }
 
     Ok(())
