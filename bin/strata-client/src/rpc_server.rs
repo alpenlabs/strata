@@ -120,18 +120,17 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
         let Some(last_checkpoint) = client_state.l1_view().last_finalized_checkpoint() else {
             return Ok(None);
         };
-        let (_, l2_blockidx) = last_checkpoint.batch_info.l2_range;
 
         // in current implementation, chainstate idx == l2 block idx
-        let idx = l2_blockidx;
+        let (_, chainstate_idx) = last_checkpoint.batch_info.l2_range;
 
         let db = self.database.clone();
 
         wait_blocking("load_checkpoint_chainstate", move || {
             let chainstate_db = db.chain_state_db();
             let chainstate = chainstate_db
-                .get_toplevel_state(idx)?
-                .ok_or(Error::MissingChainstate(idx))?;
+                .get_toplevel_state(chainstate_idx)?
+                .ok_or(Error::MissingChainstate(chainstate_idx))?;
 
             Ok(Some(Arc::new(chainstate)))
         })
