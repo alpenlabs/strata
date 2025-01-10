@@ -512,18 +512,15 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
         // withdrawal duties should only be generated from finalized checkpoint states
-        let withdrawal_duties =
-            self.get_last_checkpoint_chainstate()
-                .await
-                .map(|chainstate_opt| {
-                    chainstate_opt
-                        .map(|chainstate| {
-                            extract_withdrawal_infos(chainstate.deposits_table())
-                                .map(BridgeDuty::from)
-                                .collect::<Vec<_>>()
-                        })
-                        .unwrap_or_default()
-                })?;
+        let withdrawal_duties = self
+            .get_last_checkpoint_chainstate()
+            .await?
+            .map(|chainstate| {
+                extract_withdrawal_infos(chainstate.deposits_table())
+                    .map(BridgeDuty::from)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
 
         let mut duties = vec![];
         duties.extend(deposit_duties);
