@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::args::Args;
 
-const DEFAULT_DUTY_POLL_INTERVAL: u64 = 2000;
+const DEFAULT_DUTY_POLL_INTERVAL: u64 = 1000;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Config {
@@ -33,7 +33,7 @@ impl Config {
         })
     }
 
-    pub(crate) fn rpc_url(&self) -> String {
-        format!("{}:{}", self.rpc_host, self.rpc_port)
+    pub(crate) fn ws_url(&self) -> String {
+        format!("ws://{}:{}", self.rpc_host, self.rpc_port)
     }
 }

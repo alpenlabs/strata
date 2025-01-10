@@ -827,7 +827,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         debug!(%idx, "Proof is pending, setting proof reaedy");
 
         self.checkpoint_handle
-            .put_checkpoint_and_notify(idx, entry)
+            .put_checkpoint(idx, entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
         debug!(%idx, "Success");
