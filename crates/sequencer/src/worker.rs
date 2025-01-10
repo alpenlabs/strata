@@ -8,6 +8,7 @@ use std::{
 use parking_lot::RwLock;
 use strata_consensus_logic::csm::message::ClientUpdateNotif;
 use strata_db::traits::*;
+use strata_primitives::params::Params;
 use strata_state::{client_state::ClientState, prelude::*};
 use strata_storage::L2BlockManager;
 use strata_tasks::ShutdownGuard;
@@ -28,6 +29,7 @@ pub fn duty_tracker_task<D: Database>(
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     checkpoint_handle: Arc<CheckpointHandle>,
+    params: Arc<Params>,
 ) -> Result<(), Error> {
     let client_state_db = database.client_state_db();
     duty_tracker_task_inner(
@@ -37,6 +39,7 @@ pub fn duty_tracker_task<D: Database>(
         client_state_db.as_ref(),
         l2_block_manager.as_ref(),
         checkpoint_handle.as_ref(),
+        params.as_ref(),
     )
 }
 
@@ -47,6 +50,7 @@ fn duty_tracker_task_inner(
     client_state_db: &impl ClientStateDatabase,
     l2_block_manager: &L2BlockManager,
     checkpoint_handle: &CheckpointHandle,
+    params: &Params,
 ) -> Result<(), Error> {
     let idx = client_state_db.get_last_checkpoint_idx()?;
     let last_checkpoint_state = client_state_db.get_state_checkpoint(idx)?;
@@ -83,6 +87,7 @@ fn duty_tracker_task_inner(
             new_state,
             l2_block_manager,
             checkpoint_handle,
+            params,
         ) {
             error!(err = %e, "failed to update duties tracker");
         }
@@ -98,12 +103,13 @@ fn update_tracker(
     state: &ClientState,
     l2_block_manager: &L2BlockManager,
     checkpoint_handle: &CheckpointHandle,
+    params: &Params,
 ) -> Result<(), Error> {
     let Some(ss) = state.sync() else {
         return Ok(());
     };
 
-    let new_duties = extractor::extract_duties(state, checkpoint_handle)?;
+    let new_duties = extractor::extract_duties(state, checkpoint_handle, l2_block_manager, params)?;
 
     info!(new_duties = ?new_duties, "new duties");
 

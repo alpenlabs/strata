@@ -62,11 +62,17 @@ pub struct BlockSigningDuty {
     slot: u64,
     /// Parent to build on
     parent: L2BlockId,
+    /// Target timestamp for block
+    target_ts: u64,
 }
 
 impl BlockSigningDuty {
-    pub fn new_simple(slot: u64, parent: L2BlockId) -> Self {
-        Self { slot, parent }
+    pub fn new_simple(slot: u64, parent: L2BlockId, target_ts: u64) -> Self {
+        Self {
+            slot,
+            parent,
+            target_ts,
+        }
     }
 
     pub fn target_slot(&self) -> u64 {
@@ -75,6 +81,10 @@ impl BlockSigningDuty {
 
     pub fn parent(&self) -> L2BlockId {
         self.parent
+    }
+
+    pub fn target_ts(&self) -> u64 {
+        self.target_ts
     }
 }
 

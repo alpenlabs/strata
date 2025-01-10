@@ -1,7 +1,12 @@
 //! Extracts new duties for sequencer for a given consensus state.
 
 use strata_db::types::CheckpointConfStatus;
-use strata_state::client_state::ClientState;
+use strata_primitives::params::Params;
+use strata_state::{
+    client_state::{ClientState, SyncState},
+    header::L2Header,
+};
+use strata_storage::L2BlockManager;
 
 use super::types::{BlockSigningDuty, Duty};
 use crate::{checkpoint_handle::CheckpointHandle, errors::Error, types::BatchCheckpointDuty};
@@ -10,6 +15,8 @@ use crate::{checkpoint_handle::CheckpointHandle, errors::Error, types::BatchChec
 pub fn extract_duties(
     state: &ClientState,
     checkpoint_handle: &CheckpointHandle,
+    l2_block_manager: &L2BlockManager,
+    params: &Params,
 ) -> Result<Vec<Duty>, Error> {
     // If a sync state isn't present then we probably don't have anything we
     // want to do.  We might change this later.
@@ -17,17 +24,37 @@ pub fn extract_duties(
         return Ok(Vec::new());
     };
 
-    let tip_height = ss.chain_tip_height();
-    let tip_blkid = *ss.chain_tip_blkid();
+    let mut duties = vec![];
 
-    // Since we're not rotating sequencers, for now we just *always* produce a
-    // new block.
-    let duty_data = BlockSigningDuty::new_simple(tip_height + 1, tip_blkid);
-    let mut duties = vec![Duty::SignBlock(duty_data)];
-
+    duties.extend(extract_block_duties(ss, l2_block_manager, params)?);
     duties.extend(extract_batch_duties(checkpoint_handle)?);
 
     Ok(duties)
+}
+
+fn extract_block_duties(
+    ss: &SyncState,
+    l2_block_manager: &L2BlockManager,
+    params: &Params,
+) -> Result<Vec<Duty>, Error> {
+    let tip_height = ss.chain_tip_height();
+    let tip_blkid = *ss.chain_tip_blkid();
+
+    let tip_block_ts = l2_block_manager
+        .get_block_data_blocking(&tip_blkid)?
+        .ok_or(Error::MissingL2Block(tip_blkid))?
+        .header()
+        .timestamp();
+
+    let target_ts = tip_block_ts + params.rollup().block_time;
+
+    // Since we're not rotating sequencers, for now we just *always* produce a
+    // new block.
+    Ok(vec![Duty::SignBlock(BlockSigningDuty::new_simple(
+        tip_height + 1,
+        tip_blkid,
+        target_ts,
+    ))])
 }
 
 fn extract_batch_duties(checkpoint_handle: &CheckpointHandle) -> Result<Vec<Duty>, Error> {

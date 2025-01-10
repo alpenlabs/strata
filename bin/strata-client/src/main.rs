@@ -435,6 +435,7 @@ fn start_sequencer_tasks(
     let t_l2_block_manager = l2_block_manager.clone();
     let t_database = database.clone();
     let t_checkpoint_handle = checkpoint_handle.clone();
+    let t_params = params.clone();
     executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
         duty_worker::duty_tracker_task(
             shutdown,
@@ -443,6 +444,7 @@ fn start_sequencer_tasks(
             t_database,
             t_l2_block_manager,
             t_checkpoint_handle,
+            t_params,
         )
         .map_err(Into::into)
     });
