@@ -3,17 +3,17 @@ use std::{cmp::Reverse, collections::BinaryHeap, sync::Arc};
 use strata_db::types::CheckpointProvingStatus;
 use tokio::{
     select,
-    time::{self, Instant},
+    time::{self, Duration, Instant},
 };
 use tracing::{debug, error, warn};
 
 use crate::checkpoint_handle::CheckpointHandle;
 
 #[derive(Debug, PartialEq, Eq)]
-struct CheckpointExpiry(u64, time::Instant);
+struct CheckpointExpiry(u64, Instant);
 
 impl CheckpointExpiry {
-    fn expiry(&self) -> time::Instant {
+    fn expiry(&self) -> Instant {
         self.1
     }
 
@@ -37,7 +37,7 @@ impl Ord for CheckpointExpiry {
 /// Worker to handle checkpoint prover expiry and submit empty proof after timeout.
 pub async fn checkpoint_expiry_worker(
     checkpoint_handle: Arc<CheckpointHandle>,
-    proof_timeout: time::Duration,
+    proof_timeout: Duration,
 ) -> anyhow::Result<()> {
     // min heap of checkpoint expiry items
     // Note: there will normally only be a single item we need to track in absence of forks
@@ -58,7 +58,7 @@ pub async fn checkpoint_expiry_worker(
         };
 
         if checkpoint.proving_status == CheckpointProvingStatus::PendingProof {
-            let expiry_time = time::Instant::now() + proof_timeout;
+            let expiry_time = Instant::now() + proof_timeout;
             expiry_queue.push(Reverse(CheckpointExpiry(last_checkpoint_idx, expiry_time)));
         }
     }
@@ -90,14 +90,15 @@ pub async fn checkpoint_expiry_worker(
             _ = time::sleep_until(expiry_queue
                 .peek()
                 .map(|Reverse(CheckpointExpiry(_, expiry_time))| *expiry_time)
-                .unwrap_or_else(Instant::now)) => {
+                .unwrap_or_else(|| Instant::now() + Duration::from_millis(500))) => {
                     let now = Instant::now();
-                    while let Some(Reverse(checkpoint_expiry)) = expiry_queue.pop() {
+                    while let Some(Reverse(checkpoint_expiry)) = expiry_queue.peek() {
                         if checkpoint_expiry.expiry() > now {
                             break;
                         }
 
                         handle_pending_checkpoint_expiry(&checkpoint_handle, checkpoint_expiry.checkpoint_idx()).await;
+                        expiry_queue.pop();
                     }
             }
         }
