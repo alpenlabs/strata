@@ -77,7 +77,7 @@ pub trait ProvingOp {
             .get_proof_deps(proof_ctx)
             .map_err(ProvingTaskError::DatabaseError)?;
 
-        let cl_stf_deps = match proof_deps {
+        let deps_ctx = match proof_deps {
             // Reuse the existing dependency tasks fetched from DB.
             Some(v) => v,
             // Create new dependency tasks.
@@ -96,7 +96,7 @@ pub trait ProvingOp {
         };
 
         let mut task_tracker = task_tracker.lock().await;
-        task_tracker.create_tasks(proof_ctx, cl_stf_deps, db)
+        task_tracker.create_tasks(proof_ctx, deps_ctx, db)
     }
 
     /// Construct [`ProofContext`] from the proving operation parameters.

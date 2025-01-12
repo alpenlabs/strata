@@ -46,16 +46,12 @@ class ProverDepositTest(testenv.BridgeTestBase):
         prover_client_rpc = prover_client.create_rpc()
         time.sleep(5)
 
-        # Dispatch the prover task.
-        # TODO: re-enable commented code when proveCheckpointRaw is implemented.
-        # Currently, we prove the latest checkpoint that might not contain deposit blocks.
-
         # Proving task with with few L1 and L2 blocks including the deposit transaction
-        # l1_range = (l1_deposit_block_height - 1, l1_deposit_block_height + 1)
-        # l2_range = (l2_deposit_block_num - 1, l2_deposit_block_num + 1)
-        # task_id = prover_client_rpc.dev_strata_proveCheckpointRaw(0, l1_range, l2_range)
-        # Test on with the latest checkpoint
-        task_ids = prover_client_rpc.dev_strata_proveLatestCheckPoint()
+        l1_range = (l1_deposit_block_height - 1, l1_deposit_block_height + 1)
+        l2_range = (l2_deposit_block_num - 1, l2_deposit_block_num + 1)
+        # 339179 is a random checkpoint index.
+        # Chosen to not collide with other checkpoint tests in the same prover env.
+        task_ids = prover_client_rpc.dev_strata_proveCheckpointRaw(339179, l1_range, l2_range)
 
         self.debug(f"got task ids: {task_ids}")
         task_id = task_ids[0]

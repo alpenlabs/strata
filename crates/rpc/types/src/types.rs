@@ -267,6 +267,7 @@ pub struct RpcCheckpointInfo {
     /// L2 height the checkpoint covers
     pub l2_range: (u64, u64),
     /// L2 block that this checkpoint covers
+    /// TODO: likely unused and should be removed.
     pub l2_blockid: L2BlockId,
     /// Info on txn where checkpoint is committed on chain
     pub commitment: Option<RpcCheckpointCommitmentInfo>,
