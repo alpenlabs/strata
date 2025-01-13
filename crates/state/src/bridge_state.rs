@@ -6,9 +6,10 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
+    bitcoin_bosd::Descriptor,
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
-    l1::{self, BitcoinAmount, OutputRef, XOnlyPk},
+    l1::{self, BitcoinAmount, OutputRef},
     operator::{OperatorKeyProvider, OperatorPubkeys},
 };
 
@@ -469,19 +470,19 @@ impl DispatchCommand {
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct WithdrawOutput {
-    /// Taproot Schnorr XOnlyPubkey with the merkle root information.
-    dest_addr: XOnlyPk,
+    /// BOSD [`Descriptor`].
+    destination: Descriptor,
 
     /// Amount in sats.
     amt: BitcoinAmount,
 }
 
 impl WithdrawOutput {
-    pub fn new(dest_addr: XOnlyPk, amt: BitcoinAmount) -> Self {
-        Self { dest_addr, amt }
+    pub fn new(destination: Descriptor, amt: BitcoinAmount) -> Self {
+        Self { destination, amt }
     }
 
-    pub fn dest_addr(&self) -> &XOnlyPk {
-        &self.dest_addr
+    pub fn destination(&self) -> &Descriptor {
+        &self.destination
     }
 }
