@@ -114,8 +114,27 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
         Ok((cs, chs))
     }
 
-    async fn get_last_checkpoint_chainstate(&self) -> Option<Arc<Chainstate>> {
-        self.status_channel.chain_state().map(Arc::new)
+    async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
+        let client_state = self.status_channel.client_state();
+
+        let Some(last_checkpoint) = client_state.l1_view().last_finalized_checkpoint() else {
+            return Ok(None);
+        };
+
+        // in current implementation, chainstate idx == l2 block idx
+        let (_, chainstate_idx) = last_checkpoint.batch_info.l2_range;
+
+        let db = self.database.clone();
+
+        wait_blocking("load_checkpoint_chainstate", move || {
+            let chainstate_db = db.chain_state_db();
+            let chainstate = chainstate_db
+                .get_toplevel_state(chainstate_idx)?
+                .ok_or(Error::MissingChainstate(chainstate_idx))?;
+
+            Ok(Some(Arc::new(chainstate)))
+        })
+        .await
     }
 }
 
@@ -495,7 +514,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // withdrawal duties should only be generated from finalized checkpoint states
         let withdrawal_duties = self
             .get_last_checkpoint_chainstate()
-            .await
+            .await?
             .map(|chainstate| {
                 extract_withdrawal_infos(chainstate.deposits_table())
                     .map(BridgeDuty::from)
