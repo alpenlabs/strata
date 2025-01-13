@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
 
       - name: Cleanup space
-        uses: ./.github/actions/cleanup
+        uses: ./.github/actions/cleanup # zizmor: ignore[unpinned-uses]
 
       - uses: dtolnay/rust-toolchain@nightly
       - name: Install latest nextest release
