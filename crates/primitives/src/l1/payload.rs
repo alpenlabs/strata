@@ -171,6 +171,7 @@ pub enum L1PayloadType {
 ///
 /// These are never stored on-chain.
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+// TODO: rename this to L1PayloadIntent and remove the dest field
 pub struct PayloadIntent {
     /// The destination for this payload.
     dest: PayloadDest,

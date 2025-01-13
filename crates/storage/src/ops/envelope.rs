@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use strata_db::{
     traits::{L1PayloadDatabase, SequencerDatabase},
-    types::PayloadEntry,
+    types::{IntentEntry, PayloadEntry},
     DbResult,
 };
 use strata_primitives::buf::Buf32;
@@ -36,6 +36,9 @@ inst_ops! {
         get_payload_entry_id(idx: u64) => Option<Buf32>;
         get_next_payload_idx() => u64;
         put_payload_entry(id: Buf32, entry: PayloadEntry) => ();
+        // Intent related methods
+        get_intent_by_id(id: Buf32) => Option<IntentEntry>;
+        put_intent_entry(id: Buf32, entry: IntentEntry) => ();
     }
 }
 
@@ -45,6 +48,14 @@ fn get_payload_entry<D: SequencerDatabase>(
 ) -> DbResult<Option<PayloadEntry>> {
     let payload_db = ctx.db.payload_db();
     payload_db.get_payload_by_id(id)
+}
+
+fn get_intent_by_id<D: SequencerDatabase>(
+    ctx: &Context<D>,
+    id: Buf32,
+) -> DbResult<Option<IntentEntry>> {
+    let payload_db = ctx.db.payload_db();
+    payload_db.get_intent_by_id(id)
 }
 
 fn get_payload_entry_id<D: SequencerDatabase>(
@@ -83,4 +94,13 @@ fn put_payload_entry<D: SequencerDatabase>(
 ) -> DbResult<()> {
     let payload_db = ctx.db.payload_db();
     payload_db.put_payload_entry(id, entry)
+}
+
+fn put_intent_entry<D: SequencerDatabase>(
+    ctx: &Context<D>,
+    id: Buf32,
+    entry: IntentEntry,
+) -> DbResult<()> {
+    let payload_db = ctx.db.payload_db();
+    payload_db.put_intent_entry(id, entry)
 }
