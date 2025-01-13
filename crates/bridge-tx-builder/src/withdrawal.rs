@@ -3,8 +3,9 @@
 use bitcoin::{Amount, FeeRate, OutPoint, Psbt, Transaction, TxOut};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
+    bitcoin_bosd::Descriptor,
     bridge::{BitcoinBlockHeight, OperatorIdx, TxSigningData},
-    l1::{BitcoinPsbt, TaprootSpendPath, XOnlyPk},
+    l1::{BitcoinPsbt, TaprootSpendPath},
 };
 
 use crate::{
@@ -21,15 +22,17 @@ use crate::{
 ///
 /// It has all the information required to create a transaction for fulfilling a user's withdrawal
 /// request and pay operator fees.
+// TODO: This can be multiple withdrawal destinations by adding
+//       that `user_destination` is `IntoIterator<Descriptor>`
+//       and the user can send a single BOSD or multiple BOSDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CooperativeWithdrawalInfo {
     /// The [`OutPoint`] of the UTXO in the Bridge Address that is to be used to service the
     /// withdrawal request.
     deposit_outpoint: OutPoint,
 
-    /// The x-only public key of the user used to create the taproot address that the user can
-    /// spend from.
-    user_pk: XOnlyPk,
+    /// The BOSD [`Descriptor`] supplied by the user.
+    user_destination: Descriptor,
 
     /// The index of the operator that is assigned the withdrawal.
     assigned_operator_idx: OperatorIdx,
@@ -69,13 +72,13 @@ impl CooperativeWithdrawalInfo {
     /// Create a new withdrawal request.
     pub fn new(
         deposit_outpoint: OutPoint,
-        user_pk: XOnlyPk,
+        user_destination: Descriptor,
         assigned_operator_idx: OperatorIdx,
         exec_deadline: BitcoinBlockHeight,
     ) -> Self {
         Self {
             deposit_outpoint,
-            user_pk,
+            user_destination,
             assigned_operator_idx,
             exec_deadline,
         }
@@ -91,9 +94,9 @@ impl CooperativeWithdrawalInfo {
         self.assigned_operator_idx
     }
 
-    /// Get the recipient's [`XOnlyPk`].
-    pub fn user_pk(&self) -> XOnlyPk {
-        self.user_pk
+    /// Get the recipient's BOSD [`Descriptor`].
+    pub fn user_destination(&self) -> &Descriptor {
+        &self.user_destination
     }
 
     /// Get the execution deadline for the request.
@@ -152,11 +155,7 @@ impl CooperativeWithdrawalInfo {
         let anyone_can_spend_out = anyone_can_spend_txout();
 
         // create the output that pays to the user
-        let user_addr = self
-            .user_pk
-            .to_p2tr_address(*build_context.network())
-            .map_err(CooperativeWithdrawalError::InvalidUserPk)?;
-        let user_script_pubkey = user_addr.script_pubkey();
+        let user_script_pubkey = self.user_destination.to_script();
 
         // This fee pays for the entire transaction.
         // In the current configuration of `10` for `MIN_RELAY_FEE`, the total transaction fee
@@ -192,6 +191,7 @@ mod tests {
         Amount, Network, OutPoint, Txid,
     };
     use strata_primitives::{
+        bitcoin_bosd::Descriptor,
         bridge::OperatorIdx,
         buf::Buf32,
         errors::ParseError,
@@ -223,10 +223,16 @@ mod tests {
 
         let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
 
+        let user_descriptor: Descriptor = user_pk.into();
+
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
-        let withdrawal_info =
-            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx, 0);
+        let withdrawal_info = CooperativeWithdrawalInfo::new(
+            deposit_outpoint,
+            user_descriptor,
+            assigned_operator_idx,
+            0,
+        );
 
         let build_context = TxBuildContext::new(
             Network::Regtest,
@@ -280,11 +286,12 @@ mod tests {
 
         // Create an invalid XOnlyPublicKey by using an all-zero buffer
         let invalid_user_pk = XOnlyPk::new(Buf32::zero());
+        let invalid_user_descriptor: Descriptor = invalid_user_pk.into();
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info = CooperativeWithdrawalInfo::new(
             deposit_outpoint,
-            invalid_user_pk,
+            invalid_user_descriptor,
             assigned_operator_idx,
             0,
         );
@@ -320,10 +327,15 @@ mod tests {
         );
 
         let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
+        let user_descriptor: Descriptor = user_pk.into();
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
-        let withdrawal_info =
-            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx, 0);
+        let withdrawal_info = CooperativeWithdrawalInfo::new(
+            deposit_outpoint,
+            user_descriptor,
+            assigned_operator_idx,
+            0,
+        );
 
         let build_context =
             TxBuildContext::new(Network::Regtest, pubkey_table, assigned_operator_idx);
@@ -359,10 +371,15 @@ mod tests {
         );
 
         let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
+        let user_descriptor: Descriptor = user_pk.into();
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
-        let withdrawal_info =
-            CooperativeWithdrawalInfo::new(deposit_outpoint, user_pk, assigned_operator_idx, 0);
+        let withdrawal_info = CooperativeWithdrawalInfo::new(
+            deposit_outpoint,
+            user_descriptor,
+            assigned_operator_idx,
+            0,
+        );
 
         let build_context =
             TxBuildContext::new(Network::Regtest, pubkey_table, assigned_operator_idx);
