@@ -63,7 +63,7 @@ jobs:
           persist-credentials: false
 
       - name: Cleanup Space
-        uses: ./.github/actions/cleanup@main
+        uses: ./.github/actions/cleanup # zizmor: ignore[unpinned-uses]
 
       - name: Install bitcoind
         env:

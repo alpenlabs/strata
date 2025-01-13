@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
 
       - name: Cleanup space
-        uses: ./.github/actions/cleanup@main
+        uses: ./.github/actions/cleanup # zizmor: ignore[unpinned-uses]
 
       - uses: dtolnay/rust-toolchain@nightly
         with:
@@ -71,7 +71,7 @@ jobs:
           persist-credentials: false
 
       - name: Cleanup space
-        uses: ./.github/actions/cleanup@main
+        uses: ./.github/actions/cleanup # zizmor: ignore[unpinned-uses]
 
       - uses: dtolnay/rust-toolchain@nightly
         with:
