@@ -36,7 +36,7 @@ use revm::{
     primitives::{SpecId, TransactTo, TxEnv},
     Database, DatabaseCommit, Evm,
 };
-use strata_reth_evm::set_evm_handles;
+use strata_reth_evm::{constants::BRIDGEOUT_ADDRESS, set_evm_handles};
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},
@@ -318,9 +318,13 @@ impl EvmProcessor<InMemoryDB> {
                 storage_root,
                 code_hash: account.info.code_hash,
             };
-            state_trie
-                .insert_rlp(&state_trie_index, state_account)
-                .unwrap();
+
+            // Skip adding BridgeOut precompile (stateless contract) to the state tree.
+            if *address != BRIDGEOUT_ADDRESS {
+                state_trie
+                    .insert_rlp(&state_trie_index, state_account)
+                    .unwrap();
+            }
         }
 
         // Update state trie root in header.
