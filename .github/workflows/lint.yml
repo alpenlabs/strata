@@ -36,7 +36,7 @@ jobs:
           persist-credentials: false
 
       - name: Cleanup space
-        uses: ./.github/actions/cleanup
+        uses: ./.github/actions/cleanup@main
 
       - uses: dtolnay/rust-toolchain@nightly
         with:

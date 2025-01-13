@@ -63,7 +63,7 @@ jobs:
           persist-credentials: false
 
       - name: Cleanup Space
-        uses: ./.github/actions/cleanup
+        uses: ./.github/actions/cleanup@main
 
       - name: Install bitcoind
         env:
