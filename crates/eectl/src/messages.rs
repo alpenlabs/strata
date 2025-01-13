@@ -1,4 +1,4 @@
-use strata_primitives::prelude::*;
+use strata_primitives::{bitcoin_bosd::Descriptor, prelude::*};
 use strata_state::{
     block::L2BlockBundle,
     exec_update::{ExecUpdate, Op},
@@ -64,11 +64,11 @@ impl ExecPayloadData {
 /// L1 withdrawal data.
 #[derive(Clone, Debug)]
 pub struct WithdrawData {
-    /// Amount in L1 native asset.  For Bitcoin this is sats.
+    /// Amount in L1 native asset. For Bitcoin this is sats.
     _amt: u64,
 
-    /// Schnorr pubkey for the taproot output we're going to generate.
-    _dest_addr: Buf64,
+    /// BOSD [`Descriptor`] as withdrawal destination.
+    _destination: Descriptor,
 }
 
 /// Environment state from the CL that we pass into the EL for the payload we're

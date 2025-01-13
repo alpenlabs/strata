@@ -2,10 +2,7 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{
-    buf::Buf32,
-    l1::{BitcoinAmount, XOnlyPk},
-};
+use strata_primitives::{bitcoin_bosd::Descriptor, l1::BitcoinAmount};
 
 // TODO make this not hardcoded!
 pub const WITHDRAWAL_DENOMINATION: BitcoinAmount = BitcoinAmount::from_int_btc(10);
@@ -16,25 +13,25 @@ pub struct WithdrawalIntent {
     /// Quantity of L1 asset, for Bitcoin this is sats.
     amt: BitcoinAmount,
 
-    /// Destination public key for the withdrawal
-    pub dest_pk: XOnlyPk,
+    /// Destination [`Descriptor`] for the withdrawal
+    pub destination: Descriptor,
 }
 
 impl WithdrawalIntent {
-    pub fn new(amt: BitcoinAmount, dest_pk: XOnlyPk) -> Self {
-        Self { amt, dest_pk }
+    pub fn new(amt: BitcoinAmount, destination: Descriptor) -> Self {
+        Self { amt, destination }
     }
 
-    pub fn as_parts(&self) -> (u64, &Buf32) {
-        (self.amt.to_sat(), self.dest_pk.inner())
+    pub fn as_parts(&self) -> (u64, &Descriptor) {
+        (self.amt.to_sat(), &self.destination)
     }
 
     pub fn amt(&self) -> &BitcoinAmount {
         &self.amt
     }
 
-    pub fn dest_pk(&self) -> &XOnlyPk {
-        &self.dest_pk
+    pub fn destination(&self) -> &Descriptor {
+        &self.destination
     }
 }
 
