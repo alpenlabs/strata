@@ -26,6 +26,7 @@ class ProverClientTest(testenv.StrataTester):
 
         # Wait for the Prover Manager setup
         time.sleep(5)
+        time.sleep(60)
 
         # Dispatch the prover task
         start_block_id = cl_slot_to_block_id(seqrpc, CL_PROVER_PARAMS["start_block"])

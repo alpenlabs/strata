@@ -36,6 +36,7 @@ impl ProvingTaskStatus {
             // Specific allowed state transitions
             (ProvingTaskStatus::Pending, ProvingTaskStatus::ProvingInProgress) => true,
             (ProvingTaskStatus::ProvingInProgress, &ProvingTaskStatus::Completed) => true,
+            (ProvingTaskStatus::ProvingInProgress, &ProvingTaskStatus::Pending) => true,
             (ProvingTaskStatus::WaitingForDependencies, &ProvingTaskStatus::Pending) => true,
 
             // All other transitions are invalid

@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use strata_primitives::proof::{ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
+use strata_zkvm::ZkVmError;
 use tokio::{spawn, sync::Mutex, time::sleep};
 use tracing::{error, info};
 
@@ -95,11 +96,23 @@ pub async fn make_proof(
     {
         let mut task_tracker = task_tracker.lock().await;
         match res {
-            Ok(_) => task_tracker.update_status(task, ProvingTaskStatus::Completed)?,
+            Ok(_) => {
+                println!("AbishekB completed for {:?}", task);
+                task_tracker.update_status(task, ProvingTaskStatus::Completed)?
+            }
             // TODO: handle different errors for different failure condition
             Err(e) => {
                 error!(?task, ?e, "proving task failed");
-                task_tracker.update_status(task, ProvingTaskStatus::Failed)?
+                if let ProvingTaskError::ZkVmError(ZkVmError::ProofGenerationError(err_msg)) = e {
+                    if err_msg.contains("invalid nonce for sender") {
+                        println!("AbishekB got error for {:?}", task);
+                        task_tracker.update_status(task, ProvingTaskStatus::Pending)?
+                    } else {
+                        task_tracker.update_status(task, ProvingTaskStatus::Failed)?
+                    }
+                } else {
+                    task_tracker.update_status(task, ProvingTaskStatus::Failed)?
+                }
             }
         }
     }

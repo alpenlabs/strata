@@ -13,6 +13,7 @@ fi
 if [ ! -z $PROVER_TEST ]; then
     echo "Running on sp1-mock mode"
     cargo build --release -F sp1
+    # cargo build --release -F sp1-mock
 	export PATH=$(realpath ../target/release/):$PATH
 else
     echo "Running on seq mode"

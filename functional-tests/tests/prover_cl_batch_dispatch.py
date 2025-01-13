@@ -15,6 +15,38 @@ CL_AGG_PARAMS = [
         "start_block": 3,
         "end_block": 4,
     },
+    {
+        "start_block": 5,
+        "end_block": 6,
+    },
+    {
+        "start_block": 7,
+        "end_block": 8,
+    },
+    {
+        "start_block": 9,
+        "end_block": 10,
+    },
+    {
+        "start_block": 11,
+        "end_block": 12,
+    },
+    {
+        "start_block": 13,
+        "end_block": 14,
+    },
+    {
+        "start_block": 15,
+        "end_block": 16,
+    },
+    {
+        "start_block": 17,
+        "end_block": 18,
+    },
+    {
+        "start_block": 19,
+        "end_block": 20,
+    },
 ]
 
 
@@ -31,7 +63,7 @@ class ProverClientTest(testenv.StrataTester):
         seqrpc = seq.create_rpc()
 
         # Wait for the Prover Manager setup
-        time.sleep(5)
+        time.sleep(20)
 
         batches = []
         for batch_info in CL_AGG_PARAMS:
