@@ -135,8 +135,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
 
     let current_block_txns = current_block
         .body
-        .blob_transactions()
-        .into_iter()
+        .transactions()
         .cloned()
         .map(TransactionSignedNoHash::from)
         .collect::<Vec<TransactionSignedNoHash>>();
