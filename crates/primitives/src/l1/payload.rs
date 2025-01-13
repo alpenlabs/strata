@@ -28,7 +28,7 @@ use crate::{buf::Buf32, hash};
 )]
 #[borsh(use_discriminant = true)]
 #[repr(u8)]
-pub enum PayloadDest {
+pub enum BlobDest {
     /// If we expect the DA to be on the L1 chain that we settle to. This is
     /// always the strongest DA layer we have access to.
     L1 = 0,
@@ -36,7 +36,7 @@ pub enum PayloadDest {
 
 /// Manual `Arbitrary` impl so that we always generate L1 DA if we add future
 /// ones that would work in totally different ways.
-impl<'a> Arbitrary<'a> for PayloadDest {
+impl<'a> Arbitrary<'a> for BlobDest {
     fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::L1)
     }
@@ -57,18 +57,18 @@ impl<'a> Arbitrary<'a> for PayloadDest {
     Serialize,
     Deserialize,
 )]
-pub struct PayloadSpec {
+pub struct BlobSpec {
     /// Target settlement layer we're expecting the DA on.
-    dest: PayloadDest,
+    dest: BlobDest,
 
     /// Commitment to the payload (probably just a hash or a
     /// merkle root) that we expect to see committed to DA.
     commitment: Buf32,
 }
 
-impl PayloadSpec {
+impl BlobSpec {
     /// The target we expect the DA payload to be stored on.
-    pub fn dest(&self) -> PayloadDest {
+    pub fn dest(&self) -> BlobDest {
         self.dest
     }
 
@@ -77,7 +77,7 @@ impl PayloadSpec {
         &self.commitment
     }
 
-    fn new(dest: PayloadDest, commitment: Buf32) -> Self {
+    fn new(dest: BlobDest, commitment: Buf32) -> Self {
         Self { dest, commitment }
     }
 }
@@ -131,7 +131,7 @@ pub enum L1PayloadType {
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct PayloadIntent {
     /// The destination for this payload.
-    dest: PayloadDest,
+    dest: BlobDest,
 
     /// Commitment to the payload.
     commitment: Buf32,
@@ -141,7 +141,7 @@ pub struct PayloadIntent {
 }
 
 impl PayloadIntent {
-    pub fn new(dest: PayloadDest, commitment: Buf32, payload: L1Payload) -> Self {
+    pub fn new(dest: BlobDest, commitment: Buf32, payload: L1Payload) -> Self {
         Self {
             dest,
             commitment,
@@ -150,7 +150,7 @@ impl PayloadIntent {
     }
 
     /// The target we expect the DA payload to be stored on.
-    pub fn dest(&self) -> PayloadDest {
+    pub fn dest(&self) -> BlobDest {
         self.dest
     }
 
@@ -168,7 +168,7 @@ impl PayloadIntent {
 
     /// Generates the spec from the relevant parts of the payload intent that
     /// uniquely refers to the payload data.
-    pub fn to_spec(&self) -> PayloadSpec {
-        PayloadSpec::new(self.dest, self.commitment)
+    pub fn to_spec(&self) -> BlobSpec {
+        BlobSpec::new(self.dest, self.commitment)
     }
 }

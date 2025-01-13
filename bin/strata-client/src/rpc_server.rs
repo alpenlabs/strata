@@ -24,7 +24,7 @@ use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
     hash,
-    l1::payload::{L1Payload, PayloadDest, PayloadIntent},
+    l1::payload::{BlobDest, L1Payload, PayloadIntent},
     params::Params,
 };
 use strata_rpc_api::{
@@ -736,7 +736,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
         let commitment = hash::raw(&blob.0);
         let payload = L1Payload::new_da(blob.0);
-        let blobintent = PayloadIntent::new(PayloadDest::L1, commitment, payload);
+        let blobintent = PayloadIntent::new(BlobDest::L1, commitment, payload);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
         if let Err(e) = self.envelope_handle.submit_intent_async(blobintent).await {

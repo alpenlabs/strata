@@ -2,7 +2,7 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, l1::payload::PayloadSpec};
+use strata_primitives::{buf::Buf32, l1::payload::BlobSpec};
 
 use crate::{bridge_ops, exec_update, forced_inclusion, state_queue::StateQueue};
 
@@ -19,7 +19,7 @@ pub struct ExecEnvState {
     /// seen on the corresponding DA layer yet.
     ///
     /// This must always be sorted.
-    waiting_da_blobs: Vec<PayloadSpec>,
+    waiting_da_blobs: Vec<BlobSpec>,
 
     /// Deposits that have been queued by something but haven't been accepted in
     /// an update yet.  The sequencer should be processing these as soon as

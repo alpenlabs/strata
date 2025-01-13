@@ -7,7 +7,7 @@ use strata_db::{
     types::{L1TxStatus, PayloadEntry, PayloadL1Status},
 };
 use strata_primitives::{
-    l1::payload::{PayloadDest, PayloadIntent},
+    l1::payload::{BlobDest, PayloadIntent},
     params::Params,
 };
 use strata_status::StatusChannel;
@@ -35,7 +35,7 @@ impl EnvelopeHandle {
     }
 
     pub fn submit_intent(&self, intent: PayloadIntent) -> anyhow::Result<()> {
-        if intent.dest() != PayloadDest::L1 {
+        if intent.dest() != BlobDest::L1 {
             warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
             return Ok(());
         }
@@ -57,7 +57,7 @@ impl EnvelopeHandle {
     }
 
     pub async fn submit_intent_async(&self, intent: PayloadIntent) -> anyhow::Result<()> {
-        if intent.dest() != PayloadDest::L1 {
+        if intent.dest() != BlobDest::L1 {
             warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
             return Ok(());
         }
