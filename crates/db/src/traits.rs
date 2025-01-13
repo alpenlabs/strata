@@ -19,7 +19,7 @@ use strata_zkvm::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{CheckpointEntry, L1TxEntry, PayloadEntry},
+    types::{CheckpointEntry, IntentEntry, L1TxEntry, PayloadEntry},
     DbResult,
 };
 
@@ -250,6 +250,7 @@ pub trait CheckpointDatabase {
 /// A trait encapsulating provider and store traits to interact with the underlying database for
 /// [`PayloadEntry`]
 pub trait SequencerDatabase {
+    // TODO: remove this, and possibly separate out/rename to writer db
     type L1PayloadDB: L1PayloadDatabase;
 
     fn payload_db(&self) -> &Arc<Self::L1PayloadDB>;
@@ -269,6 +270,12 @@ pub trait L1PayloadDatabase {
 
     /// Get the last payload index
     fn get_last_payload_idx(&self) -> DbResult<Option<u64>>;
+
+    /// Store the [`IntentEntry`].
+    fn put_intent_entry(&self, payloadid: Buf32, payloadentry: IntentEntry) -> DbResult<()>;
+
+    /// Get a [`IntentEntry`] by its hash
+    fn get_intent_by_id(&self, id: Buf32) -> DbResult<Option<IntentEntry>>;
 }
 
 pub trait ProofDatabase {

@@ -7,9 +7,45 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, l1::payload::L1Payload};
+use strata_primitives::{
+    buf::Buf32,
+    l1::payload::{L1Payload, PayloadIntent},
+};
 use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
 use strata_zkvm::ProofReceipt;
+
+/// Represents an intent to publish to some DA, which will be bundled for efficiency.
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct IntentEntry {
+    pub intent: PayloadIntent,
+    pub status: IntentStatus,
+}
+
+impl IntentEntry {
+    pub fn new_unbundled(intent: PayloadIntent) -> Self {
+        Self {
+            intent,
+            status: IntentStatus::Unbundled,
+        }
+    }
+
+    pub fn new_bundled(intent: PayloadIntent, bundle_idx: u64) -> Self {
+        Self {
+            intent,
+            status: IntentStatus::Bundled(bundle_idx),
+        }
+    }
+}
+
+/// Status of Intent indicating various stages of being bundled to L1 transaction.
+/// Unbundled Intents are collected and bundled to create [`PayloadEntry].
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum IntentStatus {
+    // It is not bundled yet, and thus will be collected and processed by bundler.
+    Unbundled,
+    // It has been bundled to [`PayloadEntry`] with given bundle idx.
+    Bundled(u64),
+}
 
 /// Represents data for a payload we're still planning to post to L1.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]

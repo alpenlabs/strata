@@ -4,12 +4,12 @@ use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
     traits::{L1PayloadDatabase, SequencerDatabase},
-    types::PayloadEntry,
+    types::{IntentEntry, PayloadEntry},
     DbResult,
 };
 use strata_primitives::buf::Buf32;
 
-use super::schemas::{SeqBlobIdSchema, SeqBlobSchema};
+use super::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqIntentSchema};
 use crate::{sequence::get_next_id, DbOpsConfig};
 
 pub struct RBSeqBlobDb {
@@ -58,6 +58,23 @@ impl L1PayloadDatabase for RBSeqBlobDb {
 
     fn get_payload_id(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
         Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
+    }
+
+    fn put_intent_entry(&self, intent_id: Buf32, intent_entry: IntentEntry) -> DbResult<()> {
+        self.db
+            .with_optimistic_txn(
+                rockbound::TransactionRetry::Count(self.ops.retry_count),
+                |tx| -> Result<(), DbError> {
+                    tx.put::<SeqIntentSchema>(&intent_id, &intent_entry)?;
+
+                    Ok(())
+                },
+            )
+            .map_err(|e| DbError::TransactionError(e.to_string()))
+    }
+
+    fn get_intent_by_id(&self, id: Buf32) -> DbResult<Option<IntentEntry>> {
+        Ok(self.db.get::<SeqIntentSchema>(&id)?)
     }
 }
 
@@ -123,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update_blob_() {
+    fn test_update_blob() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBSeqBlobDb::new(db, db_ops);
 
@@ -182,5 +199,35 @@ mod tests {
 
         let last_blob_idx = seq_db.get_last_payload_idx().unwrap();
         assert_eq!(last_blob_idx, Some(1));
+    }
+
+    // Intent related tests
+
+    #[test]
+    fn test_put_intent_new_entry() {
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = RBSeqBlobDb::new(db, db_ops);
+
+        let intent: IntentEntry = ArbitraryGenerator::new().generate();
+        let intent_id: Buf32 = [0; 32].into();
+
+        seq_db.put_intent_entry(intent_id, intent.clone()).unwrap();
+
+        let stored_intent = seq_db.get_intent_by_id(intent_id).unwrap();
+        assert_eq!(stored_intent, Some(intent));
+    }
+
+    #[test]
+    fn test_put_intent_entry() {
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = RBSeqBlobDb::new(db, db_ops);
+        let intent: IntentEntry = ArbitraryGenerator::new().generate();
+        let intent_id: Buf32 = [0; 32].into();
+
+        let result = seq_db.put_intent_entry(intent_id, intent.clone());
+        assert!(result.is_ok());
+
+        let retrieved = seq_db.get_intent_by_id(intent_id).unwrap().unwrap();
+        assert_eq!(retrieved, intent);
     }
 }
