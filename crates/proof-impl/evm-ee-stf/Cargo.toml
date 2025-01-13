@@ -31,7 +31,7 @@ revm-primitives.workspace = true
 rlp = "0.5.2"
 serde.workspace = true
 serde_with.workspace = true
-thiserror = "1.0"
+thiserror.workspace = true
 
 [dev-dependencies]
 bincode.workspace = true
