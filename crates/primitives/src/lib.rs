@@ -22,3 +22,5 @@ pub mod proof;
 pub mod relay;
 pub mod sorted_vec;
 pub mod utils;
+
+pub use bitcoin_bosd;
