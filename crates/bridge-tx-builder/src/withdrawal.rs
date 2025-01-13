@@ -191,7 +191,6 @@ mod tests {
         Amount, Network, OutPoint, Txid,
     };
     use strata_primitives::{
-        bitcoin_bosd::Descriptor,
         bridge::OperatorIdx,
         buf::Buf32,
         errors::ParseError,
@@ -223,7 +222,7 @@ mod tests {
 
         let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
 
-        let user_descriptor: Descriptor = user_pk.into();
+        let user_descriptor = user_pk.to_descriptor();
 
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
@@ -286,7 +285,7 @@ mod tests {
 
         // Create an invalid XOnlyPublicKey by using an all-zero buffer
         let invalid_user_pk = XOnlyPk::new(Buf32::zero());
-        let invalid_user_descriptor: Descriptor = invalid_user_pk.into();
+        let invalid_user_descriptor = invalid_user_pk.to_descriptor();
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info = CooperativeWithdrawalInfo::new(
@@ -327,7 +326,7 @@ mod tests {
         );
 
         let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
-        let user_descriptor: Descriptor = user_pk.into();
+        let user_descriptor = user_pk.to_descriptor();
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info = CooperativeWithdrawalInfo::new(
@@ -371,7 +370,7 @@ mod tests {
         );
 
         let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
-        let user_descriptor: Descriptor = user_pk.into();
+        let user_descriptor = user_pk.to_descriptor();
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info = CooperativeWithdrawalInfo::new(
