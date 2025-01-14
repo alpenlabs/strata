@@ -4,6 +4,7 @@ use std::{fmt::Debug, time::Duration};
 
 use bitcoin::{key::Keypair, Transaction, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
+use deadpool::managed::{Object, Pool};
 use jsonrpsee::tokio::time::sleep;
 use strata_bridge_sig_manager::manager::SignatureManager;
 use strata_bridge_tx_builder::{context::BuildContext, TxKind};
@@ -19,14 +20,17 @@ use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::HexBytes;
 use tracing::{debug, info, warn};
 
-use crate::errors::{ExecError, ExecResult};
+use crate::{
+    errors::{ExecError, ExecResult},
+    ws_client::WsClientManager,
+};
+
+/// WebSocket client pool
+pub type WsClientPool = Pool<WsClientManager>;
 
 /// The execution context for handling bridge-related signing activities.
 #[derive(Clone)]
-pub struct ExecHandler<
-    L2Client: StrataApiClient + Sync + Send,
-    TxBuildContext: BuildContext + Sync + Send,
-> {
+pub struct ExecHandler<TxBuildContext: BuildContext + Sync + Send> {
     /// The build context required to create transaction data needed for signing.
     pub tx_build_ctx: TxBuildContext,
 
@@ -34,7 +38,7 @@ pub struct ExecHandler<
     pub sig_manager: SignatureManager,
 
     /// The RPC client to connect to the RPC full node.
-    pub l2_rpc_client: L2Client,
+    pub l2_rpc_client_pool: WsClientPool,
 
     /// The keypair for this client used to sign bridge-related messages.
     pub keypair: Keypair,
@@ -46,9 +50,8 @@ pub struct ExecHandler<
     pub msg_polling_interval: Duration,
 }
 
-impl<L2Client, TxBuildContext> ExecHandler<L2Client, TxBuildContext>
+impl<TxBuildContext> ExecHandler<TxBuildContext>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
 {
     /// Construct and sign a transaction based on the provided `TxInfo`.
@@ -122,9 +125,9 @@ where
         let raw_message = borsh::to_vec::<BridgeMessage>(&signed_message)
             .expect("should be able to borsh serialize raw message");
 
-        self.l2_rpc_client
-            .submit_bridge_msg(raw_message.into())
-            .await?;
+        let l2_rpc_client = self.get_ready_rpc_client().await?;
+
+        l2_rpc_client.submit_bridge_msg(raw_message.into()).await?;
 
         info!(%txid, ?scope, ?payload, "broadcasted message");
         Ok(signed_message)
@@ -286,9 +289,11 @@ where
         Payload: BorshDeserialize + Debug,
     {
         let raw_scope: HexBytes = scope.into();
-        info!(scope=?scope, "getting messages from the L2 Client");
-        let received_payloads = self
-            .l2_rpc_client
+        info!(?scope, "getting messages from the L2 Client");
+
+        let l2_rpc_client = self.get_ready_rpc_client().await?;
+
+        let received_payloads = l2_rpc_client
             .get_msgs_by_scope(raw_scope)
             .await?
             .into_iter()
@@ -316,11 +321,18 @@ where
 
         Ok(received_payloads)
     }
+
+    /// Retrieves a ready-to-use RPC client from the client pool.
+    pub async fn get_ready_rpc_client(&self) -> Result<Object<WsClientManager>, ExecError> {
+        self.l2_rpc_client_pool
+            .get()
+            .await
+            .map_err(|_| ExecError::WsPool)
+    }
 }
 
-impl<L2Client, TxBuildContext> Debug for ExecHandler<L2Client, TxBuildContext>
+impl<TxBuildContext> Debug for ExecHandler<TxBuildContext>
 where
-    L2Client: StrataApiClient + Sync + Send,
     TxBuildContext: BuildContext + Sync + Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

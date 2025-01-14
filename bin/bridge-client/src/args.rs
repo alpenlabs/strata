@@ -99,6 +99,13 @@ pub(crate) struct Cli {
         description = "duty timeout duration in seconds (default: 600)"
     )]
     pub duty_timeout_duration: Option<u64>,
+
+    /// Max retries for when RPC server fails during duty polling
+    #[argh(
+        option,
+        description = "max retries for when RPC server fails during duty polling"
+    )]
+    pub max_rpc_retry_count: Option<u16>,
 }
 
 /// Represents the operational mode of the client.

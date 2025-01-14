@@ -6,8 +6,11 @@ use bitcoin::{
     key::{Keypair, Parity},
     secp256k1::{PublicKey, SecretKey, XOnlyPublicKey, SECP256K1},
 };
-use jsonrpsee::{core::client::async_client::Client as L2RpcClient, ws_client::WsClientBuilder};
-use strata_bridge_exec::handler::ExecHandler;
+use deadpool::managed;
+use strata_bridge_exec::{
+    handler::ExecHandler,
+    ws_client::{WsClientConfig, WsClientManager},
+};
 use strata_bridge_sig_manager::prelude::SignatureManager;
 use strata_bridge_tx_builder::prelude::TxBuildContext;
 use strata_btcio::rpc::{traits::Reader, BitcoinClient};
@@ -28,7 +31,8 @@ use super::{constants::DB_THREAD_COUNT, task_manager::TaskManager};
 use crate::{
     args::Cli,
     constants::{
-        DEFAULT_DUTY_TIMEOUT_SEC, DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, ROCKSDB_RETRY_COUNT,
+        DEFAULT_DUTY_TIMEOUT_SEC, DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, MAX_RPC_RETRY_COUNT,
+        ROCKSDB_RETRY_COUNT,
     },
     db::open_rocksdb_database,
     rpc_server::{self, BridgeRpc},
@@ -64,10 +68,20 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         BitcoinClient::new(args.btc_url, args.btc_user, args.btc_pass)
             .expect("error creating the bitcoin client"),
     );
-    let l2_rpc_client: L2RpcClient = WsClientBuilder::default()
-        .build(args.rollup_url)
+
+    let config = WsClientConfig {
+        url: args.rollup_url.clone(),
+    };
+    let manager = WsClientManager { config };
+    let l2_rpc_client_pool = managed::Pool::<WsClientManager>::builder(manager)
+        .max_size(5)
+        .build()
+        .unwrap();
+
+    let l2_rpc_client = l2_rpc_client_pool
+        .get()
         .await
-        .expect("failed to connect to the rollup RPC server");
+        .expect("cannot get RPC client from pool");
 
     // Get the keypair after deriving the wallet xpriv.
     let operator_keys = resolve_xpriv(args.master_xpriv, args.master_xpriv_path)?;
@@ -132,7 +146,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let exec_handler = ExecHandler {
         tx_build_ctx: tx_context,
         sig_manager,
-        l2_rpc_client,
+        l2_rpc_client_pool,
         keypair,
         own_index,
         msg_polling_interval,
@@ -155,10 +169,16 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
             .unwrap_or(DEFAULT_DUTY_TIMEOUT_SEC),
     );
 
+    let max_retry_count = args.max_rpc_retry_count.unwrap_or(MAX_RPC_RETRY_COUNT);
+
     // TODO: wrap these in `strata-tasks`
     let duty_task = tokio::spawn(async move {
         if let Err(e) = task_manager
-            .start(duty_polling_interval, duty_timeout_duration)
+            .start(
+                duty_polling_interval,
+                duty_timeout_duration,
+                max_retry_count,
+            )
             .await
         {
             error!(error = %e, "could not start task manager");
