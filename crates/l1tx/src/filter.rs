@@ -117,8 +117,7 @@ mod test {
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
 
     /// Helper function to create filter config
-    fn create_tx_filter_config() -> TxFilterConfig {
-        let params = gen_params();
+    fn create_tx_filter_config(params: &Params) -> TxFilterConfig {
         TxFilterConfig::derive_from(params.rollup()).expect("can't get filter config")
     }
 
@@ -197,9 +196,9 @@ mod test {
     #[test]
     fn test_filter_relevant_txs_with_rollup_envelope() {
         // Test with valid name
-        let filter_config = create_tx_filter_config();
-
         let params: Params = gen_params();
+        let filter_config = create_tx_filter_config(&params);
+
         let tx = create_checkpoint_envelope_tx(params.clone().into());
         let block = create_test_block(vec![tx]);
 
@@ -225,7 +224,7 @@ mod test {
         let tx2 = create_test_tx(vec![create_test_txout(10000, &parse_addr(OTHER_ADDR))]);
         let params = gen_params();
         let block = create_test_block(vec![tx1, tx2]);
-        let filter_config = create_tx_filter_config();
+        let filter_config = create_tx_filter_config(&params);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config)
             .iter()
@@ -236,8 +235,8 @@ mod test {
 
     #[test]
     fn test_filter_relevant_txs_multiple_matches() {
-        let filter_config = create_tx_filter_config();
         let params: Params = gen_params();
+        let filter_config = create_tx_filter_config(&params);
         let tx1 = create_checkpoint_envelope_tx(params.clone().into());
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
         let tx3 = create_checkpoint_envelope_tx(params.clone().into());
@@ -254,10 +253,10 @@ mod test {
 
     #[test]
     fn test_filter_relevant_txs_deposit() {
-        let filter_config = create_tx_filter_config();
+        let params = gen_params();
+        let filter_config = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
         let ee_addr = vec![1u8; 20]; // Example EVM address
-        let params = gen_params();
         let deposit_script =
             build_test_deposit_script(deposit_config.magic_bytes.clone(), ee_addr.clone());
 
@@ -292,9 +291,9 @@ mod test {
 
     #[test]
     fn test_filter_relevant_txs_deposit_request() {
-        let filter_config = create_tx_filter_config();
-        let mut deposit_config = filter_config.deposit_config.clone();
         let params = gen_params();
+        let filter_config = create_tx_filter_config(&params);
+        let mut deposit_config = filter_config.deposit_config.clone();
         let extra_amt = 10000;
         deposit_config.deposit_amount += extra_amt;
         let dest_addr = vec![2u8; 20]; // Example EVM address
@@ -338,9 +337,9 @@ mod test {
 
     #[test]
     fn test_filter_relevant_txs_no_deposit() {
-        let filter_config = create_tx_filter_config();
-        let deposit_config = filter_config.deposit_config.clone();
         let params = gen_params();
+        let filter_config = create_tx_filter_config(&params);
+        let deposit_config = filter_config.deposit_config.clone();
         let irrelevant_tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
@@ -359,9 +358,9 @@ mod test {
 
     #[test]
     fn test_filter_relevant_txs_multiple_deposits() {
-        let filter_config = create_tx_filter_config();
-        let deposit_config = filter_config.deposit_config.clone();
         let params = gen_params();
+        let filter_config = create_tx_filter_config(&params);
+        let deposit_config = filter_config.deposit_config.clone();
         let dest_addr1 = vec![3u8; 20];
         let dest_addr2 = vec![4u8; 20];
 

@@ -286,7 +286,7 @@ pub fn generate_envelope_script_test(
     params: Arc<Params>,
     version: u8,
 ) -> anyhow::Result<ScriptBuf> {
-    build_envelope_script(params.as_ref(), &envelope_data, version)
+    build_envelope_script(params.as_ref(), &[envelope_data], version)
 }
 
 pub fn build_reveal_transaction_test(

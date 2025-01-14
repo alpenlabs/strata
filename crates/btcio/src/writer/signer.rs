@@ -25,7 +25,7 @@ pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
     ctx: Arc<WriterContext<W>>,
 ) -> Result<(Buf32, Buf32), EnvelopeError> {
     trace!("Creating and signing payload envelopes");
-    let (commit, reveal) = build_envelope_txs(&payloadentry.payload, ctx.as_ref()).await?;
+    let (commit, reveal) = build_envelope_txs(&payloadentry.payloads, ctx.as_ref()).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");
@@ -81,7 +81,7 @@ mod test {
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
-        let intent_hash = hash::raw(entry.payload.data());
+        let intent_hash = hash::raw(entry.payloads.data());
         iops.put_payload_entry_async(intent_hash, entry.clone())
             .await
             .unwrap();

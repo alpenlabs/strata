@@ -415,7 +415,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             Ok(())
         }
         Duty::CommitBatch(data) => {
-            info!(data = ?data, "commit batch");
+            info!(data = ?data, "commit batch duty");
 
             let checkpoint =
                 check_and_get_batch_checkpoint(data, checkpoint_handle, pool, params.as_ref())?;
