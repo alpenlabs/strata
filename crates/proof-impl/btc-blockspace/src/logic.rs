@@ -4,6 +4,7 @@ use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::params::RollupParams;
 use strata_state::{batch::BatchCheckpoint, l1::L1TxProof, tx::DepositInfo};
+use strata_tx_parser::filter::TxFilterConfig;
 use strata_zkvm::ZkVmEnv;
 
 use crate::scan::process_blockscan;
@@ -29,7 +30,9 @@ pub fn process_blockspace_proof_outer(zkvm: &impl ZkVmEnv) {
     let serialized_block = zkvm.read_buf();
     let inclusion_proof: Option<L1TxProof> = zkvm.read_borsh();
     let block: Block = deserialize(&serialized_block).unwrap();
-    let output = process_blockscan(&block, &inclusion_proof, &rollup_params);
+    let filter_config =
+        TxFilterConfig::derive_from(&rollup_params).expect("derive tx-filter config");
+    let output = process_blockscan(&block, &inclusion_proof, &rollup_params, &filter_config);
     zkvm.commit_borsh(&output);
 }
 

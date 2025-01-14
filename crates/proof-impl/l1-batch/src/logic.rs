@@ -7,6 +7,7 @@ use strata_state::{
     l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot, L1TxProof},
     tx::DepositInfo,
 };
+use strata_tx_parser::filter::TxFilterConfig;
 use strata_zkvm::ZkVmEnv;
 
 /// Represents the public parameters of the L1BlockScan batch proof.
@@ -29,6 +30,9 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
     let mut state: HeaderVerificationState = zkvm.read_borsh();
 
     let rollup_params: RollupParams = zkvm.read_serde();
+    let filter_config =
+        TxFilterConfig::derive_from(&rollup_params).expect("derive tx-filter config");
+
     let num_inputs: u32 = zkvm.read_serde();
     assert!(num_inputs > 0);
 
@@ -41,7 +45,8 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
         let inclusion_proof: Option<L1TxProof> = zkvm.read_borsh();
 
         let block: Block = deserialize(&serialized_block).unwrap();
-        let blockscan_result = process_blockscan(&block, &inclusion_proof, &rollup_params);
+        let blockscan_result =
+            process_blockscan(&block, &inclusion_proof, &rollup_params, &filter_config);
         state.check_and_update_continuity(&block.header, &get_btc_params());
         deposits.extend(blockscan_result.deposits);
         prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);
