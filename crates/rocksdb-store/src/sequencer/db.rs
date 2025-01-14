@@ -28,19 +28,19 @@ impl RBSeqBlobDb {
 }
 
 impl L1PayloadDatabase for RBSeqBlobDb {
-    fn put_payload_entry(&self, blob_hash: Buf32, blob: PayloadEntry) -> DbResult<()> {
+    fn put_payload_entry(&self, payload_id: Buf32, entry: PayloadEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |tx| -> Result<(), DbError> {
                     // If new, increment idx
-                    if tx.get::<SeqBlobSchema>(&blob_hash)?.is_none() {
+                    if tx.get::<SeqBlobSchema>(&payload_id)?.is_none() {
                         let idx = get_next_id::<SeqBlobIdSchema, OptimisticTransactionDB>(tx)?;
 
-                        tx.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
+                        tx.put::<SeqBlobIdSchema>(&idx, &payload_id)?;
                     }
 
-                    tx.put::<SeqBlobSchema>(&blob_hash, &blob)?;
+                    tx.put::<SeqBlobSchema>(&payload_id, &entry)?;
 
                     Ok(())
                 },

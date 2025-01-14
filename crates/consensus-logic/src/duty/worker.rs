@@ -12,7 +12,7 @@ use strata_db::traits::*;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::{
     buf::{Buf32, Buf64},
-    l1::payload::{BlobDest, L1Payload, PayloadIntent},
+    l1::payload::{L1Payload, PayloadDest, PayloadIntent},
     params::Params,
 };
 use strata_state::{batch::SignedBatchCheckpoint, client_state::ClientState, prelude::*};
@@ -424,7 +424,7 @@ fn perform_duty<D: Database, E: ExecEngineCtl>(
             let payload_data =
                 borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?;
             let payload = L1Payload::new_checkpoint(payload_data);
-            let blob_intent = PayloadIntent::new(BlobDest::L1, checkpoint_hash, payload);
+            let blob_intent = PayloadIntent::new(PayloadDest::L1, checkpoint_hash, payload);
 
             info!(signed_checkpoint = ?signed_checkpoint, "signed checkpoint");
             info!(blob_intent = ?blob_intent, "sending blob intent");

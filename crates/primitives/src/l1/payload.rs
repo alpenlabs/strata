@@ -8,6 +8,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 
 use crate::{buf::Buf32, hash};
+
 /// DA destination identifier. This will eventually be used to enable
 /// storing payloads on alternative availability schemes.
 #[derive(
@@ -28,7 +29,7 @@ use crate::{buf::Buf32, hash};
 )]
 #[borsh(use_discriminant = true)]
 #[repr(u8)]
-pub enum BlobDest {
+pub enum PayloadDest {
     /// If we expect the DA to be on the L1 chain that we settle to. This is
     /// always the strongest DA layer we have access to.
     L1 = 0,
@@ -36,7 +37,7 @@ pub enum BlobDest {
 
 /// Manual `Arbitrary` impl so that we always generate L1 DA if we add future
 /// ones that would work in totally different ways.
-impl<'a> Arbitrary<'a> for BlobDest {
+impl<'a> Arbitrary<'a> for PayloadDest {
     fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::L1)
     }
@@ -59,7 +60,7 @@ impl<'a> Arbitrary<'a> for BlobDest {
 )]
 pub struct BlobSpec {
     /// Target settlement layer we're expecting the DA on.
-    dest: BlobDest,
+    dest: PayloadDest,
 
     /// Commitment to the payload (probably just a hash or a
     /// merkle root) that we expect to see committed to DA.
@@ -68,7 +69,7 @@ pub struct BlobSpec {
 
 impl BlobSpec {
     /// The target we expect the DA payload to be stored on.
-    pub fn dest(&self) -> BlobDest {
+    pub fn dest(&self) -> PayloadDest {
         self.dest
     }
 
@@ -77,7 +78,48 @@ impl BlobSpec {
         &self.commitment
     }
 
-    fn new(dest: BlobDest, commitment: Buf32) -> Self {
+    #[allow(dead_code)]
+    fn new(dest: PayloadDest, commitment: Buf32) -> Self {
+        Self { dest, commitment }
+    }
+}
+
+/// Summary of a DA payload to be included on a DA layer. Specifies the target and
+/// a commitment to the payload.
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+    Serialize,
+    Deserialize,
+)]
+pub struct PayloadSpec {
+    /// Target settlement layer we're expecting the DA on.
+    dest: PayloadDest,
+
+    /// Commitment to the payload (probably just a hash or a
+    /// merkle root) that we expect to see committed to DA.
+    commitment: Buf32,
+}
+
+impl PayloadSpec {
+    /// The target we expect the DA payload to be stored on.
+    pub fn dest(&self) -> PayloadDest {
+        self.dest
+    }
+
+    /// Commitment to the payload.
+    pub fn commitment(&self) -> &Buf32 {
+        &self.commitment
+    }
+
+    fn new(dest: PayloadDest, commitment: Buf32) -> Self {
         Self { dest, commitment }
     }
 }
@@ -131,7 +173,7 @@ pub enum L1PayloadType {
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct PayloadIntent {
     /// The destination for this payload.
-    dest: BlobDest,
+    dest: PayloadDest,
 
     /// Commitment to the payload.
     commitment: Buf32,
@@ -141,7 +183,7 @@ pub struct PayloadIntent {
 }
 
 impl PayloadIntent {
-    pub fn new(dest: BlobDest, commitment: Buf32, payload: L1Payload) -> Self {
+    pub fn new(dest: PayloadDest, commitment: Buf32, payload: L1Payload) -> Self {
         Self {
             dest,
             commitment,
@@ -150,7 +192,7 @@ impl PayloadIntent {
     }
 
     /// The target we expect the DA payload to be stored on.
-    pub fn dest(&self) -> BlobDest {
+    pub fn dest(&self) -> PayloadDest {
         self.dest
     }
 
@@ -168,7 +210,7 @@ impl PayloadIntent {
 
     /// Generates the spec from the relevant parts of the payload intent that
     /// uniquely refers to the payload data.
-    pub fn to_spec(&self) -> BlobSpec {
-        BlobSpec::new(self.dest, self.commitment)
+    pub fn to_spec(&self) -> PayloadSpec {
+        PayloadSpec::new(self.dest, self.commitment)
     }
 }

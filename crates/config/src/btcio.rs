@@ -49,7 +49,7 @@ impl Default for WriterConfig {
 impl Default for ReaderConfig {
     fn default() -> Self {
         Self {
-            client_poll_dur_ms: 1_000,
+            client_poll_dur_ms: 200,
         }
     }
 }

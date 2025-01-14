@@ -16,8 +16,10 @@ network = "regtest"
 l1_follow_distance = 6
 client_checkpoint_interval = 10
 
-[btcio]
+[btcio.reader]
 client_poll_dur_ms = 200
+
+[btcio.writer]
 write_poll_dur_ms = 200
 fee_policy = "smart"
 reveal_amount = 100

@@ -104,8 +104,10 @@ mod test {
             rpc_url = "http://localhost:8551"
             secret = "1234567890abcdef"
 
-            [btcio]
+            [btcio.reader]
             client_poll_dur_ms = 200
+
+            [btcio.writer]
             write_poll_dur_ms = 200
             fee_policy = "smart"
             reveal_amount = 100
@@ -145,8 +147,10 @@ mod test {
             client_poll_dur_ms = 200
             client_checkpoint_interval = 10
 
-            [btcio]
+            [btcio.reader]
             client_poll_dur_ms = 200
+
+            [btcio.writer]
             write_poll_dur_ms = 200
             fee_policy = "smart"
             reveal_amount = 100
