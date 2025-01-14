@@ -247,7 +247,6 @@ where
         let h = self.header.as_mut().expect("Header not initialized");
         let txs_signed = take(&mut self.input.transactions)
             .into_iter()
-            .map(|tx| tx.into())
             .collect::<Vec<TransactionSigned>>();
         h.transactions_root = ordered_trie_root_with_encoder(&txs_signed, |tx, buf| {
             tx.encode_with_signature(&tx.signature, buf, false);
@@ -323,7 +322,7 @@ impl EvmProcessor<InMemoryDB> {
             if *address != BRIDGEOUT_ADDRESS {
                 state_trie
                     .insert_rlp(&state_trie_index, state_account)
-                    .unwrap();
+                    .expect("MPT is corrupted");
             }
         }
 

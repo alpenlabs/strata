@@ -28,13 +28,14 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
         evm_addr = self.eth_account.address
         bridge_pk = get_bridge_pubkey(self.seqrpc)
 
+        # Init RPCs.
         btc = ctx.get_service("bitcoin")
         btcrpc: BitcoindClient = btc.create_rpc()
         reth = ctx.get_service("reth")
         rethrpc = reth.create_rpc()
-        # Init the prover client
         prover_client = ctx.get_service("prover_client")
         prover_client_rpc = prover_client.create_rpc()
+        # Wait till everything is started and warmed up. Not sure if it's strictly required.
         time.sleep(5)
 
         # DEPOSIT part of the test
@@ -44,14 +45,14 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
         # Fix the strata block first (to optimize the search).
         start_block = int(rethrpc.eth_blockNumber(), base=16)
         l1_deposit_txn_id = self.deposit(ctx, evm_addr, bridge_pk)
-        # Do twise the deposit, so the withdrawal will have funds for the gas.
+        # Do twice the deposit, so the withdrawal will have funds for the gas.
         _ = self.deposit(ctx, evm_addr, bridge_pk)
 
         # Collect the L1 and L2 blocks where the deposit transaction was included.
         l1_deposit_tx_info = btcrpc.proxy.getrawtransaction(l1_deposit_txn_id, 1)
         l1_deposit_blockhash = l1_deposit_tx_info["blockhash"]
         l1_deposit_block_height = btcrpc.proxy.getblock(l1_deposit_blockhash, 1)["height"]
-        print(f"deposit block height on L1: {l1_deposit_block_height}")
+        self.info(f"deposit block height on L1: {l1_deposit_block_height}")
 
         l2_deposit_block_num = None
         end_block = int(rethrpc.eth_blockNumber(), base=16)
@@ -61,10 +62,12 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
             withdrawals = block.get("withdrawals", None)
             if withdrawals is not None and len(withdrawals) != 0:
                 l2_deposit_block_num = block_num
-        print(f"deposit block num on L2: {l2_deposit_block_num}")
+        self.info(f"deposit block num on L2: {l2_deposit_block_num}")
 
         # Proving
-        self.test_checkpoint(l1_deposit_block_height, l2_deposit_block_num, prover_client_rpc)
+        self.test_checkpoint(
+            l1_deposit_block_height, l2_deposit_block_num, prover_client_rpc, rethrpc
+        )
 
         # Deposit is OK.
         # WITHDRAWAL part of the test.
@@ -105,7 +108,7 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
 
         # Collect L2 and L1 blocks where the withdrawal has happened.
         l2_withdraw_block_num = withdraw_tx_receipt["blockNumber"]
-        print(f"withdrawal block num on L2: {l2_withdraw_block_num}")
+        self.info(f"withdrawal block num on L2: {l2_withdraw_block_num}")
 
         last_block_hash = btcrpc.proxy.getblockchaininfo()["bestblockhash"]
         last_block = btcrpc.proxy.getblock(last_block_hash, 1)
@@ -115,17 +118,24 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
         while len(last_block["tx"]) <= 1:
             last_block = btcrpc.proxy.getblock(last_block["previousblockhash"], 1)
         l1_withdraw_block_height = last_block["height"]
-        print(f"withdrawal block height on L1: {l1_withdraw_block_height}")
+        self.info(f"withdrawal block height on L1: {l1_withdraw_block_height}")
 
         # Proving
-        self.test_checkpoint(l1_withdraw_block_height, l2_withdraw_block_num, prover_client_rpc)
+        self.test_checkpoint(
+            l1_withdraw_block_height, l2_withdraw_block_num, prover_client_rpc, rethrpc
+        )
 
-    def test_checkpoint(self, l1_block, l2_block, prover_client_rpc):
+    def test_checkpoint(self, l1_block, l2_block, prover_client_rpc, rethrpc):
         self._chkpt_id += 1
         l1 = (l1_block - 1, l1_block + 1)
         l2 = (l2_block - 1, l2_block + 1)
         # Wait some time so the future blocks in the batches are finalized.
-        time.sleep(5)
+        # Given that L1 blocks are happening more frequent that L2, it's safe
+        # to assert only L2 latest block.
+        utils.wait_until(
+            lambda: int(rethrpc.eth_blockNumber(), base=16) > l2[1],
+            timeout=60,
+        )
 
         task_ids = prover_client_rpc.dev_strata_proveCheckpointRaw(self._chkpt_id, l1, l2)
 
@@ -134,8 +144,7 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
         self.debug(f"using task id: {task_id}")
         assert task_id is not None
 
-        time_out = 30
-        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
+        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)
 
 
 def confirm_btc_withdrawal(

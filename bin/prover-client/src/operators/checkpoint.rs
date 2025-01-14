@@ -57,8 +57,8 @@ impl CheckpointOperator {
     /// # Arguments
     ///
     /// - `checkpoint_info`: checkpoint data.
-    /// - `task_tracker`: A shared task tracker for managing task dependencies.
     /// - `db`: A reference to the proof database.
+    /// - `task_tracker`: A shared task tracker for managing task dependencies.
     ///
     /// # Returns
     ///
@@ -91,6 +91,7 @@ impl CheckpointOperator {
                 db,
             )
             .await?;
+        info!(%ckp_idx, "Created tasks for L1 Batch");
 
         // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
         // include the range in terms of block_id.
@@ -98,7 +99,6 @@ impl CheckpointOperator {
         let start_l2_idx = self.get_l2id(checkpoint_info.l2_range.0).await?;
         let end_l2_idx = self.get_l2id(checkpoint_info.l2_range.1).await?;
         let l2_range = vec![(start_l2_idx, end_l2_idx)];
-        info!(%ckp_idx, "Created tasks for L1 Batch");
 
         let l2_batch_keys = self
             .l2_batch_operator
