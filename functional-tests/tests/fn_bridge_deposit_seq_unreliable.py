@@ -2,7 +2,7 @@ import flexitest
 
 from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
-from utils import get_bridge_pubkey, wait_until, wait_until_with_value
+from utils import check_sequencer_down, get_bridge_pubkey, wait_until, wait_until_with_value
 from utils.constants import SATS_TO_WEI
 
 
@@ -57,15 +57,4 @@ class BridgeDepositSequencerUnreliableTest(testenv.BridgeTestBase):
         )
         self.debug(f"Strata Balance after deposits: {balance_after_deposits}")
 
-        return True
-
-
-def check_sequencer_down(seqrpc):
-    """
-    Returns True if sequencer RPC is down
-    """
-    try:
-        seqrpc.strata_protocolVersion()
-        return False
-    except RuntimeError:
         return True
