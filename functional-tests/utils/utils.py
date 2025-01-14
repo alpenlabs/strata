@@ -156,9 +156,9 @@ def check_nth_checkpoint_finalized(
         timeout=3,
     )
 
-    assert (
-        syncstat["finalized_block_id"] != batch_info["l2_blockid"]
-    ), "Checkpoint block should not yet finalize"
+    assert syncstat["finalized_block_id"] != batch_info["l2_blockid"], (
+        "Checkpoint block should not yet finalize"
+    )
     assert batch_info["idx"] == idx
     checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
     assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
@@ -275,6 +275,27 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
         if proof_status == "Completed":
             print(f"Completed the proof generation for {task_id}")
             break
+
+        time.sleep(2)
+        elapsed_time = time.time() - start_time  # Calculate elapsed time
+        if elapsed_time >= time_out:
+            raise TimeoutError(f"Operation timed out after {time_out} seconds.")
+
+
+def wait_for_proof_with_time_out_all(prover_client_rpc, task_ids, time_out=3600):
+    start_time = time.time()
+    while True:
+        all_completed = True
+        for task_id in task_ids:
+            # Fetch the proof status
+            proof_status = prover_client_rpc.dev_strata_getTaskStatus(task_id)
+            assert proof_status is not None
+            if proof_status != "Completed":
+                all_completed = False
+                break
+
+        if all_completed:
+            return
 
         time.sleep(2)
         elapsed_time = time.time() - start_time  # Calculate elapsed time

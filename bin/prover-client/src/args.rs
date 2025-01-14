@@ -104,7 +104,7 @@ pub struct Args {
     #[argh(
         option,
         description = "number of native prover workers to spawn",
-        default = "20"
+        default = "50"
     )]
     pub native_workers: usize,
 
