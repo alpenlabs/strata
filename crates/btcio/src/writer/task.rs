@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use bitcoin::Address;
 use strata_config::btcio::WriterConfig;
 use strata_db::{
-    traits::SequencerDatabase,
+    traits::L1PayloadDatabase,
     types::{IntentEntry, L1TxStatus, PayloadEntry, PayloadL1Status},
 };
 use strata_primitives::{
@@ -78,7 +78,7 @@ impl EnvelopeHandle {
 ///
 /// [`Result<EnvelopeHandle>`](anyhow::Result)
 #[allow(clippy::too_many_arguments)]
-pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
+pub fn start_envelope_task<D: L1PayloadDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,
     config: Arc<WriterConfig>,
@@ -140,7 +140,7 @@ fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u6
 /// The envelope will be monitored until it acquires the status of
 /// [`BlobL1Status::Finalized`]
 pub async fn watcher_task<W: WriterRpc>(
-    next_blbidx_to_watch: u64,
+    next_watch_payload_idx: u64,
     context: Arc<WriterContext<W>>,
     insc_ops: Arc<EnvelopeDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
@@ -149,7 +149,7 @@ pub async fn watcher_task<W: WriterRpc>(
     let interval = tokio::time::interval(Duration::from_millis(context.config.write_poll_dur_ms));
     tokio::pin!(interval);
 
-    let mut curr_payloadidx = next_blbidx_to_watch;
+    let mut curr_payloadidx = next_watch_payload_idx;
     loop {
         interval.as_mut().tick().await;
 
@@ -174,7 +174,8 @@ pub async fn watcher_task<W: WriterRpc>(
                             updated_entry.status = PayloadL1Status::Unpublished;
                             updated_entry.commit_txid = cid;
                             updated_entry.reveal_txid = rid;
-                            update_existing_entry(curr_payloadidx, updated_entry, &insc_ops)
+                            insc_ops
+                                .put_payload_entry_async(curr_payloadidx, updated_entry)
                                 .await?;
 
                             debug!(%curr_payloadidx, "Signed payload");
@@ -218,7 +219,8 @@ pub async fn watcher_task<W: WriterRpc>(
                             // Update payloadentry with new status
                             let mut updated_entry = payloadentry.clone();
                             updated_entry.status = new_status.clone();
-                            update_existing_entry(curr_payloadidx, updated_entry, &insc_ops)
+                            insc_ops
+                                .put_payload_entry_async(curr_payloadidx, updated_entry)
                                 .await?;
 
                             if new_status == PayloadL1Status::Finalized {
@@ -229,7 +231,8 @@ pub async fn watcher_task<W: WriterRpc>(
                             warn!(%curr_payloadidx, "Corresponding commit/reveal entry for payloadentry not found in broadcast db. Sign and create transactions again.");
                             let mut updated_entry = payloadentry.clone();
                             updated_entry.status = PayloadL1Status::Unsigned;
-                            update_existing_entry(curr_payloadidx, updated_entry, &insc_ops)
+                            insc_ops
+                                .put_payload_entry_async(curr_payloadidx, updated_entry)
                                 .await?;
                         }
                     }
@@ -259,16 +262,6 @@ async fn update_l1_status(
         ];
         apply_status_updates(&status_updates, status_channel).await;
     }
-}
-
-async fn update_existing_entry(
-    idx: u64,
-    updated_entry: PayloadEntry,
-    insc_ops: &EnvelopeDataOps,
-) -> anyhow::Result<()> {
-    let msg = format!("Expect to find payloadentry {idx} in db");
-    let id = insc_ops.get_payload_entry_id_async(idx).await?.expect(&msg);
-    Ok(insc_ops.put_payload_entry_async(id, updated_entry).await?)
 }
 
 /// Determine the status of the `PayloadEntry` based on the status of its commit and reveal

@@ -17,7 +17,7 @@ pub fn extract_relevant_info(
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    let relevant_txs = filter_protocol_op_tx_refs(block, rollup_params, &filter_config);
+    let relevant_txs = filter_protocol_op_tx_refs(block, rollup_params, filter_config);
 
     for tx in relevant_txs {
         match tx.proto_op() {

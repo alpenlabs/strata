@@ -260,16 +260,13 @@ pub trait SequencerDatabase {
 /// database and to fetch [`PayloadEntry`] and indices from the database
 pub trait L1PayloadDatabase {
     /// Store the [`PayloadEntry`].
-    fn put_payload_entry(&self, payloadid: Buf32, payloadentry: PayloadEntry) -> DbResult<()>;
+    fn put_payload_entry(&self, idx: u64, payloadentry: PayloadEntry) -> DbResult<()>;
 
-    /// Get a [`PayloadEntry`] by its hash
-    fn get_payload_by_id(&self, id: Buf32) -> DbResult<Option<PayloadEntry>>;
+    /// Get a [`PayloadEntry`] by its index.
+    fn get_payload_entry_by_idx(&self, idx: u64) -> DbResult<Option<PayloadEntry>>;
 
-    /// Get the payload ID corresponding to the index
-    fn get_payload_id(&self, payloadidx: u64) -> DbResult<Option<Buf32>>;
-
-    /// Get the last payload index
-    fn get_last_payload_idx(&self) -> DbResult<Option<u64>>;
+    /// Get the next payload index
+    fn get_next_payload_idx(&self) -> DbResult<u64>;
 
     /// Store the [`IntentEntry`].
     fn put_intent_entry(&self, payloadid: Buf32, payloadentry: IntentEntry) -> DbResult<()>;

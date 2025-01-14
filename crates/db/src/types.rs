@@ -50,7 +50,7 @@ pub enum IntentStatus {
 /// Represents data for a payload we're still planning to post to L1.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct PayloadEntry {
-    pub payload: L1Payload,
+    pub payloads: Vec<L1Payload>,
     pub commit_txid: Buf32,
     pub reveal_txid: Buf32,
     pub status: PayloadL1Status,
@@ -58,13 +58,13 @@ pub struct PayloadEntry {
 
 impl PayloadEntry {
     pub fn new(
-        payload: L1Payload,
+        payloads: Vec<L1Payload>,
         commit_txid: Buf32,
         reveal_txid: Buf32,
         status: PayloadL1Status,
     ) -> Self {
         Self {
-            payload,
+            payloads,
             commit_txid,
             reveal_txid,
             status,
@@ -76,10 +76,10 @@ impl PayloadEntry {
     /// NOTE: This won't have commit - reveal pairs associated with it.
     ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
     ///   by others. Those will be created and signed in a single step.
-    pub fn new_unsigned(payload: L1Payload) -> Self {
+    pub fn new_unsigned(payloads: Vec<L1Payload>) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();
-        Self::new(payload, cid, rid, PayloadL1Status::Unsigned)
+        Self::new(payloads, cid, rid, PayloadL1Status::Unsigned)
     }
 }
 

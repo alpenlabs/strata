@@ -442,11 +442,7 @@ mod test {
         let l1status: L1Status = gen.generate();
         let status_channel = StatusChannel::new(cls, l1status, Some(chs));
         let params = Arc::new(gen_params());
-<<<<<<< HEAD
         let config = Arc::new(ReaderConfig::default());
-=======
-        let config = Arc::new(BtcioConfig::default());
->>>>>>> bb9df24b (Some cleanups)
         let client = Arc::new(TestBitcoinClient::new(1));
         ReaderContext {
             event_tx,
