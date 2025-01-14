@@ -18,7 +18,7 @@ use strata_consensus_logic::{
     sync_manager::{self, SyncManager},
 };
 use strata_db::{
-    traits::{BroadcastDatabase, ChainstateDatabase, Database},
+    traits::{BroadcastDatabase, ChainstateDatabase, Database, SequencerDatabase},
     DbError,
 };
 use strata_eectl::engine::ExecEngineCtl;
@@ -417,7 +417,7 @@ fn start_sequencer_tasks(
         Arc::new(btcio_config.writer.clone()),
         params.clone(),
         sequencer_bitcoin_address,
-        seq_db,
+        SequencerDatabase::payload_db(seq_db.as_ref()).clone(),
         status_channel.clone(),
         pool.clone(),
         broadcast_handle.clone(),

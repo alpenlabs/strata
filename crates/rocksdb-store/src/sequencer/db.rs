@@ -9,8 +9,8 @@ use strata_db::{
 };
 use strata_primitives::buf::Buf32;
 
-use super::schemas::{SeqBlobIdSchema, SeqBlobSchema, SeqIntentSchema};
-use crate::{sequence::get_next_id, DbOpsConfig};
+use super::schemas::{SeqIntentSchema, SeqPayloadSchema};
+use crate::DbOpsConfig;
 
 pub struct RBSeqBlobDb {
     db: Arc<OptimisticTransactionDB>,
@@ -28,36 +28,26 @@ impl RBSeqBlobDb {
 }
 
 impl L1PayloadDatabase for RBSeqBlobDb {
-    fn put_payload_entry(&self, payload_id: Buf32, entry: PayloadEntry) -> DbResult<()> {
+    fn put_payload_entry(&self, idx: u64, entry: PayloadEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |tx| -> Result<(), DbError> {
-                    // If new, increment idx
-                    if tx.get::<SeqBlobSchema>(&payload_id)?.is_none() {
-                        let idx = get_next_id::<SeqBlobIdSchema, OptimisticTransactionDB>(tx)?;
-
-                        tx.put::<SeqBlobIdSchema>(&idx, &payload_id)?;
-                    }
-
-                    tx.put::<SeqBlobSchema>(&payload_id, &entry)?;
-
+                    tx.put::<SeqPayloadSchema>(&idx, &entry)?;
                     Ok(())
                 },
             )
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_payload_by_id(&self, id: Buf32) -> DbResult<Option<PayloadEntry>> {
-        Ok(self.db.get::<SeqBlobSchema>(&id)?)
+    fn get_payload_entry_by_idx(&self, idx: u64) -> DbResult<Option<PayloadEntry>> {
+        Ok(self.db.get::<SeqPayloadSchema>(&idx)?)
     }
 
-    fn get_last_payload_idx(&self) -> DbResult<Option<u64>> {
-        Ok(rockbound::utils::get_last::<SeqBlobIdSchema>(&*self.db)?.map(|(x, _)| x))
-    }
-
-    fn get_payload_id(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
-        Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
+    fn get_next_payload_idx(&self) -> DbResult<u64> {
+        Ok(rockbound::utils::get_last::<SeqPayloadSchema>(&*self.db)?
+            .map(|(x, _)| x + 1)
+            .unwrap_or(0))
     }
 
     fn put_intent_entry(&self, intent_id: Buf32, intent_entry: IntentEntry) -> DbResult<()> {
@@ -116,11 +106,11 @@ mod tests {
         let blob_hash: Buf32 = [0; 32].into();
 
         seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
-        let idx = seq_db.get_last_payload_idx().unwrap().unwrap();
+        let idx = seq_db.get_next_payload_idx().unwrap().unwrap();
 
         assert_eq!(seq_db.get_payload_id(idx).unwrap(), Some(blob_hash));
 
-        let stored_blob = seq_db.get_payload_by_id(blob_hash).unwrap();
+        let stored_blob = seq_db.get_payload_entry_by_idx(blob_hash).unwrap();
         assert_eq!(stored_blob, Some(blob));
     }
 
@@ -140,65 +130,49 @@ mod tests {
     }
 
     #[test]
-    fn test_update_blob() {
+    fn test_update_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBSeqBlobDb::new(db, db_ops);
 
-        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
+        let entry: PayloadEntry = ArbitraryGenerator::new().generate();
 
         // Insert
-        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_payload_entry(0, entry.clone()).unwrap();
 
-        let updated_blob: PayloadEntry = ArbitraryGenerator::new().generate();
+        let updated_entry: PayloadEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
-        seq_db
-            .put_payload_entry(blob_hash, updated_blob.clone())
-            .unwrap();
-        let retrieved_blob = seq_db.get_payload_by_id(blob_hash).unwrap().unwrap();
-        assert_eq!(updated_blob, retrieved_blob);
+        seq_db.put_payload_entry(0, updated_entry.clone()).unwrap();
+        let retrieved_entry = seq_db.get_payload_entry_by_idx(0).unwrap().unwrap();
+        assert_eq!(updated_entry, retrieved_entry);
     }
 
     #[test]
-    fn test_get_blob_by_id() {
+    fn test_get_last_entry_idx() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBSeqBlobDb::new(db, db_ops);
 
         let blob: PayloadEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
-
-        let retrieved = seq_db.get_payload_by_id(blob_hash).unwrap().unwrap();
-        assert_eq!(retrieved, blob);
-    }
-
-    #[test]
-    fn test_get_last_blob_idx() {
-        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBSeqBlobDb::new(db, db_ops);
-
-        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
-
-        let last_blob_idx = seq_db.get_last_payload_idx().unwrap();
+        let next_blob_idx = seq_db.get_next_payload_idx().unwrap();
         assert_eq!(
-            last_blob_idx, None,
+            next_blob_idx, 0,
             "There is no last blobidx in the beginning"
         );
 
-        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
-        // Now the last idx is 0
+        seq_db
+            .put_payload_entry(next_blob_idx, blob.clone())
+            .unwrap();
+        let next_blob_idx = seq_db.get_next_payload_idx().unwrap();
+        // Now the next idx is 1
 
         let blob: PayloadEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [1; 32].into();
 
-        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
-        // Now the last idx is 1
+        seq_db.put_payload_entry(1, blob.clone()).unwrap();
+        let next_blob_idx = seq_db.get_next_payload_idx().unwrap();
+        // Now the last idx is 2
 
-        let last_blob_idx = seq_db.get_last_payload_idx().unwrap();
-        assert_eq!(last_blob_idx, Some(1));
+        assert_eq!(next_blob_idx, 2);
     }
 
     // Intent related tests
