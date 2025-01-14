@@ -291,7 +291,7 @@ pub(crate) mod test_context {
     use std::sync::Arc;
 
     use bitcoin::{Address, Network};
-    use strata_config::btcio::BtcioConfig;
+    use strata_config::btcio::WriterConfig;
     use strata_status::StatusChannel;
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
@@ -304,7 +304,7 @@ pub(crate) mod test_context {
             .unwrap()
             .require_network(Network::Regtest)
             .unwrap();
-        let cfg = Arc::new(BtcioConfig::default());
+        let cfg = Arc::new(WriterConfig::default());
         let status_channel = StatusChannel::new(
             ArbitraryGenerator::new().generate(),
             ArbitraryGenerator::new().generate(),

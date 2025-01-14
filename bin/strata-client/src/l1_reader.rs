@@ -36,7 +36,7 @@ where
             rpc_client,
             ev_tx,
             target_next_block,
-            Arc::new(config.btcio.clone()),
+            Arc::new(config.btcio.reader.clone()),
             params.clone(),
             status_channel,
         ),

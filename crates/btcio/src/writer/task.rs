@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use bitcoin::Address;
-use strata_config::btcio::BtcioConfig;
+use strata_config::btcio::WriterConfig;
 use strata_db::{
     traits::SequencerDatabase,
     types::{L1TxStatus, PayloadEntry, PayloadL1Status},
@@ -93,7 +93,7 @@ impl EnvelopeHandle {
 pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,
-    config: Arc<BtcioConfig>,
+    config: Arc<WriterConfig>,
     params: Arc<Params>,
     sequencer_address: Address,
     db: Arc<D>,

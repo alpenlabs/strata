@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bitcoin::Address;
-use strata_config::btcio::BtcioConfig;
+use strata_config::btcio::WriterConfig;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
 
@@ -13,7 +13,7 @@ pub struct WriterContext<W: WriterRpc> {
     // Params for rollup.
     pub params: Arc<Params>,
     // Btcio specific configuration.
-    pub config: Arc<BtcioConfig>,
+    pub config: Arc<WriterConfig>,
     // Sequencer's address to watch utxos for and spend change amount to.
     pub sequencer_address: Address,
     // Bitcoin client to sign and submit transactions.
@@ -25,7 +25,7 @@ pub struct WriterContext<W: WriterRpc> {
 impl<W: WriterRpc> WriterContext<W> {
     pub fn new(
         params: Arc<Params>,
-        config: Arc<BtcioConfig>,
+        config: Arc<WriterConfig>,
         sequencer_address: Address,
         client: Arc<W>,
         status_channel: StatusChannel,

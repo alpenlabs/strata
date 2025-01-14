@@ -414,7 +414,7 @@ fn start_sequencer_tasks(
     let envelope_handle = start_envelope_task(
         executor,
         bitcoin_client,
-        btcio_config,
+        Arc::new(btcio_config.writer.clone()),
         params.clone(),
         sequencer_bitcoin_address,
         seq_db,

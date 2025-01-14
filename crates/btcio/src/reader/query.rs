@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
-use strata_config::btcio::BtcioConfig;
+use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
     filter::filter_protocol_op_tx_refs,
     filter_types::TxFilterConfig,
@@ -34,7 +34,7 @@ struct ReaderContext<R: ReaderRpc> {
     /// L1Event sender
     event_tx: mpsc::Sender<L1Event>,
     /// Config
-    config: Arc<BtcioConfig>,
+    config: Arc<ReaderConfig>,
     /// Params
     params: Arc<Params>,
     /// Status transmitter
@@ -46,7 +46,7 @@ pub async fn bitcoin_data_reader_task(
     client: Arc<impl ReaderRpc>,
     event_tx: mpsc::Sender<L1Event>,
     target_next_block: u64,
-    config: Arc<BtcioConfig>,
+    config: Arc<ReaderConfig>,
     params: Arc<Params>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
@@ -441,7 +441,7 @@ mod test {
         let l1status: L1Status = gen.generate();
         let status_channel = StatusChannel::new(cls, l1status, Some(chs));
         let params = Arc::new(gen_params());
-        let config = Arc::new(BtcioConfig::default());
+        let config = Arc::new(ReaderConfig::default());
         let client = Arc::new(TestBitcoinClient::new(1));
         ReaderContext {
             event_tx,

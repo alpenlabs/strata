@@ -1,10 +1,22 @@
 use serde::Deserialize;
 
 /// Configuration for btcio tasks.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct BtcioConfig {
+    pub reader: ReaderConfig,
+    pub writer: WriterConfig,
+}
+
+/// Configuration for btcio reader.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReaderConfig {
     /// How often to poll btc client
     pub client_poll_dur_ms: u32,
+}
+
+/// Configuration for btcio writer/signer.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WriterConfig {
     /// How often to invoke the writer
     pub write_poll_dur_ms: u64,
     /// How the fees for are determined.
@@ -24,13 +36,20 @@ pub enum FeePolicy {
     Fixed(u64),
 }
 
-impl Default for BtcioConfig {
+impl Default for WriterConfig {
     fn default() -> Self {
         Self {
-            client_poll_dur_ms: 200,
             write_poll_dur_ms: 1_000,
             fee_policy: FeePolicy::Smart,
             reveal_amount: 1_000,
+        }
+    }
+}
+
+impl Default for ReaderConfig {
+    fn default() -> Self {
+        Self {
+            client_poll_dur_ms: 1_000,
         }
     }
 }
