@@ -4,7 +4,7 @@ use bitcoin::Address;
 use strata_config::btcio::WriterConfig;
 use strata_db::{
     traits::SequencerDatabase,
-    types::{L1TxStatus, PayloadEntry, PayloadL1Status},
+    types::{IntentEntry, L1TxStatus, PayloadEntry, PayloadL1Status},
 };
 use strata_primitives::{
     l1::payload::{PayloadDest, PayloadIntent},
@@ -40,20 +40,15 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = PayloadEntry::new_unsigned(intent.payload().clone());
+        let id = *intent.commitment();
         debug!(commitment = %intent.commitment(), "Received intent");
-        if self
-            .ops
-            .get_payload_entry_blocking(*intent.commitment())?
-            .is_some()
-        {
-            warn!(commitment = %intent.commitment(), "Received duplicate intent");
+        if self.ops.get_intent_by_id_blocking(id)?.is_some() {
+            warn!(commitment = %id, "Received duplicate intent");
             return Ok(());
         }
+        let entry = IntentEntry::new_unbundled(intent);
 
-        Ok(self
-            .ops
-            .put_payload_entry_blocking(*intent.commitment(), entry)?)
+        Ok(self.ops.put_intent_entry_blocking(id, entry)?)
     }
 
     pub async fn submit_intent_async(&self, intent: PayloadIntent) -> anyhow::Result<()> {
@@ -62,22 +57,15 @@ impl EnvelopeHandle {
             return Ok(());
         }
 
-        let entry = PayloadEntry::new_unsigned(intent.payload().clone());
+        let id = *intent.commitment();
         debug!(commitment = %intent.commitment(), "Received intent");
-
-        if self
-            .ops
-            .get_payload_entry_async(*intent.commitment())
-            .await?
-            .is_some()
-        {
-            warn!(commitment = %intent.commitment(), "Received duplicate intent");
+        if self.ops.get_intent_by_id_async(id).await?.is_some() {
+            warn!(commitment = %id, "Received duplicate intent");
             return Ok(());
         }
-        Ok(self
-            .ops
-            .put_payload_entry_async(*intent.commitment(), entry)
-            .await?)
+        let entry = IntentEntry::new_unbundled(intent);
+
+        Ok(self.ops.put_intent_entry_async(id, entry).await?)
     }
 }
 
