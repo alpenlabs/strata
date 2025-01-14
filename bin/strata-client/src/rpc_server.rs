@@ -32,8 +32,8 @@ use strata_rpc_api::{
 };
 use strata_rpc_types::{
     errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockHeader,
-    RpcBridgeDuties, RpcChainState, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry,
-    RpcExecUpdate, RpcL1Status, RpcSyncStatus,
+    RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo, RpcClientStatus,
+    RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{
@@ -564,6 +564,16 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
             .map_err(|e| Error::Other(e.to_string()))?;
 
         Ok(entry.map(Into::into))
+    }
+
+    async fn get_checkpoint_status(&self, idx: u64) -> RpcResult<Option<RpcCheckpointConfStatus>> {
+        let entry = self
+            .checkpoint_handle
+            .get_checkpoint(idx)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+
+        Ok(entry.map(|e| e.into()))
     }
 
     async fn get_latest_checkpoint_index(&self, finalized: Option<bool>) -> RpcResult<Option<u64>> {

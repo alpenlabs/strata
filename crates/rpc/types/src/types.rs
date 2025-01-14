@@ -6,7 +6,7 @@
 
 use bitcoin::{hashes::Hash, Network, Txid, Wtxid};
 use serde::{Deserialize, Serialize};
-use strata_db::types::{CheckpointCommitment, CheckpointEntry};
+use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
     l1::{BitcoinAmount, L1TxRef, OutputRef},
@@ -257,7 +257,30 @@ impl From<CheckpointCommitment> for RpcCheckpointCommitmentInfo {
         }
     }
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RpcCheckpointConfStatus {
+    /// Pending to be posted on L1
+    Pending,
+    /// Confirmed on L1
+    Confirmed,
+    /// Finalized on L1
+    Finalized,
+}
+impl From<CheckpointConfStatus> for RpcCheckpointConfStatus {
+    fn from(value: CheckpointConfStatus) -> Self {
+        match value {
+            CheckpointConfStatus::Pending => Self::Pending,
+            CheckpointConfStatus::Confirmed => Self::Confirmed,
+            CheckpointConfStatus::Finalized => Self::Finalized,
+        }
+    }
+}
 
+impl From<CheckpointEntry> for RpcCheckpointConfStatus {
+    fn from(value: CheckpointEntry) -> Self {
+        value.confirmation_status.into()
+    }
+}
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcCheckpointInfo {
     /// The index of the checkpoint
@@ -273,6 +296,8 @@ pub struct RpcCheckpointInfo {
     pub l2_blockid: L2BlockId,
     /// Info on txn where checkpoint is committed on chain
     pub commitment: Option<RpcCheckpointCommitmentInfo>,
+    /// Confirmation status of checkpoint
+    pub confirmation_status: Option<RpcCheckpointConfStatus>,
 }
 
 impl From<BatchInfo> for RpcCheckpointInfo {
@@ -283,6 +308,7 @@ impl From<BatchInfo> for RpcCheckpointInfo {
             l2_range: value.l2_range,
             l2_blockid: value.l2_blockid,
             commitment: None,
+            confirmation_status: None,
         }
     }
 }
@@ -291,6 +317,7 @@ impl From<CheckpointEntry> for RpcCheckpointInfo {
     fn from(value: CheckpointEntry) -> Self {
         let mut item: Self = value.batch_info.into();
         item.commitment = value.commitment.map(Into::into);
+        item.confirmation_status = Some(value.confirmation_status.into());
         item
     }
 }
