@@ -1,17 +1,27 @@
-use sp1_prover::utils::get_cycles;
+use sp1_sdk::ProverClient;
 use strata_sp1_adapter::SP1Host;
+use strata_zkvm::{ProofType, ZkVmInputBuilder, ZkVmResult};
 
 use crate::{ProofReport, ZkVmHostPerf};
 
 impl ZkVmHostPerf for SP1Host {
     fn perf_report<'a>(
         &self,
-        input: <Self::Input<'a> as strata_zkvm::ZkVmInputBuilder<'a>>::Input,
-        _proof_type: strata_zkvm::ProofType,
+        input: <Self::Input<'a> as ZkVmInputBuilder<'a>>::Input,
+        _proof_type: ProofType,
         report_name: String,
-    ) -> strata_zkvm::ZkVmResult<ProofReport> {
+    ) -> ZkVmResult<ProofReport> {
+        let client = ProverClient::from_env();
+
+        #[cfg(feature = "profiling")]
+        {
+            std::env::set_var("TRACE_FILE", format!("{}.trace", report_name));
+        }
+
+        let (_, report) = client.execute(self.get_elf(), &input).run().unwrap();
+
         Ok(ProofReport {
-            cycles: get_cycles(self.get_elf(), &input),
+            cycles: report.total_instruction_count(),
             report_name,
         })
     }
