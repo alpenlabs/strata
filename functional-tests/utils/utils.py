@@ -51,6 +51,7 @@ def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
     try:
         blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
         print(f"made blocks {blk}")
+        return blk
     except Exception as ex:
         logging.warning(f"{ex} while generating address")
         return
