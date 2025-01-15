@@ -9,6 +9,8 @@ FUNCTIONAL_TESTS_DIR  = functional-tests
 FUNCTIONAL_TESTS_DATADIR = _dd
 DOCKER_DIR = docker
 DOCKER_DATADIR = .data
+PROVER_PERF_EVAL_DIR  = provers/perf
+PROVER_PROOFS_CACHE_DIR  = provers/tests/proofs
 
 # Cargo profile for builds. Default is for local builds, CI uses an override.
 PROFILE ?= release
@@ -64,6 +66,18 @@ mutants-test: ## Runs `nextest` under `cargo-mutants`. Caution: This can take *r
 .PHONY: sec
 sec: ## Check for security advisories on any dependencies.
 	cargo audit #  HACK: not denying warnings as we depend on `yaml-rust` via `format-serde-error` which is unmaintained
+
+
+##@ Prover
+.PHONY: prover-eval
+prover-eval: prover-clean ## Generate reports and profiling data for proofs
+	cd $(PROVER_PERF_EVAL_DIR) && cargo run --release -F profiling
+
+.PHONY: prover-clean
+prover-clean: ## Cleans up proofs and profiling data generated
+	rm -rf $(PROVER_PERF_EVAL_DIR)/*.trace
+	rm -rf $(PROVER_PROOFS_CACHE_DIR)/*.proof
+
 
 ##@ Functional Tests
 .PHONY: ensure-poetry

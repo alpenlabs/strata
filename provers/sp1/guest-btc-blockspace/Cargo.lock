@@ -2149,6 +2149,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-l1tx"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "musig2",
+ "strata-bridge-tx-builder",
+ "strata-primitives",
+ "strata-state",
+ "thiserror 1.0.68",
+ "tracing",
+]
+
+[[package]]
 name = "strata-primitives"
 version = "0.1.0"
 dependencies = [
@@ -2160,6 +2177,7 @@ dependencies = [
  "digest 0.10.7",
  "hex",
  "musig2",
+ "num_enum",
  "rand",
  "reth-primitives",
  "secp256k1",
@@ -2180,9 +2198,9 @@ dependencies = [
  "serde",
  "sha2",
  "strata-bridge-tx-builder",
+ "strata-l1tx",
  "strata-primitives",
  "strata-state",
- "strata-tx-parser",
  "strata-zkvm",
 ]
 
@@ -2213,30 +2231,12 @@ dependencies = [
  "digest 0.10.7",
  "ethnum",
  "hex",
- "num_enum",
  "serde",
  "sha2",
  "strata-bridge-tx-builder",
  "strata-crypto",
  "strata-primitives",
  "strata-zkvm",
- "tracing",
-]
-
-[[package]]
-name = "strata-tx-parser"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "bitcoin",
- "borsh",
- "hex",
- "musig2",
- "strata-bridge-tx-builder",
- "strata-primitives",
- "strata-state",
- "thiserror 1.0.68",
  "tracing",
 ]
 
