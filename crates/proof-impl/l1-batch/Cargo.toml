@@ -11,6 +11,7 @@ serde.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-state.workspace = true
+strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
 [dev-dependencies]

@@ -12,14 +12,12 @@ use strata_tx_parser::filter::{filter_protocol_op_tx_refs, TxFilterConfig};
 pub fn extract_relevant_info(
     block: &Block,
     rollup_params: &RollupParams,
+    filter_config: &TxFilterConfig,
 ) -> (Vec<DepositInfo>, Option<BatchCheckpoint>) {
-    let filter_config =
-        TxFilterConfig::derive_from(rollup_params).expect("derive tx-filter config");
-
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    let relevant_txs = filter_protocol_op_tx_refs(block, &filter_config);
+    let relevant_txs = filter_protocol_op_tx_refs(block, filter_config);
 
     for tx in relevant_txs {
         match tx.proto_op() {
