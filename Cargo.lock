@@ -13306,8 +13306,8 @@ name = "strata-reth-primitives"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
- "reth-primitives",
  "serde",
+ "strata-primitives",
 ]
 
 [[package]]
