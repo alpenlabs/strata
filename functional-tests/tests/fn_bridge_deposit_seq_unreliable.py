@@ -39,7 +39,7 @@ class BridgeDepositSequencerUnreliableTest(testenv.BridgeTestBase):
 
         self.debug("Making DRT")
         # make deposit request transaction
-        self.make_drt(ctx, el_address, bridge_pk)
+        self.make_drt(el_address, bridge_pk)
 
         # start again
         self.seq.start()

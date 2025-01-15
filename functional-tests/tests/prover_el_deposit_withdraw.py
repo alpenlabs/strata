@@ -6,7 +6,12 @@ from strata_utils import get_balance
 
 from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
-from utils import get_bridge_pubkey, utils, wait_for_proof_with_time_out
+from utils import (
+    confirm_btc_withdrawal,
+    get_bridge_pubkey,
+    wait_for_proof_with_time_out,
+    wait_until,
+)
 
 
 @flexitest.register
@@ -35,7 +40,9 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
         rethrpc = reth.create_rpc()
         prover_client = ctx.get_service("prover_client")
         prover_client_rpc = prover_client.create_rpc()
-        # Wait till everything is started and warmed up. Not sure if it's strictly required.
+        # Wait some time until the prover client has loaded the ELFs and ready to accept RPCs.
+        # It might happen this is already unnecessary.
+        # TODO: Ideally, this should be an health check RPC to the prover client.
         time.sleep(5)
 
         # DEPOSIT part of the test
@@ -132,7 +139,7 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
         # Wait some time so the future blocks in the batches are finalized.
         # Given that L1 blocks are happening more frequent that L2, it's safe
         # to assert only L2 latest block.
-        utils.wait_until(
+        wait_until(
             lambda: int(rethrpc.eth_blockNumber(), base=16) > l2[1],
             timeout=60,
         )
@@ -145,34 +152,3 @@ class ProverDepositWithdrawTest(testenv.BridgeTestBase):
         assert task_id is not None
 
         wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)
-
-
-def confirm_btc_withdrawal(
-    withdraw_address,
-    btc_url,
-    btc_user,
-    btc_password,
-    original_balance,
-    expected_increase,
-    debug_fn=print,
-):
-    """
-    Wait for the BTC balance to reflect the withdrawal and confirm the final balance
-    equals `original_balance + expected_increase`.
-    """
-    # Wait for the new balance,
-    # this includes waiting for a new batch checkpoint,
-    # duty processing by the bridge clients and maturity of the withdrawal.
-    utils.wait_until(
-        lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > original_balance,
-        timeout=60,
-    )
-
-    # Check final BTC balance
-    btc_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
-    debug_fn(f"BTC final balance: {btc_balance}")
-    debug_fn(f"Expected final balance: {original_balance + expected_increase}")
-
-    assert (
-        btc_balance == original_balance + expected_increase
-    ), "BTC balance after withdrawal is not as expected"
