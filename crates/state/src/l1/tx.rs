@@ -1,6 +1,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use strata_primitives::l1::RawBitcoinTx;
 
 use super::L1TxProof;
 use crate::tx::ProtocolOperation;
@@ -12,12 +13,12 @@ use crate::tx::ProtocolOperation;
 pub struct L1Tx {
     // TODO: verify if we need L1TxProof or L1WtxProof
     proof: L1TxProof,
-    tx: Vec<u8>,
+    tx: RawBitcoinTx,
     protocol_operation: ProtocolOperation,
 }
 
 impl L1Tx {
-    pub fn new(proof: L1TxProof, tx: Vec<u8>, protocol_operation: ProtocolOperation) -> Self {
+    pub fn new(proof: L1TxProof, tx: RawBitcoinTx, protocol_operation: ProtocolOperation) -> Self {
         Self {
             proof,
             tx,
@@ -29,7 +30,7 @@ impl L1Tx {
         &self.proof
     }
 
-    pub fn tx_data(&self) -> &[u8] {
+    pub fn tx_data(&self) -> &RawBitcoinTx {
         &self.tx
     }
 

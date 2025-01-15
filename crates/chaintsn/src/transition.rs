@@ -398,7 +398,7 @@ mod tests {
                 .map(|idx| {
                     let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
                     let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
-                    let tx = ArbitraryGenerator::new_with_size(1 << 8).generate();
+                    let tx = ArbitraryGenerator::new_with_size(1 << 12).generate();
 
                     let l1tx = if idx == 1 {
                         let protocol_op = ProtocolOperation::Deposit(DepositInfo {

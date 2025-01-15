@@ -200,7 +200,7 @@ mod tests {
         // prepare the clientState and ClientUpdateOutput for up to 20th index
         for idx in 0..20 {
             let mut state = state.clone();
-            let l2block: L2Block = ArbitraryGenerator::new().generate();
+            let l2block: L2Block = ArbitraryGenerator::new_with_size(1 << 12).generate();
             let ss: SyncState = ArbitraryGenerator::new().generate();
 
             let output = ClientUpdateOutput::new(

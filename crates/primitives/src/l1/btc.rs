@@ -9,6 +9,7 @@ use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     absolute::LockTime,
     address::NetworkUnchecked,
+    consensus::{deserialize, encode, serialize},
     hashes::{sha256d, Hash},
     key::{rand, Keypair, Parity, TapTweak},
     secp256k1::{SecretKey, XOnlyPublicKey, SECP256K1},
@@ -740,6 +741,92 @@ impl XOnlyPk {
     }
 }
 
+impl From<Transaction> for RawBitcoinTx {
+    fn from(value: Transaction) -> Self {
+        Self(serialize(&value))
+    }
+}
+
+impl TryFrom<RawBitcoinTx> for Transaction {
+    type Error = encode::Error;
+    fn try_from(value: RawBitcoinTx) -> Result<Self, Self::Error> {
+        deserialize(&value.0)
+    }
+}
+
+impl TryFrom<&RawBitcoinTx> for Transaction {
+    type Error = encode::Error;
+    fn try_from(value: &RawBitcoinTx) -> Result<Self, Self::Error> {
+        deserialize(&value.0)
+    }
+}
+
+impl<'a> arbitrary::Arbitrary<'a> for RawBitcoinTx {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Random number of inputs and outputs (bounded for simplicity)
+        let input_count = u.int_in_range::<usize>(0..=4)?;
+        let output_count = u.int_in_range::<usize>(0..=4)?;
+
+        // Build random inputs
+        let mut inputs = Vec::with_capacity(input_count);
+        for _ in 0..input_count {
+            // Random 32-byte TXID
+            let mut txid_bytes = [0u8; 32];
+            u.fill_buffer(&mut txid_bytes)?;
+
+            // Random vout
+            let vout = u32::arbitrary(u)?;
+
+            // Random scriptSig (bounded size)
+            let script_sig_size = u.int_in_range::<usize>(0..=50)?;
+            let script_sig_bytes = u.bytes(script_sig_size)?;
+            let script_sig = ScriptBuf::from_bytes(script_sig_bytes.to_vec());
+
+            inputs.push(TxIn {
+                previous_output: OutPoint {
+                    txid: Txid::from_byte_array(txid_bytes),
+                    vout,
+                },
+                script_sig,
+                sequence: Sequence::MAX,
+                witness: Witness::default(), // or generate random witness if desired
+            });
+        }
+
+        // Build random outputs
+        let mut outputs = Vec::with_capacity(output_count);
+        for _ in 0..output_count {
+            // Random value (in satoshis)
+            let value = Amount::from_sat(u64::arbitrary(u)?);
+
+            // Random scriptPubKey (bounded size)
+            let script_pubkey_size = u.int_in_range::<usize>(0..=50)?;
+            let script_pubkey_bytes = u.bytes(script_pubkey_size)?;
+            let script_pubkey = ScriptBuf::from(script_pubkey_bytes.to_vec());
+
+            outputs.push(TxOut {
+                value,
+                script_pubkey,
+            });
+        }
+
+        // Construct the transaction
+        let tx = Transaction {
+            version: Version::ONE,
+            lock_time: LockTime::ZERO,
+            input: inputs,
+            output: outputs,
+        };
+
+        Ok(tx.into())
+    }
+}
+
+/// Represents a raw, byte-encoded Bitcoin transaction with custom [`Arbitrary`] support.  
+/// Provides conversions (via [`TryFrom`]) to and from [`Transaction`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct RawBitcoinTx(Vec<u8>);
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -752,14 +839,14 @@ mod tests {
         script::Builder,
         secp256k1::{Parity, SecretKey, SECP256K1},
         taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
-        Address, Amount, Network, ScriptBuf, TapNodeHash, TxOut, XOnlyPublicKey,
+        Address, Amount, Network, ScriptBuf, TapNodeHash, Transaction, TxOut, XOnlyPublicKey,
     };
     use rand::{rngs::OsRng, Rng};
     use strata_test_utils::ArbitraryGenerator;
 
     use super::{
         BitcoinAddress, BitcoinAmount, BitcoinTxOut, BitcoinTxid, BorshDeserialize, BorshSerialize,
-        XOnlyPk,
+        RawBitcoinTx, XOnlyPk,
     };
     use crate::{
         errors::ParseError,
@@ -1190,5 +1277,12 @@ mod tests {
             deserialized_txid, txid,
             "original and deserialized txid must be the same"
         );
+    }
+
+    #[test]
+    fn test_bitcoin_tx_arbitrary_generation() {
+        let mut generator = ArbitraryGenerator::new();
+        let raw_tx: RawBitcoinTx = generator.generate();
+        let _: Transaction = raw_tx.try_into().expect("should generate valid tx");
     }
 }
