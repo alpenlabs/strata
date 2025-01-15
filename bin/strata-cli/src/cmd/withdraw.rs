@@ -7,6 +7,7 @@ use alloy::{
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use indicatif::ProgressBar;
+use strata_primitives::bitcoin_bosd::Descriptor;
 
 use crate::{
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
@@ -15,7 +16,6 @@ use crate::{
     settings::Settings,
     signet::SignetWallet,
     strata::StrataWallet,
-    taproot::ExtractP2trPubkey,
 };
 
 /// Withdraw 10 BTC from Strata to signet
@@ -24,11 +24,11 @@ use crate::{
 pub struct WithdrawArgs {
     /// the signet address to send funds to. defaults to a new internal wallet address
     #[argh(positional)]
-    p2tr_address: Option<String>,
+    address: Option<String>,
 }
 
 pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
-    let address = args.p2tr_address.map(|a| {
+    let address = args.address.map(|a| {
         Address::from_str(&a)
             .expect("valid address")
             .require_network(settings.network)
@@ -49,17 +49,14 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
     };
     println!("Bridging out {BRIDGE_OUT_AMOUNT} to {address}");
 
+    let bosd: Descriptor = address.into();
+
     let tx = l2w
         .transaction_request()
         .with_to(settings.bridge_strata_address)
         .with_value(U256::from(BRIDGE_OUT_AMOUNT.to_sat() as u128 * SATS_TO_WEI))
-        .input(TransactionInput::new(
-            address
-                .extract_p2tr_pubkey()
-                .expect("valid P2TR address")
-                .serialize()
-                .into(),
-        ));
+        // calldata for the Strata EVM-BOSD descriptor
+        .input(TransactionInput::new(bosd.to_bytes().into()));
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
