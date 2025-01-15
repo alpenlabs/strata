@@ -6,6 +6,7 @@ import flexitest
 from strata_utils import (
     get_address,
     get_recovery_address,
+    xonlypk_to_descriptor,
 )
 
 from envs.rollup_params_cfg import RollupConfig
