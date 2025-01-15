@@ -35,9 +35,9 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     L2BlockStatusSchema::COLUMN_FAMILY_NAME,
     L2BlockHeightSchema::COLUMN_FAMILY_NAME,
     WriteBatchSchema::COLUMN_FAMILY_NAME,
-    // Seqdb schemas
-    SeqPayloadSchema::COLUMN_FAMILY_NAME,
-    SeqIntentSchema::COLUMN_FAMILY_NAME,
+    // Payload/intent schemas
+    PayloadSchema::COLUMN_FAMILY_NAME,
+    IntentSchema::COLUMN_FAMILY_NAME,
     // Bcast schemas
     BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
     BcastL1TxSchema::COLUMN_FAMILY_NAME,
@@ -87,11 +87,8 @@ use l2::{
     schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema},
 };
 use rockbound::{schema::ColumnFamilyName, Schema};
-pub use sequencer::db::RBSeqBlobDb;
-use sequencer::{
-    db::SequencerDB,
-    schemas::{SeqIntentSchema, SeqPayloadSchema},
-};
+pub use sequencer::db::RBPayloadDb;
+use sequencer::schemas::{IntentSchema, PayloadSchema};
 pub use sync_event::db::SyncEventDb;
 
 use crate::{
@@ -175,10 +172,9 @@ pub fn init_broadcaster_database(
     BroadcastDb::new(l1_broadcast_db.into()).into()
 }
 
-pub fn init_sequencer_database(
+pub fn init_writer_database(
     rbdb: Arc<rockbound::OptimisticTransactionDB>,
     ops_config: DbOpsConfig,
-) -> Arc<SequencerDB<RBSeqBlobDb>> {
-    let seqdb = RBSeqBlobDb::new(rbdb, ops_config).into();
-    SequencerDB::new(seqdb).into()
+) -> Arc<RBPayloadDb> {
+    RBPayloadDb::new(rbdb, ops_config).into()
 }

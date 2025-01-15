@@ -8,10 +8,10 @@ use crate::{
 
 define_table_with_seek_key_codec!(
     /// A table to store idx-> payload entry mapping
-    (SeqPayloadSchema) u64 => PayloadEntry
+    (PayloadSchema) u64 => PayloadEntry
 );
 
 define_table_with_default_codec!(
     /// A table to store intentid -> intent mapping
-    (SeqIntentSchema) Buf32 => IntentEntry
+    (IntentSchema) Buf32 => IntentEntry
 );

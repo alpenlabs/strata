@@ -18,16 +18,15 @@ use strata_consensus_logic::{
     sync_manager::{self, SyncManager},
 };
 use strata_db::{
-    traits::{BroadcastDatabase, ChainstateDatabase, Database, SequencerDatabase},
+    traits::{BroadcastDatabase, ChainstateDatabase, Database},
     DbError,
 };
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::Params;
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, init_broadcaster_database, init_core_dbs,
-    init_sequencer_database, open_rocksdb_database, sequencer::db::SequencerDB, CommonDb,
-    DbOpsConfig, RBSeqBlobDb, ROCKSDB_NAME,
+    broadcaster::db::BroadcastDb, init_broadcaster_database, init_core_dbs, init_writer_database,
+    open_rocksdb_database, CommonDb, DbOpsConfig, RBPayloadDb, ROCKSDB_NAME,
 };
 use strata_rpc_api::{
     StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
@@ -143,14 +142,15 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 ctx.bitcoin_client.clone(),
                 params.clone(),
             );
-            let seq_db = init_sequencer_database(rbdb.clone(), ops_config);
+            let writer_db = init_writer_database(rbdb.clone(), ops_config);
 
+            // TODO: split writer tasks from this
             start_sequencer_tasks(
                 ctx.clone(),
                 &config,
                 sequencer_config,
                 &executor,
-                seq_db,
+                writer_db,
                 checkpoint_handle.clone(),
                 broadcast_handle,
                 &mut methods,
@@ -373,7 +373,7 @@ fn start_sequencer_tasks(
     config: &Config,
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
-    seq_db: Arc<SequencerDB<RBSeqBlobDb>>,
+    writer_db: Arc<RBPayloadDb>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     methods: &mut Methods,
@@ -417,7 +417,7 @@ fn start_sequencer_tasks(
         Arc::new(btcio_config.writer.clone()),
         params.clone(),
         sequencer_bitcoin_address,
-        SequencerDatabase::payload_db(seq_db.as_ref()).clone(),
+        writer_db,
         status_channel.clone(),
         pool.clone(),
         broadcast_handle.clone(),
