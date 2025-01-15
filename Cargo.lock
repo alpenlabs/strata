@@ -13432,7 +13432,7 @@ dependencies = [
 
 [[package]]
 name = "strata-python-utils"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "bdk_bitcoind_rpc",

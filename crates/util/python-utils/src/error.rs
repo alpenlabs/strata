@@ -24,6 +24,9 @@ pub(crate) enum Error {
     /// Invalid Bitcoin address.
     BitcoinAddress,
 
+    /// `OP_RETURN` bigger than 80 bytes.
+    OpReturnTooLong,
+
     /// Could not create a BitcoinD RPC client.
     RpcClient,
 
@@ -49,6 +52,9 @@ impl From<Error> for PyErr {
             }
             Error::BitcoinAddress => {
                 PyErr::new::<PyTypeError, _>("Not a valid bitcoin address".to_owned())
+            }
+            Error::OpReturnTooLong => {
+                PyErr::new::<PyTypeError, _>("OP_RETURN bigger than 80 bytes".to_owned())
             }
             Error::RpcClient => {
                 PyErr::new::<PyTypeError, _>("Could not create RPC client".to_owned())
