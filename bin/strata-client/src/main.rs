@@ -26,7 +26,7 @@ use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::Params;
 use strata_rocksdb::{
     broadcaster::db::BroadcastDb, init_broadcaster_database, init_core_dbs, init_writer_database,
-    open_rocksdb_database, CommonDb, DbOpsConfig, RBPayloadDb, ROCKSDB_NAME,
+    open_rocksdb_database, CommonDb, DbOpsConfig, RBL1WriterDb, ROCKSDB_NAME,
 };
 use strata_rpc_api::{
     StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
@@ -373,7 +373,7 @@ fn start_sequencer_tasks(
     config: &Config,
     sequencer_config: &SequencerConfig,
     executor: &TaskExecutor,
-    writer_db: Arc<RBPayloadDb>,
+    writer_db: Arc<RBL1WriterDb>,
     checkpoint_handle: Arc<CheckpointHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     methods: &mut Methods,

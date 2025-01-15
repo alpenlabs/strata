@@ -248,7 +248,7 @@ pub trait CheckpointDatabase {
 
 /// A trait encapsulating provider and store traits to create/update [`PayloadEntry`] in the
 /// database and to fetch [`PayloadEntry`] and indices from the database
-pub trait L1PayloadDatabase {
+pub trait L1WriterDatabase {
     /// Store the [`PayloadEntry`].
     fn put_payload_entry(&self, idx: u64, payloadentry: PayloadEntry) -> DbResult<()>;
 
@@ -263,6 +263,12 @@ pub trait L1PayloadDatabase {
 
     /// Get a [`IntentEntry`] by its hash
     fn get_intent_by_id(&self, id: Buf32) -> DbResult<Option<IntentEntry>>;
+
+    /// Get a [`IntentEntry`] by its idx
+    fn get_intent_by_idx(&self, idx: u64) -> DbResult<Option<IntentEntry>>;
+
+    /// Get  the next intent index
+    fn get_next_intent_idx(&self) -> DbResult<u64>;
 }
 
 pub trait ProofDatabase {

@@ -87,7 +87,7 @@ use l2::{
     schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema},
 };
 use rockbound::{schema::ColumnFamilyName, Schema};
-pub use sequencer::db::RBPayloadDb;
+pub use sequencer::db::RBL1WriterDb;
 use sequencer::schemas::{IntentSchema, PayloadSchema};
 pub use sync_event::db::SyncEventDb;
 
@@ -175,6 +175,6 @@ pub fn init_broadcaster_database(
 pub fn init_writer_database(
     rbdb: Arc<rockbound::OptimisticTransactionDB>,
     ops_config: DbOpsConfig,
-) -> Arc<RBPayloadDb> {
-    RBPayloadDb::new(rbdb, ops_config).into()
+) -> Arc<RBL1WriterDb> {
+    RBL1WriterDb::new(rbdb, ops_config).into()
 }

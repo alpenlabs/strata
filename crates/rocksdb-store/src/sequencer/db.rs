@@ -1,33 +1,33 @@
 use std::sync::Arc;
 
-use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
+use rockbound::{utils::get_last, OptimisticTransactionDB as DB, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
-    traits::L1PayloadDatabase,
+    traits::L1WriterDatabase,
     types::{IntentEntry, PayloadEntry},
     DbResult,
 };
 use strata_primitives::buf::Buf32;
 
-use super::schemas::{IntentSchema, PayloadSchema};
-use crate::DbOpsConfig;
+use super::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
+use crate::{sequence::get_next_id, DbOpsConfig};
 
-pub struct RBPayloadDb {
-    db: Arc<OptimisticTransactionDB>,
+pub struct RBL1WriterDb {
+    db: Arc<DB>,
     ops: DbOpsConfig,
 }
 
-impl RBPayloadDb {
+impl RBL1WriterDb {
     /// Wraps an existing database handle.
     ///
     /// Assumes it was opened with column families as defined in `STORE_COLUMN_FAMILIES`.
     // FIXME Make it better/generic.
-    pub fn new(db: Arc<OptimisticTransactionDB>, ops: DbOpsConfig) -> Self {
+    pub fn new(db: Arc<DB>, ops: DbOpsConfig) -> Self {
         Self { db, ops }
     }
 }
 
-impl L1PayloadDatabase for RBPayloadDb {
+impl L1WriterDatabase for RBL1WriterDb {
     fn put_payload_entry(&self, idx: u64, entry: PayloadEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
@@ -45,7 +45,7 @@ impl L1PayloadDatabase for RBPayloadDb {
     }
 
     fn get_next_payload_idx(&self) -> DbResult<u64> {
-        Ok(rockbound::utils::get_last::<PayloadSchema>(&*self.db)?
+        Ok(get_last::<PayloadSchema>(&*self.db)?
             .map(|(x, _)| x + 1)
             .unwrap_or(0))
     }
@@ -55,6 +55,8 @@ impl L1PayloadDatabase for RBPayloadDb {
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |tx| -> Result<(), DbError> {
+                    let idx = get_next_id::<IntentIdxSchema, DB>(tx)?;
+                    tx.put::<IntentIdxSchema>(&idx, &intent_id)?;
                     tx.put::<IntentSchema>(&intent_id, &intent_entry)?;
 
                     Ok(())
@@ -66,12 +68,33 @@ impl L1PayloadDatabase for RBPayloadDb {
     fn get_intent_by_id(&self, id: Buf32) -> DbResult<Option<IntentEntry>> {
         Ok(self.db.get::<IntentSchema>(&id)?)
     }
+
+    fn get_intent_by_idx(&self, idx: u64) -> DbResult<Option<IntentEntry>> {
+        match self.db.get::<IntentIdxSchema>(&idx)? {
+            Some(id) => self
+                .db
+                .get::<IntentSchema>(&id)?
+                .ok_or_else(|| {
+                    DbError::Other(format!(
+                    "Intent index({idx}) exists but corresponding id does not exist in writer db"
+                ))
+                })
+                .map(Some),
+            None => Ok(None),
+        }
+    }
+
+    fn get_next_intent_idx(&self) -> DbResult<u64> {
+        Ok(get_last::<IntentIdxSchema>(&*self.db)?
+            .map(|(x, _)| x + 1)
+            .unwrap_or(0))
+    }
 }
 
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::L1PayloadDatabase;
+    use strata_db::traits::L1WriterDatabase;
     use strata_primitives::buf::Buf32;
     use strata_test_utils::ArbitraryGenerator;
     use test;
@@ -82,7 +105,7 @@ mod tests {
     #[test]
     fn test_put_blob_new_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBPayloadDb::new(db, db_ops);
+        let seq_db = RBL1WriterDb::new(db, db_ops);
 
         let blob: PayloadEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
@@ -99,7 +122,7 @@ mod tests {
     #[test]
     fn test_put_blob_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBPayloadDb::new(db, db_ops);
+        let seq_db = RBL1WriterDb::new(db, db_ops);
         let blob: PayloadEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
@@ -114,7 +137,7 @@ mod tests {
     #[test]
     fn test_update_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBPayloadDb::new(db, db_ops);
+        let seq_db = RBL1WriterDb::new(db, db_ops);
 
         let entry: PayloadEntry = ArbitraryGenerator::new().generate();
 
@@ -132,7 +155,7 @@ mod tests {
     #[test]
     fn test_get_last_entry_idx() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBPayloadDb::new(db, db_ops);
+        let seq_db = RBL1WriterDb::new(db, db_ops);
 
         let blob: PayloadEntry = ArbitraryGenerator::new().generate();
 
@@ -162,7 +185,7 @@ mod tests {
     #[test]
     fn test_put_intent_new_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBPayloadDb::new(db, db_ops);
+        let seq_db = RBL1WriterDb::new(db, db_ops);
 
         let intent: IntentEntry = ArbitraryGenerator::new().generate();
         let intent_id: Buf32 = [0; 32].into();
@@ -176,7 +199,7 @@ mod tests {
     #[test]
     fn test_put_intent_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let seq_db = RBPayloadDb::new(db, db_ops);
+        let seq_db = RBL1WriterDb::new(db, db_ops);
         let intent: IntentEntry = ArbitraryGenerator::new().generate();
         let intent_id: Buf32 = [0; 32].into();
 
