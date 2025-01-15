@@ -5,5 +5,5 @@ use crate::{define_table_with_seek_key_codec, define_table_without_codec, impl_b
 // Consensus Output Schema and corresponding codecs implementation
 define_table_with_seek_key_codec!(
     /// Table to store client state updates.
-    (ClientUpdateOutputSchema) u64 => ClientUpdateOutput
+    (ClientUpdateSchema) u64 => ClientUpdateOutput
 );

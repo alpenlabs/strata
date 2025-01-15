@@ -25,8 +25,7 @@ pub const ROCKSDB_NAME: &str = "strata-client";
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     SequenceSchema::COLUMN_FAMILY_NAME,
     ChainstateSchema::COLUMN_FAMILY_NAME,
-    ClientUpdateOutputSchema::COLUMN_FAMILY_NAME,
-    ClientStateSchema::COLUMN_FAMILY_NAME,
+    ClientUpdateSchema::COLUMN_FAMILY_NAME,
     L1BlockSchema::COLUMN_FAMILY_NAME,
     MmrSchema::COLUMN_FAMILY_NAME,
     SyncEventSchema::COLUMN_FAMILY_NAME,
@@ -96,7 +95,7 @@ pub use sync_event::db::SyncEventDb;
 
 use crate::{
     chain_state::schemas::{ChainstateSchema, WriteBatchSchema},
-    client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema},
+    client_state::schemas::ClientUpdateSchema,
     l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema},
     sequence::SequenceSchema,
     sync_event::schemas::SyncEventSchema,

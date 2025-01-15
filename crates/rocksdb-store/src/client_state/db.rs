@@ -4,7 +4,7 @@ use rockbound::{OptimisticTransactionDB, Schema, SchemaDBOperationsExt};
 use strata_db::{errors::*, traits::*, DbResult};
 use strata_state::operation::*;
 
-use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
+use super::schemas::ClientUpdateSchema;
 use crate::DbOpsConfig;
 
 pub struct ClientStateDb {
@@ -39,30 +39,30 @@ impl ClientStateDb {
 
 impl ClientStateDatabase for ClientStateDb {
     fn write_client_update(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
-        let expected_idx = match self.get_last_idx::<ClientUpdateOutputSchema>()? {
+        let expected_idx = match self.get_last_idx::<ClientUpdateSchema>()? {
             Some(last_idx) => last_idx + 1,
             None => 1,
         };
         if idx != expected_idx {
             return Err(DbError::OooInsert("consensus_store", idx));
         }
-        self.db.put::<ClientUpdateOutputSchema>(&idx, &output)?;
+        self.db.put::<ClientUpdateSchema>(&idx, &output)?;
         Ok(())
     }
 
     fn get_last_update_idx(&self) -> DbResult<u64> {
-        match self.get_last_idx::<ClientUpdateOutputSchema>()? {
+        match self.get_last_idx::<ClientUpdateSchema>()? {
             Some(idx) => Ok(idx),
             None => Err(DbError::NotBootstrapped),
         }
     }
 
     fn get_client_update(&self, idx: u64) -> DbResult<Option<ClientUpdateOutput>> {
-        Ok(self.db.get::<ClientUpdateOutputSchema>(&idx)?)
+        Ok(self.db.get::<ClientUpdateSchema>(&idx)?)
     }
 
     fn get_prev_update_at(&self, idx: u64) -> DbResult<u64> {
-        let mut iterator = self.db.iter::<ClientStateSchema>()?;
+        let mut iterator = self.db.iter::<ClientUpdateSchema>()?;
         iterator.seek_to_last();
         let rev_iterator = iterator.rev();
 
@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn test_get_last_idx() {
         let db = setup_db();
-        let idx = db.get_last_idx::<ClientUpdateOutputSchema>().unwrap();
+        let idx = db.get_last_idx::<ClientUpdateSchema>().unwrap();
         assert_eq!(idx, None);
     }
 
@@ -107,16 +107,16 @@ mod tests {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
         let db = setup_db();
 
-        let res = db.write_client_update_output(2, output.clone());
+        let res = db.write_client_update(2, output.clone());
         assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 2))));
 
-        let res = db.write_client_update_output(1, output.clone());
+        let res = db.write_client_update(1, output.clone());
         assert!(res.is_ok());
 
-        let res = db.write_client_update_output(1, output.clone());
+        let res = db.write_client_update(1, output.clone());
         assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 1))));
 
-        let res = db.write_client_update_output(3, output.clone());
+        let res = db.write_client_update(3, output.clone());
         assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 3))));
     }
 
@@ -128,7 +128,7 @@ mod tests {
         assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
 
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
-        let _ = db.write_client_update_output(1, output.clone());
+        let _ = db.write_client_update(1, output.clone());
 
         let idx = db.get_last_write_idx();
         assert!(idx.is_ok_and(|x| matches!(x, 1)));
@@ -139,7 +139,7 @@ mod tests {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
-        let _ = db.write_client_update_output(1, output.clone());
+        let _ = db.write_client_update(1, output.clone());
 
         let writes = db.get_client_state_writes(1).unwrap().unwrap();
         assert_eq!(&writes, output.writes());
@@ -150,7 +150,7 @@ mod tests {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
-        let _ = db.write_client_update_output(1, output.clone());
+        let _ = db.write_client_update(1, output.clone());
 
         let actions = db.get_client_update_actions(1).unwrap().unwrap();
         assert_eq!(&actions, output.actions());
