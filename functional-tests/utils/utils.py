@@ -184,10 +184,6 @@ def check_nth_checkpoint_finalized(
     # Submit checkpoint if proof_timeout is not set
     if proof_timeout is None:
         submit_checkpoint(idx, seqrpc, prover_rpc, manual_gen)
-    else:
-        # Just wait until timeout period instead of submitting so that sequencer submits empty proof
-        delta = 1
-        time.sleep(proof_timeout + delta)
 
     if manual_gen:
         # Produce l1 blocks until proof is finalized
@@ -199,7 +195,7 @@ def check_nth_checkpoint_finalized(
     wait_until(
         lambda: seqrpc.strata_syncStatus()["finalized_block_id"] == to_finalize_blkid,
         error_with="Block not finalized",
-        timeout=10,
+        timeout=(proof_timeout or 0) + 10,
     )
 
 
