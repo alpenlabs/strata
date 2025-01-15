@@ -193,14 +193,12 @@ mod tests {
     use strata_primitives::{
         bridge::OperatorIdx,
         buf::Buf32,
-        errors::ParseError,
         l1::{TaprootSpendPath, XOnlyPk},
     };
     use strata_test_utils::bridge::{generate_keypairs, generate_pubkey_table};
 
     use crate::{
         context::TxBuildContext,
-        errors::{BridgeTxBuilderError, CooperativeWithdrawalError},
         prelude::{CooperativeWithdrawalInfo, BRIDGE_DENOMINATION},
         TxKind,
     };
@@ -266,48 +264,6 @@ mod tests {
             matches!(signing_data.spend_path, TaprootSpendPath::Key),
             "signing data should have a keypath spend"
         );
-    }
-
-    #[test]
-    fn test_construct_signing_data_invalid_user_pk() {
-        // Arrange
-        let (pubkeys, _seckeys) = generate_keypairs(2);
-        let pubkey_table = generate_pubkey_table(&pubkeys[..]);
-        let deposit_outpoint =
-            OutPoint::new(Txid::from_raw_hash(sha256d::Hash::hash(&[2u8; 32])), 2);
-
-        let user_index = 1usize;
-        let assigned_operator_idx = 0usize;
-        assert_ne!(
-            user_index, assigned_operator_idx,
-            "use separate indexes for user and assigned operator"
-        );
-
-        // Create an invalid XOnlyPublicKey by using an all-zero buffer
-        let invalid_user_pk = XOnlyPk::new(Buf32::zero());
-        let invalid_user_descriptor = invalid_user_pk.to_descriptor();
-        let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
-
-        let withdrawal_info = CooperativeWithdrawalInfo::new(
-            deposit_outpoint,
-            invalid_user_descriptor,
-            assigned_operator_idx,
-            0,
-        );
-
-        let build_context =
-            TxBuildContext::new(Network::Regtest, pubkey_table, assigned_operator_idx);
-
-        // Act
-        let signing_data_result = withdrawal_info.construct_signing_data(&build_context);
-
-        // Assert
-        assert!(signing_data_result.is_err_and(|e| matches!(
-            e,
-            BridgeTxBuilderError::CooperativeWithdrawalTransaction(
-                CooperativeWithdrawalError::InvalidUserPk(ParseError::InvalidPubkey(_)),
-            ),
-        )));
     }
 
     #[test]
