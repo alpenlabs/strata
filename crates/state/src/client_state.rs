@@ -384,12 +384,17 @@ impl ClientStateMut {
         self.state.l1_view_mut()
     }
 
+    pub fn push_action(&mut self, action: SyncAction) {
+        self.actions.push(action);
+    }
+
     // Semantic mutator functions.
 
     /// Sets the flag that the chain is now active, which will eventually allow
     /// the FCM to start.
-    pub fn activate_chain(&mut self) {
+    pub fn activate_chain(&mut self, genesis_blkid: L2BlockId) {
         self.state.chain_active = true;
+        self.state.sync_state = Some(SyncState::from_genesis_blkid(genesis_blkid))
     }
 
     /// Updates the L1 header verification state

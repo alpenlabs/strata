@@ -401,8 +401,10 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
                     // updates
                     let tip_blkid = *reorg.new_tip();
                     info!(?tip_blkid, "new chain tip block");
-                    let ev = SyncEvent::NewTipBlock(tip_blkid);
-                    csm_ctl.submit_event(ev)?;
+
+                    // TODO completely remove this
+                    //let ev = SyncEvent::NewTipBlock(tip_blkid);
+                    //csm_ctl.submit_event(ev)?;
 
                     // Update status
                     status_channel.update_chainstate(post_state);

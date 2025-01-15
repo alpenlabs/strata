@@ -6,7 +6,7 @@ use std::sync::Arc;
 use strata_db::traits::*;
 use strata_primitives::params::Params;
 use strata_state::{
-    client_state::ClientState,
+    client_state::{ClientState, ClientStateMut},
     operation::{self, ClientUpdateOutput},
 };
 use tracing::*;
@@ -68,29 +68,25 @@ impl<D: Database> StateTracker<D> {
         debug!(?ev, "Processing event");
 
         // Compute the state transition.
-        let outp = client_transition::process_event(&self.cur_state, &ev, db, &self.params)?;
-
-        // Clone the state and apply the operations to it.
-        let mut new_state = self.cur_state.as_ref().clone();
-        operation::apply_writes_to_state(&mut new_state, outp.writes().iter().cloned());
+        let mut state_mut = ClientStateMut::new(self.cur_state.as_ref().clone());
+        client_transition::process_event(&mut state_mut, &ev, db, &self.params)?;
+        let output = state_mut.into_output();
 
         // Update bookkeeping.
-        self.cur_state = Arc::new(new_state);
+        self.cur_state = Arc::new(output.new_state().clone());
         self.cur_state_idx = ev_idx;
         debug!(%ev_idx, "computed new consensus state");
 
         // Store the outputs.
         // TODO ideally avoid clone
-        client_state_db.write_client_update_output(ev_idx, outp.clone())?;
+        client_state_db.write_client_update(ev_idx, output.clone())?;
 
-        Ok((outp, self.cur_state.clone()))
+        Ok((output, self.cur_state.clone()))
     }
 
     /// Writes the current state to the database as a new checkpoint.
     pub fn store_checkpoint(&self) -> anyhow::Result<()> {
-        let client_state_db = self.database.client_state_db();
-        let state = self.cur_state.as_ref().clone(); // TODO avoid clone
-        client_state_db.write_client_state_checkpoint(self.cur_state_idx, state)?;
+        warn!("tried to store checkpoint, we deprecated this functionality");
         Ok(())
     }
 }
@@ -109,23 +105,20 @@ impl<D: Database> StateTracker<D> {
 pub fn reconstruct_cur_state(
     cs_db: &impl ClientStateDatabase,
 ) -> anyhow::Result<(u64, ClientState)> {
-    let last_ckpt_idx = cs_db.get_last_checkpoint_idx()?;
+    let last_update_idx = cs_db.get_last_update_idx()?;
 
     // genesis state.
-    if last_ckpt_idx == 0 {
+    /*if last_ckpt_idx == 0 {
         debug!("starting from init state");
         let state = cs_db
             .get_state_checkpoint(0)?
             .ok_or(Error::MissingCheckpoint(0))?;
         return Ok((0, state));
-    }
+    }*/
 
-    // If we're not in genesis, then we probably have to replay some writes.
-    let last_write_idx = cs_db.get_last_write_idx()?;
+    let state = reconstruct_state(cs_db, last_update_idx)?;
 
-    let state = reconstruct_state(cs_db, last_write_idx)?;
-
-    Ok((last_write_idx, state))
+    Ok((last_update_idx, state))
 }
 
 /// Reconstructs the
@@ -144,33 +137,15 @@ pub fn reconstruct_state(
     cs_db: &impl ClientStateDatabase,
     idx: u64,
 ) -> anyhow::Result<ClientState> {
-    match cs_db.get_state_checkpoint(idx)? {
-        Some(cl) => {
+    match cs_db.get_client_update(idx)? {
+        Some(update) => {
             // if the checkpoint was created at the idx itself, return the checkpoint
             debug!(%idx, "no writes to replay");
-            Ok(cl)
+            Ok(update.new_state().clone())
         }
         None => {
-            // get the previously written checkpoint
-            let prev_ckpt_idx = cs_db.get_prev_checkpoint_at(idx)?;
-
-            // get the previous checkpoint Client State
-            let mut state = cs_db
-                .get_state_checkpoint(prev_ckpt_idx)?
-                .ok_or(Error::MissingCheckpoint(idx))?;
-
-            // write the client state
-            let write_replay_start = prev_ckpt_idx + 1;
-            debug!(%prev_ckpt_idx, %idx, "reconstructing state from checkpoint");
-
-            for i in write_replay_start..=idx {
-                let writes = cs_db
-                    .get_client_state_writes(i)?
-                    .ok_or(Error::MissingConsensusWrites(i))?;
-                operation::apply_writes_to_state(&mut state, writes.into_iter());
-            }
-
-            Ok(state)
+            warn!("removed suppport for reconstructing states");
+            Err(Error::MissingSyncEvent(idx).into())
         }
     }
 }

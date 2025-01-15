@@ -69,12 +69,14 @@ fn duty_tracker_task_inner(
 ) -> Result<(), Error> {
     let mut duties_tracker = types::DutyTracker::new_empty();
 
-    let idx = database.client_state_db().get_last_checkpoint_idx()?;
-    let last_checkpoint_state = database.client_state_db().get_state_checkpoint(idx)?;
-    let last_finalized_blk = match last_checkpoint_state {
-        Some(state) => state.sync().map(|sync| *sync.finalized_blkid()),
+    let cs_db = database.client_state_db();
+    let last_state_idx = cs_db.get_last_update_idx()?;
+    let last_state = cs_db.get_client_update(last_state_idx)?;
+    let last_finalized_blk = match last_state {
+        Some(state) => state.new_state().sync().map(|sync| *sync.finalized_blkid()),
         None => None,
     };
+
     duties_tracker.set_finalized_block(last_finalized_blk);
 
     // TODO: figure out where the l1_tx_filters_commitment is stored

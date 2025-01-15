@@ -241,10 +241,11 @@ fn handle_sync_event<D: Database>(
     assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
 
     // Write the client state checkpoint periodically based on the event idx.
-    if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
+    // TODO no more checkpointing, do we remove this entirely?
+    /*if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
         let client_state_db = state.database.client_state_db();
         client_state_db.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
-    }
+    }*/
 
     // FIXME clean this up
     let mut status = CsmStatus::default();
@@ -269,29 +270,13 @@ fn apply_action<D: Database>(
     status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match action {
-        SyncAction::UpdateTip(blkid) => {
-            // Tell the EL that this block does indeed look good.
-            debug!(?blkid, "updating EL safe block");
-            engine.update_safe_block(blkid)?;
-
-            // TODO update the tip we report in RPCs and whatnot
-        }
-
-        SyncAction::MarkInvalid(blkid) => {
-            // TODO not sure what this should entail yet
-            warn!(?blkid, "marking block invalid!");
-            state
-                .l2_block_manager
-                .set_block_status_blocking(&blkid, BlockStatus::Invalid)?;
-        }
-
-        SyncAction::FinalizeBlock(blkid) => {
+        SyncAction::FinalizeEpoch(blkid) => {
             // For the fork choice manager this gets picked up later.  We don't have
             // to do anything here *necessarily*.
             // TODO we should probably emit a state checkpoint here if we
             // aren't already
             info!(?blkid, "finalizing block");
-            engine.update_finalized_block(blkid)?;
+            engine.update_finalized_block((*blkid.last_blkid()).into())?;
         }
 
         SyncAction::L2Genesis(l1blkid) => {

@@ -10,6 +10,7 @@ use strata_state::{
     batch::{BatchCheckpoint, BatchCheckpointWithCommitment, BatchInfo},
     block,
     client_state::*,
+    epoch::EpochCommitment,
     header::L2Header,
     id::L2BlockId,
     l1::{get_btc_params, HeaderVerificationState, L1BlockId},
@@ -23,23 +24,19 @@ use crate::{errors::*, genesis::make_genesis_block, l1_handler::verify_proof};
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
 pub fn process_event<D: Database>(
-    state: &ClientState,
+    state: &mut ClientStateMut,
     ev: &SyncEvent,
     database: &D,
     params: &Params,
-) -> Result<ClientUpdateOutput, Error> {
-    let mut writes = Vec::new();
-    let mut actions = Vec::new();
-
+) -> Result<(), Error> {
     match ev {
         SyncEvent::L1Block(height, l1blkid) => {
             // If the block is before the horizon we don't care about it.
             if *height < params.rollup().horizon_l1_height {
                 #[cfg(test)]
                 warn!("early L1 block at h={height}, you may have set up the test env wrong");
-
                 warn!(%height, "ignoring unexpected L1Block event before horizon");
-                return Ok(ClientUpdateOutput::new(writes, actions));
+                return Ok(());
             }
 
             // FIXME this doesn't do any SPV checks to make sure we only go to
@@ -49,14 +46,14 @@ pub fn process_event<D: Database>(
                 .get_block_manifest(*height)?
                 .ok_or(Error::MissingL1BlockHeight(*height))?;
 
-            let l1v = state.l1_view();
-            let l1_vs = state.l1_view().tip_verification_state();
+            let tip_l1_block_height = state.state().l1_view().tip_l1_block_height();
+            let l1_vs = state.state().l1_view().tip_verification_state();
 
             // Do the consensus checks
             if let Some(l1_vs) = l1_vs {
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
                 let mut updated_l1vs = l1_vs.clone();
-                for height in (l1_vs_height..l1v.tip_l1_block_height()) {
+                for height in (l1_vs_height..=tip_l1_block_height) {
                     let block_mf = l1_db
                         .get_block_manifest(height)?
                         .ok_or(Error::MissingL1BlockHeight(height))?;
@@ -66,23 +63,25 @@ pub fn process_event<D: Database>(
                         updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
                 }
 
-                writes.push(ClientStateWrite::UpdateVerificationState(updated_l1vs))
+                state.update_l1_verif_state(updated_l1vs);
             }
 
             // Only accept the block if it's the next block in the chain we expect to accept.
+            let l1v = state.state().l1_view();
             let cur_seen_tip_height = l1v.tip_l1_block_height();
             let next_exp_height = l1v.next_expected_l1_block();
             if next_exp_height > params.rollup().horizon_l1_height {
-                // TODO check that the new block we're trying to add has the same parent as the tip
-                // block
                 let cur_tip_block = l1_db
                     .get_block_manifest(cur_seen_tip_height)?
                     .ok_or(Error::MissingL1BlockHeight(cur_seen_tip_height))?;
+
+                // TODO check that the new block we're trying to add has the
+                // same parent as the tip block
             }
 
             // Moved this out of the following if-else to make the code work.
             let commitment = L1BlockCommitment::new(*height, *l1blkid);
-            writes.push(ClientStateWrite::SetL1Tip(commitment));
+            state.set_l1_tip(commitment);
 
             if *height == next_exp_height {
                 // TODO
@@ -98,10 +97,10 @@ pub fn process_event<D: Database>(
             let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
             let maturable_height = next_exp_height.saturating_sub(safe_depth);
 
-            if maturable_height > params.rollup().horizon_l1_height && state.is_chain_active() {
-                let (wrs, acts) = handle_mature_l1_height(maturable_height, state, database);
-                writes.extend(wrs);
-                actions.extend(acts);
+            if maturable_height > params.rollup().horizon_l1_height
+                && state.state().is_chain_active()
+            {
+                handle_mature_l1_height(state, maturable_height, database);
             }
         }
 
@@ -122,23 +121,23 @@ pub fn process_event<D: Database>(
             let threshold = params.rollup.l1_reorg_safe_depth;
             let genesis_threshold = genesis_ht + threshold as u64;
 
-            debug!(%genesis_threshold, %genesis_ht, active=%state.is_chain_active(), "Inside activate chain");
+            let active = state.state().is_chain_active();
+            debug!(%genesis_threshold, %genesis_ht, %active, "Inside activate chain");
 
             // If necessary, activate the chain!
-            if !state.is_chain_active() && *height >= genesis_threshold {
+            if !state.state().is_chain_active() && *height >= genesis_threshold {
                 debug!("emitting chain activation");
                 let genesis_block = make_genesis_block(params);
 
-                writes.push(ClientStateWrite::ActivateChain);
-                writes.push(ClientStateWrite::UpdateVerificationState(
-                    l1_verification_state.clone(),
-                ));
-                writes.push(ClientStateWrite::ReplaceSync(Box::new(
-                    SyncState::from_genesis_blkid(genesis_block.header().get_blockid()),
-                )));
-                actions.push(SyncAction::L2Genesis(
+                let l1_commitment = L1BlockCommitment::new(
+                    l1_verification_state.last_verified_block_num as u64,
                     l1_verification_state.last_verified_block_hash,
-                ));
+                );
+
+                state.push_action(SyncAction::L2Genesis(l1_commitment));
+
+                state.activate_chain(genesis_block.header().get_blockid());
+                state.update_l1_verif_state(l1_verification_state.clone());
             }
         }
 
@@ -150,14 +149,14 @@ pub fn process_event<D: Database>(
                 .ok_or(Error::MissingL1BlockHeight(*to_height))?;
             let commitment = L1BlockCommitment::new(*to_height, blkmf.block_hash().into());
 
-            writes.push(ClientStateWrite::RollbackL1BlocksTo(*to_height));
-            writes.push(ClientStateWrite::SetL1Tip(commitment));
+            state.rollback_l1_tip(*to_height);
+            state.set_l1_tip(commitment);
         }
 
         SyncEvent::L1DABatch(height, checkpoints) => {
             debug!(%height, "received L1DABatch");
 
-            if let Some(ss) = state.sync() {
+            if let Some(ss) = state.state().sync() {
                 // TODO load it up and figure out what's there, see if we have to
                 // load the state updates from L1 or something
                 let l2_db = database.l2_db();
@@ -168,7 +167,7 @@ pub fn process_event<D: Database>(
                 // When DABatch appears, it is only confirmed at the moment. These will be finalized
                 // only when the corresponding L1 block is buried enough
                 if !proof_verified_checkpoints.is_empty() {
-                    writes.push(ClientStateWrite::CheckpointsReceived(
+                    for ckpt in
                         proof_verified_checkpoints
                             .iter()
                             .map(|batch_checkpoint_with_commitment| {
@@ -181,10 +180,11 @@ pub fn process_event<D: Database>(
                                     *height,
                                 )
                             })
-                            .collect(),
-                    ));
+                    {
+                        state.accept_pending_checkpoint(ckpt);
+                    }
 
-                    actions.push(SyncAction::WriteCheckpoints(
+                    state.push_action(SyncAction::WriteCheckpoints(
                         *height,
                         proof_verified_checkpoints,
                     ));
@@ -194,48 +194,9 @@ pub fn process_event<D: Database>(
                 return Err(Error::MissingClientSyncState);
             }
         }
-
-        SyncEvent::NewTipBlock(blkid) => {
-            debug!(?blkid, "Received NewTipBlock");
-            let l2_db = database.l2_db();
-            let block = l2_db
-                .get_block_data(*blkid)?
-                .ok_or(Error::MissingL2Block(*blkid))?;
-
-            // TODO: get chainstate idx from blkid OR pass correct idx in sync event
-            let block_idx = block.header().blockidx();
-            let chainstate_db = database.chain_state_db();
-            let chainstate = chainstate_db
-                .get_toplevel_state(block_idx)?
-                .ok_or(Error::MissingIdxChainstate(block_idx))?;
-
-            debug!(?chainstate, "Chainstate for new tip block");
-            // height of last matured L1 block in chain state
-            let chs_last_buried = chainstate.epoch_state().safe_l1_height().saturating_sub(1);
-            // buried height in client state
-
-            // FIXME this is ugly but we're cleaning all this up soon anyways
-            if let Some(l1seg) = block.l1_segment() {
-                let safe_l1_height = chainstate.epoch_state().safe_l1_height();
-                let safe_l1_blkid = chainstate.epoch_state().safe_l1_blkid();
-                let commitment = L1BlockCommitment::new(safe_l1_height, *safe_l1_blkid);
-                writes.push(ClientStateWrite::SetL1Tip(commitment));
-            }
-
-            // TODO better checks here
-            writes.push(ClientStateWrite::AcceptL2Block(
-                *blkid,
-                block.block().header().blockidx(),
-            ));
-            actions.push(SyncAction::UpdateTip(*blkid));
-
-            let (wrs, acts) = handle_checkpoint_finalization(state, blkid, params, database);
-            writes.extend(wrs);
-            actions.extend(acts);
-        }
     }
 
-    Ok(ClientUpdateOutput::new(writes, actions))
+    Ok(())
 }
 
 /// Handles the maturation of L1 height by finalizing checkpoints and emitting
@@ -260,54 +221,55 @@ pub fn process_event<D: Database>(
 /// * A vector of [`ClientStateWrite`] representing the state changes to be written.
 /// * A vector of [`SyncAction`] representing the actions to be synchronized.
 fn handle_mature_l1_height(
+    state: &mut ClientStateMut,
     maturable_height: u64,
-    state: &ClientState,
     database: &impl Database,
-) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
-    let mut writes = Vec::new();
-    let mut actions = Vec::new();
+) {
+    let l1v = state.state().l1_view();
+
+    if !l1v.has_verified_checkpoint_before(maturable_height) {
+        return;
+    }
 
     // If there are checkpoints at or before the maturable height, mark them as finalized
-    if state
-        .l1_view()
-        .has_verified_checkpoint_before(maturable_height)
-    {
-        if let Some(checkpt) = state
-            .l1_view()
-            .get_last_verified_checkpoint_before(maturable_height)
-        {
-            // FinalizeBlock Should only be applied when l2_block is actually
-            // available in l2_db
-            // If l2 blocks is not in db then finalization will happen when
-            // l2Block is fetched from the network and the corresponding
-            //checkpoint is already finalized.
-            let l2_blockid = checkpt.batch_info.l2_blockid;
+    if let Some(checkpt) = l1v.get_last_verified_checkpoint_before(maturable_height) {
+        // FinalizeBlock Should only be applied when l2_block is actually
+        // available in l2_db
+        // If l2 blocks is not in db then finalization will happen when
+        // l2Block is fetched from the network and the corresponding
+        //checkpoint is already finalized.
+        let l2_blockid = checkpt.batch_info.l2_blockid;
 
-            match database.l2_db().get_block_data(l2_blockid) {
-                Ok(Some(_)) => {
-                    debug!(%maturable_height, "Writing CheckpointFinalized");
-                    writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
-                    // Emit sync action for finalizing a l2 block
-                    info!(%maturable_height, %l2_blockid, "l2 block found in db, push FinalizeBlock SyncAction");
-                    actions.push(SyncAction::FinalizeBlock(l2_blockid));
-                }
-                Ok(None) => {
-                    warn!(
-                        %maturable_height,%l2_blockid, "l2 block not in db yet, skipping finalize"
-                    );
-                }
-                Err(e) => {
-                    error!(%e, "error while fetching block data from l2_db");
-                }
+        match database.l2_db().get_block_data(l2_blockid) {
+            Ok(Some(_)) => {
+                debug!(%maturable_height, "Writing CheckpointFinalized");
+
+                //writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
+                state.finalized_checkpoint(maturable_height);
+
+                // Emit sync action for finalizing a l2 block
+                info!(%maturable_height, %l2_blockid, "l2 block found in db, push FinalizeBlock SyncAction");
+                let checkpoint_slot = 0;
+
+                let epoch_commitment =
+                    EpochCommitment::new(maturable_height, checkpoint_slot, l2_blockid);
+                state.push_action(SyncAction::FinalizeEpoch(epoch_commitment));
             }
-        } else {
-            warn!(
-            %maturable_height,
-            "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
-            );
+            Ok(None) => {
+                warn!(
+                    %maturable_height,%l2_blockid, "l2 block not in db yet, skipping finalize"
+                );
+            }
+            Err(e) => {
+                error!(%e, "error while fetching block data from l2_db");
+            }
         }
+    } else {
+        warn!(
+        %maturable_height,
+        "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
+        );
     }
-    (writes, actions)
 }
 
 /// Handles the finalization of a checkpoint by processing the corresponding L2
@@ -332,14 +294,12 @@ fn handle_mature_l1_height(
 /// * A vector of [`ClientStateWrite`] representing the state changes to be written.
 /// * A vector of [`SyncAction`] representing the actions to be synchronized.
 fn handle_checkpoint_finalization(
-    state: &ClientState,
+    state: &mut ClientStateMut,
     blkid: &L2BlockId,
     params: &Params,
     database: &impl Database,
-) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
-    let mut writes = Vec::new();
-    let mut actions = Vec::new();
-    let verified_checkpoints: &[L1Checkpoint] = state.l1_view().verified_checkpoints();
+) {
+    let verified_checkpoints: &[L1Checkpoint] = state.state().l1_view().verified_checkpoints();
     match find_l1_height_for_l2_blockid(verified_checkpoints, blkid) {
         Some(l1_height) => {
             let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
@@ -347,22 +307,20 @@ fn handle_checkpoint_finalization(
             // Maturable height is the height at which l1 blocks are sufficiently buried
             // and have negligible chance of reorg.
             let maturable_height = state
+                .state()
                 .l1_view()
                 .next_expected_l1_block()
                 .saturating_sub(safe_depth);
 
             // The l1 height should be handled only if it is less than maturable height
             if l1_height < maturable_height {
-                let (wrs, acts) = handle_mature_l1_height(l1_height, state, database);
-                writes.extend(wrs);
-                actions.extend(acts);
+                handle_mature_l1_height(state, l1_height, database);
             }
         }
         None => {
             debug!(%blkid, "L2 block not found in verified checkpoints, possibly not a last block in the checkpoint.");
         }
     }
-    (writes, actions)
 }
 
 /// Searches for a given [`L2BlockId`] within a slice of [`L1Checkpoint`] structs
@@ -394,11 +352,14 @@ fn find_l1_height_for_l2_blockid(
 /// A vector containing the valid sequence of [`BatchCheckpoint`]s, starting from the first valid
 /// one.
 pub fn filter_verified_checkpoints(
-    state: &ClientState,
+    state: &mut ClientStateMut,
     checkpoints: &[BatchCheckpointWithCommitment],
     params: &RollupParams,
 ) -> Vec<BatchCheckpointWithCommitment> {
-    let l1_view = state.l1_view();
+    // TODO move this function to happen closer to the reader and we can just
+    // ignore invalid checkpoints
+
+    let l1_view = state.state().l1_view();
     let last_verified = l1_view.verified_checkpoints().last();
     let last_finalized = l1_view.last_finalized_checkpoint();
 
