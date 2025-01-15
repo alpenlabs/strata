@@ -484,7 +484,9 @@ where
         attributes.withdrawals(),
     )?;
 
-    let withdrawal_intents = collect_withdrawal_intents(receipts.iter().cloned()).collect();
+    let withdrawal_intents = collect_withdrawal_intents(receipts.iter().cloned())
+        .flatten()
+        .collect();
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call
