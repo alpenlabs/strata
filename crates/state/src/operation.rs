@@ -41,6 +41,11 @@ impl ClientUpdateOutput {
     pub fn into_parts(self) -> (ClientState, Vec<SyncAction>) {
         (self.new_state, self.actions)
     }
+
+    /// Discards the actions and extracts the new state by itself.
+    pub fn into_state(self) -> ClientState {
+        self.new_state
+    }
 }
 
 /// Actions the client state machine directs the node to take to update its own

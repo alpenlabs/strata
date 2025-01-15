@@ -16,7 +16,7 @@ pub fn fork_choice_state_initial<D: Database>(
     db: Arc<D>,
     rollup_params: &RollupParams,
 ) -> Result<ForkchoiceState> {
-    let last_cstate = get_last_checkpoint_state(db.as_ref())?;
+    let last_cstate = get_last_state(db.as_ref())?;
 
     let latest_block_hash = get_block_hash_by_id(
         db.as_ref(),
@@ -49,17 +49,18 @@ fn get_block_hash(l2_block: L2BlockBundle) -> Result<B256> {
         .context("Failed to convert L2Block to EVML2Block")
 }
 
-fn get_last_checkpoint_state<D: Database>(db: &D) -> Result<Option<ClientState>> {
-    let last_checkpoint_idx = db.client_state_db().get_last_checkpoint_idx();
+fn get_last_state<D: Database>(db: &D) -> Result<Option<ClientState>> {
+    let last_update_idx = db.client_state_db().get_last_update_idx();
 
-    if let Err(DbError::NotBootstrapped) = last_checkpoint_idx {
+    if let Err(DbError::NotBootstrapped) = last_update_idx {
         // before genesis block ready; use hardcoded genesis state
         return Ok(None);
     }
 
-    last_checkpoint_idx
-        .and_then(|ckpt_idx| db.client_state_db().get_state_checkpoint(ckpt_idx))
-        .context("Failed to get last checkpoint state")
+    last_update_idx
+        .and_then(|ckpt_idx| db.client_state_db().get_client_update(ckpt_idx))
+        .map(|res| res.map(|output| output.into_state()))
+        .context("forkchoice: load get last checkpoint state")
 }
 
 fn get_block_hash_by_id<D: Database>(

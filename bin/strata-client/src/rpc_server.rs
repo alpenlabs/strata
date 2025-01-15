@@ -8,7 +8,6 @@ use bitcoin::{
     secp256k1::{PublicKey, XOnlyPublicKey},
     Transaction as BTransaction, Txid,
 };
-use borsh::BorshSerialize;
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
@@ -629,17 +628,11 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     async fn get_client_update_output(&self, idx: u64) -> RpcResult<Option<ClientUpdateOutput>> {
         let db = self.database.clone();
 
+        // TODO convert to use manager interface
         let res = wait_blocking("fetch_client_update_output", move || {
             let client_state_db = db.client_state_db();
-
-            let writes = client_state_db.get_client_state_writes(idx)?;
-            let actions = client_state_db.get_client_update_actions(idx)?;
-
-            match (writes, actions) {
-                (Some(w), Some(a)) => Ok(Some(ClientUpdateOutput::new(w, a))),
-                // normally this is just that they're both missing
-                _ => Ok(None),
-            }
+            let output = client_state_db.get_client_update(idx)?;
+            Ok(output)
         })
         .await?;
 
