@@ -8,6 +8,7 @@ from strata_utils import (
     extract_p2tr_pubkey,
     get_address,
     get_recovery_address,
+    xonlypk_to_descriptor,
 )
 from web3 import Web3, middleware
 
@@ -166,7 +167,7 @@ class BridgeTestBase(StrataTester):
         """
         Withdrawal Request Transaction in Strata's EVM.
         """
-        data_bytes = bytes.fromhex(change_address_pk)
+        data_bytes = bytes.fromhex(xonlypk_to_descriptor(change_address_pk))
 
         transaction = {
             "from": el_address,
@@ -183,7 +184,7 @@ class BridgeTestBase(StrataTester):
         Estimate the gas for the withdrawal transaction.
         """
 
-        data_bytes = bytes.fromhex(change_address_pk)
+        data_bytes = bytes.fromhex(xonlypk_to_descriptor(change_address_pk))
 
         transaction = {
             "from": el_address,
