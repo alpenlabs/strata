@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use bitcoin::Address;
 use strata_config::btcio::WriterConfig;
 use strata_db::{
-    traits::L1PayloadDatabase,
+    traits::L1WriterDatabase,
     types::{IntentEntry, L1TxStatus, PayloadEntry, PayloadL1Status},
 };
 use strata_primitives::{
@@ -11,7 +11,7 @@ use strata_primitives::{
     params::Params,
 };
 use strata_status::StatusChannel;
-use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
+use strata_storage::ops::writer::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;
 use tracing::*;
 
@@ -79,7 +79,7 @@ impl EnvelopeHandle {
 ///
 /// [`Result<EnvelopeHandle>`](anyhow::Result)
 #[allow(clippy::too_many_arguments)]
-pub fn start_envelope_task<D: L1PayloadDatabase + Send + Sync + 'static>(
+pub fn start_envelope_task<D: L1WriterDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,
     config: Arc<WriterConfig>,

@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use strata_db::types::{IntentEntry, IntentStatus, PayloadEntry};
-use strata_storage::ops::envelope::EnvelopeDataOps;
+use strata_storage::ops::writer::EnvelopeDataOps;
 use tokio::time::sleep;
 use tracing::warn;
 

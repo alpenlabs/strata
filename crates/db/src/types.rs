@@ -35,6 +35,10 @@ impl IntentEntry {
             status: IntentStatus::Bundled(bundle_idx),
         }
     }
+
+    pub fn payload(&self) -> &L1Payload {
+        self.intent.payload()
+    }
 }
 
 /// Status of Intent indicating various stages of being bundled to L1 transaction.
