@@ -236,8 +236,6 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     };
 
     let build_args = BuildArgs {
-        elf_name: format!("{}.elf", program),
-        output_directory: "cache".to_owned(),
         features,
         ..Default::default()
     };
