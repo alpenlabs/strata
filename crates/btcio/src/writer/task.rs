@@ -15,6 +15,7 @@ use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;
 use tracing::*;
 
+use super::bundler::bundler_task;
 use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::{traits::WriterRpc, BitcoinClient},
@@ -89,10 +90,10 @@ pub fn start_envelope_task<D: L1PayloadDatabase + Send + Sync + 'static>(
     pool: threadpool::ThreadPool,
     broadcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<Arc<EnvelopeHandle>> {
-    let envelope_data_ops = Arc::new(Context::new(db).into_ops(pool));
-    let next_watch_payload_idx = get_next_payloadidx_to_watch(envelope_data_ops.as_ref())?;
+    let writer_ops = Arc::new(Context::new(db).into_ops(pool));
+    let next_watch_payload_idx = get_next_payloadidx_to_watch(writer_ops.as_ref())?;
 
-    let envelope_handle = Arc::new(EnvelopeHandle::new(envelope_data_ops.clone()));
+    let envelope_handle = Arc::new(EnvelopeHandle::new(writer_ops.clone()));
     let ctx = Arc::new(WriterContext::new(
         params,
         config,
@@ -101,14 +102,13 @@ pub fn start_envelope_task<D: L1PayloadDatabase + Send + Sync + 'static>(
         status_channel,
     ));
 
+    let wops = writer_ops.clone();
     executor.spawn_critical_async("btcio::watcher_task", async move {
-        watcher_task(
-            next_watch_payload_idx,
-            ctx,
-            envelope_data_ops,
-            broadcast_handle,
-        )
-        .await
+        watcher_task(next_watch_payload_idx, ctx, wops.clone(), broadcast_handle).await
+    });
+
+    executor.spawn_critical_async("btcio::bundler_task", async move {
+        bundler_task(writer_ops).await
     });
 
     Ok(envelope_handle)
