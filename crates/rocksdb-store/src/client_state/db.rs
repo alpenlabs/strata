@@ -41,11 +41,14 @@ impl ClientStateDatabase for ClientStateDb {
     fn write_client_update(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
         let expected_idx = match self.get_last_idx::<ClientUpdateSchema>()? {
             Some(last_idx) => last_idx + 1,
-            None => 1,
+            // This used to be 1, now it's 0, now I'm not sure what makes sense.
+            None => 0,
         };
+
         if idx != expected_idx {
             return Err(DbError::OooInsert("consensus_store", idx));
         }
+
         self.db.put::<ClientUpdateSchema>(&idx, &output)?;
         Ok(())
     }
