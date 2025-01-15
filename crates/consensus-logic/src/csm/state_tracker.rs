@@ -138,12 +138,11 @@ pub fn reconstruct_state(
     idx: u64,
 ) -> anyhow::Result<ClientState> {
     match cs_db.get_client_update(idx)? {
-        Some(update) => {
-            // if the checkpoint was created at the idx itself, return the checkpoint
-            debug!(%idx, "no writes to replay");
-            Ok(update.new_state().clone())
-        }
+        // Normally just return it directly.
+        Some(update) => Ok(update.into_state()),
         None => {
+            // We don't need to do this anymore, we can just do it from the
+            // sync events so it's much less stateful.
             warn!("removed suppport for reconstructing states");
             Err(Error::MissingSyncEvent(idx).into())
         }
@@ -152,58 +151,5 @@ pub fn reconstruct_state(
 
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::{ClientStateDatabase, Database};
-    use strata_rocksdb::test_utils::get_common_db;
-    use strata_state::{
-        block::L2Block,
-        client_state::{ClientState, SyncState},
-        header::L2Header,
-        operation::{apply_writes_to_state, ClientStateWrite, ClientUpdateOutput, SyncAction},
-    };
-    use strata_test_utils::ArbitraryGenerator;
-
-    use super::reconstruct_state;
-
-    #[test]
-    fn test_reconstruct_state() {
-        let database = get_common_db();
-        let client_state_db = database.client_state_db();
-        let state: ClientState = ArbitraryGenerator::new().generate();
-
-        let mut client_state_list = vec![state.clone()];
-
-        // prepare the clientState and ClientUpdateOutput for up to 20th index
-        for idx in 0..20 {
-            let mut state = state.clone();
-            let l2block: L2Block = ArbitraryGenerator::new().generate();
-            let ss: SyncState = ArbitraryGenerator::new().generate();
-
-            let output = ClientUpdateOutput::new(
-                vec![
-                    ClientStateWrite::ReplaceSync(Box::new(ss)),
-                    ClientStateWrite::AcceptL2Block(
-                        l2block.header().get_blockid(),
-                        l2block.header().blockidx(),
-                    ),
-                ],
-                vec![SyncAction::UpdateTip(l2block.header().get_blockid())],
-            );
-
-            let client_writes = Vec::from(output.writes()).into_iter();
-            apply_writes_to_state(&mut state, client_writes);
-            client_state_list.push(state.clone());
-
-            let _ = client_state_db.write_client_update_output(idx, output);
-            // write clientState checkpoint for indices that are multiples of 4
-            if idx % 4 == 0 {
-                let _ = client_state_db.write_client_state_checkpoint(idx, state);
-            }
-        }
-        // for the 13th, 14th, 15th state, we require fetching the 12th index ClientState and
-        // applying the writes.
-        for i in 13..17 {
-            let client_state = reconstruct_state(client_state_db.as_ref(), i).unwrap();
-            assert_eq!(client_state_list[(i + 1) as usize], client_state);
-        }
-    }
+    // (removed state reconstruction test, it doesn't do anything anymore)
 }

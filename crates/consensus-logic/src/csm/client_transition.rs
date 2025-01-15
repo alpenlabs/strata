@@ -437,7 +437,6 @@ mod tests {
 
     struct TestEvent<'a> {
         event: SyncEvent,
-        expected_writes: &'a [ClientStateWrite],
         expected_actions: &'a [SyncAction],
     }
 
@@ -453,19 +452,19 @@ mod tests {
         database: &impl Database,
         params: &Params,
     ) {
+        let mut cur_state = state.clone();
+
         for case in test_cases {
             println!("Running test case: {}", case.description);
             let mut outputs = Vec::new();
             for (i, test_event) in case.events.iter().enumerate() {
-                let output = process_event(state, &test_event.event, database, params).unwrap();
+                // Process the event.
+                let mut state_mut = ClientStateMut::new(state.clone());
+                process_event(&mut state_mut, &test_event.event, database, params).unwrap();
+                let output = state_mut.into_output();
+
+                // Make sure we got the actions we expected.
                 outputs.push(output.clone());
-                assert_eq!(
-                    output.writes(),
-                    test_event.expected_writes,
-                    "Failed on writes for event {} in test case: {}",
-                    i + 1,
-                    case.description
-                );
                 assert_eq!(
                     output.actions(),
                     test_event.expected_actions,
@@ -473,15 +472,15 @@ mod tests {
                     i + 1,
                     case.description
                 );
+
+                cur_state = output.into_state();
             }
 
-            for output in outputs {
-                operation::apply_writes_to_state(state, output.writes().iter().cloned());
-            }
-
-            // Run the state assertions after all events
-            (case.state_assertions)(state);
+            // Run the state assertions after all events.
+            (case.state_assertions)(&cur_state);
         }
+
+        *state = cur_state;
     }
 
     #[test]
@@ -519,10 +518,6 @@ mod tests {
                 description: "At horizon block",
                 events: &[TestEvent {
                     event: SyncEvent::L1Block(horizon, l1_chain[0].block_hash()),
-                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
-                        horizon,
-                        l1_chain[0].block_hash().into(),
-                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -538,10 +533,6 @@ mod tests {
                 description: "At horizon block + 1",
                 events: &[TestEvent {
                     event: SyncEvent::L1Block(horizon + 1, l1_chain[1].block_hash().into()),
-                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
-                        horizon + 1,
-                        l1_chain[1].block_hash().into(),
-                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -561,10 +552,6 @@ mod tests {
                         genesis,
                         l1_chain[(genesis - horizon) as usize].block_hash().into(),
                     ),
-                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
-                        genesis,
-                        l1_chain[(genesis - horizon) as usize].block_hash().into(),
-                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new(move |state| {
@@ -579,13 +566,6 @@ mod tests {
                         genesis + 1,
                         l1_chain[(genesis + 1 - horizon) as usize].block_hash(),
                     ),
-
-                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
-                        genesis + 1,
-                        l1_chain[(genesis + 1 - horizon) as usize]
-                            .block_hash()
-                            .into(),
-                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -610,12 +590,6 @@ mod tests {
                         genesis + 2,
                         l1_chain[(genesis + 2 - horizon) as usize].block_hash(),
                     ),
-                    expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
-                        genesis + 2,
-                        l1_chain[(genesis + 2 - horizon) as usize]
-                            .block_hash()
-                            .into(),
-                    ))],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -641,30 +615,16 @@ mod tests {
                             genesis + 3,
                             l1_verification_state.clone(),
                         ),
-                        expected_writes: &[
-                            ClientStateWrite::ActivateChain,
-                            ClientStateWrite::UpdateVerificationState(
-                                l1_verification_state.clone(),
-                            ),
-                            ClientStateWrite::ReplaceSync(Box::new(SyncState::from_genesis_blkid(
-                                genesis_blockid,
-                            ))),
-                        ],
-                        expected_actions: &[SyncAction::L2Genesis(
+                        expected_actions: &[SyncAction::L2Genesis(L1BlockCommitment::new(
+                            genesis,
                             l1_chain[(genesis - horizon) as usize].block_hash(),
-                        )],
+                        ))],
                     },
                     TestEvent {
                         event: SyncEvent::L1Block(
                             genesis + 3,
                             l1_chain[(genesis + 3 - horizon) as usize].block_hash(),
                         ),
-                        expected_writes: &[ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
-                            genesis + 3,
-                            l1_chain[(genesis + 3 - horizon) as usize]
-                                .block_hash()
-                                .into(),
-                        ))],
                         expected_actions: &[],
                     },
                 ],
@@ -680,13 +640,6 @@ mod tests {
                 description: "Rollback to genesis height",
                 events: &[TestEvent {
                     event: SyncEvent::L1Revert(genesis),
-                    expected_writes: &[
-                        ClientStateWrite::RollbackL1BlocksTo(genesis),
-                        ClientStateWrite::SetL1Tip(L1BlockCommitment::new(
-                            genesis,
-                            l1_chain[(genesis - horizon) as usize].block_hash().into(),
-                        )),
-                    ],
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({ move |state| {} }),
