@@ -59,11 +59,11 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         btcrpc.proxy.generatetoaddress(101, seq_addr)
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
-        manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth, seq_addr)
+        manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth + 1, seq_addr)
 
         # Sanity Check for first checkpoint
         idx = 0
-        check_nth_checkpoint_finalized(idx, seqrpc, prover_rpc, manual_gen)
+        check_nth_checkpoint_finalized(idx, seqrpc, prover_rpc, manual_gen, proof_timeout=30)
         self.debug(f"Pass checkpoint finalization for checkpoint {idx}")
 
         # TODO remove this after adding a proper config file
