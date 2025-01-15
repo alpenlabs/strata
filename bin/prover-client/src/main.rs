@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use args::Args;
+use checkpoint_runner::runner::checkpoint_proof_runner;
 use db::open_rocksdb_database;
 use jsonrpsee::http_client::HttpClientBuilder;
 use operators::ProofOperator;
@@ -17,6 +18,7 @@ use tokio::{spawn, sync::Mutex};
 use tracing::debug;
 
 mod args;
+mod checkpoint_runner;
 mod db;
 mod errors;
 mod hosts;
@@ -90,9 +92,24 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
     spawn(async move { manager.process_pending_tasks().await });
     debug!("Spawn process pending tasks");
 
-    // Run prover manager in dev mode or runner mode
+    // run the checkpoint runner
+    if args.enable_checkpoint_runner {
+        let checkpoint_operator = operator.checkpoint_operator().clone();
+        let task_tracker_for_checkpoint = task_tracker.clone();
+        let db_for_checkpoint = db.clone();
+
+        spawn(async move {
+            checkpoint_proof_runner(
+                checkpoint_operator,
+                task_tracker_for_checkpoint,
+                db_for_checkpoint,
+            )
+            .await
+        });
+    }
+
+    // Run the RPC server on dev mode only
     if args.enable_dev_rpcs {
-        // Run the RPC server on dev mode only
         let rpc_url = args.get_dev_rpc_url();
         run_rpc_server(
             task_tracker.clone(),

@@ -219,6 +219,11 @@ impl CheckpointOperator {
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
             .ok_or(ProvingTaskError::WitnessNotFound)
     }
+
+    /// Returns a reference to the internal CL (Consensus Layer) `HttpClient`.
+    pub fn cl_client(&self) -> &HttpClient {
+        &self.cl_client
+    }
 }
 
 impl ProvingOp for CheckpointOperator {

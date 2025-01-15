@@ -125,6 +125,17 @@ pub struct Args {
     /// Defaults to `true`.
     #[argh(option, description = "enable prover client dev rpc", default = "true")]
     pub enable_dev_rpcs: bool,
+
+    /// Controls the checkpoint proof runner service.
+    ///
+    /// When enabled, prover will automatically generate and submit proofs for checkpoints.
+    /// Defaults to `false`.
+    #[argh(
+        option,
+        description = "enable prover client checkpoint runner",
+        default = "false"
+    )]
+    pub enable_checkpoint_runner: bool,
 }
 
 impl Args {
