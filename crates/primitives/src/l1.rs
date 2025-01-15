@@ -101,6 +101,12 @@ impl L1BlockCommitment {
     }
 }
 
+impl Display for L1BlockCommitment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}@{}", self.blkid, self.height)
+    }
+}
+
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
 #[derive(
