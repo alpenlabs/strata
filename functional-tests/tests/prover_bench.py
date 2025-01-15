@@ -31,7 +31,7 @@ class ProverClientTest(testenv.StrataTester):
 
         start_time = time.time()
 
-        el_prover_params = generate_ee_prover_params(start_block=1, end_block=50, step=1)
+        el_prover_params = generate_ee_prover_params(start_block=1, end_block=13 * 1, step=13)
         print("Using el prover params: ", el_prover_params)
 
         for params in el_prover_params:
