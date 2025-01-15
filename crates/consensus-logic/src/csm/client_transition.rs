@@ -452,8 +452,6 @@ mod tests {
         database: &impl Database,
         params: &Params,
     ) {
-        let mut cur_state = state.clone();
-
         for case in test_cases {
             println!("Running test case: {}", case.description);
             let mut outputs = Vec::new();
@@ -473,14 +471,12 @@ mod tests {
                     case.description
                 );
 
-                cur_state = output.into_state();
+                *state = output.into_state();
             }
 
             // Run the state assertions after all events.
-            (case.state_assertions)(&cur_state);
+            (case.state_assertions)(&state);
         }
-
-        *state = cur_state;
     }
 
     #[test]
@@ -631,8 +627,8 @@ mod tests {
                 state_assertions: Box::new({
                     let l1_chain = &l1_chain;
                     move |state| {
-                        assert!(state.is_chain_active());
                         assert_eq!(state.next_exp_l1_block(), genesis + 4);
+                        assert!(state.is_chain_active());
                     }
                 }),
             },
