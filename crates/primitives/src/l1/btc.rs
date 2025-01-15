@@ -741,6 +741,18 @@ impl XOnlyPk {
     }
 }
 
+/// Represents a raw, byte-encoded Bitcoin transaction with custom [`Arbitrary`] support.  
+/// Provides conversions (via [`TryFrom`]) to and from [`Transaction`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct RawBitcoinTx(Vec<u8>);
+
+impl RawBitcoinTx {
+    /// Creates a new `RawBitcoinTx` from a raw byte vector.
+    pub fn from_raw_bytes(bytes: Vec<u8>) -> Self {
+        RawBitcoinTx(bytes)
+    }
+}
+
 impl From<Transaction> for RawBitcoinTx {
     fn from(value: Transaction) -> Self {
         Self(serialize(&value))
@@ -821,11 +833,6 @@ impl<'a> arbitrary::Arbitrary<'a> for RawBitcoinTx {
         Ok(tx.into())
     }
 }
-
-/// Represents a raw, byte-encoded Bitcoin transaction with custom [`Arbitrary`] support.  
-/// Provides conversions (via [`TryFrom`]) to and from [`Transaction`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub struct RawBitcoinTx(Vec<u8>);
 
 #[cfg(test)]
 mod tests {
@@ -1284,5 +1291,9 @@ mod tests {
         let mut generator = ArbitraryGenerator::new();
         let raw_tx: RawBitcoinTx = generator.generate();
         let _: Transaction = raw_tx.try_into().expect("should generate valid tx");
+
+        let raw_tx = RawBitcoinTx::from_raw_bytes(generator.generate());
+        let res: Result<Transaction, _> = raw_tx.try_into();
+        assert!(res.is_err());
     }
 }
