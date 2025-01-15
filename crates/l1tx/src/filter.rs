@@ -8,7 +8,7 @@ use super::messages::ProtocolOpTxRef;
 pub use crate::filter_types::TxFilterConfig;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
-    inscription::parse_inscription_data,
+    envelope::parser::parse_envelope_data,
 };
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
@@ -34,8 +34,8 @@ pub fn filter_protocol_op_tx_refs(
 //  TODO: make this function return multiple ops as a single tx can have multiple outpoints that's
 //  relevant
 fn extract_protocol_ops(tx: &Transaction, filter_conf: &TxFilterConfig) -> Vec<ProtocolOperation> {
-    // Currently all we have are inscription txs, deposits and deposit requests
-    parse_inscription_checkpoints(tx, filter_conf)
+    // Currently all we have are envelope txs, deposits and deposit requests
+    parse_envelope_checkpoints(tx, filter_conf)
         .map(ProtocolOperation::Checkpoint)
         .chain(parse_deposits(tx, filter_conf).map(ProtocolOperation::Deposit))
         .chain(parse_deposit_requests(tx, filter_conf).map(ProtocolOperation::DepositRequest))
@@ -58,21 +58,19 @@ fn parse_deposits(
     extract_deposit_info(tx, &filter_conf.deposit_config).into_iter()
 }
 
-/// Parses inscription from the given transaction. Currently, the only inscription recognizable is
-/// the checkpoint inscription.
-// TODO: we need to change inscription structure and possibly have inscriptions for checkpoints and
+/// Parses envelope from the given transaction. Currently, the only envelope recognizable is
+/// the checkpoint envelope.
+// TODO: we need to change envelope structure and possibly have envelopes for checkpoints and
 // DA separately
-fn parse_inscription_checkpoints<'a>(
+fn parse_envelope_checkpoints<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> impl Iterator<Item = SignedBatchCheckpoint> + 'a {
     tx.input.iter().filter_map(|inp| {
         inp.witness
             .tapscript()
-            .and_then(|scr| {
-                parse_inscription_data(&scr.into(), &filter_conf.rollup_name.clone()).ok()
-            })
-            .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.batch_data()).ok())
+            .and_then(|scr| parse_envelope_data(&scr.into(), &filter_conf.rollup_name.clone()).ok())
+            .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.data()).ok())
     })
 }
 
@@ -92,14 +90,9 @@ mod test {
         Transaction, TxMerkleNode, TxOut,
     };
     use rand::{rngs::OsRng, RngCore};
-    use strata_btcio::test_utils::{
-        build_reveal_transaction_test, generate_inscription_script_test,
-    };
-    use strata_primitives::l1::BitcoinAmount;
-    use strata_state::{
-        batch::SignedBatchCheckpoint,
-        tx::{InscriptionData, ProtocolOperation},
-    };
+    use strata_btcio::test_utils::{build_reveal_transaction_test, generate_envelope_script_test};
+    use strata_primitives::l1::{payload::L1Payload, BitcoinAmount};
+    use strata_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::TxFilterConfig;
@@ -160,15 +153,15 @@ mod test {
             .unwrap()
     }
 
-    // Create an inscription transaction. The focus here is to create a tapscript, rather than a
+    // Create an envelope transaction. The focus here is to create a tapscript, rather than a
     // completely valid control block
-    fn create_inscription_tx(rollup_name: String) -> Transaction {
+    fn create_envelope_tx(rollup_name: String) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
         let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
-        let inscription_data = InscriptionData::new(borsh::to_vec(&signed_checkpoint).unwrap());
+        let envelope_data = L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap());
 
-        let script = generate_inscription_script_test(inscription_data, &rollup_name, 1).unwrap();
+        let script = generate_envelope_script_test(envelope_data, &rollup_name, 1).unwrap();
 
         // Create controlblock
         let mut rand_bytes = [0; 32];
@@ -192,12 +185,12 @@ mod test {
     }
 
     #[test]
-    fn test_filter_relevant_txs_with_rollup_inscription() {
+    fn test_filter_relevant_txs_with_rollup_envelope() {
         // Test with valid name
         let filter_config = create_tx_filter_config();
 
         let rollup_name = filter_config.rollup_name.clone();
-        let tx = create_inscription_tx(rollup_name.clone());
+        let tx = create_envelope_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)
@@ -209,7 +202,7 @@ mod test {
 
         // Test with invalid name
         let rollup_name = "invalidRollupName".to_string();
-        let tx = create_inscription_tx(rollup_name.clone());
+        let tx = create_envelope_tx(rollup_name.clone());
         let block = create_test_block(vec![tx]);
         let result = filter_protocol_op_tx_refs(&block, &filter_config);
         assert!(result.is_empty(), "Should filter out invalid name");
@@ -233,9 +226,9 @@ mod test {
     fn test_filter_relevant_txs_multiple_matches() {
         let filter_config = create_tx_filter_config();
         let rollup_name = filter_config.rollup_name.clone();
-        let tx1 = create_inscription_tx(rollup_name.clone());
+        let tx1 = create_envelope_tx(rollup_name.clone());
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_inscription_tx(rollup_name);
+        let tx3 = create_envelope_tx(rollup_name);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, &filter_config)

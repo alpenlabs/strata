@@ -3,7 +3,7 @@ use std::{fs, path::Path, sync::Arc, time::Duration};
 use alloy_rpc_types::engine::JwtSecret;
 use bitcoin::{base58, bip32::Xpriv, Address, Network};
 use format_serde_error::SerdeError;
-use strata_btcio::rpc::{traits::Wallet, BitcoinClient};
+use strata_btcio::rpc::{traits::WalletRpc, BitcoinClient};
 use strata_config::Config;
 use strata_consensus_logic::{
     csm::state_tracker,

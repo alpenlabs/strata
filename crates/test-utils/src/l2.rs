@@ -74,6 +74,8 @@ pub fn gen_params_with_seed(seed: u64) -> Params {
     Params {
         rollup: RollupParams {
             rollup_name: "strata".to_string(),
+            checkpoint_tag: "strata-ckpt".to_string(),
+            da_tag: "strata-da".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
             horizon_l1_height: 40318,

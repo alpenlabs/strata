@@ -20,7 +20,7 @@ use crate::rpc::{
 /// consider wrapping with [`tokio`](tokio)'s
 /// [`spawn_blocking`](tokio::task::spawn_blocking) or any other method.
 #[async_trait]
-pub trait Reader {
+pub trait ReaderRpc {
     /// Estimates the approximate fee per kilobyte needed for a transaction
     /// to begin confirmation within conf_target blocks if possible and return
     /// the number of blocks for which the estimate is valid.
@@ -77,7 +77,7 @@ pub trait Reader {
 /// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 /// or any other method.
 #[async_trait]
-pub trait Broadcaster {
+pub trait BroadcasterRpc {
     /// Sends a raw transaction to the network.
     ///
     /// # Parameters
@@ -90,7 +90,7 @@ pub trait Broadcaster {
 /// Wallet functionality that any Bitcoin client **without private keys** that
 /// interacts with the Bitcoin network should provide.
 ///
-/// For signing transactions, see [`Signer`].
+/// For signing transactions, see [`SignerRpc`].
 ///
 /// # Note
 ///
@@ -101,7 +101,7 @@ pub trait Broadcaster {
 /// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 /// or any other method.
 #[async_trait]
-pub trait Wallet {
+pub trait WalletRpc {
     /// Generates new address under own control for the underlying Bitcoin
     /// client's wallet.
     async fn get_new_address(&self) -> ClientResult<Address>;
@@ -142,7 +142,7 @@ pub trait Wallet {
 /// [`spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 /// or any other method.
 #[async_trait]
-pub trait Signer {
+pub trait SignerRpc {
     /// Signs a transaction using the keys available in the underlying Bitcoin
     /// client's wallet and returns a signed transaction.
     ///
@@ -165,3 +165,9 @@ pub trait Signer {
         wallet_name: String,
     ) -> ClientResult<Vec<ImportDescriptorResult>>;
 }
+
+/// Marker trait for [`ReaderRpc`], [`SignerRpc`] and [`WalletRpc`]
+#[async_trait]
+pub trait WriterRpc: ReaderRpc + SignerRpc + WalletRpc {}
+
+impl<T: ReaderRpc + SignerRpc + WalletRpc> WriterRpc for T {}

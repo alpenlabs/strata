@@ -9,236 +9,20 @@ use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
     absolute::LockTime,
     address::NetworkUnchecked,
-    consensus::serialize,
     hashes::{sha256d, Hash},
     key::{rand, Keypair, Parity, TapTweak},
     secp256k1::{SecretKey, XOnlyPublicKey, SECP256K1},
-    taproot::{ControlBlock, TaprootMerkleBranch},
+    taproot::{ControlBlock, LeafVersion, TaprootMerkleBranch},
     transaction::Version,
-    Address, AddressType, Amount, Block, BlockHash, Network, OutPoint, Psbt, ScriptBuf, Sequence,
-    TapNodeHash, Transaction, TxIn, TxOut, Txid, Witness,
+    Address, AddressType, Amount, Network, OutPoint, Psbt, ScriptBuf, Sequence, TapNodeHash,
+    Transaction, TxIn, TxOut, Txid, Witness,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use rand::rngs::OsRng;
 use reth_primitives::revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError, impl_buf_wrapper};
-
-/// ID of an L1 block, usually the hash of its header.
-#[derive(
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    Default,
-    Arbitrary,
-    BorshSerialize,
-    BorshDeserialize,
-    Deserialize,
-    Serialize,
-)]
-pub struct L1BlockId(Buf32);
-
-impl L1BlockId {
-    /// Computes the blkid from the header buf.  This expensive in proofs and
-    /// should only be done when necessary.
-    pub fn compute_from_header_buf(buf: &[u8]) -> L1BlockId {
-        Self::from(crate::hash::sha256d(buf))
-    }
-}
-
-impl_buf_wrapper!(L1BlockId, Buf32, 32);
-
-impl From<BlockHash> for L1BlockId {
-    fn from(value: BlockHash) -> Self {
-        L1BlockId(value.into())
-    }
-}
-
-impl From<L1BlockId> for BlockHash {
-    fn from(value: L1BlockId) -> Self {
-        BlockHash::from_byte_array(value.0.into())
-    }
-}
-
-/// Reference to a transaction in a block.  This is the block index and the
-/// position of the transaction in the block.
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    Hash,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Arbitrary,
-    BorshDeserialize,
-    BorshSerialize,
-    Serialize,
-    Deserialize,
-)]
-pub struct L1TxRef(u64, u32);
-
-impl L1TxRef {
-    pub fn blk_idx(&self) -> u64 {
-        self.0
-    }
-    pub fn position(&self) -> u32 {
-        self.1
-    }
-}
-
-impl From<L1TxRef> for (u64, u32) {
-    fn from(val: L1TxRef) -> Self {
-        (val.0, val.1)
-    }
-}
-
-impl From<(u64, u32)> for L1TxRef {
-    fn from(value: (u64, u32)) -> Self {
-        Self(value.0, value.1)
-    }
-}
-
-/// A trait for computing some kind of transaction ID (e.g., [`Txid`] or
-/// [`Wtxid`](bitcoin::Wtxid)) from a [`Transaction`].
-///
-/// This trait is designed to be implemented by "marker" types that define how a transaction ID
-/// should be computed. For example, [`TxIdMarker`] invokes [`Transaction::compute_txid`], and
-/// [`WtxIdMarker`] invokes [`Transaction::compute_wtxid`]. This approach avoids duplicating
-/// inclusion-proof or serialization logic across multiple ID computations.
-pub trait TxIdComputable {
-    /// Computes the transaction ID for the given transaction.
-    ///
-    /// The `idx` parameter allows marker types to handle special cases such as the coinbase
-    /// transaction (which has a zero [`Wtxid`](bitcoin::Wtxid)) by looking up the transaction
-    /// index.
-    fn compute_id(tx: &Transaction, idx: usize) -> Buf32;
-}
-
-/// Marker type for computing the [`Txid`].
-#[derive(
-    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct TxIdMarker;
-
-/// Marker type for computing the [`Wtxid`](bitcoin::Wtxid).
-#[derive(
-    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct WtxIdMarker;
-
-impl TxIdComputable for TxIdMarker {
-    fn compute_id(tx: &Transaction, _idx: usize) -> Buf32 {
-        tx.compute_txid().into()
-    }
-}
-
-impl TxIdComputable for WtxIdMarker {
-    fn compute_id(tx: &Transaction, idx: usize) -> Buf32 {
-        // Coinbase transaction wtxid is hash with zeroes
-        if idx == 0 {
-            return Buf32::zero();
-        }
-        tx.compute_wtxid().into()
-    }
-}
-
-/// Includes [`L1BlockManifest`] along with scan rules that it is applied to
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct L1BlockManifest {
-    /// The actual l1 record
-    record: L1BlockRecord,
-    /// Epoch, which was used to generate this manifest
-    epoch: u64,
-}
-
-impl L1BlockManifest {
-    pub fn new(record: L1BlockRecord, epoch: u64) -> Self {
-        Self { record, epoch }
-    }
-
-    pub fn header(&self) -> &[u8] {
-        self.record.header()
-    }
-
-    pub fn block_hash(&self) -> L1BlockId {
-        self.record.block_hash()
-    }
-
-    pub fn txs_root(&self) -> Buf32 {
-        self.record.txs_root()
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
-
-    pub fn into_record(self) -> L1BlockRecord {
-        self.record
-    }
-}
-
-/// Describes an L1 block and associated data that we need to keep around.
-// TODO should we include the block index here?
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct L1BlockRecord {
-    /// Block hash/ID, kept here so we don't have to be aware of the hash function
-    /// here.  This is what we use in the MMR.
-    blockid: L1BlockId,
-
-    /// Block header and whatever additional data we might want to query.
-    header: Vec<u8>,
-
-    /// Merkle root for the transactions in the block.  For Bitcoin, this is
-    /// actually the witness transactions root, since we care about the witness
-    /// data.
-    txs_root: Buf32,
-}
-
-impl L1BlockRecord {
-    pub fn new(blockid: L1BlockId, header: Vec<u8>, txs_root: Buf32) -> Self {
-        Self {
-            blockid,
-            header,
-            txs_root,
-        }
-    }
-
-    pub fn block_hash(&self) -> L1BlockId {
-        self.blockid
-    }
-
-    pub fn header(&self) -> &[u8] {
-        &self.header
-    }
-
-    /// Witness transactions root.
-    pub fn txs_root(&self) -> Buf32 {
-        self.txs_root
-    }
-}
-
-impl From<Block> for L1BlockRecord {
-    fn from(block: Block) -> Self {
-        let blockid = block.block_hash().into();
-        let root = block
-            .witness_root()
-            .map(|x| x.to_byte_array())
-            .unwrap_or_default();
-        let header = serialize(&block.header);
-        Self {
-            blockid,
-            txs_root: Buf32(root),
-            header,
-        }
-    }
-}
+use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};
 
 /// L1 output reference.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -305,33 +89,6 @@ impl<'a> Arbitrary<'a> for OutputRef {
         Ok(OutputRef(OutPoint { txid, vout }))
     }
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Arbitrary)]
-pub struct L1Status {
-    /// If the last time we tried to poll the client (as of `last_update`)
-    /// we were successful.
-    pub bitcoin_rpc_connected: bool,
-
-    /// The last error message we received when trying to poll the client, if
-    /// there was one.
-    pub last_rpc_error: Option<String>,
-
-    /// Current block height.
-    pub cur_height: u64,
-
-    /// Current tip block ID as string.
-    pub cur_tip_blkid: String,
-
-    /// Last published txid where L2 blob was present
-    pub last_published_txid: Option<Buf32>,
-
-    /// UNIX millis time of the last time we got a new update from the L1 connector.
-    pub last_update: u64,
-
-    /// number of published transactions in current run (commit + reveal pair count as 1)
-    pub published_inscription_count: u64,
-}
-
 /// A wrapper around the [`bitcoin::Address<NetworkChecked>`] type created in order to implement
 /// some useful traits on it such as [`serde::Deserialize`], [`borsh::BorshSerialize`] and
 /// [`borsh::BorshDeserialize`].
@@ -451,13 +208,6 @@ impl BorshDeserialize for BitcoinAddress {
     }
 }
 
-/// Outpoint of a bitcoin tx
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, BorshSerialize, BorshDeserialize)]
-pub struct Outpoint {
-    pub txid: Buf32,
-    pub vout: u32,
-}
-
 /// A wrapper for bitcoin amount in sats similar to the implementation in [`bitcoin::Amount`].
 ///
 /// NOTE: This wrapper has been created so that we can implement `Borsh*` traits on it.
@@ -551,59 +301,11 @@ impl Sum for BitcoinAmount {
     }
 }
 
-/// A wrapper around [`Buf32`] for XOnly Schnorr taproot pubkeys.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct XOnlyPk(Buf32);
-
-impl XOnlyPk {
-    /// Construct a new [`XOnlyPk`] directly from a [`Buf32`].
-    pub fn new(val: Buf32) -> Self {
-        Self(val)
-    }
-
-    /// Get the underlying [`Buf32`].
-    pub fn inner(&self) -> &Buf32 {
-        &self.0
-    }
-
-    /// Convert a [`BitcoinAddress`] into a [`XOnlyPk`].
-    pub fn from_address(checked_addr: &BitcoinAddress) -> Result<Self, ParseError> {
-        let checked_addr = checked_addr.address();
-
-        if let Some(AddressType::P2tr) = checked_addr.address_type() {
-            let script_pubkey = checked_addr.script_pubkey();
-
-            // skip the version and length bytes
-            let pubkey_bytes = &script_pubkey.as_bytes()[2..34];
-            let output_key: XOnlyPublicKey = XOnlyPublicKey::from_slice(pubkey_bytes)?;
-
-            let serialized_key: FixedBytes<32> = output_key.serialize().into();
-
-            Ok(Self(Buf32(serialized_key.into())))
-        } else {
-            Err(ParseError::UnsupportedAddress(checked_addr.address_type()))
-        }
-    }
-
-    /// Convert the [`XOnlyPk`] to an [`Address`].
-    pub fn to_p2tr_address(&self, network: Network) -> Result<Address, ParseError> {
-        let buf: [u8; 32] = self.0 .0;
-        let pubkey = XOnlyPublicKey::from_slice(&buf)?;
-
-        Ok(Address::p2tr_tweaked(
-            pubkey.dangerous_assume_tweaked(),
-            network,
-        ))
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BitcoinPsbt(Psbt);
 
 impl BitcoinPsbt {
-    pub fn inner(&self) -> &bitcoin::Psbt {
+    pub fn inner(&self) -> &Psbt {
         &self.0
     }
 
@@ -613,7 +315,7 @@ impl BitcoinPsbt {
 }
 
 impl From<Psbt> for BitcoinPsbt {
-    fn from(value: bitcoin::Psbt) -> Self {
+    fn from(value: Psbt) -> Self {
         Self(value)
     }
 }
@@ -687,7 +389,7 @@ impl<'a> Arbitrary<'a> for BitcoinPsbt {
 pub struct BitcoinTxid(Txid);
 
 impl From<Txid> for BitcoinTxid {
-    fn from(value: bitcoin::Txid) -> Self {
+    fn from(value: Txid) -> Self {
         Self(value)
     }
 }
@@ -766,13 +468,13 @@ impl<'a> Arbitrary<'a> for BitcoinTxid {
 pub struct BitcoinTxOut(TxOut);
 
 impl BitcoinTxOut {
-    pub fn inner(&self) -> &bitcoin::TxOut {
+    pub fn inner(&self) -> &TxOut {
         &self.0
     }
 }
 
 impl From<TxOut> for BitcoinTxOut {
-    fn from(value: bitcoin::TxOut) -> Self {
+    fn from(value: TxOut) -> Self {
         Self(value)
     }
 }
@@ -810,7 +512,7 @@ impl BorshDeserialize for BitcoinTxOut {
         reader.read_exact(&mut script_bytes)?;
         let script_pubkey = ScriptBuf::from(script_bytes);
 
-        Ok(BitcoinTxOut(bitcoin::TxOut {
+        Ok(BitcoinTxOut(TxOut {
             value: Amount::from_sat(value),
             script_pubkey,
         }))
@@ -824,7 +526,7 @@ impl<'a> Arbitrary<'a> for BitcoinTxOut {
         let value = u64::arbitrary(u)?;
         let script_len = usize::arbitrary(u)? % 100; // Limit script length
         let script_bytes = u.bytes(script_len)?;
-        let script_pubkey = bitcoin::ScriptBuf::from(script_bytes.to_vec());
+        let script_pubkey = ScriptBuf::from(script_bytes.to_vec());
 
         Ok(Self(TxOut {
             value: Amount::from_sat(value),
@@ -936,7 +638,7 @@ impl<'a> Arbitrary<'a> for TaprootSpendPath {
                 // Now we will manually generate the fields of the ControlBlock struct
 
                 // Leaf version
-                let leaf_version = bitcoin::taproot::LeafVersion::TapScript;
+                let leaf_version = LeafVersion::TapScript;
 
                 // Output key parity (Even or Odd)
                 let output_key_parity = if bool::arbitrary(u)? {
@@ -983,6 +685,61 @@ impl<'a> Arbitrary<'a> for TaprootSpendPath {
     }
 }
 
+/// Outpoint of a bitcoin tx
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, BorshSerialize, BorshDeserialize)]
+pub struct Outpoint {
+    pub txid: Buf32,
+    pub vout: u32,
+}
+
+/// A wrapper around [`Buf32`] for XOnly Schnorr taproot pubkeys.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
+)]
+pub struct XOnlyPk(Buf32);
+
+impl XOnlyPk {
+    /// Construct a new [`XOnlyPk`] directly from a [`Buf32`].
+    pub fn new(val: Buf32) -> Self {
+        Self(val)
+    }
+
+    /// Get the underlying [`Buf32`].
+    pub fn inner(&self) -> &Buf32 {
+        &self.0
+    }
+
+    /// Convert a [`BitcoinAddress`] into a [`XOnlyPk`].
+    pub fn from_address(checked_addr: &BitcoinAddress) -> Result<Self, ParseError> {
+        let checked_addr = checked_addr.address();
+
+        if let Some(AddressType::P2tr) = checked_addr.address_type() {
+            let script_pubkey = checked_addr.script_pubkey();
+
+            // skip the version and length bytes
+            let pubkey_bytes = &script_pubkey.as_bytes()[2..34];
+            let output_key: XOnlyPublicKey = XOnlyPublicKey::from_slice(pubkey_bytes)?;
+
+            let serialized_key: FixedBytes<32> = output_key.serialize().into();
+
+            Ok(Self(Buf32(serialized_key.into())))
+        } else {
+            Err(ParseError::UnsupportedAddress(checked_addr.address_type()))
+        }
+    }
+
+    /// Convert the [`XOnlyPk`] to an [`Address`].
+    pub fn to_p2tr_address(&self, network: Network) -> Result<Address, ParseError> {
+        let buf: [u8; 32] = self.0 .0;
+        let pubkey = XOnlyPublicKey::from_slice(&buf)?;
+
+        Ok(Address::p2tr_tweaked(
+            pubkey.dangerous_assume_tweaked(),
+            network,
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -1001,11 +758,12 @@ mod tests {
     use strata_test_utils::ArbitraryGenerator;
 
     use super::{
-        BitcoinAddress, BitcoinAmount, BitcoinTxid, BorshDeserialize, BorshSerialize, XOnlyPk,
+        BitcoinAddress, BitcoinAmount, BitcoinTxOut, BitcoinTxid, BorshDeserialize, BorshSerialize,
+        XOnlyPk,
     };
     use crate::{
         errors::ParseError,
-        l1::{BitcoinPsbt, BitcoinTxOut, TaprootSpendPath},
+        l1::{BitcoinPsbt, TaprootSpendPath},
     };
 
     #[test]

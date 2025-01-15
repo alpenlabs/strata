@@ -19,7 +19,7 @@ use strata_zkvm::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{BlobEntry, CheckpointEntry, L1TxEntry},
+    types::{CheckpointEntry, L1TxEntry, PayloadEntry},
     DbResult,
 };
 
@@ -246,27 +246,27 @@ pub trait CheckpointDatabase {
 
 /// NOTE: We might have to merge this with the [`Database`]
 /// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`BlobEntry`]
+/// [`PayloadEntry`]
 pub trait SequencerDatabase {
-    type BlobDB: BlobDatabase;
+    type L1PayloadDB: L1PayloadDatabase;
 
-    fn blob_db(&self) -> &Arc<Self::BlobDB>;
+    fn payload_db(&self) -> &Arc<Self::L1PayloadDB>;
 }
 
-/// A trait encapsulating provider and store traits to create/update [`BlobEntry`] in the database
-/// and to fetch [`BlobEntry`] and indices from the database
-pub trait BlobDatabase {
-    /// Store the [`BlobEntry`].
-    fn put_blob_entry(&self, blobid: Buf32, blobentry: BlobEntry) -> DbResult<()>;
+/// A trait encapsulating provider and store traits to create/update [`PayloadEntry`] in the
+/// database and to fetch [`PayloadEntry`] and indices from the database
+pub trait L1PayloadDatabase {
+    /// Store the [`PayloadEntry`].
+    fn put_payload_entry(&self, payloadid: Buf32, payloadentry: PayloadEntry) -> DbResult<()>;
 
-    /// Get a [`BlobEntry`] by its hash
-    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>>;
+    /// Get a [`PayloadEntry`] by its hash
+    fn get_payload_by_id(&self, id: Buf32) -> DbResult<Option<PayloadEntry>>;
 
-    /// Get the blob ID corresponding to the index
-    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>>;
+    /// Get the payload ID corresponding to the index
+    fn get_payload_id(&self, payloadidx: u64) -> DbResult<Option<Buf32>>;
 
-    /// Get the last blob index
-    fn get_last_blob_idx(&self) -> DbResult<Option<u64>>;
+    /// Get the last payload index
+    fn get_last_payload_idx(&self) -> DbResult<Option<u64>>;
 }
 
 pub trait ProofDatabase {

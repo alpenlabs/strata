@@ -25,7 +25,7 @@ use tracing::*;
 
 use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
-    traits::{Broadcaster, Reader, Signer, Wallet},
+    traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
     types::{
         CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
         ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
@@ -190,7 +190,7 @@ impl BitcoinClient {
 }
 
 #[async_trait]
-impl Reader for BitcoinClient {
+impl ReaderRpc for BitcoinClient {
     async fn estimate_smart_fee(&self, conf_target: u16) -> ClientResult<u64> {
         let result = self
             .call::<Box<RawValue>>("estimatesmartfee", &[to_value(conf_target)?])
@@ -253,7 +253,7 @@ impl Reader for BitcoinClient {
 }
 
 #[async_trait]
-impl Broadcaster for BitcoinClient {
+impl BroadcasterRpc for BitcoinClient {
     async fn send_raw_transaction(&self, tx: &Transaction) -> ClientResult<Txid> {
         let txstr = serialize_hex(tx);
         trace!(txstr = %txstr, "Sending raw transaction");
@@ -276,7 +276,7 @@ impl Broadcaster for BitcoinClient {
 }
 
 #[async_trait]
-impl Wallet for BitcoinClient {
+impl WalletRpc for BitcoinClient {
     async fn get_new_address(&self) -> ClientResult<Address> {
         let address_unchecked = self
             .call::<GetNewAddress>("getnewaddress", &[])
@@ -310,7 +310,7 @@ impl Wallet for BitcoinClient {
 }
 
 #[async_trait]
-impl Signer for BitcoinClient {
+impl SignerRpc for BitcoinClient {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,

@@ -26,7 +26,7 @@ reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-strata-tx-parser.workspace = true
+strata-l1tx.workspace = true
 thiserror.workspace = true
 threadpool.workspace = true
 tokio.workspace = true
@@ -36,6 +36,7 @@ tracing.workspace = true
 strata-common.workspace = true
 strata-rocksdb = { workspace = true, features = ["test_utils"] }
 strata-state = { workspace = true, features = ["test_utils"] }
+strata-status.workspace = true
 strata-test-utils.workspace = true
 
 arbitrary.workspace = true

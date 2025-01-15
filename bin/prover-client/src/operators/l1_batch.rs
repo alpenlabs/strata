@@ -4,7 +4,7 @@ use bitcoin::{params::MAINNET, Block};
 use strata_btcio::{
     reader::query::get_verification_state,
     rpc::{
-        traits::{Reader, Wallet},
+        traits::{ReaderRpc, WalletRpc},
         BitcoinClient,
     },
 };

@@ -8,10 +8,10 @@ bitcoin.workspace = true
 borsh.workspace = true
 ethnum.workspace = true
 serde.workspace = true
+strata-l1tx.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-state.workspace = true
-strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
 [dev-dependencies]

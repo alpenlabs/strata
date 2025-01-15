@@ -1,4 +1,4 @@
-use strata_db::types::BlobEntry;
+use strata_db::types::PayloadEntry;
 use strata_primitives::buf::Buf32;
 
 use crate::{
@@ -13,5 +13,5 @@ define_table_with_seek_key_codec!(
 
 define_table_with_default_codec!(
     /// A table to store blobid -> blob mapping
-    (SeqBlobSchema) Buf32 => BlobEntry
+    (SeqBlobSchema) Buf32 => PayloadEntry
 );

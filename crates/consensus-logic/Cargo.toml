@@ -9,6 +9,7 @@ strata-chaintsn.workspace = true
 strata-crypto = { workspace = true, default-features = true }
 strata-db.workspace = true
 strata-eectl.workspace = true
+strata-l1tx.workspace = true
 strata-primitives.workspace = true
 strata-risc0-adapter.workspace = true
 strata-rpc-types.workspace = true
@@ -17,7 +18,6 @@ strata-state.workspace = true
 strata-status.workspace = true
 strata-storage.workspace = true
 strata-tasks.workspace = true
-strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
 anyhow.workspace = true

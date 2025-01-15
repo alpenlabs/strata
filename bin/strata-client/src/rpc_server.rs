@@ -11,7 +11,7 @@ use bitcoin::{
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
-use strata_btcio::{broadcaster::L1BroadcastHandle, writer::InscriptionHandle};
+use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 use strata_consensus_logic::{
     checkpoint::CheckpointHandle, csm::state_tracker::reconstruct_state, l1_handler::verify_proof,
     sync_manager::SyncManager,
@@ -24,6 +24,7 @@ use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
     hash,
+    l1::payload::{L1Payload, PayloadDest, PayloadIntent},
     params::Params,
 };
 use strata_rpc_api::{
@@ -41,7 +42,6 @@ use strata_state::{
     bridge_ops::WithdrawalIntent,
     chain_state::Chainstate,
     client_state::ClientState,
-    da_blob::{BlobDest, BlobIntent},
     header::L2Header,
     id::L2BlockId,
     l1::L1BlockId,
@@ -697,7 +697,7 @@ impl StrataAdminApiServer for AdminServerImpl {
 }
 
 pub struct SequencerServerImpl {
-    inscription_handle: Arc<InscriptionHandle>,
+    envelope_handle: Arc<EnvelopeHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     checkpoint_handle: Arc<CheckpointHandle>,
     params: Arc<Params>,
@@ -705,13 +705,13 @@ pub struct SequencerServerImpl {
 
 impl SequencerServerImpl {
     pub fn new(
-        inscription_handle: Arc<InscriptionHandle>,
+        envelope_handle: Arc<EnvelopeHandle>,
         broadcast_handle: Arc<L1BroadcastHandle>,
         params: Arc<Params>,
         checkpoint_handle: Arc<CheckpointHandle>,
     ) -> Self {
         Self {
-            inscription_handle,
+            envelope_handle,
             broadcast_handle,
             params,
             checkpoint_handle,
@@ -735,14 +735,11 @@ impl StrataSequencerApiServer for SequencerServerImpl {
 
     async fn submit_da_blob(&self, blob: HexBytes) -> RpcResult<()> {
         let commitment = hash::raw(&blob.0);
-        let blobintent = BlobIntent::new(BlobDest::L1, commitment, blob.0);
+        let payload = L1Payload::new_da(blob.0);
+        let blobintent = PayloadIntent::new(PayloadDest::L1, commitment, payload);
         // NOTE: It would be nice to return reveal txid from the submit method. But creation of txs
         // is deferred to signer in the writer module
-        if let Err(e) = self
-            .inscription_handle
-            .submit_intent_async(blobintent)
-            .await
-        {
+        if let Err(e) = self.envelope_handle.submit_intent_async(blobintent).await {
             return Err(Error::Other(e.to_string()).into());
         }
         Ok(())

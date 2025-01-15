@@ -12,6 +12,7 @@ borsh.workspace = true
 digest.workspace = true
 hex.workspace = true
 musig2 = { workspace = true, features = ["serde"] }
+num_enum.workspace = true
 rand = { workspace = true, optional = true }
 reth-primitives.workspace = true
 secp256k1 = { workspace = true, optional = true }

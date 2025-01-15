@@ -3,8 +3,8 @@ use std::sync::Arc;
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
-    traits::{BlobDatabase, SequencerDatabase},
-    types::BlobEntry,
+    traits::{L1PayloadDatabase, SequencerDatabase},
+    types::PayloadEntry,
     DbResult,
 };
 use strata_primitives::buf::Buf32;
@@ -27,20 +27,20 @@ impl RBSeqBlobDb {
     }
 }
 
-impl BlobDatabase for RBSeqBlobDb {
-    fn put_blob_entry(&self, blob_hash: Buf32, blob: BlobEntry) -> DbResult<()> {
+impl L1PayloadDatabase for RBSeqBlobDb {
+    fn put_payload_entry(&self, payload_id: Buf32, entry: PayloadEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |tx| -> Result<(), DbError> {
                     // If new, increment idx
-                    if tx.get::<SeqBlobSchema>(&blob_hash)?.is_none() {
+                    if tx.get::<SeqBlobSchema>(&payload_id)?.is_none() {
                         let idx = get_next_id::<SeqBlobIdSchema, OptimisticTransactionDB>(tx)?;
 
-                        tx.put::<SeqBlobIdSchema>(&idx, &blob_hash)?;
+                        tx.put::<SeqBlobIdSchema>(&idx, &payload_id)?;
                     }
 
-                    tx.put::<SeqBlobSchema>(&blob_hash, &blob)?;
+                    tx.put::<SeqBlobSchema>(&payload_id, &entry)?;
 
                     Ok(())
                 },
@@ -48,15 +48,15 @@ impl BlobDatabase for RBSeqBlobDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_blob_by_id(&self, id: Buf32) -> DbResult<Option<BlobEntry>> {
+    fn get_payload_by_id(&self, id: Buf32) -> DbResult<Option<PayloadEntry>> {
         Ok(self.db.get::<SeqBlobSchema>(&id)?)
     }
 
-    fn get_last_blob_idx(&self) -> DbResult<Option<u64>> {
+    fn get_last_payload_idx(&self) -> DbResult<Option<u64>> {
         Ok(rockbound::utils::get_last::<SeqBlobIdSchema>(&*self.db)?.map(|(x, _)| x))
     }
 
-    fn get_blob_id(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
+    fn get_payload_id(&self, blobidx: u64) -> DbResult<Option<Buf32>> {
         Ok(self.db.get::<SeqBlobIdSchema>(&blobidx)?)
     }
 }
@@ -71,10 +71,10 @@ impl<D> SequencerDB<D> {
     }
 }
 
-impl<B: BlobDatabase> SequencerDatabase for SequencerDB<B> {
-    type BlobDB = B;
+impl<B: L1PayloadDatabase> SequencerDatabase for SequencerDB<B> {
+    type L1PayloadDB = B;
 
-    fn blob_db(&self) -> &Arc<Self::BlobDB> {
+    fn payload_db(&self) -> &Arc<Self::L1PayloadDB> {
         &self.db
     }
 }
@@ -82,7 +82,7 @@ impl<B: BlobDatabase> SequencerDatabase for SequencerDB<B> {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_db::traits::BlobDatabase;
+    use strata_db::traits::L1PayloadDatabase;
     use strata_primitives::buf::Buf32;
     use strata_test_utils::ArbitraryGenerator;
     use test;
@@ -95,15 +95,15 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBSeqBlobDb::new(db, db_ops);
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
+        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
-        let idx = seq_db.get_last_blob_idx().unwrap().unwrap();
+        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
+        let idx = seq_db.get_last_payload_idx().unwrap().unwrap();
 
-        assert_eq!(seq_db.get_blob_id(idx).unwrap(), Some(blob_hash));
+        assert_eq!(seq_db.get_payload_id(idx).unwrap(), Some(blob_hash));
 
-        let stored_blob = seq_db.get_blob_by_id(blob_hash).unwrap();
+        let stored_blob = seq_db.get_payload_by_id(blob_hash).unwrap();
         assert_eq!(stored_blob, Some(blob));
     }
 
@@ -111,12 +111,12 @@ mod tests {
     fn test_put_blob_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBSeqBlobDb::new(db, db_ops);
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
+        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
 
-        let result = seq_db.put_blob_entry(blob_hash, blob);
+        let result = seq_db.put_payload_entry(blob_hash, blob);
 
         // Should be ok to put to existing key
         assert!(result.is_ok());
@@ -127,19 +127,19 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBSeqBlobDb::new(db, db_ops);
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
+        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
         // Insert
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
 
-        let updated_blob: BlobEntry = ArbitraryGenerator::new().generate();
+        let updated_blob: PayloadEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
         seq_db
-            .put_blob_entry(blob_hash, updated_blob.clone())
+            .put_payload_entry(blob_hash, updated_blob.clone())
             .unwrap();
-        let retrieved_blob = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
+        let retrieved_blob = seq_db.get_payload_by_id(blob_hash).unwrap().unwrap();
         assert_eq!(updated_blob, retrieved_blob);
     }
 
@@ -148,12 +148,12 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBSeqBlobDb::new(db, db_ops);
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
+        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
 
-        let retrieved = seq_db.get_blob_by_id(blob_hash).unwrap().unwrap();
+        let retrieved = seq_db.get_payload_by_id(blob_hash).unwrap().unwrap();
         assert_eq!(retrieved, blob);
     }
 
@@ -162,25 +162,25 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBSeqBlobDb::new(db, db_ops);
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
+        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [0; 32].into();
 
-        let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
+        let last_blob_idx = seq_db.get_last_payload_idx().unwrap();
         assert_eq!(
             last_blob_idx, None,
             "There is no last blobidx in the beginning"
         );
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
         // Now the last idx is 0
 
-        let blob: BlobEntry = ArbitraryGenerator::new().generate();
+        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
         let blob_hash: Buf32 = [1; 32].into();
 
-        seq_db.put_blob_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
         // Now the last idx is 1
 
-        let last_blob_idx = seq_db.get_last_blob_idx().unwrap();
+        let last_blob_idx = seq_db.get_last_payload_idx().unwrap();
         assert_eq!(last_blob_idx, Some(1));
     }
 }

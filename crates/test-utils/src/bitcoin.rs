@@ -6,11 +6,11 @@ use bitcoin::{
     hashes::Hash,
     Block, Transaction,
 };
+use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{buf::Buf32, l1::L1BlockRecord};
 use strata_state::l1::{
     get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
 };
-use strata_tx_parser::filter::TxFilterConfig;
 
 use crate::{l2::gen_params, ArbitraryGenerator};
 

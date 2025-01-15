@@ -253,6 +253,8 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
 
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
+        checkpoint_tag: cmd.checkpoint_tag.unwrap_or("strata-ckpt".to_string()),
+        da_tag: cmd.da_tag.unwrap_or("strata-da".to_string()),
         bitcoin_network: ctx.bitcoin_network,
         // TODO make these consts
         block_time_sec: cmd.block_time.unwrap_or(15),
@@ -390,6 +392,10 @@ fn resolve_xpriv(
 pub struct ParamsConfig {
     /// Name of the network.
     name: String,
+    /// Tagname used to identify DA envelopes
+    da_tag: String,
+    /// Tagname used to identify Checkpoint envelopes
+    checkpoint_tag: String,
     /// Network to use.
     #[allow(unused)]
     bitcoin_network: Network,
@@ -435,6 +441,8 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
     RollupParams {
         rollup_name: config.name,
         block_time: config.block_time_sec * 1000,
+        da_tag: config.da_tag,
+        checkpoint_tag: config.checkpoint_tag,
         cred_rule: cr,
         // TODO do we want to remove this?
         horizon_l1_height: config.genesis_trigger / 2,

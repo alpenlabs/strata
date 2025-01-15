@@ -9,13 +9,13 @@ borsh.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true
 strata-bridge-tx-builder.workspace = true
+strata-l1tx.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
-strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
 [dev-dependencies]
 hex.workspace = true
 rand.workspace = true
-strata-test-utils.workspace = true
 strata-native-zkvm-adapter.workspace = true
+strata-test-utils.workspace = true

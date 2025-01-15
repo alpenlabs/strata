@@ -47,19 +47,3 @@ pub struct DepositRequestInfo {
     /// EE address
     pub address: Vec<u8>,
 }
-
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct InscriptionData {
-    /// payload present in inscription transaction (either batchTx or checkpointTx)
-    batch_data: Vec<u8>,
-}
-
-impl InscriptionData {
-    pub fn new(batch_data: Vec<u8>) -> Self {
-        Self { batch_data }
-    }
-
-    pub fn batch_data(&self) -> &[u8] {
-        &self.batch_data
-    }
-}

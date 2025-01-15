@@ -18,6 +18,7 @@ strata-db.workspace = true
 strata-eectl.workspace = true
 strata-evmexec.workspace = true
 strata-key-derivation.workspace = true
+strata-l1tx.workspace = true
 strata-primitives.workspace = true
 strata-rocksdb.workspace = true
 strata-rpc-api.workspace = true
@@ -28,7 +29,6 @@ strata-status.workspace = true
 strata-storage.workspace = true
 strata-sync.workspace = true
 strata-tasks.workspace = true
-strata-tx-parser.workspace = true
 strata-zkvm.workspace = true
 
 alloy-rpc-types.workspace = true

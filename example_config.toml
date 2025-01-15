@@ -14,9 +14,15 @@ network = "regtest"
 
 [sync]
 l1_follow_distance = 6
-max_reorg_depth = 4
-client_poll_dur_ms = 200
 client_checkpoint_interval = 10
+
+[btcio.reader]
+client_poll_dur_ms = 200
+
+[btcio.writer]
+write_poll_dur_ms = 200
+fee_policy = "smart"
+reveal_amount = 100
 
 [exec.reth]
 # reth {authrpc.address}:{authrpc.port}

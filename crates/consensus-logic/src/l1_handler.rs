@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use secp256k1::XOnlyPublicKey;
 use strata_db::traits::{Database, L1Database};
+use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
@@ -19,7 +20,6 @@ use strata_state::{
     l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
 };
-use strata_tx_parser::messages::{BlockData, L1Event};
 use strata_zkvm::{ProofReceipt, ZkVmError, ZkVmResult};
 use tokio::sync::mpsc;
 use tracing::*;
@@ -125,7 +125,7 @@ where
     }
 }
 
-/// Parses inscriptions and checks for batch data in the transactions
+/// Parses envelopes and checks for batch data in the transactions
 fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
@@ -135,8 +135,8 @@ fn check_for_da_batch(
     let signed_checkpts = protocol_ops_txs
         .iter()
         .filter_map(|ops_txs| match ops_txs.proto_op() {
-            strata_state::tx::ProtocolOperation::Checkpoint(inscription) => Some((
-                inscription,
+            strata_state::tx::ProtocolOperation::Checkpoint(envelope) => Some((
+                envelope,
                 &blockdata.block().txdata[ops_txs.index() as usize],
             )),
             _ => None,

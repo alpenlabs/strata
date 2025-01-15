@@ -7,54 +7,54 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, l1::payload::L1Payload};
 use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
 use strata_zkvm::ProofReceipt;
 
-/// Represents data for a blob we're still planning to inscribe.
-// TODO rename to `BlockInscriptionEntry` to emphasize this isn't just about *all* blobs
+/// Represents data for a payload we're still planning to post to L1.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct BlobEntry {
-    pub blob: Vec<u8>,
+pub struct PayloadEntry {
+    pub payload: L1Payload,
     pub commit_txid: Buf32,
     pub reveal_txid: Buf32,
-    pub status: BlobL1Status,
+    pub status: PayloadL1Status,
 }
 
-impl BlobEntry {
+impl PayloadEntry {
     pub fn new(
-        blob: Vec<u8>,
+        payload: L1Payload,
         commit_txid: Buf32,
         reveal_txid: Buf32,
-        status: BlobL1Status,
+        status: PayloadL1Status,
     ) -> Self {
         Self {
-            blob,
+            payload,
             commit_txid,
             reveal_txid,
             status,
         }
     }
 
-    /// Create new unsigned blobentry.
+    /// Create new unsigned [`PayloadEntry`].
     ///
     /// NOTE: This won't have commit - reveal pairs associated with it.
     ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
     ///   by others. Those will be created and signed in a single step.
-    pub fn new_unsigned(blob: Vec<u8>) -> Self {
+    pub fn new_unsigned(payload: L1Payload) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();
-        Self::new(blob, cid, rid, BlobL1Status::Unsigned)
+        Self::new(payload, cid, rid, PayloadL1Status::Unsigned)
     }
 }
 
-/// Various status that transactions corresponding to a blob can be in L1
+/// Various status that transactions corresponding to a payload can be in L1
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum BlobL1Status {
-    /// The blob has not been signed yet, i.e commit-reveal transactions have not been created yet.
+pub enum PayloadL1Status {
+    /// The payload has not been signed yet, i.e commit-reveal transactions have not been created
+    /// yet.
     Unsigned,
 
-    /// The commit-reveal transactions for blob are signed and waiting to be published
+    /// The commit-reveal transactions for payload are signed and waiting to be published
     Unpublished,
 
     /// The transactions are published
