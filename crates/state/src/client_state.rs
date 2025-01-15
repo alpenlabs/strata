@@ -163,16 +163,6 @@ impl SyncState {
         }
     }
 
-    #[deprecated(note = "getting rid of CSM awareness of tip soon (STR-696)")]
-    pub fn tip_height(&self) -> u64 {
-        panic!("csm: tip does not exist anymore");
-    }
-
-    #[deprecated(note = "getting rid of CSM awareness of tip soon (STR-696)")]
-    pub fn chain_tip_blkid(&self) -> &L2BlockId {
-        panic!("csm: tip does not exist anymore");
-    }
-
     pub fn finalized_epoch(&self) -> u64 {
         self.finalized_epoch
     }
@@ -187,6 +177,8 @@ impl SyncState {
 
     /// Returns the commitment for the finalized epoch.
     pub fn get_epoch_commitment(&self) -> EpochCommitment {
+        // TODO convert this into being the principal field and the other fields
+        // as being convenience functions
         EpochCommitment::new(
             self.finalized_epoch(),
             self.finalized_slot(),
