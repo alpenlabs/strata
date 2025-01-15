@@ -2,9 +2,9 @@
 
 use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::params::RollupParams;
 use strata_state::{batch::BatchCheckpoint, l1::L1TxProof, tx::DepositInfo};
-use strata_tx_parser::filter::TxFilterConfig;
 use strata_zkvm::ZkVmEnv;
 
 use crate::scan::process_blockscan;

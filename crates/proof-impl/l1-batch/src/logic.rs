@@ -1,5 +1,6 @@
 use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_proofimpl_btc_blockspace::scan::process_blockscan;
 use strata_state::{
@@ -7,7 +8,6 @@ use strata_state::{
     l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot, L1TxProof},
     tx::DepositInfo,
 };
-use strata_tx_parser::filter::TxFilterConfig;
 use strata_zkvm::ZkVmEnv;
 
 /// Represents the public parameters of the L1BlockScan batch proof.
