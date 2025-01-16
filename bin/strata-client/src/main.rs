@@ -565,5 +565,5 @@ fn start_template_manager_task(ctx: CoreContext, executor: &TaskExecutor) -> Tem
         template_manager_worker(shutdown, manager, rx)
     });
 
-    TemplateManagerHandle::new(tx)
+    TemplateManagerHandle::new(tx, 64.try_into().expect("valid non zero usize"))
 }

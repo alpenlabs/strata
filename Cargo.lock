@@ -13711,6 +13711,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "borsh",
+ "lru",
  "parking_lot 0.12.3",
  "serde",
  "strata-chaintsn",
