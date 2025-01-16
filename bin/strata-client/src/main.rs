@@ -139,7 +139,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     match &config.client.client_mode {
         // If we're a sequencer, start the sequencer db and duties task.
-        ClientMode::Sequencer => {
+        ClientMode::Sequencer(_) => {
             let broadcast_database = init_broadcaster_database(rbdb.clone(), ops_config);
             let broadcast_handle = start_broadcaster_tasks(
                 broadcast_database,

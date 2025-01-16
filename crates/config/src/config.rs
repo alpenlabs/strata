@@ -11,10 +11,14 @@ pub struct FullNodeConfig {
     pub sequencer_rpc: String,
 }
 
+// SequencerConfig is empty for now
+#[derive(Debug, Clone, Deserialize)]
+pub struct SequencerConfig {}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum ClientMode {
-    Sequencer,
+    Sequencer(SequencerConfig),
     FullNode(FullNodeConfig),
 }
 
@@ -66,7 +70,7 @@ pub struct Config {
 
 #[cfg(test)]
 mod test {
-    use crate::config::Config;
+    use super::*;
 
     #[test]
     fn test_config_load() {
@@ -117,6 +121,10 @@ mod test {
             "should be able to load sequencer TOML config but got: {:?}",
             config.err()
         );
+        assert!(matches!(
+            config.unwrap().client.client_mode,
+            ClientMode::Sequencer(..)
+        ));
 
         let config_string_fullnode = r#"
             [bitcoind_rpc]
