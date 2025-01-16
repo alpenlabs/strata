@@ -8,7 +8,7 @@ from threading import Thread
 from typing import Any, Callable, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
-from strata_utils import convert_to_xonly_pk, musig_aggregate_pks
+from strata_utils import convert_to_xonly_pk, get_balance, musig_aggregate_pks
 
 from factory.seqrpc import JsonrpcClient
 from utils.constants import *
@@ -548,3 +548,34 @@ def check_sequencer_down(seqrpc):
         return False
     except RuntimeError:
         return True
+
+
+def confirm_btc_withdrawal(
+    withdraw_address,
+    btc_url,
+    btc_user,
+    btc_password,
+    original_balance,
+    expected_increase,
+    debug_fn=print,
+):
+    """
+    Wait for the BTC balance to reflect the withdrawal and confirm the final balance
+    equals `original_balance + expected_increase`.
+    """
+    # Wait for the new balance,
+    # this includes waiting for a new batch checkpoint,
+    # duty processing by the bridge clients and maturity of the withdrawal.
+    wait_until(
+        lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > original_balance,
+        timeout=60,
+    )
+
+    # Check final BTC balance
+    btc_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
+    debug_fn(f"BTC final balance: {btc_balance}")
+    debug_fn(f"Expected final balance: {original_balance + expected_increase}")
+
+    assert (
+        btc_balance == original_balance + expected_increase
+    ), "BTC balance after withdrawal is not as expected"

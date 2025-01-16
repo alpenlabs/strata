@@ -8,7 +8,7 @@ use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_primitives::{
     revm_primitives::alloy_primitives::{Address, B256},
-    BlockNumHash, BlockWithSenders, TransactionSignedNoHash,
+    BlockNumHash, BlockWithSenders, TransactionSigned,
 };
 use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
 use reth_revm::{db::CacheDB, primitives::FixedBytes};
@@ -135,11 +135,9 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
 
     let current_block_txns = current_block
         .body
-        .blob_transactions()
-        .into_iter()
+        .transactions()
         .cloned()
-        .map(TransactionSignedNoHash::from)
-        .collect::<Vec<TransactionSignedNoHash>>();
+        .collect::<Vec<TransactionSigned>>();
 
     let prev_state_root = prev_block.state_root;
 

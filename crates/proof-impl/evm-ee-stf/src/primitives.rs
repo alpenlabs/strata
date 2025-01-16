@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use alloy_consensus::{serde_bincode_compat, Header};
+use alloy_consensus::{serde_bincode_compat as serde_bincode_compat_header, Header};
 use reth_primitives::{
     revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256},
-    TransactionSignedNoHash, Withdrawal,
+    transaction::serde_bincode_compat as serde_bincode_compat_tx,
+    TransactionSigned, Withdrawal,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -36,8 +37,8 @@ pub struct EvmBlockStfOutput {
 pub struct EvmBlockStfInput {
     /// The Keccak 256-bit hash of the parent block's header, in its entirety.
     /// N.B. The reason serde_bincode_compat is necessary:
-    /// `[serde_bincode_compat]`(alloy_consensus::serde_bincode_compat)
-    #[serde_as(as = "serde_bincode_compat::Header")]
+    /// [`serde_bincode_compat`](alloy_consensus::serde_bincode_compat)
+    #[serde_as(as = "serde_bincode_compat_header::Header")]
     pub parent_header: Header,
 
     /// The 160-bit address to which all fees collected from the successful mining of this block
@@ -73,7 +74,8 @@ pub struct EvmBlockStfInput {
     pub ancestor_headers: Vec<Header>,
 
     /// A list of transactions to process.
-    pub transactions: Vec<TransactionSignedNoHash>,
+    #[serde_as(as = "Vec<serde_bincode_compat_tx::TransactionSigned>")]
+    pub transactions: Vec<TransactionSigned>,
 
     /// A list of withdrawals to process.
     pub withdrawals: Vec<Withdrawal>,

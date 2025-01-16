@@ -3,7 +3,7 @@ from strata_utils import get_balance
 
 from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
-from utils import utils
+from utils import confirm_btc_withdrawal, get_bridge_pubkey
 
 # Local constants
 # Gas for the withdrawal transaction
@@ -56,7 +56,7 @@ class BridgeWithdrawHappyTest(testenv.BridgeTestBase):
         # Make sure starting ETH balance is 0
         check_initial_eth_balance(self.rethrpc, el_address, self.debug)
 
-        bridge_pk = utils.get_bridge_pubkey(self.seqrpc)
+        bridge_pk = get_bridge_pubkey(self.seqrpc)
         self.debug(f"Bridge pubkey: {bridge_pk}")
 
         # make two deposits
@@ -87,34 +87,3 @@ def check_initial_eth_balance(rethrpc, address, debug_fn=print):
     balance = int(rethrpc.eth_getBalance(address), 16)
     debug_fn(f"Strata Balance before deposits: {balance}")
     assert balance == 0, "Strata balance is not expected (should be zero initially)"
-
-
-def confirm_btc_withdrawal(
-    withdraw_address,
-    btc_url,
-    btc_user,
-    btc_password,
-    original_balance,
-    expected_increase,
-    debug_fn=print,
-):
-    """
-    Wait for the BTC balance to reflect the withdrawal and confirm the final balance
-    equals `original_balance + expected_increase`.
-    """
-    # Wait for the new balance,
-    # this includes waiting for a new batch checkpoint,
-    # duty processing by the bridge clients and maturity of the withdrawal.
-    utils.wait_until(
-        lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password) > original_balance,
-        timeout=60,
-    )
-
-    # Check final BTC balance
-    btc_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
-    debug_fn(f"BTC final balance: {btc_balance}")
-    debug_fn(f"Expected final balance: {original_balance + expected_increase}")
-
-    assert (
-        btc_balance == original_balance + expected_increase
-    ), "BTC balance after withdrawal is not as expected"

@@ -159,11 +159,23 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn prove_checkpoint_raw(
         &self,
-        _checkpoint_idx: u64,
-        _l1_range: (u64, u64),
-        _l2_range: (u64, u64),
+        checkpoint_idx: u64,
+        l1_range: (u64, u64),
+        l2_range: (u64, u64),
     ) -> RpcResult<Vec<ProofKey>> {
-        unimplemented!()
+        self.operator
+            .checkpoint_operator()
+            .create_task_raw(
+                checkpoint_idx,
+                l1_range,
+                l2_range,
+                self.task_tracker.clone(),
+                &self.db,
+            )
+            .await
+            .map_err(to_jsonrpsee_error(
+                "failed to create task for raw checkpoint",
+            ))
     }
 
     async fn get_task_status(&self, key: ProofKey) -> RpcResult<String> {

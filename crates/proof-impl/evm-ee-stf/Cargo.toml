@@ -22,7 +22,7 @@ k256 = { version = "=0.13.3", features = [
   "std",
   "ecdsa",
 ], default-features = false }
-reth-primitives.workspace = true
+reth-primitives = { workspace = true, features = ["serde-bincode-compat"] }
 reth-trie-common.workspace = true
 revm.workspace = true
 rlp = "0.5.2"

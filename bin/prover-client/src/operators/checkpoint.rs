@@ -52,6 +52,130 @@ impl CheckpointOperator {
         }
     }
 
+    /// Creates dependency tasks for the given `checkpoint_info`.
+    ///
+    /// # Arguments
+    ///
+    /// - `checkpoint_info`: checkpoint data.
+    /// - `db`: A reference to the proof database.
+    /// - `task_tracker`: A shared task tracker for managing task dependencies.
+    ///
+    /// # Returns
+    ///
+    /// A [`Vec`] containing the [`ProofKey`] for the dependent proving operations.
+    async fn create_deps_tasks_inner(
+        &self,
+        checkpoint_info: RpcCheckpointInfo,
+        db: &ProofDb,
+        task_tracker: Arc<Mutex<TaskTracker>>,
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        let ckp_idx = checkpoint_info.idx;
+
+        // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
+        // include the range in terms of block_id.
+        // https://alpenlabs.atlassian.net/browse/STR-756
+        let start_l1_block_id = self
+            .l1_batch_operator
+            .get_block_at(checkpoint_info.l1_range.0)
+            .await?;
+        let end_l1_block_id = self
+            .l1_batch_operator
+            .get_block_at(checkpoint_info.l1_range.1)
+            .await?;
+
+        let l1_batch_keys = self
+            .l1_batch_operator
+            .create_task(
+                (start_l1_block_id, end_l1_block_id),
+                task_tracker.clone(),
+                db,
+            )
+            .await?;
+        info!(%ckp_idx, "Created tasks for L1 Batch");
+
+        // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
+        // include the range in terms of block_id.
+        // https://alpenlabs.atlassian.net/browse/STR-756
+        let start_l2_idx = self.get_l2id(checkpoint_info.l2_range.0).await?;
+        let end_l2_idx = self.get_l2id(checkpoint_info.l2_range.1).await?;
+        let l2_range = vec![(start_l2_idx, end_l2_idx)];
+
+        let l2_batch_keys = self
+            .l2_batch_operator
+            .create_task(l2_range, task_tracker.clone(), db)
+            .await?;
+
+        info!(%ckp_idx, "Created tasks for L2 Batch");
+
+        let mut all_keys = l1_batch_keys;
+        all_keys.extend(l2_batch_keys);
+        Ok(all_keys)
+    }
+
+    /// Manual creation of checkpoint task. Intended to be used in tests.
+    ///
+    /// #Note
+    ///
+    /// This is analogous to [`ProvingOp::create_task`].
+    /// In fact, a forked version with construction of dependency tasks from manually constructed
+    /// [`RpcCheckpointInfo`].
+    ///
+    /// # Arguments
+    ///
+    /// - `checkpoint_idx`: index of the checkpoint.
+    /// - `l1_range`: range of blocks on L1 to be included in the checkpoint.
+    /// - `l2_range`: range of block on L2 to be included in the  checkpoint.
+    /// - `task_tracker`: A shared task tracker for managing task dependencies.
+    /// - `db`: A reference to the proof database.
+    ///
+    /// # Returns
+    ///
+    /// A vector of [`ProofKey`] corresponding to the checkpoint proving operation.
+    pub async fn create_task_raw(
+        &self,
+        checkpoint_idx: u64,
+        l1_range: (u64, u64),
+        l2_range: (u64, u64),
+        task_tracker: Arc<Mutex<TaskTracker>>,
+        db: &ProofDb,
+    ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        let checkpoint_info = RpcCheckpointInfo {
+            idx: checkpoint_idx,
+            l1_range,
+            l2_range,
+            // TODO: likely unused and should be removed.
+            l2_blockid: Buf32::default().into(),
+            commitment: None,
+        };
+        let proof_ctx = self.construct_proof_ctx(&checkpoint_idx)?;
+
+        // Try to fetch the existing prover tasks for dependencies.
+        let proof_deps = db
+            .get_proof_deps(proof_ctx)
+            .map_err(ProvingTaskError::DatabaseError)?;
+
+        let deps_ctx = match proof_deps {
+            // Reuse the existing dependency tasks fetched from DB.
+            Some(v) => v,
+            // Create new dependency tasks.
+            None => {
+                let deps_keys = self
+                    .create_deps_tasks_inner(checkpoint_info, db, task_tracker.clone())
+                    .await?;
+                let deps: Vec<_> = deps_keys.iter().map(|v| v.context().to_owned()).collect();
+
+                if !deps.is_empty() {
+                    db.put_proof_deps(proof_ctx, deps.clone())
+                        .map_err(ProvingTaskError::DatabaseError)?;
+                }
+                deps
+            }
+        };
+
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.create_tasks(proof_ctx, deps_ctx, db)
+    }
+
     async fn fetch_ckp_info(&self, ckp_idx: u64) -> Result<RpcCheckpointInfo, ProvingTaskError> {
         self.cl_client
             .get_checkpoint_info(ckp_idx)
@@ -151,45 +275,7 @@ impl ProvingOp for CheckpointOperator {
         task_tracker: Arc<Mutex<TaskTracker>>,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let checkpoint_info = self.fetch_ckp_info(ckp_idx).await?;
-
-        // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
-        // include the range in terms of block_id.
-        // https://alpenlabs.atlassian.net/browse/STR-756
-        let start_l1_block_id = self
-            .l1_batch_operator
-            .get_block_at(checkpoint_info.l1_range.0)
-            .await?;
-        let end_l1_block_id = self
-            .l1_batch_operator
-            .get_block_at(checkpoint_info.l1_range.1)
-            .await?;
-
-        let l1_batch_keys = self
-            .l1_batch_operator
-            .create_task(
-                (start_l1_block_id, end_l1_block_id),
-                task_tracker.clone(),
-                db,
-            )
-            .await?;
-
-        // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
-        // include the range in terms of block_id.
-        // https://alpenlabs.atlassian.net/browse/STR-756
-        let start_l2_idx = self.get_l2id(checkpoint_info.l2_range.0).await?;
-        let end_l2_idx = self.get_l2id(checkpoint_info.l2_range.1).await?;
-        let l2_range = vec![(start_l2_idx, end_l2_idx)];
-        info!(%ckp_idx, "Created tasks for L1 Batch");
-
-        let l2_batch_keys = self
-            .l2_batch_operator
-            .create_task(l2_range, task_tracker.clone(), db)
-            .await?;
-
-        info!(%ckp_idx, "Created tasks for L2 Batch");
-
-        let mut r = l1_batch_keys;
-        r.extend(l2_batch_keys);
-        Ok(r)
+        self.create_deps_tasks_inner(checkpoint_info, db, task_tracker)
+            .await
     }
 }
