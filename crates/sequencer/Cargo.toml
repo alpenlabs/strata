@@ -6,7 +6,6 @@ version = "0.1.0"
 [dependencies]
 strata-chaintsn.workspace = true
 strata-consensus-logic.workspace = true
-strata-crypto = { workspace = true, default-features = true }
 strata-db.workspace = true
 strata-eectl.workspace = true
 strata-primitives.workspace = true

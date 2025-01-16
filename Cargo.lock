@@ -13454,7 +13454,6 @@ dependencies = [
  "serde",
  "strata-chaintsn",
  "strata-consensus-logic",
- "strata-crypto",
  "strata-db",
  "strata-eectl",
  "strata-primitives",
