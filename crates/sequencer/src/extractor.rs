@@ -9,7 +9,7 @@ use strata_state::{
 use strata_storage::L2BlockManager;
 
 use super::types::{BlockSigningDuty, Duty};
-use crate::{checkpoint_handle::CheckpointHandle, errors::Error, types::BatchCheckpointDuty};
+use crate::{checkpoint::CheckpointHandle, errors::Error, types::BatchCheckpointDuty};
 
 /// Extracts new duties given a consensus state and a identity.
 pub fn extract_duties(

@@ -13,7 +13,7 @@ use tokio::sync::broadcast;
 use tracing::*;
 
 use crate::{
-    checkpoint_handle::CheckpointHandle,
+    checkpoint::CheckpointHandle,
     errors::Error,
     extractor,
     types::{DutyTracker, StateUpdate},
