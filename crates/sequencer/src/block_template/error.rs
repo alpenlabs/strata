@@ -8,12 +8,14 @@ pub enum Error {
     TimestampTooEarly(u64),
     #[error("unknown templateid: {0}")]
     UnknownTemplateId(L2BlockId),
-    #[error("invalid signature supplied for templateid: {0})")]
+    #[error("invalid signature supplied for templateid: {0}")]
     InvalidSignature(L2BlockId),
+    #[error("failed to send request, template worker exited")]
+    RequestChannelClosed,
+    #[error("failed to get response, template worker exited")]
+    ResponseChannelClosed,
     #[error("db: {0}")]
     DbError(#[from] DbError),
     #[error("consensus: {0}")]
     ConsensusError(#[from] strata_consensus_logic::errors::Error),
-    #[error("channel: {0}")]
-    ChannelError(&'static str),
 }

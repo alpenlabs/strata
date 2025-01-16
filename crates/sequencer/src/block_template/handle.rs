@@ -1,11 +1,8 @@
-use std::{num::NonZeroUsize, sync::Arc};
-
-use lru::LruCache;
 use strata_primitives::l2::L2BlockId;
 use strata_state::block::L2BlockBundle;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot};
 
-use crate::block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error};
+use super::{BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error, SharedState};
 
 #[derive(Debug)]
 pub enum TemplateManagerRequest {
@@ -18,21 +15,17 @@ pub enum TemplateManagerRequest {
         BlockCompletionData,
         oneshot::Sender<Result<L2BlockBundle, Error>>,
     ),
-    GetBlockTemplate(L2BlockId, oneshot::Sender<Result<BlockTemplate, Error>>),
 }
 
 #[derive(Debug, Clone)]
 pub struct TemplateManagerHandle {
     tx: mpsc::Sender<TemplateManagerRequest>,
-    cache: Arc<Mutex<LruCache<L2BlockId, BlockTemplate>>>,
+    shared: SharedState,
 }
 
 impl TemplateManagerHandle {
-    pub fn new(tx: mpsc::Sender<TemplateManagerRequest>, cache_size: NonZeroUsize) -> Self {
-        Self {
-            tx,
-            cache: Arc::new(Mutex::new(LruCache::new(cache_size))),
-        }
+    pub fn new(tx: mpsc::Sender<TemplateManagerRequest>, shared: SharedState) -> Self {
+        Self { tx, shared }
     }
 
     async fn request<R>(
@@ -40,14 +33,15 @@ impl TemplateManagerHandle {
         build_request: impl FnOnce(oneshot::Sender<Result<R, Error>>) -> TemplateManagerRequest,
     ) -> Result<R, Error> {
         let (tx, rx) = oneshot::channel();
-        self.tx.send(build_request(tx)).await.map_err(|_| {
-            Error::ChannelError("failed to send request to template manager, worker likely exited")
-        })?;
+        self.tx
+            .send(build_request(tx))
+            .await
+            .map_err(|_| Error::RequestChannelClosed)?;
 
         match rx.await {
             Ok(res) => res,
             // oneshot tx is dropped
-            Err(_) => Err(Error::ChannelError("tx dropped, worker likely exited")),
+            Err(_) => Err(Error::ResponseChannelClosed),
         }
     }
 
@@ -55,16 +49,18 @@ impl TemplateManagerHandle {
         &self,
         config: BlockGenerationConfig,
     ) -> Result<BlockTemplate, Error> {
-        let template = self
-            .request(|tx| TemplateManagerRequest::GenerateBlockTemplate(config, tx))
-            .await?;
-
-        self.cache
-            .lock()
+        // check if pending template exists
+        if let Ok(template) = self
+            .shared
+            .read()
             .await
-            .push(template.template_id(), template.clone());
+            .get_pending_block_template_by_parent(config.parent_block_id())
+        {
+            return Ok(template);
+        }
 
-        Ok(template)
+        self.request(|tx| TemplateManagerRequest::GenerateBlockTemplate(config.clone(), tx))
+            .await
     }
 
     pub async fn complete_block_template(
@@ -72,30 +68,16 @@ impl TemplateManagerHandle {
         template_id: L2BlockId,
         completion: BlockCompletionData,
     ) -> Result<L2BlockBundle, Error> {
-        let bundle = self
-            .request(|tx| {
-                TemplateManagerRequest::CompleteBlockTemplate(template_id, completion, tx)
-            })
-            .await?;
-
-        self.cache.lock().await.pop(&template_id);
-
-        Ok(bundle)
+        self.request(|tx| {
+            TemplateManagerRequest::CompleteBlockTemplate(template_id, completion, tx)
+        })
+        .await
     }
 
     pub async fn get_block_template(&self, template_id: L2BlockId) -> Result<BlockTemplate, Error> {
-        if let Some(cached) = self.cache.lock().await.get(&template_id) {
-            return Ok(cached.clone());
-        }
-        let template = self
-            .request(|tx| TemplateManagerRequest::GetBlockTemplate(template_id, tx))
-            .await?;
-
-        self.cache
-            .lock()
+        self.shared
+            .read()
             .await
-            .push(template.template_id(), template.clone());
-
-        Ok(template)
+            .get_pending_block_template(template_id)
     }
 }

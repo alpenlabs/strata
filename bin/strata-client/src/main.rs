@@ -31,7 +31,7 @@ use strata_rpc_api::{
     StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
 };
 use strata_sequencer::{
-    block_template::{template_manager_worker, BlockTemplateManager, TemplateManagerHandle},
+    block_template,
     checkpoint::{checkpoint_expiry_worker, checkpoint_worker, CheckpointHandle},
     duty::{types::DutyTracker, worker as duty_worker},
 };
@@ -550,7 +550,10 @@ async fn start_rpc(
     Ok(())
 }
 
-fn start_template_manager_task(ctx: CoreContext, executor: &TaskExecutor) -> TemplateManagerHandle {
+fn start_template_manager_task(
+    ctx: CoreContext,
+    executor: &TaskExecutor,
+) -> block_template::TemplateManagerHandle {
     let CoreContext {
         database,
         engine,
@@ -560,10 +563,13 @@ fn start_template_manager_task(ctx: CoreContext, executor: &TaskExecutor) -> Tem
     } = ctx;
     let (tx, rx) = mpsc::channel(100);
 
-    let manager = BlockTemplateManager::new(params, database, engine, status_channel);
+    let worker_ctx = block_template::WorkerContext::new(params, database, engine, status_channel);
+    let shared_state: block_template::SharedState = Default::default();
+
+    let t_shared_state = shared_state.clone();
     executor.spawn_critical("template_manager_worker", |shutdown| {
-        template_manager_worker(shutdown, manager, rx)
+        block_template::worker(shutdown, worker_ctx, t_shared_state, rx)
     });
 
-    TemplateManagerHandle::new(tx, 64.try_into().expect("valid non zero usize"))
+    block_template::TemplateManagerHandle::new(tx, shared_state)
 }

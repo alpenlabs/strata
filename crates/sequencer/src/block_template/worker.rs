@@ -1,24 +1,107 @@
-use strata_db::traits::{Database, L2BlockDatabase};
-use strata_eectl::engine::ExecEngineCtl;
-use strata_primitives::params::Params;
-use strata_state::header::L2Header;
-use strata_status::StatusChannel;
-use strata_tasks::ShutdownGuard;
-use tokio::sync::mpsc;
-use tracing::warn;
-
-use crate::{
-    block_template::{
-        prepare_block, BlockGenerationConfig, BlockTemplate, BlockTemplateManager, Error,
-        FullBlockTemplate, TemplateManagerRequest,
+use std::{
+    collections::{
+        hash_map::Entry::{Occupied, Vacant},
+        HashMap,
     },
-    utils::now_millis,
+    sync::Arc,
 };
 
-/// Worker task for block template manager.
-pub fn template_manager_worker<D, E>(
+use strata_db::traits::{Database, L2BlockDatabase};
+use strata_eectl::engine::ExecEngineCtl;
+use strata_primitives::params::{Params, RollupParams};
+use strata_state::{
+    block::L2BlockBundle,
+    block_validation::verify_sequencer_signature,
+    header::{L2BlockHeader, L2Header},
+    id::L2BlockId,
+};
+use strata_status::StatusChannel;
+use strata_tasks::ShutdownGuard;
+use tokio::sync::{mpsc, RwLock};
+use tracing::warn;
+
+use super::{
+    prepare_block, BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error,
+    FullBlockTemplate, TemplateManagerRequest,
+};
+use crate::utils::now_millis;
+
+/// Container to pass context to worker
+#[derive(Debug)]
+pub struct WorkerContext<D, E> {
+    params: Arc<Params>,
+    database: Arc<D>,
+    engine: Arc<E>,
+    status_channel: StatusChannel,
+}
+
+impl<D, E> WorkerContext<D, E> {
+    pub fn new(
+        params: Arc<Params>,
+        database: Arc<D>,
+        engine: Arc<E>,
+        status_channel: StatusChannel,
+    ) -> Self {
+        Self {
+            params,
+            database,
+            engine,
+            status_channel,
+        }
+    }
+}
+
+/// Mutable worker state
+#[derive(Debug, Default)]
+pub struct WorkerState {
+    /// templateid -> template
+    pub(crate) pending_templates: HashMap<L2BlockId, FullBlockTemplate>,
+    /// parent blockid -> templateid
+    pub(crate) pending_by_parent: HashMap<L2BlockId, L2BlockId>,
+}
+
+impl WorkerState {
+    pub(crate) fn insert_template(&mut self, template_id: L2BlockId, template: FullBlockTemplate) {
+        let parent_blockid = *template.header().parent();
+        if let Some(_existing) = self.pending_templates.insert(template_id, template) {
+            warn!("existing pending block template overwritten: {template_id}");
+        }
+        self.pending_by_parent.insert(parent_blockid, template_id);
+    }
+
+    pub(crate) fn get_pending_block_template(
+        &self,
+        template_id: L2BlockId,
+    ) -> Result<BlockTemplate, Error> {
+        self.pending_templates
+            .get(&template_id)
+            .map(BlockTemplate::from_full_ref)
+            .ok_or(Error::UnknownTemplateId(template_id))
+    }
+
+    pub(crate) fn get_pending_block_template_by_parent(
+        &self,
+        parent_block_id: L2BlockId,
+    ) -> Result<BlockTemplate, Error> {
+        let template_id = self
+            .pending_by_parent
+            .get(&parent_block_id)
+            .ok_or(Error::UnknownTemplateId(parent_block_id))?;
+
+        self.pending_templates
+            .get(template_id)
+            .map(BlockTemplate::from_full_ref)
+            .ok_or(Error::UnknownTemplateId(*template_id))
+    }
+}
+
+pub type SharedState = Arc<RwLock<WorkerState>>;
+
+/// Block template worker task.
+pub fn worker<D, E>(
     shutdown: ShutdownGuard,
-    mut manager: BlockTemplateManager<D, E>,
+    ctx: WorkerContext<D, E>,
+    state: SharedState,
     mut rx: mpsc::Receiver<TemplateManagerRequest>,
 ) -> anyhow::Result<()>
 where
@@ -27,28 +110,25 @@ where
 {
     while let Some(request) = rx.blocking_recv() {
         match request {
-            TemplateManagerRequest::GenerateBlockTemplate(config, sender) => {
-                if sender
-                    .send(generate_block_template(&mut manager, config))
+            TemplateManagerRequest::GenerateBlockTemplate(config, response) => {
+                if response
+                    .send(generate_block_template(&ctx, &state, config))
                     .is_err()
                 {
                     warn!("failed sending GenerateBlockTemplate result");
                 }
             }
-            TemplateManagerRequest::CompleteBlockTemplate(template_id, completion, sender) => {
-                if sender
-                    .send(manager.complete_block_template(template_id, completion))
+            TemplateManagerRequest::CompleteBlockTemplate(template_id, completion, response) => {
+                if response
+                    .send(complete_block_template(
+                        ctx.params.rollup(),
+                        &state,
+                        template_id,
+                        completion,
+                    ))
                     .is_err()
                 {
                     warn!(?template_id, "failed sending CompleteBlockTemplate result");
-                }
-            }
-            TemplateManagerRequest::GetBlockTemplate(template_id, sender) => {
-                if sender
-                    .send(manager.get_pending_block_template(template_id))
-                    .is_err()
-                {
-                    warn!(?template_id, "failed sending GetBlockTemplate result")
                 }
             }
         };
@@ -61,8 +141,10 @@ where
     Ok(())
 }
 
+/// Generate new [`BlockTemplate`] according to provided [`BlockGenerationConfig`].
 fn generate_block_template<D, E>(
-    manager: &mut BlockTemplateManager<D, E>,
+    ctx: &WorkerContext<D, E>,
+    state: &RwLock<WorkerState>,
     config: BlockGenerationConfig,
 ) -> Result<BlockTemplate, Error>
 where
@@ -70,23 +152,28 @@ where
     E: ExecEngineCtl,
 {
     // check if we already have pending template for this parent block id
-    if let Ok(template) = manager.get_pending_block_template_by_parent(config.parent_block_id()) {
+    if let Ok(template) = state
+        .blocking_read()
+        .get_pending_block_template_by_parent(config.parent_block_id())
+    {
         return Ok(template);
     }
 
     let full_template = generate_block_template_inner(
         config,
-        manager.params.as_ref(),
-        manager.database.as_ref(),
-        manager.engine.as_ref(),
-        &manager.status_channel,
+        ctx.params.as_ref(),
+        ctx.database.as_ref(),
+        ctx.engine.as_ref(),
+        &ctx.status_channel,
     )?;
 
     let template = BlockTemplate::from_full_ref(&full_template);
 
     let template_id = full_template.get_blockid();
 
-    manager.insert_template(template_id, full_template);
+    state
+        .blocking_write()
+        .insert_template(template_id, full_template);
 
     Ok(template)
 }
@@ -125,4 +212,36 @@ fn generate_block_template_inner<D: Database, E: ExecEngineCtl>(
         prepare_block(slot, parent, &l1_state, ts, database, engine, params)?;
 
     Ok(FullBlockTemplate::new(header, body, accessory))
+}
+
+/// Verify [`BlockCompletionData`] and create [`L2BlockBundle`] from template with provided id.
+fn complete_block_template(
+    rollup_params: &RollupParams,
+    state: &RwLock<WorkerState>,
+    template_id: L2BlockId,
+    completion: BlockCompletionData,
+) -> Result<L2BlockBundle, Error> {
+    let mut state = state.blocking_write();
+    match state.pending_templates.entry(template_id) {
+        Vacant(entry) => Err(Error::UnknownTemplateId(entry.into_key())),
+        Occupied(entry) => {
+            if !check_completion_data(rollup_params, entry.get().header(), &completion) {
+                Err(Error::InvalidSignature(template_id))
+            } else {
+                let template = entry.remove();
+                let parent = template.header().parent();
+                state.pending_by_parent.remove(parent);
+                Ok(template.complete_block_template(completion))
+            }
+        }
+    }
+}
+
+fn check_completion_data(
+    rollup_params: &RollupParams,
+    header: &L2BlockHeader,
+    completion: &BlockCompletionData,
+) -> bool {
+    // currently only checks for correct sequencer signature.
+    verify_sequencer_signature(rollup_params, &header.get_sighash(), completion.signature())
 }

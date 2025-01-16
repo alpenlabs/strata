@@ -48,7 +48,7 @@ impl FullBlockTemplate {
     }
 }
 
-/// Block template with only sufficient info for signing to be passed for signing.
+/// Block template with only sufficient info to be passed for signing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockTemplate {
     header: L2BlockHeader,
@@ -85,7 +85,7 @@ impl BlockCompletionData {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct BlockGenerationConfig {
     parent_block_id: L2BlockId,
     #[serde(skip_serializing_if = "Option::is_none")]
