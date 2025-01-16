@@ -20,7 +20,7 @@ enum DutyExecError {
     GenerateTemplate(jsonrpsee::core::ClientError),
     #[error("failed completing template: {0}")]
     CompleteTemplate(jsonrpsee::core::ClientError),
-    #[error("failed submitting checkpoing signature: {0}")]
+    #[error("failed submitting checkpoint signature: {0}")]
     CompleteCheckpoint(jsonrpsee::core::ClientError),
 }
 

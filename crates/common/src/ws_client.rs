@@ -46,7 +46,7 @@ impl Manager for WsClientManager {
     /// Creates a new WebSocket client.
     ///
     /// Attempts to initialize a new WebSocket client using the provided configuration.
-    /// Returns a [`WsClient`]
+    /// Returns a [`WebsocketClient`]
     async fn create(&self) -> Result<Self::Type, Self::Error> {
         let client = WsClientBuilder::default()
             .build(self.config.url.clone())
@@ -55,7 +55,7 @@ impl Manager for WsClientManager {
         Ok(client)
     }
 
-    /// Recycles an existing [`WsClient`]
+    /// Recycles an existing [`WebsocketClient`]
     ///
     /// Checks whether the provided client is still valid. If the client is connected,
     /// it is retained. Otherwise, an error is returned, indicating the need to recreate
@@ -108,9 +108,9 @@ impl ManagedWsClient {
     }
 }
 
-/// Implements the [`ClientT`] trait for [`WsClient`].
+/// Implements the [`ClientT`] trait for [`ManagedWsClient`].
 ///
-/// This implementation allows `[WsClient`] to perform JSON-RPC operations,
+/// This implementation allows `[ManagedWsClient`] to perform JSON-RPC operations,
 /// including notifications, method calls, and batch requests.
 #[async_trait]
 impl ClientT for ManagedWsClient {

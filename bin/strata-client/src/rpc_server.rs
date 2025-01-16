@@ -733,6 +733,7 @@ pub struct SequencerServerImpl {
 }
 
 impl SequencerServerImpl {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         envelope_handle: Arc<EnvelopeHandle>,
         broadcast_handle: Arc<L1BroadcastHandle>,
