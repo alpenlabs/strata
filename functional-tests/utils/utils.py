@@ -131,6 +131,18 @@ class RollupParamsSettings:
         )
 
 
+@dataclass
+class ProverClientSettings:
+    native_workers: int
+    loop_interval: int
+
+    @staticmethod
+    def new_default():
+        return ProverClientSettings(
+            native_workers=DEFAULT_PROVER_NATIVE_WORKERS, loop_interval=DEFAULT_PROVER_LOOP_INTERVAL
+        )
+
+
 def check_nth_checkpoint_finalized(
     idx,
     seqrpc,

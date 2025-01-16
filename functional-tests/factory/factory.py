@@ -269,6 +269,7 @@ class ProverClientFactory(flexitest.Factory):
         sequencer_url: str,
         reth_url: str,
         rollup_params: str,
+        settings: ProverClientSettings,
         ctx: flexitest.EnvContext,
     ):
         datadir = ctx.make_service_dir("prover_client")
@@ -287,8 +288,8 @@ class ProverClientFactory(flexitest.Factory):
             "--bitcoind-user", bitcoind_config["bitcoind_user"],
             "--bitcoind-password", bitcoind_config["bitcoind_pass"],
             "--datadir", datadir,
-            "--native-workers", str(20),
-            "--loop-interval", str(100)
+            "--native-workers", str(settings.native_workers),
+            "--loop-interval", str(settings.loop_interval)
         ]
         # fmt: on
 
