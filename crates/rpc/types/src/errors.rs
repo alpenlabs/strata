@@ -55,6 +55,9 @@ pub enum RpcServerError {
     #[error("Invalid proof for checkpoint {0}: {1}")]
     InvalidProof(u64, String),
 
+    #[error("Checkpoint retrieval failed: {0}")]
+    Checkpoint(String),
+
     /// Generic internal error message.  If this is used often it should be made
     /// into its own error type.
     #[error("{0}")]
@@ -78,14 +81,15 @@ impl RpcServerError {
             Self::ClientNotStarted => -32606,
             Self::BeforeGenesis => -32607,
             Self::FetchLimitReached(_, _) => -32608,
-            Self::UnknownIdx(_) => -32608,
             Self::MissingL1BlockManifest(_) => -32609,
             Self::MissingCheckpointInDb(_) => -32610,
             Self::ProofAlreadyCreated(_) => -32611,
             Self::InvalidProof(_, _) => -32612,
-            Self::BlockingAbort(_) => -32001,
+            Self::UnknownIdx(_) => -32613,
+            Self::Checkpoint(_) => -32614,
             Self::Other(_) => -32000,
-            Self::OtherEx(_, _) => -32000,
+            Self::OtherEx(_, _) => -32001,
+            Self::BlockingAbort(_) => -32002,
         }
     }
 }

@@ -109,9 +109,12 @@ pub trait StrataApi {
     #[method(name = "getCheckpointInfo")]
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
 
-    /// Get the checkpoint status if checkpoint exists
-    #[method(name = "getCheckpointStatus")]
-    async fn get_checkpoint_status(&self, idx: u64) -> RpcResult<Option<RpcCheckpointConfStatus>>;
+    /// Get the checkpoint confirmation status if checkpoint exists
+    #[method(name = "getCheckpointConfStatus")]
+    async fn get_checkpoint_conf_status(
+        &self,
+        idx: u64,
+    ) -> RpcResult<Option<RpcCheckpointConfStatus>>;
 
     /// Get the l2block status from its height
     /// This assumes that the block finalization is always sequential. i.e all the blocks before the

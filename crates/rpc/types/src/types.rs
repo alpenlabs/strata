@@ -257,7 +257,9 @@ impl From<CheckpointCommitment> for RpcCheckpointCommitmentInfo {
         }
     }
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum RpcCheckpointConfStatus {
     /// Pending to be posted on L1
     Pending,
@@ -266,6 +268,7 @@ pub enum RpcCheckpointConfStatus {
     /// Finalized on L1
     Finalized,
 }
+
 impl From<CheckpointConfStatus> for RpcCheckpointConfStatus {
     fn from(value: CheckpointConfStatus) -> Self {
         match value {
@@ -281,6 +284,7 @@ impl From<CheckpointEntry> for RpcCheckpointConfStatus {
         value.confirmation_status.into()
     }
 }
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcCheckpointInfo {
     /// The index of the checkpoint

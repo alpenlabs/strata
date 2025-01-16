@@ -566,14 +566,15 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         Ok(entry.map(Into::into))
     }
 
-    async fn get_checkpoint_status(&self, idx: u64) -> RpcResult<Option<RpcCheckpointConfStatus>> {
-        let entry = self
-            .checkpoint_handle
+    async fn get_checkpoint_conf_status(
+        &self,
+        idx: u64,
+    ) -> RpcResult<Option<RpcCheckpointConfStatus>> {
+        self.checkpoint_handle
             .get_checkpoint(idx)
             .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-
-        Ok(entry.map(|e| e.into()))
+            .map(|opt| opt.map(Into::into))
+            .map_err(|e| Error::Checkpoint(e.to_string()).into())
     }
 
     async fn get_latest_checkpoint_index(&self, finalized: Option<bool>) -> RpcResult<Option<u64>> {
