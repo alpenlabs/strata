@@ -14,9 +14,11 @@ use tracing::*;
 
 use crate::{
     checkpoint::CheckpointHandle,
-    errors::Error,
-    extractor,
-    types::{DutyTracker, StateUpdate},
+    duty::{
+        errors::Error,
+        extractor,
+        types::{DutyTracker, StateUpdate},
+    },
 };
 
 pub fn duty_tracker_task<D: Database>(

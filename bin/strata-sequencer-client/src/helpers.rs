@@ -7,7 +7,7 @@ use strata_primitives::{
     buf::{Buf32, Buf64},
     keys::ZeroizableXpriv,
 };
-use strata_sequencer::types::{Identity, IdentityData, IdentityKey};
+use strata_sequencer::duty::types::{Identity, IdentityData, IdentityKey};
 use strata_state::{batch::BatchCheckpoint, header::L2BlockHeader};
 use tracing::debug;
 use zeroize::Zeroize;

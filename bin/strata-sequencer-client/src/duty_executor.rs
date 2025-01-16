@@ -5,7 +5,7 @@ use strata_rpc_api::StrataSequencerApiClient;
 use strata_rpc_types::HexBytes64;
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig},
-    types::{BatchCheckpointDuty, BlockSigningDuty, Duty, IdentityData},
+    duty::types::{BatchCheckpointDuty, BlockSigningDuty, Duty, IdentityData},
     utils::now_millis,
 };
 use thiserror::Error;

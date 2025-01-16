@@ -2,8 +2,5 @@
 
 pub mod block_template;
 pub mod checkpoint;
-pub mod errors;
-pub mod extractor;
-pub mod types;
+pub mod duty;
 pub mod utils;
-pub mod worker;

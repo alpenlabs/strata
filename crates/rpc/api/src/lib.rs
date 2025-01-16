@@ -10,7 +10,7 @@ use strata_rpc_types::{
 };
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate},
-    types::Duty,
+    duty::types::Duty,
 };
 use strata_state::{
     block::L2Block, client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput,
