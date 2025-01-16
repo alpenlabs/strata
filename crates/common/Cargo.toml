@@ -6,7 +6,7 @@ version = "0.1.0"
 [dependencies]
 bitcoin.workspace = true
 deadpool.workspace = true
-jsonrpsee.workspace = true
+jsonrpsee = { workspace = true, features = ["client"] }
 opentelemetry.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry_sdk.workspace = true
