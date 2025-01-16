@@ -4,7 +4,7 @@ use argh::FromArgs;
 use bitcoin::Network;
 use strata_config::{
     bridge::RelayerConfig, btcio::BtcioConfig, BitcoindConfig, ClientConfig, ClientMode, Config,
-    ExecConfig, FullNodeConfig, RethELConfig, SyncConfig,
+    ExecConfig, FullNodeConfig, RethELConfig, SequencerConfig, SyncConfig,
 };
 
 #[derive(Debug, Clone, FromArgs)]
@@ -78,7 +78,7 @@ impl Args {
                 datadir: require(args.datadir, "args: no client --datadir provided")?,
                 client_mode: {
                     if args.sequencer {
-                        ClientMode::Sequencer
+                        ClientMode::Sequencer(SequencerConfig {})
                     } else if let Some(sequencer_rpc) = args.sequencer_rpc {
                         ClientMode::FullNode(FullNodeConfig { sequencer_rpc })
                     } else {
@@ -132,10 +132,9 @@ impl Args {
         if let Some(datadir) = args.datadir {
             config.client.datadir = datadir;
         }
-        // sequencer_key has priority over sequencer_rpc if both are provided
 
         if args.sequencer {
-            config.client.client_mode = ClientMode::Sequencer;
+            config.client.client_mode = ClientMode::Sequencer(SequencerConfig {});
         } else if let Some(sequencer_rpc) = args.sequencer_rpc {
             config.client.client_mode = ClientMode::FullNode(FullNodeConfig { sequencer_rpc });
         }
