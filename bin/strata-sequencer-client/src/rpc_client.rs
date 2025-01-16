@@ -1,8 +1,7 @@
-use jsonrpsee::{core::client::async_client::Client, ws_client::WsClientBuilder};
+use strata_common::ws_client::{ManagedWsClient, WsClientConfig};
 
-pub(crate) async fn rpc_client(url: &str) -> Client {
-    WsClientBuilder::default()
-        .build(url)
-        .await
-        .expect("Failed to connect to the RPC server")
+pub(crate) async fn rpc_client(url: &str) -> ManagedWsClient {
+    ManagedWsClient::new_with_default_pool(WsClientConfig {
+        url: url.to_string(),
+    })
 }
