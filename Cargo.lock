@@ -12767,6 +12767,7 @@ dependencies = [
  "strata-bridge-sig-manager",
  "strata-bridge-tx-builder",
  "strata-btcio",
+ "strata-common",
  "strata-primitives",
  "strata-rpc-api",
  "strata-rpc-types",
@@ -12981,6 +12982,8 @@ name = "strata-common"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
+ "deadpool",
+ "jsonrpsee",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",

@@ -3,7 +3,7 @@
 
 use core::fmt;
 
-use deadpool::managed::{self, Manager, RecycleError, RecycleResult};
+use deadpool::managed::{self, Manager, Object, Pool, RecycleError, RecycleResult};
 use jsonrpsee::{
     core::{
         async_trait,
@@ -35,20 +35,13 @@ pub struct WsClientManager {
     pub config: WsClientConfig,
 }
 
-/// Wrapper for the WebSocket client.
-#[derive(Debug)]
-pub struct WsClient {
-    /// WebSocket client
-    inner: WebsocketClient,
-}
-
 /// Implements the [`Manager`] trait for managing WebSocket clients.
 ///
 /// The [`WsClientManager`] provides methods to create new clients and recycle
 /// existing ones, ensuring that clients remain in a valid state.
 impl Manager for WsClientManager {
-    type Type = WsClient;
-    type Error = jsonrpsee::core::StringError;
+    type Type = WebsocketClient;
+    type Error = jsonrpsee::core::client::Error;
 
     /// Creates a new WebSocket client.
     ///
@@ -59,7 +52,7 @@ impl Manager for WsClientManager {
             .build(self.config.url.clone())
             .await?;
 
-        Ok(WsClient { inner: client })
+        Ok(client)
     }
 
     /// Recycles an existing [`WsClient`]
@@ -72,7 +65,7 @@ impl Manager for WsClientManager {
         obj: &mut Self::Type,
         _metrics: &managed::Metrics,
     ) -> RecycleResult<Self::Error> {
-        if obj.inner.is_connected() {
+        if obj.is_connected() {
             Ok(())
         } else {
             Err(RecycleError::Message(
@@ -82,12 +75,45 @@ impl Manager for WsClientManager {
     }
 }
 
+/// Wrapper for the WebSocket client.
+#[derive(Debug)]
+pub struct ManagedWsClient {
+    /// WebSocket client
+    pool: Pool<WsClientManager>,
+}
+
+impl ManagedWsClient {
+    pub fn new(pool: Pool<WsClientManager>) -> Self {
+        Self { pool }
+    }
+
+    pub fn new_with_default_pool(ws_client_config: WsClientConfig) -> Self {
+        let manager = WsClientManager {
+            config: ws_client_config,
+        };
+
+        let pool = Pool::builder(manager)
+            .max_size(5)
+            .build()
+            .expect("websocket client pool should be buildable");
+
+        Self { pool }
+    }
+
+    async fn get_ready_rpc_client(&self) -> Result<Object<WsClientManager>, ClientError> {
+        self.pool
+            .get()
+            .await
+            .map_err(|err| ClientError::Custom(err.to_string()))
+    }
+}
+
 /// Implements the [`ClientT`] trait for [`WsClient`].
 ///
 /// This implementation allows `[WsClient`] to perform JSON-RPC operations,
 /// including notifications, method calls, and batch requests.
 #[async_trait]
-impl ClientT for WsClient {
+impl ClientT for ManagedWsClient {
     /// Send a [notification request](https://www.jsonrpc.org/specification#notification).
     ///
     /// Notifications do not produce a response on the JSON-RPC server.
@@ -95,7 +121,10 @@ impl ClientT for WsClient {
     where
         Params: ToRpcParams + Send,
     {
-        self.inner.notification(method, params).await
+        self.get_ready_rpc_client()
+            .await?
+            .notification(method, params)
+            .await
     }
 
     /// Send a [method call request](https://www.jsonrpc.org/specification#request_object).
@@ -106,7 +135,10 @@ impl ClientT for WsClient {
         R: DeserializeOwned,
         Params: ToRpcParams + Send,
     {
-        self.inner.request(method, params).await
+        self.get_ready_rpc_client()
+            .await?
+            .request(method, params)
+            .await
     }
 
     /// Sends a batch request.
@@ -117,6 +149,9 @@ impl ClientT for WsClient {
     where
         R: DeserializeOwned + fmt::Debug + 'a,
     {
-        self.inner.batch_request(batch).await
+        self.get_ready_rpc_client()
+            .await?
+            .batch_request(batch)
+            .await
     }
 }
