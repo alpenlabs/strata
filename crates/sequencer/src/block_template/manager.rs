@@ -95,10 +95,7 @@ where
             Vacant(entry) => Err(Error::UnknownTemplateId(entry.into_key())),
             Occupied(entry) => {
                 if !check_completion_data(self.params.rollup(), entry.get().header(), &completion) {
-                    Err(Error::InvalidSignature(
-                        template_id,
-                        *completion.signature(),
-                    ))
+                    Err(Error::InvalidSignature(template_id))
                 } else {
                     let template = entry.remove();
                     let parent = template.header().parent();
