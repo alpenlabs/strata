@@ -6,8 +6,8 @@ use strata_rocksdb::{
     L1BroadcastDb, RBL1WriterDb,
 };
 use strata_storage::ops::{
-    writer::{Context, EnvelopeDataOps},
     l1tx_broadcast::Context as BContext,
+    writer::{Context, EnvelopeDataOps},
 };
 
 use crate::broadcaster::L1BroadcastHandle;

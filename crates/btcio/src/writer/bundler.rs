@@ -3,19 +3,20 @@ use std::{sync::Arc, time::Duration};
 use strata_db::types::{IntentEntry, IntentStatus, PayloadEntry};
 use strata_storage::ops::writer::EnvelopeDataOps;
 use tokio::time::sleep;
-use tracing::warn;
+use tracing::*;
 
-const BUNDLE_INTERVAL: u64 = 10;
+const BUNDLE_INTERVAL: u64 = 200; // millis
 
 /// Periodically bundles unbundled intents into payload entries.
 pub(crate) async fn bundler_task(ops: Arc<EnvelopeDataOps>) -> anyhow::Result<()> {
     let mut last_idx = 0;
     loop {
         let (unbundled, new_idx) = get_unbundled_intents_after(last_idx, ops.as_ref()).await?;
+        debug!(len=%unbundled.len(), "found unbundled intents");
         process_unbundled_entries(ops.as_ref(), unbundled).await?;
         last_idx = new_idx;
 
-        let _ = sleep(Duration::from_secs(BUNDLE_INTERVAL)).await;
+        let _ = sleep(Duration::from_millis(BUNDLE_INTERVAL)).await;
     }
 }
 
@@ -51,9 +52,10 @@ async fn get_unbundled_intents_after(
     ops: &EnvelopeDataOps,
 ) -> anyhow::Result<(Vec<IntentEntry>, u64)> {
     let latest_idx = ops.get_next_payload_idx_async().await?.saturating_sub(1);
+    debug!(%idx, "Latest intent idx");
     let mut curr_intent_idx = latest_idx;
     let mut unbundled_intents = Vec::new();
-    while curr_intent_idx > idx {
+    while curr_intent_idx >= idx {
         if let Some(intent_entry) = ops.get_intent_by_idx_async(curr_intent_idx).await? {
             match intent_entry.status {
                 IntentStatus::Unbundled => unbundled_intents.push(intent_entry),
@@ -64,6 +66,10 @@ async fn get_unbundled_intents_after(
             }
         } else {
             warn!(%curr_intent_idx, "Could not find expected intent in db");
+            break;
+        }
+
+        if curr_intent_idx == 0 {
             break;
         }
         curr_intent_idx -= 1;
