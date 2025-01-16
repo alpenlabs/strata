@@ -21,7 +21,7 @@ use helpers::load_seqkey;
 use rpc_client::rpc_client;
 use strata_common::logging;
 use strata_rpc_api::StrataSequencerApiClient;
-use strata_sequencer::types::Duty;
+use strata_sequencer::duty::types::Duty;
 use strata_tasks::TaskManager;
 use tokio::{runtime::Handle, sync::mpsc};
 use tracing::{error, info, warn};

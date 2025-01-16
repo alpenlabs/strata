@@ -45,7 +45,7 @@ use strata_sequencer::{
         BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
     },
     checkpoint::{verify_checkpoint_sig, CheckpointHandle},
-    types::{Duty, DutyEntry, DutyTracker},
+    duty::types::{Duty, DutyEntry, DutyTracker},
 };
 use strata_state::{
     batch::{BatchCheckpoint, SignedBatchCheckpoint},

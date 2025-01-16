@@ -33,8 +33,7 @@ use strata_rpc_api::{
 use strata_sequencer::{
     block_template::{template_manager_worker, BlockTemplateManager, TemplateManagerHandle},
     checkpoint::{checkpoint_expiry_worker, checkpoint_worker, CheckpointHandle},
-    types::DutyTracker,
-    worker as duty_worker,
+    duty::{types::DutyTracker, worker as duty_worker},
 };
 use strata_status::StatusChannel;
 use strata_storage::{
