@@ -113,15 +113,18 @@ fn get_next_batch<D: Database>(
 
             let first_checkpoint_idx = 0;
 
-            // Include genesis l1 height to current seen height
-            let l1_range = (state.genesis_l1_height(), state.l1_view().tip_height());
-
-            let genesis_l1_state_hash = state
-                .genesis_verification_hash()
-                .ok_or(Error::ChainInactive)?;
             let current_l1_state = state
                 .l1_view()
                 .tip_verification_state()
+                .ok_or(Error::ChainInactive)?;
+
+            // Include blocks after genesis l1 height to last verified height
+            let l1_range = (
+                state.genesis_l1_height() + 1,
+                current_l1_state.last_verified_block_num as u64,
+            );
+            let genesis_l1_state_hash = state
+                .genesis_verification_hash()
                 .ok_or(Error::ChainInactive)?;
             let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
             let l1_transition = (genesis_l1_state_hash, current_l1_state_hash);
@@ -157,11 +160,14 @@ fn get_next_batch<D: Database>(
         Some(prev_checkpoint) => {
             let checkpoint = prev_checkpoint.batch_info.clone();
 
-            let l1_range = (checkpoint.l1_range.1 + 1, state.l1_view().tip_height());
             let current_l1_state = state
                 .l1_view()
                 .tip_verification_state()
                 .ok_or(Error::ChainInactive)?;
+            let l1_range = (
+                checkpoint.l1_range.1 + 1,
+                current_l1_state.last_verified_block_num as u64,
+            );
             let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
             let l1_transition = (checkpoint.l1_transition.1, current_l1_state_hash);
 

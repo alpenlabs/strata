@@ -63,7 +63,7 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
 
         # Sanity Check for first checkpoint
         idx = 0
-        check_nth_checkpoint_finalized(idx, seqrpc, prover_rpc, manual_gen, proof_timeout=30)
+        check_nth_checkpoint_finalized(idx, seqrpc, prover_rpc, manual_gen)
         self.debug(f"Pass checkpoint finalization for checkpoint {idx}")
 
         # TODO remove this after adding a proper config file

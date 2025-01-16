@@ -38,7 +38,7 @@ class BlockFinalizationTest(testenv.StrataTester):
 
         # Check for first 4 checkpoints
         for n in range(4):
-            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc, proof_timeout=30)
+            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
             self.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         # Proof for checkpoint 0 is already sent above
