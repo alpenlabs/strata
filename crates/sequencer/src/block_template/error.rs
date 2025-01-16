@@ -6,13 +6,13 @@ use thiserror::Error;
 pub enum Error {
     #[error("block timestamp too early: {0}")]
     TimestampTooEarly(u64),
-    #[error("unknown blockId: {0}")]
-    UnknownBlockId(L2BlockId),
-    #[error("invalid signature: {0}, {1}")]
+    #[error("unknown templateid: {0}")]
+    UnknownTemplateId(L2BlockId),
+    #[error("invalid signature supplied for template (templateid {0}, sig {1})")]
     InvalidSignature(L2BlockId, Buf64),
-    #[error("{0}")]
+    #[error("db: {0}")]
     DbError(#[from] DbError),
-    #[error("{0}")]
+    #[error("consensus: {0}")]
     ConsensusError(#[from] strata_consensus_logic::errors::Error),
     #[error("channel: {0}")]
     ChannelError(&'static str),

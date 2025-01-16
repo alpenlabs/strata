@@ -19,8 +19,9 @@ use strata_state::{
     header::{L2BlockHeader, L2Header},
 };
 use strata_status::StatusChannel;
+use tracing::warn;
 
-use crate::block_template::{BlockCompletionData, BlockTemplate, BlockTemplateFull, Error};
+use crate::block_template::{BlockCompletionData, BlockTemplate, Error, FullBlockTemplate};
 
 #[derive(Debug)]
 pub struct BlockTemplateManager<D, E> {
@@ -29,7 +30,9 @@ pub struct BlockTemplateManager<D, E> {
     pub(crate) engine: Arc<E>,
     pub(crate) status_channel: StatusChannel,
     // TODO: add some form of expiry to purge orphaned items
-    pending_templates: HashMap<L2BlockId, BlockTemplateFull>,
+    /// templateid -> template
+    pending_templates: HashMap<L2BlockId, FullBlockTemplate>,
+    /// parent blockid -> templateid
     pending_by_parent: HashMap<L2BlockId, L2BlockId>,
 }
 
@@ -54,45 +57,53 @@ where
         }
     }
 
-    pub(crate) fn insert_template(&mut self, block_id: L2BlockId, template: BlockTemplateFull) {
-        let parent = *template.header().parent();
-        self.pending_templates.insert(block_id, template);
-        self.pending_by_parent.insert(parent, block_id);
+    pub(crate) fn insert_template(&mut self, template_id: L2BlockId, template: FullBlockTemplate) {
+        let parent_blockid = *template.header().parent();
+        if let Some(_existing) = self.pending_templates.insert(template_id, template) {
+            warn!("existing pending block template overwritten: {template_id}");
+        }
+        self.pending_by_parent.insert(parent_blockid, template_id);
     }
 
-    pub(crate) fn get_block_template(&self, block_id: L2BlockId) -> Result<BlockTemplate, Error> {
+    pub(crate) fn get_pending_block_template(
+        &self,
+        template_id: L2BlockId,
+    ) -> Result<BlockTemplate, Error> {
         self.pending_templates
-            .get(&block_id)
+            .get(&template_id)
             .map(BlockTemplate::from_full_ref)
-            .ok_or(Error::UnknownBlockId(block_id))
+            .ok_or(Error::UnknownTemplateId(template_id))
     }
 
-    pub(crate) fn get_block_template_by_parent(
+    pub(crate) fn get_pending_block_template_by_parent(
         &self,
         parent_block_id: L2BlockId,
     ) -> Result<BlockTemplate, Error> {
         let block_id = self
             .pending_by_parent
             .get(&parent_block_id)
-            .ok_or(Error::UnknownBlockId(parent_block_id))?;
+            .ok_or(Error::UnknownTemplateId(parent_block_id))?;
 
-        self.get_block_template(*block_id)
+        self.get_pending_block_template(*block_id)
     }
 
     pub(crate) fn complete_block_template(
         &mut self,
-        block_id: L2BlockId,
+        template_id: L2BlockId,
         completion: BlockCompletionData,
     ) -> Result<L2BlockBundle, Error> {
-        match self.pending_templates.entry(block_id) {
-            Vacant(entry) => Err(Error::UnknownBlockId(entry.into_key())),
+        match self.pending_templates.entry(template_id) {
+            Vacant(entry) => Err(Error::UnknownTemplateId(entry.into_key())),
             Occupied(entry) => {
                 if !is_completion_data_valid(
                     self.params.rollup(),
                     entry.get().header(),
                     &completion,
                 ) {
-                    Err(Error::InvalidSignature(block_id, *completion.signature()))
+                    Err(Error::InvalidSignature(
+                        template_id,
+                        *completion.signature(),
+                    ))
                 } else {
                     let template = entry.remove();
                     let parent = template.header().parent();

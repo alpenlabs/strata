@@ -1,9 +1,6 @@
 //! Executes duties.
 
-use std::{
-    sync::Arc,
-    time::{self},
-};
+use std::{sync::Arc, time};
 
 use parking_lot::RwLock;
 use strata_consensus_logic::csm::message::ClientUpdateNotif;

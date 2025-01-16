@@ -9,13 +9,13 @@ use strata_state::{
 
 /// Block template with header, body, and accessory.
 #[derive(Debug, Clone)]
-pub struct BlockTemplateFull {
+pub struct FullBlockTemplate {
     header: L2BlockHeader,
     body: L2BlockBody,
     accessory: L2BlockAccessory,
 }
 
-impl BlockTemplateFull {
+impl FullBlockTemplate {
     pub fn new(header: L2BlockHeader, body: L2BlockBody, accessory: L2BlockAccessory) -> Self {
         Self {
             header,
@@ -24,7 +24,7 @@ impl BlockTemplateFull {
         }
     }
 
-    pub fn block_id(&self) -> L2BlockId {
+    pub fn get_blockid(&self) -> L2BlockId {
         self.header.get_blockid()
     }
 
@@ -35,7 +35,7 @@ impl BlockTemplateFull {
     pub fn complete_block_template(self, completion: BlockCompletionData) -> L2BlockBundle {
         #[cfg(feature = "debug-utils")]
         check_bail_trigger(BAIL_DUTY_SIGN_BLOCK);
-        let BlockTemplateFull {
+        let FullBlockTemplate {
             header,
             body,
             accessory,
@@ -63,7 +63,7 @@ impl BlockTemplate {
         &self.header
     }
 
-    pub fn from_full_ref(full: &BlockTemplateFull) -> Self {
+    pub fn from_full_ref(full: &FullBlockTemplate) -> Self {
         Self {
             header: full.header.clone(),
         }
@@ -111,7 +111,7 @@ impl BlockGenerationConfig {
         self.parent_block_id
     }
 
-    pub fn ts(&self, default: u64) -> u64 {
-        self.ts.unwrap_or(default)
+    pub fn ts(&self) -> &Option<u64> {
+        &self.ts
     }
 }
