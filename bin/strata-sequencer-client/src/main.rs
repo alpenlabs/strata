@@ -57,7 +57,7 @@ fn main_inner(args: Args) -> Result<()> {
     let task_manager = TaskManager::new(handle.clone());
     let executor = task_manager.executor();
 
-    let rpc = Arc::new(handle.block_on(rpc_client(&config.ws_url())));
+    let rpc = Arc::new(rpc_client(&config.ws_url()));
 
     let (duty_tx, duty_rx) = mpsc::channel(64);
 
