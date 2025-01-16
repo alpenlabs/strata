@@ -30,7 +30,7 @@ class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
             error_with="Checkpoint was not generated in time",
         )
 
-        self.debug(f"checkpoint: {ckp_idx} found")
+        self.info(f"checkpoint: {ckp_idx} found")
 
         ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
         assert ckp is not None
@@ -42,7 +42,7 @@ class CLBlockWitnessDataGenerationTest(testenv.StrataTester):
             error_with="Checkpoint was not finalized in time",
             timeout=60,
         )
-        self.debug(f"checkpoint: {ckp_idx} finalized")
+        self.info(f"checkpoint: {ckp_idx} finalized")
 
         ckp = seqrpc.strata_getCheckpointInfo(ckp_idx)
         # print(ckp)

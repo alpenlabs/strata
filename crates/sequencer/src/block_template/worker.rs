@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 use crate::{
     block_assembly::prepare_block,
     block_template::{
-        BlockGenerationConfig, BlockTemplate, BlockTemplateFull, BlockTemplateManager, Error,
+        BlockGenerationConfig, BlockTemplate, BlockTemplateManager, Error, FullBlockTemplate,
         TemplateManagerRequest,
     },
     utils::now_millis,
@@ -34,7 +34,7 @@ where
                 let _ = sender.send(manager.complete_block_template(template_id, completion));
             }
             TemplateManagerRequest::GetBlockTemplate(block_id, sender) => {
-                let _ = sender.send(manager.get_block_template(block_id));
+                let _ = sender.send(manager.get_pending_block_template(block_id));
             }
         };
 
@@ -55,7 +55,7 @@ where
     E: ExecEngineCtl,
 {
     // check if we already have pending template for this parent block id
-    if let Ok(template) = manager.get_block_template_by_parent(config.parent_block_id()) {
+    if let Ok(template) = manager.get_pending_block_template_by_parent(config.parent_block_id()) {
         return Ok(template);
     }
 
@@ -69,9 +69,9 @@ where
 
     let template = BlockTemplate::from_full_ref(&full_template);
 
-    let block_id = full_template.block_id();
+    let template_id = full_template.get_blockid();
 
-    manager.insert_template(block_id, full_template);
+    manager.insert_template(template_id, full_template);
 
     Ok(template)
 }
@@ -82,13 +82,13 @@ fn generate_block_template_inner<D: Database, E: ExecEngineCtl>(
     database: &D,
     engine: &E,
     status_channel: &StatusChannel,
-) -> Result<BlockTemplateFull, Error> {
+) -> Result<FullBlockTemplate, Error> {
     // get parent block
     let parent_block_id = config.parent_block_id();
     let l2db = database.l2_db();
     let parent = l2db
         .get_block_data(parent_block_id)?
-        .ok_or(Error::UnknownBlockId(parent_block_id))?;
+        .ok_or(Error::UnknownTemplateId(parent_block_id))?;
 
     let parent_ts = parent.header().timestamp();
 
@@ -96,7 +96,7 @@ fn generate_block_template_inner<D: Database, E: ExecEngineCtl>(
     let slot = parent.header().blockidx() + 1;
 
     // next block timestamp
-    let ts = config.ts(now_millis());
+    let ts = config.ts().unwrap_or_else(now_millis);
 
     // maintain min block_time
     if ts < parent_ts + params.rollup().block_time {
@@ -109,5 +109,5 @@ fn generate_block_template_inner<D: Database, E: ExecEngineCtl>(
     let (header, body, accessory) =
         prepare_block(slot, parent, &l1_state, ts, database, engine, params)?;
 
-    Ok(BlockTemplateFull::new(header, body, accessory))
+    Ok(FullBlockTemplate::new(header, body, accessory))
 }
