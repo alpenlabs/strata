@@ -44,8 +44,7 @@ use strata_sequencer::{
     block_template::{
         BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
     },
-    checkpoint::verify_checkpoint_sig,
-    checkpoint_handle::CheckpointHandle,
+    checkpoint::{verify_checkpoint_sig, CheckpointHandle},
     types::{Duty, DutyEntry, DutyTracker},
 };
 use strata_state::{

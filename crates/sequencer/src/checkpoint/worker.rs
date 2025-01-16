@@ -14,7 +14,7 @@ use strata_tasks::ShutdownGuard;
 use tokio::sync::broadcast;
 use tracing::{debug, warn};
 
-use crate::{checkpoint_handle::CheckpointHandle, errors::Error};
+use crate::{checkpoint::CheckpointHandle, errors::Error};
 
 /// Worker to monitor client state updates and create checkpoint entries
 /// pending proof when previous proven checkpoint is finalized.

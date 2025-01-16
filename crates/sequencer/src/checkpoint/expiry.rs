@@ -7,7 +7,7 @@ use tokio::{
 };
 use tracing::{debug, error, warn};
 
-use crate::checkpoint_handle::CheckpointHandle;
+use crate::checkpoint::CheckpointHandle;
 
 #[derive(Debug, PartialEq, Eq)]
 struct CheckpointExpiry(u64, Instant);
