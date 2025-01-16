@@ -5,6 +5,7 @@ use strata_state::header::L2Header;
 use strata_status::StatusChannel;
 use strata_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
+use tracing::warn;
 
 use crate::{
     block_template::{
@@ -27,13 +28,28 @@ where
     while let Some(request) = rx.blocking_recv() {
         match request {
             TemplateManagerRequest::GenerateBlockTemplate(config, sender) => {
-                let _ = sender.send(generate_block_template(&mut manager, config));
+                if sender
+                    .send(generate_block_template(&mut manager, config))
+                    .is_err()
+                {
+                    warn!("failed sending GenerateBlockTemplate result");
+                }
             }
             TemplateManagerRequest::CompleteBlockTemplate(template_id, completion, sender) => {
-                let _ = sender.send(manager.complete_block_template(template_id, completion));
+                if sender
+                    .send(manager.complete_block_template(template_id, completion))
+                    .is_err()
+                {
+                    warn!(?template_id, "failed sending CompleteBlockTemplate result");
+                }
             }
-            TemplateManagerRequest::GetBlockTemplate(block_id, sender) => {
-                let _ = sender.send(manager.get_pending_block_template(block_id));
+            TemplateManagerRequest::GetBlockTemplate(template_id, sender) => {
+                if sender
+                    .send(manager.get_pending_block_template(template_id))
+                    .is_err()
+                {
+                    warn!(?template_id, "failed sending GetBlockTemplate result")
+                }
             }
         };
 

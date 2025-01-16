@@ -40,14 +40,14 @@ impl TemplateManagerHandle {
         build_request: impl FnOnce(oneshot::Sender<Result<R, Error>>) -> TemplateManagerRequest,
     ) -> Result<R, Error> {
         let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(build_request(tx))
-            .await
-            .map_err(|_| Error::ChannelError("send"))?;
+        self.tx.send(build_request(tx)).await.map_err(|_| {
+            Error::ChannelError("failed to send request to template manager, worker likely exited")
+        })?;
 
         match rx.await {
             Ok(res) => res,
-            Err(_) => Err(Error::ChannelError("oneshot tx dropped")),
+            // oneshot tx is dropped
+            Err(_) => Err(Error::ChannelError("tx dropped, worker likely exited")),
         }
     }
 

@@ -1,5 +1,5 @@
 use strata_db::DbError;
-use strata_primitives::{buf::Buf64, l2::L2BlockId};
+use strata_primitives::l2::L2BlockId;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -8,8 +8,8 @@ pub enum Error {
     TimestampTooEarly(u64),
     #[error("unknown templateid: {0}")]
     UnknownTemplateId(L2BlockId),
-    #[error("invalid signature supplied for template (templateid {0}, sig {1})")]
-    InvalidSignature(L2BlockId, Buf64),
+    #[error("invalid signature supplied for templateid: {0})")]
+    InvalidSignature(L2BlockId),
     #[error("db: {0}")]
     DbError(#[from] DbError),
     #[error("consensus: {0}")]
