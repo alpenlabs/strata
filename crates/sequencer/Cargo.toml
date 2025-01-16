@@ -7,7 +7,6 @@ version = "0.1.0"
 strata-chaintsn.workspace = true
 strata-common = { workspace = true, optional = true }
 strata-consensus-logic.workspace = true
-strata-crypto = { workspace = true, default-features = true }
 strata-db.workspace = true
 strata-eectl.workspace = true
 strata-primitives.workspace = true

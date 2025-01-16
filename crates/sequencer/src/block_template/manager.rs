@@ -6,16 +6,15 @@ use std::{
     sync::Arc,
 };
 
-use strata_crypto::verify_schnorr_sig;
 use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::{
-    block_credential::CredRule,
     l2::L2BlockId,
     params::{Params, RollupParams},
 };
 use strata_state::{
     block::L2BlockBundle,
+    block_validation::verify_sequencer_signature,
     header::{L2BlockHeader, L2Header},
 };
 use strata_status::StatusChannel;
@@ -95,11 +94,7 @@ where
         match self.pending_templates.entry(template_id) {
             Vacant(entry) => Err(Error::UnknownTemplateId(entry.into_key())),
             Occupied(entry) => {
-                if !is_completion_data_valid(
-                    self.params.rollup(),
-                    entry.get().header(),
-                    &completion,
-                ) {
+                if !check_completion_data(self.params.rollup(), entry.get().header(), &completion) {
                     Err(Error::InvalidSignature(
                         template_id,
                         *completion.signature(),
@@ -115,16 +110,11 @@ where
     }
 }
 
-fn is_completion_data_valid(
+fn check_completion_data(
     rollup_params: &RollupParams,
     header: &L2BlockHeader,
     completion: &BlockCompletionData,
 ) -> bool {
-    let sighash = header.get_sighash();
-    match &rollup_params.cred_rule {
-        CredRule::Unchecked => true,
-        CredRule::SchnorrKey(pubkey) => {
-            verify_schnorr_sig(completion.signature(), &sighash, pubkey)
-        }
-    }
+    // currently only checks for correct sequencer signature.
+    verify_sequencer_signature(rollup_params, &header.get_sighash(), completion.signature())
 }

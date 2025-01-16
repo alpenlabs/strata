@@ -13716,7 +13716,6 @@ dependencies = [
  "strata-chaintsn",
  "strata-common",
  "strata-consensus-logic",
- "strata-crypto",
  "strata-db",
  "strata-eectl",
  "strata-primitives",
