@@ -28,20 +28,28 @@ impl TemplateManagerHandle {
         Self { tx }
     }
 
-    pub async fn generate_block_template(
+    async fn request<R>(
         &self,
-        config: BlockGenerationConfig,
-    ) -> Result<BlockTemplate, Error> {
+        build_request: impl FnOnce(oneshot::Sender<Result<R, Error>>) -> TemplateManagerRequest,
+    ) -> Result<R, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
-            .send(TemplateManagerRequest::GenerateBlockTemplate(config, tx))
+            .send(build_request(tx))
             .await
             .map_err(|_| Error::ChannelError("send"))?;
 
         match rx.await {
-            Err(_) => Err(Error::ChannelError("oneshot tx dropped")),
             Ok(res) => res,
+            Err(_) => Err(Error::ChannelError("oneshot tx dropped")),
         }
+    }
+
+    pub async fn generate_block_template(
+        &self,
+        config: BlockGenerationConfig,
+    ) -> Result<BlockTemplate, Error> {
+        self.request(|tx| TemplateManagerRequest::GenerateBlockTemplate(config, tx))
+            .await
     }
 
     pub async fn complete_block_template(
@@ -49,32 +57,14 @@ impl TemplateManagerHandle {
         template_id: L2BlockId,
         completion: BlockCompletionData,
     ) -> Result<L2BlockBundle, Error> {
-        let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(TemplateManagerRequest::CompleteBlockTemplate(
-                template_id,
-                completion,
-                tx,
-            ))
-            .await
-            .map_err(|_| Error::ChannelError("send"))?;
-
-        match rx.await {
-            Err(_) => Err(Error::ChannelError("oneshot tx dropped")),
-            Ok(res) => res,
-        }
+        self.request(|tx| {
+            TemplateManagerRequest::CompleteBlockTemplate(template_id, completion, tx)
+        })
+        .await
     }
 
     pub async fn get_block_template(&self, template_id: L2BlockId) -> Result<BlockTemplate, Error> {
-        let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(TemplateManagerRequest::GetBlockTemplate(template_id, tx))
+        self.request(|tx| TemplateManagerRequest::GetBlockTemplate(template_id, tx))
             .await
-            .map_err(|_| Error::ChannelError("send"))?;
-
-        match rx.await {
-            Err(_) => Err(Error::ChannelError("oneshot tx dropped")),
-            Ok(res) => res,
-        }
     }
 }
