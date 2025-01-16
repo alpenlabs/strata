@@ -268,6 +268,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         self,
         pre_generate_blocks: int = 0,
         rollup_settings: Optional[RollupParamsSettings] = None,
+        prover_client_settings: Optional[ProverClientSettings] = None,
         auto_generate_blocks: bool = True,
         pre_fund_addrs: bool = True,
         n_operators: int = 2,
@@ -278,6 +279,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
         self.rollup_settings = rollup_settings
+        self.prover_client_settings = prover_client_settings
         self.auto_generate_blocks = auto_generate_blocks
         self.pre_fund_addrs = pre_fund_addrs
         self.n_operators = n_operators
@@ -418,11 +420,13 @@ class BasicEnvConfig(flexitest.EnvConfig):
         reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
 
         prover_client_fac = ctx.get_factory("prover_client")
+        prover_client_settings = self.prover_client_settings or ProverClientSettings.new_default()
         prover_client = prover_client_fac.create_prover_client(
             bitcoind_config,
             f"http://localhost:{seq_port}",
             f"http://localhost:{reth_rpc_http_port}",
             params,
+            prover_client_settings,
         )
         svcs["prover_client"] = prover_client
 
