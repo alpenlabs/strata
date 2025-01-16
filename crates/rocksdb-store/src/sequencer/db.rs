@@ -51,18 +51,24 @@ impl L1WriterDatabase for RBL1WriterDb {
     }
 
     fn put_intent_entry(&self, intent_id: Buf32, intent_entry: IntentEntry) -> DbResult<()> {
-        self.db
+        let res = self
+            .db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |tx| -> Result<(), DbError> {
+                    tracing::debug!(%intent_id, "putting intent");
                     let idx = get_next_id::<IntentIdxSchema, DB>(tx)?;
+                    tracing::debug!(%idx, "next intent idx...");
                     tx.put::<IntentIdxSchema>(&idx, &intent_id)?;
                     tx.put::<IntentSchema>(&intent_id, &intent_entry)?;
 
                     Ok(())
                 },
             )
-            .map_err(|e| DbError::TransactionError(e.to_string()))
+            .map_err(|e| DbError::TransactionError(e.to_string()));
+        let next = self.get_next_intent_idx()?;
+        tracing::debug!(%next, "next intent idx after put");
+        res
     }
 
     fn get_intent_by_id(&self, id: Buf32) -> DbResult<Option<IntentEntry>> {

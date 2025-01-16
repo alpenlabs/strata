@@ -38,6 +38,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Payload/intent schemas
     PayloadSchema::COLUMN_FAMILY_NAME,
     IntentSchema::COLUMN_FAMILY_NAME,
+    IntentIdxSchema::COLUMN_FAMILY_NAME,
     // Bcast schemas
     BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
     BcastL1TxSchema::COLUMN_FAMILY_NAME,
@@ -88,7 +89,7 @@ use l2::{
 };
 use rockbound::{schema::ColumnFamilyName, Schema};
 pub use sequencer::db::RBL1WriterDb;
-use sequencer::schemas::{IntentSchema, PayloadSchema};
+use sequencer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
 pub use sync_event::db::SyncEventDb;
 
 use crate::{

@@ -35,37 +35,51 @@ impl EnvelopeHandle {
         Self { ops }
     }
 
+    /// Checks if it is duplicate, if not creates a new [`IntentEntry`] from `intent` and puts it in
+    /// the database.
     pub fn submit_intent(&self, intent: PayloadIntent) -> anyhow::Result<()> {
+        let id = *intent.commitment();
+
+        // Check if the intent is meant for L1
         if intent.dest() != PayloadDest::L1 {
-            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
+            warn!(commitment = %id, "Received intent not meant for L1");
             return Ok(());
         }
 
-        let id = *intent.commitment();
-        debug!(commitment = %intent.commitment(), "Received intent");
+        debug!(commitment = %id, "Received intent for processing");
+
+        // Check if it is duplicate
         if self.ops.get_intent_by_id_blocking(id)?.is_some() {
             warn!(commitment = %id, "Received duplicate intent");
             return Ok(());
         }
-        let entry = IntentEntry::new_unbundled(intent);
 
+        // Create and store IntentEntry
+        let entry = IntentEntry::new_unbundled(intent);
         Ok(self.ops.put_intent_entry_blocking(id, entry)?)
     }
 
+    /// Checks if it is duplicate, if not creates a new [`IntentEntry`] from `intent` and puts it in
+    /// the database
     pub async fn submit_intent_async(&self, intent: PayloadIntent) -> anyhow::Result<()> {
+        let id = *intent.commitment();
+
+        // Check if the intent is meant for L1
         if intent.dest() != PayloadDest::L1 {
-            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
+            warn!(commitment = %id, "Received intent not meant for L1");
             return Ok(());
         }
 
-        let id = *intent.commitment();
-        debug!(commitment = %intent.commitment(), "Received intent");
+        debug!(commitment = %id, "Received intent for processing");
+
+        // Check if it is duplicate
         if self.ops.get_intent_by_id_async(id).await?.is_some() {
             warn!(commitment = %id, "Received duplicate intent");
             return Ok(());
         }
-        let entry = IntentEntry::new_unbundled(intent);
 
+        // Create and store IntentEntry
+        let entry = IntentEntry::new_unbundled(intent);
         Ok(self.ops.put_intent_entry_async(id, entry).await?)
     }
 }
