@@ -7,10 +7,9 @@ use strata_tasks::ShutdownGuard;
 use tokio::sync::mpsc;
 
 use crate::{
-    block_assembly::prepare_block,
     block_template::{
-        BlockGenerationConfig, BlockTemplate, BlockTemplateManager, Error, FullBlockTemplate,
-        TemplateManagerRequest,
+        prepare_block, BlockGenerationConfig, BlockTemplate, BlockTemplateManager, Error,
+        FullBlockTemplate, TemplateManagerRequest,
     },
     utils::now_millis,
 };
