@@ -236,7 +236,7 @@ mod tests {
         db: &L1Db,
         num_txs: usize,
     ) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
-        let mut arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new_with_size(1 << 12);
 
         // TODO maybe tweak this to make it a bit more realistic?
         let mf: L1BlockManifest = arb.generate();

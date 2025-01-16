@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
+use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt};
 use strata_db::{
     errors::DbError,
     traits::{BlockStatus, L2BlockDatabase},
@@ -84,10 +84,7 @@ impl L2BlockDatabase for L2Db {
         if self.get_block_data(id)?.is_none() {
             return Ok(());
         }
-
-        let mut batch = SchemaBatch::new();
-        batch.put::<L2BlockStatusSchema>(&id, &status)?;
-        self.db.write_schemas(batch)?;
+        self.db.put::<L2BlockStatusSchema>(&id, &status)?;
 
         Ok(())
     }
@@ -117,7 +114,7 @@ mod tests {
     use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn get_mock_data() -> L2BlockBundle {
-        let mut arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new_with_size(1 << 12);
         let l2_block: L2BlockBundle = arb.generate();
 
         l2_block

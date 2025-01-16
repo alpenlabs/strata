@@ -10,8 +10,7 @@
 use std::sync::Arc;
 
 use bitcoin::{
-    consensus::Decodable, hashes::Hash, params::Params, Address, Amount, Network, OutPoint,
-    TapNodeHash, Transaction,
+    hashes::Hash, params::Params, Address, Amount, Network, OutPoint, TapNodeHash, Transaction,
 };
 use jsonrpsee::core::RpcResult;
 use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
@@ -54,22 +53,20 @@ pub(super) async fn extract_deposit_requests<L1DB: L1Database>(
         .map_err(RpcServerError::Db)?;
 
     let deposit_info_iter = l1_txs.into_iter().filter_map(move |l1_tx| {
-        let mut raw_tx = l1_tx.tx_data();
-        let tx = Transaction::consensus_decode(&mut raw_tx);
-        if tx.is_err() {
-            // The client does not benefit from knowing that some transaction stored in the db is
-            // invalid/corrupted. They should get the rest of the duties even if some of them are
-            // potentially corrupted.
-            // The sequencer/full node operator _does_ care about this though. So, we log the
-            // error instead.
-            let err = tx.unwrap_err();
-            error!(%block_height, ?err, "failed to decode raw tx bytes in L1Database");
-            debug!(%block_height, ?err, ?l1_tx, "failed to decode raw tx bytes in L1Database");
+        let tx: Transaction = match l1_tx.tx_data().try_into() {
+            Ok(tx) => tx,
+            Err(err) => {
+                // The client does not benefit from knowing that some transaction stored in the db is
+                // invalid/corrupted. They should get the rest of the duties even if some of them are
+                // potentially corrupted.
+                // The sequencer/full node operator _does_ care about this though. So, we log the
+                // error instead.
+                error!(%block_height, ?err, "failed to decode raw tx bytes in L1Database");
+                debug!(%block_height, ?err, ?l1_tx, "failed to decode raw tx bytes in L1Database");
 
-            return None;
-        }
-
-        let tx = tx.expect("raw tx bytes must be decodable");
+                return None;
+            }
+        };
 
         let deposit_request_outpoint = OutPoint {
             txid: tx.compute_txid(),
@@ -183,7 +180,6 @@ mod tests {
 
     use bitcoin::{
         absolute::LockTime,
-        consensus::Encodable,
         key::rand::{self, Rng},
         opcodes::{OP_FALSE, OP_TRUE},
         script::Builder,
@@ -199,7 +195,7 @@ mod tests {
     use strata_primitives::{
         bridge::OperatorIdx,
         buf::Buf32,
-        l1::{BitcoinAmount, L1BlockManifest, OutputRef, XOnlyPk},
+        l1::{BitcoinAmount, L1BlockManifest, OutputRef, RawBitcoinTx, XOnlyPk},
     };
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
@@ -338,7 +334,7 @@ mod tests {
         l1_db: &Arc<Store>,
         num_blocks: usize,
         max_txs_per_block: usize,
-        needle: (Vec<u8>, ProtocolOperation),
+        needle: (RawBitcoinTx, ProtocolOperation),
     ) -> usize {
         let mut arb = ArbitraryGenerator::new();
         assert!(
@@ -399,7 +395,7 @@ mod tests {
     }
 
     /// Create a known transaction that should be present in some block.
-    fn get_needle() -> (Vec<u8>, ProtocolOperation, DepositInfo) {
+    fn get_needle() -> (RawBitcoinTx, ProtocolOperation, DepositInfo) {
         let mut arb = ArbitraryGenerator::new();
         let network = Network::Regtest;
 
@@ -437,10 +433,6 @@ mod tests {
         let txid = tx.compute_txid();
         let deposit_request_outpoint = OutPoint { txid, vout: 0 };
 
-        let mut raw_tx = vec![];
-        tx.consensus_encode(&mut raw_tx)
-            .expect("should be able to encode tx");
-
         let total_amount = num_btc * BitcoinAmount::SATS_FACTOR;
         let protocol_op = ProtocolOperation::DepositRequest(DepositRequestInfo {
             amt: total_amount,
@@ -458,7 +450,7 @@ mod tests {
                 .expect("address must be valid"),
         );
 
-        (raw_tx, protocol_op, expected_deposit_info)
+        (tx.into(), protocol_op, expected_deposit_info)
     }
 
     /// Generates a mock transaction either arbitrarily or deterministically.
@@ -471,7 +463,7 @@ mod tests {
     ///    generated. The chances of an arbitrarily constructed pair being valid is extremely rare.
     ///    So, you can assume that this flag represents whether the pair is valid (true) or invalid
     ///    (false).
-    fn generate_mock_tx() -> (Vec<u8>, ProtocolOperation, bool) {
+    fn generate_mock_tx() -> (RawBitcoinTx, ProtocolOperation, bool) {
         let mut arb = ArbitraryGenerator::new();
 
         let should_be_valid: bool = arb.generate();
@@ -485,7 +477,7 @@ mod tests {
         (valid_tx, valid_protocol_op, should_be_valid)
     }
 
-    fn generate_invalid_tx(arb: &mut ArbitraryGenerator) -> (Vec<u8>, ProtocolOperation) {
+    fn generate_invalid_tx(arb: &mut ArbitraryGenerator) -> (RawBitcoinTx, ProtocolOperation) {
         let random_protocol_op: ProtocolOperation = arb.generate();
 
         // true => tx invalid
@@ -493,26 +485,16 @@ mod tests {
         let tx_invalid: bool = OsRng.gen_bool(0.5);
 
         if tx_invalid {
-            let mut random_tx: Vec<u8> = arb.generate();
-            while random_tx.is_empty() {
-                random_tx = arb.generate();
-            }
-
-            return (random_tx, random_protocol_op);
+            return (arb.generate(), random_protocol_op);
         }
 
         let (mut valid_tx, _, _) = generate_mock_unsigned_tx();
         valid_tx.output[0].script_pubkey = ScriptBuf::from_bytes(arb.generate());
 
-        let mut tx_with_invalid_script_pubkey = vec![];
-        valid_tx
-            .consensus_encode(&mut tx_with_invalid_script_pubkey)
-            .expect("should be able to encode tx");
-
-        (tx_with_invalid_script_pubkey, random_protocol_op)
+        (valid_tx.into(), random_protocol_op)
     }
 
-    fn generate_valid_tx(arb: &mut ArbitraryGenerator) -> (Vec<u8>, ProtocolOperation) {
+    fn generate_valid_tx(arb: &mut ArbitraryGenerator) -> (RawBitcoinTx, ProtocolOperation) {
         let (tx, spend_info, script_to_spend) = generate_mock_unsigned_tx();
 
         let random_hash = *spend_info
@@ -524,10 +506,6 @@ mod tests {
             .expect("should contain a hash")
             .as_byte_array();
 
-        let mut raw_tx = vec![];
-        tx.consensus_encode(&mut raw_tx)
-            .expect("should be able to encode transaction");
-
         let deposit_request_info = DepositRequestInfo {
             amt: 1_000_000_000,      // 10 BTC
             address: arb.generate(), // random rollup address (this is fine)
@@ -536,7 +514,7 @@ mod tests {
 
         let deposit_request = ProtocolOperation::DepositRequest(deposit_request_info);
 
-        (raw_tx, deposit_request)
+        (tx.into(), deposit_request)
     }
 
     /// Generate a random chain state with some dispatched deposits.

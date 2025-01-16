@@ -1,8 +1,4 @@
-use bitcoin::{
-    block::Header,
-    consensus::{serialize, Encodable},
-    Block,
-};
+use bitcoin::{block::Header, consensus::Encodable, Block};
 use strata_primitives::{buf::Buf32, hash::sha256d};
 
 use crate::{
@@ -46,9 +42,8 @@ pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation)
     let tx = &block.txdata[idx as usize];
 
     let proof = L1TxProof::generate(&block.txdata, idx);
-    let tx = serialize(tx);
 
-    L1Tx::new(proof, tx, proto_op_data)
+    L1Tx::new(proof, tx.clone().into(), proto_op_data)
 }
 
 #[cfg(test)]

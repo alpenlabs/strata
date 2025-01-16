@@ -20,7 +20,7 @@ use strata_state::{
 use crate::{bitcoin::get_btc_chain, ArbitraryGenerator};
 
 pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
-    let mut arb = ArbitraryGenerator::new();
+    let mut arb = ArbitraryGenerator::new_with_size(1 << 12);
     let header: L2BlockHeader = arb.generate();
     let body: L2BlockBody = arb.generate();
     let accessory: L2BlockAccessory = arb.generate();
