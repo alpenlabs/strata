@@ -8,7 +8,7 @@ use crate::{duty::types::BatchCheckpointDuty, errors::Error};
 
 /// Extracts new duties given a consensus state and a identity.
 pub fn extract_duties(
-    state: &ClientState,
+    csm_state: &ClientState,
     _ident: &Identity,
     _params: &Params,
     chs_db: &impl ChainstateDatabase,
@@ -16,7 +16,7 @@ pub fn extract_duties(
 ) -> Result<Vec<Duty>, Error> {
     // If a sync state isn't present then we probably don't have anything we
     // want to do.  We might change this later.
-    let Some(ss) = state.sync() else {
+    let Some(ss) = csm_state.sync() else {
         return Ok(Vec::new());
     };
 
@@ -29,7 +29,7 @@ pub fn extract_duties(
     let mut duties = vec![Duty::SignBlock(duty_data)];
 
     duties.extend(extract_batch_duties(
-        state,
+        csm_state,
         tip_height,
         tip_blkid,
         chs_db,

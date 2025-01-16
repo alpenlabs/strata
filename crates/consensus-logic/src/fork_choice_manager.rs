@@ -8,7 +8,7 @@ use strata_db::{
     traits::{BlockStatus, ChainstateDatabase, Database},
 };
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
-use strata_primitives::params::Params;
+use strata_primitives::{l2::L2BlockCommitment, params::Params};
 use strata_state::{
     block::L2BlockBundle, block_validation::validate_block_segments, chain_state::Chainstate,
     client_state::ClientState, prelude::*, state_op::StateCache, sync_event::SyncEvent,
@@ -47,11 +47,7 @@ pub struct ForkChoiceManager<D: Database> {
     chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
 
     /// Current best block.
-    // TODO make sure we actually want to have this
-    tip_blkid: L2BlockId,
-
-    /// Current tip slot.
-    tip_slot: u64,
+    tip: L2BlockCommitment,
 }
 
 impl<D: Database> ForkChoiceManager<D> {
@@ -62,8 +58,7 @@ impl<D: Database> ForkChoiceManager<D> {
         l2_block_manager: Arc<L2BlockManager>,
         cur_csm_state: Arc<ClientState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
-        tip_blkid: L2BlockId,
-        tip_slot: u64,
+        tip: L2BlockCommitment,
     ) -> Self {
         Self {
             params,
@@ -71,13 +66,20 @@ impl<D: Database> ForkChoiceManager<D> {
             l2_block_manager,
             cur_csm_state,
             chain_tracker,
-            tip_blkid,
-            tip_slot,
+            tip,
         }
     }
 
     fn finalized_tip(&self) -> &L2BlockId {
         self.chain_tracker.finalized_tip()
+    }
+
+    fn tip_slot(&self) -> u64 {
+        self.tip.slot()
+    }
+
+    fn tip_blkid(&self) -> &L2BlockId {
+        self.tip.blkid()
     }
 
     fn set_block_status(&self, id: &L2BlockId, status: BlockStatus) -> Result<(), DbError> {
@@ -96,8 +98,14 @@ impl<D: Database> ForkChoiceManager<D> {
 
     fn get_block_index(&self, blkid: &L2BlockId) -> anyhow::Result<u64> {
         // FIXME this is horrible but it makes our current use case much faster, see below
-        if *blkid == self.tip_blkid {
-            return Ok(self.tip_slot);
+        if blkid == self.tip_blkid() {
+            return Ok(self.tip_slot());
+        }
+
+        // FIXME similarly, this is another optimization for common use cases,
+        // just in case
+        if blkid == self.finalized_tip() {
+            return Ok(self.chain_tracker.finalized_slot());
         }
 
         // FIXME we should have some in-memory cache of blkid->height, although now that we use the
@@ -119,27 +127,18 @@ pub fn init_forkchoice_manager<D: Database>(
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
     let sync_state = init_csm_state.sync().expect("csm state should be init");
-    let chain_tip_height = sync_state.tip_height();
 
-    let finalized_blockid = *sync_state.finalized_blkid();
-    let finalized_block = l2_block_manager
-        .get_block_data_blocking(&finalized_blockid)?
-        .ok_or(Error::MissingL2Block(finalized_blockid))?;
-    let finalized_height = finalized_block.header().blockidx();
-
-    debug!(%finalized_height, %chain_tip_height, "finalized and chain tip height");
+    let finalized_epoch = sync_state.get_epoch_commitment();
+    let final_slot = finalized_epoch.last_slot();
 
     // Populate the unfinalized block tracker.
     let mut chain_tracker =
-        unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_blockid);
-    chain_tracker.load_unfinalized_blocks(
-        finalized_height,
-        chain_tip_height,
-        l2_block_manager.as_ref(),
-    )?;
+        unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_epoch);
+    chain_tracker.load_unfinalized_blocks(final_slot, l2_block_manager.as_ref())?;
 
-    let (cur_tip_blkid, cur_tip_index) =
-        determine_start_tip(&chain_tracker, l2_block_manager.as_ref())?;
+    let cur_tip = determine_start_tip(&chain_tracker, l2_block_manager.as_ref())?;
+    let tip_slot = cur_tip.slot();
+    debug!(%final_slot, %tip_slot, "fetched final and tip slots");
 
     // Actually assemble the forkchoice manager state.
     let fcm = ForkChoiceManager::new(
@@ -148,8 +147,7 @@ pub fn init_forkchoice_manager<D: Database>(
         l2_block_manager.clone(),
         init_csm_state,
         chain_tracker,
-        cur_tip_blkid,
-        cur_tip_index,
+        cur_tip,
     );
 
     Ok(fcm)
@@ -160,7 +158,7 @@ pub fn init_forkchoice_manager<D: Database>(
 fn determine_start_tip(
     unfin: &UnfinalizedBlockTracker,
     l2_block_manager: &L2BlockManager,
-) -> anyhow::Result<(L2BlockId, u64)> {
+) -> anyhow::Result<L2BlockCommitment> {
     let mut iter = unfin.chain_tips_iter();
 
     let mut best = iter.next().expect("fcm: no chain tips");
@@ -186,7 +184,7 @@ fn determine_start_tip(
         }
     }
 
-    Ok((*best, best_height))
+    Ok(L2BlockCommitment::new(best_height, *best))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -358,7 +356,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             // Insert block into pending block tracker and figure out if we
             // should switch to it as a potential head.  This returns if we
             // created a new tip instead of advancing an existing tip.
-            let cur_tip = fcm_state.tip_blkid;
+            let cur_tip_blkid = *fcm_state.tip_blkid();
             let new_tip = fcm_state
                 .chain_tracker
                 .attach_block(blkid, block_bundle.header())?;
@@ -367,7 +365,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             }
 
             let best_block = pick_best_block(
-                &cur_tip,
+                &cur_tip_blkid,
                 fcm_state.chain_tracker.chain_tips_iter(),
                 &fcm_state.l2_block_manager,
             )?;
@@ -377,8 +375,9 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             // context aware so that we know we're not doing anything abnormal
             // in the normal case
             let depth = 100; // TODO change this
-            let reorg = reorg::compute_reorg(&cur_tip, best_block, depth, &fcm_state.chain_tracker)
-                .ok_or(Error::UnableToFindReorg(cur_tip, *best_block))?;
+            let reorg =
+                reorg::compute_reorg(&cur_tip_blkid, best_block, depth, &fcm_state.chain_tracker)
+                    .ok_or(Error::UnableToFindReorg(cur_tip_blkid, *best_block))?;
 
             debug!(?reorg, "REORG");
 
@@ -445,8 +444,8 @@ fn handle_new_state<D: Database>(
         .expect("fcm: client state missing sync data")
         .clone();
 
-    let csm_tip = sync.chain_tip_blkid();
-    debug!(?csm_tip, "got new CSM state");
+    let finalized_epoch = sync.get_epoch_commitment();
+    debug!(?finalized_epoch, "got new CSM state");
 
     // Decide if we're going to update the finalized tip first.  If it didn't
     // change then there's no point.
@@ -460,7 +459,9 @@ fn handle_new_state<D: Database>(
     fcm_state.cur_csm_state = Arc::new(cs);
 
     if should_update_fin_tip {
-        let fin_report = fcm_state.chain_tracker.update_finalized_tip(new_fin_tip)?;
+        let fin_report = fcm_state
+            .chain_tracker
+            .update_finalized_tip(&finalized_epoch)?;
         info!(blkid = ?new_fin_tip, "updated finalized tip");
         trace!(?fin_report, "finalization report");
         // TODO do something with the finalization report?
@@ -596,7 +597,7 @@ fn apply_tip_update<D: Database>(
 
     // Check to see if we need to roll back to a previous state in order to
     // compute new states.
-    if pivot_idx < fcm.tip_slot {
+    if pivot_idx < fcm.tip_slot() {
         debug!(?pivot_blkid, %pivot_idx, "rolling back chainstate");
         chs_db.rollback_writes_to(pivot_idx)?;
     }
@@ -606,8 +607,7 @@ fn apply_tip_update<D: Database>(
     for (idx, blkid, writes) in updates {
         debug!(?blkid, "applying CL state update");
         chs_db.write_state_update(idx, &writes)?;
-        fcm.tip_blkid = *blkid;
-        fcm.tip_slot = idx;
+        fcm.tip = L2BlockCommitment::new(idx, *blkid);
     }
 
     Ok(pre_state)

@@ -145,7 +145,7 @@ fn update_tracker(
     let new_duties =
         extractor::extract_duties(state, ident, params, chs_db, rollup_params_commitment)?;
 
-    info!(new_duties = ?new_duties, "new duties");
+    info!(?new_duties, "new duties");
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state

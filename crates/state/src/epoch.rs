@@ -3,7 +3,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, l1::L1BlockCommitment};
+use strata_primitives::{buf::Buf32, l1::L1BlockCommitment, l2::L2BlockCommitment};
 
 use crate::id::L2BlockId;
 
@@ -37,6 +37,7 @@ pub struct EpochHeader {
 /// might be slightly different depending on the context and we'd want to name
 /// them explicitly.  So avoid returning this in RPC endpoints, instead copy the
 /// fields to an RPC type that's more contextual to avoid misinterpretation.
+// TODO move to primitives crate
 #[derive(
     Copy,
     Clone,
@@ -112,5 +113,11 @@ impl EpochCommitment {
     /// This might not be useful.
     pub fn is_null(&self) -> bool {
         Buf32::from(self.blkid).is_zero()
+    }
+}
+
+impl Into<L2BlockCommitment> for EpochCommitment {
+    fn into(self) -> L2BlockCommitment {
+        L2BlockCommitment::new(self.last_slot(), *self.last_blkid())
     }
 }

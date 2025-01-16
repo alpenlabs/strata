@@ -4,9 +4,9 @@ use std::collections::*;
 
 use strata_db::traits::BlockStatus;
 use strata_primitives::buf::Buf32;
-use strata_state::prelude::*;
+use strata_state::{epoch::EpochCommitment, prelude::*};
 use strata_storage::L2BlockManager;
-use tracing::warn;
+use tracing::*;
 
 use crate::errors::ChainTipError;
 
@@ -19,9 +19,10 @@ struct BlockEntry {
 
 /// Tracks the unfinalized block tree on top of the finalized tip.
 pub struct UnfinalizedBlockTracker {
-    /// Block that we treat as a base that all of the other blocks that we're
-    /// considering uses.
-    finalized_tip: L2BlockId,
+    /// Epoch that we treat as a base that all of the other blocks that we're
+    /// considering uses.  This contains the final block of the epoch that we
+    /// attach unfinalized blocks to.
+    finalized_epoch: EpochCommitment,
 
     /// Table of pending blocks near the tip of the block tree.
     pending_table: HashMap<L2BlockId, BlockEntry>,
@@ -33,10 +34,10 @@ pub struct UnfinalizedBlockTracker {
 
 impl UnfinalizedBlockTracker {
     /// Creates a new tracker with just a finalized tip and no pending blocks.
-    pub fn new_empty(finalized_tip: L2BlockId) -> Self {
+    pub fn new_empty(finalized_epoch: EpochCommitment) -> Self {
         let mut pending_tbl = HashMap::new();
         pending_tbl.insert(
-            finalized_tip,
+            *finalized_epoch.last_blkid(),
             BlockEntry {
                 parent: L2BlockId::from(Buf32::zero()),
                 children: HashSet::new(),
@@ -44,9 +45,9 @@ impl UnfinalizedBlockTracker {
         );
 
         let mut unf_tips = HashSet::new();
-        unf_tips.insert(finalized_tip);
+        unf_tips.insert(*finalized_epoch.last_blkid());
         Self {
-            finalized_tip,
+            finalized_epoch,
             pending_table: pending_tbl,
             unfinalized_tips: unf_tips,
         }
@@ -54,20 +55,25 @@ impl UnfinalizedBlockTracker {
 
     /// Returns the "finalized tip", which is the base of the unfinalized tree.
     pub fn finalized_tip(&self) -> &L2BlockId {
-        &self.finalized_tip
+        self.finalized_epoch.last_blkid()
+    }
+
+    /// Returns the highest finalized slot.
+    pub fn finalized_slot(&self) -> u64 {
+        self.finalized_epoch.last_slot()
     }
 
     /// Returns `true` if the block is either the finalized tip or is already
     /// known to the tracker.
     pub fn is_seen_block(&self, id: &L2BlockId) -> bool {
-        self.finalized_tip == *id || self.pending_table.contains_key(id)
+        *self.finalized_tip() == *id || self.pending_table.contains_key(id)
     }
 
     /// Gets the parent of a block from within the tree.  Returns `None` if the
     /// block or its parent isn't in the tree.  Returns `None` for the finalized
     /// tip block, since its parent isn't in the tree.
     pub fn get_parent(&self, id: &L2BlockId) -> Option<&L2BlockId> {
-        if *id == self.finalized_tip {
+        if id == self.finalized_tip() {
             return None;
         }
         self.pending_table.get(id).map(|ent| &ent.parent)
@@ -80,7 +86,7 @@ impl UnfinalizedBlockTracker {
 
     /// Checks if the block is traceable all the way back to the finalized tip.
     fn sanity_check_parent_seq(&self, blkid: &L2BlockId) -> bool {
-        if *blkid == self.finalized_tip {
+        if blkid == self.finalized_tip() {
             return true;
         }
 
@@ -103,17 +109,19 @@ impl UnfinalizedBlockTracker {
         header: &SignedL2BlockHeader,
     ) -> Result<bool, ChainTipError> {
         if self.pending_table.contains_key(&blkid) {
-            warn!(blkid = ?blkid, "block already attached");
+            warn!(?blkid, "block already attached");
             return Ok(false);
         }
 
+        // Fetch the parent entry so that we can insert the new block as a child
+        // and reference the parent.
         let parent_blkid = header.parent();
-
-        if let Some(parent_ent) = self.pending_table.get_mut(parent_blkid) {
-            parent_ent.children.insert(blkid);
-        } else {
+        let Some(parent_ent) = self.pending_table.get_mut(parent_blkid) else {
             return Err(ChainTipError::AttachMissingParent(blkid, *header.parent()));
-        }
+        };
+
+        // Insert the new blkid into the parent's children list.
+        parent_ent.children.insert(blkid);
 
         let ent = BlockEntry {
             parent: *header.parent(),
@@ -134,26 +142,28 @@ impl UnfinalizedBlockTracker {
     /// competing chains that were rejected.
     pub fn update_finalized_tip(
         &mut self,
-        blkid: &L2BlockId,
+        new_epoch: &EpochCommitment,
     ) -> Result<FinalizeReport, ChainTipError> {
+        let new_fin_blkid = new_epoch.last_blkid();
+
         // Sanity check the block so we know it's here.
-        if !self.sanity_check_parent_seq(blkid) {
-            return Err(ChainTipError::MissingBlock(*blkid));
+        if !self.sanity_check_parent_seq(new_fin_blkid) {
+            return Err(ChainTipError::MissingBlock(*new_fin_blkid));
         }
 
-        if *blkid == self.finalized_tip {
+        if new_fin_blkid == self.finalized_tip() {
             return Ok(FinalizeReport {
-                prev_tip: *blkid,
-                finalized: vec![*blkid],
+                prev_tip: *new_fin_blkid,
+                finalized: vec![*new_fin_blkid],
                 rejected: Vec::new(),
             });
         }
 
         let mut finalized = vec![];
-        let mut at = *blkid;
+        let mut at = *new_fin_blkid;
 
         // Walk down to the current finalized tip and put everything as finalized.
-        while at != self.finalized_tip {
+        while at != *self.finalized_tip() {
             finalized.push(at);
 
             // Get the parent of the block we're at
@@ -164,8 +174,7 @@ impl UnfinalizedBlockTracker {
         let mut to_evict = vec![];
 
         // Walk down from the parent of blkid and find the chains that needs to be evicted
-
-        let mut at = self.pending_table.get(blkid).unwrap().parent;
+        let mut at = self.pending_table.get(new_fin_blkid).unwrap().parent;
         loop {
             let ent = self.pending_table.get(&at).unwrap();
             for child in &ent.children {
@@ -173,13 +182,13 @@ impl UnfinalizedBlockTracker {
                     to_evict.push(*child);
                 }
             }
-            if at == self.finalized_tip {
+            if at == *self.finalized_tip() {
                 break;
             }
             at = ent.parent;
         }
 
-        // Put all the blocks of the chains that needs to be evicted
+        // Find all the blocks of the chains that needs to be evicted.
         let mut evicted = to_evict.clone();
         for b in to_evict {
             evicted.extend(self.get_all_descendants(&b))
@@ -193,14 +202,14 @@ impl UnfinalizedBlockTracker {
         // And also remove blocks that we're finalizing, *except* the new
         // finalized tip.
         for b in &finalized {
-            if b != blkid {
+            if b != new_fin_blkid {
                 self.remove(b);
             }
         }
 
         // Just update the finalized tip now.
-        let old_tip = self.finalized_tip;
-        self.finalized_tip = *blkid;
+        let old_tip = *self.finalized_tip();
+        self.finalized_epoch = *new_epoch;
 
         // Sanity check and construct the report.
         assert!(
@@ -215,6 +224,8 @@ impl UnfinalizedBlockTracker {
     }
 
     pub fn get_all_descendants(&self, blkid: &L2BlockId) -> HashSet<L2BlockId> {
+        // TODO eventually rewrite this to use some recursion and return an
+        // iterator to avoid this annoying allocation mess
         let mut descendants = HashSet::new();
         let mut to_visit = vec![*blkid];
 
@@ -226,6 +237,7 @@ impl UnfinalizedBlockTracker {
                 }
             }
         }
+
         descendants
     }
 
@@ -251,13 +263,23 @@ impl UnfinalizedBlockTracker {
     pub fn load_unfinalized_blocks(
         &mut self,
         finalized_height: u64,
-        chain_tip_height: u64,
         l2_block_manager: &L2BlockManager,
     ) -> anyhow::Result<()> {
-        for height in (finalized_height + 1)..=chain_tip_height {
-            let Ok(block_ids) = l2_block_manager.get_blocks_at_height_blocking(height) else {
-                return Err(anyhow::anyhow!("failed to get blocks at height {}", height));
+        let mut cur_height = finalized_height + 1;
+        loop {
+            let Ok(block_ids) = l2_block_manager.get_blocks_at_height_blocking(cur_height) else {
+                return Err(anyhow::anyhow!(
+                    "failed to get blocks at height {}",
+                    cur_height
+                ));
             };
+
+            // If there's no blocks at this height then we're done.
+            if block_ids.is_empty() {
+                trace!(%cur_height, "ending search for new blocks");
+                break;
+            }
+
             let block_ids = block_ids
                 .into_iter()
                 .filter(|block_id| {
@@ -272,16 +294,14 @@ impl UnfinalizedBlockTracker {
                 })
                 .collect::<Vec<_>>();
 
-            if block_ids.is_empty() {
-                return Err(anyhow::anyhow!("missing blocks at height {}", height));
-            }
-
             for block_id in block_ids {
                 if let Some(block) = l2_block_manager.get_block_data_blocking(&block_id)? {
                     let header = block.header();
                     let _ = self.attach_block(block_id, header);
                 }
             }
+
+            cur_height += 1;
         }
 
         Ok(())
