@@ -11,10 +11,21 @@ use strata_state::{
     client_state::ClientState,
 };
 use strata_tasks::ShutdownGuard;
+use thiserror::Error;
 use tokio::sync::broadcast;
 use tracing::{debug, warn};
 
-use crate::{checkpoint::CheckpointHandle, duty::errors::Error};
+use crate::checkpoint::CheckpointHandle;
+
+#[derive(Debug, Error)]
+enum Error {
+    #[error("chain is not active yet")]
+    ChainInactive,
+    #[error("missing expected chainstate for blockidx {0}")]
+    MissingIdxChainstate(u64),
+    #[error("db: {0}")]
+    Db(#[from] strata_db::errors::DbError),
+}
 
 /// Worker to monitor client state updates and create checkpoint entries
 /// pending proof when previous proven checkpoint is finalized.

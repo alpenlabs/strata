@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Extracts new duties given a consensus state and a identity.
-pub fn extract_duties(
+pub(crate) fn extract_duties(
     state: &ClientState,
     checkpoint_handle: &CheckpointHandle,
     l2_block_manager: &L2BlockManager,
