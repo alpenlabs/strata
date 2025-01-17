@@ -1,5 +1,3 @@
-use std::str::from_utf8;
-
 use bitcoin::{
     opcodes::all::OP_IF,
     script::{Instruction, Instructions},
@@ -84,11 +82,10 @@ fn parse_l1_payload(
     Ok(L1Payload::new(payload, ptype))
 }
 
-fn parse_payload_type(bytes: &[u8], params: &RollupParams) -> Option<L1PayloadType> {
-    let str = from_utf8(bytes).ok()?;
-    if params.checkpoint_tag == str {
+fn parse_payload_type(tag_bytes: &[u8], params: &RollupParams) -> Option<L1PayloadType> {
+    if params.checkpoint_tag.as_bytes() == tag_bytes {
         Some(L1PayloadType::Checkpoint)
-    } else if params.da_tag == str {
+    } else if params.da_tag.as_bytes() == tag_bytes {
         Some(L1PayloadType::Da)
     } else {
         None

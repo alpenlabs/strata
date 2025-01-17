@@ -4,7 +4,7 @@ use rockbound::{utils::get_last, OptimisticTransactionDB as DB, SchemaDBOperatio
 use strata_db::{
     errors::DbError,
     traits::L1WriterDatabase,
-    types::{IntentEntry, PayloadEntry},
+    types::{BundledPayloadEntry, IntentEntry},
     DbResult,
 };
 use strata_primitives::buf::Buf32;
@@ -28,7 +28,7 @@ impl RBL1WriterDb {
 }
 
 impl L1WriterDatabase for RBL1WriterDb {
-    fn put_payload_entry(&self, idx: u64, entry: PayloadEntry) -> DbResult<()> {
+    fn put_payload_entry(&self, idx: u64, entry: BundledPayloadEntry) -> DbResult<()> {
         self.db
             .with_optimistic_txn(
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
@@ -40,7 +40,7 @@ impl L1WriterDatabase for RBL1WriterDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_payload_entry_by_idx(&self, idx: u64) -> DbResult<Option<PayloadEntry>> {
+    fn get_payload_entry_by_idx(&self, idx: u64) -> DbResult<Option<BundledPayloadEntry>> {
         Ok(self.db.get::<PayloadSchema>(&idx)?)
     }
 
@@ -113,7 +113,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
 
-        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
+        let blob: BundledPayloadEntry = ArbitraryGenerator::new().generate();
 
         seq_db.put_payload_entry(0, blob.clone()).unwrap();
 
@@ -125,7 +125,7 @@ mod tests {
     fn test_put_blob_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
-        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
+        let blob: BundledPayloadEntry = ArbitraryGenerator::new().generate();
 
         seq_db.put_payload_entry(0, blob.clone()).unwrap();
 
@@ -140,12 +140,12 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
 
-        let entry: PayloadEntry = ArbitraryGenerator::new().generate();
+        let entry: BundledPayloadEntry = ArbitraryGenerator::new().generate();
 
         // Insert
         seq_db.put_payload_entry(0, entry.clone()).unwrap();
 
-        let updated_entry: PayloadEntry = ArbitraryGenerator::new().generate();
+        let updated_entry: BundledPayloadEntry = ArbitraryGenerator::new().generate();
 
         // Update existing idx
         seq_db.put_payload_entry(0, updated_entry.clone()).unwrap();
@@ -158,7 +158,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
 
-        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
+        let blob: BundledPayloadEntry = ArbitraryGenerator::new().generate();
 
         let next_blob_idx = seq_db.get_next_payload_idx().unwrap();
         assert_eq!(
@@ -171,7 +171,7 @@ mod tests {
             .unwrap();
         // Now the next idx is 1
 
-        let blob: PayloadEntry = ArbitraryGenerator::new().generate();
+        let blob: BundledPayloadEntry = ArbitraryGenerator::new().generate();
 
         seq_db.put_payload_entry(1, blob.clone()).unwrap();
         let next_blob_idx = seq_db.get_next_payload_idx().unwrap();

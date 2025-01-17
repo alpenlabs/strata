@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use strata_db::{
     traits::L1WriterDatabase,
-    types::{IntentEntry, PayloadEntry},
+    types::{BundledPayloadEntry, IntentEntry},
     DbResult,
 };
 use strata_primitives::buf::Buf32;
@@ -13,8 +13,8 @@ use crate::exec::*;
 
 inst_ops_simple! {
     (<D: L1WriterDatabase> => EnvelopeDataOps) {
-        put_payload_entry(idx: u64, payloadentry: PayloadEntry) => ();
-        get_payload_entry_by_idx(idx: u64) => Option<PayloadEntry>;
+        put_payload_entry(idx: u64, payloadentry: BundledPayloadEntry) => ();
+        get_payload_entry_by_idx(idx: u64) => Option<BundledPayloadEntry>;
         get_next_payload_idx() => u64;
         put_intent_entry(id: Buf32, entry: IntentEntry) => ();
         get_intent_by_id(id: Buf32) => Option<IntentEntry>;

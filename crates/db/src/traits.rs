@@ -19,7 +19,7 @@ use strata_zkvm::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{CheckpointEntry, IntentEntry, L1TxEntry, PayloadEntry},
+    types::{BundledPayloadEntry, CheckpointEntry, IntentEntry, L1TxEntry},
     DbResult,
 };
 
@@ -246,14 +246,14 @@ pub trait CheckpointDatabase {
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
 
-/// A trait encapsulating provider and store traits to create/update [`PayloadEntry`] in the
-/// database and to fetch [`PayloadEntry`] and indices from the database
+/// A trait encapsulating provider and store traits to create/update [`BundledPayloadEntry`] in the
+/// database and to fetch [`BundledPayloadEntry`] and indices from the database
 pub trait L1WriterDatabase {
-    /// Store the [`PayloadEntry`].
-    fn put_payload_entry(&self, idx: u64, payloadentry: PayloadEntry) -> DbResult<()>;
+    /// Store the [`BundledPayloadEntry`].
+    fn put_payload_entry(&self, idx: u64, payloadentry: BundledPayloadEntry) -> DbResult<()>;
 
-    /// Get a [`PayloadEntry`] by its index.
-    fn get_payload_entry_by_idx(&self, idx: u64) -> DbResult<Option<PayloadEntry>>;
+    /// Get a [`BundledPayloadEntry`] by its index.
+    fn get_payload_entry_by_idx(&self, idx: u64) -> DbResult<Option<BundledPayloadEntry>>;
 
     /// Get the next payload index
     fn get_next_payload_idx(&self) -> DbResult<u64>;

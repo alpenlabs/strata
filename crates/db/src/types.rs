@@ -42,30 +42,30 @@ impl IntentEntry {
 }
 
 /// Status of Intent indicating various stages of being bundled to L1 transaction.
-/// Unbundled Intents are collected and bundled to create [`PayloadEntry].
+/// Unbundled Intents are collected and bundled to create [`BundledPayloadEntry].
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub enum IntentStatus {
     // It is not bundled yet, and thus will be collected and processed by bundler.
     Unbundled,
-    // It has been bundled to [`PayloadEntry`] with given bundle idx.
+    // It has been bundled to [`BundledPayloadEntry`] with given bundle idx.
     Bundled(u64),
 }
 
 /// Represents data for a payload we're still planning to post to L1.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct PayloadEntry {
+pub struct BundledPayloadEntry {
     pub payloads: Vec<L1Payload>,
     pub commit_txid: Buf32,
     pub reveal_txid: Buf32,
-    pub status: PayloadL1Status,
+    pub status: L1BundleStatus,
 }
 
-impl PayloadEntry {
+impl BundledPayloadEntry {
     pub fn new(
         payloads: Vec<L1Payload>,
         commit_txid: Buf32,
         reveal_txid: Buf32,
-        status: PayloadL1Status,
+        status: L1BundleStatus,
     ) -> Self {
         Self {
             payloads,
@@ -75,7 +75,7 @@ impl PayloadEntry {
         }
     }
 
-    /// Create new unsigned [`PayloadEntry`].
+    /// Create new unsigned [`BundledPayloadEntry`].
     ///
     /// NOTE: This won't have commit - reveal pairs associated with it.
     ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
@@ -83,13 +83,13 @@ impl PayloadEntry {
     pub fn new_unsigned(payloads: Vec<L1Payload>) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();
-        Self::new(payloads, cid, rid, PayloadL1Status::Unsigned)
+        Self::new(payloads, cid, rid, L1BundleStatus::Unsigned)
     }
 }
 
 /// Various status that transactions corresponding to a payload can be in L1
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum PayloadL1Status {
+pub enum L1BundleStatus {
     /// The payload has not been signed yet, i.e commit-reveal transactions have not been created
     /// yet.
     Unsigned,
