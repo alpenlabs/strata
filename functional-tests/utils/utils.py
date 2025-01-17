@@ -594,20 +594,10 @@ def handle_bailout(seq, seqrpc, bail_context):
     Raises:
         AssertionError: If the bailout or chain tip progress fails.
     """
-
-    def client_status(seqrpc, cur_chain_tip):
-        def another():
-            d = seqrpc.strata_clientStatus()
-            print(d)
-            return d["chain_tip_slot"] > cur_chain_tip
-
-        return another
-
     # wait for 2 seconds for chain tip slot to accumulate.
     # Since the chain tip requirement is not exact, we can sleep here
     time.sleep(2)
     cur_chain_tip = seqrpc.strata_clientStatus()["chain_tip_slot"]
-    print(cur_chain_tip)
 
     # Trigger the bailout
     seqrpc.debug_bail(bail_context)
@@ -630,7 +620,7 @@ def handle_bailout(seq, seqrpc, bail_context):
 
     # Ensure the chain tip progresses
     wait_until(
-        client_status(seqrpc, cur_chain_tip),
+        lambda: seqrpc.strata_clientStatus()["chain_tip_slot"] > cur_chain_tip,
         error_with="chain tip slot not progressing",
         timeout=20,
     )
