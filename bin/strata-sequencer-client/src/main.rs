@@ -7,6 +7,7 @@
 mod args;
 mod config;
 mod duty_executor;
+mod duty_fetcher;
 mod errors;
 mod helpers;
 mod rpc_client;
@@ -16,15 +17,14 @@ use std::{sync::Arc, time::Duration};
 use args::Args;
 use config::Config;
 use duty_executor::duty_executor_worker;
+use duty_fetcher::duty_fetcher_worker;
 use errors::{AppError, Result};
 use helpers::load_seqkey;
 use rpc_client::rpc_client;
 use strata_common::logging;
-use strata_rpc_api::StrataSequencerApiClient;
-use strata_sequencer::duty::types::Duty;
 use strata_tasks::TaskManager;
 use tokio::{runtime::Handle, sync::mpsc};
-use tracing::{error, info, warn};
+use tracing::info;
 
 const SHUTDOWN_TIMEOUT_MS: u64 = 5000;
 
@@ -72,37 +72,6 @@ fn main_inner(args: Args) -> Result<()> {
 
     task_manager.start_signal_listeners();
     task_manager.monitor(Some(Duration::from_millis(SHUTDOWN_TIMEOUT_MS)))?;
-
-    Ok(())
-}
-
-async fn duty_fetcher_worker<R>(
-    rpc: Arc<R>,
-    duty_tx: mpsc::Sender<Duty>,
-    poll_interval: u64,
-) -> anyhow::Result<()>
-where
-    R: StrataSequencerApiClient + Send + Sync + 'static,
-{
-    let mut interval = tokio::time::interval(Duration::from_millis(poll_interval));
-    'top: loop {
-        interval.tick().await;
-        let duties = match rpc.get_sequencer_duties().await {
-            Ok(duties) => duties,
-            Err(err) => {
-                // log error and try again
-                error!("duty_fetcher_worker: failed to get duties: {}", err);
-                continue;
-            }
-        };
-
-        for duty in duties {
-            if duty_tx.send(duty).await.is_err() {
-                warn!("duty_fetcher_worker: rx dropped; exiting");
-                break 'top;
-            }
-        }
-    }
 
     Ok(())
 }
