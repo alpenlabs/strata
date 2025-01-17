@@ -29,7 +29,7 @@ use crate::rpc::{
     types::{
         CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
         ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
-        SignRawTransactionWithWallet,
+        SignRawTransactionWithWallet, TestMempoolAccept,
     },
 };
 
@@ -279,6 +279,13 @@ impl BroadcasterRpc for BitcoinClient {
             Err(e) => Err(ClientError::Other(e.to_string())),
         }
     }
+
+    async fn test_mempool_accept(&self, tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>> {
+        let txstr = serialize_hex(tx);
+        trace!(%txstr, "Testing mempool accept");
+        self.call::<Vec<TestMempoolAccept>>("testmempoolaccept", &[to_value([txstr])?])
+            .await
+    }
 }
 
 #[async_trait]
@@ -481,6 +488,18 @@ mod test {
         let got = client.sign_raw_transaction_with_wallet(&tx).await.unwrap();
         assert!(got.complete);
         assert!(consensus::encode::deserialize_hex::<Transaction>(&got.hex).is_ok());
+
+        // test_mempool_accept
+        let txids = client
+            .test_mempool_accept(&tx)
+            .await
+            .expect("must be able to test mempool accept");
+        let got = txids.first().expect("there must be at least one txid");
+        assert_eq!(
+            got.txid,
+            tx.compute_txid(),
+            "txids must match in the mempool"
+        );
 
         // send_raw_transaction
         let got = client.send_raw_transaction(&tx).await.unwrap();
