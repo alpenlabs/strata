@@ -5,6 +5,7 @@ use strata_storage::ops::writer::EnvelopeDataOps;
 use tokio::time::sleep;
 use tracing::*;
 
+// TODO: get this from config
 const BUNDLE_INTERVAL: u64 = 200; // millis
 
 /// Periodically bundles unbundled intents into payload entries.
@@ -12,7 +13,6 @@ pub(crate) async fn bundler_task(ops: Arc<EnvelopeDataOps>) -> anyhow::Result<()
     let mut last_idx = 0;
     loop {
         let (unbundled, new_idx) = get_unbundled_intents_after(last_idx, ops.as_ref()).await?;
-        debug!(len=%unbundled.len(), "found unbundled intents");
         process_unbundled_entries(ops.as_ref(), unbundled).await?;
         last_idx = new_idx;
 
@@ -51,8 +51,7 @@ async fn get_unbundled_intents_after(
     idx: u64,
     ops: &EnvelopeDataOps,
 ) -> anyhow::Result<(Vec<IntentEntry>, u64)> {
-    let latest_idx = ops.get_next_payload_idx_async().await?.saturating_sub(1);
-    debug!(%idx, "Latest intent idx");
+    let latest_idx = ops.get_next_intent_idx_async().await?.saturating_sub(1);
     let mut curr_intent_idx = latest_idx;
     let mut unbundled_intents = Vec::new();
     while curr_intent_idx >= idx {
