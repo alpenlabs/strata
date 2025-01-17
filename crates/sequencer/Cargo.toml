@@ -24,9 +24,6 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-# rand = { version = "0.8.5", features = ["getrandom", "std_rng"] }
-# strata-db = { workspace = true, features = ["stubs"] }
-# strata-rocksdb = { workspace = true, features = ["test_utils"] }
 strata-test-utils.workspace = true
 
 [lints]
