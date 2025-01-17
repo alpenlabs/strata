@@ -146,6 +146,7 @@ impl CheckpointOperator {
             // TODO: likely unused and should be removed.
             l2_blockid: Buf32::default().into(),
             commitment: None,
+            confirmation_status: None,
         };
         let proof_ctx = self.construct_proof_ctx(&checkpoint_idx)?;
 

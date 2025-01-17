@@ -5,8 +5,8 @@ use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
-    HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcChainState, RpcCheckpointInfo,
-    RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
+    HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus,
+    RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
 };
 use strata_state::{
     block::L2Block, client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput,
@@ -108,6 +108,13 @@ pub trait StrataApi {
     /// Get nth checkpoint info if any
     #[method(name = "getCheckpointInfo")]
     async fn get_checkpoint_info(&self, idx: u64) -> RpcResult<Option<RpcCheckpointInfo>>;
+
+    /// Get the checkpoint confirmation status if checkpoint exists
+    #[method(name = "getCheckpointConfStatus")]
+    async fn get_checkpoint_conf_status(
+        &self,
+        idx: u64,
+    ) -> RpcResult<Option<RpcCheckpointConfStatus>>;
 
     /// Get the l2block status from its height
     /// This assumes that the block finalization is always sequential. i.e all the blocks before the
