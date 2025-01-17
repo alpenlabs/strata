@@ -5,7 +5,7 @@ use crate::rpc::{
     client::ClientResult,
     types::{
         GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
-        ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+        ListTransactions, ListUnspent, SignRawTransactionWithWallet, TestMempoolAccept,
     },
 };
 
@@ -92,6 +92,9 @@ pub trait BroadcasterRpc {
     /// - `tx`: The raw transaction to send. This should be a byte array containing the serialized
     ///   raw transaction data.
     async fn send_raw_transaction(&self, tx: &Transaction) -> ClientResult<Txid>;
+
+    /// Tests if a raw transaction is valid.
+    async fn test_mempool_accept(&self, tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>>;
 }
 
 /// Wallet functionality that any Bitcoin client **without private keys** that

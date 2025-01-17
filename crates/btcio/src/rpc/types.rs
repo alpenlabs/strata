@@ -317,6 +317,16 @@ pub struct ListTransactions {
     pub txid: Txid,
 }
 
+/// Models the result of JSON-RPC method `testmempoolaccept`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct TestMempoolAccept {
+    /// The transaction id.
+    #[serde(deserialize_with = "deserialize_txid")]
+    pub txid: Txid,
+    /// Rejection reason, if any.
+    pub reject_reason: Option<String>,
+}
+
 /// Models the result of JSON-RPC method `signrawtransactionwithwallet`.
 ///
 /// # Note

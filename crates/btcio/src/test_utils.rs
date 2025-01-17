@@ -14,7 +14,7 @@ use crate::{
         traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
         types::{
             GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
-            ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+            ListTransactions, ListUnspent, SignRawTransactionWithWallet, TestMempoolAccept,
         },
         ClientResult,
     },
@@ -113,6 +113,13 @@ impl BroadcasterRpc for TestBitcoinClient {
     // send_raw_transaction sends a raw transaction to the network
     async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
         Ok(Txid::from_slice(&[1u8; 32]).unwrap())
+    }
+    async fn test_mempool_accept(&self, _tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>> {
+        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        Ok(vec![TestMempoolAccept {
+            txid: some_tx.compute_txid(),
+            reject_reason: None,
+        }])
     }
 }
 
