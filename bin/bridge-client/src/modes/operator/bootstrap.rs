@@ -31,8 +31,8 @@ use super::{constants::DB_THREAD_COUNT, task_manager::TaskManager};
 use crate::{
     args::Cli,
     constants::{
-        DEFAULT_DUTY_TIMEOUT_SEC, DEFAULT_RPC_HOST, DEFAULT_RPC_PORT, MAX_RPC_RETRY_COUNT,
-        ROCKSDB_RETRY_COUNT,
+        DEFAULT_DUTY_TIMEOUT_SEC, DEFAULT_MAX_RPC_RETRY_COUNT, DEFAULT_ROCKSDB_RETRY_COUNT,
+        DEFAULT_RPC_HOST, DEFAULT_RPC_PORT,
     },
     db::open_rocksdb_database,
     rpc_server::{self, BridgeRpc},
@@ -48,7 +48,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
 
     // Initialize a rocksdb instance with the required column families.
     let rbdb = open_rocksdb_database(data_dir)?;
-    let retry_count = args.retry_count.unwrap_or(ROCKSDB_RETRY_COUNT);
+    let retry_count = args.retry_count.unwrap_or(DEFAULT_ROCKSDB_RETRY_COUNT);
     let ops_config = DbOpsConfig::new(retry_count);
 
     // Setup Threadpool for the database I/O ops.
@@ -175,7 +175,9 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
             .unwrap_or(DEFAULT_DUTY_TIMEOUT_SEC),
     );
 
-    let max_retry_count = args.max_rpc_retry_count.unwrap_or(MAX_RPC_RETRY_COUNT);
+    let max_retry_count = args
+        .max_rpc_retry_count
+        .unwrap_or(DEFAULT_MAX_RPC_RETRY_COUNT);
 
     // TODO: wrap these in `strata-tasks`
     let duty_task = tokio::spawn(async move {
