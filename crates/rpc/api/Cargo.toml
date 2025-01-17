@@ -6,12 +6,12 @@ version = "0.1.0"
 [dependencies]
 strata-bridge-sig-manager.workspace = true
 strata-bridge-tx-builder.workspace = true
+strata-common.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
 strata-state.workspace = true
 strata-zkvm.workspace = true
-strata-common.workspace = true
 
 bitcoin.workspace = true
 hex.workspace = true

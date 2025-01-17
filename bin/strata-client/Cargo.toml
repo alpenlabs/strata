@@ -61,4 +61,7 @@ strata-mmr.workspace = true
 strata-test-utils.workspace = true
 
 [features]
-debug-utils = ["strata-common/debug-utils", "strata-consensus-logic/debug-utils"]
+debug-utils = [
+  "strata-common/debug-utils",
+  "strata-consensus-logic/debug-utils",
+]

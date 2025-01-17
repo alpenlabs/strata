@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 strata-btcio.workspace = true
 strata-chaintsn.workspace = true
+strata-common = { workspace = true, default-features = true }
 strata-crypto = { workspace = true, default-features = true }
 strata-db.workspace = true
 strata-eectl.workspace = true
@@ -19,7 +20,6 @@ strata-status.workspace = true
 strata-storage.workspace = true
 strata-tasks.workspace = true
 strata-zkvm.workspace = true
-strata-common = { workspace = true , default-features = true }
 
 anyhow.workspace = true
 bitcoin.workspace = true
