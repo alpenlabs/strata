@@ -1,10 +1,9 @@
 //! Descriptors for publishing updated FCM state to other components.
 
-use strata_primitives::l2::L2BlockCommitment;
-
-use crate::epoch::EpochCommitment;
+use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment};
 
 /// Summary of the current FCM state that can be consumed by other components.
+#[derive(Clone, Debug)]
 pub struct FcmState {
     tip: L2BlockCommitment,
     last_epoch: EpochCommitment,

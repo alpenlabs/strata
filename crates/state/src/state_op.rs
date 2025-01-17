@@ -9,6 +9,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
+    epoch::EpochCommitment,
     l1::{BitcoinAmount, L1BlockCommitment, OutputRef},
 };
 use tracing::*;
@@ -17,7 +18,6 @@ use crate::{
     bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::{Chainstate, EpochState},
-    epoch::EpochCommitment,
     header::L2Header,
     id::L2BlockId,
     l1::{self, L1MaturationEntry},

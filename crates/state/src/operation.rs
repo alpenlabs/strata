@@ -4,13 +4,12 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::l1::L1BlockCommitment;
+use strata_primitives::{epoch::EpochCommitment, l1::L1BlockCommitment};
 use tracing::*;
 
 use crate::{
     batch::BatchCheckpointWithCommitment,
     client_state::{ClientState, L1Checkpoint, SyncState},
-    epoch::EpochCommitment,
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
 };

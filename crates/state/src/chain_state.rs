@@ -1,11 +1,12 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, hash::compute_borsh_hash, l1::L1BlockCommitment};
+use strata_primitives::{
+    buf::Buf32, epoch::EpochCommitment, hash::compute_borsh_hash, l1::L1BlockCommitment,
+};
 
 use crate::{
     bridge_ops::{self, WithdrawalIntent},
     bridge_state::{self, DepositEntry, DepositsTable, OperatorTable},
-    epoch::EpochCommitment,
     exec_env::{self, ExecEnvState},
     genesis::GenesisStateData,
     prelude::*,

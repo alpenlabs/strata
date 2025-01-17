@@ -1,7 +1,9 @@
 //! Handle to inspect the current CSM state and wait for updates when there are
 //! any.
 
-use crate::{client_state::ClientState, epoch::EpochCommitment, id::L2BlockId};
+use strata_primitives::epoch::EpochCommitment;
+
+use crate::client_state::ClientState;
 
 #[derive(Clone, Debug, Default)]
 pub struct CsmStatus {

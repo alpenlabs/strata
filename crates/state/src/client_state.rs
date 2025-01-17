@@ -6,12 +6,11 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, l1::L1BlockCommitment};
+use strata_primitives::{buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment};
 use tracing::*;
 
 use crate::{
     batch::{BatchInfo, BootstrapState},
-    epoch::EpochCommitment,
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
     operation::{ClientUpdateOutput, SyncAction},
