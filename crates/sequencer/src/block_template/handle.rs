@@ -4,12 +4,17 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::{BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error, SharedState};
 
+/// Request to be sent from [`TemplateManagerHandle`] to [`block_template::worker`].
+/// Each also passes a [`oneshot::Sender`] to return the result of the operation.
 #[derive(Debug)]
 pub enum TemplateManagerRequest {
+    /// Build and return a new block template signable by sequencer.
     GenerateBlockTemplate(
         BlockGenerationConfig,
         oneshot::Sender<Result<BlockTemplate, Error>>,
     ),
+    /// Provide [`BlockCompletionData`] for an existing template to create
+    /// a complete [`L2BlockBundle`]
     CompleteBlockTemplate(
         L2BlockId,
         BlockCompletionData,
