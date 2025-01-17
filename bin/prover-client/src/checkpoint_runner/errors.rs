@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::errors::ProvingTaskError;
+
 /// Represents errors that can occur during checkpoint-related operations.
 ///
 /// This error type encompasses various failure scenarios that may occur when
@@ -19,6 +21,10 @@ pub enum CheckpointError {
     /// Occurs when failed to submit checkpoint proof to the sequencer.
     #[error("Failed to submit checkpoint proof for index {index}: {error}")]
     SubmitProofError { index: u64, error: String },
+
+    // Ooccurs when
+    #[error("Proof error: {0}")]
+    ProofErr(#[from] ProvingTaskError),
 }
 
 /// A type alias for Results involving checkpoint operations.

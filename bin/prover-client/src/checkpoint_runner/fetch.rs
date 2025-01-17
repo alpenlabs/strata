@@ -11,7 +11,7 @@ pub async fn fetch_latest_checkpoint_index(cl_client: &HttpClient) -> Checkpoint
         .get_latest_checkpoint_index(None)
         .await
         .map_err(|e| {
-            error!("Failed to fetch current checkpoint index: {e}");
+            error!(err = ?e, "Failed to fetch current checkpoint index");
             CheckpointError::FetchError(e.to_string())
         })?
         .ok_or_else(|| {

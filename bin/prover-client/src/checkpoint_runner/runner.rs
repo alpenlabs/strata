@@ -15,6 +15,12 @@ use crate::{
 
 const CHECKPOINT_POLL_INTERVAL: u64 = 10;
 
+/// Holds the current checkpoint index for the runner to track progress.
+#[derive(Default)]
+struct CheckpointRunnerState {
+    pub current_checkpoint_idx: Option<u64>,
+}
+
 /// Periodically polls for the latest checkpoint index and updates the current index.
 /// Dispatches tasks when a new checkpoint is detected.
 pub async fn checkpoint_proof_runner(
@@ -24,15 +30,13 @@ pub async fn checkpoint_proof_runner(
 ) {
     info!("Checkpoint runner started");
     let mut ticker = interval(Duration::from_secs(CHECKPOINT_POLL_INTERVAL));
-    let mut current_checkpoint_idx: Option<u64> = None;
+    let mut runner_state = CheckpointRunnerState::default();
 
     loop {
         ticker.tick().await;
 
-        if let Err(e) =
-            process_checkpoint(&operator, &task_tracker, &db, &mut current_checkpoint_idx).await
-        {
-            error!("Error processing checkpoint: {e:?}");
+        if let Err(e) = process_checkpoint(&operator, &task_tracker, &db, &mut runner_state).await {
+            error!(err = ?e, "error processing checkpoint");
         }
     }
 }
@@ -41,21 +45,19 @@ async fn process_checkpoint(
     operator: &CheckpointOperator,
     task_tracker: &Arc<Mutex<TaskTracker>>,
     db: &Arc<ProofDb>,
-    current_checkpoint_idx: &mut Option<u64>,
+    runner_state: &mut CheckpointRunnerState,
 ) -> anyhow::Result<()> {
     let new_checkpoint = fetch_latest_checkpoint_index(operator.cl_client()).await?;
 
-    if !should_update_checkpoint(*current_checkpoint_idx, new_checkpoint) {
-        info!(
-           "Fetched checkpoint {new_checkpoint} is not newer than current {current_checkpoint_idx:?}"
-       );
+    if !should_update_checkpoint(runner_state.current_checkpoint_idx, new_checkpoint) {
+        info!("Fetched checkpoint {new_checkpoint} is not newer than current checkpoint");
         return Ok(());
     }
 
     operator
         .create_task(new_checkpoint, task_tracker.clone(), db)
         .await?;
-    *current_checkpoint_idx = Some(new_checkpoint);
+    runner_state.current_checkpoint_idx = Some(new_checkpoint);
 
     Ok(())
 }

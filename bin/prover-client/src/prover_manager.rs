@@ -72,9 +72,11 @@ impl ProverManager {
                             // If checkpoint proving; submit proof to sequencer
                             if let ProofContext::Checkpoint(checkpoint_index) = task.context() {
                                 let cl_client = operator.checkpoint_operator().cl_client();
-                                let _ =
-                                    submit_checkpoint_proof(*checkpoint_index, cl_client, task, db)
-                                        .await;
+                                submit_checkpoint_proof(*checkpoint_index, cl_client, task, db)
+                                    .await
+                                    .unwrap_or_else(|err| {
+                                        error!(?err, "Error submitting checkpoint proof");
+                                    });
                             }
                         }
                         Err(err) => {

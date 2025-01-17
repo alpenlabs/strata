@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -131,5 +133,15 @@ impl ProofKey {
 
     pub fn host(&self) -> &ProofZkVm {
         &self.host
+    }
+}
+
+impl Display for ProofKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ProofKey(context = {:?}, host = {:?})",
+            self.context, self.host
+        )
     }
 }

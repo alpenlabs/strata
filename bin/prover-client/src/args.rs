@@ -117,7 +117,7 @@ pub struct Args {
         description = "wait time in milliseconds for the prover manager loop",
         default = "1_000"
     )]
-    pub loop_interval: u64,
+    pub poll_interval: u64,
 
     /// Enables or disables development RPC endpoints.
     ///

@@ -8,6 +8,7 @@ use strata_rpc_types::ProofKey;
 use tracing::info;
 
 use super::errors::{CheckpointError, CheckpointResult};
+use crate::errors::ProvingTaskError::{DatabaseError, ProofNotFound};
 
 /// Submits checkpoint proof to the sequencer.
 pub async fn submit_checkpoint_proof(
@@ -16,12 +17,12 @@ pub async fn submit_checkpoint_proof(
     proof_key: ProofKey,
     proof_db: Arc<ProofDb>,
 ) -> CheckpointResult<()> {
-    let proof = proof_db.get_proof(proof_key).unwrap().unwrap();
+    let proof = proof_db
+        .get_proof(proof_key)
+        .map_err(DatabaseError)?
+        .ok_or(ProofNotFound(proof_key))?;
 
-    info!(
-        "Sending checkpoint proof: {:?} ckp id: {:?} to the sequencer",
-        proof_key, checkpoint_index
-    );
+    info!(%proof_key, %checkpoint_index, "submitting ready checkpoint proof");
 
     sequencer_client
         .submit_checkpoint_proof(checkpoint_index, proof)

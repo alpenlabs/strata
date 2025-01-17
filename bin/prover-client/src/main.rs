@@ -84,7 +84,7 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
         operator.clone(),
         db.clone(),
         args.get_workers(),
-        args.loop_interval,
+        args.poll_interval,
     );
     debug!("Initialized Prover Manager");
 
