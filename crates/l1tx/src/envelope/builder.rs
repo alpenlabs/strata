@@ -38,7 +38,7 @@ fn build_payload_envelope(
         .push_opcode(OP_IF)
         .push_slice(tag)
         // Insert version
-        .push_slice(PushBytesBuf::from(version.to_be_bytes()))
+        .push_slice(PushBytesBuf::from([version]))
         // Insert size
         .push_slice(PushBytesBuf::from(
             (payload.data().len() as u32).to_be_bytes(),

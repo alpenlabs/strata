@@ -82,14 +82,12 @@ fn parse_payload_type(bytes: &[u8], params: &RollupParams) -> Option<L1PayloadTy
     }
 }
 
-fn validate_version(bytes: &[u8]) -> Option<u64> {
-    if bytes.len() != 8 {
-        warn!("Invalid version bytes length");
+fn validate_version(bytes: &[u8]) -> Option<u8> {
+    if bytes.len() != 1 {
+        warn!("Invalid version bytes length, should be 1");
         return None;
     }
-    let mut buf: [u8; 8] = [0; 8];
-    buf.copy_from_slice(&bytes[0..8]);
-    let version = u64::from_be_bytes(buf);
+    let version = bytes[0];
     // TODO: add version validation logic, i.e which particular versions are supported
     Some(version)
 }
@@ -160,10 +158,8 @@ mod tests {
         let script =
             generate_envelope_script_test(envelope_data.clone(), params.clone().into(), 1).unwrap();
 
-        // Parse the rollup name
         let result = parse_envelope_data(&script, params.rollup()).unwrap();
 
-        // Assert the rollup name was parsed correctly
         assert_eq!(result, envelope_data);
 
         // Try with larger size

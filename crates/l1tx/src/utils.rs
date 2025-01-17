@@ -24,7 +24,8 @@ pub fn next_op(instructions: &mut Instructions<'_>) -> Option<Opcode> {
 
 /// Extract next instruction and try to parse it as a byte slice
 pub fn next_bytes<'a>(instructions: &mut Instructions<'a>) -> Option<&'a [u8]> {
-    match instructions.next() {
+    let ins = instructions.next();
+    match ins {
         Some(Ok(Instruction::PushBytes(bytes))) => Some(bytes.as_bytes()),
         _ => None,
     }
@@ -41,7 +42,7 @@ pub fn next_u32(instructions: &mut Instructions<'_>) -> Option<u32> {
             }
             let mut buf = [0; 4];
             buf[..bytes.len()].copy_from_slice(bytes.as_bytes());
-            Some(u32::from_le_bytes(buf))
+            Some(u32::from_be_bytes(buf))
         }
         Some(Ok(Instruction::Op(op))) => {
             // Handle small integers pushed by OP_1 to OP_16
