@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use strata_db::{traits::BroadcastDatabase, types::L1TxEntry};
 use strata_rocksdb::{
-    broadcaster::db::BroadcastDb, sequencer::db::SequencerDB, test_utils::get_rocksdb_tmp_instance,
-    L1BroadcastDb, RBL1WriterDb,
+    broadcaster::db::BroadcastDb, test_utils::get_rocksdb_tmp_instance, L1BroadcastDb, RBL1WriterDb,
 };
 use strata_storage::ops::{
     l1tx_broadcast::Context as BContext,
@@ -12,11 +11,10 @@ use strata_storage::ops::{
 
 use crate::broadcaster::L1BroadcastHandle;
 
-/// Returns [`Arc`] of [`SequencerDB`] for testing
-pub fn get_db() -> Arc<SequencerDB<RBL1WriterDb>> {
+/// Returns [`Arc`] of [`RBL1WriterDb`] for testing
+pub fn get_db() -> Arc<RBL1WriterDb> {
     let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
-    let seqdb = Arc::new(RBL1WriterDb::new(db, db_ops));
-    Arc::new(SequencerDB::new(seqdb))
+    Arc::new(RBL1WriterDb::new(db, db_ops))
 }
 
 /// Returns [`Arc`] of [`EnvelopeDataOps`] for testing

@@ -75,14 +75,14 @@ mod test {
         let ctx = get_writer_context();
 
         // First insert an unsigned blob
-        let entry = PayloadEntry::new_unsigned(L1Payload::new_da([1; 100].to_vec()));
+        let payload = L1Payload::new_da([1; 100].to_vec());
+        let entry = PayloadEntry::new_unsigned(vec![payload]);
 
         assert_eq!(entry.status, PayloadL1Status::Unsigned);
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
-        let intent_hash = hash::raw(entry.payloads.data());
-        iops.put_payload_entry_async(intent_hash, entry.clone())
+        iops.put_payload_entry_async(0, entry.clone())
             .await
             .unwrap();
 

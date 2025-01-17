@@ -305,7 +305,6 @@ fn determine_payload_next_status(
 
 #[cfg(test)]
 mod test {
-    use strata_primitives::buf::Buf32;
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -329,24 +328,20 @@ mod test {
 
         let mut e1: PayloadEntry = ArbitraryGenerator::new().generate();
         e1.status = PayloadL1Status::Finalized;
-        let payload_hash: Buf32 = [1; 32].into();
-        iops.put_payload_entry_blocking(payload_hash, e1).unwrap();
-        let expected_idx = iops.get_next_payload_idx_blocking().unwrap();
+        iops.put_payload_entry_blocking(0, e1).unwrap();
 
         let mut e2: PayloadEntry = ArbitraryGenerator::new().generate();
         e2.status = PayloadL1Status::Published;
-        let payload_hash: Buf32 = [2; 32].into();
-        iops.put_payload_entry_blocking(payload_hash, e2).unwrap();
+        iops.put_payload_entry_blocking(1, e2).unwrap();
+        let expected_idx = 1; // All entries before this do not need to be watched.
 
         let mut e3: PayloadEntry = ArbitraryGenerator::new().generate();
         e3.status = PayloadL1Status::Unsigned;
-        let payload_hash: Buf32 = [3; 32].into();
-        iops.put_payload_entry_blocking(payload_hash, e3).unwrap();
+        iops.put_payload_entry_blocking(2, e3).unwrap();
 
         let mut e4: PayloadEntry = ArbitraryGenerator::new().generate();
         e4.status = PayloadL1Status::Unsigned;
-        let payload_hash: Buf32 = [4; 32].into();
-        iops.put_payload_entry_blocking(payload_hash, e4).unwrap();
+        iops.put_payload_entry_blocking(3, e4).unwrap();
 
         let idx = get_next_payloadidx_to_watch(&iops).unwrap();
 
