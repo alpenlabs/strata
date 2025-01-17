@@ -19,6 +19,8 @@ class CrashAdvanceConsensusStateTest(testenv.StrataTester):
 
         The check is present in the function `sign_and_store_block` on block_assembly.
         Further discussion is required regarding what to do here. which will re-enable this test
+        Track the issue on:
+        https://alpenlabs.atlassian.net/browse/STR-916
         """
         return
         seq = ctx.get_service("sequencer")
