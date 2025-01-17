@@ -114,14 +114,10 @@ mod tests {
         let seq_db = RBL1WriterDb::new(db, db_ops);
 
         let blob: PayloadEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
-        let idx = seq_db.get_next_payload_idx().unwrap().unwrap();
+        seq_db.put_payload_entry(0, blob.clone()).unwrap();
 
-        assert_eq!(seq_db.get_payload_id(idx).unwrap(), Some(blob_hash));
-
-        let stored_blob = seq_db.get_payload_entry_by_idx(blob_hash).unwrap();
+        let stored_blob = seq_db.get_payload_entry_by_idx(0).unwrap();
         assert_eq!(stored_blob, Some(blob));
     }
 
@@ -130,11 +126,10 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
         let blob: PayloadEntry = ArbitraryGenerator::new().generate();
-        let blob_hash: Buf32 = [0; 32].into();
 
-        seq_db.put_payload_entry(blob_hash, blob.clone()).unwrap();
+        seq_db.put_payload_entry(0, blob.clone()).unwrap();
 
-        let result = seq_db.put_payload_entry(blob_hash, blob);
+        let result = seq_db.put_payload_entry(0, blob);
 
         // Should be ok to put to existing key
         assert!(result.is_ok());

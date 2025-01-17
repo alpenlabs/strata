@@ -674,7 +674,7 @@ mod tests {
         let payload = L1Payload::new_da(vec![0u8; 100]);
         let (commit, reveal) = super::create_envelope_transactions(
             &ctx,
-            &payload,
+            &[payload],
             utxos.to_vec(),
             10,
             bitcoin::Network::Bitcoin,
