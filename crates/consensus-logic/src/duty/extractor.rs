@@ -1,6 +1,6 @@
 use strata_db::traits::ChainstateDatabase;
 use strata_primitives::{buf::Buf32, params::Params};
-use strata_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
+use strata_state::{batch::BatchInfo, chain_state::Chainstate, id::L2BlockId};
 use tracing::*;
 
 use super::types::{BlockSigningDuty, Duty, Identity};
@@ -8,20 +8,14 @@ use crate::{duty::types::BatchCheckpointDuty, errors::Error};
 
 /// Extracts new duties given a consensus state and a identity.
 pub fn extract_duties(
-    csm_state: &ClientState,
+    state: &Chainstate,
     _ident: &Identity,
     _params: &Params,
     chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
-    // If a sync state isn't present then we probably don't have anything we
-    // want to do.  We might change this later.
-    let Some(ss) = csm_state.sync() else {
-        return Ok(Vec::new());
-    };
-
-    let tip_height = ss.tip_height();
-    let tip_blkid = *ss.chain_tip_blkid();
+    let tip_height = state.chain_tip_slot();
+    let tip_blkid = state.chain_tip_blkid();
 
     // Since we're not rotating sequencers, for now we just *always* produce a
     // new block.
@@ -29,7 +23,7 @@ pub fn extract_duties(
     let mut duties = vec![Duty::SignBlock(duty_data)];
 
     duties.extend(extract_batch_duties(
-        csm_state,
+        state,
         tip_height,
         tip_blkid,
         chs_db,
@@ -40,18 +34,12 @@ pub fn extract_duties(
 }
 
 fn extract_batch_duties(
-    state: &ClientState,
+    state: &Chainstate,
     tip_height: u64,
     tip_id: L2BlockId,
     chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
-    if !state.is_chain_active() {
-        debug!("chain not active, no duties created");
-        // There are no duties if the chain is not yet active
-        return Ok(vec![]);
-    };
-
     match state.l1_view().last_finalized_checkpoint() {
         // Cool, we are producing first batch!
         None => {

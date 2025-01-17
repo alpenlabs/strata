@@ -16,10 +16,11 @@ use strata_primitives::{
 };
 use strata_state::{
     batch::SignedBatchCheckpoint,
-    client_state::ClientState,
+    chain_state::Chainstate,
     da_blob::{BlobDest, BlobIntent},
     prelude::*,
 };
+use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
 use strata_tasks::{ShutdownGuard, TaskExecutor};
 use tokio::sync::broadcast;
@@ -39,7 +40,7 @@ use crate::{
 
 pub fn duty_tracker_task<D: Database>(
     shutdown: ShutdownGuard,
-    cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    status_ch: Arc<StatusChannel>,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: Arc<D>,
@@ -49,7 +50,7 @@ pub fn duty_tracker_task<D: Database>(
     let db = database.as_ref();
     duty_tracker_task_inner(
         shutdown,
-        cupdate_rx,
+        status_ch.as_ref(),
         batch_queue,
         ident,
         db,
@@ -60,7 +61,7 @@ pub fn duty_tracker_task<D: Database>(
 
 fn duty_tracker_task_inner(
     shutdown: ShutdownGuard,
-    mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    status_ch: &StatusChannel,
     batch_queue: broadcast::Sender<DutyBatch>,
     ident: Identity,
     database: &impl Database,
@@ -83,12 +84,15 @@ fn duty_tracker_task_inner(
     // Maybe in the chain state?
     let rollup_params_commitment = params.rollup().compute_hash();
 
+    let chs_rx = status_ch.subscribe_chainstate();
+
     loop {
         if shutdown.should_shutdown() {
             warn!("received shutdown signal");
             break;
         }
-        let update = match cupdate_rx.blocking_recv() {
+
+        let new_chainstate = match chs_rx.blocking_recv() {
             Ok(u) => u,
             Err(broadcast::error::RecvError::Closed) => {
                 break;
@@ -100,14 +104,12 @@ fn duty_tracker_task_inner(
             }
         };
 
-        let ev_idx = update.sync_event_idx();
-        let new_state = update.new_state();
-        trace!(%ev_idx, "new consensus state, updating duties");
-        trace!("STATE: {new_state:?}");
+        let tip_slot = new_chainstate.chain_tip_slot();
+        trace!(%tip_slot, "new chainstate, updating duties");
 
         if let Err(e) = update_tracker(
             &mut duties_tracker,
-            new_state,
+            new_chainstate.as_ref(),
             &ident,
             l2_block_manager,
             params,
@@ -131,17 +133,13 @@ fn duty_tracker_task_inner(
 
 fn update_tracker(
     tracker: &mut types::DutyTracker,
-    state: &ClientState,
+    state: &Chainstate,
     ident: &Identity,
     l2_block_manager: &L2BlockManager,
     params: &Params,
     chs_db: &impl ChainstateDatabase,
     rollup_params_commitment: Buf32,
 ) -> Result<(), Error> {
-    let Some(ss) = state.sync() else {
-        return Ok(());
-    };
-
     let new_duties =
         extractor::extract_duties(state, ident, params, chs_db, rollup_params_commitment)?;
 
@@ -149,7 +147,7 @@ fn update_tracker(
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
-    let tip_blkid = *ss.chain_tip_blkid();
+    let tip_blkid = state.chain_tip_blockid();
     let block = l2_block_manager
         .get_block_data_blocking(&tip_blkid)?
         .ok_or(Error::MissingL2Block(tip_blkid))?;
@@ -157,11 +155,11 @@ fn update_tracker(
     let ts = time::Instant::now(); // FIXME XXX use .timestamp()!!!
 
     // Figure out which blocks were finalized
-    let new_finalized = state.sync().map(|sync| *sync.finalized_blkid());
+    let new_finalized = state.finalized_epoch();
     let newly_finalized_blocks: Vec<L2BlockId> = get_finalized_blocks(
         tracker.get_finalized_block(),
         l2_block_manager,
-        new_finalized,
+        Some(new_finalized),
     )?;
 
     let latest_finalized_batch = state

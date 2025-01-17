@@ -19,6 +19,7 @@ pub mod da_blob;
 pub mod epoch;
 pub mod exec_env;
 pub mod exec_update;
+pub mod fcm_state;
 pub mod forced_inclusion;
 pub mod genesis;
 pub mod header;

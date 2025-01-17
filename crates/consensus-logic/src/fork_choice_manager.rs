@@ -187,8 +187,9 @@ fn determine_start_tip(
     Ok(L2BlockCommitment::new(best_height, *best))
 }
 
-#[allow(clippy::too_many_arguments)]
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
+// TODO remove _csm_ctl
+#[allow(clippy::too_many_arguments)]
 pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
     handle: Handle,
@@ -196,7 +197,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
     fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
-    csm_ctl: Arc<CsmController>,
+    _csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
@@ -234,7 +235,6 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         fcm,
         engine.as_ref(),
         fcm_rx,
-        &csm_ctl,
         status_channel,
     ) {
         error!(err = ?e, "tracker aborted");
@@ -257,7 +257,6 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
     mut fcm_state: ForkChoiceManager<D>,
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
-    csm_ctl: &CsmController,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
     let mut cl_rx = status_channel.subscribe_client_state();
@@ -271,7 +270,7 @@ fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
 
         match fcm_ev {
             FcmEvent::NewFcmMsg(m) => {
-                process_fc_message(m, &mut fcm_state, engine, csm_ctl, &status_channel)
+                process_fc_message(m, &mut fcm_state, engine, &status_channel)
             }
             FcmEvent::NewStateUpdate(st) => handle_new_state(&mut fcm_state, st),
             FcmEvent::Abort => break,
@@ -317,7 +316,6 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
     msg: ForkChoiceMessage,
     fcm_state: &mut ForkChoiceManager<D>,
     engine: &E,
-    csm_ctl: &CsmController,
     status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match msg {

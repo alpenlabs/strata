@@ -6,10 +6,16 @@ use strata_state::{
     bridge_state::{DepositsTable, OperatorTable},
     chain_state::Chainstate,
     client_state::{ClientState, L1Checkpoint, LocalL1State, SyncState},
+    fcm_state::FcmState,
 };
 use thiserror::Error;
-use tokio::sync::watch::{self, error::RecvError};
-use tracing::{instrument::WithSubscriber, warn};
+use tokio::sync::{
+    broadcast,
+    watch::{self, error::RecvError},
+};
+use tracing::warn;
+
+pub const CHAINSTATE_BUFFER_CNT: usize = 256;
 
 #[derive(Debug, Error)]
 pub enum StatusError {
@@ -24,7 +30,7 @@ pub enum StatusError {
 ///
 /// This struct provides a convenient way to manage and access
 /// both the sender and receiver components of a status communication channel.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct StatusChannel {
     /// Shared reference to the status sender.
     sender: Arc<StatusSender>,
@@ -47,17 +53,20 @@ impl StatusChannel {
     pub fn new(cl_state: ClientState, l1_status: L1Status, ch_state: Option<Chainstate>) -> Self {
         let (cl_tx, cl_rx) = watch::channel(cl_state);
         let (l1_tx, l1_rx) = watch::channel(l1_status);
-        let (chs_tx, chs_rx) = watch::channel(ch_state);
+        let (chs_tx, chs_rx) = watch::channel(ch_state.clone());
+        let (chs_seq_tx, chs_seq_rx) = broadcast::channel(CHAINSTATE_BUFFER_CNT);
 
         let sender = Arc::new(StatusSender {
-            cl: cl_tx,
-            l1: l1_tx,
-            chs: chs_tx,
+            csm_tx: cl_tx,
+            l1_tx,
+            chs_tx,
+            fcm_tx: chs_seq_tx,
         });
         let receiver = Arc::new(StatusReceiver {
-            cl: cl_rx,
-            l1: l1_rx,
-            chs: chs_rx,
+            csm_rx: cl_rx,
+            l1_rx,
+            chs_rx,
+            fcm_rx: chs_seq_rx,
         });
 
         Self { sender, receiver }
@@ -67,13 +76,13 @@ impl StatusChannel {
 
     /// Gets the latest [`LocalL1State`].
     pub fn get_l1_view(&self) -> LocalL1State {
-        self.receiver.cl.borrow().l1_view().clone()
+        self.receiver.csm_rx.borrow().l1_view().clone()
     }
 
     /// Gets the last finalized [`L1Checkpoint`] from the current client state.
     pub fn get_last_checkpoint(&self) -> Option<L1Checkpoint> {
         self.receiver
-            .cl
+            .csm_rx
             .borrow()
             .l1_view()
             .last_finalized_checkpoint()
@@ -82,11 +91,11 @@ impl StatusChannel {
 
     /// Gets the latest [`SyncState`].
     pub fn get_sync_state(&self) -> Option<SyncState> {
-        self.receiver.cl.borrow().sync().cloned()
+        self.receiver.csm_rx.borrow().sync().cloned()
     }
 
     fn get_chainstate_cloned(&self) -> Option<Chainstate> {
-        self.receiver.chs.borrow().clone()
+        self.receiver.chs_rx.borrow().clone()
     }
 
     /// Gets the current L2 chain tip, if set.
@@ -122,34 +131,39 @@ impl StatusChannel {
 
     /// Gets the latest [`L1Status`].
     pub fn get_l1_reader_status(&self) -> L1Status {
-        self.receiver.l1.borrow().clone()
+        self.receiver.l1_rx.borrow().clone()
     }
 
     /// Gets the latest epoch
     pub fn epoch(&self) -> Option<u64> {
         self.receiver
-            .chs
+            .chs_rx
             .borrow()
             .to_owned()
             .map(|ch| ch.cur_epoch())
     }
 
     pub fn chain_state(&self) -> Option<Chainstate> {
-        self.receiver.chs.borrow().clone()
+        self.receiver.chs_rx.borrow().clone()
     }
 
     pub fn client_state(&self) -> ClientState {
-        self.receiver.cl.borrow().clone()
+        self.receiver.csm_rx.borrow().clone()
     }
 
-    /// Create a subscription to the client state watcher.
+    /// Creates a subscription to the client state channel.
     pub fn subscribe_client_state(&self) -> watch::Receiver<ClientState> {
-        self.sender.cl.subscribe()
+        self.sender.csm_tx.subscribe()
+    }
+
+    /// Creates a subscription to the chainstate channel.
+    pub fn subscribe_fcm_state(&self) -> broadcast::Receiver<FcmState> {
+        self.sender.fcm_tx.subscribe()
     }
 
     /// Waits until there's a new client state and returns the client state.
     pub async fn wait_for_client_change(&self) -> Result<ClientState, RecvError> {
-        let mut s = self.receiver.cl.clone();
+        let mut s = self.receiver.csm_rx.clone();
         s.mark_unchanged();
         s.changed().await?;
         let state = s.borrow_and_update().clone();
@@ -158,7 +172,7 @@ impl StatusChannel {
 
     /// Waits until genesis and returns the client state.
     pub async fn wait_until_genesis(&self) -> Result<ClientState, RecvError> {
-        let mut rx = self.receiver.cl.clone();
+        let mut rx = self.receiver.csm_rx.clone();
         let chs = rx.wait_for(|chs| chs.has_genesis_occurred()).await?;
         Ok(chs.clone())
     }
@@ -167,16 +181,25 @@ impl StatusChannel {
 
     /// Sends the updated `Chainstate` to the chain state receiver. Logs a warning if the receiver
     /// is dropped.
-    pub fn update_chainstate(&self, post_state: Chainstate) {
-        if self.sender.chs.send(Some(post_state)).is_err() {
+    pub fn update_chainstate(&self, post_state: Arc<Chainstate>) {
+        if self
+            .sender
+            .chs_tx
+            .send(Some(post_state.as_ref().clone()))
+            .is_err()
+        {
             warn!("chain state receiver dropped");
         }
+    }
+
+    pub fn update_fcm_state(&self, state: FcmState) {
+        let _ = self.sender.fcm_tx.send(state);
     }
 
     /// Sends the updated `ClientState` to the client state receiver. Logs a warning if the receiver
     /// is dropped.
     pub fn update_client_state(&self, post_state: ClientState) {
-        if self.sender.cl.send(post_state).is_err() {
+        if self.sender.csm_tx.send(post_state).is_err() {
             warn!("client state receiver dropped");
         }
     }
@@ -184,24 +207,24 @@ impl StatusChannel {
     /// Sends the updated `L1Status` to the L1 status receiver. Logs a warning if the receiver is
     /// dropped.
     pub fn update_l1_status(&self, post_state: L1Status) {
-        if self.sender.l1.send(post_state).is_err() {
+        if self.sender.l1_tx.send(post_state).is_err() {
             warn!("l1 status receiver dropped");
         }
     }
 }
 
-/// Wrapper for watch status receivers
-#[derive(Clone, Debug)]
+/// Wrapper for watch status receivers.
 struct StatusReceiver {
-    cl: watch::Receiver<ClientState>,
-    l1: watch::Receiver<L1Status>,
-    chs: watch::Receiver<Option<Chainstate>>,
+    csm_rx: watch::Receiver<ClientState>,
+    l1_rx: watch::Receiver<L1Status>,
+    chs_rx: watch::Receiver<Option<Chainstate>>,
+    fcm_rx: broadcast::Receiver<FcmState>,
 }
 
-/// Wrapper for watch status senders
-#[derive(Clone, Debug)]
+/// Wrapper for watch status senders.
 struct StatusSender {
-    cl: watch::Sender<ClientState>,
-    l1: watch::Sender<L1Status>,
-    chs: watch::Sender<Option<Chainstate>>,
+    csm_tx: watch::Sender<ClientState>,
+    l1_tx: watch::Sender<L1Status>,
+    chs_tx: watch::Sender<Option<Chainstate>>,
+    fcm_tx: broadcast::Sender<FcmState>,
 }
