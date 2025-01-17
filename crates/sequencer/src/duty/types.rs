@@ -105,14 +105,6 @@ impl BatchCheckpointDuty {
         self.checkpoint.batch_info().idx()
     }
 
-    // pub fn batch_info(&self) -> &BatchInfo {
-    //     &self.batch_info
-    // }
-
-    // pub fn bootstrap_state(&self) -> &BootstrapState {
-    //     &self.bootstrap_state
-    // }
-
     pub fn checkpoint(&self) -> &BatchCheckpoint {
         &self.checkpoint
     }
