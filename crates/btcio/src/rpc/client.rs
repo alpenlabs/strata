@@ -238,6 +238,12 @@ impl ReaderRpc for BitcoinClient {
             .await
     }
 
+    async fn get_current_timestamp(&self) -> ClientResult<u32> {
+        let best_block_hash = self.call::<BlockHash>("getbestblockhash", &[]).await?;
+        let block = self.get_block(&best_block_hash).await?;
+        Ok(block.header.time)
+    }
+
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         self.call::<Vec<Txid>>("getrawmempool", &[]).await
     }
@@ -408,6 +414,12 @@ mod test {
         // get_blockchain_info
         let get_blockchain_info = client.get_blockchain_info().await.unwrap();
         assert_eq!(get_blockchain_info.blocks, 0);
+
+        // get_current_timestamp
+        let _ = client
+            .get_current_timestamp()
+            .await
+            .expect("must be able to get current timestamp");
 
         let blocks = mine_blocks(&bitcoind, 101, None).unwrap();
 

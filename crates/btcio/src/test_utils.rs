@@ -95,6 +95,10 @@ impl ReaderRpc for TestBitcoinClient {
         })
     }
 
+    async fn get_current_timestamp(&self) -> ClientResult<u32> {
+        Ok(1_000)
+    }
+
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         Ok(vec![])
     }
