@@ -4,7 +4,7 @@ use bitcoin::Address;
 use strata_config::btcio::WriterConfig;
 use strata_db::{
     traits::L1WriterDatabase,
-    types::{IntentEntry, L1TxStatus, PayloadEntry, PayloadL1Status},
+    types::{BundledPayloadEntry, IntentEntry, L1BundleStatus, L1TxStatus},
 };
 use strata_primitives::{
     l1::payload::{PayloadDest, PayloadIntent},
@@ -137,7 +137,7 @@ fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u6
         let Some(payload) = insc_ops.get_payload_entry_by_idx_blocking(next_idx - 1)? else {
             break;
         };
-        if payload.status == PayloadL1Status::Finalized {
+        if payload.status == L1BundleStatus::Finalized {
             break;
         };
         next_idx -= 1;
@@ -174,7 +174,7 @@ pub async fn watcher_task<W: WriterRpc>(
             match payloadentry.status {
                 // If unsigned or needs resign, create new signed commit/reveal txs and update the
                 // entry
-                PayloadL1Status::Unsigned | PayloadL1Status::NeedsResign => {
+                L1BundleStatus::Unsigned | L1BundleStatus::NeedsResign => {
                     debug!(?payloadentry.status, %curr_payloadidx, "Processing unsigned payloadentry");
                     match create_and_sign_payload_envelopes(
                         &payloadentry,
@@ -185,7 +185,7 @@ pub async fn watcher_task<W: WriterRpc>(
                     {
                         Ok((cid, rid)) => {
                             let mut updated_entry = payloadentry.clone();
-                            updated_entry.status = PayloadL1Status::Unpublished;
+                            updated_entry.status = L1BundleStatus::Unpublished;
                             updated_entry.commit_txid = cid;
                             updated_entry.reveal_txid = rid;
                             insc_ops
@@ -206,13 +206,13 @@ pub async fn watcher_task<W: WriterRpc>(
                     }
                 }
                 // If finalized, nothing to do, move on to process next entry
-                PayloadL1Status::Finalized => {
+                L1BundleStatus::Finalized => {
                     curr_payloadidx += 1;
                 }
                 // If entry is signed but not finalized or excluded yet, check broadcast txs status
-                PayloadL1Status::Published
-                | PayloadL1Status::Confirmed
-                | PayloadL1Status::Unpublished => {
+                L1BundleStatus::Published
+                | L1BundleStatus::Confirmed
+                | L1BundleStatus::Unpublished => {
                     debug!(%curr_payloadidx, "Checking payloadentry's broadcast status");
                     let commit_tx = broadcast_handle
                         .get_tx_entry_by_id_async(payloadentry.commit_txid)
@@ -237,14 +237,14 @@ pub async fn watcher_task<W: WriterRpc>(
                                 .put_payload_entry_async(curr_payloadidx, updated_entry)
                                 .await?;
 
-                            if new_status == PayloadL1Status::Finalized {
+                            if new_status == L1BundleStatus::Finalized {
                                 curr_payloadidx += 1;
                             }
                         }
                         _ => {
                             warn!(%curr_payloadidx, "Corresponding commit/reveal entry for payloadentry not found in broadcast db. Sign and create transactions again.");
                             let mut updated_entry = payloadentry.clone();
-                            updated_entry.status = PayloadL1Status::Unsigned;
+                            updated_entry.status = L1BundleStatus::Unsigned;
                             insc_ops
                                 .put_payload_entry_async(curr_payloadidx, updated_entry)
                                 .await?;
@@ -260,15 +260,15 @@ pub async fn watcher_task<W: WriterRpc>(
 }
 
 async fn update_l1_status(
-    payloadentry: &PayloadEntry,
-    new_status: &PayloadL1Status,
+    payloadentry: &BundledPayloadEntry,
+    new_status: &L1BundleStatus,
     status_channel: &StatusChannel,
 ) {
     // Update L1 status. Since we are processing one payloadentry at a time, if the entry is
     // finalized/confirmed, then it means it is published as well
-    if *new_status == PayloadL1Status::Published
-        || *new_status == PayloadL1Status::Confirmed
-        || *new_status == PayloadL1Status::Finalized
+    if *new_status == L1BundleStatus::Published
+        || *new_status == L1BundleStatus::Confirmed
+        || *new_status == L1BundleStatus::Finalized
     {
         let status_updates = [
             L1StatusUpdate::LastPublishedTxid(payloadentry.reveal_txid.into()),
@@ -283,23 +283,23 @@ async fn update_l1_status(
 fn determine_payload_next_status(
     commit_status: &L1TxStatus,
     reveal_status: &L1TxStatus,
-) -> PayloadL1Status {
+) -> L1BundleStatus {
     match (&commit_status, &reveal_status) {
         // If reveal is finalized, both are finalized
-        (_, L1TxStatus::Finalized { .. }) => PayloadL1Status::Finalized,
+        (_, L1TxStatus::Finalized { .. }) => L1BundleStatus::Finalized,
         // If reveal is confirmed, both are confirmed
-        (_, L1TxStatus::Confirmed { .. }) => PayloadL1Status::Confirmed,
+        (_, L1TxStatus::Confirmed { .. }) => L1BundleStatus::Confirmed,
         // If reveal is published regardless of commit, the payload is published
-        (_, L1TxStatus::Published) => PayloadL1Status::Published,
+        (_, L1TxStatus::Published) => L1BundleStatus::Published,
         // if commit has invalid inputs, needs resign
-        (L1TxStatus::InvalidInputs, _) => PayloadL1Status::NeedsResign,
+        (L1TxStatus::InvalidInputs, _) => L1BundleStatus::NeedsResign,
         // If commit is unpublished, both are upublished
-        (L1TxStatus::Unpublished, _) => PayloadL1Status::Unpublished,
+        (L1TxStatus::Unpublished, _) => L1BundleStatus::Unpublished,
         // If commit is published but not reveal, the payload is unpublished
-        (_, L1TxStatus::Unpublished) => PayloadL1Status::Unpublished,
+        (_, L1TxStatus::Unpublished) => L1BundleStatus::Unpublished,
         // If reveal has invalid inputs, these need resign because we can do nothing with just
         // commit tx confirmed. This should not occur in practice
-        (_, L1TxStatus::InvalidInputs) => PayloadL1Status::NeedsResign,
+        (_, L1TxStatus::InvalidInputs) => L1BundleStatus::NeedsResign,
     }
 }
 
@@ -326,21 +326,21 @@ mod test {
     fn test_initialize_writer_state_with_existing_payloads() {
         let iops = get_envelope_ops();
 
-        let mut e1: PayloadEntry = ArbitraryGenerator::new().generate();
-        e1.status = PayloadL1Status::Finalized;
+        let mut e1: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        e1.status = L1BundleStatus::Finalized;
         iops.put_payload_entry_blocking(0, e1).unwrap();
 
-        let mut e2: PayloadEntry = ArbitraryGenerator::new().generate();
-        e2.status = PayloadL1Status::Published;
+        let mut e2: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        e2.status = L1BundleStatus::Published;
         iops.put_payload_entry_blocking(1, e2).unwrap();
         let expected_idx = 1; // All entries before this do not need to be watched.
 
-        let mut e3: PayloadEntry = ArbitraryGenerator::new().generate();
-        e3.status = PayloadL1Status::Unsigned;
+        let mut e3: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        e3.status = L1BundleStatus::Unsigned;
         iops.put_payload_entry_blocking(2, e3).unwrap();
 
-        let mut e4: PayloadEntry = ArbitraryGenerator::new().generate();
-        e4.status = PayloadL1Status::Unsigned;
+        let mut e4: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        e4.status = L1BundleStatus::Unsigned;
         iops.put_payload_entry_blocking(3, e4).unwrap();
 
         let idx = get_next_payloadidx_to_watch(&iops).unwrap();
@@ -353,30 +353,30 @@ mod test {
         // When both are unpublished
         let (commit_status, reveal_status) = (L1TxStatus::Unpublished, L1TxStatus::Unpublished);
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Unpublished);
+        assert_eq!(next, L1BundleStatus::Unpublished);
 
         // When both are Finalized
         let fin = L1TxStatus::Finalized { confirmations: 5 };
         let (commit_status, reveal_status) = (fin.clone(), fin);
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Finalized);
+        assert_eq!(next, L1BundleStatus::Finalized);
 
         // When both are Confirmed
         let conf = L1TxStatus::Confirmed { confirmations: 5 };
         let (commit_status, reveal_status) = (conf.clone(), conf.clone());
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Confirmed);
+        assert_eq!(next, L1BundleStatus::Confirmed);
 
         // When both are Published
         let publ = L1TxStatus::Published;
         let (commit_status, reveal_status) = (publ.clone(), publ.clone());
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Published);
+        assert_eq!(next, L1BundleStatus::Published);
 
         // When both have invalid
         let (commit_status, reveal_status) = (L1TxStatus::InvalidInputs, L1TxStatus::InvalidInputs);
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::NeedsResign);
+        assert_eq!(next, L1BundleStatus::NeedsResign);
 
         // When reveal has invalid inputs but commit is confirmed. I doubt this would happen in
         // practice for our case.
@@ -384,6 +384,6 @@ mod test {
         // published.
         let (commit_status, reveal_status) = (conf.clone(), L1TxStatus::InvalidInputs);
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::NeedsResign);
+        assert_eq!(next, L1BundleStatus::NeedsResign);
     }
 }

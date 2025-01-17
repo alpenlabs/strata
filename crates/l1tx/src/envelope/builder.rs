@@ -45,9 +45,7 @@ fn build_payload_envelope(
         ));
 
     // Insert actual data
-    trace!(batchdata_size = %payload.data().len(), "Inserting batch data");
     for chunk in payload.data().chunks(520) {
-        trace!(size=%chunk.len(), "inserting chunk");
         builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec())?);
     }
     builder = builder.push_opcode(OP_ENDIF);

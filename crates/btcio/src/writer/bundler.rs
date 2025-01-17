@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use strata_db::types::{IntentEntry, IntentStatus, PayloadEntry};
+use strata_db::types::{BundledPayloadEntry, IntentEntry, IntentStatus};
 use strata_storage::ops::writer::EnvelopeDataOps;
 use tokio::time::sleep;
 use tracing::*;
@@ -30,7 +30,7 @@ async fn process_unbundled_entries(
     for mut entry in unbundled {
         // NOTE: In future, the logic to create payload will be different. We need to group
         // intents and create payload entries accordingly
-        let payload_entry = PayloadEntry::new_unsigned(vec![entry.payload().clone()]);
+        let payload_entry = BundledPayloadEntry::new_unsigned(vec![entry.payload().clone()]);
 
         // TODO: the following block till "Atomic Ends" should be atomic.
         let idx = ops.get_next_payload_idx_async().await?;

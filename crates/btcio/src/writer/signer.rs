@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bitcoin::{consensus, Transaction};
-use strata_db::types::{L1TxEntry, PayloadEntry};
+use strata_db::types::{BundledPayloadEntry, L1TxEntry};
 use strata_primitives::buf::Buf32;
 use tracing::*;
 
@@ -20,7 +20,7 @@ type BlobIdx = u64;
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
 pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
-    payloadentry: &PayloadEntry,
+    payloadentry: &BundledPayloadEntry,
     broadcast_handle: &L1BroadcastHandle,
     ctx: Arc<WriterContext<W>>,
 ) -> Result<(Buf32, Buf32), EnvelopeError> {
@@ -59,7 +59,7 @@ pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
 
 #[cfg(test)]
 mod test {
-    use strata_db::types::{PayloadEntry, PayloadL1Status};
+    use strata_db::types::{BundledPayloadEntry, L1BundleStatus};
     use strata_primitives::l1::payload::L1Payload;
 
     use super::*;
@@ -76,9 +76,9 @@ mod test {
 
         // First insert an unsigned blob
         let payload = L1Payload::new_da([1; 100].to_vec());
-        let entry = PayloadEntry::new_unsigned(vec![payload]);
+        let entry = BundledPayloadEntry::new_unsigned(vec![payload]);
 
-        assert_eq!(entry.status, PayloadL1Status::Unsigned);
+        assert_eq!(entry.status, L1BundleStatus::Unsigned);
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
