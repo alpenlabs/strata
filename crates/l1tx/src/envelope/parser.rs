@@ -46,29 +46,42 @@ pub enum EnvelopeParseError {
 /// # Errors
 ///
 /// This function errors if it cannot parse the [`L1Payload`]
-pub fn parse_envelope_data(
+pub fn parse_envelope_payloads(
     script: &ScriptBuf,
     params: &RollupParams,
-) -> Result<L1Payload, EnvelopeParseError> {
+) -> Result<Vec<L1Payload>, EnvelopeParseError> {
     let mut instructions = script.instructions();
 
-    enter_envelope(&mut instructions)?;
+    let mut payloads = Vec::new();
+    // TODO: make this sophisticated, i.e. even if one payload parsing fails, continue finding other
+    // envelopes and extracting payloads. Or is that really necessary?
+    while let Ok(payload) = parse_l1_payload(&mut instructions, params) {
+        payloads.push(payload);
+    }
+    Ok(payloads)
+}
 
-    // Parse tag
-    let tag = next_bytes(&mut instructions)
+fn parse_l1_payload(
+    instructions: &mut Instructions,
+    params: &RollupParams,
+) -> Result<L1Payload, EnvelopeParseError> {
+    enter_envelope(instructions)?;
+
+    // Parse type
+    let ptype = next_bytes(instructions)
         .and_then(|bytes| parse_payload_type(bytes, params))
         .ok_or(EnvelopeParseError::InvalidTag)?;
 
     // Parse version
-    let _version = next_bytes(&mut instructions)
+    let _version = next_bytes(instructions)
         .and_then(validate_version)
         .ok_or(EnvelopeParseError::InvalidVersion)?;
 
     // Parse size
-    let size = next_u32(&mut instructions).ok_or(EnvelopeParseError::InvalidSize)?;
+    let size = next_u32(instructions).ok_or(EnvelopeParseError::InvalidSize)?;
     // Parse payload
-    let payload = extract_n_bytes(size, &mut instructions)?;
-    Ok(L1Payload::new(payload, tag))
+    let payload = extract_n_bytes(size, instructions)?;
+    Ok(L1Payload::new(payload, ptype))
 }
 
 fn parse_payload_type(bytes: &[u8], params: &RollupParams) -> Option<L1PayloadType> {
@@ -155,14 +168,18 @@ mod tests {
         let bytes = vec![0, 1, 2, 3];
         let params = gen_params();
         let version = 1;
-        let envelope_data = L1Payload::new_checkpoint(bytes.clone());
-        let script =
-            generate_envelope_script_test(&[envelope_data.clone()], params.clone().into(), version)
-                .unwrap();
+        let envelope1 = L1Payload::new_checkpoint(bytes.clone());
+        let envelope2 = L1Payload::new_checkpoint(bytes.clone());
+        let script = generate_envelope_script_test(
+            &[envelope1.clone(), envelope2.clone()],
+            params.clone().into(),
+            version,
+        )
+        .unwrap();
 
-        let result = parse_envelope_data(&script, params.rollup()).unwrap();
+        let result = parse_envelope_payloads(&script, params.rollup()).unwrap();
 
-        assert_eq!(result, envelope_data);
+        assert_eq!(result, vec![envelope1, envelope2]);
 
         // Try with larger size
         let bytes = vec![1; 2000];
@@ -172,9 +189,9 @@ mod tests {
                 .unwrap();
 
         // Parse the rollup name
-        let result = parse_envelope_data(&script, params.rollup()).unwrap();
+        let result = parse_envelope_payloads(&script, params.rollup()).unwrap();
 
         // Assert the rollup name was parsed correctly
-        assert_eq!(result, envelope_data);
+        assert_eq!(result, vec![envelope_data]);
     }
 }

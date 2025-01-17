@@ -1,15 +1,16 @@
 use bitcoin::{Block, Transaction};
-use strata_primitives::params::RollupParams;
+use strata_primitives::{l1::payload::L1PayloadType, params::RollupParams};
 use strata_state::{
     batch::SignedBatchCheckpoint,
     tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
 };
+use tracing::warn;
 
 use super::messages::ProtocolOpTxRef;
 pub use crate::filter_types::TxFilterConfig;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
-    envelope::parser::parse_envelope_data,
+    envelope::parser::parse_envelope_payloads,
 };
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
@@ -72,12 +73,25 @@ fn parse_envelope_checkpoints<'a>(
     tx: &'a Transaction,
     params: &'a RollupParams,
 ) -> impl Iterator<Item = SignedBatchCheckpoint> + 'a {
-    tx.input.iter().filter_map(|inp| {
+    tx.input.iter().flat_map(|inp| {
         inp.witness
             .tapscript()
-            .and_then(|scr| parse_envelope_data(&scr.into(), params).ok())
-            // TODO: get checkpoint or da
-            .and_then(|data| borsh::from_slice::<SignedBatchCheckpoint>(data.data()).ok())
+            .and_then(|scr| parse_envelope_payloads(&scr.into(), params).ok())
+            .map(|items| {
+                items
+                    .into_iter()
+                    .filter_map(|item| match *item.payload_type() {
+                        L1PayloadType::Checkpoint => {
+                            borsh::from_slice::<SignedBatchCheckpoint>(item.data()).ok()
+                        }
+                        L1PayloadType::Da => {
+                            warn!("Da parsing is not supported yet");
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
     })
 }
 
