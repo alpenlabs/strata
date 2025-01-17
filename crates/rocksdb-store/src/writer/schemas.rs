@@ -1,4 +1,4 @@
-use strata_db::types::{IntentEntry, PayloadEntry};
+use strata_db::types::{BundledPayloadEntry, IntentEntry};
 use strata_primitives::buf::Buf32;
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
 
 define_table_with_seek_key_codec!(
     /// A table to store idx-> payload entry mapping
-    (PayloadSchema) u64 => PayloadEntry
+    (PayloadSchema) u64 => BundledPayloadEntry
 );
 
 define_table_with_default_codec!(
