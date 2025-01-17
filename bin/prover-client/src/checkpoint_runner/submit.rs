@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_rocksdb::prover::db::ProofDb;
@@ -14,13 +12,13 @@ use crate::errors::ProvingTaskError::{DatabaseError, ProofNotFound};
 pub async fn submit_checkpoint_proof(
     checkpoint_index: u64,
     sequencer_client: &HttpClient,
-    proof_key: ProofKey,
-    proof_db: Arc<ProofDb>,
+    proof_key: &ProofKey,
+    proof_db: &ProofDb,
 ) -> CheckpointResult<()> {
     let proof = proof_db
         .get_proof(proof_key)
         .map_err(DatabaseError)?
-        .ok_or(ProofNotFound(proof_key))?;
+        .ok_or(ProofNotFound(*proof_key))?;
 
     info!(%proof_key, %checkpoint_index, "submitting ready checkpoint proof");
 

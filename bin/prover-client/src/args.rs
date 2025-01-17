@@ -110,14 +110,15 @@ pub struct Args {
 
     /// The wait time, in milliseconds, for the prover manager loop.
     ///
-    /// Adjust this value to control how frequently the prover manager checks for jobs.
-    /// Defaults to 1,000 milliseconds.
+    /// This value determines how frequently the prover manager checks for available jobs.
+    /// Adjust it to balance responsiveness and resource usage. The default value is 1,000
+    /// milliseconds.
     #[argh(
         option,
         description = "wait time in milliseconds for the prover manager loop",
         default = "1_000"
     )]
-    pub poll_interval: u64,
+    pub polling_interval: u64,
 
     /// Enables or disables development RPC endpoints.
     ///

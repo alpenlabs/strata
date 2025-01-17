@@ -71,6 +71,7 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
         el_client,
         cl_client,
         rollup_params,
+        args.enable_checkpoint_runner,
     ));
     let task_tracker = Arc::new(Mutex::new(TaskTracker::new()));
 
@@ -84,7 +85,7 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
         operator.clone(),
         db.clone(),
         args.get_workers(),
-        args.poll_interval,
+        args.polling_interval,
     );
     debug!("Initialized Prover Manager");
 

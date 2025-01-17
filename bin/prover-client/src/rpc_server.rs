@@ -182,7 +182,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
         // first check in DB if the proof is already present
         let proof = self
             .db
-            .get_proof(key)
+            .get_proof(&key)
             .map_err(to_jsonrpsee_error("db failure"))?;
         match proof {
             // If proof is in DB, it was completed
@@ -205,7 +205,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn get_proof(&self, key: ProofKey) -> RpcResult<Option<ProofReceipt>> {
         self.db
-            .get_proof(key)
+            .get_proof(&key)
             .map_err(to_jsonrpsee_error("proof not found in db"))
     }
 

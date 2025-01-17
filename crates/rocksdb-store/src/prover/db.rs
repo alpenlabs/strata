@@ -35,8 +35,8 @@ impl ProofDatabase for ProofDb {
             .map_err(|e| DbError::TransactionError(e.to_string()))
     }
 
-    fn get_proof(&self, proof_key: ProofKey) -> DbResult<Option<ProofReceipt>> {
-        Ok(self.db.get::<ProofSchema>(&proof_key)?)
+    fn get_proof(&self, proof_key: &ProofKey) -> DbResult<Option<ProofReceipt>> {
+        Ok(self.db.get::<ProofSchema>(proof_key)?)
     }
 
     fn del_proof(&self, proof_key: ProofKey) -> DbResult<bool> {
@@ -134,7 +134,7 @@ mod tests {
             "ProofReceipt should be inserted successfully"
         );
 
-        let stored_proof = db.get_proof(proof_key).unwrap();
+        let stored_proof = db.get_proof(&proof_key).unwrap();
         assert_eq!(stored_proof, Some(proof));
     }
 
@@ -163,7 +163,7 @@ mod tests {
         let res = db.del_proof(proof_key);
         assert!(matches!(res, Ok(false)));
 
-        let stored_proof = db.get_proof(proof_key).unwrap();
+        let stored_proof = db.get_proof(&proof_key).unwrap();
         assert_eq!(stored_proof, None, "Nonexistent proof should return None");
     }
 

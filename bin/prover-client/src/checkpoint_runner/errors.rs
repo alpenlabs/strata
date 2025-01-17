@@ -22,10 +22,11 @@ pub enum CheckpointError {
     #[error("Failed to submit checkpoint proof for index {index}: {error}")]
     SubmitProofError { index: u64, error: String },
 
-    // Ooccurs when
+    /// Occurs when an error is encountered during proof generation
+    /// or retrieval of a checkpoint proof, detailed in [`ProvingTaskError`].
     #[error("Proof error: {0}")]
     ProofErr(#[from] ProvingTaskError),
 }
 
-/// A type alias for Results involving checkpoint operations.
+/// A type alias for results involving checkpoint operations.
 pub type CheckpointResult<T> = Result<T, CheckpointError>;

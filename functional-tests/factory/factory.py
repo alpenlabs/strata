@@ -289,8 +289,8 @@ class ProverClientFactory(flexitest.Factory):
             "--bitcoind-password", bitcoind_config["bitcoind_pass"],
             "--datadir", datadir,
             "--native-workers", str(settings.native_workers),
-            "--poll-interval", str(settings.poll_interval),
-            "--enable-checkpoint-runner", settings.enable_checkpoint_proving
+            "--polling-interval", str(settings.polling_interval),
+            "--enable-checkpoint-runner", "true" if settings.enable_checkpoint_proving else "false"
         ]
         # fmt: on
 

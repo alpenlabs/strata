@@ -134,14 +134,14 @@ class RollupParamsSettings:
 @dataclass
 class ProverClientSettings:
     native_workers: int
-    poll_interval: int
-    enable_checkpoint_proving: str
+    polling_interval: int
+    enable_checkpoint_proving: bool
 
     @staticmethod
     def new_default():
         return ProverClientSettings(
             native_workers=DEFAULT_PROVER_NATIVE_WORKERS,
-            poll_interval=DEFAULT_PROVER_POLL_INTERVAL,
+            polling_interval=DEFAULT_PROVER_POLLING_INTERVAL,
             enable_checkpoint_proving=DEFAULT_PROVER_ENABLE_CHECKPOINT_PROVING,
         )
 
@@ -171,9 +171,9 @@ def check_nth_checkpoint_finalized(
         timeout=3,
     )
 
-    assert syncstat["finalized_block_id"] != batch_info["l2_blockid"], (
-        "Checkpoint block should not yet finalize"
-    )
+    assert (
+        syncstat["finalized_block_id"] != batch_info["l2_blockid"]
+    ), "Checkpoint block should not yet finalize"
     assert batch_info["idx"] == idx
     checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
     assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
@@ -579,6 +579,6 @@ def confirm_btc_withdrawal(
     debug_fn(f"BTC final balance: {btc_balance}")
     debug_fn(f"Expected final balance: {original_balance + expected_increase}")
 
-    assert btc_balance == original_balance + expected_increase, (
-        "BTC balance after withdrawal is not as expected"
-    )
+    assert (
+        btc_balance == original_balance + expected_increase
+    ), "BTC balance after withdrawal is not as expected"

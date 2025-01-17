@@ -17,7 +17,10 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 
 use super::{cl_agg::ClAggOperator, l1_batch::L1BatchOperator, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
+use crate::{
+    checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError, hosts,
+    task_tracker::TaskTracker,
+};
 
 /// A struct that implements the [`ProvingOp`] for Checkpoint Proof.
 ///
@@ -34,6 +37,7 @@ pub struct CheckpointOperator {
     l1_batch_operator: Arc<L1BatchOperator>,
     l2_batch_operator: Arc<ClAggOperator>,
     rollup_params: Arc<RollupParams>,
+    enable_checkpoint_runner: bool,
 }
 
 impl CheckpointOperator {
@@ -43,12 +47,14 @@ impl CheckpointOperator {
         l1_batch_operator: Arc<L1BatchOperator>,
         l2_batch_operator: Arc<ClAggOperator>,
         rollup_params: Arc<RollupParams>,
+        enable_checkpoint_runner: bool,
     ) -> Self {
         Self {
             cl_client,
             l1_batch_operator,
             l2_batch_operator,
             rollup_params,
+            enable_checkpoint_runner,
         }
     }
 
@@ -220,9 +226,22 @@ impl CheckpointOperator {
             .ok_or(ProvingTaskError::WitnessNotFound)
     }
 
-    /// Returns a reference to the internal CL (Consensus Layer) `HttpClient`.
+    /// Returns a reference to the internal CL (Consensus Layer) [`HttpClient`].
     pub fn cl_client(&self) -> &HttpClient {
         &self.cl_client
+    }
+
+    pub async fn submit_checkpoint_proof(
+        &self,
+        checkpoint_index: u64,
+        proof_key: &ProofKey,
+        proof_db: &ProofDb,
+    ) {
+        if self.enable_checkpoint_runner {
+            submit_checkpoint_proof(checkpoint_index, self.cl_client(), proof_key, proof_db)
+                .await
+                .unwrap_or_else(|err| error!(?err, "Failed to submit checkpoint proof"));
+        }
     }
 }
 
@@ -250,7 +269,7 @@ impl ProvingOp for CheckpointOperator {
         let l1_batch_id = deps[0];
         let l1_batch_key = ProofKey::new(l1_batch_id, *task_id.host());
         let l1_batch_proof = db
-            .get_proof(l1_batch_key)
+            .get_proof(&l1_batch_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(l1_batch_key))?;
         let l1_batch_vk = hosts::get_verification_key(&l1_batch_key);
@@ -259,7 +278,7 @@ impl ProvingOp for CheckpointOperator {
         let cl_agg_id = deps[1];
         let cl_agg_key = ProofKey::new(cl_agg_id, *task_id.host());
         let cl_agg_proof = db
-            .get_proof(cl_agg_key)
+            .get_proof(&cl_agg_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(cl_agg_key))?;
         let cl_agg_vk = hosts::get_verification_key(&cl_agg_key);
