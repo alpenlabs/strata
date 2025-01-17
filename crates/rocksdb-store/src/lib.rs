@@ -7,8 +7,8 @@ pub mod client_state;
 pub mod l1;
 pub mod l2;
 pub mod prover;
-pub mod sequencer;
 pub mod sync_event;
+pub mod writer;
 
 pub mod macros;
 mod sequence;
@@ -88,9 +88,9 @@ use l2::{
     schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema},
 };
 use rockbound::{schema::ColumnFamilyName, Schema};
-pub use sequencer::db::RBL1WriterDb;
-use sequencer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
 pub use sync_event::db::SyncEventDb;
+pub use writer::db::RBL1WriterDb;
+use writer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
 
 use crate::{
     chain_state::schemas::{ChainstateSchema, WriteBatchSchema},

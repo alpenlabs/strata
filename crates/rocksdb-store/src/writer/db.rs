@@ -169,7 +169,6 @@ mod tests {
         seq_db
             .put_payload_entry(next_blob_idx, blob.clone())
             .unwrap();
-        let next_blob_idx = seq_db.get_next_payload_idx().unwrap();
         // Now the next idx is 1
 
         let blob: PayloadEntry = ArbitraryGenerator::new().generate();
