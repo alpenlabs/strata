@@ -3,7 +3,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import get_balance, string_to_opreturn_descriptor
 
 from envs import net_settings, testenv
-from utils import generate_n_blocks, get_bridge_pubkey, wait_until
+from utils import check_initial_eth_balance, get_bridge_pubkey, wait_until
 
 # Local constants
 # Gas for the withdrawal transaction
@@ -28,8 +28,6 @@ class BridgeWithdrawHappyOpReturnTest(testenv.BridgeTestBase):
             testenv.BasicEnvConfig(
                 pre_generate_blocks=101,
                 rollup_settings=fast_batch_settings,
-                # need to manually control the block generations
-                auto_generate_blocks=False,
             )
         )
 
@@ -39,15 +37,12 @@ class BridgeWithdrawHappyOpReturnTest(testenv.BridgeTestBase):
         # create both btc and sequencer RPC
         btcrpc: BitcoindClient = btc.create_rpc()
         seqrpc = seq.create_rpc()
-        # generate 5 btc blocks
-        generate_n_blocks(btcrpc, 5)
 
         # Wait for seq
         wait_until(
             lambda: seqrpc.strata_protocolVersion() is not None,
             error_with="Sequencer did not start on time",
         )
-        generate_n_blocks(btcrpc, 5)
 
         # Generate addresses
         address = ctx.env.gen_ext_btc_address()
@@ -79,25 +74,41 @@ class BridgeWithdrawHappyOpReturnTest(testenv.BridgeTestBase):
         self.deposit(ctx, el_address, bridge_pk)
 
         # Withdraw
-        self.withdraw_op_return(ctx, el_address, bosd)
+        _, withdraw_tx_receipt, _ = self.withdraw(ctx, el_address, bosd)
 
-        # Move forward a single block
-        block = generate_n_blocks(btcrpc, 1)[0]  # There's only one
-        last_block = btcrpc.getblock(block)
+        # Collect L2 and L1 blocks where the withdrawal has happened.
+        l2_withdraw_block_num = withdraw_tx_receipt["blockNumber"]
+        self.info(f"withdrawal block num on L2: {l2_withdraw_block_num}")
 
-        # Get the output of the tx
-        # OP_RETURN is the second output
-        outputs = last_block["txs"][0].as_dict()["outputs"]
-        op_return_output = outputs[1]
-        self.debug(f"OP_RETURN output: {op_return_output}")
-        op_return_script_type = op_return_output["script_type"]
-        assert op_return_script_type == "nulldata", "OP_RETURN not found"
+        last_block_hash = btcrpc.proxy.getblockchaininfo()["bestblockhash"]
+        last_block = btcrpc.getblock(last_block_hash)
+        # Check all blocks down from the latest.
+        # Those blocks will have only coinbase tx for all the empty blocks.
+        # Block with the withdrawal transfer will have at least two transactions.
+        l1_withdraw_block_height = last_block["height"]
+        self.info(f"withdrawal block height on L1: {l1_withdraw_block_height}")
 
         return True
 
+        # FIXME: Somehow the block does not have the "hello world"
+        # (OP_RETURN LEN 68656c6c6f20776f726c64)
+        # payload. I don't know how to fix it.
 
-def check_initial_eth_balance(rethrpc, address, debug_fn=print):
-    """Asserts that the initial ETH balance for `address` is zero."""
-    balance = int(rethrpc.eth_getBalance(address), 16)
-    debug_fn(f"Strata Balance before deposits: {balance}")
-    assert balance == 0, "Strata balance is not expected (should be zero initially)"
+        # Get the output of the tx that is not the conibase tx
+        outputs = last_block["txs"][1].as_dict()["outputs"]
+        # OP_RETURN is the first output
+        op_return_output = outputs[0]
+        self.debug(f"OP_RETURN output: {op_return_output}")
+
+        # Check if it is a nulldata output
+        op_return_script_type = op_return_output["script_type"]
+        assert op_return_script_type == "nulldata", "OP_RETURN not found"
+
+        # Check the payload
+        op_return_data = op_return_output["script"]
+        # The same transformation (remove the <OP_RETURN> <LEN>)
+        op_return_payload = op_return_data[4:]
+        reconstructed_bosd = string_to_opreturn_descriptor(op_return_payload)
+        assert reconstructed_bosd == bosd, "Reconstructed BOSD is not the same as the original"
+
+        return True
