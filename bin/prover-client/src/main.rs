@@ -63,6 +63,8 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
         args.get_btc_rpc_url(),
         args.bitcoind_user.clone(),
         args.bitcoind_password.clone(),
+        args.bitcoin_retry_count,
+        args.bitcoin_retry_interval,
     )
     .context("Failed to connect to the Bitcoin client")?;
 

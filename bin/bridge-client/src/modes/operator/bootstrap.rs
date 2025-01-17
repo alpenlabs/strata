@@ -65,8 +65,14 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
 
     // Setup RPC clients.
     let l1_rpc_client = Arc::new(
-        BitcoinClient::new(args.btc_url, args.btc_user, args.btc_pass)
-            .expect("error creating the bitcoin client"),
+        BitcoinClient::new(
+            args.btc_url,
+            args.btc_user,
+            args.btc_pass,
+            args.btc_retry_count,
+            args.btc_retry_interval,
+        )
+        .expect("error creating the bitcoin client"),
     );
 
     let config = WsClientConfig {

@@ -39,7 +39,10 @@ use crate::rpc::{
 pub type ClientResult<T> = Result<T, ClientError>;
 
 /// The maximum number of retries for a request.
-const MAX_RETRIES: u8 = 3;
+const DEFAULT_MAX_RETRIES: u8 = 3;
+
+/// The maximum number of retries for a request.
+const DEFAULT_RETRY_INTERVAL_MS: u64 = 1_000;
 
 /// Custom implementation to convert a value to a `Value` type.
 pub fn to_value<T>(value: T) -> ClientResult<Value>
@@ -59,6 +62,10 @@ pub struct BitcoinClient {
     client: Client,
     /// The ID of the current request.
     id: AtomicUsize,
+    /// The maximum number of retries for a request.
+    max_retries: u8,
+    /// Interval between retries for a request in ms.
+    retry_interval: u64,
 }
 
 /// Response returned by the `bitcoind` RPC server.
@@ -71,7 +78,13 @@ struct Response<R> {
 
 impl BitcoinClient {
     /// Creates a new [`BitcoinClient`] with the given URL, username, and password.
-    pub fn new(url: String, username: String, password: String) -> ClientResult<Self> {
+    pub fn new(
+        url: String,
+        username: String,
+        password: String,
+        max_retries: Option<u8>,
+        retry_interval: Option<u64>,
+    ) -> ClientResult<Self> {
         if username.is_empty() || password.is_empty() {
             return Err(ClientError::MissingUserPassword);
         }
@@ -96,9 +109,18 @@ impl BitcoinClient {
 
         let id = AtomicUsize::new(0);
 
+        let max_retries = max_retries.unwrap_or(DEFAULT_MAX_RETRIES);
+        let retry_interval = retry_interval.unwrap_or(DEFAULT_RETRY_INTERVAL_MS);
+
         trace!(url = %url, "Created bitcoin client");
 
-        Ok(Self { url, client, id })
+        Ok(Self {
+            url,
+            client,
+            id,
+            max_retries,
+            retry_interval,
+        })
     }
 
     fn next_id(&self) -> usize {
@@ -186,10 +208,10 @@ impl BitcoinClient {
                 }
             }
             retries += 1;
-            if retries >= MAX_RETRIES {
-                return Err(ClientError::MaxRetriesExceeded(MAX_RETRIES));
+            if retries >= self.max_retries {
+                return Err(ClientError::MaxRetriesExceeded(self.max_retries));
             }
-            sleep(Duration::from_millis(1_000)).await;
+            sleep(Duration::from_millis(self.retry_interval)).await;
         }
     }
 }

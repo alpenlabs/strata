@@ -66,6 +66,17 @@ pub(crate) struct Cli {
     #[argh(option, description = "password for bitcoin RPC")]
     pub btc_pass: String,
 
+    /// Max retries for Bitcoin RPC calls.
+    #[argh(option, description = "max retries for bitcoin RPC (default: 3)")]
+    pub btc_retry_count: Option<u8>,
+
+    /// Timeout duration for btc request retries in ms. Defaults to `1000`.
+    #[argh(
+        option,
+        description = "max interval between bitcoin RPC retries in ms (default: 1000)"
+    )]
+    pub btc_retry_interval: Option<u64>,
+
     /// URL for the Rollup RPC server.
     #[argh(option, description = "url for the rollup RPC server")]
     pub rollup_url: String,

@@ -45,6 +45,10 @@ pub struct BitcoindConfig {
     pub rpc_user: String,
     pub rpc_password: String,
     pub network: Network,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_count: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_interval: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
