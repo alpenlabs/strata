@@ -154,9 +154,11 @@ mod tests {
     fn test_parse_envelope_data() {
         let bytes = vec![0, 1, 2, 3];
         let params = gen_params();
+        let version = 1;
         let envelope_data = L1Payload::new_checkpoint(bytes.clone());
         let script =
-            generate_envelope_script_test(envelope_data.clone(), params.clone().into(), 1).unwrap();
+            generate_envelope_script_test(&[envelope_data.clone()], params.clone().into(), version)
+                .unwrap();
 
         let result = parse_envelope_data(&script, params.rollup()).unwrap();
 
@@ -166,7 +168,8 @@ mod tests {
         let bytes = vec![1; 2000];
         let envelope_data = L1Payload::new_checkpoint(bytes.clone());
         let script =
-            generate_envelope_script_test(envelope_data.clone(), params.clone().into(), 1).unwrap();
+            generate_envelope_script_test(&[envelope_data.clone()], params.clone().into(), version)
+                .unwrap();
 
         // Parse the rollup name
         let result = parse_envelope_data(&script, params.rollup()).unwrap();

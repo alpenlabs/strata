@@ -163,14 +163,17 @@ mod test {
     }
 
     // Create an envelope transaction. The focus here is to create a tapscript, rather than a
-    // completely valid control block
-    fn create_checkpoint_envelope_tx(params: Arc<Params>) -> Transaction {
+    // completely valid control block. Includes `n_envelopes` envelopes in the tapscript.
+    fn create_checkpoint_envelope_tx(params: Arc<Params>, n_envelopes: u32) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
-        let envelope_data = L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap());
-
-        let script = generate_envelope_script_test(envelope_data, params, 1).unwrap();
+        let payloads: Vec<_> = (0..n_envelopes)
+            .map(|_| {
+                let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
+                L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
+            })
+            .collect();
+        let script = generate_envelope_script_test(&payloads, params, 1).unwrap();
 
         // Create controlblock
         let mut rand_bytes = [0; 32];
@@ -199,20 +202,26 @@ mod test {
         let params: Params = gen_params();
         let filter_config = create_tx_filter_config(&params);
 
-        let tx = create_checkpoint_envelope_tx(params.clone().into());
+        // Testing multiple envelopes are parsed
+        let num_envelopes = 2;
+        let tx = create_checkpoint_envelope_tx(params.clone().into(), num_envelopes);
         let block = create_test_block(vec![tx]);
 
-        let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config)
-            .iter()
-            .map(|op_refs| op_refs.index())
-            .collect();
+        let ops = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
+        let txids: Vec<u32> = ops.iter().map(|op_refs| op_refs.index()).collect();
 
+        assert_eq!(
+            ops.len(),
+            num_envelopes as usize,
+            "All the envelopes should be identified"
+        );
         assert_eq!(txids[0], 0, "Should filter valid rollup name");
 
         // Test with invalid checkpoint tag
         let mut new_params = params.clone();
         new_params.rollup.checkpoint_tag = "invalid_checkpoint_tag".to_string();
-        let tx = create_checkpoint_envelope_tx(new_params.into());
+
+        let tx = create_checkpoint_envelope_tx(new_params.into(), 2);
         let block = create_test_block(vec![tx]);
         let result = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
         assert!(result.is_empty(), "Should filter out invalid name");
@@ -237,9 +246,9 @@ mod test {
     fn test_filter_relevant_txs_multiple_matches() {
         let params: Params = gen_params();
         let filter_config = create_tx_filter_config(&params);
-        let tx1 = create_checkpoint_envelope_tx(params.clone().into());
+        let tx1 = create_checkpoint_envelope_tx(params.clone().into(), 1);
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_checkpoint_envelope_tx(params.clone().into());
+        let tx3 = create_checkpoint_envelope_tx(params.clone().into(), 1);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config)

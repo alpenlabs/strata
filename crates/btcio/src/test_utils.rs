@@ -282,11 +282,11 @@ impl SignerRpc for TestBitcoinClient {
 }
 
 pub fn generate_envelope_script_test(
-    envelope_data: L1Payload,
+    payloads: &[L1Payload],
     params: Arc<Params>,
     version: u8,
 ) -> anyhow::Result<ScriptBuf> {
-    build_envelope_script(params.as_ref(), &[envelope_data], version)
+    build_envelope_script(params.as_ref(), payloads, version)
 }
 
 pub fn build_reveal_transaction_test(
