@@ -530,12 +530,6 @@ async fn start_rpc(
         .await
         .expect("init: build rpc server");
 
-    #[cfg(feature = "debug-utils")]
-    {
-        let debug_rpc = rpc_server::DebugServerImpl;
-        methods.merge(debug_rpc.into_rpc())?;
-    }
-
     let rpc_handle = rpc_server.start(methods);
 
     // start a Btcio event handler
