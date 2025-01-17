@@ -58,6 +58,13 @@ pub trait ReaderRpc {
     /// Gets various state info regarding blockchain processing.
     async fn get_blockchain_info(&self) -> ClientResult<GetBlockchainInfo>;
 
+    /// Gets the timestamp in the block header of the current best block in bitcoin.
+    ///
+    /// # Note
+    ///
+    /// Time is Unix epoch time in seconds.
+    async fn get_current_timestamp(&self) -> ClientResult<u32>;
+
     /// Gets all transaction ids in mempool.
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>>;
 
