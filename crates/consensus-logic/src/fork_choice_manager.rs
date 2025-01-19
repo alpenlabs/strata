@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use strata_chaintsn::transition::process_block;
 #[cfg(feature = "debug-utils")]
-use strata_common::bail_manager::{check_bail_trigger, ADVANCE_CONSENSUS_STATE};
+use strata_common::bail_manager::{check_bail_trigger, BAIL_ADVANCE_CONSENSUS_STATE};
 use strata_db::{
     errors::DbError,
     traits::{BlockStatus, ChainstateDatabase, Database},
@@ -327,7 +327,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
     match msg {
         ForkChoiceMessage::NewBlock(blkid) => {
             #[cfg(feature = "debug-utils")]
-            check_bail_trigger(ADVANCE_CONSENSUS_STATE);
+            check_bail_trigger(BAIL_ADVANCE_CONSENSUS_STATE);
 
             let block_bundle = fcm_state
                 .get_block_data(&blkid)?

@@ -227,6 +227,70 @@ class BridgeTestBase(StrataTester):
         return drt_tx_id
 
 
+class CrashTestBase(StrataTester):
+    """
+    Testbase for Crash Test
+    """
+
+    def __init__(self, ctx: flexitest.InitContext):
+        ctx.set_env("basic")
+
+    def main(self, ctx: flexitest.RunContext):
+        self.seq = ctx.get_service("sequencer")
+        self.seqrpc = self.seq.create_rpc()
+
+        self.debug("checking connectivity")
+        protocol_version = self.seqrpc.strata_protocolVersion()
+        assert protocol_version is not None, "Sequencer RPC inactive"
+
+        self.check_handle_bailout()
+
+        return True
+
+    def get_bail_tag(self) -> str:
+        raise NotImplementedError
+
+    def check_handle_bailout(self):
+        """
+        Handles the bailout process for the given sequencer RPC.
+
+        Raises:
+            AssertionError: If the bailout or chain tip progress fails.
+        """
+        # wait for 2 seconds for chain tip slot to accumulate.
+        # Since the chain tip requirement is not exact, we can sleep here
+        time.sleep(2)
+        cur_chain_tip = self.seqrpc.strata_clientStatus()["chain_tip_slot"]
+
+        # Trigger the bailout
+        self.seqrpc.debug_bail(self.get_bail_tag())
+
+        # Ensure the sequencer bails out
+        wait_until(
+            lambda: check_sequencer_down(self.seqrpc),
+            error_with="Sequencer didn't bail out",
+        )
+        # Stop the sequencer to update bookkeeping, we know the sequencer has
+        # already stopped
+        self.seq.stop()
+
+        # Restart the sequencer
+        self.seq.start()
+
+        wait_until(
+            lambda: not check_sequencer_down(self.seqrpc),
+            error_with="Sequencer didn't start",
+            timeout=20,
+        )
+
+        # Ensure the chain tip progresses
+        wait_until(
+            lambda: self.seqrpc.strata_clientStatus()["chain_tip_slot"] > cur_chain_tip,
+            error_with="chain tip slot not progressing",
+            timeout=20,
+        )
+
+
 class BasicLiveEnv(flexitest.LiveEnv):
     """
     A common thin layer for all instances of the Environments.

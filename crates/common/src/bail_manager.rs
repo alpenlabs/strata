@@ -2,9 +2,9 @@ use std::sync::LazyLock;
 
 use tokio::sync::watch;
 
-pub static DUTY_SIGN_BLOCK: &str = "duty_sign_block";
-pub static ADVANCE_CONSENSUS_STATE: &str = "advance_consensus_state";
-pub static SYNC_EVENT: &str = "sync_event";
+pub static BAIL_DUTY_SIGN_BLOCK: &str = "duty_sign_block";
+pub static BAIL_ADVANCE_CONSENSUS_STATE: &str = "advance_consensus_state";
+pub static BAIL_SYNC_EVENT: &str = "sync_event";
 
 struct BailWatch {
     sender: watch::Sender<Option<String>>,

@@ -1,13 +1,15 @@
 import flexitest
 
 from envs import testenv
-from utils import handle_bailout
 
 
 @flexitest.register
-class CrashAdvanceConsensusStateTest(testenv.StrataTester):
+class CrashAdvanceConsensusStateTestd(testenv.CrashTestBase):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        super().__init__(ctx)
+
+    def get_bail_tag(self) -> str:
+        return "advance_consensus_state"
 
     def main(self, ctx: flexitest.RunContext):
         """
@@ -18,19 +20,8 @@ class CrashAdvanceConsensusStateTest(testenv.StrataTester):
         but found block in database already slot=7 target_slot=7
 
         The check is present in the function `sign_and_store_block` on block_assembly.
-        Further discussion is required regarding what to do here. which will re-enable this test
+        Further work is required for fixing the problem. To re-enable this test remove this main() function
         Track the issue on:
         https://alpenlabs.atlassian.net/browse/STR-916
         """
         return
-        seq = ctx.get_service("sequencer")
-
-        seqrpc = seq.create_rpc()
-        self.debug("checking connectivity")
-        protocol_version = seqrpc.strata_protocolVersion()
-        assert protocol_version is not None, "Sequencer RPC inactive"
-
-        bail_context = "advance_consensus_state"
-        handle_bailout(seq, seqrpc, bail_context)
-
-        return True

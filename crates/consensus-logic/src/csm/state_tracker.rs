@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 #[cfg(feature = "debug-utils")]
-use strata_common::bail_manager::{check_bail_trigger, SYNC_EVENT};
+use strata_common::bail_manager::{check_bail_trigger, BAIL_SYNC_EVENT};
 use strata_db::traits::*;
 use strata_primitives::params::Params;
 use strata_state::{
@@ -70,7 +70,7 @@ impl<D: Database> StateTracker<D> {
         debug!(?ev, "Processing event");
 
         #[cfg(feature = "debug-utils")]
-        check_bail_trigger(SYNC_EVENT);
+        check_bail_trigger(BAIL_SYNC_EVENT);
 
         // Compute the state transition.
         let outp = client_transition::process_event(&self.cur_state, &ev, db, &self.params)?;
