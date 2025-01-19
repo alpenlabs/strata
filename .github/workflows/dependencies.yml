@@ -25,6 +25,8 @@ env:
     </p>
     </details>
 
+permissions: {}
+
 jobs:
   update:
     name: Update

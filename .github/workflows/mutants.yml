@@ -13,6 +13,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.run_id }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   mutants-test:
     name: Generate mutants on diff against default branch and test

@@ -9,6 +9,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions: {}
+
 jobs:
   docs:
     name: Generate docs

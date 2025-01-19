@@ -13,6 +13,8 @@ env:
   RUST_LOG: debug
   RUST_BACKTRACE: full
 
+permissions: {}
+
 jobs:
   test:
     name: Run integration tests and generate report
