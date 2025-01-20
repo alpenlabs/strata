@@ -23,6 +23,7 @@
         "londonBlock": 0,
         "terminalTotalDifficulty": 0,
         "terminalTotalDifficultyPassed": true,
-        "shanghaiTime": 0
+        "shanghaiTime": 0,
+        "mergeNetsplitBlock": 0
     }
 }
