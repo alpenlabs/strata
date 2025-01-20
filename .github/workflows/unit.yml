@@ -76,8 +76,6 @@ jobs:
         uses: ./.github/actions/cleanup # zizmor: ignore[unpinned-uses]
 
       - uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly-2024-07-27
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
