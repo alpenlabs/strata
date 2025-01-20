@@ -1,5 +1,9 @@
+use std::sync::Arc;
+
+use strata_consensus_logic::{csm::message::ForkChoiceMessage, sync_manager::SyncManager};
 use strata_primitives::l2::L2BlockId;
 use strata_state::block::L2BlockBundle;
+use strata_storage::L2BlockManager;
 use tokio::sync::{mpsc, oneshot};
 
 use super::{BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error, SharedState};
@@ -22,15 +26,27 @@ pub enum TemplateManagerRequest {
     ),
 }
 
-#[derive(Debug, Clone)]
+#[allow(missing_debug_implementations)]
 pub struct TemplateManagerHandle {
     tx: mpsc::Sender<TemplateManagerRequest>,
     shared: SharedState,
+    l2_block_manager: Arc<L2BlockManager>,
+    sync_manager: Arc<SyncManager>,
 }
 
 impl TemplateManagerHandle {
-    pub fn new(tx: mpsc::Sender<TemplateManagerRequest>, shared: SharedState) -> Self {
-        Self { tx, shared }
+    pub fn new(
+        tx: mpsc::Sender<TemplateManagerRequest>,
+        shared: SharedState,
+        l2_block_manager: Arc<L2BlockManager>,
+        sync_manager: Arc<SyncManager>,
+    ) -> Self {
+        Self {
+            tx,
+            shared,
+            l2_block_manager,
+            sync_manager,
+        }
     }
 
     async fn request<R>(
@@ -72,11 +88,28 @@ impl TemplateManagerHandle {
         &self,
         template_id: L2BlockId,
         completion: BlockCompletionData,
-    ) -> Result<L2BlockBundle, Error> {
-        self.request(|tx| {
-            TemplateManagerRequest::CompleteBlockTemplate(template_id, completion, tx)
-        })
-        .await
+    ) -> Result<L2BlockId, Error> {
+        let block_bundle = self
+            .request(|tx| {
+                TemplateManagerRequest::CompleteBlockTemplate(template_id, completion, tx)
+            })
+            .await?;
+
+        // save block to db
+        self.l2_block_manager
+            .put_block_data_async(block_bundle)
+            .await?;
+
+        // send blockid to fcm
+        if !self
+            .sync_manager
+            .submit_chain_tip_msg_async(ForkChoiceMessage::NewBlock(template_id))
+            .await
+        {
+            return Err(Error::FcmChannelClosed);
+        }
+
+        Ok(template_id)
     }
 
     pub async fn get_block_template(&self, template_id: L2BlockId) -> Result<BlockTemplate, Error> {

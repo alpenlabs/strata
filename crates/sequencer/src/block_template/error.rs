@@ -14,6 +14,8 @@ pub enum Error {
     RequestChannelClosed,
     #[error("failed to get response, template worker exited")]
     ResponseChannelClosed,
+    #[error("failed to send fcm message, fcm worker exited")]
+    FcmChannelClosed,
     #[error("db: {0}")]
     DbError(#[from] DbError),
     #[error("consensus: {0}")]
