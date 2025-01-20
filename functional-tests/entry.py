@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import sys
 
@@ -10,19 +11,57 @@ from factory import factory
 from utils import *
 from utils.constants import *
 
+TEST_DIR: str = "tests"
+
+# Initialize the parser with arguments.
+parser = argparse.ArgumentParser(prog="entry.py")
+parser.add_argument("-g", "--groups", nargs="*", help="Define the test groups to execute")
+parser.add_argument("-t", "--tests", nargs="*", help="Define individual tests to execute")
+
+
+def filter_tests(parsed_args, modules):
+    """
+    Filters test modules against parsed args supplied from the command line.
+    """
+
+    arg_groups = frozenset(parsed_args.groups or [])
+    arg_tests = frozenset([t.removesuffix(".py") for t in parsed_args.tests or []])
+
+    filtered = dict()
+    for test, path in modules.items():
+        # Drop the prefix of the path before TEST_DIR
+        test_path_parts = os.path.normpath(path).split(os.path.sep)
+        # idx should never be None because TEST_DIR should be in the path.
+        idx = next((i for i, part in enumerate(test_path_parts) if part == TEST_DIR), None)
+        test_path_parts = test_path_parts[idx + 1 :]
+        # The "groups" the current test belongs to.
+        test_groups = frozenset(test_path_parts[:-1])
+
+        # Filtering logic:
+        # if groups or tests were specified (non-empty) as args, then check for exclusion
+        take = True
+        if arg_groups and not (arg_groups & test_groups):
+            take = False
+        if arg_tests and test not in arg_tests:
+            take = False
+
+        if take:
+            filtered[test] = path
+
+    return filtered
+
 
 def main(argv):
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    test_dir = os.path.join(root_dir, "tests")
-    modules = flexitest.runtime.scan_dir_for_modules(test_dir)
-    all_tests = flexitest.runtime.load_candidate_modules(modules)
+    """
+    The main entrypoint for running functional tests.
+    """
 
-    if len(argv) > 1:
-        # Run the specific test file passed as the first argument (without .py extension)
-        tests = [str(tst).removesuffix(".py").removeprefix("tests/") for tst in argv[1:]]
-    else:
-        # Run all tests
-        tests = all_tests
+    parsed_args = parser.parse_args(argv[1:])
+
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    test_dir = os.path.join(root_dir, TEST_DIR)
+    modules = filter_tests(parsed_args, flexitest.runtime.scan_dir_for_modules(test_dir))
+    tests = flexitest.runtime.load_candidate_modules(modules)
 
     btc_fac = factory.BitcoinFactory([12300 + i for i in range(100)])
     seq_fac = factory.StrataFactory([12400 + i for i in range(100)])
