@@ -28,8 +28,8 @@ use crate::rpc::{
     traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
     types::{
         CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
-        ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
-        SignRawTransactionWithWallet,
+        GetTxOut, ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions,
+        ListUnspent, SignRawTransactionWithWallet, TestMempoolAccept,
     },
 };
 
@@ -238,8 +238,31 @@ impl ReaderRpc for BitcoinClient {
             .await
     }
 
+    async fn get_current_timestamp(&self) -> ClientResult<u32> {
+        let best_block_hash = self.call::<BlockHash>("getbestblockhash", &[]).await?;
+        let block = self.get_block(&best_block_hash).await?;
+        Ok(block.header.time)
+    }
+
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         self.call::<Vec<Txid>>("getrawmempool", &[]).await
+    }
+
+    async fn get_tx_out(
+        &self,
+        txid: &Txid,
+        vout: u32,
+        include_mempool: bool,
+    ) -> ClientResult<GetTxOut> {
+        self.call::<GetTxOut>(
+            "gettxout",
+            &[
+                to_value(txid.to_string())?,
+                to_value(vout)?,
+                to_value(include_mempool)?,
+            ],
+        )
+        .await
     }
 
     async fn network(&self) -> ClientResult<Network> {
@@ -272,6 +295,13 @@ impl BroadcasterRpc for BitcoinClient {
             },
             Err(e) => Err(ClientError::Other(e.to_string())),
         }
+    }
+
+    async fn test_mempool_accept(&self, tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>> {
+        let txstr = serialize_hex(tx);
+        trace!(%txstr, "Testing mempool accept");
+        self.call::<Vec<TestMempoolAccept>>("testmempoolaccept", &[to_value([txstr])?])
+            .await
     }
 }
 
@@ -409,6 +439,12 @@ mod test {
         let get_blockchain_info = client.get_blockchain_info().await.unwrap();
         assert_eq!(get_blockchain_info.blocks, 0);
 
+        // get_current_timestamp
+        let _ = client
+            .get_current_timestamp()
+            .await
+            .expect("must be able to get current timestamp");
+
         let blocks = mine_blocks(&bitcoind, 101, None).unwrap();
 
         // get_block
@@ -470,9 +506,29 @@ mod test {
         assert!(got.complete);
         assert!(consensus::encode::deserialize_hex::<Transaction>(&got.hex).is_ok());
 
+        // test_mempool_accept
+        let txids = client
+            .test_mempool_accept(&tx)
+            .await
+            .expect("must be able to test mempool accept");
+        let got = txids.first().expect("there must be at least one txid");
+        assert_eq!(
+            got.txid,
+            tx.compute_txid(),
+            "txids must match in the mempool"
+        );
+
         // send_raw_transaction
         let got = client.send_raw_transaction(&tx).await.unwrap();
         assert!(got.as_byte_array().len() == 32);
+
+        // get_tx_out
+        let vout = 0;
+        let got = client
+            .get_tx_out(&tx.compute_txid(), vout, true)
+            .await
+            .unwrap();
+        assert_eq!(got.value, 1.0);
 
         // list_transactions
         let got = client.list_transactions(None).await.unwrap();

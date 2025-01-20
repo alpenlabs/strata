@@ -4,8 +4,8 @@ use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txi
 use crate::rpc::{
     client::ClientResult,
     types::{
-        GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
-        ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+        GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor, ImportDescriptorResult,
+        ListTransactions, ListUnspent, SignRawTransactionWithWallet, TestMempoolAccept,
     },
 };
 
@@ -58,8 +58,23 @@ pub trait ReaderRpc {
     /// Gets various state info regarding blockchain processing.
     async fn get_blockchain_info(&self) -> ClientResult<GetBlockchainInfo>;
 
+    /// Gets the timestamp in the block header of the current best block in bitcoin.
+    ///
+    /// # Note
+    ///
+    /// Time is Unix epoch time in seconds.
+    async fn get_current_timestamp(&self) -> ClientResult<u32>;
+
     /// Gets all transaction ids in mempool.
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>>;
+
+    /// Returns details about an unspent transaction output.
+    async fn get_tx_out(
+        &self,
+        txid: &Txid,
+        vout: u32,
+        include_mempool: bool,
+    ) -> ClientResult<GetTxOut>;
 
     /// Gets the underlying [`Network`] information.
     async fn network(&self) -> ClientResult<Network>;
@@ -85,6 +100,9 @@ pub trait BroadcasterRpc {
     /// - `tx`: The raw transaction to send. This should be a byte array containing the serialized
     ///   raw transaction data.
     async fn send_raw_transaction(&self, tx: &Transaction) -> ClientResult<Txid>;
+
+    /// Tests if a raw transaction is valid.
+    async fn test_mempool_accept(&self, tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>>;
 }
 
 /// Wallet functionality that any Bitcoin client **without private keys** that
