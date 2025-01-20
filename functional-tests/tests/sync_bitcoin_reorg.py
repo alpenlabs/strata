@@ -59,7 +59,7 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         btcrpc.proxy.generatetoaddress(101, seq_addr)
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
-        manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth, seq_addr)
+        manual_gen = ManualGenBlocksConfig(btcrpc, finality_depth + 1, seq_addr)
 
         # Sanity Check for first checkpoint
         idx = 0

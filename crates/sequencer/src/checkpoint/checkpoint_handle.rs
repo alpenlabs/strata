@@ -6,6 +6,7 @@ use strata_storage::CheckpointDbManager;
 use tokio::sync::broadcast;
 use tracing::*;
 
+#[allow(missing_debug_implementations)]
 pub struct CheckpointHandle {
     /// Manager for underlying database.
     db_manager: Arc<CheckpointDbManager>,

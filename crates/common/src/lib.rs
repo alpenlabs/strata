@@ -2,3 +2,4 @@
 //! Such as initializing the tracing framework and whatever else.
 
 pub mod logging;
+pub mod ws_client;

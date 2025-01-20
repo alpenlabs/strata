@@ -6,4 +6,4 @@
 pub mod config;
 pub mod errors;
 pub mod handler;
-pub mod ws_client;
+pub use strata_common::ws_client;

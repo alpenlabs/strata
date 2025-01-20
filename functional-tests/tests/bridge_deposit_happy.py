@@ -6,7 +6,7 @@ from strata_utils import deposit_request_transaction, drain_wallet
 
 from envs import testenv
 from envs.testenv import BasicEnvConfig
-from utils import get_bridge_pubkey
+from utils import get_bridge_pubkey, wait_until
 
 
 @flexitest.register
@@ -158,8 +158,13 @@ class BridgeDepositHappyTest(testenv.StrataTester):
         self.debug(f"Current deposits: {n_deposits_post}")
         assert n_deposits_post == n_deposits_pre + 1, "deposit was not registered"
 
+        # wait for new block to be generated on rollup
+        block_number = int(rethrpc.eth_blockNumber(), 16)
+        wait_until(
+            lambda: int(rethrpc.eth_blockNumber(), 16) > block_number,
+            error_with="Block did not increase",
+        )
         # Make sure that the balance has increased
-        time.sleep(0.5)
         new_balance = int(rethrpc.eth_getBalance(f"0x{el_address}"), 16)
         self.debug(f"Balance after deposit (EL address): {new_balance}")
         assert new_balance > original_balance, "balance did not increase"

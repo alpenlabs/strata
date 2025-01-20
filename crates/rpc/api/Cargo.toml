@@ -9,6 +9,7 @@ strata-bridge-tx-builder.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
+strata-sequencer.workspace = true
 strata-state.workspace = true
 strata-zkvm.workspace = true
 

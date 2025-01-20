@@ -12503,6 +12503,7 @@ dependencies = [
  "strata-bridge-sig-manager",
  "strata-bridge-tx-builder",
  "strata-btcio",
+ "strata-common",
  "strata-primitives",
  "strata-rpc-api",
  "strata-rpc-types",
@@ -12696,6 +12697,7 @@ dependencies = [
  "strata-rpc-api",
  "strata-rpc-types",
  "strata-rpc-utils",
+ "strata-sequencer",
  "strata-state",
  "strata-status",
  "strata-storage",
@@ -12716,6 +12718,8 @@ name = "strata-common"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
+ "deadpool",
+ "jsonrpsee",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
@@ -13411,6 +13415,7 @@ dependencies = [
  "strata-db",
  "strata-primitives",
  "strata-rpc-types",
+ "strata-sequencer",
  "strata-state",
  "strata-zkvm",
  "thiserror 1.0.69",
@@ -13437,6 +13442,53 @@ name = "strata-rpc-utils"
 version = "0.1.0"
 dependencies = [
  "jsonrpsee",
+]
+
+[[package]]
+name = "strata-sequencer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "borsh",
+ "parking_lot 0.12.3",
+ "serde",
+ "strata-chaintsn",
+ "strata-consensus-logic",
+ "strata-db",
+ "strata-eectl",
+ "strata-primitives",
+ "strata-state",
+ "strata-status",
+ "strata-storage",
+ "strata-tasks",
+ "strata-test-utils",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "strata-sequencer-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argh",
+ "bitcoin",
+ "jsonrpsee",
+ "serde",
+ "strata-common",
+ "strata-crypto",
+ "strata-key-derivation",
+ "strata-primitives",
+ "strata-rpc-api",
+ "strata-rpc-types",
+ "strata-sequencer",
+ "strata-state",
+ "strata-tasks",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]

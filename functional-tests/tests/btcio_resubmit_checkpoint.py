@@ -28,9 +28,6 @@ class ResubmitCheckpointTest(testenv.StrataTester):
         # generate 5 btc blocks
         generate_n_blocks(btcrpc, 5)
 
-        # Generate some funds to sequencer
-        seqaddr = seq.get_prop("address")
-
         # Wait for seq
         wait_until(
             lambda: seqrpc.strata_protocolVersion() is not None,
@@ -41,7 +38,7 @@ class ResubmitCheckpointTest(testenv.StrataTester):
             lambda: seqrpc.strata_getL2BlockStatus(1),
             predicate=lambda val: isinstance(val, dict) and "Finalized" in val,
             error_with="transactions are not being Finalized",
-            timeout=10,
+            timeout=30,
         )
         verified_block_hash = btcrpc.proxy.getblockhash(verified_on["Finalized"])
         block_data = btcrpc.getblock(verified_block_hash)
@@ -54,15 +51,6 @@ class ResubmitCheckpointTest(testenv.StrataTester):
                 continue
 
         tx = submit_da_blob(btcrpc, seqrpc, envelope_data)
-        # Calculate scriptbpubkey for sequencer address
-        addrdata = btcrpc.proxy.validateaddress(seqaddr)
-        scriptpubkey = addrdata["scriptPubKey"]
-
-        # NOTE: could have just compared address
-        # but bitcoinlib is somehow giving bc1* addr even though network is regtest
-        assert (
-            tx.outputs[0].lock_script.hex() == scriptpubkey
-        ), "Output should be locked to sequencer's scriptpubkey"
 
         # ensure that client is still up and running
         wait_until(

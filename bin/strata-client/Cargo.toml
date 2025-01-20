@@ -24,6 +24,7 @@ strata-rocksdb.workspace = true
 strata-rpc-api.workspace = true
 strata-rpc-types.workspace = true
 strata-rpc-utils.workspace = true
+strata-sequencer.workspace = true
 strata-state.workspace = true
 strata-status.workspace = true
 strata-storage.workspace = true
