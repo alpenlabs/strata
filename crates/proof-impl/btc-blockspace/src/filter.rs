@@ -17,10 +17,10 @@ pub fn extract_relevant_info(
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    let relevant_txs = filter_protocol_op_tx_refs(block, rollup_params, filter_config);
+    let txrefs = filter_protocol_op_tx_refs(block, rollup_params, filter_config);
 
-    for tx in relevant_txs {
-        match tx.proto_op() {
+    for op in txrefs.into_iter().flat_map(|t| t.proto_ops().to_vec()) {
+        match op {
             ProtocolOperation::Deposit(deposit_info) => {
                 deposits.push(deposit_info.clone());
             }

@@ -24,10 +24,8 @@ pub fn filter_protocol_op_tx_refs(
         .txdata
         .iter()
         .enumerate()
-        .flat_map(|(i, tx)| {
-            extract_protocol_ops(tx, params, filter_config)
-                .into_iter()
-                .map(move |relevant_tx| ProtocolOpTxRef::new(i as u32, relevant_tx))
+        .map(|(i, tx)| {
+            ProtocolOpTxRef::new(i as u32, extract_protocol_ops(tx, params, filter_config))
         })
         .collect()
 }
@@ -300,15 +298,17 @@ mod test {
             "The relevant transaction should be the first one"
         );
 
-        if let ProtocolOperation::Deposit(deposit_info) = &result[0].proto_op() {
-            assert_eq!(deposit_info.address, ee_addr, "EE address should match");
-            assert_eq!(
-                deposit_info.amt,
-                BitcoinAmount::from_sat(deposit_config.deposit_amount),
-                "Deposit amount should match"
-            );
-        } else {
-            panic!("Expected Deposit info");
+        for op in result[0].proto_ops() {
+            if let ProtocolOperation::Deposit(deposit_info) = op {
+                assert_eq!(deposit_info.address, ee_addr, "EE address should match");
+                assert_eq!(
+                    deposit_info.amt,
+                    BitcoinAmount::from_sat(deposit_config.deposit_amount),
+                    "Deposit amount should match"
+                );
+            } else {
+                panic!("Expected Deposit info");
+            }
         }
     }
 
@@ -345,17 +345,19 @@ mod test {
             "The relevant transaction should be the first one"
         );
 
-        if let ProtocolOperation::DepositRequest(deposit_req_info) = &result[0].proto_op() {
-            assert_eq!(
-                deposit_req_info.address, dest_addr,
-                "EE address should match"
-            );
-            assert_eq!(
-                deposit_req_info.take_back_leaf_hash, dummy_block,
-                "Control block should match"
-            );
-        } else {
-            panic!("Expected DepositRequest info");
+        for op in result[0].proto_ops() {
+            if let ProtocolOperation::DepositRequest(deposit_req_info) = op {
+                assert_eq!(
+                    deposit_req_info.address, dest_addr,
+                    "EE address should match"
+                );
+                assert_eq!(
+                    deposit_req_info.take_back_leaf_hash, dummy_block,
+                    "Control block should match"
+                );
+            } else {
+                panic!("Expected DepositRequest info");
+            }
         }
     }
 
@@ -422,7 +424,11 @@ mod test {
             "Second relevant transaction should be at index 1"
         );
 
-        for (i, info) in result.iter().map(|op_txs| op_txs.proto_op()).enumerate() {
+        for (i, info) in result
+            .iter()
+            .flat_map(|op_txs| op_txs.proto_ops())
+            .enumerate()
+        {
             if let ProtocolOperation::Deposit(deposit_info) = info {
                 assert_eq!(
                     deposit_info.address,

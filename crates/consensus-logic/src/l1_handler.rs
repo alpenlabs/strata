@@ -19,6 +19,7 @@ use strata_state::{
     },
     l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
+    tx::ProtocolOperation,
 };
 use strata_storage::L1BlockManager;
 use tokio::sync::mpsc;
@@ -130,15 +131,14 @@ fn check_for_da_batch(
 ) -> Vec<BatchCheckpointWithCommitment> {
     let protocol_ops_txs = blockdata.protocol_ops_txs();
 
-    let signed_checkpts = protocol_ops_txs
-        .iter()
-        .filter_map(|ops_txs| match ops_txs.proto_op() {
-            strata_state::tx::ProtocolOperation::Checkpoint(envelope) => Some((
-                envelope,
-                &blockdata.block().txdata[ops_txs.index() as usize],
-            )),
+    let signed_checkpts = protocol_ops_txs.iter().flat_map(|txref| {
+        txref.proto_ops().iter().filter_map(|op| match op {
+            ProtocolOperation::Checkpoint(envelope) => {
+                Some((envelope, &blockdata.block().txdata[txref.index() as usize]))
+            }
             _ => None,
-        });
+        })
+    });
 
     let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
         if let Some(seq_pubkey) = seq_pubkey {
@@ -245,7 +245,7 @@ fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
             generate_l1_tx(
                 blockdata.block(),
                 ops_txs.index(),
-                ops_txs.proto_op().clone(),
+                ops_txs.proto_ops().to_vec(),
             )
         })
         .collect()

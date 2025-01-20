@@ -25,13 +25,13 @@ pub struct ProtocolOpTxRef {
     /// Index of the transaction in the block
     index: u32,
     /// The operation that is to be applied on data
-    proto_op: ProtocolOperation,
+    proto_ops: Vec<ProtocolOperation>,
 }
 
 impl ProtocolOpTxRef {
     /// Creates a new ProtocolOpTxRef
-    pub fn new(index: u32, proto_op: ProtocolOperation) -> Self {
-        Self { index, proto_op }
+    pub fn new(index: u32, proto_ops: Vec<ProtocolOperation>) -> Self {
+        Self { index, proto_ops }
     }
 
     /// Returns the index of the transaction
@@ -40,8 +40,8 @@ impl ProtocolOpTxRef {
     }
 
     /// Returns a reference to the protocol operation
-    pub fn proto_op(&self) -> &ProtocolOperation {
-        &self.proto_op
+    pub fn proto_ops(&self) -> &[ProtocolOperation] {
+        &self.proto_ops
     }
 }
 

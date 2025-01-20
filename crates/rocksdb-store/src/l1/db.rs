@@ -209,7 +209,7 @@ mod tests {
             .map(|i| {
                 let proof = L1TxProof::new(i as u32, arb.generate());
                 let parsed_tx: ProtocolOperation = arb.generate();
-                L1Tx::new(proof, arb.generate(), parsed_tx)
+                L1Tx::new(proof, arb.generate(), vec![parsed_tx])
             })
             .collect();
         let mmr: CompactMmr = arb.generate();
