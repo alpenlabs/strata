@@ -5,7 +5,7 @@ use strata_primitives::bitcoin_bosd::Descriptor;
 
 use crate::error::Error;
 
-/// Validades if a given string is a valid BOSD.
+/// Validates if a given string is a valid BOSD.
 #[pyfunction]
 pub fn is_valid_bosd(s: &str) -> bool {
     let result = s.parse::<Descriptor>();
