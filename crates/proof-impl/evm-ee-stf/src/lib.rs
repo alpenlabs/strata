@@ -73,6 +73,7 @@ pub fn process_block_transaction(
     // `ElBlockStfInput`. This will allow for efficient filtering of`WithdrawalIntentEvents`.
     let withdrawal_intents =
         collect_withdrawal_intents(receipts.into_iter().map(|el| Some(el.receipt)))
+            .flatten()
             .collect::<Vec<_>>();
 
     // Construct the public parameters for the proof

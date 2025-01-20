@@ -18,6 +18,7 @@ use bitcoin::{
     Address, AddressType, Amount, Network, OutPoint, Psbt, ScriptBuf, Sequence, TapNodeHash,
     Transaction, TxIn, TxOut, Txid, Witness,
 };
+use bitcoin_bosd::{Descriptor, DescriptorType};
 use borsh::{BorshDeserialize, BorshSerialize};
 use rand::rngs::OsRng;
 use reth_primitives::revm_primitives::FixedBytes;
@@ -104,6 +105,7 @@ pub struct BitcoinAddress {
 }
 
 impl BitcoinAddress {
+    /// Parses a [`BitcoinAddress`] from a string.
     pub fn parse(address_str: &str, network: Network) -> Result<Self, ParseError> {
         let address = address_str
             .parse::<Address<NetworkUnchecked>>()
@@ -117,6 +119,13 @@ impl BitcoinAddress {
             network,
             address: checked_address,
         })
+    }
+
+    /// Parses a [`BitcoinAddress`] from raw bytes representation of a bitcoin Script.
+    pub fn from_bytes(bytes: &[u8], network: Network) -> Result<Self, ParseError> {
+        let script_buf = ScriptBuf::from_bytes(bytes.to_vec());
+        let address = Address::from_script(&script_buf, network)?;
+        Ok(Self { network, address })
     }
 }
 
@@ -302,6 +311,7 @@ impl Sum for BitcoinAmount {
     }
 }
 
+/// [Borsh](borsh)-friendly Bitcoin [`Psbt`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BitcoinPsbt(Psbt);
 
@@ -739,9 +749,24 @@ impl XOnlyPk {
             network,
         ))
     }
+
+    /// Converts [`XOnlyPk`] to [`Descriptor`].
+    pub fn to_descriptor(self) -> Descriptor {
+        let type_tag = DescriptorType::P2tr.to_u8();
+        Descriptor::from_vec([&[type_tag], self.0.as_bytes()].concat()).expect("infallible")
+    }
 }
 
-/// Represents a raw, byte-encoded Bitcoin transaction with custom [`Arbitrary`] support.  
+impl TryFrom<XOnlyPk> for Descriptor {
+    type Error = ParseError;
+
+    fn try_from(value: XOnlyPk) -> Result<Self, Self::Error> {
+        let inner_xonly_pk = XOnlyPublicKey::try_from(value.0)?;
+        Ok(inner_xonly_pk.into())
+    }
+}
+
+/// Represents a raw, byte-encoded Bitcoin transaction with custom [`Arbitrary`] support.
 /// Provides conversions (via [`TryFrom`]) to and from [`Transaction`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct RawBitcoinTx(Vec<u8>);
@@ -848,6 +873,7 @@ mod tests {
         taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
         Address, Amount, Network, ScriptBuf, TapNodeHash, Transaction, TxOut, XOnlyPublicKey,
     };
+    use bitcoin_bosd::DescriptorType;
     use rand::{rngs::OsRng, Rng};
     use strata_test_utils::ArbitraryGenerator;
 
@@ -856,6 +882,7 @@ mod tests {
         RawBitcoinTx, XOnlyPk,
     };
     use crate::{
+        buf::Buf32,
         errors::ParseError,
         l1::{BitcoinPsbt, TaprootSpendPath},
     };
@@ -1295,5 +1322,16 @@ mod tests {
         let raw_tx = RawBitcoinTx::from_raw_bytes(generator.generate());
         let res: Result<Transaction, _> = raw_tx.try_into();
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_xonly_pk_to_descriptor() {
+        let xonly_pk = XOnlyPk::new(Buf32::from([1u8; 32]));
+        let descriptor = xonly_pk.to_descriptor();
+        assert_eq!(descriptor.type_tag(), DescriptorType::P2tr);
+
+        let payload = descriptor.payload();
+        assert_eq!(payload.len(), 32);
+        assert_eq!(payload, xonly_pk.0.as_bytes());
     }
 }

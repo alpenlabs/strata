@@ -1,18 +1,23 @@
-use std::array::TryFromSliceError;
-
 use revm::{
     primitives::{PrecompileError, PrecompileErrors, PrecompileOutput, PrecompileResult},
     ContextStatefulPrecompile, Database,
 };
-use revm_primitives::{Bytes, FixedBytes, Log, LogData, U256};
+use revm_primitives::{Bytes, Log, LogData, U256};
+use strata_primitives::bitcoin_bosd::Descriptor;
 use strata_reth_primitives::WithdrawalIntentEvent;
 
 pub use crate::constants::BRIDGEOUT_ADDRESS;
 use crate::utils::wei_to_sats;
 
-/// Ensure that input is exactly 32 bytes
-fn try_into_pubkey(maybe_pubkey: &Bytes) -> Result<FixedBytes<32>, TryFromSliceError> {
-    maybe_pubkey.as_ref().try_into()
+/// Ensure that input is a valid BOSD [`Descriptor`].
+fn try_into_bosd(maybe_bosd: &Bytes) -> Result<Descriptor, PrecompileError> {
+    let desc = Descriptor::from_bytes(maybe_bosd.as_ref());
+    match desc {
+        Ok(valid_desc) => Ok(valid_desc),
+        Err(_) => Err(PrecompileError::other(
+            "Invalid BOSD: expected a valid BOSD descriptor",
+        )),
+    }
 }
 
 /// Custom precompile to burn rollup native token and add bridge out intent of equal amount.
@@ -33,13 +38,12 @@ impl BridgeoutPrecompile {
 impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
     fn call(
         &self,
-        dest_pk_bytes: &Bytes,
+        destination: &Bytes,
         _gas_limit: u64,
         evmctx: &mut revm::InnerEvmContext<DB>,
     ) -> PrecompileResult {
-        // Validate the length of the destination public key
-        let dest_pk = try_into_pubkey(dest_pk_bytes)
-            .map_err(|_| PrecompileError::other("Invalid public key length: expected 32 bytes"))?;
+        // Validate that this is a valid BOSD
+        let _ = try_into_bosd(destination)?;
 
         // Verify that the transaction value matches the required withdrawal amount
         let withdrawal_amount = evmctx.env.tx.value;
@@ -59,7 +63,11 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
         })?;
 
         // Log the bridge withdrawal intent
-        let evt = WithdrawalIntentEvent { amount, dest_pk };
+        let evt = WithdrawalIntentEvent {
+            amount,
+            // PERF: This may be improved by avoiding the allocation.
+            destination: destination.clone(),
+        };
         let logdata = LogData::from(&evt);
 
         evmctx.journaled_state.log(Log {

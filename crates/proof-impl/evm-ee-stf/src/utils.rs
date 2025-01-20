@@ -1,8 +1,4 @@
-use strata_primitives::{
-    buf::Buf32,
-    evm_exec::create_evm_extra_payload,
-    l1::{BitcoinAmount, XOnlyPk},
-};
+use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, l1::BitcoinAmount};
 use strata_state::{
     block::ExecSegment,
     bridge_ops,
@@ -17,9 +13,10 @@ pub fn generate_exec_update(el_proof_pp: &EvmBlockStfOutput) -> ExecSegment {
         .withdrawal_intents
         .iter()
         .map(|intent| {
+            // TODO: proper error handling
             bridge_ops::WithdrawalIntent::new(
                 BitcoinAmount::from_sat(intent.amt),
-                XOnlyPk::new(intent.dest_pk.into()),
+                intent.destination.clone(),
             )
         })
         .collect::<Vec<_>>();
