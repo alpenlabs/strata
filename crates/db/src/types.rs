@@ -7,49 +7,89 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, l1::payload::L1Payload};
+use strata_primitives::{
+    buf::Buf32,
+    l1::payload::{L1Payload, PayloadIntent},
+};
 use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
 use strata_zkvm::ProofReceipt;
 
-/// Represents data for a payload we're still planning to post to L1.
+/// Represents an intent to publish to some DA, which will be bundled for efficiency.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct PayloadEntry {
-    pub payload: L1Payload,
-    pub commit_txid: Buf32,
-    pub reveal_txid: Buf32,
-    pub status: PayloadL1Status,
+pub struct IntentEntry {
+    pub intent: PayloadIntent,
+    pub status: IntentStatus,
 }
 
-impl PayloadEntry {
+impl IntentEntry {
+    pub fn new_unbundled(intent: PayloadIntent) -> Self {
+        Self {
+            intent,
+            status: IntentStatus::Unbundled,
+        }
+    }
+
+    pub fn new_bundled(intent: PayloadIntent, bundle_idx: u64) -> Self {
+        Self {
+            intent,
+            status: IntentStatus::Bundled(bundle_idx),
+        }
+    }
+
+    pub fn payload(&self) -> &L1Payload {
+        self.intent.payload()
+    }
+}
+
+/// Status of Intent indicating various stages of being bundled to L1 transaction.
+/// Unbundled Intents are collected and bundled to create [`BundledPayloadEntry].
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub enum IntentStatus {
+    // It is not bundled yet, and thus will be collected and processed by bundler.
+    Unbundled,
+    // It has been bundled to [`BundledPayloadEntry`] with given bundle idx.
+    Bundled(u64),
+}
+
+/// Represents data for a payload we're still planning to post to L1.
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
+pub struct BundledPayloadEntry {
+    pub payloads: Vec<L1Payload>,
+    pub commit_txid: Buf32,
+    pub reveal_txid: Buf32,
+    pub status: L1BundleStatus,
+}
+
+impl BundledPayloadEntry {
     pub fn new(
-        payload: L1Payload,
+        payloads: Vec<L1Payload>,
         commit_txid: Buf32,
         reveal_txid: Buf32,
-        status: PayloadL1Status,
+        status: L1BundleStatus,
     ) -> Self {
         Self {
-            payload,
+            payloads,
             commit_txid,
             reveal_txid,
             status,
         }
     }
 
-    /// Create new unsigned [`PayloadEntry`].
+    /// Create new unsigned [`BundledPayloadEntry`].
     ///
     /// NOTE: This won't have commit - reveal pairs associated with it.
     ///   Because it is better to defer gathering utxos as late as possible to prevent being spent
     ///   by others. Those will be created and signed in a single step.
-    pub fn new_unsigned(payload: L1Payload) -> Self {
+    pub fn new_unsigned(payloads: Vec<L1Payload>) -> Self {
         let cid = Buf32::zero();
         let rid = Buf32::zero();
-        Self::new(payload, cid, rid, PayloadL1Status::Unsigned)
+        Self::new(payloads, cid, rid, L1BundleStatus::Unsigned)
     }
 }
 
 /// Various status that transactions corresponding to a payload can be in L1
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub enum PayloadL1Status {
+pub enum L1BundleStatus {
     /// The payload has not been signed yet, i.e commit-reveal transactions have not been created
     /// yet.
     Unsigned,
