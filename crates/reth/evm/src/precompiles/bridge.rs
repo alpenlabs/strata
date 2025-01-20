@@ -38,13 +38,12 @@ impl BridgeoutPrecompile {
 impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
     fn call(
         &self,
-        destination_bytes: &Bytes,
+        destination: &Bytes,
         _gas_limit: u64,
         evmctx: &mut revm::InnerEvmContext<DB>,
     ) -> PrecompileResult {
         // Validate that this is a valid BOSD
-        let destination = try_into_bosd(destination_bytes)?;
-        let destination_bytes = destination.to_bytes().into();
+        let _ = try_into_bosd(destination)?;
 
         // Verify that the transaction value matches the required withdrawal amount
         let withdrawal_amount = evmctx.env.tx.value;
@@ -66,7 +65,8 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
         // Log the bridge withdrawal intent
         let evt = WithdrawalIntentEvent {
             amount,
-            destination: destination_bytes,
+            // PERF: This may be improved by avoiding the allocation.
+            destination: destination.clone(),
         };
         let logdata = LogData::from(&evt);
 
