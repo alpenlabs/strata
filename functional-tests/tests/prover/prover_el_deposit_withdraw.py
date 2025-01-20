@@ -2,7 +2,7 @@ import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
-from strata_utils import get_balance
+from strata_utils import extract_p2tr_pubkey, get_balance, xonlypk_to_descriptor
 
 from envs.rollup_params_cfg import RollupConfig
 from mixins import bridge_mixin
@@ -22,6 +22,8 @@ class ProverDepositWithdrawTest(bridge_mixin.BridgeMixin):
 
     Since withdrawal can't currently happen without a deposit, those two
     (semantically different) tests are merged in one.
+
+    NOTE: The withdrawal destination is a Bitcoin Output Script Descriptor (BOSD).
     """
 
     def __init__(self, ctx: flexitest.InitContext):
@@ -82,6 +84,11 @@ class ProverDepositWithdrawTest(bridge_mixin.BridgeMixin):
 
         withdraw_address = ctx.env.gen_ext_btc_address()
 
+        xonlypk = extract_p2tr_pubkey(withdraw_address)
+        self.debug(f"XOnly PK: {xonlypk}")
+        bosd = xonlypk_to_descriptor(xonlypk)
+        self.debug(f"BOSD: {bosd}")
+
         cfg: RollupConfig = ctx.env.rollup_cfg()
         # D BTC
         deposit_amount = cfg.deposit_amount
@@ -98,7 +105,7 @@ class ProverDepositWithdrawTest(bridge_mixin.BridgeMixin):
         self.debug(f"BTC balance before withdraw: {original_balance}")
 
         # Withdraw
-        _, withdraw_tx_receipt, _ = self.withdraw(ctx, evm_addr, withdraw_address)
+        _, withdraw_tx_receipt, _ = self.withdraw(ctx, evm_addr, bosd)
 
         # Confirm BTC side
         # We expect final BTC balance to be D BTC minus operator fees
