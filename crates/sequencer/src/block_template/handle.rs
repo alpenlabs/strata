@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::{BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error, SharedState};
 
-/// Request to be sent from [`TemplateManagerHandle`] to [`block_template::worker`].
+/// Request to be sent from [`TemplateManagerHandle`] to [`super::worker`].
 /// Each also passes a [`oneshot::Sender`] to return the result of the operation.
 #[derive(Debug)]
 pub enum TemplateManagerRequest {
