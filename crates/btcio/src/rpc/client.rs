@@ -28,8 +28,8 @@ use crate::rpc::{
     traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
     types::{
         CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
-        ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
-        SignRawTransactionWithWallet, TestMempoolAccept,
+        GetTxOut, ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions,
+        ListUnspent, SignRawTransactionWithWallet, TestMempoolAccept,
     },
 };
 
@@ -246,6 +246,23 @@ impl ReaderRpc for BitcoinClient {
 
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         self.call::<Vec<Txid>>("getrawmempool", &[]).await
+    }
+
+    async fn get_tx_out(
+        &self,
+        txid: &Txid,
+        vout: u32,
+        include_mempool: bool,
+    ) -> ClientResult<GetTxOut> {
+        self.call::<GetTxOut>(
+            "gettxout",
+            &[
+                to_value(txid.to_string())?,
+                to_value(vout)?,
+                to_value(include_mempool)?,
+            ],
+        )
+        .await
     }
 
     async fn network(&self) -> ClientResult<Network> {
@@ -504,6 +521,14 @@ mod test {
         // send_raw_transaction
         let got = client.send_raw_transaction(&tx).await.unwrap();
         assert!(got.as_byte_array().len() == 32);
+
+        // get_tx_out
+        let vout = 0;
+        let got = client
+            .get_tx_out(&tx.compute_txid(), vout, true)
+            .await
+            .unwrap();
+        assert_eq!(got.value, 1.0);
 
         // list_transactions
         let got = client.list_transactions(None).await.unwrap();

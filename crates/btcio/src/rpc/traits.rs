@@ -4,7 +4,7 @@ use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txi
 use crate::rpc::{
     client::ClientResult,
     types::{
-        GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
+        GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor, ImportDescriptorResult,
         ListTransactions, ListUnspent, SignRawTransactionWithWallet, TestMempoolAccept,
     },
 };
@@ -67,6 +67,14 @@ pub trait ReaderRpc {
 
     /// Gets all transaction ids in mempool.
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>>;
+
+    /// Returns details about an unspent transaction output.
+    async fn get_tx_out(
+        &self,
+        txid: &Txid,
+        vout: u32,
+        include_mempool: bool,
+    ) -> ClientResult<GetTxOut>;
 
     /// Gets the underlying [`Network`] information.
     async fn network(&self) -> ClientResult<Network>;
