@@ -247,16 +247,18 @@ fn fetch_deposit_update_txs(
     h: u64,
     l1_db: &impl L1Database,
 ) -> Result<Vec<DepositUpdateTx>, Error> {
-    let relevant_tx_ref = l1_db
+    let tx_refs = l1_db
         .get_block_txs(h)?
         .ok_or(Error::MissingL1BlockHeight(h))?;
 
     let mut deposit_update_txs = Vec::new();
-    for tx_ref in relevant_tx_ref {
+    for tx_ref in tx_refs {
         let tx = l1_db.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
 
-        if let Deposit(dep) = tx.protocol_operation() {
-            deposit_update_txs.push(DepositUpdateTx::new(tx, tx_ref.position()));
+        for op in tx.protocol_ops() {
+            if let Deposit(dep) = op {
+                deposit_update_txs.push(DepositUpdateTx::new(tx.clone(), tx_ref.position()))
+            }
         }
     }
 
