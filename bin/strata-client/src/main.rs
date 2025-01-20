@@ -422,8 +422,6 @@ fn start_sequencer_tasks(
         params.clone(),
         checkpoint_handle.clone(),
         template_manager_handle,
-        sync_manager.clone(),
-        l2_block_manager.clone(),
         duty_tracker.clone(),
     );
     methods.merge(admin_rpc.into_rpc())?;
@@ -559,6 +557,8 @@ fn start_template_manager_task(
         engine,
         params,
         status_channel,
+        l2_block_manager,
+        sync_manager,
         ..
     } = ctx;
     let (tx, rx) = mpsc::channel(100);
@@ -571,5 +571,5 @@ fn start_template_manager_task(
         block_template::worker(shutdown, worker_ctx, t_shared_state, rx)
     });
 
-    block_template::TemplateManagerHandle::new(tx, shared_state)
+    block_template::TemplateManagerHandle::new(tx, shared_state, l2_block_manager, sync_manager)
 }

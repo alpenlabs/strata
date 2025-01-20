@@ -14,9 +14,7 @@ use parking_lot::RwLock;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 use strata_consensus_logic::{
-    csm::{message::ForkChoiceMessage, state_tracker::reconstruct_state},
-    l1_handler::verify_proof,
-    sync_manager::SyncManager,
+    csm::state_tracker::reconstruct_state, l1_handler::verify_proof, sync_manager::SyncManager,
 };
 use strata_db::{
     traits::*,
@@ -37,7 +35,7 @@ use strata_rpc_types::{
     RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo,
     RpcClientStatus, RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
-use strata_rpc_utils::{to_jsonrpsee_error, to_jsonrpsee_error_object};
+use strata_rpc_utils::to_jsonrpsee_error;
 use strata_sequencer::{
     block_template::{
         BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
@@ -722,8 +720,6 @@ pub struct SequencerServerImpl {
     broadcast_handle: Arc<L1BroadcastHandle>,
     checkpoint_handle: Arc<CheckpointHandle>,
     template_manager_handle: TemplateManagerHandle,
-    sync_manager: Arc<SyncManager>,
-    l2_block_manager: Arc<L2BlockManager>,
     params: Arc<Params>,
     duty_tracker: Arc<RwLock<DutyTracker>>,
 }
@@ -736,8 +732,6 @@ impl SequencerServerImpl {
         params: Arc<Params>,
         checkpoint_handle: Arc<CheckpointHandle>,
         template_manager_handle: TemplateManagerHandle,
-        sync_manager: Arc<SyncManager>,
-        l2_block_manager: Arc<L2BlockManager>,
         duty_tracker: Arc<RwLock<DutyTracker>>,
     ) -> Self {
         Self {
@@ -746,8 +740,6 @@ impl SequencerServerImpl {
             params,
             checkpoint_handle,
             template_manager_handle,
-            sync_manager,
-            l2_block_manager,
             duty_tracker,
         }
     }
@@ -866,31 +858,10 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         template_id: L2BlockId,
         completion: BlockCompletionData,
     ) -> RpcResult<L2BlockId> {
-        let block_bundle = self
-            .template_manager_handle
+        self.template_manager_handle
             .complete_block_template(template_id, completion)
             .await
-            .map_err(to_jsonrpsee_error("failed to complete block template"))?;
-
-        // save block to db
-        self.l2_block_manager
-            .put_block_data_async(block_bundle)
-            .await
-            .map_err(to_jsonrpsee_error("failed to save block"))?;
-
-        // send blockid to fcm
-        if !self
-            .sync_manager
-            .submit_chain_tip_msg_async(ForkChoiceMessage::NewBlock(template_id))
-            .await
-        {
-            return Err(to_jsonrpsee_error_object(
-                Option::<&str>::None,
-                "failed to send ForkChoiceMessage",
-            ));
-        }
-
-        Ok(template_id)
+            .map_err(to_jsonrpsee_error("failed to complete block template"))
     }
 
     async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()> {
