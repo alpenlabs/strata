@@ -13,8 +13,9 @@ use crate::{
     rpc::{
         traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
         types::{
-            GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
-            ListTransactions, ListUnspent, SignRawTransactionWithWallet, TestMempoolAccept,
+            GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor, ImportDescriptorResult,
+            ListTransactions, ListUnspent, ScriptPubkey, SignRawTransactionWithWallet,
+            TestMempoolAccept,
         },
         ClientResult,
     },
@@ -101,6 +102,29 @@ impl ReaderRpc for TestBitcoinClient {
 
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         Ok(vec![])
+    }
+
+    async fn get_tx_out(
+        &self,
+        _txid: &Txid,
+        _vout: u32,
+        _include_mempool: bool,
+    ) -> ClientResult<GetTxOut> {
+        Ok(GetTxOut {
+            best_block: BlockHash::all_zeros().to_string(),
+            confirmations: 1,
+            value: 1.0,
+            script_pubkey: Some(ScriptPubkey {
+                // Taken from mainnet txid
+                // e35e3357cac58a56dab78fa3c544f52f091561ff84428da28bdc5c49fc4c5ffc
+                asm: "OP_0 OP_PUSHBYTES_20 78a93a5b649de9deabd9494ae9bc41f3c9c13837".to_string(),
+                hex: "001478a93a5b649de9deabd9494ae9bc41f3c9c13837".to_string(),
+                req_sigs: 1,
+                type_: "V0_P2WPKH".to_string(),
+                address: Some("bc1q0z5n5kmynh5aa27ef99wn0zp70yuzwph68my2c".to_string()),
+            }),
+            coinbase: false,
+        })
     }
 
     async fn network(&self) -> ClientResult<Network> {
