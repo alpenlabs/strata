@@ -37,7 +37,7 @@ class BitcoinFactory(flexitest.Factory):
             "bitcoind",
             "-txindex",
             "-regtest",
-            "-listen",
+            "-listen=0",
             f"-port={p2p_port}",
             "-printtoconsole",
             "-fallbackfee=0.00001",
