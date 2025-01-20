@@ -278,7 +278,7 @@ pub trait ProofDatabase {
     /// Retrieves a proof by its key.
     ///
     /// Returns `Some(proof)` if found, or `None` if not.
-    fn get_proof(&self, proof_key: ProofKey) -> DbResult<Option<ProofReceipt>>;
+    fn get_proof(&self, proof_key: &ProofKey) -> DbResult<Option<ProofReceipt>>;
 
     /// Deletes a proof by its key.
     ///

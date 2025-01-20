@@ -91,7 +91,9 @@ impl TaskTracker {
         // Gather dependencies that are not completed
         let mut pending_deps = Vec::with_capacity(deps.len());
         for &dep in deps {
-            let proof = db.get_proof(dep).map_err(ProvingTaskError::DatabaseError)?;
+            let proof = db
+                .get_proof(&dep)
+                .map_err(ProvingTaskError::DatabaseError)?;
             match proof {
                 Some(_) => {}
                 None => {

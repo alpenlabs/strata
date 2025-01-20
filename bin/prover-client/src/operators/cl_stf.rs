@@ -160,7 +160,7 @@ impl ProvingOp for ClStfOperator {
         let evm_ee_id = evm_ee_ids.first().ok_or(ProvingTaskError::NoTasksFound)?;
         let evm_ee_key = ProofKey::new(*evm_ee_id, *task_id.host());
         let evm_ee_proof = db
-            .get_proof(evm_ee_key)
+            .get_proof(&evm_ee_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(evm_ee_key))?;
         let evm_ee_vk = hosts::get_verification_key(&evm_ee_key);

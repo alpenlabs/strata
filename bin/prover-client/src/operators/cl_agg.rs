@@ -72,7 +72,7 @@ impl ProvingOp for ClAggOperator {
         for proof_id in deps {
             let proof_key = ProofKey::new(proof_id, *task_id.host());
             let proof = db
-                .get_proof(proof_key)
+                .get_proof(&proof_key)
                 .map_err(ProvingTaskError::DatabaseError)?
                 .ok_or(ProvingTaskError::ProofNotFound(proof_key))?;
             batch.push(proof);

@@ -57,6 +57,7 @@ impl ProofOperator {
         evm_ee_client: HttpClient,
         cl_client: HttpClient,
         rollup_params: RollupParams,
+        enable_checkpoint_runner: bool,
     ) -> Self {
         let btc_client = Arc::new(btc_client);
         let rollup_params = Arc::new(rollup_params);
@@ -77,6 +78,7 @@ impl ProofOperator {
             Arc::new(l1_batch_operator.clone()),
             Arc::new(cl_agg_operator.clone()),
             rollup_params.clone(),
+            enable_checkpoint_runner,
         );
 
         ProofOperator::new(
@@ -131,8 +133,12 @@ impl ProofOperator {
             ProofContext::ClAgg(_, _) => {
                 Self::prove(&self.cl_agg_operator, proof_key, db, host).await
             }
-            ProofContext::Checkpoint(_) => {
-                Self::prove(&self.checkpoint_operator, proof_key, db, host).await
+            ProofContext::Checkpoint(checkpoint_index) => {
+                Self::prove(&self.checkpoint_operator, proof_key, db, host).await?;
+                self.checkpoint_operator
+                    .submit_checkpoint_proof(*checkpoint_index, proof_key, db)
+                    .await;
+                Ok(())
             }
         }
     }

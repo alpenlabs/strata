@@ -134,12 +134,15 @@ class RollupParamsSettings:
 @dataclass
 class ProverClientSettings:
     native_workers: int
-    loop_interval: int
+    polling_interval: int
+    enable_checkpoint_proving: bool
 
     @staticmethod
     def new_default():
         return ProverClientSettings(
-            native_workers=DEFAULT_PROVER_NATIVE_WORKERS, loop_interval=DEFAULT_PROVER_LOOP_INTERVAL
+            native_workers=DEFAULT_PROVER_NATIVE_WORKERS,
+            polling_interval=DEFAULT_PROVER_POLLING_INTERVAL,
+            enable_checkpoint_proving=DEFAULT_PROVER_ENABLE_CHECKPOINT_PROVING,
         )
 
 
