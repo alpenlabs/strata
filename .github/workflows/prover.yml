@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
 
+permissions: {}
+
 jobs:
   eval_perf:
     permissions:
@@ -59,4 +61,3 @@ jobs:
         working-directory: provers/perf
         env:
           RUSTFLAGS: "-C target-cpu=native -C link-arg=-fuse-ld=lld"
-

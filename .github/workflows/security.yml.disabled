@@ -9,6 +9,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions: {}
+
 jobs:
   supply-chain:
     name: Run `cargo-audit`
