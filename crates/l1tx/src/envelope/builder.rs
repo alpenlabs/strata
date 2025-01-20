@@ -11,7 +11,6 @@ use strata_primitives::{
     l1::payload::{L1Payload, L1PayloadType},
     params::Params,
 };
-use tracing::*;
 
 // Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
 pub fn build_envelope_script(

@@ -139,8 +139,11 @@ fn apply_op_to_chainstate(op: &StateOp, state: &mut Chainstate) {
 
             // TODO add it to the MMR so we can reference it in the future
             let (header_record, deposit_txs, _) = matured_block.into_parts();
-            for tx in deposit_txs {
-                if let Deposit(deposit_info) = tx.tx().protocol_operation() {
+            for op in deposit_txs
+                .into_iter()
+                .flat_map(|x| x.tx().protocol_ops().to_vec())
+            {
+                if let Deposit(deposit_info) = op {
                     trace!("we got some deposit_txs");
                     let amt = deposit_info.amt;
                     let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
