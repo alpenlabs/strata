@@ -337,6 +337,54 @@ mod test {
     }
 
     #[test]
+    fn test_filter_multiple_ops_in_single_tx() {
+        let params = gen_params();
+        let filter_config = create_tx_filter_config(&params);
+        let deposit_config = filter_config.deposit_config.clone();
+        let ee_addr = vec![1u8; 20]; // Example EVM address
+
+        // Create deposit utxo
+        let deposit_script =
+            build_test_deposit_script(deposit_config.magic_bytes.clone(), ee_addr.clone());
+
+        let mut tx = create_test_deposit_tx(
+            Amount::from_sat(deposit_config.deposit_amount),
+            &deposit_config.address.address().script_pubkey(),
+            &deposit_script,
+        );
+
+        // Create envelope tx and copy its input to the above deposit tx
+        let num_envelopes = 1;
+        let envtx = create_checkpoint_envelope_tx(&params, num_envelopes);
+        tx.input.push(envtx.input[0].clone());
+
+        // Create a block with single tx that has multiple ops
+        let block = create_test_block(vec![tx]);
+
+        let result =
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
+
+        assert_eq!(result.len(), 1, "Should find one relevant transaction");
+        assert_eq!(
+            result[0].proto_ops().len(),
+            2,
+            "Should find two protocol ops"
+        );
+
+        let mut dep_count = 0;
+        let mut ckpt_count = 0;
+        for op in result[0].proto_ops() {
+            match op {
+                ProtocolOperation::Deposit(_) => dep_count += 1,
+                ProtocolOperation::Checkpoint(_) => ckpt_count += 1,
+                _ => {}
+            }
+        }
+        assert_eq!(dep_count, 1, "should have one deposit");
+        assert_eq!(ckpt_count, 1, "should have one checkpoint");
+    }
+
+    #[test]
     fn test_filter_relevant_txs_deposit_request() {
         let params = gen_params();
         let filter_config = create_tx_filter_config(&params);

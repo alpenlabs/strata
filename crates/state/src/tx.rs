@@ -22,6 +22,9 @@ pub enum ProtocolOperation {
 
 /// Similar to [`ProtocolOperation`] except that this also contains blob data which is not relevant
 /// to chain.
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
 #[allow(clippy::large_enum_variant)]
 pub enum RawProtocolOperation {
     /// Deposit Transaction
