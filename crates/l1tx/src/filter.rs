@@ -178,7 +178,7 @@ mod test {
 
     // Create an envelope transaction. The focus here is to create a tapscript, rather than a
     // completely valid control block. Includes `n_envelopes` envelopes in the tapscript.
-    fn create_checkpoint_envelope_tx(params: Arc<Params>, n_envelopes: u32) -> Transaction {
+    fn create_checkpoint_envelope_tx(params: &Params, n_envelopes: u32) -> Transaction {
         let address = parse_addr(OTHER_ADDR);
         let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
         let payloads: Vec<_> = (0..n_envelopes)
@@ -218,7 +218,7 @@ mod test {
 
         // Testing multiple envelopes are parsed
         let num_envelopes = 2;
-        let tx = create_checkpoint_envelope_tx(params.clone().into(), num_envelopes);
+        let tx = create_checkpoint_envelope_tx(&params, num_envelopes);
         let block = create_test_block(vec![tx]);
 
         let ops = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
@@ -235,7 +235,7 @@ mod test {
         let mut new_params = params.clone();
         new_params.rollup.checkpoint_tag = "invalid_checkpoint_tag".to_string();
 
-        let tx = create_checkpoint_envelope_tx(new_params.into(), 2);
+        let tx = create_checkpoint_envelope_tx(&new_params, 2);
         let block = create_test_block(vec![tx]);
         let result = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config);
         assert!(result.is_empty(), "Should filter out invalid name");
@@ -260,9 +260,9 @@ mod test {
     fn test_filter_relevant_txs_multiple_matches() {
         let params: Params = gen_params();
         let filter_config = create_tx_filter_config(&params);
-        let tx1 = create_checkpoint_envelope_tx(params.clone().into(), 1);
+        let tx1 = create_checkpoint_envelope_tx(&params, 1);
         let tx2 = create_test_tx(vec![create_test_txout(100, &parse_addr(OTHER_ADDR))]);
-        let tx3 = create_checkpoint_envelope_tx(params.clone().into(), 1);
+        let tx3 = create_checkpoint_envelope_tx(&params, 1);
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
         let txids: Vec<u32> = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config)

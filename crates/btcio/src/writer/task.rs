@@ -13,9 +13,10 @@ use strata_primitives::{
 use strata_status::StatusChannel;
 use strata_storage::ops::writer::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;
+use tokio::sync::mpsc::{self, Sender};
 use tracing::*;
 
-use super::bundler::bundler_task;
+use super::bundler::{bundler_task, get_initial_unbundled_entries};
 use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::{traits::WriterRpc, BitcoinClient},
@@ -28,11 +29,12 @@ use crate::{
 /// A handle to the Envelope task.
 pub struct EnvelopeHandle {
     ops: Arc<EnvelopeDataOps>,
+    intent_tx: Sender<IntentEntry>,
 }
 
 impl EnvelopeHandle {
-    pub fn new(ops: Arc<EnvelopeDataOps>) -> Self {
-        Self { ops }
+    pub fn new(ops: Arc<EnvelopeDataOps>, intent_tx: Sender<IntentEntry>) -> Self {
+        Self { ops, intent_tx }
     }
 
     /// Checks if it is duplicate, if not creates a new [`IntentEntry`] from `intent` and puts it in
@@ -56,7 +58,13 @@ impl EnvelopeHandle {
 
         // Create and store IntentEntry
         let entry = IntentEntry::new_unbundled(intent);
-        Ok(self.ops.put_intent_entry_blocking(id, entry)?)
+        self.ops.put_intent_entry_blocking(id, entry.clone())?;
+
+        // Send to bundler
+        if let Err(e) = self.intent_tx.blocking_send(entry) {
+            warn!("Could not send intent entry to bundler: {:?}", e);
+        }
+        Ok(())
     }
 
     /// Checks if it is duplicate, if not creates a new [`IntentEntry`] from `intent` and puts it in
@@ -80,7 +88,14 @@ impl EnvelopeHandle {
 
         // Create and store IntentEntry
         let entry = IntentEntry::new_unbundled(intent);
-        Ok(self.ops.put_intent_entry_async(id, entry).await?)
+        self.ops.put_intent_entry_blocking(id, entry.clone())?;
+
+        // Send to bundler
+        if let Err(e) = self.intent_tx.send(entry).await {
+            warn!("Could not send intent entry to bundler: {:?}", e);
+        }
+
+        Ok(())
     }
 }
 
@@ -106,11 +121,12 @@ pub fn start_envelope_task<D: L1WriterDatabase + Send + Sync + 'static>(
 ) -> anyhow::Result<Arc<EnvelopeHandle>> {
     let writer_ops = Arc::new(Context::new(db).into_ops(pool));
     let next_watch_payload_idx = get_next_payloadidx_to_watch(writer_ops.as_ref())?;
+    let (intent_tx, intent_rx) = mpsc::channel::<IntentEntry>(64);
 
-    let envelope_handle = Arc::new(EnvelopeHandle::new(writer_ops.clone()));
+    let envelope_handle = Arc::new(EnvelopeHandle::new(writer_ops.clone(), intent_tx));
     let ctx = Arc::new(WriterContext::new(
         params,
-        config,
+        config.clone(),
         sequencer_address,
         bitcoin_client,
         status_channel,
@@ -121,8 +137,9 @@ pub fn start_envelope_task<D: L1WriterDatabase + Send + Sync + 'static>(
         watcher_task(next_watch_payload_idx, ctx, wops.clone(), broadcast_handle).await
     });
 
-    executor.spawn_critical_async("btcio::bundler_task", async move {
-        bundler_task(writer_ops).await
+    let unbundled = get_initial_unbundled_entries(writer_ops.as_ref())?;
+    executor.spawn_critical_async_with_shutdown("btcio::bundler_task", |shutdown| async move {
+        bundler_task(unbundled, writer_ops, config.clone(), intent_rx, shutdown).await
     });
 
     Ok(envelope_handle)

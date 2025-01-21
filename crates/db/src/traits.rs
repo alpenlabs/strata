@@ -246,7 +246,7 @@ pub trait CheckpointDatabase {
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
 
-/// A trait encapsulating provider and store traits to create/update [`BundledPayloadEntry`] in the
+/// Encapsulates provider and store traits to create/update [`BundledPayloadEntry`] in the
 /// database and to fetch [`BundledPayloadEntry`] and indices from the database
 pub trait L1WriterDatabase {
     /// Store the [`BundledPayloadEntry`].
