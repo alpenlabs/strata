@@ -138,7 +138,7 @@ impl ReaderRpc for TestBitcoinClient {
             SubmitPackageTxResult {
                 txid: some_tx.compute_txid().to_string(),
                 other_wtxid: None,
-                vsize: Some(vsize as i64),
+                vsize: vsize as i64,
                 fees: None,
                 error: None,
             },

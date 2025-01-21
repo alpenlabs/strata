@@ -299,7 +299,7 @@ pub struct SubmitPackageTxResult {
     #[serde(rename = "other-wtxid")]
     pub other_wtxid: Option<String>,
     /// Sigops-adjusted virtual transaction size.
-    pub vsize: Option<i64>,
+    pub vsize: i64,
     /// Transaction fees.
     pub fees: Option<SubmitPackageTxResultFees>,
     /// The transaction error string, if it was rejected by the mempool
