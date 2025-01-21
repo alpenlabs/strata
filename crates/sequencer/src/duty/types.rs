@@ -97,14 +97,17 @@ pub struct BatchCheckpointDuty {
 }
 
 impl BatchCheckpointDuty {
+    /// Create new duty from [`BatchCheckpoint`]
     pub fn new(checkpoint: BatchCheckpoint) -> Self {
         Self { checkpoint }
     }
 
+    /// Gen checkpoint index.
     pub fn idx(&self) -> u64 {
         self.checkpoint.batch_info().idx()
     }
 
+    /// Get reference to checkpoint.
     pub fn checkpoint(&self) -> &BatchCheckpoint {
         &self.checkpoint
     }
@@ -202,10 +205,12 @@ impl DutyTracker {
         }));
     }
 
+    /// Sets the finalized block.
     pub fn set_finalized_block(&mut self, blkid: Option<L2BlockId>) {
         self.finalized_block = blkid;
     }
 
+    /// Get finalized block.
     pub fn get_finalized_block(&self) -> Option<L2BlockId> {
         self.finalized_block
     }
@@ -216,6 +221,7 @@ impl DutyTracker {
     }
 }
 
+/// Represents a single duty inside duty tracker.
 #[derive(Clone, Debug)]
 pub struct DutyEntry {
     /// Duty data itself.
@@ -232,10 +238,12 @@ pub struct DutyEntry {
 }
 
 impl DutyEntry {
+    /// Get reference to Duty.
     pub fn duty(&self) -> &Duty {
         &self.duty
     }
 
+    /// Get duty ID.
     pub fn id(&self) -> Buf32 {
         self.id
     }
@@ -297,6 +305,7 @@ pub enum Identity {
     Sequencer(Buf32),
 }
 
+/// Represents a group of duties created from a single sync event.
 #[derive(Clone, Debug)]
 pub struct DutyBatch {
     sync_ev_idx: u64,
@@ -323,6 +332,7 @@ impl DutyBatch {
 /// Sequencer key used for signing-related duties.
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum IdentityKey {
+    /// Sequencer pubkey
     Sequencer(Buf32),
 }
 

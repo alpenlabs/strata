@@ -1,5 +1,6 @@
 use std::{thread, time};
 
+// TODO: use local error type
 use strata_consensus_logic::errors::Error;
 use strata_db::traits::{ChainstateDatabase, Database, L1Database};
 use strata_eectl::{

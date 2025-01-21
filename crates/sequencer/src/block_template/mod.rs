@@ -1,3 +1,5 @@
+//! Block template management for block assembly.
+
 mod block_assembly;
 mod error;
 mod handle;

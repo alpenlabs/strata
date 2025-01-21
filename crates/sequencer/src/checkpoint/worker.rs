@@ -1,3 +1,5 @@
+//! worker to monitor chainstate and create checkpoint entries.
+
 use std::sync::Arc;
 
 use strata_consensus_logic::csm::message::ClientUpdateNotif;

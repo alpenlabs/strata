@@ -36,6 +36,7 @@ pub struct WorkerContext<D, E> {
 }
 
 impl<D, E> WorkerContext<D, E> {
+    /// Create new worker context.
     pub fn new(
         params: Arc<Params>,
         database: Arc<D>,
@@ -95,6 +96,7 @@ impl WorkerState {
     }
 }
 
+/// State of worker shared between worker task and handle.
 pub type SharedState = Arc<RwLock<WorkerState>>;
 
 /// Block template worker task.

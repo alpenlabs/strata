@@ -21,6 +21,7 @@ use crate::{
     },
 };
 
+/// Watch client state updates and generate sequencer duties.
 pub fn duty_tracker_task<D: Database>(
     shutdown: ShutdownGuard,
     duty_tracker: Arc<RwLock<DutyTracker>>,

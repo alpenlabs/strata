@@ -1,3 +1,5 @@
+//! Checkpoint generation and expiry.
+
 pub mod checkpoint_handle;
 pub mod expiry;
 pub mod helper;

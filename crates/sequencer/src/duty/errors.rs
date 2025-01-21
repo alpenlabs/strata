@@ -1,13 +1,16 @@
-//! common error types for sequencer duty
+//! Common error types for sequencer duty.
 
 use strata_state::id::L2BlockId;
 use thiserror::Error;
 
+/// Errors used in sequencer duty.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// L2 block not found in db.
     #[error("L2 blkid {0:?} missing from database")]
     MissingL2Block(L2BlockId),
 
+    /// Other db error.
     #[error("db: {0}")]
     Db(#[from] strata_db::errors::DbError),
 }

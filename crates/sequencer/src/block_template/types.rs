@@ -7,7 +7,11 @@ use strata_state::{
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
 };
 
-/// Block template with header, body, and accessory.
+/// Represents a complete block template containing header, body, and accessory data
+///
+/// A full block template is an intermediate representation of a block that hasn't been
+/// finalized/signed yet. It contains all the components needed to create a complete
+/// L2BlockBundle once signing is complete.
 #[derive(Debug, Clone)]
 pub struct FullBlockTemplate {
     header: L2BlockHeader,
@@ -16,6 +20,7 @@ pub struct FullBlockTemplate {
 }
 
 impl FullBlockTemplate {
+    /// Creates a new full block template from its components.
     pub fn new(header: L2BlockHeader, body: L2BlockBody, accessory: L2BlockAccessory) -> Self {
         Self {
             header,
@@ -24,14 +29,17 @@ impl FullBlockTemplate {
         }
     }
 
+    /// Retrieves the block identifier from the header.
     pub fn get_blockid(&self) -> L2BlockId {
         self.header.get_blockid()
     }
 
+    /// Returns a reference to the block header.
     pub fn header(&self) -> &L2BlockHeader {
         &self.header
     }
 
+    /// Accepts signature and finalizes the template into a signed L2BlockBundle.
     pub fn complete_block_template(self, completion: BlockCompletionData) -> L2BlockBundle {
         #[cfg(feature = "debug-utils")]
         check_bail_trigger(BAIL_DUTY_SIGN_BLOCK);
@@ -55,14 +63,17 @@ pub struct BlockTemplate {
 }
 
 impl BlockTemplate {
+    /// Returns the ID of the template (equivalent to resulting L2 block ID).
     pub fn template_id(&self) -> L2BlockId {
         self.header.get_blockid()
     }
 
+    /// Returns a reference to the L2 block header.
     pub fn header(&self) -> &L2BlockHeader {
         &self.header
     }
 
+    /// Create from full block template.
     pub fn from_full_ref(full: &FullBlockTemplate) -> Self {
         Self {
             header: full.header.clone(),
@@ -70,21 +81,26 @@ impl BlockTemplate {
     }
 }
 
+/// Sufficient data to complete a [`FullBlockTemplate`] and create a [`L2BlockBundle`].
+/// Currently consists of a valid signature for the block from sequencer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockCompletionData {
     signature: Buf64,
 }
 
 impl BlockCompletionData {
+    /// Create from signature.
     pub fn from_signature(signature: Buf64) -> Self {
         Self { signature }
     }
 
+    /// Returns a reference to signature.
     pub fn signature(&self) -> &Buf64 {
         &self.signature
     }
 }
 
+/// Configuration provided by sequencer for the new block to be assembled.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct BlockGenerationConfig {
     parent_block_id: L2BlockId,
@@ -95,6 +111,7 @@ pub struct BlockGenerationConfig {
 }
 
 impl BlockGenerationConfig {
+    /// Create new instance with provided parent block id.
     pub fn from_parent_block_id(parent_block_id: L2BlockId) -> Self {
         Self {
             parent_block_id,
@@ -102,15 +119,18 @@ impl BlockGenerationConfig {
         }
     }
 
+    /// Update with provided block timestamp.
     pub fn with_ts(mut self, ts: u64) -> Self {
         self.ts = Some(ts);
         self
     }
 
+    /// Return parent block id.
     pub fn parent_block_id(&self) -> L2BlockId {
         self.parent_block_id
     }
 
+    /// Return block timestamp.
     pub fn ts(&self) -> &Option<u64> {
         &self.ts
     }

@@ -1,3 +1,5 @@
+//! Handle timeouts for checkpoints in ProofPublishMode::Timeout
+
 use std::{cmp::Reverse, collections::BinaryHeap, sync::Arc};
 
 use strata_db::types::CheckpointProvingStatus;

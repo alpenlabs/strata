@@ -26,6 +26,7 @@ pub enum TemplateManagerRequest {
     ),
 }
 
+/// Handle for communication with the template manager worker.
 #[allow(missing_debug_implementations)]
 pub struct TemplateManagerHandle {
     tx: mpsc::Sender<TemplateManagerRequest>,
@@ -35,6 +36,7 @@ pub struct TemplateManagerHandle {
 }
 
 impl TemplateManagerHandle {
+    /// Create new instance.
     pub fn new(
         tx: mpsc::Sender<TemplateManagerRequest>,
         shared: SharedState,
@@ -66,6 +68,8 @@ impl TemplateManagerHandle {
         }
     }
 
+    /// Generate a new block template based on provided [`BlockGenerationConfig`].
+    /// Will return cached template for request if it exists.
     pub async fn generate_block_template(
         &self,
         config: BlockGenerationConfig,
@@ -84,6 +88,7 @@ impl TemplateManagerHandle {
             .await
     }
 
+    /// Complete specified template with [`BlockCompletionData`] and submit to FCM.
     pub async fn complete_block_template(
         &self,
         template_id: L2BlockId,
@@ -112,6 +117,7 @@ impl TemplateManagerHandle {
         Ok(template_id)
     }
 
+    /// Get a pending block template from cache if it exists.
     pub async fn get_block_template(&self, template_id: L2BlockId) -> Result<BlockTemplate, Error> {
         self.shared
             .read()
