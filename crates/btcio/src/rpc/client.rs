@@ -454,6 +454,9 @@ mod test {
         test_utils::corepc_node_helpers::{get_bitcoind_and_client, mine_blocks},
     };
 
+    /// 50 BTC in [`Network::Regtest`].
+    const COINBASE_AMOUNT: Amount = Amount::from_sat(50 * 100_000_000);
+
     #[tokio::test()]
     async fn client_works() {
         logging::init(logging::LoggerConfig::with_base_name("btcio-tests"));
@@ -552,14 +555,6 @@ mod test {
         let got = client.send_raw_transaction(&tx).await.unwrap();
         assert!(got.as_byte_array().len() == 32);
 
-        // get_tx_out
-        let vout = 0;
-        let got = client
-            .get_tx_out(&tx.compute_txid(), vout, true)
-            .await
-            .unwrap();
-        assert_eq!(got.value, 1.0);
-
         // list_transactions
         let got = client.list_transactions(None).await.unwrap();
         assert_eq!(got.len(), 10);
@@ -590,6 +585,56 @@ mod test {
             .unwrap();
         let expected = vec![ImportDescriptorResult { success: true }];
         assert_eq!(expected, got);
+    }
+
+    async fn get_tx_out() {
+        logging::init(logging::LoggerConfig::with_base_name("btcio-gettxout"));
+
+        let (bitcoind, client) = get_bitcoind_and_client();
+
+        // network sanity check
+        let got = client.network().await.unwrap();
+        let expected = Network::Regtest;
+        assert_eq!(expected, got);
+
+        let address = bitcoind
+            .client
+            .get_new_address()
+            .unwrap()
+            .address()
+            .unwrap()
+            .assume_checked();
+        let blocks = mine_blocks(&bitcoind, 101, Some(address)).unwrap();
+        let last_block = client.get_block(blocks.first().unwrap()).await.unwrap();
+        let coinbase_tx = last_block.coinbase().unwrap();
+
+        // gettxout should work with a non-spent UTXO.
+        let got = client
+            .get_tx_out(&coinbase_tx.compute_txid(), 0, true)
+            .await
+            .unwrap();
+        assert_eq!(got.value, COINBASE_AMOUNT.to_btc());
+
+        // gettxout should fail with a spent UTXO.
+        let new_address = bitcoind
+            .client
+            .get_new_address()
+            .unwrap()
+            .address()
+            .unwrap()
+            .assume_checked();
+        let send_amount = Amount::from_sat(COINBASE_AMOUNT.to_sat() - 2_000); // 2k sats as fees.
+        let _send_tx = bitcoind
+            .client
+            .send_to_address(&new_address, send_amount)
+            .unwrap()
+            .txid()
+            .unwrap();
+        let result = client
+            .get_tx_out(&coinbase_tx.compute_txid(), 0, true)
+            .await;
+        trace!(?result, "gettxout result");
+        assert!(result.is_err());
     }
 
     /// Create two transactions.
