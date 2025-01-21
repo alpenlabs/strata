@@ -28,10 +28,6 @@ tokio.workspace = true
 tracing.workspace = true
 zeroize.workspace = true
 
-[dev-dependencies]
-# arbitrary.workspace = true
-# strata-test-utils.workspace = true
-
 [lints]
 rust.missing_debug_implementations = "warn"
 rust.missing_docs = "warn"
