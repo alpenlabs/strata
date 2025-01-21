@@ -29,7 +29,7 @@ use crate::rpc::{
     types::{
         CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
         GetTxOut, ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions,
-        ListUnspent, SignRawTransactionWithWallet, TestMempoolAccept,
+        ListUnspent, SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
 };
 
@@ -263,6 +263,12 @@ impl ReaderRpc for BitcoinClient {
             ],
         )
         .await
+    }
+
+    async fn submit_package(&self, txs: &[Transaction]) -> ClientResult<SubmitPackage> {
+        let txstrs: Vec<String> = txs.iter().map(serialize_hex).collect();
+        self.call::<SubmitPackage>("submitpackage", &[to_value(txstrs)?])
+            .await
     }
 
     async fn network(&self) -> ClientResult<Network> {

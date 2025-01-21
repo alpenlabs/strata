@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use async_trait::async_trait;
 use bitcoin::{
     bip32::Xpriv,
@@ -15,7 +17,7 @@ use crate::{
         types::{
             GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor, ImportDescriptorResult,
             ListTransactions, ListUnspent, ScriptPubkey, SignRawTransactionWithWallet,
-            TestMempoolAccept,
+            SubmitPackage, SubmitPackageTxResult, TestMempoolAccept,
         },
         ClientResult,
     },
@@ -124,6 +126,27 @@ impl ReaderRpc for TestBitcoinClient {
                 address: Some("bc1q0z5n5kmynh5aa27ef99wn0zp70yuzwph68my2c".to_string()),
             }),
             coinbase: false,
+        })
+    }
+
+    async fn submit_package(&self, _txs: &[Transaction]) -> ClientResult<SubmitPackage> {
+        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        let wtxid = some_tx.compute_wtxid();
+        let vsize = some_tx.vsize();
+        let tx_results = BTreeMap::from([(
+            wtxid.to_string(),
+            SubmitPackageTxResult {
+                txid: some_tx.compute_txid().to_string(),
+                other_wtxid: None,
+                vsize: Some(vsize as i64),
+                fees: None,
+                error: None,
+            },
+        )]);
+        Ok(SubmitPackage {
+            package_msg: "success".to_string(),
+            tx_results,
+            replaced_transactions: vec![],
         })
     }
 
