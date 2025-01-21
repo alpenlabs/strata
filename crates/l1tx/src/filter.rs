@@ -32,6 +32,8 @@ where
             let protocol_ops = extract_protocol_ops(tx, params, filter_config, process_raw);
             ProtocolOpTxRef::new(i as u32, protocol_ops)
         })
+        // Filter out tx refs which do not contain protocol ops
+        .filter(|txref| !txref.proto_ops().is_empty())
         .collect()
 }
 
@@ -238,15 +240,15 @@ mod test {
         let tx = create_checkpoint_envelope_tx(&params, num_envelopes);
         let block = create_test_block(vec![tx]);
 
-        let ops = filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
-        let txids: Vec<u32> = ops.iter().map(|op_refs| op_refs.index()).collect();
+        let tx_refs =
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
 
+        assert_eq!(tx_refs.len(), 1, "There's one tx containing protocol ops");
         assert_eq!(
-            ops.len(),
-            num_envelopes as usize,
-            "All the envelopes should be identified"
+            tx_refs[0].proto_ops().len(),
+            2,
+            "Should filter relevant envelopes"
         );
-        assert_eq!(txids[0], 0, "Should filter valid rollup name");
 
         // Test with invalid checkpoint tag
         let mut new_params = params.clone();
@@ -256,7 +258,7 @@ mod test {
         let block = create_test_block(vec![tx]);
         let result =
             filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
-        assert!(result.is_empty(), "Should filter out invalid name");
+        assert!(result.is_empty(), "Should filter out irrelevant txs");
     }
 
     #[test]
