@@ -113,7 +113,7 @@ jobs:
           cache-on-failure: true
 
       - name: Build Cargo project
-        run: cargo build --locked
+        run: cargo build --locked -F debug-utils
 
       - name: Run functional tests (1)
         id: funcTestsRun1

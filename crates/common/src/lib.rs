@@ -2,3 +2,6 @@
 //! Such as initializing the tracing framework and whatever else.
 
 pub mod logging;
+
+#[cfg(feature = "debug-utils")]
+pub mod bail_manager;
