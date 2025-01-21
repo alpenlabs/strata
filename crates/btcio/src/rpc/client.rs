@@ -130,9 +130,12 @@ impl BitcoinClient {
             trace!(?response, "Response received");
             match response {
                 Ok(resp) => {
-                    let data = resp
-                        .json::<Response<T>>()
+                    let raw_response = resp
+                        .text()
                         .await
+                        .map_err(|e| ClientError::Parse(e.to_string()))?;
+                    trace!(%raw_response, "Raw response received");
+                    let data: Response<T> = serde_json::from_str(&raw_response)
                         .map_err(|e| ClientError::Parse(e.to_string()))?;
                     if let Some(err) = data.error {
                         return Err(ClientError::Server(err.code, err.message));
