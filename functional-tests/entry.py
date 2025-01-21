@@ -25,7 +25,10 @@ def filter_tests(parsed_args, modules):
     """
 
     arg_groups = frozenset(parsed_args.groups or [])
-    arg_tests = frozenset([t.removesuffix(".py") for t in parsed_args.tests or []])
+    # Extract filenames from the tests paths.
+    arg_tests = frozenset(
+        [os.path.split(t)[1].removesuffix(".py") for t in parsed_args.tests or []]
+    )
 
     filtered = dict()
     for test, path in modules.items():
