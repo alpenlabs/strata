@@ -51,7 +51,7 @@ pub enum EnvelopeError {
 // Btcio depends on `tx-parser`. So this file is behind a feature flag 'test-utils' and on dev
 // dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
 // dependency doesn't happen
-pub async fn build_envelope_txs<W: WriterRpc>(
+pub(crate) async fn build_envelope_txs<W: WriterRpc>(
     payloads: &[L1Payload],
     ctx: &WriterContext<W>,
 ) -> anyhow::Result<(Transaction, Transaction)> {

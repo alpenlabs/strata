@@ -40,7 +40,7 @@ pub(crate) async fn bundler_task(
                     info!("Bundler received shutdown. Stopping.");
                     break;
                 }
-                // Process unbundled, returning entries which are unprocessed for some reason.
+                // Process unbundled entries, returning entries which are unprocessed for some reason.
                 unbundled = process_unbundled_entries(ops.as_ref(), unbundled).await?;
             }
         }
@@ -50,6 +50,8 @@ pub(crate) async fn bundler_task(
 
 /// Processes and bundles a list of unbundled intents into payload entries. Returns a vector of
 /// entries which are unbundled for some reason.
+/// The reason could be the entries is too small in size to be included in an envelope and thus
+/// makes sense to include once a bunch of entries are collected.
 /// NOTE: The current logic is simply 1-1 mapping between intents and payloads, in future it can
 /// be sophisticated.
 async fn process_unbundled_entries(
@@ -57,6 +59,10 @@ async fn process_unbundled_entries(
     unbundled: Vec<IntentEntry>,
 ) -> DbResult<Vec<IntentEntry>> {
     for mut entry in unbundled {
+        // Check it is actually unbundled, omit if bundled
+        if entry.status != IntentStatus::Unbundled {
+            continue;
+        }
         // NOTE: In future, the logic to create payload will be different. We need to group
         // intents and create payload entries accordingly
         let payload_entry = BundledPayloadEntry::new_unsigned(vec![entry.payload().clone()]);
@@ -76,8 +82,8 @@ async fn process_unbundled_entries(
     Ok(vec![])
 }
 
-/// Retrieves unbundled intents after a given index in ascending order along with the latest
-/// entry idx.
+/// Retrieves unbundled intents since the beginning in ascending order along with the latest
+/// entry idx. This traverses backwards from latest index and breaks once it founds a bundled entry.
 pub(crate) fn get_initial_unbundled_entries(
     ops: &EnvelopeDataOps,
 ) -> anyhow::Result<Vec<IntentEntry>> {

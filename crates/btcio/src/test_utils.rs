@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
 use bitcoin::{
@@ -283,10 +282,10 @@ impl SignerRpc for TestBitcoinClient {
 
 pub fn generate_envelope_script_test(
     payloads: &[L1Payload],
-    params: Arc<Params>,
+    params: &Params,
     version: u8,
 ) -> anyhow::Result<ScriptBuf> {
-    build_envelope_script(params.as_ref(), payloads, version)
+    build_envelope_script(params, payloads, version)
 }
 
 pub fn build_reveal_transaction_test(

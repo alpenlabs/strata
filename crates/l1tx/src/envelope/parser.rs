@@ -169,7 +169,7 @@ mod tests {
         let envelope2 = L1Payload::new_checkpoint(bytes.clone());
         let script = generate_envelope_script_test(
             &[envelope1.clone(), envelope2.clone()],
-            params.clone().into(),
+            &params,
             version,
         )
         .unwrap();
@@ -182,8 +182,7 @@ mod tests {
         let bytes = vec![1; 2000];
         let envelope_data = L1Payload::new_checkpoint(bytes.clone());
         let script =
-            generate_envelope_script_test(&[envelope_data.clone()], params.clone().into(), version)
-                .unwrap();
+            generate_envelope_script_test(&[envelope_data.clone()], &params, version).unwrap();
 
         // Parse the rollup name
         let result = parse_envelope_payloads(&script, params.rollup()).unwrap();

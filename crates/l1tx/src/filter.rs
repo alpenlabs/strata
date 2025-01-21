@@ -97,7 +97,7 @@ fn parse_envelope_checkpoints<'a>(
 
 #[cfg(test)]
 mod test {
-    use std::{str::FromStr, sync::Arc};
+    use std::str::FromStr;
 
     use bitcoin::{
         absolute::{Height, LockTime},
