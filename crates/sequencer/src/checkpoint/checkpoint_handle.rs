@@ -1,4 +1,7 @@
+#![allow(missing_docs)]
+
 //! Checkpointing bookkeeping and control logic.
+
 use std::sync::Arc;
 
 use strata_db::{types::CheckpointEntry, DbResult};

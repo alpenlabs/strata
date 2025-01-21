@@ -67,6 +67,7 @@ pub struct BlockSigningDuty {
 }
 
 impl BlockSigningDuty {
+    /// Create new block signing duty from components.
     pub fn new_simple(slot: u64, parent: L2BlockId, target_ts: u64) -> Self {
         Self {
             slot,
@@ -75,14 +76,17 @@ impl BlockSigningDuty {
         }
     }
 
+    /// Returns target slot for block signing duty.
     pub fn target_slot(&self) -> u64 {
         self.slot
     }
 
+    /// Returns parent block id for block signing duty.
     pub fn parent(&self) -> L2BlockId {
         self.parent
     }
 
+    /// Returns target ts for block signing duty.
     pub fn target_ts(&self) -> u64 {
         self.target_ts
     }
@@ -269,6 +273,7 @@ pub struct StateUpdate {
 }
 
 impl StateUpdate {
+    /// Create a new state update.
     pub fn new(
         last_block_slot: u64,
         cur_timestamp: time::Instant,
@@ -289,10 +294,12 @@ impl StateUpdate {
         }
     }
 
+    /// Create state update without blocks or batch info.
     pub fn new_simple(last_block_slot: u64, cur_timestamp: time::Instant) -> Self {
         Self::new(last_block_slot, cur_timestamp, Vec::new(), None)
     }
 
+    /// Check if a given L2 block is marked as finalized in this update.
     pub fn is_finalized(&self, id: &L2BlockId) -> bool {
         self.newly_finalized_blocks.binary_search(id).is_ok()
     }
@@ -313,6 +320,7 @@ pub struct DutyBatch {
 }
 
 impl DutyBatch {
+    /// Create a new duty batch for a single sync event.
     pub fn new(sync_ev_idx: u64, duties: Vec<DutyEntry>) -> Self {
         Self {
             sync_ev_idx,
@@ -320,10 +328,12 @@ impl DutyBatch {
         }
     }
 
+    /// Returns sync event idx that this duty batch was created from.
     pub fn sync_ev_idx(&self) -> u64 {
         self.sync_ev_idx
     }
 
+    /// Returns reference to duties in this batch.
     pub fn duties(&self) -> &[DutyEntry] {
         &self.duties
     }
@@ -332,7 +342,7 @@ impl DutyBatch {
 /// Sequencer key used for signing-related duties.
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum IdentityKey {
-    /// Sequencer pubkey
+    /// Sequencer private key used for signing.
     Sequencer(Buf32),
 }
 
@@ -342,11 +352,14 @@ pub enum IdentityKey {
 /// with real cryptographic signatures and putting keys in the rollup params.
 #[derive(Clone, Debug)]
 pub struct IdentityData {
+    /// Unique identifying info.
     pub ident: Identity,
+    /// Signing key.
     pub key: IdentityKey,
 }
 
 impl IdentityData {
+    /// Create new IdentityData from components.
     pub fn new(ident: Identity, key: IdentityKey) -> Self {
         Self { ident, key }
     }
