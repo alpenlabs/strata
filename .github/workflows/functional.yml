@@ -70,9 +70,9 @@ jobs:
 
       - name: Install bitcoind
         env:
-          BITCOIND_VERSION: "28.0"
+          BITCOIND_VERSION: "28.1"
           BITCOIND_ARCH: "x86_64-linux-gnu"
-          SHASUM: "7fe294b02b25b51acb8e8e0a0eb5af6bbafa7cd0c5b0e5fcbb61263104a82fbc"
+          SHASUM: "07f77afd326639145b9ba9562912b2ad2ccec47b8a305bd075b4f4cb127b7ed7"
         run: |
           curl -fsSLO --proto "=https" --tlsv1.2 "https://bitcoincore.org/bin/bitcoin-core-$BITCOIND_VERSION/bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
           sha256sum -c <<< "$SHASUM bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
