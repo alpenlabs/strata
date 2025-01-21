@@ -79,16 +79,33 @@ You can run all tests:
 ./run_test.sh
 ```
 
-Or, you can run a specific test:
+You also can run a specific test:
 
 ```bash
-./run_test.sh fn_bridge_deposit_happy
+./run_test.sh -t tests/bridge/bridge_deposit_happy.py
+```
+
+Or (shorter version),
+
+```bash
+./run_test.sh -t bridge/bridge_deposit_happy.py
+```
+
+Or, you can run a specific test group:
+
+```bash
+./run_test.sh -g bridge
+```
+
+The full list of arguments for running tests can be viewed by:
+```bash
+./run_test.sh -h
 ```
 
 ## Running prover tasks
 
 ```bash
-PROVER_TEST=1 ./run_test.sh fn_prover_client.py
+PROVER_TEST=1 ./run_test.sh -g prover
 ```
 
 The test harness script will be extended with more functionality as we need it.
