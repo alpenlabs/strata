@@ -4,9 +4,9 @@ use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txi
 use crate::rpc::{
     client::ClientResult,
     types::{
-        GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor, ImportDescriptorResult,
-        ListTransactions, ListUnspent, SignRawTransactionWithWallet, SubmitPackage,
-        TestMempoolAccept,
+        CreateRawTransaction, GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor,
+        ImportDescriptorResult, ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+        SubmitPackage, TestMempoolAccept,
     },
 };
 
@@ -159,6 +159,12 @@ pub trait WalletRpc {
 
     /// Lists all wallets in the underlying Bitcoin client.
     async fn list_wallets(&self) -> ClientResult<Vec<String>>;
+
+    /// Creates a raw transaction.
+    async fn create_raw_transaction(
+        &self,
+        raw_tx: CreateRawTransaction,
+    ) -> ClientResult<Transaction>;
 }
 
 /// Signing functionality that any Bitcoin client **with private keys** that

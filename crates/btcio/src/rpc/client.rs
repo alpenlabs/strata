@@ -8,8 +8,9 @@ use std::{
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
 use bitcoin::{
-    bip32::Xpriv, consensus::encode::serialize_hex, Address, Block, BlockHash, Network,
-    Transaction, Txid,
+    bip32::Xpriv,
+    consensus::{self, encode::serialize_hex},
+    Address, Block, BlockHash, Network, Transaction, Txid,
 };
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION, CONTENT_TYPE},
@@ -27,9 +28,10 @@ use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
     types::{
-        CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction,
-        GetTxOut, ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions,
-        ListUnspent, SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
+        CreateRawTransaction, CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo,
+        GetNewAddress, GetTransaction, GetTxOut, ImportDescriptor, ImportDescriptorResult,
+        ListDescriptors, ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+        SubmitPackage, TestMempoolAccept,
     },
 };
 
@@ -342,6 +344,22 @@ impl WalletRpc for BitcoinClient {
 
     async fn list_wallets(&self) -> ClientResult<Vec<String>> {
         self.call::<Vec<String>>("listwallets", &[]).await
+    }
+
+    async fn create_raw_transaction(
+        &self,
+        raw_tx: CreateRawTransaction,
+    ) -> ClientResult<Transaction> {
+        let raw_tx = self
+            .call::<String>(
+                "createrawtransaction",
+                &[to_value(raw_tx.inputs)?, to_value(raw_tx.outputs)?],
+            )
+            .await?;
+        trace!(%raw_tx, "Created raw transaction");
+        Ok(consensus::encode::deserialize_hex(&raw_tx).map_err(|e| {
+            ClientError::Other(format!("Failed to deserialize raw transaction: {}", e))
+        })?)
     }
 }
 

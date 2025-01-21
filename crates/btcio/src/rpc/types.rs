@@ -189,6 +189,68 @@ pub struct ScriptPubkey {
     pub address: Option<String>,
 }
 
+/// Models the arguments of JSON-RPC method `createrawtransaction`.
+///
+/// # Note
+///
+/// Assumes that the transaction is always "replaceable" by default and has a locktime of 0.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct CreateRawTransaction {
+    pub inputs: Vec<CreateRawTransactionInput>,
+    pub outputs: Vec<CreateRawTransactionOutput>,
+}
+
+/// Models the input of JSON-RPC method `createrawtransaction`.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct CreateRawTransactionInput {
+    pub txid: String,
+    pub vout: u32,
+}
+
+/// Models the output of JSON-RPC method `createrawtransaction`.
+///
+/// The outputs specified as key-value pairs, where the keys is an address,
+/// and the values are the amounts to be sent to that address.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(untagged)]
+pub enum CreateRawTransactionOutput {
+    /// A pair of an [`Address`] string and an [`Amount`] in BTC.
+    AddressAmount {
+        /// An [`Address`] string.
+        address: String,
+        /// An [`Amount`] in BTC.
+        amount: f64,
+    },
+    /// A payload such as in `OP_RETURN` transactions.
+    Data {
+        /// The payload.
+        data: String,
+    },
+}
+
+impl Serialize for CreateRawTransactionOutput {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            CreateRawTransactionOutput::AddressAmount { address, amount } => {
+                let mut map = serde_json::Map::new();
+                map.insert(
+                    address.clone(),
+                    serde_json::Value::Number(serde_json::Number::from_f64(*amount).unwrap()),
+                );
+                map.serialize(serializer)
+            }
+            CreateRawTransactionOutput::Data { data } => {
+                let mut map = serde_json::Map::new();
+                map.insert("data".to_string(), serde_json::Value::String(data.clone()));
+                map.serialize(serializer)
+            }
+        }
+    }
+}
+
 /// Result of JSON-RPC method `submitpackage`.
 ///
 /// > submitpackage ["rawtx",...] ( maxfeerate maxburnamount )
