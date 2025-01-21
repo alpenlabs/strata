@@ -458,7 +458,6 @@ pub fn filter_verified_checkpoints(
 #[cfg(test)]
 mod tests {
     use bitcoin::params::MAINNET;
-    use strata_common::bail_manager::BAIL_RECEIVER;
     use strata_db::traits::L1Database;
     use strata_primitives::{block_credential, l1::L1BlockRecord};
     use strata_rocksdb::test_utils::get_common_db;
