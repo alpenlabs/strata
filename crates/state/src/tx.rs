@@ -5,7 +5,7 @@ use strata_primitives::l1::{BitcoinAmount, OutputRef};
 
 use crate::batch::SignedBatchCheckpoint;
 
-/// Information related to relevant transactions to be stored in L1Tx
+/// Information related to relevant transactions to be stored in an `L1Tx`.
 #[derive(
     Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
 )]
@@ -17,7 +17,30 @@ pub enum ProtocolOperation {
     DepositRequest(DepositRequestInfo),
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
-    // TODO: add other kinds like Proofs and statediffs
+    // TODO: add other kinds like proofs and state diffs
+}
+
+/// Similar to [`ProtocolOperation`] except that this also contains blob data which is not relevant
+/// to chain.
+#[allow(clippy::large_enum_variant)]
+pub enum RawProtocolOperation {
+    /// Deposit Transaction
+    Deposit(DepositInfo),
+    /// Deposit Request info
+    DepositRequest(DepositRequestInfo),
+    /// Checkpoint data
+    Checkpoint(SignedBatchCheckpoint),
+    // TODO: add other kinds like proofs and state diffs
+}
+
+impl From<RawProtocolOperation> for ProtocolOperation {
+    fn from(val: RawProtocolOperation) -> Self {
+        match val {
+            RawProtocolOperation::DepositRequest(d) => ProtocolOperation::DepositRequest(d),
+            RawProtocolOperation::Deposit(d) => ProtocolOperation::Deposit(d),
+            RawProtocolOperation::Checkpoint(c) => ProtocolOperation::Checkpoint(c),
+        }
+    }
 }
 
 #[derive(

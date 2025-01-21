@@ -324,9 +324,18 @@ async fn process_block<R: ReaderRpc>(
     let txs = block.txdata.len();
 
     let params = ctx.params.clone();
-    let filtered_txs =
-        filter_protocol_op_tx_refs(&block, ctx.params.rollup(), state.filter_config());
-    let block_data = BlockData::new(height, block, filtered_txs);
+    let filtered_tx_refs = filter_protocol_op_tx_refs(
+        &block,
+        ctx.params.rollup(),
+        state.filter_config(),
+        &mut |_raw_op| {
+            // TODO: Store relevant info in `RawProtocolOp` to db. This is relevant especially for
+            // DA transactions where the protocol only cares for the commitment but the node needs
+            // to store the actual data in db
+            Ok(())
+        },
+    );
+    let block_data = BlockData::new(height, block, filtered_tx_refs);
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");
 

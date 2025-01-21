@@ -17,7 +17,10 @@ pub fn extract_relevant_info(
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    let txrefs = filter_protocol_op_tx_refs(block, rollup_params, filter_config);
+    // Just pass a no-op to the filter function as prover does not have to do anything with the raw
+    // data like storing in db.
+    let txrefs =
+        filter_protocol_op_tx_refs(block, rollup_params, filter_config, &mut |_raw_op| Ok(()));
 
     for op in txrefs.into_iter().flat_map(|t| t.proto_ops().to_vec()) {
         match op {

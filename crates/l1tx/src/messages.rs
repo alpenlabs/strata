@@ -18,8 +18,8 @@ pub enum L1Event {
     GenesisVerificationState(u64, HeaderVerificationState),
 }
 
-/// Core protocol specific transaction. It can be thought of as relevant transactions for the
-/// Protocol
+/// Core protocol specific bitcoin transaction reference. A bitcoin transaction can have multiple
+/// operations relevant to protocol. This is used in the context of [`BlockData`].
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub struct ProtocolOpTxRef {
     /// Index of the transaction in the block
