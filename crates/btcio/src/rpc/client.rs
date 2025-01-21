@@ -445,11 +445,14 @@ impl SignerRpc for BitcoinClient {
 #[cfg(test)]
 mod test {
 
-    use bitcoin::{consensus, hashes::Hash, NetworkKind};
+    use bitcoin::{consensus, hashes::Hash, Amount, NetworkKind};
     use strata_common::logging;
 
     use super::*;
-    use crate::test_utils::corepc_node_helpers::{get_bitcoind_and_client, mine_blocks};
+    use crate::{
+        rpc::types::{CreateRawTransactionInput, CreateRawTransactionOutput},
+        test_utils::corepc_node_helpers::{get_bitcoind_and_client, mine_blocks},
+    };
 
     #[tokio::test()]
     async fn client_works() {
@@ -587,5 +590,98 @@ mod test {
             .unwrap();
         let expected = vec![ImportDescriptorResult { success: true }];
         assert_eq!(expected, got);
+    }
+
+    /// Create two transactions.
+    /// 1. Normal one: sends 1 BTC to an address that we control.
+    /// 2. CFFP: replaces the first transaction with a different one that we also control.
+    ///
+    /// This is needed because we must SIGN all these transactions, and we can't sign a transaction
+    /// that we don't control.
+    #[tokio::test()]
+    async fn submit_package() {
+        logging::init(logging::LoggerConfig::with_base_name("btcio-tests"));
+
+        let (bitcoind, client) = get_bitcoind_and_client();
+
+        // network
+        let got = client.network().await.unwrap();
+        let expected = Network::Regtest;
+        assert_eq!(expected, got);
+
+        let blocks = mine_blocks(&bitcoind, 101, None).unwrap();
+        let last_block = client.get_block(blocks.first().unwrap()).await.unwrap();
+        let coinbase_tx = last_block.coinbase().unwrap();
+
+        let destination = client.get_new_address().await.unwrap();
+        let change_address = client.get_new_address().await.unwrap();
+        let amount = Amount::from_btc(1.0).unwrap();
+        let change_amount = Amount::from_btc(48.999).unwrap(); // 0.0001 fee
+        let amount_minus_fees = Amount::from_sat(amount.to_sat() - 2_000);
+
+        let send_back_address = client.get_new_address().await.unwrap();
+        let parent_raw_tx = CreateRawTransaction {
+            inputs: vec![CreateRawTransactionInput {
+                txid: coinbase_tx.compute_txid().to_string(),
+                vout: 0,
+            }],
+            outputs: vec![
+                // Destination
+                CreateRawTransactionOutput::AddressAmount {
+                    address: destination.to_string(),
+                    amount: amount.to_btc(),
+                },
+                // Change
+                CreateRawTransactionOutput::AddressAmount {
+                    address: change_address.to_string(),
+                    amount: change_amount.to_btc(),
+                },
+            ],
+        };
+        let parent = client.create_raw_transaction(parent_raw_tx).await.unwrap();
+        let signed_parent: Transaction = consensus::encode::deserialize_hex(
+            client
+                .sign_raw_transaction_with_wallet(&parent)
+                .await
+                .unwrap()
+                .hex
+                .as_str(),
+        )
+        .unwrap();
+
+        // sanity check
+        let parent_submitted = client.send_raw_transaction(&signed_parent).await.unwrap();
+
+        let child_raw_tx = CreateRawTransaction {
+            inputs: vec![CreateRawTransactionInput {
+                txid: parent_submitted.to_string(),
+                vout: 0,
+            }],
+            outputs: vec![
+                // Send back
+                CreateRawTransactionOutput::AddressAmount {
+                    address: send_back_address.to_string(),
+                    amount: amount_minus_fees.to_btc(),
+                },
+            ],
+        };
+        let child = client.create_raw_transaction(child_raw_tx).await.unwrap();
+        let signed_child: Transaction = consensus::encode::deserialize_hex(
+            client
+                .sign_raw_transaction_with_wallet(&child)
+                .await
+                .unwrap()
+                .hex
+                .as_str(),
+        )
+        .unwrap();
+
+        // Ok now we have a parent and a child transaction.
+        let result = client
+            .submit_package(&[signed_parent, signed_child])
+            .await
+            .unwrap();
+        assert_eq!(result.tx_results.len(), 2);
+        assert_eq!(result.package_msg, "success");
     }
 }
