@@ -140,6 +140,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 &executor,
                 ctx.bitcoin_client.clone(),
                 params.clone(),
+                config.btcio.broadcaster.poll_interval_ms,
             );
             let writer_db = init_writer_database(rbdb.clone(), ops_config);
 
@@ -477,6 +478,7 @@ fn start_broadcaster_tasks(
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,
     params: Arc<Params>,
+    broadcast_poll_interval: u64,
 ) -> Arc<L1BroadcastHandle> {
     // Set up L1 broadcaster.
     let broadcast_ctx = strata_storage::ops::l1tx_broadcast::Context::new(
@@ -484,8 +486,13 @@ fn start_broadcaster_tasks(
     );
     let broadcast_ops = Arc::new(broadcast_ctx.into_ops(pool));
     // start broadcast task
-    let broadcast_handle =
-        spawn_broadcaster_task(executor, bitcoin_client.clone(), broadcast_ops, params);
+    let broadcast_handle = spawn_broadcaster_task(
+        executor,
+        bitcoin_client.clone(),
+        broadcast_ops,
+        params,
+        broadcast_poll_interval,
+    );
     Arc::new(broadcast_handle)
 }
 

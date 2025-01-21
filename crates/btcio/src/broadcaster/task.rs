@@ -15,17 +15,16 @@ use crate::{
     rpc::traits::{BroadcasterRpc, WalletRpc},
 };
 
-const BROADCAST_POLL_INTERVAL: u64 = 1_000; // millis
-
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task(
     rpc_client: Arc<impl BroadcasterRpc + WalletRpc>,
     ops: Arc<l1tx_broadcast::BroadcastDbOps>,
     mut entry_receiver: Receiver<(u64, L1TxEntry)>,
     params: Arc<Params>,
+    broadcast_poll_interval: u64,
 ) -> BroadcasterResult<()> {
     info!("Starting Broadcaster task");
-    let interval = tokio::time::interval(Duration::from_millis(BROADCAST_POLL_INTERVAL));
+    let interval = tokio::time::interval(Duration::from_millis(broadcast_poll_interval));
     tokio::pin!(interval);
 
     let mut state = BroadcasterState::initialize(&ops).await?;

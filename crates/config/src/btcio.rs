@@ -5,6 +5,7 @@ use serde::Deserialize;
 pub struct BtcioConfig {
     pub reader: ReaderConfig,
     pub writer: WriterConfig,
+    pub broadcaster: BroadcasterConfig,
 }
 
 /// Configuration for btcio reader.
@@ -38,6 +39,13 @@ pub enum FeePolicy {
     Fixed(u64),
 }
 
+/// Configuration for btcio broadcaster.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BroadcasterConfig {
+    /// How often to invoke the broadcaster, in ms.
+    pub poll_interval_ms: u64,
+}
+
 impl Default for WriterConfig {
     fn default() -> Self {
         Self {
@@ -53,6 +61,14 @@ impl Default for ReaderConfig {
     fn default() -> Self {
         Self {
             client_poll_dur_ms: 200,
+        }
+    }
+}
+
+impl Default for BroadcasterConfig {
+    fn default() -> Self {
+        Self {
+            poll_interval_ms: 1_000,
         }
     }
 }
