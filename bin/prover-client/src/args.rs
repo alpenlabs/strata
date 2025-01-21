@@ -110,14 +110,15 @@ pub struct Args {
 
     /// The wait time, in milliseconds, for the prover manager loop.
     ///
-    /// Adjust this value to control how frequently the prover manager checks for jobs.
-    /// Defaults to 1,000 milliseconds.
+    /// This value determines how frequently the prover manager checks for available jobs.
+    /// Adjust it to balance responsiveness and resource usage. The default value is 1,000
+    /// milliseconds.
     #[argh(
         option,
         description = "wait time in milliseconds for the prover manager loop",
         default = "1_000"
     )]
-    pub loop_interval: u64,
+    pub polling_interval: u64,
 
     /// Enables or disables development RPC endpoints.
     ///
@@ -125,6 +126,17 @@ pub struct Args {
     /// Defaults to `true`.
     #[argh(option, description = "enable prover client dev rpc", default = "true")]
     pub enable_dev_rpcs: bool,
+
+    /// Controls the checkpoint proof runner service.
+    ///
+    /// When enabled, prover will automatically generate and submit proofs for checkpoints.
+    /// Defaults to `false`.
+    #[argh(
+        option,
+        description = "enable prover client checkpoint runner",
+        default = "false"
+    )]
+    pub enable_checkpoint_runner: bool,
 }
 
 impl Args {
