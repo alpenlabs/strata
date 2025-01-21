@@ -141,7 +141,6 @@ mod tests {
         let script =
             generate_envelope_script_test(&[envelope1.clone(), envelope2.clone()], &params)
                 .unwrap();
-
         let result = parse_envelope_payloads(&script, params.rollup()).unwrap();
 
         assert_eq!(result, vec![envelope1, envelope2]);
