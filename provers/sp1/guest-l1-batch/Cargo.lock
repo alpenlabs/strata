@@ -2216,7 +2216,6 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-state",
- "strata-tx-parser",
  "strata-zkvm",
 ]
 
