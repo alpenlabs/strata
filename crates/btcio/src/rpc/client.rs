@@ -645,11 +645,11 @@ mod test {
     /// that we don't control.
     #[tokio::test()]
     async fn submit_package() {
-        logging::init(logging::LoggerConfig::with_base_name("btcio-tests"));
+        logging::init(logging::LoggerConfig::with_base_name("btcio-submitpackage"));
 
         let (bitcoind, client) = get_bitcoind_and_client();
 
-        // network
+        // network sanity check
         let got = client.network().await.unwrap();
         let expected = Network::Regtest;
         assert_eq!(expected, got);
@@ -661,7 +661,8 @@ mod test {
         let destination = client.get_new_address().await.unwrap();
         let change_address = client.get_new_address().await.unwrap();
         let amount = Amount::from_btc(1.0).unwrap();
-        let change_amount = Amount::from_btc(48.999).unwrap(); // 0.0001 fee
+        let fees = Amount::from_btc(0.0001).unwrap();
+        let change_amount = COINBASE_AMOUNT - amount - fees;
         let amount_minus_fees = Amount::from_sat(amount.to_sat() - 2_000);
 
         let send_back_address = client.get_new_address().await.unwrap();
