@@ -521,6 +521,46 @@ pub struct SignRawTransactionWithWallet {
     pub errors: Option<Vec<SignRawTransactionWithWalletError>>,
 }
 
+/// Models the optional previous transaction outputs argument for the method
+/// `signrawtransactionwithwallet`.
+///
+/// These are the outputs that this transaction depends on but may not yet be in the block chain.
+/// Widely used for One Parent One Child (1P1C) Relay in Bitcoin >28.0.
+///
+/// > transaction outputs
+/// > [
+/// > {                            (json object)
+/// > "txid": "hex",             (string, required) The transaction id
+/// > "vout": n,                 (numeric, required) The output number
+/// > "scriptPubKey": "hex",     (string, required) The output script
+/// > "redeemScript": "hex",     (string, optional) (required for P2SH) redeem script
+/// > "witnessScript": "hex",    (string, optional) (required for P2WSH or P2SH-P2WSH) witness
+/// > script
+/// > "amount": amount,          (numeric or string, optional) (required for Segwit inputs) the
+/// > amount spent
+/// > },
+/// > ...
+/// > ]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct PreviousTransactionOutput {
+    /// The transaction id.
+    #[serde(deserialize_with = "deserialize_txid")]
+    pub txid: Txid,
+    /// The output number.
+    pub vout: u32,
+    /// The output script.
+    #[serde(rename = "scriptPubKey")]
+    pub script_pubkey: String,
+    /// The redeem script.
+    #[serde(rename = "redeemScript")]
+    pub redeem_script: Option<String>,
+    /// The witness script.
+    #[serde(rename = "witnessScript")]
+    pub witness_script: Option<String>,
+    /// The amount spent.
+    pub amount: Option<f64>,
+}
+
 /// Models the result of the JSON-RPC method `listdescriptors`.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ListDescriptors {
