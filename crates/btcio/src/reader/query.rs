@@ -6,22 +6,26 @@ use std::{
 
 use anyhow::bail;
 use bitcoin::{Block, BlockHash};
+use secp256k1::XOnlyPublicKey;
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
     messages::{BlockData, L1Event, RelevantTxEntry},
 };
-use strata_primitives::params::Params;
-use strata_state::l1::{
-    get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
-    L1BlockId, TimestampStore,
+use strata_primitives::{block_credential::CredRule, params::Params};
+use strata_state::{
+    l1::{
+        get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
+        L1BlockId, TimestampStore,
+    },
+    sync_event::SyncEvent,
 };
 use strata_status::StatusChannel;
-use tokio::sync::mpsc;
+use strata_storage::L1BlockManager;
 use tracing::*;
 
 use crate::{
-    reader::{state::ReaderState, tx_indexer::ReaderTxVisitorImpl},
+    reader::{handler::handle_bitcoin_event, state::ReaderState, tx_indexer::ReaderTxVisitorImpl},
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -31,8 +35,8 @@ struct ReaderContext<R: ReaderRpc> {
     /// Bitcoin reader client
     client: Arc<R>,
 
-    /// L1Event sender
-    event_tx: mpsc::Sender<L1Event>,
+    /// L1db manager
+    l1_manager: Arc<L1BlockManager>,
 
     /// Config
     config: Arc<ReaderConfig>,
@@ -42,31 +46,45 @@ struct ReaderContext<R: ReaderRpc> {
 
     /// Status transmitter
     status_channel: StatusChannel,
+
+    /// Sequencer Pubkey
+    seq_pubkey: Option<XOnlyPublicKey>,
 }
 
 /// The main task that initializes the reader state and starts reading from bitcoin.
 pub async fn bitcoin_data_reader_task(
     client: Arc<impl ReaderRpc>,
-    event_tx: mpsc::Sender<L1Event>,
+    l1_manager: Arc<L1BlockManager>,
     target_next_block: u64,
     config: Arc<ReaderConfig>,
     params: Arc<Params>,
     status_channel: StatusChannel,
+    submit_event: impl Fn(SyncEvent) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
+    let seq_pubkey = match params.rollup.cred_rule {
+        CredRule::Unchecked => None,
+        CredRule::SchnorrKey(buf32) => Some(
+            XOnlyPublicKey::try_from(buf32)
+                .expect("the sequencer pubkey must be valid in the params"),
+        ),
+    };
+
     let ctx = ReaderContext {
         client,
-        event_tx,
+        l1_manager,
         config,
         params,
         status_channel,
+        seq_pubkey,
     };
-    do_reader_task(ctx, target_next_block).await
+    do_reader_task(ctx, target_next_block, submit_event).await
 }
 
 /// Inner function that actually does the reading task.
 async fn do_reader_task<R: ReaderRpc>(
     ctx: ReaderContext<R>,
     target_next_block: u64,
+    submit_event: impl Fn(SyncEvent) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -81,32 +99,42 @@ async fn do_reader_task<R: ReaderRpc>(
         let cur_best_height = state.best_block_idx();
 
         // See if epoch/filter rules have changed
-        if let Some(new_config) = update_epoch_and_filter_config(&ctx, &mut state).await? {
-            let epoch = state.epoch();
-            debug!(%epoch, ?new_config, "New filter rule received, will revert to the last checkpoint's height");
-            handle_new_filter_rule(&ctx, &mut state).await?;
-        }
+        check_and_handle_new_filter_config(&ctx, &mut state, &submit_event).await?;
 
         let poll_span = debug_span!("l1poll", %cur_best_height);
 
-        if let Err(err) = poll_for_new_blocks(&ctx, &mut state, &mut status_updates)
+        match poll_for_new_blocks(&ctx, &mut state, &mut status_updates)
             .instrument(poll_span)
             .await
         {
-            warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
-            status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
+            Err(err) => {
+                warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
+                status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
 
-            if let Some(err) = err.downcast_ref::<reqwest::Error>() {
-                // recoverable errors
-                if err.is_connect() {
-                    status_updates.push(L1StatusUpdate::RpcConnected(false));
-                }
-                // unrecoverable errors
-                if err.is_builder() {
-                    panic!("btcio: couldn't build the L1 client");
+                if let Some(err) = err.downcast_ref::<reqwest::Error>() {
+                    // recoverable errors
+                    if err.is_connect() {
+                        status_updates.push(L1StatusUpdate::RpcConnected(false));
+                    }
+                    // unrecoverable errors
+                    if err.is_builder() {
+                        panic!("btcio: couldn't build the L1 client");
+                    }
                 }
             }
-        }
+            Ok(events) => {
+                // handle events
+                for ev in events {
+                    handle_bitcoin_event(
+                        ev,
+                        ctx.l1_manager.as_ref(),
+                        &submit_event,
+                        ctx.params.as_ref(),
+                        &ctx.seq_pubkey,
+                    )?;
+                }
+            }
+        };
 
         tokio::time::sleep(poll_dur).await;
 
@@ -121,38 +149,15 @@ async fn do_reader_task<R: ReaderRpc>(
     }
 }
 
-/// Reverts the reader state to the height where the last checkpoint is finalized.
-async fn handle_new_filter_rule<R: ReaderRpc>(
-    ctx: &ReaderContext<R>,
-    state: &mut ReaderState,
-) -> anyhow::Result<()> {
-    // Get the L1 height corresponding to the new epoch
-    let last_checkpt_height = ctx
-        .status_channel
-        .get_last_checkpoint()
-        .expect("got epoch change without checkpoint finalized")
-        .height;
-
-    // Now, we need to revert to the point before the last checkpoint height.
-    state.rollback_to_height(last_checkpt_height);
-
-    // Send L1 revert so that the recent txs can be appropriately re-filtered
-    info!(%last_checkpt_height, "Reverting back to last checkpoint height");
-    let revert_ev = L1Event::RevertTo(last_checkpt_height);
-    if ctx.event_tx.send(revert_ev).await.is_err() {
-        warn!("unable to submit L1 reorg event, did persistence task exit?");
-    }
-
-    Ok(())
-}
-
 /// Checks and updates epoch and filter config changes. Returns the new filter config if changed
 /// else returns None.
-async fn update_epoch_and_filter_config<R: ReaderRpc>(
+async fn check_and_handle_new_filter_config<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
-) -> anyhow::Result<Option<TxFilterConfig>> {
+    submit_event: &impl Fn(SyncEvent) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
     let new_epoch = ctx.status_channel.epoch().unwrap_or(0);
+    println!("new epoch {}", new_epoch);
     // TODO: check if new_epoch < current epoch. should panic if so?
     let curr_epoch = state.epoch();
 
@@ -165,10 +170,25 @@ async fn update_epoch_and_filter_config<R: ReaderRpc>(
 
         if new_config != *curr_filter_config {
             state.set_filter_config(new_config.clone());
-            return Ok(Some(new_config));
+            let last_checkpt_height = ctx
+                .status_channel
+                .get_last_checkpoint()
+                .expect("got epoch change without checkpoint finalized")
+                .height;
+            // Now, we need to revert to the point before the last checkpoint height.
+            state.rollback_to_height(last_checkpt_height);
+            // Create revert event
+            let revert_ev = L1Event::RevertTo(last_checkpt_height);
+            handle_bitcoin_event(
+                revert_ev,
+                ctx.l1_manager.as_ref(),
+                submit_event,
+                ctx.params.as_ref(),
+                &ctx.seq_pubkey,
+            )?;
         }
     }
-    Ok(None)
+    Ok(())
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
@@ -220,12 +240,13 @@ async fn init_reader_state<R: ReaderRpc>(
 }
 
 /// Polls the chain to see if there's new blocks to look at, possibly reorging
-/// if there's a mixup and we have to go back.
+/// if there's a mixup and we have to go back. Returns events corresponding to block and
+/// transactions.
 async fn poll_for_new_blocks<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<L1Event>> {
     let chain_info = ctx.client.get_blockchain_info().await?;
     status_updates.push(L1StatusUpdate::RpcConnected(true));
     let client_height = chain_info.blocks;
@@ -236,8 +257,10 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
 
     if fresh_best_block == *state.best_block() {
         trace!("polled client, nothing to do");
-        return Ok(());
+        return Ok(vec![]);
     }
+
+    let mut events = Vec::new();
 
     // First, check for a reorg if there is one.
     if let Some((pivot_height, pivot_blkid)) = find_pivot_block(ctx.client.as_ref(), state).await? {
@@ -245,9 +268,7 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
             info!(%pivot_height, %pivot_blkid, "found apparent reorg");
             state.rollback_to_height(pivot_height);
             let revert_ev = L1Event::RevertTo(pivot_height);
-            if ctx.event_tx.send(revert_ev).await.is_err() {
-                warn!("unable to submit L1 reorg event, did persistence task exit?");
-            }
+            events.push(revert_ev);
         }
     } else {
         // TODO make this case a bit more structured
@@ -260,18 +281,19 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
     // Now process each block we missed.
     let scan_start_height = state.next_height();
     for fetch_height in scan_start_height..=client_height {
-        let l1blkid = match fetch_and_process_block(ctx, fetch_height, state, status_updates).await
-        {
-            Ok(b) => b,
+        match fetch_and_process_block(ctx, fetch_height, state, status_updates).await {
+            Ok((blkid, ev)) => {
+                events.push(ev);
+                info!(%fetch_height, %blkid, "accepted new block");
+            }
             Err(e) => {
                 warn!(%fetch_height, err = %e, "failed to fetch new block");
                 break;
             }
         };
-        info!(%fetch_height, %l1blkid, "accepted new block");
     }
 
-    Ok(())
+    Ok(events)
 }
 
 /// Finds the highest block index where we do agree with the node.  If we never
@@ -302,19 +324,14 @@ async fn fetch_and_process_block<R: ReaderRpc>(
     height: u64,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
-) -> anyhow::Result<BlockHash> {
+) -> anyhow::Result<(BlockHash, L1Event)> {
     let block = ctx.client.get_block_at(height).await?;
     let (ev, l1blkid) = process_block(ctx, state, status_updates, height, block).await?;
-
-    if let Err(e) = ctx.event_tx.send(ev).await {
-        error!("failed to submit L1 block event, did the persistence task crash?");
-        return Err(e.into());
-    }
 
     // Insert to new block, incrementing cur_height.
     let _deep = state.accept_new_block(l1blkid);
 
-    Ok(l1blkid)
+    Ok((l1blkid, ev))
 }
 
 /// Processes a bitcoin Block to return corresponding `L1Event` and `BlockHash`.
@@ -352,17 +369,8 @@ async fn process_block<R: ReaderRpc>(
         info!(%height, %genesis_ht, "time for genesis");
         let l1_verification_state =
             get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
-        if let Err(e) = ctx
-            .event_tx
-            .send(L1Event::GenesisVerificationState(
-                height,
-                l1_verification_state,
-            ))
-            .await
-        {
-            error!("failed to submit L1 block event, did the persistence task crash?");
-            return Err(e.into());
-        }
+        let ev = L1Event::GenesisVerificationState(height, l1_verification_state);
+        return Ok((ev, l1blkid));
     }
 
     let ev = L1Event::BlockData(block_data, state.epoch());
@@ -429,11 +437,13 @@ mod test {
         params::DepositTxParams,
         sorted_vec::SortedVec,
     };
+    use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
         chain_state::Chainstate,
         client_state::{ClientState, L1Checkpoint},
     };
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
+    use threadpool::ThreadPool;
 
     use super::*;
     use crate::test_utils::{
@@ -441,25 +451,28 @@ mod test {
         TestBitcoinClient,
     };
 
+    /// Used to populate recent blocks in reader state.
     const N_RECENT_BLOCKS: usize = 10;
 
-    fn get_reader_ctx(
-        event_tx: mpsc::Sender<L1Event>,
-        chs: Chainstate,
-        cls: ClientState,
-    ) -> ReaderContext<TestBitcoinClient> {
+    fn get_reader_ctx(chs: Chainstate, cls: ClientState) -> ReaderContext<TestBitcoinClient> {
         let mut gen = ArbitraryGenerator::new();
         let l1status: L1Status = gen.generate();
         let status_channel = StatusChannel::new(cls, l1status, Some(chs));
         let params = Arc::new(gen_params());
         let config = Arc::new(ReaderConfig::default());
         let client = Arc::new(TestBitcoinClient::new(1));
+
+        let (rbdb, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let l1_db = Arc::new(L1Db::new(rbdb.clone(), db_ops));
+        let pool = ThreadPool::new(1);
+        let l1_manager = Arc::new(L1BlockManager::new(pool, l1_db));
         ReaderContext {
-            event_tx,
+            l1_manager,
             config,
             status_channel,
             params,
             client,
+            seq_pubkey: None,
         }
     }
 
@@ -504,40 +517,40 @@ mod test {
 
     #[tokio::test]
     async fn test_epoch_change() {
-        let (event_tx, _event_rx) = mpsc::channel::<L1Event>(10);
         let mut chstate: Chainstate = ArbitraryGenerator::new().generate();
         let clstate: ClientState = ArbitraryGenerator::new().generate();
         let curr_epoch = chstate.cur_epoch();
+        println!("curr epoch {:?}", curr_epoch);
 
-        let ctx = get_reader_ctx(event_tx, chstate.clone(), clstate);
+        let ctx = get_reader_ctx(chstate.clone(), clstate);
         let mut state = get_reader_state(&ctx);
+        println!("STATE: {:?}", state);
 
         // Update new chainstate from status channel
         chstate.set_epoch(curr_epoch + 1);
         ctx.status_channel.update_chainstate(chstate);
+        let old_filter_config = state.filter_config().clone();
 
         // Now If we check for filter rule changes
-        let new_config = update_epoch_and_filter_config(&ctx, &mut state)
+        check_and_handle_new_filter_config(&ctx, &mut state, &|_| Ok(()))
             .await
             .unwrap();
 
         // The state's epoch should be updated
         assert_eq!(state.epoch(), curr_epoch + 1);
 
-        assert!(new_config.is_some());
         // Check that state's filter config is updated
-        assert!(new_config.unwrap() == *state.filter_config());
+        assert!(old_filter_config != *state.filter_config());
     }
 
     /// Checks that when new epoch occurs, reverts the reader state back to the height of last
     /// finalized checkpoint.
     #[tokio::test]
-    async fn test_handle_new_filter_rule() {
-        let (event_tx, _event_rx) = mpsc::channel::<L1Event>(10);
+    async fn test_new_filter_rule() {
         let chstate: Chainstate = ArbitraryGenerator::new().generate();
         let mut clstate: ClientState = ArbitraryGenerator::new().generate();
 
-        let ctx = get_reader_ctx(event_tx, chstate.clone(), clstate.clone());
+        let ctx = get_reader_ctx(chstate.clone(), clstate.clone());
         let mut state = get_reader_state(&ctx);
 
         let checkpoint_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
@@ -551,7 +564,10 @@ mod test {
         // Update the client state with new checkpoint height
         ctx.status_channel.update_client_state(clstate);
 
-        handle_new_filter_rule(&ctx, &mut state).await.unwrap();
+        // Now If we check for filter rule changes
+        check_and_handle_new_filter_config(&ctx, &mut state, &|_| Ok(()))
+            .await
+            .unwrap();
 
         // Check the reader state's next_height
         assert_eq!(state.next_height(), checkpoint_height + 1);

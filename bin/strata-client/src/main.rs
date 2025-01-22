@@ -340,6 +340,8 @@ fn start_core_tasks(
     )?
     .into();
 
+    let l1db = database.l1_db().clone();
+    let l1_manager = Arc::new(L1BlockManager::new(pool.clone(), l1db));
     // Start the L1 tasks to get that going.
     l1_reader::start_reader_tasks(
         executor,
