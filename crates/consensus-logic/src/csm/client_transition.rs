@@ -21,7 +21,7 @@ use strata_storage::NodeStorage;
 use tracing::*;
 use zkaleido::ProofReceipt;
 
-use crate::{errors::*, genesis::make_genesis_block, l1_handler::verify_proof};
+use crate::{errors::*, genesis::make_genesis_block, util::verify_proof};
 
 /// Interface for external context necessary specifically for event validation.
 pub trait EventContext {
