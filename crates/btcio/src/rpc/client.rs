@@ -30,8 +30,8 @@ use crate::rpc::{
     types::{
         CreateRawTransaction, CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo,
         GetNewAddress, GetTransaction, GetTxOut, ImportDescriptor, ImportDescriptorResult,
-        ListDescriptors, ListTransactions, ListUnspent, SignRawTransactionWithWallet,
-        SubmitPackage, TestMempoolAccept,
+        ListDescriptors, ListTransactions, ListUnspent, PreviousTransactionOutput,
+        SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
 };
 
@@ -371,12 +371,14 @@ impl SignerRpc for BitcoinClient {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,
+        prev_outputs: Option<Vec<PreviousTransactionOutput>>,
     ) -> ClientResult<SignRawTransactionWithWallet> {
         let tx_hex = serialize_hex(tx);
         trace!(tx_hex = %tx_hex, "Signing transaction");
+        trace!(?prev_outputs, "Signing transaction with previous outputs");
         self.call::<SignRawTransactionWithWallet>(
             "signrawtransactionwithwallet",
-            &[to_value(tx_hex)?],
+            &[to_value(tx_hex)?, to_value(prev_outputs)?],
         )
         .await
     }
@@ -445,7 +447,7 @@ impl SignerRpc for BitcoinClient {
 #[cfg(test)]
 mod test {
 
-    use bitcoin::{consensus, hashes::Hash, Amount, NetworkKind};
+    use bitcoin::{consensus, hashes::Hash, transaction, Amount, NetworkKind};
     use strata_common::logging;
 
     use super::*;
@@ -535,7 +537,10 @@ mod test {
         assert_eq!(expected, got);
 
         // sign_raw_transaction_with_wallet
-        let got = client.sign_raw_transaction_with_wallet(&tx).await.unwrap();
+        let got = client
+            .sign_raw_transaction_with_wallet(&tx, None)
+            .await
+            .unwrap();
         assert!(got.complete);
         assert!(consensus::encode::deserialize_hex::<Transaction>(&got.hex).is_ok());
 
@@ -687,7 +692,7 @@ mod test {
         let parent = client.create_raw_transaction(parent_raw_tx).await.unwrap();
         let signed_parent: Transaction = consensus::encode::deserialize_hex(
             client
-                .sign_raw_transaction_with_wallet(&parent)
+                .sign_raw_transaction_with_wallet(&parent, None)
                 .await
                 .unwrap()
                 .hex
@@ -714,7 +719,7 @@ mod test {
         let child = client.create_raw_transaction(child_raw_tx).await.unwrap();
         let signed_child: Transaction = consensus::encode::deserialize_hex(
             client
-                .sign_raw_transaction_with_wallet(&child)
+                .sign_raw_transaction_with_wallet(&child, None)
                 .await
                 .unwrap()
                 .hex
@@ -723,6 +728,107 @@ mod test {
         .unwrap();
 
         // Ok now we have a parent and a child transaction.
+        let result = client
+            .submit_package(&[signed_parent, signed_child])
+            .await
+            .unwrap();
+        assert_eq!(result.tx_results.len(), 2);
+        assert_eq!(result.package_msg, "success");
+    }
+
+    /// Similar to [`submit_package`], but with where the parent does not pay fees,
+    /// and the child has to pay fees.
+    ///
+    /// This is called 1P1C because it has one parent and one child.
+    /// See <https://bitcoinops.org/en/bitcoin-core-28-wallet-integration-guide/>
+    /// for more information.
+    #[tokio::test]
+    async fn submit_package_1p1c() {
+        logging::init(logging::LoggerConfig::with_base_name(
+            "btcio-submitpackage-1p1c",
+        ));
+
+        let (bitcoind, client) = get_bitcoind_and_client();
+
+        // 1p1c sanity check
+        let server_version = bitcoind.client.server_version().unwrap();
+        assert!(server_version > 28);
+
+        let destination = client.get_new_address().await.unwrap();
+
+        let blocks = mine_blocks(&bitcoind, 101, None).unwrap();
+        let last_block = client.get_block(blocks.first().unwrap()).await.unwrap();
+        let coinbase_tx = last_block.coinbase().unwrap();
+
+        let parent_raw_tx = CreateRawTransaction {
+            inputs: vec![CreateRawTransactionInput {
+                txid: coinbase_tx.compute_txid().to_string(),
+                vout: 0,
+            }],
+            outputs: vec![CreateRawTransactionOutput::AddressAmount {
+                address: destination.to_string(),
+                amount: COINBASE_AMOUNT.to_btc(),
+            }],
+        };
+        let mut parent = client.create_raw_transaction(parent_raw_tx).await.unwrap();
+        parent.version = transaction::Version(3);
+        assert_eq!(parent.version, transaction::Version(3));
+        trace!(?parent, "parent:");
+        let signed_parent: Transaction = consensus::encode::deserialize_hex(
+            client
+                .sign_raw_transaction_with_wallet(&parent, None)
+                .await
+                .unwrap()
+                .hex
+                .as_str(),
+        )
+        .unwrap();
+        assert_eq!(signed_parent.version, transaction::Version(3));
+
+        // Assert that the parent tx cannot be broadcasted.
+        let parent_broadcasted = client.send_raw_transaction(&signed_parent).await;
+        assert!(parent_broadcasted.is_err());
+
+        // 5k sats as fees.
+        let amount_minus_fees = Amount::from_sat(COINBASE_AMOUNT.to_sat() - 43_000);
+        let child_raw_tx = CreateRawTransaction {
+            inputs: vec![CreateRawTransactionInput {
+                txid: signed_parent.compute_txid().to_string(),
+                vout: 0,
+            }],
+            outputs: vec![CreateRawTransactionOutput::AddressAmount {
+                address: destination.to_string(),
+                amount: amount_minus_fees.to_btc(),
+            }],
+        };
+        let mut child = client.create_raw_transaction(child_raw_tx).await.unwrap();
+        child.version = transaction::Version(3);
+        assert_eq!(child.version, transaction::Version(3));
+        trace!(?child, "child:");
+        let prev_outputs = vec![PreviousTransactionOutput {
+            txid: parent.compute_txid(),
+            vout: 0,
+            script_pubkey: parent.output[0].script_pubkey.to_hex_string(),
+            redeem_script: None,
+            witness_script: None,
+            amount: Some(COINBASE_AMOUNT.to_btc()),
+        }];
+        let signed_child: Transaction = consensus::encode::deserialize_hex(
+            client
+                .sign_raw_transaction_with_wallet(&child, Some(prev_outputs))
+                .await
+                .unwrap()
+                .hex
+                .as_str(),
+        )
+        .unwrap();
+        assert_eq!(signed_child.version, transaction::Version(3));
+
+        // Assert that the child tx cannot be broadcasted.
+        let child_broadcasted = client.send_raw_transaction(&signed_child).await;
+        assert!(child_broadcasted.is_err());
+
+        // Let's send as a package 1C1P.
         let result = client
             .submit_package(&[signed_parent, signed_child])
             .await

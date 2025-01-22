@@ -16,8 +16,9 @@ use crate::{
         traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
         types::{
             CreateRawTransaction, GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor,
-            ImportDescriptorResult, ListTransactions, ListUnspent, ScriptPubkey,
-            SignRawTransactionWithWallet, SubmitPackage, SubmitPackageTxResult, TestMempoolAccept,
+            ImportDescriptorResult, ListTransactions, ListUnspent, PreviousTransactionOutput,
+            ScriptPubkey, SignRawTransactionWithWallet, SubmitPackage, SubmitPackageTxResult,
+            TestMempoolAccept,
         },
         ClientResult,
     },
@@ -254,6 +255,7 @@ impl SignerRpc for TestBitcoinClient {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,
+        _prev_outputs: Option<Vec<PreviousTransactionOutput>>,
     ) -> ClientResult<SignRawTransactionWithWallet> {
         let tx_hex = consensus::encode::serialize_hex(tx);
         Ok(SignRawTransactionWithWallet {

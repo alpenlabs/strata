@@ -5,8 +5,8 @@ use crate::rpc::{
     client::ClientResult,
     types::{
         CreateRawTransaction, GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor,
-        ImportDescriptorResult, ListTransactions, ListUnspent, SignRawTransactionWithWallet,
-        SubmitPackage, TestMempoolAccept,
+        ImportDescriptorResult, ListTransactions, ListUnspent, PreviousTransactionOutput,
+        SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
 };
 
@@ -190,6 +190,7 @@ pub trait SignerRpc {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,
+        prev_outputs: Option<Vec<PreviousTransactionOutput>>,
     ) -> ClientResult<SignRawTransactionWithWallet>;
 
     /// Gets the underlying [`Xpriv`] from the wallet.
