@@ -53,11 +53,15 @@ jobs:
 
       - name: Run performance evaluation
         run: |
+          # If this is a pull_request event, set --post-to-gba
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            POST_FLAG="--post-to-gh"
+          fi
           cargo run --profile prover-ci -- \
-          --post-to-gh \
           --github-token "${{ secrets.GITHUB_TOKEN }}" \
           --pr-number "${{ github.event.pull_request.number }}" \
           --commit-hash "${{ github.sha }}" \
+          $POST_FLAG
         working-directory: provers/perf
         env:
           RUSTFLAGS: "-C target-cpu=native -C link-arg=-fuse-ld=lld"
