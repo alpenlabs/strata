@@ -224,7 +224,11 @@ fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
 /// Generates the ELF contents and VK hash for a given program.
 #[cfg(not(debug_assertions))]
 fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
-    let features = {
+    let mut build_args = BuildArgs {
+        ..Default::default()
+    };
+
+    build_args.features = {
         #[cfg(feature = "mock")]
         {
             vec!["mock".to_string()]
@@ -235,10 +239,14 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
         }
     };
 
-    let build_args = BuildArgs {
-        features,
-        ..Default::default()
-    };
+    // In the Docker build, override the guest program’s Cargo workspace root with the Strata
+    // workspace root so Docker mounts the entire Strata workspace, enabling the guest program
+    // to import Strata crates relatively.
+    #[cfg(feature = "docker-build")]
+    {
+        build_args.docker = true;
+        build_args.workspace_directory = Some("../../..".to_owned());
+    }
 
     // Build the program with the specified arguments
     // Note: SP1_v4's build_programs_with_args does not handle ELF migration
