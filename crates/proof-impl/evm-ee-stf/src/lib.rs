@@ -25,8 +25,8 @@ use db::InMemoryDBHelper;
 use mpt::keccak;
 pub use primitives::{EvmBlockStfInput, EvmBlockStfOutput};
 use processor::{EvmConfig, EvmProcessor};
-use reth_primitives::revm_primitives::alloy_primitives::B256;
 use revm::{primitives::SpecId, InMemoryDB};
+use revm_primitives::alloy_primitives::B256;
 use strata_reth_evm::collect_withdrawal_intents;
 use strata_zkvm::ZkVmEnv;
 use utils::generate_exec_update;
@@ -72,8 +72,7 @@ pub fn process_block_transaction(
     // TODO: Optimize receipt iteration by implementing bloom filters or adding hints to
     // `ElBlockStfInput`. This will allow for efficient filtering of`WithdrawalIntentEvents`.
     let withdrawal_intents =
-        collect_withdrawal_intents(receipts.into_iter().map(|el| Some(el.receipt)))
-            .collect::<Vec<_>>();
+        collect_withdrawal_intents(receipts.into_iter().map(Some)).collect::<Vec<_>>();
 
     // Construct the public parameters for the proof
     EvmBlockStfOutput {

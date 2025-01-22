@@ -26,10 +26,6 @@ k256 = { version = "=0.13.3", features = [
 ], default-features = false }
 reth-primitives = { workspace = true, features = ["serde-bincode-compat"] }
 reth-primitives-traits.workspace = true
-reth-trie-common = { workspace = true, features = [
-  "serde-bincode-compat",
-  "eip1186",
-] }
 revm.workspace = true
 revm-primitives.workspace = true
 rlp = "0.5.2"

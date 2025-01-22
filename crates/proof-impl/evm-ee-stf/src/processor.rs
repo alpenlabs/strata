@@ -18,13 +18,13 @@
 use std::{mem, mem::take};
 
 use alloy_consensus::constants::{GWEI_TO_WEI, MAXIMUM_EXTRA_DATA_SIZE};
-use alloy_eips::eip1559::BaseFeeParams;
+use alloy_eips::{eip1559::BaseFeeParams, eip2718::Encodable2718};
 use alloy_primitives::map::DefaultHashBuilder;
-use alloy_rlp::{BufMut, Encodable};
+use alloy_rlp::BufMut;
 use alloy_rpc_types_eth::TransactionTrait;
 use alloy_trie::root::ordered_trie_root_with_encoder;
 use anyhow::anyhow;
-use reth_primitives::{Header, Receipt, ReceiptWithBloom, Transaction, TransactionSigned};
+use reth_primitives::{Header, Receipt, Transaction, TransactionSigned};
 use reth_primitives_traits::{constants::MINIMUM_GAS_LIMIT, SignedTransaction};
 use revm::{
     db::{AccountState, InMemoryDB},
@@ -165,7 +165,7 @@ where
     }
 
     /// Processes each transaction and collect receipts and storage changes.
-    pub fn execute(&mut self) -> Vec<ReceiptWithBloom<reth_primitives::Receipt>> {
+    pub fn execute(&mut self) -> Vec<reth_primitives::Receipt> {
         let gwei_to_wei: U256 = U256::from(GWEI_TO_WEI);
         let mut evm = Evm::builder()
             .with_spec_id(self.evm_config.spec_id)
@@ -225,7 +225,6 @@ where
 
             // Update logs bloom.
             logs_bloom.accrue_bloom(&receipt.bloom_slow());
-            let receipt = ReceiptWithBloom::from(receipt);
             receipts.push(receipt);
 
             // Commit state changes.
@@ -252,7 +251,7 @@ where
             tx.eip2718_encode(&tx.signature, buf);
         });
         h.receipts_root = ordered_trie_root_with_encoder(&receipts, |receipt, buf| {
-            receipt.encode(buf);
+            receipt.with_bloom_ref().encode_2718(buf);
         });
         h.withdrawals_root = Some(ordered_trie_root_with_encoder(
             &self.input.withdrawals,

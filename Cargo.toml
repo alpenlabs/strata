@@ -139,7 +139,8 @@ alloy-rpc-types-eth = { version = "0.7.3", default-features = false, features = 
 ] }
 alloy-serde = { version = "0.7.3", default-features = false }
 alloy-sol-types = "0.8.11"
-alloy-trie = { version = "0.7", default-features = false }
+# TODO: fix exact version during the next reth bump.
+alloy-trie = { version = "=0.7.6", default-features = false }
 revm = { version = "18.0.0", features = ["std"], default-features = false }
 revm-primitives = { version = "14.0.0", features = [
   "std",

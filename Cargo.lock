@@ -1301,15 +1301,15 @@ dependencies = [
 
 [[package]]
 name = "alloy-trie"
-version = "0.7.8"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6917c79e837aa7b77b7a6dae9f89cbe15313ac161c4d3cfaf8909ef21f3d22d8"
+checksum = "3a5fd8fea044cc9a8c8a50bb6f28e31f0385d820f116c5b98f6f4e55d6e5590b"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "arrayvec",
  "derive_more",
- "nybbles 0.3.4",
+ "nybbles",
  "serde",
  "smallvec",
  "tracing",
@@ -6802,19 +6802,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nybbles"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8983bb634df7248924ee0c4c3a749609b5abcb082c28fffe3254b3eb3602b307"
-dependencies = [
- "alloy-rlp",
- "const-hex",
- "proptest",
- "serde",
- "smallvec",
-]
-
-[[package]]
 name = "objc"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9425,7 +9412,7 @@ dependencies = [
  "alloy-eips 0.7.3",
  "alloy-primitives",
  "alloy-rlp",
- "nybbles 0.2.1",
+ "nybbles",
  "reth-consensus",
  "reth-prune-types",
  "reth-storage-errors",
@@ -10785,7 +10772,7 @@ dependencies = [
  "bytes",
  "derive_more",
  "itertools 0.13.0",
- "nybbles 0.2.1",
+ "nybbles",
  "reth-codecs",
  "reth-primitives-traits",
  "revm-primitives",
@@ -13306,7 +13293,6 @@ dependencies = [
  "k256",
  "reth-primitives",
  "reth-primitives-traits",
- "reth-trie-common",
  "revm",
  "revm-primitives",
  "rlp",

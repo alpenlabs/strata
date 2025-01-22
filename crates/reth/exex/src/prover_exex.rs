@@ -140,13 +140,6 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
         .ok_or(eyre!("failed to recover senders"))?;
 
     let accessed_states = get_accessed_states(ctx, &block_execution_input, prev_block_idx)?;
-
-    let current_block_txns = current_block
-        .body
-        .transactions()
-        .cloned()
-        .collect::<Vec<TransactionSigned>>();
-
     let prev_state_root = prev_block.state_root;
 
     let mut parent_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
@@ -203,7 +196,7 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
         timestamp: current_block.header.timestamp,
         extra_data: current_block.header.extra_data,
         mix_hash: current_block.header.mix_hash,
-        transactions: current_block_txns,
+        transactions: current_block.body.transactions,
         withdrawals,
         pre_state_trie: state_trie,
         pre_state_storage: storage,
