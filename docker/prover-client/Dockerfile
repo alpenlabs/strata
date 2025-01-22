@@ -22,11 +22,14 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
 
 COPY . .
 
+# Accept an argument for Cargo features
+ARG PROVER_FEATURES=""
+
 # Build dependencies in release mode
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cargo build --release --bin strata-prover-client
+    cargo build --release --bin strata-prover-client -F ${PROVER_FEATURES}
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
