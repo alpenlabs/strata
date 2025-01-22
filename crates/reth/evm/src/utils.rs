@@ -30,23 +30,21 @@ pub fn wei_to_sats(wei: U256) -> (U256, U256) {
 /// A [`Descriptor`], if invalid does not create an [`WithdrawalIntent`].
 pub fn collect_withdrawal_intents(
     receipts: impl Iterator<Item = Option<Receipt>>,
-) -> impl Iterator<Item = Option<WithdrawalIntent>> {
+) -> impl Iterator<Item = WithdrawalIntent> {
     receipts
         .flatten()
         .flat_map(|receipt| receipt.logs)
         .filter(|log| log.address == BRIDGEOUT_ADDRESS)
         .filter_map(|log| {
             WithdrawalIntentEvent::decode_log(&log, true)
-                .map(|evt| {
-                    let descriptor = Descriptor::from_bytes(&evt.destination);
-                    match descriptor {
-                        Ok(valid_descriptor) => Some(WithdrawalIntent {
+                .ok()
+                .and_then(|evt| {
+                    Descriptor::from_bytes(&evt.destination)
+                        .ok()
+                        .map(|valid_descriptor| WithdrawalIntent {
                             amt: evt.amount,
                             destination: valid_descriptor,
-                        }),
-                        Err(_) => None,
-                    }
+                        })
                 })
-                .ok()
         })
 }
