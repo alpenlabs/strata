@@ -18,6 +18,7 @@ pub enum ProtocolOperation {
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
     // TODO: add other kinds like proofs and state diffs
+    // DACommitment(Buf32),
 }
 
 /// Similar to [`ProtocolOperation`] except that this also contains blob data which is not relevant
@@ -34,6 +35,7 @@ pub enum RawProtocolOperation {
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
     // TODO: add other kinds like proofs and state diffs
+    // DA(Vec<u8>),
 }
 
 impl From<RawProtocolOperation> for ProtocolOperation {

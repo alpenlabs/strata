@@ -329,7 +329,7 @@ async fn process_block<R: ReaderRpc>(
         ctx.params.rollup(),
         state.filter_config(),
         &mut |_raw_op| {
-            // TODO: Store relevant info in `RawProtocolOp` to db. This is relevant especially for
+            // TODO: Store relevant info in `RawProtocolOp` to db. This is useful especially for
             // DA transactions where the protocol only cares for the commitment but the node needs
             // to store the actual data in db
             Ok(())

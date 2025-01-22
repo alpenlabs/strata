@@ -6,7 +6,7 @@ use strata_state::{
 };
 use tracing::warn;
 
-use super::messages::ProtocolOpTxRef;
+use super::messages::ProtocolOpsTxRef;
 pub use crate::filter_types::TxFilterConfig;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
@@ -15,22 +15,19 @@ use crate::{
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
 /// [`TxFilterConfig`]s
-pub fn filter_protocol_op_tx_refs<F>(
+pub fn filter_protocol_op_tx_refs(
     block: &Block,
     params: &RollupParams,
     filter_config: &TxFilterConfig,
-    process_raw: &mut F,
-) -> Vec<ProtocolOpTxRef>
-where
-    F: FnMut(&RawProtocolOperation) -> anyhow::Result<()>,
-{
+    process_raw: &mut impl FnMut(&RawProtocolOperation) -> anyhow::Result<()>,
+) -> Vec<ProtocolOpsTxRef> {
     block
         .txdata
         .iter()
         .enumerate()
         .map(|(i, tx)| {
             let protocol_ops = extract_protocol_ops(tx, params, filter_config, process_raw);
-            ProtocolOpTxRef::new(i as u32, protocol_ops)
+            ProtocolOpsTxRef::new(i as u32, protocol_ops)
         })
         // Filter out tx refs which do not contain protocol ops
         .filter(|txref| !txref.proto_ops().is_empty())
@@ -39,15 +36,12 @@ where
 
 /// If a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
 /// info.
-fn extract_protocol_ops<F>(
+fn extract_protocol_ops(
     tx: &Transaction,
     params: &RollupParams,
     filter_conf: &TxFilterConfig,
-    process_raw: &mut F,
-) -> Vec<ProtocolOperation>
-where
-    F: FnMut(&RawProtocolOperation) -> anyhow::Result<()>,
-{
+    process_raw: &mut impl FnMut(&RawProtocolOperation) -> anyhow::Result<()>,
+) -> Vec<ProtocolOperation> {
     // Currently all we have are envelope txs, deposits and deposit requests
     parse_envelope_checkpoints(tx, params)
         .map(RawProtocolOperation::Checkpoint)

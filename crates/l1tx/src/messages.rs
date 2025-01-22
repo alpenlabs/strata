@@ -21,15 +21,15 @@ pub enum L1Event {
 /// Core protocol specific bitcoin transaction reference. A bitcoin transaction can have multiple
 /// operations relevant to protocol. This is used in the context of [`BlockData`].
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
-pub struct ProtocolOpTxRef {
+pub struct ProtocolOpsTxRef {
     /// Index of the transaction in the block
     index: u32,
     /// The operation that is to be applied on data
     proto_ops: Vec<ProtocolOperation>,
 }
 
-impl ProtocolOpTxRef {
-    /// Creates a new ProtocolOpTxRef
+impl ProtocolOpsTxRef {
+    /// Creates a new [`ProtocolOpsTxRef`]
     pub fn new(index: u32, proto_ops: Vec<ProtocolOperation>) -> Self {
         Self { index, proto_ops }
     }
@@ -51,11 +51,11 @@ pub struct BlockData {
     block_num: u64,
     block: Block,
     /// Transactions in the block that are relevant to rollup
-    protocol_ops_txs: Vec<ProtocolOpTxRef>,
+    protocol_ops_txs: Vec<ProtocolOpsTxRef>,
 }
 
 impl BlockData {
-    pub fn new(block_num: u64, block: Block, protocol_ops_txs: Vec<ProtocolOpTxRef>) -> Self {
+    pub fn new(block_num: u64, block: Block, protocol_ops_txs: Vec<ProtocolOpsTxRef>) -> Self {
         Self {
             block_num,
             block,
@@ -71,7 +71,7 @@ impl BlockData {
         self.protocol_ops_txs.iter().map(|v| v.index)
     }
 
-    pub fn protocol_ops_txs(&self) -> &[ProtocolOpTxRef] {
+    pub fn protocol_ops_txs(&self) -> &[ProtocolOpsTxRef] {
         &self.protocol_ops_txs
     }
 
