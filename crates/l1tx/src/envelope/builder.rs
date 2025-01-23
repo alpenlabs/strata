@@ -31,17 +31,14 @@ fn build_payload_envelope(
     payload: &L1Payload,
     version: u8,
 ) -> anyhow::Result<Vec<u8>> {
-    let tag = get_payload_type_tag(payload.payload_type(), params)?;
+    let type_bytes = get_payload_type_tag(payload.payload_type(), params);
+    let type_tag = PushBytesBuf::try_from(type_bytes)?;
     let mut builder = script::Builder::new()
         .push_opcode(OP_FALSE)
         .push_opcode(OP_IF)
-        .push_slice(tag)
+        .push_slice(type_tag)
         // Insert version
-        .push_slice(PushBytesBuf::from([version]))
-        // Insert size
-        .push_slice(PushBytesBuf::from(
-            (payload.data().len() as u32).to_be_bytes(),
-        ));
+        .push_slice(PushBytesBuf::from([version]));
 
     // Insert actual data
     for chunk in payload.data().chunks(520) {
@@ -51,14 +48,9 @@ fn build_payload_envelope(
     Ok(builder.as_bytes().to_vec())
 }
 
-fn get_payload_type_tag(
-    payload_type: &L1PayloadType,
-    params: &Params,
-) -> anyhow::Result<PushBytesBuf> {
-    Ok(match *payload_type {
-        L1PayloadType::Checkpoint => {
-            PushBytesBuf::try_from(params.rollup().checkpoint_tag.as_bytes().to_vec())?
-        }
-        L1PayloadType::Da => PushBytesBuf::try_from(params.rollup().da_tag.as_bytes().to_vec())?,
-    })
+fn get_payload_type_tag(payload_type: &L1PayloadType, params: &Params) -> Vec<u8> {
+    match *payload_type {
+        L1PayloadType::Checkpoint => params.rollup().checkpoint_tag.as_bytes().to_vec(),
+        L1PayloadType::Da => params.rollup().da_tag.as_bytes().to_vec(),
+    }
 }

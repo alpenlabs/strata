@@ -1,5 +1,5 @@
 use bitcoin::{
-    opcodes::all::OP_IF,
+    opcodes::all::{OP_ENDIF, OP_IF},
     script::{Instruction, Instructions},
     ScriptBuf,
 };
@@ -8,13 +8,9 @@ use strata_primitives::{
     params::RollupParams,
 };
 use thiserror::Error;
-use tracing::{debug, warn};
+use tracing::warn;
 
-use crate::utils::{next_bytes, next_op, next_u32};
-
-pub const ROLLUP_NAME_TAG: &[u8] = &[1];
-pub const VERSION_TAG: &[u8] = &[2];
-pub const BATCH_DATA_TAG: &[u8] = &[3];
+use crate::utils::{next_bytes, next_op};
 
 /// Errors that can be generated while parsing envelopes.
 #[derive(Debug, Error)]
@@ -22,15 +18,12 @@ pub enum EnvelopeParseError {
     /// Does not have an `OP_IF..OP_ENDIF` block
     #[error("Invalid/Missing envelope(NO OP_IF..OP_ENDIF): ")]
     InvalidEnvelope,
-    /// Does not have a valid tag
-    #[error("Invalid/Missing tag")]
-    InvalidTag,
+    /// Does not have a valid type tag
+    #[error("Invalid/Missing type tag")]
+    InvalidTypeTag,
     // Does not have a valid version
     #[error("Invalid/Missing version")]
     InvalidVersion,
-    // Does not have a valid size
-    #[error("Invalid/Missing size")]
-    InvalidSize,
     /// Does not have a valid format
     #[error("Invalid Format")]
     InvalidFormat,
@@ -68,17 +61,15 @@ fn parse_l1_payload(
     // Parse type
     let ptype = next_bytes(instructions)
         .and_then(|bytes| parse_payload_type(bytes, params))
-        .ok_or(EnvelopeParseError::InvalidTag)?;
+        .ok_or(EnvelopeParseError::InvalidTypeTag)?;
 
     // Parse version
     let _version = next_bytes(instructions)
         .and_then(validate_version)
         .ok_or(EnvelopeParseError::InvalidVersion)?;
 
-    // Parse size
-    let size = next_u32(instructions).ok_or(EnvelopeParseError::InvalidSize)?;
     // Parse payload
-    let payload = extract_n_bytes(size, instructions)?;
+    let payload = extract_until_op_endif(instructions)?;
     Ok(L1Payload::new(payload, ptype))
 }
 
@@ -132,23 +123,22 @@ fn enter_envelope(instructions: &mut Instructions) -> Result<(), EnvelopeParseEr
 }
 
 /// Extract bytes of `size` from the remaining instructions
-fn extract_n_bytes(
-    size: u32,
-    instructions: &mut Instructions,
-) -> Result<Vec<u8>, EnvelopeParseError> {
-    debug!("Extracting {} bytes from instructions", size);
+fn extract_until_op_endif(instructions: &mut Instructions) -> Result<Vec<u8>, EnvelopeParseError> {
     let mut data = vec![];
-    let mut curr_size: u32 = 0;
-    while let Some(bytes) = next_bytes(instructions) {
-        data.extend_from_slice(bytes);
-        curr_size += bytes.len() as u32;
+    for elem in instructions {
+        match elem {
+            Ok(Instruction::Op(OP_ENDIF)) => {
+                break;
+            }
+            Ok(Instruction::PushBytes(b)) => {
+                data.extend_from_slice(b.as_bytes());
+            }
+            _ => {
+                return Err(EnvelopeParseError::InvalidPayload);
+            }
+        }
     }
-    if curr_size == size {
-        Ok(data)
-    } else {
-        debug!("Extracting {} bytes from instructions", size);
-        Err(EnvelopeParseError::InvalidPayload)
-    }
+    Ok(data)
 }
 
 #[cfg(test)]

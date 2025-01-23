@@ -70,17 +70,17 @@ impl L1WriterDatabase for RBL1WriterDb {
     }
 
     fn get_intent_by_idx(&self, idx: u64) -> DbResult<Option<IntentEntry>> {
-        match self.db.get::<IntentIdxSchema>(&idx)? {
-            Some(id) => self
-                .db
+        if let Some(id) = self.db.get::<IntentIdxSchema>(&idx)? {
+            self.db
                 .get::<IntentSchema>(&id)?
                 .ok_or_else(|| {
                     DbError::Other(format!(
                     "Intent index({idx}) exists but corresponding id does not exist in writer db"
                 ))
                 })
-                .map(Some),
-            None => Ok(None),
+                .map(Some)
+        } else {
+            Ok(None)
         }
     }
 
