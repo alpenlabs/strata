@@ -2,12 +2,17 @@ use bitcoin::{Block, Transaction};
 use strata_primitives::{l1::payload::L1PayloadType, params::RollupParams};
 use strata_state::{
     batch::SignedBatchCheckpoint,
-    tx::{DepositInfo, DepositRequestInfo, ProtocolOperation, RawProtocolOperation},
+    tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
 };
 use tracing::warn;
 
+mod types;
+pub mod visitor;
+
+pub use types::TxFilterConfig;
+use visitor::OpsVisitor;
+
 use super::messages::ProtocolOpsTxRef;
-pub use crate::filter_types::TxFilterConfig;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
     envelope::parser::parse_envelope_payloads,
@@ -15,18 +20,18 @@ use crate::{
 
 /// Filter protocol operations as refs from relevant [`Transaction`]s in a block based on given
 /// [`TxFilterConfig`]s
-pub fn filter_protocol_op_tx_refs(
+pub fn filter_protocol_op_tx_refs<V: OpsVisitor>(
     block: &Block,
     params: &RollupParams,
     filter_config: &TxFilterConfig,
-    process_raw: &mut impl FnMut(&RawProtocolOperation) -> anyhow::Result<()>,
+    ops_visitor: &V,
 ) -> Vec<ProtocolOpsTxRef> {
     block
         .txdata
         .iter()
         .enumerate()
         .map(|(i, tx)| {
-            let protocol_ops = extract_protocol_ops(tx, params, filter_config, process_raw);
+            let protocol_ops = extract_protocol_ops(tx, params, filter_config, ops_visitor);
             ProtocolOpsTxRef::new(i as u32, protocol_ops)
         })
         // Filter out tx refs which do not contain protocol ops
@@ -36,23 +41,19 @@ pub fn filter_protocol_op_tx_refs(
 
 /// If a [`Transaction`] is relevant based on given [`RelevantTxType`]s then we extract relevant
 /// info.
-fn extract_protocol_ops(
+fn extract_protocol_ops<V: OpsVisitor>(
     tx: &Transaction,
     params: &RollupParams,
     filter_conf: &TxFilterConfig,
-    process_raw: &mut impl FnMut(&RawProtocolOperation) -> anyhow::Result<()>,
+    ops_visitor: &V,
 ) -> Vec<ProtocolOperation> {
     // Currently all we have are envelope txs, deposits and deposit requests
     parse_envelope_checkpoints(tx, params)
-        .map(RawProtocolOperation::Checkpoint)
-        .chain(parse_deposits(tx, filter_conf).map(RawProtocolOperation::Deposit))
-        .chain(parse_deposit_requests(tx, filter_conf).map(RawProtocolOperation::DepositRequest))
-        .map(|raw_op| {
-            if process_raw(&raw_op).is_err() {
-                warn!(txid=%tx.compute_txid(), "Error processing raw op for transaction id");
-            }
-            raw_op.into()
-        })
+        .map(|c| ops_visitor.visit_checkpoint(c))
+        .chain(parse_deposits(tx, filter_conf).map(|x| ops_visitor.visit_deposit(x)))
+        .chain(
+            parse_deposit_requests(tx, filter_conf).map(|x| ops_visitor.visit_deposit_request(x)),
+        )
         .collect()
 }
 
@@ -123,13 +124,10 @@ mod test {
         l1::{payload::L1Payload, BitcoinAmount},
         params::Params,
     };
-    use strata_state::{
-        batch::SignedBatchCheckpoint,
-        tx::{ProtocolOperation, RawProtocolOperation},
-    };
+    use strata_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
-    use super::TxFilterConfig;
+    use super::{visitor::OpsVisitor, TxFilterConfig};
     use crate::{
         deposit::test_utils::{
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
@@ -139,6 +137,10 @@ mod test {
     };
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
+
+    struct TestVisitor;
+
+    impl OpsVisitor for TestVisitor {}
 
     /// Helper function to create filter config
     fn create_tx_filter_config(params: &Params) -> TxFilterConfig {
@@ -219,10 +221,6 @@ mod test {
         tx
     }
 
-    fn no_op(_raw: &RawProtocolOperation) -> anyhow::Result<()> {
-        Ok(())
-    }
-
     #[test]
     fn test_filter_relevant_txs_with_rollup_envelope() {
         // Test with valid name
@@ -235,7 +233,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let tx_refs =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor);
 
         assert_eq!(tx_refs.len(), 1, "There's one tx containing protocol ops");
         assert_eq!(
@@ -251,7 +249,7 @@ mod test {
         let tx = create_checkpoint_envelope_tx(&new_params, 2);
         let block = create_test_block(vec![tx]);
         let result =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor);
         assert!(result.is_empty(), "Should filter out irrelevant txs");
     }
 
@@ -264,7 +262,7 @@ mod test {
         let filter_config = create_tx_filter_config(&params);
 
         let txids: Vec<u32> =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op)
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor)
                 .iter()
                 .map(|op_refs| op_refs.index())
                 .collect();
@@ -281,7 +279,7 @@ mod test {
         let block = create_test_block(vec![tx1, tx2, tx3]);
 
         let txids: Vec<u32> =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op)
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor)
                 .iter()
                 .map(|op_refs| op_refs.index())
                 .collect();
@@ -309,7 +307,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let result =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -358,7 +356,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let result =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -405,7 +403,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let result =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor);
 
         assert_eq!(result.len(), 1, "Should find one relevant transaction");
         assert_eq!(
@@ -445,7 +443,7 @@ mod test {
         let block = create_test_block(vec![irrelevant_tx]);
 
         let result =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor);
 
         assert!(
             result.is_empty(),
@@ -481,7 +479,7 @@ mod test {
         let block = create_test_block(vec![tx1, tx2]);
 
         let result =
-            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &mut no_op);
+            filter_protocol_op_tx_refs(&block, params.rollup(), &filter_config, &TestVisitor);
 
         assert_eq!(result.len(), 2, "Should find two relevant transactions");
         assert_eq!(

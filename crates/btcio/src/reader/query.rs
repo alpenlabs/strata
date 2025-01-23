@@ -8,8 +8,7 @@ use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
-    filter::filter_protocol_op_tx_refs,
-    filter_types::TxFilterConfig,
+    filter::{filter_protocol_op_tx_refs, TxFilterConfig},
     messages::{BlockData, L1Event},
 };
 use strata_primitives::params::Params;
@@ -22,7 +21,7 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    reader::state::ReaderState,
+    reader::{ops_visitor::ClientOpsVisitor, state::ReaderState},
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -324,17 +323,9 @@ async fn process_block<R: ReaderRpc>(
     let txs = block.txdata.len();
 
     let params = ctx.params.clone();
-    let filtered_tx_refs = filter_protocol_op_tx_refs(
-        &block,
-        ctx.params.rollup(),
-        state.filter_config(),
-        &mut |_raw_op| {
-            // TODO: Store relevant info in `RawProtocolOp` to db. This is useful especially for
-            // DA transactions where the protocol only cares for the commitment but the node needs
-            // to store the actual data in db
-            Ok(())
-        },
-    );
+    let visitor = ClientOpsVisitor;
+    let filtered_tx_refs =
+        filter_protocol_op_tx_refs(&block, ctx.params.rollup(), state.filter_config(), &visitor);
     let block_data = BlockData::new(height, block, filtered_tx_refs);
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");

@@ -1,7 +1,10 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::l1::{BitcoinAmount, OutputRef};
+use strata_primitives::{
+    buf::Buf32,
+    l1::{BitcoinAmount, OutputRef},
+};
 
 use crate::batch::SignedBatchCheckpoint;
 
@@ -17,35 +20,9 @@ pub enum ProtocolOperation {
     DepositRequest(DepositRequestInfo),
     /// Checkpoint data
     Checkpoint(SignedBatchCheckpoint),
+    // Da Commitment
+    DaCommitment(Buf32),
     // TODO: add other kinds like proofs and state diffs
-    // DACommitment(Buf32),
-}
-
-/// Similar to [`ProtocolOperation`] except that this also contains blob data which is not relevant
-/// to chain.
-#[derive(
-    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
-)]
-#[allow(clippy::large_enum_variant)]
-pub enum RawProtocolOperation {
-    /// Deposit Transaction
-    Deposit(DepositInfo),
-    /// Deposit Request info
-    DepositRequest(DepositRequestInfo),
-    /// Checkpoint data
-    Checkpoint(SignedBatchCheckpoint),
-    // TODO: add other kinds like proofs and state diffs
-    // DA(Vec<u8>),
-}
-
-impl From<RawProtocolOperation> for ProtocolOperation {
-    fn from(val: RawProtocolOperation) -> Self {
-        match val {
-            RawProtocolOperation::DepositRequest(d) => ProtocolOperation::DepositRequest(d),
-            RawProtocolOperation::Deposit(d) => ProtocolOperation::Deposit(d),
-            RawProtocolOperation::Checkpoint(c) => ProtocolOperation::Checkpoint(c),
-        }
-    }
 }
 
 #[derive(
