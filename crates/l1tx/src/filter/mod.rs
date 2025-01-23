@@ -12,7 +12,7 @@ pub mod visitor;
 pub use types::TxFilterConfig;
 use visitor::OpsVisitor;
 
-use super::messages::ProtocolOpsTxRef;
+use super::messages::ProtocolTxEntry;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
     envelope::parser::parse_envelope_payloads,
@@ -25,14 +25,14 @@ pub fn filter_protocol_op_tx_refs<V: OpsVisitor>(
     params: &RollupParams,
     filter_config: &TxFilterConfig,
     ops_visitor: &V,
-) -> Vec<ProtocolOpsTxRef> {
+) -> Vec<ProtocolTxEntry> {
     block
         .txdata
         .iter()
         .enumerate()
         .map(|(i, tx)| {
             let protocol_ops = extract_protocol_ops(tx, params, filter_config, ops_visitor);
-            ProtocolOpsTxRef::new(i as u32, protocol_ops)
+            ProtocolTxEntry::new(i as u32, protocol_ops)
         })
         // Filter out tx refs which do not contain protocol ops
         .filter(|txref| !txref.proto_ops().is_empty())

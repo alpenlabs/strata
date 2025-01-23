@@ -21,15 +21,15 @@ pub enum L1Event {
 /// Core protocol specific bitcoin transaction reference. A bitcoin transaction can have multiple
 /// operations relevant to protocol. This is used in the context of [`BlockData`].
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
-pub struct ProtocolOpsTxRef {
+pub struct ProtocolTxEntry {
     /// Index of the transaction in the block
     index: u32,
     /// The operation that is to be applied on data
     proto_ops: Vec<ProtocolOperation>,
 }
 
-impl ProtocolOpsTxRef {
-    /// Creates a new [`ProtocolOpsTxRef`]
+impl ProtocolTxEntry {
+    /// Creates a new [`ProtocolTxEntry`]
     pub fn new(index: u32, proto_ops: Vec<ProtocolOperation>) -> Self {
         Self { index, proto_ops }
     }
@@ -50,16 +50,16 @@ impl ProtocolOpsTxRef {
 pub struct BlockData {
     block_num: u64,
     block: Block,
-    /// Transactions in the block that are relevant to rollup
-    protocol_ops_txs: Vec<ProtocolOpsTxRef>,
+    /// Transactions in the block that contain protocol operations
+    protocol_txs: Vec<ProtocolTxEntry>,
 }
 
 impl BlockData {
-    pub fn new(block_num: u64, block: Block, protocol_ops_txs: Vec<ProtocolOpsTxRef>) -> Self {
+    pub fn new(block_num: u64, block: Block, protocol_txs: Vec<ProtocolTxEntry>) -> Self {
         Self {
             block_num,
             block,
-            protocol_ops_txs,
+            protocol_txs,
         }
     }
 
@@ -67,12 +67,12 @@ impl BlockData {
         &self.block
     }
 
-    pub fn protocol_ops_tx_idxs(&self) -> impl Iterator<Item = u32> + '_ {
-        self.protocol_ops_txs.iter().map(|v| v.index)
+    pub fn protocol_tx_idxs(&self) -> impl Iterator<Item = u32> + '_ {
+        self.protocol_txs.iter().map(|v| v.index)
     }
 
-    pub fn protocol_ops_txs(&self) -> &[ProtocolOpsTxRef] {
-        &self.protocol_ops_txs
+    pub fn protocol_txs(&self) -> &[ProtocolTxEntry] {
+        &self.protocol_txs
     }
 
     pub fn block_num(&self) -> u64 {

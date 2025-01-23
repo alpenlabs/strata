@@ -129,7 +129,7 @@ fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
 ) -> Vec<BatchCheckpointWithCommitment> {
-    let protocol_ops_txs = blockdata.protocol_ops_txs();
+    let protocol_ops_txs = blockdata.protocol_txs();
 
     let signed_checkpts = protocol_ops_txs.iter().flat_map(|txref| {
         txref.proto_ops().iter().filter_map(|op| match op {
@@ -239,7 +239,7 @@ fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
     blockdata
-        .protocol_ops_txs()
+        .protocol_txs()
         .iter()
         .map(|ops_txs| {
             generate_l1_tx(
