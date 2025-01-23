@@ -41,8 +41,9 @@ impl ClientUpdateOutput {
     }
 }
 
-/// Describes possible writes to client state that we can make.  We use this
-/// instead of directly modifying the client state to reduce the volume of data
+/// Describes possible writes to client state that we can make.
+///
+/// We use this instead of directly modifying the client state to reduce the volume of data
 /// that we have to clone and save to disk with each sync event.
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,

@@ -20,7 +20,7 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use rand::rngs::OsRng;
-use reth_primitives::revm_primitives::FixedBytes;
+use revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};
@@ -90,9 +90,10 @@ impl<'a> Arbitrary<'a> for OutputRef {
         Ok(OutputRef(OutPoint { txid, vout }))
     }
 }
-/// A wrapper around the [`bitcoin::Address<NetworkChecked>`] type created in order to implement
-/// some useful traits on it such as [`serde::Deserialize`], [`borsh::BorshSerialize`] and
-/// [`borsh::BorshDeserialize`].
+/// A wrapper around the [`bitcoin::Address<NetworkChecked>`] type.
+///
+/// It's created in order to implement some useful traits on it such as
+/// [`serde::Deserialize`], [`borsh::BorshSerialize`] and [`borsh::BorshDeserialize`].
 // TODO: implement [`arbitrary::Arbitrary`]?
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BitcoinAddress {

@@ -1,5 +1,5 @@
 use borsh::BorshDeserialize;
-use reth_primitives::revm_primitives::B256;
+use revm_primitives::B256;
 use strata_primitives::evm_exec::EVMExtraPayload;
 use strata_state::block::{L2Block, L2BlockBundle};
 use thiserror::Error;

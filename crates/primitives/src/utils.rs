@@ -85,7 +85,8 @@ pub struct SchnorrKeypair {
     pub pk: Buf32,
 }
 
-/// Get the temporary schnorr keypairs for testing purpose
+/// Get the temporary schnorr keypairs for testing purpose.
+///
 /// These are generated randomly and added here just for functional tests till we don't have proper
 /// genesis configuration plus operator  addition mechanism ready
 // FIXME remove

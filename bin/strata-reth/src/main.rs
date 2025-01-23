@@ -1,5 +1,4 @@
 mod db;
-mod rpc;
 
 use std::{fs, future::Future, path::PathBuf, sync::Arc};
 
@@ -15,8 +14,8 @@ use reth_cli::chainspec::ChainSpecParser;
 use reth_cli_commands::node::NodeCommand;
 use strata_reth_db::rocksdb::WitnessDB;
 use strata_reth_exex::ProverWitnessGenerator;
-use strata_reth_node::StrataEthereumNode;
-use strata_reth_rpc::{SequencerClient, StrataRPC, StrataRpcApiServer};
+use strata_reth_node::{args::StrataNodeArgs, StrataEthereumNode};
+use strata_reth_rpc::{StrataRPC, StrataRpcApiServer};
 use tracing::info;
 
 const DEFAULT_CHAIN_SPEC: &str = include_str!("../res/devnet-chain.json");
@@ -39,9 +38,13 @@ fn main() {
 
     if let Err(err) = run(command, |builder, ext| async move {
         let datadir = builder.config().datadir().data_dir().to_path_buf();
-        let mut node_builder = builder.node(StrataEthereumNode::default());
 
-        let sequencer_http = ext.sequencer_http.clone();
+        let node_args = StrataNodeArgs {
+            sequencer_http: ext.sequencer_http.clone(),
+        };
+
+        let mut node_builder = builder.node(StrataEthereumNode::new(node_args));
+
         let mut extend_rpc = None;
 
         // Install Prover Input ExEx, persist to DB, and add RPC for querying block witness.
@@ -63,11 +66,6 @@ fn main() {
                 ctx.modules.merge_configured(rpc.into_rpc())?;
             }
 
-            if let Some(sequencer_http) = sequencer_http {
-                ctx.registry
-                    .eth_api()
-                    .set_sequencer_client(SequencerClient::new(sequencer_http))?;
-            }
             Ok(())
         });
 

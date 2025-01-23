@@ -1,5 +1,5 @@
 pub mod rocksdb;
-use reth_primitives::revm_primitives::alloy_primitives::B256;
+use revm_primitives::alloy_primitives::B256;
 pub use strata_db::{errors, DbResult};
 use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 

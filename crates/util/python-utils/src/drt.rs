@@ -10,7 +10,7 @@ use bdk_wallet::{
     KeychainKind, TxOrdering, Wallet,
 };
 use pyo3::prelude::*;
-use reth_primitives::revm_primitives::alloy_primitives::Address as RethAddress;
+use revm_primitives::alloy_primitives::Address as RethAddress;
 use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
 
 use crate::{

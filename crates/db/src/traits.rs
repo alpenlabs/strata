@@ -194,12 +194,14 @@ pub enum BlockStatus {
     Invalid,
 }
 
-/// Db trait for the (consensus layer) chain state database.  For now we only
-/// have a modestly sized "toplevel" chain state and no "large" state like the
-/// EL does.  This trait is designed to permit a change to storing larger state
-/// like that in the future without *too* much extra effort.  We decide new
-/// states by providing the database with a generic "write batch" and offloading
-/// the effort of deciding how to compute that write batch to the database impl.
+/// Db trait for the (consensus layer) chain state database.
+///
+/// For now we only have a modestly sized "toplevel" chain state and no "large"
+/// state like the EL does.  This trait is designed to permit a change to
+/// storing larger state like that in the future without *too* much extra effort.
+/// We decide new states by providing the database with a generic "write batch"
+/// and offloading the effort of deciding how to compute that write batch to the
+/// database impl.
 pub trait ChainstateDatabase {
     /// Writes the genesis chainstate at index 0.
     fn write_genesis_state(&self, toplevel: &Chainstate) -> DbResult<()>;

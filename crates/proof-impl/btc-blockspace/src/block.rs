@@ -1,6 +1,8 @@
-//! Utility functions for computing and verifying various cryptographic properties of Bitcoin
-//! blocks, including Merkle roots, witness commitments, and proof-of-work validation. These
-//! functions are designed to be equivalent to the corresponding methods found in the
+//! Utility functions to work with cryptographic properties of Bitcoin blocks.
+//!
+//! Its function is to compute and verify various primitives including Merkle roots,
+//! witness commitments, and proof-of-work validation. These functions are designed
+//! to be equivalent to the corresponding methods found in the
 //! [`bitcoin`](bitcoin::Block), providing custom implementations where necessary.
 
 use bitcoin::{

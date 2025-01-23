@@ -1,19 +1,17 @@
 use std::{collections::HashMap, sync::Arc};
 
-use alloy_rpc_types::EIP1186AccountProofResponse;
+use alloy_rpc_types::{serde_helpers::JsonStorageKey, BlockNumHash, EIP1186AccountProofResponse};
 use eyre::eyre;
 use futures_util::TryStreamExt;
 use reth_evm::execute::{BlockExecutionInput, BlockExecutorProvider, Executor};
 use reth_exex::{ExExContext, ExExEvent};
-use reth_node_api::FullNodeComponents;
-use reth_primitives::{
-    revm_primitives::alloy_primitives::{Address, B256},
-    BlockNumHash, BlockWithSenders, TransactionSigned,
-};
+use reth_node_api::{FullNodeComponents, NodeTypes};
+use reth_primitives::{BlockExt, BlockWithSenders, EthPrimitives};
 use reth_provider::{BlockReader, Chain, ExecutionOutcome, StateProviderFactory};
 use reth_revm::{db::CacheDB, primitives::FixedBytes};
-use reth_rpc_types_compat::proof::from_primitive_account_proof;
 use reth_trie::{HashedPostState, TrieInput};
+use reth_trie_common::KeccakKeyHasher;
+use revm_primitives::alloy_primitives::{Address, B256};
 use strata_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, EvmBlockStfInput};
 use strata_reth_db::WitnessStore;
 use tracing::{debug, error};
@@ -23,12 +21,19 @@ use crate::{
     cache_db_provider::{AccessedState, CacheDBProvider},
 };
 
-pub struct ProverWitnessGenerator<Node: FullNodeComponents, S: WitnessStore + Clone> {
+pub struct ProverWitnessGenerator<
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
+    S: WitnessStore + Clone,
+> {
     ctx: ExExContext<Node>,
     db: Arc<S>,
 }
 
-impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<Node, S> {
+impl<
+        Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
+        S: WitnessStore + Clone,
+    > ProverWitnessGenerator<Node, S>
+{
     pub fn new(ctx: ExExContext<Node>, db: Arc<S>) -> Self {
         Self { ctx, db }
     }
@@ -78,7 +83,10 @@ impl<Node: FullNodeComponents, S: WitnessStore + Clone> ProverWitnessGenerator<N
     }
 }
 
-fn get_accessed_states<'a, Node: FullNodeComponents>(
+fn get_accessed_states<
+    'a,
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
+>(
     ctx: &ExExContext<Node>,
     block: &'a BlockWithSenders,
     block_idx: u64,
@@ -98,7 +106,7 @@ fn get_accessed_states<'a, Node: FullNodeComponents>(
     Ok(acessed_state)
 }
 
-fn extract_zkvm_input<Node: FullNodeComponents>(
+fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>>(
     block_id: FixedBytes<32>,
     ctx: &ExExContext<Node>,
     exec_outcome: &ExecutionOutcome,
@@ -132,13 +140,6 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         .ok_or(eyre!("failed to recover senders"))?;
 
     let accessed_states = get_accessed_states(ctx, &block_execution_input, prev_block_idx)?;
-
-    let current_block_txns = current_block
-        .body
-        .transactions()
-        .cloned()
-        .collect::<Vec<TransactionSigned>>();
-
     let prev_state_root = prev_block.state_root;
 
     let mut parent_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
@@ -154,11 +155,12 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
 
         // Apply empty bundle state over previous block state.
         let proof = previous_provider.proof(
-            TrieInput::from_state(HashedPostState::from_bundle_state([])),
+            TrieInput::from_state(HashedPostState::from_bundle_state::<KeccakKeyHasher>([])),
             *accessed_address,
             &slots,
         )?;
-        let proof = from_primitive_account_proof(proof);
+        let proof =
+            proof.into_eip1186_response(slots.into_iter().map(JsonStorageKey::from).collect());
 
         parent_proofs.insert(*accessed_address, proof);
     }
@@ -171,11 +173,12 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
             .collect();
 
         let proof = previous_provider.proof(
-            TrieInput::from_state(exec_outcome.hash_state_slow()),
+            TrieInput::from_state(exec_outcome.hash_state_slow::<KeccakKeyHasher>()),
             *accessed_address,
             &slots,
         )?;
-        let proof = from_primitive_account_proof(proof);
+        let proof =
+            proof.into_eip1186_response(slots.into_iter().map(JsonStorageKey::from).collect());
 
         current_proofs.insert(*accessed_address, proof);
     }
@@ -193,7 +196,7 @@ fn extract_zkvm_input<Node: FullNodeComponents>(
         timestamp: current_block.header.timestamp,
         extra_data: current_block.header.extra_data,
         mix_hash: current_block.header.mix_hash,
-        transactions: current_block_txns,
+        transactions: current_block.body.transactions,
         withdrawals,
         pre_state_trie: state_trie,
         pre_state_storage: storage,

@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 
+use alloy_eips::{eip4895::Withdrawals, eip7685::Requests};
 use alloy_rpc_types::{
     engine::{
         ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadV1,
@@ -8,12 +9,11 @@ use alloy_rpc_types::{
     Withdrawal,
 };
 use reth::rpc::compat::engine::payload::block_to_payload_v2;
+use reth_chain_state::ExecutedBlock;
 use reth_node_api::{BuiltPayload, PayloadAttributes, PayloadBuilderAttributes};
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
-use reth_primitives::{
-    revm_primitives::alloy_primitives::{Address, B256, U256},
-    SealedBlock, Withdrawals,
-};
+use reth_primitives::SealedBlock;
+use revm_primitives::alloy_primitives::{Address, B256, U256};
 use serde::{Deserialize, Serialize};
 use strata_reth_primitives::WithdrawalIntent;
 
@@ -56,7 +56,11 @@ impl PayloadBuilderAttributes for StrataPayloadBuilderAttributes {
     type RpcPayloadAttributes = StrataPayloadAttributes;
     type Error = Infallible;
 
-    fn try_new(parent: B256, attributes: StrataPayloadAttributes) -> Result<Self, Infallible> {
+    fn try_new(
+        parent: B256,
+        attributes: StrataPayloadAttributes,
+        _version: u8,
+    ) -> Result<Self, Infallible> {
         Ok(Self(EthPayloadBuilderAttributes::new(
             parent,
             attributes.inner,
@@ -114,6 +118,14 @@ impl BuiltPayload for StrataBuiltPayload {
 
     fn fees(&self) -> U256 {
         self.inner.fees()
+    }
+
+    fn executed_block(&self) -> Option<ExecutedBlock> {
+        self.inner.executed_block()
+    }
+
+    fn requests(&self) -> Option<Requests> {
+        self.inner.requests()
     }
 }
 

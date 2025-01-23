@@ -17,24 +17,24 @@
 // limitations under the License.
 use std::{mem, mem::take};
 
-use alloy_eips::eip1559::BaseFeeParams;
+use alloy_consensus::constants::{GWEI_TO_WEI, MAXIMUM_EXTRA_DATA_SIZE};
+use alloy_eips::{eip1559::BaseFeeParams, eip2718::Encodable2718};
 use alloy_primitives::map::DefaultHashBuilder;
 use alloy_rlp::BufMut;
+use alloy_rpc_types_eth::TransactionTrait;
+use alloy_trie::root::ordered_trie_root_with_encoder;
 use anyhow::anyhow;
-use reth_primitives::{
-    constants::{GWEI_TO_WEI, MAXIMUM_EXTRA_DATA_SIZE, MINIMUM_GAS_LIMIT},
-    revm_primitives::{
-        alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
-        Account,
-    },
-    Header, Receipt, ReceiptWithBloom, Transaction, TransactionSigned,
-};
-use reth_trie_common::root::ordered_trie_root_with_encoder;
+use reth_primitives::{Header, Receipt, Transaction, TransactionSigned};
+use reth_primitives_traits::{constants::MINIMUM_GAS_LIMIT, SignedTransaction};
 use revm::{
     db::{AccountState, InMemoryDB},
     interpreter::Host,
     primitives::{SpecId, TransactTo, TxEnv},
     Database, DatabaseCommit, Evm,
+};
+use revm_primitives::{
+    alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
+    Account,
 };
 use strata_reth_evm::{constants::BRIDGEOUT_ADDRESS, set_evm_handles};
 
@@ -165,7 +165,7 @@ where
     }
 
     /// Processes each transaction and collect receipts and storage changes.
-    pub fn execute(&mut self) -> Vec<ReceiptWithBloom> {
+    pub fn execute(&mut self) -> Vec<reth_primitives::Receipt> {
         let gwei_to_wei: U256 = U256::from(GWEI_TO_WEI);
         let mut evm = Evm::builder()
             .with_spec_id(self.evm_config.spec_id)
@@ -192,7 +192,7 @@ where
 
         for (tx_no, tx) in self.input.transactions.iter().enumerate() {
             // Recover the sender from the transaction signature.
-            let tx_from = tx.recover_signer().unwrap();
+            let tx_from = tx.recover_signer_unchecked().unwrap();
 
             // Validate tx gas.
             let block_available_gas = U256::from(self.input.gas_limit) - cumulative_gas_used;
@@ -225,7 +225,6 @@ where
 
             // Update logs bloom.
             logs_bloom.accrue_bloom(&receipt.bloom_slow());
-            let receipt = ReceiptWithBloom::from(receipt);
             receipts.push(receipt);
 
             // Commit state changes.
@@ -249,10 +248,10 @@ where
             .into_iter()
             .collect::<Vec<TransactionSigned>>();
         h.transactions_root = ordered_trie_root_with_encoder(&txs_signed, |tx, buf| {
-            tx.encode_with_signature(&tx.signature, buf, false);
+            tx.eip2718_encode(&tx.signature, buf);
         });
         h.receipts_root = ordered_trie_root_with_encoder(&receipts, |receipt, buf| {
-            receipt.encode_inner(buf, false);
+            receipt.with_bloom_ref().encode_2718(buf);
         });
         h.withdrawals_root = Some(ordered_trie_root_with_encoder(
             &self.input.withdrawals,

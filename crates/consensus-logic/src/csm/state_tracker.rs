@@ -100,7 +100,9 @@ impl<D: Database> StateTracker<D> {
     }
 }
 
-/// Reconstructs the [`ClientState`] by fetching the last available checkpoint
+/// Reconstructs the [`ClientState`].
+///
+/// It does so by fetching the last available checkpoint
 /// and replaying all relevant
 /// [`ClientStateWrite`](strata_state::operation::ClientStateWrite)
 /// from that checkpoint up to the specified index `idx`,
