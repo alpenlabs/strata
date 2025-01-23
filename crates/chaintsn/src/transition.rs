@@ -35,9 +35,10 @@ use crate::{
 /// chain, but it will abort if there are any semantic issues that
 /// don't make sense.
 ///
-/// This operates on a state cache that's expected to be empty, panics
-/// otherwise.  Does not check the `state_root` in the header for correctness,
-/// so that can be unset so it can be use during block assembly.
+/// This operates on a state cache that's expected to be empty, may panic if
+/// changes have been made, although this is not guaranteed.  Does not check the
+/// `state_root` in the header for correctness, so that can be unset so it can
+/// be use during block assembly.
 pub fn process_block(
     state: &mut StateCache,
     header: &impl L2Header,
