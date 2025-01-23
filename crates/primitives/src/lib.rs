@@ -14,6 +14,7 @@ pub mod l1;
 pub mod l2;
 #[macro_use]
 mod macros;
+pub mod epoch;
 pub mod keys;
 pub mod operator;
 pub mod params;
