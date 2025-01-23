@@ -1,5 +1,8 @@
-use strata_db::traits::{ChainstateProvider, Database, L2DataProvider};
+use std::sync::Arc;
+
+use strata_db::traits::{ChainstateProvider, Database};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
+use strata_storage::L2BlockManager;
 use tracing::debug;
 
 /// Sync missing blocks in EL using payloads stored in L2 block database.
@@ -7,6 +10,7 @@ use tracing::debug;
 /// TODO: retry on network errors
 pub fn sync_chainstate_to_el(
     database: &impl Database,
+    l2_block_manager: Arc<L2BlockManager>,
     engine: &impl ExecEngineCtl,
 ) -> anyhow::Result<()> {
     let chain_state_prov = database.chain_state_provider();
@@ -29,7 +33,6 @@ pub fn sync_chainstate_to_el(
 
     debug!(?sync_from_idx, "last known index in EL");
 
-    let l2_prov = database.l2_provider();
     for idx in sync_from_idx..=latest_idx {
         debug!(?idx, "Syncing chainstate");
         let Some(chain_state) = chain_state_prov.get_toplevel_state(idx)? else {
@@ -38,13 +41,14 @@ pub fn sync_chainstate_to_el(
 
         let block_id = chain_state.chain_tip_blockid();
 
-        let Some(l2block) = l2_prov.get_block_data(block_id)? else {
+        let Some(l2block) = l2_block_manager.get_block_blocking(&block_id)? else {
             anyhow::bail!(format!("Missing L2 block idx: {}", block_id));
         };
 
         let payload = ExecPayloadData::from_l2_block_bundle(&l2block);
 
         engine.submit_payload(payload)?;
+        engine.update_safe_block(block_id)?;
     }
 
     Ok(())

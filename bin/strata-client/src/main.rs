@@ -257,6 +257,7 @@ pub struct CoreContext {
 
 fn do_startup_checks(
     database: &impl Database,
+    l2_block_manager: Arc<L2BlockManager>,
     engine: &impl ExecEngineCtl,
     bitcoin_client: &impl Reader,
     runtime: &Runtime,
@@ -301,7 +302,7 @@ fn do_startup_checks(
         Ok(false) => {
             // Current chain tip tip block is not known by the EL.
             warn!("missing expected evm block, block_id = {}", chain_tip);
-            sync_chainstate_to_el(database, engine)?;
+            sync_chainstate_to_el(database, l2_block_manager, engine)?;
         }
         Err(error) => {
             // Likely network issue
@@ -341,6 +342,7 @@ fn start_core_tasks(
     // do startup checks
     do_startup_checks(
         database.as_ref(),
+        l2_block_manager.clone(),
         engine.as_ref(),
         bitcoin_client.as_ref(),
         runtime,
