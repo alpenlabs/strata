@@ -12,12 +12,6 @@ pub enum CsmMessage {
 /// Message about a new block the fork choice manager might do something with.
 #[derive(Clone, Debug)]
 pub enum ForkChoiceMessage {
-    /// Signals the CSM resuming from some state.
-    CsmResume(Arc<ClientState>),
-
-    /// New client state with the output that produced it.
-    NewState(Arc<ClientState>, Arc<ClientUpdateOutput>),
-
     /// New block coming in from over the network to be considered.
     NewBlock(L2BlockId),
 }

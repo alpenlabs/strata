@@ -18,7 +18,7 @@ use tracing::*;
 use crate::{
     errors::Error,
     genesis,
-    message::{ClientUpdateNotif, CsmMessage, ForkChoiceMessage},
+    message::{ClientUpdateNotif, CsmMessage},
     state_tracker,
 };
 
@@ -100,23 +100,10 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     mut state: WorkerState<D>,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
-    status_rx: Arc<StatusTx>,
-    fcm_msg_tx: mpsc::Sender<ForkChoiceMessage>,
+    status_tx: Arc<StatusTx>,
 ) -> Result<(), Error> {
-    // Send a message off to the forkchoice manager that we're resuming.
-    let start_state = state.state_tracker.cur_state().clone();
-    assert!(fcm_msg_tx
-        .blocking_send(ForkChoiceMessage::CsmResume(start_state))
-        .is_ok());
-
     while let Some(msg) = msg_rx.blocking_recv() {
-        if let Err(e) = process_msg(
-            &mut state,
-            engine.as_ref(),
-            &msg,
-            status_rx.clone(),
-            &fcm_msg_tx,
-        ) {
+        if let Err(e) = process_msg(&mut state, engine.as_ref(), &msg, &status_tx) {
             error!(err = %e, ?msg, "failed to process sync message, skipping");
         }
 
@@ -135,8 +122,7 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     msg: &CsmMessage,
-    status_rx: Arc<StatusTx>,
-    fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
+    status_tx: &Arc<StatusTx>,
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
@@ -144,17 +130,13 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
             // just in case.
             let cur_ev_idx = state.state_tracker.cur_state_idx();
             let next_exp_idx = cur_ev_idx + 1;
-            if *idx > next_exp_idx {
-                let missed_ev_cnt = idx - next_exp_idx;
-                warn!(%missed_ev_cnt, "applying missed sync events");
-                for ev_idx in next_exp_idx..*idx {
-                    trace!(%ev_idx, "running missed sync event");
-                    handle_sync_event(state, engine, ev_idx, status_rx.clone(), fcm_msg_tx)?;
+            for ev_idx in next_exp_idx..=*idx {
+                if ev_idx < *idx {
+                    warn!(%ev_idx, "Applying missed sync event.");
                 }
+                handle_sync_event(state, engine, ev_idx, status_tx)?;
             }
 
-            // TODO ensure correct event index ordering
-            handle_sync_event(state, engine, *idx, status_rx, fcm_msg_tx)?;
             Ok(())
         }
     }
@@ -164,8 +146,7 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     state: &mut WorkerState<D>,
     engine: &E,
     ev_idx: u64,
-    status_tx: Arc<StatusTx>,
-    fcm_msg_tx: &mpsc::Sender<ForkChoiceMessage>,
+    status_tx: &Arc<StatusTx>,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
     let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
@@ -255,13 +236,6 @@ fn handle_sync_event<D: Database, E: ExecEngineCtl>(
     if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
         let css = state.database.client_state_store();
         css.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
-    }
-
-    // Broadcast the update to all the different things listening (which should
-    // be consolidated).
-    let fcm_msg = ForkChoiceMessage::NewState(new_state.clone(), outp.clone());
-    if fcm_msg_tx.blocking_send(fcm_msg).is_err() {
-        error!(%ev_idx, "failed to submit new CSM state to FCM");
     }
 
     let mut status = CsmStatus::default();

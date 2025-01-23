@@ -11,7 +11,10 @@ use strata_primitives::params::Params;
 use strata_status::{StatusRx, StatusTx};
 use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use strata_tasks::TaskExecutor;
-use tokio::sync::{broadcast, mpsc};
+use tokio::{
+    runtime::Runtime,
+    sync::{broadcast, mpsc},
+};
 
 use crate::{
     ctl::CsmController,
@@ -86,6 +89,7 @@ pub fn start_sync_tasks<
     E: ExecEngineCtl + Sync + Send + 'static,
 >(
     executor: &TaskExecutor,
+    runtime: &Runtime,
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
@@ -114,16 +118,20 @@ pub fn start_sync_tasks<
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
     let fcm_params = params.clone();
+    let handle = runtime.handle().clone();
+    let st_tx = status_bundle.0.clone();
     executor.spawn_critical("fork_choice_manager::tracker_task", |shutdown| {
         // TODO this should be simplified into a builder or something
         fork_choice_manager::tracker_task(
             shutdown,
+            handle,
             fcm_database,
             fcm_l2_block_manager,
             fcm_engine,
             fcm_rx,
             fcm_csm_controller,
             fcm_params,
+            st_tx,
         )
     });
 
@@ -137,19 +145,10 @@ pub fn start_sync_tasks<
     )?;
 
     let csm_engine = engine.clone();
-    let csm_fcm_tx = fcm_tx.clone();
-
     let status_tx = status_bundle.0.clone();
     executor.spawn_critical("client_worker_task", |shutdown| {
-        worker::client_worker_task(
-            shutdown,
-            client_worker_state,
-            csm_engine,
-            csm_rx,
-            status_tx,
-            csm_fcm_tx,
-        )
-        .map_err(Into::into)
+        worker::client_worker_task(shutdown, client_worker_state, csm_engine, csm_rx, status_tx)
+            .map_err(Into::into)
     });
 
     Ok(SyncManager {

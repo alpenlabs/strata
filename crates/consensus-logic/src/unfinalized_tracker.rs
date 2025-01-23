@@ -141,6 +141,14 @@ impl UnfinalizedBlockTracker {
             return Err(ChainTipError::MissingBlock(*blkid));
         }
 
+        if *blkid == self.finalized_tip {
+            return Ok(FinalizeReport {
+                prev_tip: *blkid,
+                finalized: vec![*blkid],
+                rejected: Vec::new(),
+            });
+        }
+
         let mut finalized = vec![];
         let mut at = *blkid;
 

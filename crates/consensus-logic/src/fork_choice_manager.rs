@@ -11,11 +11,15 @@ use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
 use strata_state::{
     block::L2BlockBundle, block_validation::validate_block_segments, client_state::ClientState,
-    operation::SyncAction, prelude::*, state_op::StateCache, sync_event::SyncEvent,
+    prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
+use strata_status::StatusTx;
 use strata_storage::L2BlockManager;
 use strata_tasks::ShutdownGuard;
-use tokio::sync::mpsc;
+use tokio::{
+    runtime::Handle,
+    sync::{mpsc, watch},
+};
 use tracing::*;
 
 use crate::{
@@ -149,51 +153,6 @@ pub fn init_forkchoice_manager<D: Database>(
     Ok(fcm)
 }
 
-/// Recvs inputs from the FCM channel until we receive a signal that we've
-/// reached a point where we've done genesis.
-fn wait_for_csm_ready(
-    shutdown: &ShutdownGuard,
-    fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
-) -> anyhow::Result<Arc<ClientState>> {
-    while let Some(msg) = fcm_rx.blocking_recv() {
-        if let Some(state) = process_early_fcm_msg(msg) {
-            return Ok(state);
-        }
-
-        if shutdown.should_shutdown() {
-            warn!("received shutdown signal");
-            break;
-        }
-    }
-
-    warn!("CSM task exited without providing new state");
-    Err(Error::MissingClientSyncState.into())
-}
-
-/// Considers an FCM message and extracts the CSM state from it if the chain
-/// seems active from its perspective.
-fn process_early_fcm_msg(msg: ForkChoiceMessage) -> Option<Arc<ClientState>> {
-    match msg {
-        ForkChoiceMessage::CsmResume(state) => {
-            if state.is_chain_active() && state.sync().is_some() {
-                return Some(state);
-            }
-        }
-
-        ForkChoiceMessage::NewState(state, _) => {
-            if state.is_chain_active() && state.sync().is_some() {
-                return Some(state);
-            }
-        }
-
-        ForkChoiceMessage::NewBlock(blkid) => {
-            error!(blkid = ?blkid, "got unexpected early FCM new block message");
-        }
-    }
-
-    None
-}
-
 /// Determines the starting chain tip.  For now, this is just the block with the
 /// highest index, choosing the lowest ordered blockid in the case of ties.
 fn determine_start_tip(
@@ -231,23 +190,30 @@ fn determine_start_tip(
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
 pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
+    handle: Handle,
     database: Arc<D>,
     l2_block_manager: Arc<L2BlockManager>,
     engine: Arc<E>,
-    mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
-    csm_controller: Arc<CsmController>,
+    fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
+    csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
-    // Wait until the CSM gives us a state we can start from.
-    info!("waiting for CSM ready");
-    let init_state = match wait_for_csm_ready(&shutdown, &mut fcm_rx) {
-        Ok(s) => s,
-        Err(e) => {
-            error!(err = %e, "failed to initialize forkchoice manager");
-            return Err(e);
+    let mut cl_rx = status_tx.cl.subscribe();
+    info!("waiting for genesis");
+    let init_state = handle.block_on(async {
+        loop {
+            let c = cl_rx.changed().await;
+            if c.is_err() {
+                return Err(anyhow::anyhow!("ClientState update sender dropped"));
+            }
+            let st = cl_rx.borrow();
+            if st.has_genesis_occured() {
+                return Ok(st.clone());
+            }
         }
-    };
-    info!("CSM is ready");
+    })?;
+    let init_state = Arc::new(init_state);
 
     // we should have the finalized tips in state at this point
     let Some(ss) = init_state.sync() else {
@@ -273,9 +239,15 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     };
     info!(%finalized_blockid, "forkchoice manager started");
 
-    if let Err(e) =
-        forkchoice_manager_task_inner(&shutdown, fcm, engine.as_ref(), fcm_rx, &csm_controller)
-    {
+    if let Err(e) = forkchoice_manager_task_inner(
+        &shutdown,
+        handle,
+        fcm,
+        engine.as_ref(),
+        fcm_rx,
+        &csm_ctl,
+        status_tx,
+    ) {
         error!(err = ?e, "tracker aborted");
         return Err(e);
     }
@@ -283,28 +255,68 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     Ok(())
 }
 
+#[allow(clippy::large_enum_variant)]
+enum FcmEvent {
+    NewFcmMsg(ForkChoiceMessage),
+    NewStateUpdate(ClientState),
+    Abort,
+}
+
 fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
     shutdown: &ShutdownGuard,
-    mut state: ForkChoiceManager<D>,
+    handle: Handle,
+    mut fcm_state: ForkChoiceManager<D>,
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: &CsmController,
+    status_tx: Arc<StatusTx>,
 ) -> anyhow::Result<()> {
+    let mut cl_rx = status_tx.cl.subscribe();
     loop {
         if shutdown.should_shutdown() {
             warn!("received shutdown signal");
             break;
         }
 
-        let Some(m) = fcm_rx.blocking_recv() else {
-            break;
-        };
+        let fcm_ev = wait_for_fcm_event(&handle, &mut fcm_rx, &mut cl_rx);
 
-        // TODO decide when errors are actually failures vs when they're okay
-        process_fc_message(m, &mut state, engine, csm_ctl)?;
+        match fcm_ev {
+            FcmEvent::NewFcmMsg(m) => process_fc_message(m, &mut fcm_state, engine, csm_ctl),
+            FcmEvent::NewStateUpdate(st) => handle_new_state(&mut fcm_state, st),
+            FcmEvent::Abort => break,
+        }?;
     }
 
+    info!("Exiting fork_choice_manager task");
     Ok(())
+}
+
+fn wait_for_fcm_event(
+    handle: &Handle,
+    fcm_rx: &mut mpsc::Receiver<ForkChoiceMessage>,
+    cl_rx: &mut watch::Receiver<ClientState>,
+) -> FcmEvent {
+    handle.block_on(async {
+        tokio::select! {
+            m = fcm_rx.recv() => {
+                match m {
+                    Some(msg) => FcmEvent::NewFcmMsg(msg),
+                    None => {
+                        warn!("Fcm channel closed");
+                        FcmEvent::Abort
+                    }
+                }
+            }
+            c = cl_rx.changed() => {
+                if c.is_err() {
+                    warn!("ClientState update sender closed");
+                    FcmEvent::Abort
+                } else {
+                    FcmEvent::NewStateUpdate(cl_rx.borrow().clone())
+                }
+            }
+        }
+    })
 }
 
 fn process_fc_message<D: Database, E: ExecEngineCtl>(
@@ -314,32 +326,6 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
     csm_ctl: &CsmController,
 ) -> anyhow::Result<()> {
     match msg {
-        ForkChoiceMessage::CsmResume(_) => {
-            warn!("got unexpected late CSM resume message, ignoring");
-        }
-
-        ForkChoiceMessage::NewState(cs, output) => {
-            let sync = cs.sync().expect("fcm: client state missing sync data");
-
-            let csm_tip = sync.chain_tip_blkid();
-            debug!(?csm_tip, "got new CSM state");
-
-            // Update the new state.
-            fcm_state.cur_csm_state = cs;
-
-            // TODO use output actions to clear out dangling states now
-            for act in output.actions() {
-                if let SyncAction::FinalizeBlock(blkid) = act {
-                    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
-                    info!(?blkid, ?fin_report, "finalized block")
-                    // TODO do something with the finalization report
-                }
-            }
-
-            // TODO recheck every remaining block's validity using the new state
-            // starting from the bottom up, putting into a new chain tracker
-        }
-
         ForkChoiceMessage::NewBlock(blkid) => {
             let block_bundle = fcm_state
                 .get_block_data(&blkid)?
@@ -439,6 +425,29 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
         }
     }
 
+    Ok(())
+}
+
+fn handle_new_state<D: Database>(
+    fcm_state: &mut ForkChoiceManager<D>,
+    cs: ClientState,
+) -> anyhow::Result<()> {
+    let sync = cs
+        .sync()
+        .expect("fcm: client state missing sync data")
+        .clone();
+    let csm_tip = sync.chain_tip_blkid();
+    debug!(?csm_tip, "got new CSM state");
+    // Update the new state.
+    fcm_state.cur_csm_state = Arc::new(cs);
+    let blkid = sync.finalized_blkid();
+    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
+    info!(?blkid, "updated finalized tip");
+    trace!(?fin_report, "finalization report");
+    // TODO do something with the finalization report
+
+    // TODO recheck every remaining block's validity using the new state
+    // starting from the bottom up, putting into a new chain tracker
     Ok(())
 }
 
