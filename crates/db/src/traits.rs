@@ -194,22 +194,27 @@ pub enum BlockStatus {
     Invalid,
 }
 
-/// Db trait for the (consensus layer) chain state database.
+/// Low-level Strata chainstate database.  This provides the basic interface for
+/// storing and fetching write batches and toplevel states on disk.
 ///
-/// For now we only have a modestly sized "toplevel" chain state and no "large"
-/// state like the EL does.  This trait is designed to permit a change to
-/// storing larger state like that in the future without *too* much extra effort.
-/// We decide new states by providing the database with a generic "write batch"
-/// and offloading the effort of deciding how to compute that write batch to the
-/// database impl.
+/// Currently we do not have a "bulk" state that we would want to avoid storing
+/// in memory all at once.  In the future, we expect that this interface would
+/// be extended to expose a "finalized" state that's fully materialized, along
+/// with functions to walk the finalized state forwards and backwards.  We can
+/// use the unmerged write batches to construct a view of more recent states
+/// than the fully materialized state in-memory.
+///
+/// For now, the full state is just the "toplevel" state that can always be
+/// expected to be of moderate size in memory.
+// TODO maybe rewrite this around storing write batches according to blkid?
 pub trait ChainstateDatabase {
     /// Writes the genesis chainstate at index 0.
-    fn write_genesis_state(&self, toplevel: &Chainstate) -> DbResult<()>;
+    fn write_genesis_state(&self, toplevel: Chainstate) -> DbResult<()>;
 
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
     /// previous writes must be purged first in order to be replaced.
-    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<()>;
+    fn write_state_update(&self, idx: u64, batch: WriteBatch) -> DbResult<()>;
 
     /// Tells the database to purge state before a certain block index (height).
     fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()>;
@@ -227,7 +232,8 @@ pub trait ChainstateDatabase {
     /// Gets the write batch stored to compute a height.
     fn get_writes_at(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
 
-    /// Gets the toplevel chain state at a particular block index (height).
+    /// Gets the toplevel chain state at a particular block slot, if it can be
+    /// retrieved.
     fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<Chainstate>>;
 }
 

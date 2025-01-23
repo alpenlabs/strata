@@ -56,22 +56,19 @@ impl ChainstateDatabase for ChainstateDb {
         Ok(self.db.get::<ChainstateSchema>(&idx)?)
     }
 
-    fn write_genesis_state(
-        &self,
-        toplevel: &strata_state::chain_state::Chainstate,
-    ) -> DbResult<()> {
+    fn write_genesis_state(&self, toplevel: strata_state::chain_state::Chainstate) -> DbResult<()> {
         let genesis_key = 0;
         if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
             return Err(DbError::OverwriteStateUpdate(genesis_key));
         }
-        self.db.put::<ChainstateSchema>(&genesis_key, toplevel)?;
+        self.db.put::<ChainstateSchema>(&genesis_key, &toplevel)?;
         Ok(())
     }
 
     fn write_state_update(
         &self,
         idx: u64,
-        batch: &strata_state::state_op::WriteBatch,
+        batch: strata_state::state_op::WriteBatch,
     ) -> DbResult<()> {
         if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteStateUpdate(idx));
@@ -82,10 +79,10 @@ impl ChainstateDatabase for ChainstateDb {
             Some(state) => state,
             None => return Err(DbError::OooInsert("Chainstate", idx)),
         };
-        let post_state = state_op::apply_write_batch_to_chainstate(pre_state, batch);
+        let post_state = state_op::apply_write_batch_to_chainstate(pre_state, &batch);
 
         let mut write_batch = SchemaBatch::new();
-        write_batch.put::<WriteBatchSchema>(&idx, batch)?;
+        write_batch.put::<WriteBatchSchema>(&idx, &batch)?;
         write_batch.put::<ChainstateSchema>(&idx, &post_state)?;
         self.db.write_schemas(write_batch)?;
 
