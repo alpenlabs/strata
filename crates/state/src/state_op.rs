@@ -51,6 +51,11 @@ impl WriteBatch {
     pub fn new_replace(new_state: Chainstate) -> Self {
         Self::new(new_state, Vec::new())
     }
+
+    /// Extracts the toplevel state, discarding the write ops.
+    pub fn into_toplevel(self) -> Chainstate {
+        self.new_toplevel_state
+    }
 }
 
 // TODO reversiblity stuff?
