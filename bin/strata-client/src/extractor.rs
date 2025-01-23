@@ -185,7 +185,7 @@ mod tests {
         script::Builder,
         taproot::LeafVersion,
         transaction::Version,
-        ScriptBuf, Sequence, TxIn, TxOut, Witness,
+        ScriptBuf, Sequence, TxIn, TxOut, Witness, XOnlyPublicKey,
     };
     use rand::rngs::OsRng;
     use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
@@ -517,6 +517,17 @@ mod tests {
         (tx.into(), deposit_request)
     }
 
+    /// Generate a valid [`Buf32`] for [`XOnlyPublicKey`].
+    fn generate_valid_xonly_pk_buf32() -> Buf32 {
+        let mut arb = ArbitraryGenerator::new();
+        loop {
+            let random_buf: Buf32 = arb.generate();
+            if XOnlyPublicKey::from_slice(&random_buf.0).is_ok() {
+                return random_buf;
+            }
+        }
+    }
+
     /// Generate a random chain state with some dispatched deposits.
     ///
     /// # Returns
@@ -578,7 +589,7 @@ mod tests {
 
             num_dispatched += 1;
 
-            let random_buf: Buf32 = arb.generate();
+            let random_buf = generate_valid_xonly_pk_buf32();
             let dest_addr = XOnlyPk::new(random_buf);
             let dest_descriptor = dest_addr.to_descriptor();
 
