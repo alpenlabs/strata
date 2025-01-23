@@ -40,11 +40,8 @@ pub fn xonlypk_to_descriptor(xonly: &str) -> Result<String, Error> {
 /// Converts a string to an `OP_RETURN` BOSD [`Descriptor`].
 #[pyfunction]
 pub fn string_to_opreturn_descriptor(s: &str) -> Result<String, Error> {
-    // Encode the string to hex first
-    let string_bytes = s.as_bytes().to_vec();
-    let op_return_bytes = [vec![0], string_bytes].concat();
-    let descriptor =
-        Descriptor::from_bytes(&op_return_bytes).map_err(|_| Error::OpReturnTooLong)?;
+    let payload = s.as_bytes().to_vec();
+    let descriptor = Descriptor::new_op_return(&payload).map_err(|_| Error::OpReturnTooLong)?;
     Ok(descriptor.to_string())
 }
 

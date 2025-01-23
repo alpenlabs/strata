@@ -18,7 +18,7 @@ use bitcoin::{
     Address, AddressType, Amount, Network, OutPoint, Psbt, ScriptBuf, Sequence, TapNodeHash,
     Transaction, TxIn, TxOut, Txid, Witness,
 };
-use bitcoin_bosd::{Descriptor, DescriptorType};
+use bitcoin_bosd::Descriptor;
 use borsh::{BorshDeserialize, BorshSerialize};
 use rand::rngs::OsRng;
 use revm_primitives::FixedBytes;
@@ -740,6 +740,11 @@ impl XOnlyPk {
         }
     }
 
+    /// Convert the [`XOnlyPk`] to a `rust-bitcoin`'s [`XOnlyPublicKey`].
+    pub fn to_xonly_public_key(&self) -> XOnlyPublicKey {
+        XOnlyPublicKey::from_slice(self.0.as_bytes()).expect("XOnlyPk is valid")
+    }
+
     /// Convert the [`XOnlyPk`] to an [`Address`].
     pub fn to_p2tr_address(&self, network: Network) -> Result<Address, ParseError> {
         let buf: [u8; 32] = self.0 .0;
@@ -752,9 +757,8 @@ impl XOnlyPk {
     }
 
     /// Converts [`XOnlyPk`] to [`Descriptor`].
-    pub fn to_descriptor(self) -> Descriptor {
-        let type_tag = DescriptorType::P2tr.to_u8();
-        Descriptor::from_vec([&[type_tag], self.0.as_bytes()].concat()).expect("infallible")
+    pub fn to_descriptor(&self) -> Descriptor {
+        Descriptor::new_p2tr(&self.to_xonly_public_key().serialize())
     }
 }
 
