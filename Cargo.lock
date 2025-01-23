@@ -2146,9 +2146,9 @@ dependencies = [
 
 [[package]]
 name = "bitcoin-bosd"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da2a875a5cd072cb774e631eb5e45e0698f3edec6b2f99c1eacf3045ccb342fc"
+checksum = "ad21a2a0e7700cfd23b188046a82af64714089651f291ca0aea19bc11aa67b82"
 dependencies = [
  "arbitrary",
  "bitcoin",
