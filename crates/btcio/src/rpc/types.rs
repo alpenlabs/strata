@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use bitcoin::{
     absolute::Height,
     address::{self, NetworkUnchecked},
@@ -144,6 +146,182 @@ pub struct GetBlockVerbosityOne {
     /// The hash of the next block (if available).
     #[serde(rename = "nextblockhash")]
     pub next_block_hash: Option<String>,
+}
+
+/// Result of JSON-RPC method `gettxout`.
+///
+/// > gettxout "txid" n ( include_mempool )
+/// >
+/// > Returns details about an unspent transaction output.
+/// >
+/// > Arguments:
+/// > 1. txid               (string, required) The transaction id
+/// > 2. n                  (numeric, required) vout number
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct GetTxOut {
+    /// The hash of the block at the tip of the chain.
+    #[serde(rename = "bestblock")]
+    pub best_block: String,
+    /// The number of confirmations.
+    pub confirmations: u32, // TODO: Change this to an i64.
+    /// The transaction value in BTC.
+    pub value: f64,
+    /// The script pubkey.
+    #[serde(rename = "scriptPubkey")]
+    pub script_pubkey: Option<ScriptPubkey>,
+    /// Coinbase or not.
+    pub coinbase: bool,
+}
+
+/// A script pubkey.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ScriptPubkey {
+    /// Script assembly.
+    pub asm: String,
+    /// Script hex.
+    pub hex: String,
+    #[serde(rename = "reqSigs")]
+    pub req_sigs: i64,
+    /// The type, eg pubkeyhash.
+    #[serde(rename = "type")]
+    pub type_: String,
+    /// Bitcoin address.
+    pub address: Option<String>,
+}
+
+/// Models the arguments of JSON-RPC method `createrawtransaction`.
+///
+/// # Note
+///
+/// Assumes that the transaction is always "replaceable" by default and has a locktime of 0.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct CreateRawTransaction {
+    pub inputs: Vec<CreateRawTransactionInput>,
+    pub outputs: Vec<CreateRawTransactionOutput>,
+}
+
+/// Models the input of JSON-RPC method `createrawtransaction`.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct CreateRawTransactionInput {
+    pub txid: String,
+    pub vout: u32,
+}
+
+/// Models the output of JSON-RPC method `createrawtransaction`.
+///
+/// The outputs specified as key-value pairs, where the keys is an address,
+/// and the values are the amounts to be sent to that address.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(untagged)]
+pub enum CreateRawTransactionOutput {
+    /// A pair of an [`Address`] string and an [`Amount`] in BTC.
+    AddressAmount {
+        /// An [`Address`] string.
+        address: String,
+        /// An [`Amount`] in BTC.
+        amount: f64,
+    },
+    /// A payload such as in `OP_RETURN` transactions.
+    Data {
+        /// The payload.
+        data: String,
+    },
+}
+
+impl Serialize for CreateRawTransactionOutput {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            CreateRawTransactionOutput::AddressAmount { address, amount } => {
+                let mut map = serde_json::Map::new();
+                map.insert(
+                    address.clone(),
+                    serde_json::Value::Number(serde_json::Number::from_f64(*amount).unwrap()),
+                );
+                map.serialize(serializer)
+            }
+            CreateRawTransactionOutput::Data { data } => {
+                let mut map = serde_json::Map::new();
+                map.insert("data".to_string(), serde_json::Value::String(data.clone()));
+                map.serialize(serializer)
+            }
+        }
+    }
+}
+
+/// Result of JSON-RPC method `submitpackage`.
+///
+/// > submitpackage ["rawtx",...] ( maxfeerate maxburnamount )
+/// >
+/// > Submit a package of raw transactions (serialized, hex-encoded) to local node.
+/// > The package will be validated according to consensus and mempool policy rules. If any
+/// > transaction passes, it will be accepted to mempool.
+/// > This RPC is experimental and the interface may be unstable. Refer to doc/policy/packages.md
+/// > for documentation on package policies.
+/// > Warning: successful submission does not mean the transactions will propagate throughout the
+/// > network.
+/// >
+/// > Arguments:
+/// > 1. package          (json array, required) An array of raw transactions.
+/// > The package must solely consist of a child and its parents. None of the parents may depend on
+/// > each other.
+/// > The package must be topologically sorted, with the child being the last element in the array.
+/// > [
+/// > "rawtx",     (string)
+/// > ...
+/// > ]
+#[allow(clippy::doc_lazy_continuation)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct SubmitPackage {
+    /// The transaction package result message.
+    ///
+    /// "success" indicates all transactions were accepted into or are already in the mempool.
+    pub package_msg: String,
+    /// Transaction results keyed by wtxid.
+    #[serde(rename = "tx-results")]
+    pub tx_results: BTreeMap<String, SubmitPackageTxResult>,
+    /// List of txids of replaced transactions.
+    #[serde(rename = "replaced-transactions")]
+    pub replaced_transactions: Vec<String>,
+}
+
+/// Models the per-transaction result included in the JSON-RPC method `submitpackage`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct SubmitPackageTxResult {
+    /// The transaction id.
+    pub txid: String,
+    /// The wtxid of a different transaction with the same txid but different witness found in the
+    /// mempool.
+    ///
+    /// If set, this means the submitted transaction was ignored.
+    #[serde(rename = "other-wtxid")]
+    pub other_wtxid: Option<String>,
+    /// Sigops-adjusted virtual transaction size.
+    pub vsize: i64,
+    /// Transaction fees.
+    pub fees: Option<SubmitPackageTxResultFees>,
+    /// The transaction error string, if it was rejected by the mempool
+    pub error: Option<String>,
+}
+
+/// Models the fees included in the per-transaction result of the JSON-RPC method `submitpackage`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct SubmitPackageTxResultFees {
+    /// Transaction fee.
+    #[serde(rename = "base")]
+    pub base_fee: f64,
+    /// The effective feerate.
+    ///
+    /// Will be `None` if the transaction was already in the mempool. For example, the package
+    /// feerate and/or feerate with modified fees from the `prioritisetransaction` JSON-RPC method.
+    #[serde(rename = "effective-feerate")]
+    pub effective_fee_rate: Option<f64>,
+    /// If [`Self::effective_fee_rate`] is provided, this holds the wtxid's of the transactions
+    /// whose fees and vsizes are included in effective-feerate.
+    #[serde(rename = "effective-includes")]
+    pub effective_includes: Option<Vec<String>>,
 }
 
 /// Result of JSON-RPC method `gettxout`.
@@ -317,6 +495,16 @@ pub struct ListTransactions {
     pub txid: Txid,
 }
 
+/// Models the result of JSON-RPC method `testmempoolaccept`.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct TestMempoolAccept {
+    /// The transaction id.
+    #[serde(deserialize_with = "deserialize_txid")]
+    pub txid: Txid,
+    /// Rejection reason, if any.
+    pub reject_reason: Option<String>,
+}
+
 /// Models the result of JSON-RPC method `signrawtransactionwithwallet`.
 ///
 /// # Note
@@ -331,6 +519,46 @@ pub struct SignRawTransactionWithWallet {
     pub complete: bool,
     /// Errors, if any.
     pub errors: Option<Vec<SignRawTransactionWithWalletError>>,
+}
+
+/// Models the optional previous transaction outputs argument for the method
+/// `signrawtransactionwithwallet`.
+///
+/// These are the outputs that this transaction depends on but may not yet be in the block chain.
+/// Widely used for One Parent One Child (1P1C) Relay in Bitcoin >28.0.
+///
+/// > transaction outputs
+/// > [
+/// > {                            (json object)
+/// > "txid": "hex",             (string, required) The transaction id
+/// > "vout": n,                 (numeric, required) The output number
+/// > "scriptPubKey": "hex",     (string, required) The output script
+/// > "redeemScript": "hex",     (string, optional) (required for P2SH) redeem script
+/// > "witnessScript": "hex",    (string, optional) (required for P2WSH or P2SH-P2WSH) witness
+/// > script
+/// > "amount": amount,          (numeric or string, optional) (required for Segwit inputs) the
+/// > amount spent
+/// > },
+/// > ...
+/// > ]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct PreviousTransactionOutput {
+    /// The transaction id.
+    #[serde(deserialize_with = "deserialize_txid")]
+    pub txid: Txid,
+    /// The output number.
+    pub vout: u32,
+    /// The output script.
+    #[serde(rename = "scriptPubKey")]
+    pub script_pubkey: String,
+    /// The redeem script.
+    #[serde(rename = "redeemScript")]
+    pub redeem_script: Option<String>,
+    /// The witness script.
+    #[serde(rename = "witnessScript")]
+    pub witness_script: Option<String>,
+    /// The amount spent.
+    pub amount: Option<f64>,
 }
 
 /// Models the result of the JSON-RPC method `listdescriptors`.

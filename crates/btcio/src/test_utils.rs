@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use async_trait::async_trait;
 use bitcoin::{
     bip32::Xpriv,
@@ -13,8 +15,10 @@ use crate::{
     rpc::{
         traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
         types::{
-            GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
-            ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+            CreateRawTransaction, GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor,
+            ImportDescriptorResult, ListTransactions, ListUnspent, PreviousTransactionOutput,
+            ScriptPubkey, SignRawTransactionWithWallet, SubmitPackage, SubmitPackageTxResult,
+            TestMempoolAccept,
         },
         ClientResult,
     },
@@ -95,8 +99,56 @@ impl ReaderRpc for TestBitcoinClient {
         })
     }
 
+    async fn get_current_timestamp(&self) -> ClientResult<u32> {
+        Ok(1_000)
+    }
+
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         Ok(vec![])
+    }
+
+    async fn get_tx_out(
+        &self,
+        _txid: &Txid,
+        _vout: u32,
+        _include_mempool: bool,
+    ) -> ClientResult<GetTxOut> {
+        Ok(GetTxOut {
+            best_block: BlockHash::all_zeros().to_string(),
+            confirmations: 1,
+            value: 1.0,
+            script_pubkey: Some(ScriptPubkey {
+                // Taken from mainnet txid
+                // e35e3357cac58a56dab78fa3c544f52f091561ff84428da28bdc5c49fc4c5ffc
+                asm: "OP_0 OP_PUSHBYTES_20 78a93a5b649de9deabd9494ae9bc41f3c9c13837".to_string(),
+                hex: "001478a93a5b649de9deabd9494ae9bc41f3c9c13837".to_string(),
+                req_sigs: 1,
+                type_: "V0_P2WPKH".to_string(),
+                address: Some("bc1q0z5n5kmynh5aa27ef99wn0zp70yuzwph68my2c".to_string()),
+            }),
+            coinbase: false,
+        })
+    }
+
+    async fn submit_package(&self, _txs: &[Transaction]) -> ClientResult<SubmitPackage> {
+        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        let wtxid = some_tx.compute_wtxid();
+        let vsize = some_tx.vsize();
+        let tx_results = BTreeMap::from([(
+            wtxid.to_string(),
+            SubmitPackageTxResult {
+                txid: some_tx.compute_txid().to_string(),
+                other_wtxid: None,
+                vsize: vsize as i64,
+                fees: None,
+                error: None,
+            },
+        )]);
+        Ok(SubmitPackage {
+            package_msg: "success".to_string(),
+            tx_results,
+            replaced_transactions: vec![],
+        })
     }
 
     async fn network(&self) -> ClientResult<Network> {
@@ -109,6 +161,13 @@ impl BroadcasterRpc for TestBitcoinClient {
     // send_raw_transaction sends a raw transaction to the network
     async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
         Ok(Txid::from_slice(&[1u8; 32]).unwrap())
+    }
+    async fn test_mempool_accept(&self, _tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>> {
+        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        Ok(vec![TestMempoolAccept {
+            txid: some_tx.compute_txid(),
+            reject_reason: None,
+        }])
     }
 }
 
@@ -181,6 +240,14 @@ impl WalletRpc for TestBitcoinClient {
     async fn list_wallets(&self) -> ClientResult<Vec<String>> {
         Ok(vec![])
     }
+
+    async fn create_raw_transaction(
+        &self,
+        _raw_tx: CreateRawTransaction,
+    ) -> ClientResult<Transaction> {
+        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        Ok(some_tx)
+    }
 }
 
 #[async_trait]
@@ -188,6 +255,7 @@ impl SignerRpc for TestBitcoinClient {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,
+        _prev_outputs: Option<Vec<PreviousTransactionOutput>>,
     ) -> ClientResult<SignRawTransactionWithWallet> {
         let tx_hex = consensus::encode::serialize_hex(tx);
         Ok(SignRawTransactionWithWallet {

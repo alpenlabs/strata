@@ -4,8 +4,9 @@ use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txi
 use crate::rpc::{
     client::ClientResult,
     types::{
-        GetBlockchainInfo, GetTransaction, ImportDescriptor, ImportDescriptorResult,
-        ListTransactions, ListUnspent, SignRawTransactionWithWallet,
+        CreateRawTransaction, GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor,
+        ImportDescriptorResult, ListTransactions, ListUnspent, PreviousTransactionOutput,
+        SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
 };
 
@@ -58,8 +59,35 @@ pub trait ReaderRpc {
     /// Gets various state info regarding blockchain processing.
     async fn get_blockchain_info(&self) -> ClientResult<GetBlockchainInfo>;
 
+    /// Gets the timestamp in the block header of the current best block in bitcoin.
+    ///
+    /// # Note
+    ///
+    /// Time is Unix epoch time in seconds.
+    async fn get_current_timestamp(&self) -> ClientResult<u32>;
+
     /// Gets all transaction ids in mempool.
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>>;
+
+    /// Returns details about an unspent transaction output.
+    async fn get_tx_out(
+        &self,
+        txid: &Txid,
+        vout: u32,
+        include_mempool: bool,
+    ) -> ClientResult<GetTxOut>;
+
+    /// Submit a package of raw transactions (serialized, hex-encoded) to local node.
+    ///
+    /// The package will be validated according to consensus and mempool policy rules. If any
+    /// transaction passes, it will be accepted to mempool. This RPC is experimental and the
+    /// interface may be unstable. Refer to doc/policy/packages.md for documentation on package
+    /// policies.
+    ///
+    /// # Warning
+    ///
+    /// Successful submission does not mean the transactions will propagate throughout the network.
+    async fn submit_package(&self, txs: &[Transaction]) -> ClientResult<SubmitPackage>;
 
     /// Gets the underlying [`Network`] information.
     async fn network(&self) -> ClientResult<Network>;
@@ -85,6 +113,9 @@ pub trait BroadcasterRpc {
     /// - `tx`: The raw transaction to send. This should be a byte array containing the serialized
     ///   raw transaction data.
     async fn send_raw_transaction(&self, tx: &Transaction) -> ClientResult<Txid>;
+
+    /// Tests if a raw transaction is valid.
+    async fn test_mempool_accept(&self, tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>>;
 }
 
 /// Wallet functionality that any Bitcoin client **without private keys** that
@@ -128,6 +159,12 @@ pub trait WalletRpc {
 
     /// Lists all wallets in the underlying Bitcoin client.
     async fn list_wallets(&self) -> ClientResult<Vec<String>>;
+
+    /// Creates a raw transaction.
+    async fn create_raw_transaction(
+        &self,
+        raw_tx: CreateRawTransaction,
+    ) -> ClientResult<Transaction>;
 }
 
 /// Signing functionality that any Bitcoin client **with private keys** that
@@ -153,6 +190,7 @@ pub trait SignerRpc {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,
+        prev_outputs: Option<Vec<PreviousTransactionOutput>>,
     ) -> ClientResult<SignRawTransactionWithWallet>;
 
     /// Gets the underlying [`Xpriv`] from the wallet.

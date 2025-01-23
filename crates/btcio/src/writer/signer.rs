@@ -31,7 +31,7 @@ pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
     debug!(commit_txid = ?ctxid, "Signing commit transaction");
     let signed_commit = ctx
         .client
-        .sign_raw_transaction_with_wallet(&commit)
+        .sign_raw_transaction_with_wallet(&commit, None)
         .await
         .map_err(|e| EnvelopeError::SignRawTransaction(e.to_string()))?
         .hex;
