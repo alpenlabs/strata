@@ -23,7 +23,7 @@ pub fn wei_to_sats(wei: U256) -> (U256, U256) {
 }
 
 /// Collects withdrawal intents from bridge-out events in the receipts.
-/// Returns a vector of optional [`WithdrawalIntent`]s.
+/// Returns a vector of [`WithdrawalIntent`]s.
 ///
 /// # Note
 ///
