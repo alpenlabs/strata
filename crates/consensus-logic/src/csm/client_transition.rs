@@ -10,7 +10,6 @@ use strata_state::{
     batch::{BatchCheckpoint, BatchCheckpointWithCommitment, BatchInfo},
     block,
     client_state::*,
-    epoch::EpochCommitment,
     header::L2Header,
     id::L2BlockId,
     l1::{get_btc_params, HeaderVerificationState, L1BlockId},

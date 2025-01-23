@@ -289,7 +289,7 @@ fn apply_action<D: Database>(
                     error!(err = %err, "failed to compute chain genesis");
                     Error::GenesisFailed(err.to_string())
                 })?;
-            status_channel.update_chainstate(chstate);
+            status_channel.update_chainstate(Arc::new(chstate));
         }
 
         SyncAction::WriteCheckpoints(_height, checkpoints) => {

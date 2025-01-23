@@ -2,6 +2,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     buf::Buf32, epoch::EpochCommitment, hash::compute_borsh_hash, l1::L1BlockCommitment,
+    l2::L2BlockCommitment,
 };
 
 use crate::{
@@ -20,10 +21,7 @@ use crate::{
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct Chainstate {
     /// Most recent seen block.
-    pub(crate) last_block: L2BlockId,
-
-    /// The slot of the last produced block.
-    pub(crate) last_slot: u64,
+    pub(crate) last_block: L2BlockCommitment,
 
     /// The checkpoint epoch period we're currently in, and so the index we
     /// expect the next checkpoint to be for.
@@ -53,8 +51,7 @@ impl Chainstate {
     // TODO remove genesis blkid since apparently we don't need it anymore
     pub fn from_genesis(gdata: &GenesisStateData) -> Self {
         Self {
-            last_block: gdata.genesis_blkid(),
-            last_slot: 0,
+            last_block: L2BlockCommitment::new(0, gdata.genesis_blkid()),
             cur_epoch: 0,
             epoch_state: EpochState::from_genesis(gdata),
             pending_withdraws: StateQueue::new_empty(),
@@ -64,14 +61,19 @@ impl Chainstate {
 
     /// Returns the slot last processed on the chainstate.
     pub fn chain_tip_slot(&self) -> u64 {
-        self.last_slot
+        self.last_block.slot()
     }
 
     /// Returns the blockid of the last processed block, which was used to
     /// construct this chainstate (unless we're currently in the process of
     /// modifying this chainstate copy).
+    // TODO make this return a ref
     pub fn chain_tip_blockid(&self) -> L2BlockId {
-        self.last_block
+        self.last_block.blkid()
+    }
+
+    pub fn chain_tip_block(&self) -> &L2BlockCommitment {
+        &self.last_block
     }
 
     /// Index of the current epoch.

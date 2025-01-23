@@ -120,6 +120,7 @@ fn duty_tracker_task_inner(
         }
 
         // Publish the new batch.
+        let ev_idx = 0; // TODO remove this
         let batch = DutyBatch::new(ev_idx, duties_tracker.duties().to_vec());
         if batch_queue.send(batch).is_err() {
             warn!("failed to publish new duties batch");

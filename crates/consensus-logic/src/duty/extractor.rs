@@ -15,7 +15,7 @@ pub fn extract_duties(
     rollup_params_commitment: Buf32,
 ) -> Result<Vec<Duty>, Error> {
     let tip_height = state.chain_tip_slot();
-    let tip_blkid = state.chain_tip_blkid();
+    let tip_blkid = state.chain_tip_blockid();
 
     // Since we're not rotating sequencers, for now we just *always* produce a
     // new block.
