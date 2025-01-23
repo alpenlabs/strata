@@ -54,7 +54,7 @@ impl L2BlockCommitment {
         self.slot
     }
 
-    pub fn blkid(&self) -> &L2Block {
+    pub fn blkid(&self) -> &L2BlockId {
         &self.blkid
     }
 }
