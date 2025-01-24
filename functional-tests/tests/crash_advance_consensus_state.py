@@ -1,15 +1,13 @@
 import flexitest
 
-from envs import testenv
+from mixins import seq_crash_mixin
+from utils import wait_until
 
 
 @flexitest.register
-class CrashAdvanceConsensusStateTestd(testenv.CrashTestBase):
+class CrashAdvanceConsensusStateTestd(seq_crash_mixin.SeqCrashMixin):
     def __init__(self, ctx: flexitest.InitContext):
-        super().__init__(ctx)
-
-    def get_bail_tag(self) -> str:
-        return "advance_consensus_state"
+        ctx.set_env("basic")
 
     def main(self, ctx: flexitest.RunContext):
         """
@@ -21,8 +19,18 @@ class CrashAdvanceConsensusStateTestd(testenv.CrashTestBase):
 
         The check is present in the function `sign_and_store_block` on block_assembly.
         Further work is required for fixing the problem.
-        To re-enable this test remove this main() function
+        To re-enable this test remove the return below.
         Track the issue on:
         https://alpenlabs.atlassian.net/browse/STR-916
         """
         return
+
+        cur_chain_tip = self.handle_bail(lambda: "advance_consensus_state")
+
+        wait_until(
+            lambda: self.seqrpc.strata_clientStatus()["chain_tip_slot"] > cur_chain_tip,
+            error_with="chain tip slot not progressing",
+            timeout=20,
+        )
+
+        return True

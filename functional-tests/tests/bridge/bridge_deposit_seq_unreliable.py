@@ -1,13 +1,13 @@
 import flexitest
 
-from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
+from mixins import bridge_mixin
 from utils import check_sequencer_down, get_bridge_pubkey, wait_until, wait_until_with_value
 from utils.constants import SATS_TO_WEI
 
 
 @flexitest.register
-class BridgeDepositSequencerUnreliableTest(testenv.BridgeTestBase):
+class BridgeDepositSequencerUnreliableTest(bridge_mixin.BridgeMixin):
     """
     Makes two DRT deposits to the same EL address
     After the first DRT is processed and EL address has balance,the sequencer is

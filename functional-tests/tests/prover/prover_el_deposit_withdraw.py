@@ -4,8 +4,8 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import get_balance
 
-from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
+from mixins import bridge_mixin
 from utils import (
     confirm_btc_withdrawal,
     get_bridge_pubkey,
@@ -15,7 +15,7 @@ from utils import (
 
 
 @flexitest.register
-class ProverDepositWithdrawTest(testenv.BridgeTestBase):
+class ProverDepositWithdrawTest(bridge_mixin.BridgeMixin):
     """
     Checks that the prover is able to prove the checkpoint that contains
     deposit and withdrawal transactions.

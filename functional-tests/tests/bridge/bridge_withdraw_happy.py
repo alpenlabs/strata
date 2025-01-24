@@ -3,18 +3,12 @@ from strata_utils import get_balance
 
 from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
+from mixins import bridge_mixin
 from utils import confirm_btc_withdrawal, get_bridge_pubkey
-
-# Local constants
-# Gas for the withdrawal transaction
-WITHDRAWAL_GAS_FEE = 22_000  # technically is 21_000
-# Ethereum Private Key
-# NOTE: don't use this private key in production
-ETH_PRIVATE_KEY = "0x0000000000000000000000000000000000000000000000000000000000000001"
 
 
 @flexitest.register
-class BridgeWithdrawHappyTest(testenv.BridgeTestBase):
+class BridgeWithdrawHappyTest(bridge_mixin.BridgeMixin):
     """
     Makes two DRT deposits to the same EL address, then makes a withdrawal to a change address.
 
