@@ -712,8 +712,12 @@ pub struct XOnlyPk(Buf32);
 
 impl XOnlyPk {
     /// Construct a new [`XOnlyPk`] directly from a [`Buf32`].
-    pub fn new(val: Buf32) -> Self {
-        Self(val)
+    pub fn new(val: Buf32) -> Result<Self, ParseError> {
+        if Self::is_valid_xonly_public_key(&val) {
+            Ok(Self(val))
+        } else {
+            Err(ParseError::InvalidPoint(val))
+        }
     }
 
     /// Get the underlying [`Buf32`].
@@ -760,6 +764,11 @@ impl XOnlyPk {
     pub fn to_descriptor(&self) -> Result<Descriptor, ParseError> {
         Descriptor::new_p2tr(&self.to_xonly_public_key().serialize())
             .map_err(|_| ParseError::InvalidPoint(self.0))
+    }
+
+    /// Checks if the [`Buf32`] is a valid [`XOnlyPublicKey`].
+    fn is_valid_xonly_public_key(buf: &Buf32) -> bool {
+        XOnlyPublicKey::from_slice(buf.as_bytes()).is_ok()
     }
 }
 
@@ -1332,7 +1341,7 @@ mod tests {
 
     #[test]
     fn test_xonly_pk_to_descriptor() {
-        let xonly_pk = XOnlyPk::new(Buf32::from([2u8; 32]));
+        let xonly_pk = XOnlyPk::new(Buf32::from([2u8; 32])).unwrap();
         let descriptor = xonly_pk.to_descriptor().unwrap();
         assert_eq!(descriptor.type_tag(), DescriptorType::P2tr);
 

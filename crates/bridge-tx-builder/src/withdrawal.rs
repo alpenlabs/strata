@@ -220,7 +220,10 @@ mod tests {
 
         let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
 
-        let user_descriptor = user_pk.to_descriptor().expect("infallible");
+        let user_descriptor = user_pk
+            .expect("infallible")
+            .to_descriptor()
+            .expect("infallible");
 
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
@@ -281,13 +284,14 @@ mod tests {
             "use separate indexes for user and assigned operator"
         );
 
-        let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
-        let user_descriptor = user_pk.to_descriptor();
+        let user_pk =
+            XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize())).unwrap();
+        let user_descriptor = user_pk.to_descriptor().unwrap();
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info = CooperativeWithdrawalInfo::new(
             deposit_outpoint,
-            user_descriptor.unwrap(),
+            user_descriptor,
             assigned_operator_idx,
             0,
         );
@@ -325,13 +329,14 @@ mod tests {
             "use separate indexes for user and assigned operator"
         );
 
-        let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
-        let user_descriptor = user_pk.to_descriptor();
+        let user_pk =
+            XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize())).unwrap();
+        let user_descriptor = user_pk.to_descriptor().unwrap();
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
         let withdrawal_info = CooperativeWithdrawalInfo::new(
             deposit_outpoint,
-            user_descriptor.unwrap(),
+            user_descriptor,
             assigned_operator_idx,
             0,
         );

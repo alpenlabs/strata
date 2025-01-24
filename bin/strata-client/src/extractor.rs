@@ -592,6 +592,7 @@ mod tests {
             let random_buf = generate_valid_xonly_pk_buf32();
             let dest_addr = XOnlyPk::new(random_buf);
             let dest_descriptor = dest_addr
+                .expect("infallible due to generate_valid_xonly_pk_buf32")
                 .to_descriptor()
                 .expect("infallible due to generate_valid_xonly_pk_buf32");
 
