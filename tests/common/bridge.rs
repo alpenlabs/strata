@@ -254,7 +254,7 @@ impl Operator {
 
                 event!(Level::INFO, event = "all nonces collected", operator_idx=%self.index);
 
-                let receive_signatures = self.agggregate_signatures(&txid, timeout_duration).await;
+                let receive_signatures = self.aggregate_signatures(&txid, timeout_duration).await;
                 assert!(
                     receive_signatures.is_ok(),
                     "timeout while trying to collect signatures"
@@ -315,7 +315,7 @@ impl Operator {
 
                 event!(Level::INFO, event = "all nonces collected", operator_idx=%self.index);
 
-                let receive_signatures = self.agggregate_signatures(&txid, timeout_duration).await;
+                let receive_signatures = self.aggregate_signatures(&txid, timeout_duration).await;
                 assert!(
                     receive_signatures.is_ok(),
                     "timeout while trying to collect signatures"
@@ -399,7 +399,7 @@ impl Operator {
         .await
     }
 
-    async fn agggregate_signatures(
+    async fn aggregate_signatures(
         &mut self,
         txid: &Txid,
         timeout_duration: Duration,
@@ -549,6 +549,7 @@ impl Agent {
         let x_only_pk = Buf32(x_only_pk.serialize());
 
         XOnlyPk::new(x_only_pk)
+            .expect("infallible due to being construct from a XOnlyPublicKey constructor")
     }
 
     /// Mines [`Self::MIN_BLOCKS_TILL_SPENDABLE`] + `num_blocks` to this user's address.
