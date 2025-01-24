@@ -8,7 +8,6 @@ use strata_primitives::{
     params::RollupParams,
 };
 use thiserror::Error;
-use tracing::warn;
 
 use crate::utils::{next_bytes, next_op};
 
@@ -21,9 +20,6 @@ pub enum EnvelopeParseError {
     /// Does not have a valid type tag
     #[error("Invalid/Missing type tag")]
     InvalidTypeTag,
-    // Does not have a valid version
-    #[error("Invalid/Missing version")]
-    InvalidVersion,
     /// Does not have a valid format
     #[error("Invalid Format")]
     InvalidFormat,
@@ -63,11 +59,6 @@ fn parse_l1_payload(
         .and_then(|bytes| parse_payload_type(bytes, params))
         .ok_or(EnvelopeParseError::InvalidTypeTag)?;
 
-    // Parse version
-    let _version = next_bytes(instructions)
-        .and_then(validate_version)
-        .ok_or(EnvelopeParseError::InvalidVersion)?;
-
     // Parse payload
     let payload = extract_until_op_endif(instructions)?;
     Ok(L1Payload::new(payload, ptype))
@@ -81,16 +72,6 @@ fn parse_payload_type(tag_bytes: &[u8], params: &RollupParams) -> Option<L1Paylo
     } else {
         None
     }
-}
-
-fn validate_version(bytes: &[u8]) -> Option<u8> {
-    if bytes.len() != 1 {
-        warn!("Invalid version bytes length, should be 1");
-        return None;
-    }
-    let version = bytes[0];
-    // TODO: add version validation logic, i.e which particular versions are supported
-    Some(version)
 }
 
 /// Check for consecutive `OP_FALSE` and `OP_IF` that marks the beginning of an envelope
@@ -154,15 +135,11 @@ mod tests {
     fn test_parse_envelope_data() {
         let bytes = vec![0, 1, 2, 3];
         let params = gen_params();
-        let version = 1;
         let envelope1 = L1Payload::new_checkpoint(bytes.clone());
         let envelope2 = L1Payload::new_checkpoint(bytes.clone());
-        let script = generate_envelope_script_test(
-            &[envelope1.clone(), envelope2.clone()],
-            &params,
-            version,
-        )
-        .unwrap();
+        let script =
+            generate_envelope_script_test(&[envelope1.clone(), envelope2.clone()], &params)
+                .unwrap();
 
         let result = parse_envelope_payloads(&script, params.rollup()).unwrap();
 
@@ -171,8 +148,7 @@ mod tests {
         // Try with larger size
         let bytes = vec![1; 2000];
         let envelope_data = L1Payload::new_checkpoint(bytes.clone());
-        let script =
-            generate_envelope_script_test(&[envelope_data.clone()], &params, version).unwrap();
+        let script = generate_envelope_script_test(&[envelope_data.clone()], &params).unwrap();
 
         // Parse the rollup name
         let result = parse_envelope_payloads(&script, params.rollup()).unwrap();

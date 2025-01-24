@@ -29,7 +29,6 @@ use super::context::WriterContext;
 use crate::rpc::{traits::WriterRpc, types::ListUnspent};
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
-const ENVELOPE_VERSION: u8 = 1;
 
 // TODO: these might need to be in rollup params
 #[derive(Debug, Error)]
@@ -79,8 +78,7 @@ pub fn create_envelope_transactions<W: WriterRpc>(
     let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
 
     // Start creating envelope content
-    let reveal_script =
-        build_reveal_script(ctx.params.as_ref(), &public_key, payloads, ENVELOPE_VERSION)?;
+    let reveal_script = build_reveal_script(ctx.params.as_ref(), &public_key, payloads)?;
 
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
@@ -382,14 +380,13 @@ fn build_reveal_script(
     params: &Params,
     taproot_public_key: &XOnlyPublicKey,
     payloads: &[L1Payload],
-    version: u8,
 ) -> Result<ScriptBuf, anyhow::Error> {
     let mut script_bytes = script::Builder::new()
         .push_x_only_key(taproot_public_key)
         .push_opcode(OP_CHECKSIG)
         .into_script()
         .into_bytes();
-    let script = build_envelope_script(params, payloads, version)?;
+    let script = build_envelope_script(params, payloads)?;
     script_bytes.extend(script.into_bytes());
     Ok(ScriptBuf::from(script_bytes))
 }

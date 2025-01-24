@@ -13,32 +13,22 @@ use strata_primitives::{
 };
 
 // Generates a [`ScriptBuf`] that consists of `OP_IF .. OP_ENDIF` block
-pub fn build_envelope_script(
-    params: &Params,
-    payloads: &[L1Payload],
-    version: u8,
-) -> anyhow::Result<ScriptBuf> {
+pub fn build_envelope_script(params: &Params, payloads: &[L1Payload]) -> anyhow::Result<ScriptBuf> {
     let mut bytes = Vec::new();
     for payload in payloads {
-        let script_bytes = build_payload_envelope(params, payload, version)?;
+        let script_bytes = build_payload_envelope(params, payload)?;
         bytes.extend(script_bytes);
     }
     Ok(ScriptBuf::from_bytes(bytes))
 }
 
-fn build_payload_envelope(
-    params: &Params,
-    payload: &L1Payload,
-    version: u8,
-) -> anyhow::Result<Vec<u8>> {
+fn build_payload_envelope(params: &Params, payload: &L1Payload) -> anyhow::Result<Vec<u8>> {
     let type_bytes = get_payload_type_tag(payload.payload_type(), params);
     let type_tag = PushBytesBuf::try_from(type_bytes)?;
     let mut builder = script::Builder::new()
         .push_opcode(OP_FALSE)
         .push_opcode(OP_IF)
-        .push_slice(type_tag)
-        // Insert version
-        .push_slice(PushBytesBuf::from([version]));
+        .push_slice(type_tag);
 
     // Insert actual data
     for chunk in payload.data().chunks(520) {

@@ -187,7 +187,7 @@ mod test {
                 L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
             })
             .collect();
-        let script = generate_envelope_script_test(&payloads, params, 1).unwrap();
+        let script = generate_envelope_script_test(&payloads, params).unwrap();
 
         // Create controlblock
         let mut rand_bytes = [0; 32];
