@@ -934,9 +934,9 @@ impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRp
             .await?;
         match chain_state {
             Some(cs) => Ok(Some(RpcChainState {
-                tip_blkid: cs.chain_tip_blockid(),
+                tip_blkid: cs.chain_tip_blkid(),
                 tip_slot: cs.chain_tip_slot(),
-                cur_epoch: cs.epoch(),
+                cur_epoch: cs.cur_epoch(),
             })),
             None => Ok(None),
         }

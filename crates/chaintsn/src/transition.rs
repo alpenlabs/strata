@@ -71,7 +71,7 @@ pub fn process_block(
 /// let's not get ahead of ourselves.
 fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
     // Just take the last block's slot.
-    let blkid_buf = *state.state().chain_tip_blockid().as_ref();
+    let blkid_buf = *state.state().chain_tip_blkid().as_ref();
     SlotRng::from_seed(blkid_buf)
 }
 

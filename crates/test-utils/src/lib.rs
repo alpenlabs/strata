@@ -7,7 +7,7 @@ pub mod evm_ee;
 pub mod l2;
 
 /// The default buffer size for the `ArbitraryGenerator`.
-const ARB_GEN_LEN: usize = 2048;
+const ARB_GEN_LEN: usize = 16384;
 
 pub struct ArbitraryGenerator {
     buf: Vec<u8>, // Persistent buffer

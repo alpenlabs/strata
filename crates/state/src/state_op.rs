@@ -8,6 +8,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
+    l2::L2BlockCommitment,
 };
 use tracing::*;
 
@@ -147,12 +148,18 @@ impl StateCache {
     // TODO rework a lot of these to make them lower-level and focus more on
     // just keeping the core invariants consistent
 
-    /// Sets the current slot in the state.
+    /// Sets the last block commitment, derived from a header.
     pub fn set_cur_header(&mut self, header: &impl L2Header) {
-        // TODO rework this to use L2BlockCommitment
+        self.set_last_block(L2BlockCommitment::new(
+            header.blockidx(),
+            header.get_blockid(),
+        ));
+    }
+
+    /// Sets the last block commitment.
+    pub fn set_last_block(&mut self, block: L2BlockCommitment) {
         let state = self.state_mut();
-        state.slot = header.blockidx();
-        state.last_block = header.get_blockid();
+        state.last_block = block;
     }
 
     /// remove a deposit intent from the pending deposits queue.

@@ -110,7 +110,11 @@ impl StatusChannel {
 
     /// Gets the latest epoch
     pub fn epoch(&self) -> Option<u64> {
-        self.receiver.chs.borrow().to_owned().map(|ch| ch.epoch())
+        self.receiver
+            .chs
+            .borrow()
+            .to_owned()
+            .map(|ch| ch.cur_epoch())
     }
 
     pub fn chain_state(&self) -> Option<Chainstate> {

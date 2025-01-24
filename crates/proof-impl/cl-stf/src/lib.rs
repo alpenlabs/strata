@@ -98,13 +98,13 @@ fn process_cl_stf(
     let initial_snapshot = ChainStateSnapshot {
         hash: prev_state.compute_state_root(),
         slot: prev_state.chain_tip_slot(),
-        l2_blockid: prev_state.chain_tip_blockid(),
+        l2_blockid: *prev_state.chain_tip_blkid(),
     };
 
     let final_snapshot = ChainStateSnapshot {
         hash: new_state.compute_state_root(),
         slot: new_state.chain_tip_slot(),
-        l2_blockid: new_state.chain_tip_blockid(),
+        l2_blockid: *new_state.chain_tip_blkid(),
     };
 
     L2BatchProofOutput {
