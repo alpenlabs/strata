@@ -64,33 +64,6 @@ impl<'c> EventContext for StorageEventContext<'c> {
     }
 }
 
-#[cfg(test)]
-pub struct DummyEventContext {
-    // maybe something?
-}
-
-#[cfg(test)]
-impl DummyEventContext {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-#[cfg(test)]
-impl EventContext for DummyEventContext {
-    fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
-        Err(Error::MissingL1BlockHeight(height))
-    }
-
-    fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
-        Err(Error::MissingL2Block(*blkid))
-    }
-
-    fn get_toplevel_chainstate(&self, slot: u64) -> Result<Chainstate, Error> {
-        Err(Error::MissingIdxChainstate(slot))
-    }
-}
-
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
 pub fn process_event(
@@ -526,6 +499,30 @@ mod tests {
 
     use super::*;
     use crate::genesis;
+
+    pub struct DummyEventContext {
+        // nothing
+    }
+
+    impl DummyEventContext {
+        pub fn new() -> Self {
+            Self {}
+        }
+    }
+
+    impl EventContext for DummyEventContext {
+        fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
+            Ok(ArbitraryGenerator::new().generate())
+        }
+
+        fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
+            Err(Error::MissingL2Block(*blkid))
+        }
+
+        fn get_toplevel_chainstate(&self, slot: u64) -> Result<Chainstate, Error> {
+            Err(Error::MissingIdxChainstate(slot))
+        }
+    }
 
     struct TestEvent<'a> {
         event: SyncEvent,
