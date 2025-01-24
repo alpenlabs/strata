@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::bail;
 use bitcoin::BlockHash;
+use strata_common::env::parse_env_or;
 use strata_db::traits::Database;
 use strata_primitives::params::Params;
 use strata_state::l1::{
@@ -25,6 +26,8 @@ use crate::{
     rpc::traits::Reader,
     status::{apply_status_updates, L1StatusUpdate},
 };
+
+const L1_POLL_INTERVAL_MS_ENVVAR: &str = "L1_POLL_INTERVAL_MS";
 
 // TODO: remove this
 pub async fn bitcoin_data_reader_task<D: Database + 'static>(
@@ -186,7 +189,12 @@ async fn poll_for_new_blocks(
 
     // Now process each block we missed.
     let scan_start_height = state.next_height();
+    let scan_interval_ms = parse_env_or(L1_POLL_INTERVAL_MS_ENVVAR, 1);
+    let mut interval = tokio::time::interval(Duration::from_millis(scan_interval_ms));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     for fetch_height in scan_start_height..=client_height {
+        // HACK: need to slow down l1 reader
+        interval.tick().await;
         let l1blkid = match fetch_and_process_block(
             fetch_height,
             client,
