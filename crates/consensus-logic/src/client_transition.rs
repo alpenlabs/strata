@@ -280,12 +280,26 @@ fn handle_mature_l1_height(
             let l2_blockid = checkpt.batch_info.l2_blockid;
 
             match database.l2_provider().get_block_data(l2_blockid) {
-                Ok(Some(_)) => {
-                    debug!(%maturable_height, "Writing CheckpointFinalized");
-                    writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
-                    // Emit sync action for finalizing a l2 block
-                    info!(%maturable_height, %l2_blockid, "l2 block found in db, push FinalizeBlock SyncAction");
-                    actions.push(SyncAction::FinalizeBlock(l2_blockid));
+                Ok(Some(bundle)) => {
+                    let block_height = bundle.header().blockidx();
+                    // FIXME: only checking height and not for potential fork
+                    match database.chain_state_provider().get_last_state_idx() {
+                        Ok(chainstate_height) => {
+                            if block_height > chainstate_height {
+                                warn!(%maturable_height, %l2_blockid, "l2 block not in chainstate yet, skipping finalize");
+                            } else {
+                                debug!(%maturable_height, "Writing CheckpointFinalized");
+                                writes
+                                    .push(ClientStateWrite::CheckpointFinalized(maturable_height));
+                                // Emit sync action for finalizing a l2 block
+                                info!(%maturable_height, %l2_blockid, "l2 block found in db, push FinalizeBlock SyncAction");
+                                actions.push(SyncAction::FinalizeBlock(l2_blockid));
+                            }
+                        }
+                        Err(e) => {
+                            error!(%e, "error while fetching block data from chainstate db");
+                        }
+                    }
                 }
                 Ok(None) => {
                     warn!(
