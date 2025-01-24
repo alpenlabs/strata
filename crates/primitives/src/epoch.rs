@@ -79,31 +79,4 @@ impl EpochCommitment {
     pub fn is_null(&self) -> bool {
         Buf32::from(self.last_blkid).is_zero()
     }
-
-    /// Checks if the epoch is sane.
-    ///
-    /// Ie. if the terminal blkid is zero then the last slot and epoch number
-    /// are also zero.
-    fn sanity_check(&self) -> bool {
-        if self.is_null() {
-            self.last_slot == 0 && self.epoch == 0
-        } else {
-            self.last_slot != 0
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::EpochCommitment;
-
-    #[test]
-    fn test_epoch_sanity() {
-        // TODO write test
-    }
-
-    #[test]
-    fn test_epoch_insanity() {
-        // TODO write test
-    }
 }
