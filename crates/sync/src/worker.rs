@@ -14,9 +14,9 @@ use crate::{
 };
 
 pub struct L2SyncContext<T: SyncClient> {
-    client: T,
-    l2_block_manager: Arc<L2BlockManager>,
-    sync_manager: Arc<SyncManager>,
+    pub(crate) client: T,
+    pub(crate) l2_block_manager: Arc<L2BlockManager>,
+    pub(crate) sync_manager: Arc<SyncManager>,
 }
 
 impl<T: SyncClient> L2SyncContext<T> {

@@ -186,13 +186,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 ctx.l2_block_manager.clone(),
                 ctx.sync_manager.clone(),
             );
-            // NOTE: this might block for some time during first run with empty db until genesis
-            // block is generated
-            let mut l2_sync_state =
-                strata_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
 
             executor.spawn_critical_async("l2-sync-manager", async move {
-                strata_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
+                strata_sync::simple_sync_worker(&l2_sync_context)
                     .await
                     .map_err(Into::into)
             });
