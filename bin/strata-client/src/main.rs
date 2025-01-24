@@ -103,7 +103,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Initialize core databases
     let database = init_core_dbs(rbdb.clone(), ops_config);
-    let manager = create_node_storage(database.clone(), pool.clone());
+    let storage = Arc::new(create_node_storage(database.clone(), pool.clone()));
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
@@ -111,7 +111,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bridge_msg_ctx = strata_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
-    let checkpoint_handle: Arc<_> = CheckpointHandle::new(manager.checkpoint().clone()).into();
+    let checkpoint_handle: Arc<_> = CheckpointHandle::new(storage.checkpoint().clone()).into();
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
 
     // Check if we have to do genesis.
@@ -128,7 +128,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         &config,
         params.clone(),
         database,
-        &manager,
+        storage.clone(),
         bridge_msg_ops,
         bitcoin_client,
     )?;
@@ -167,7 +167,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             let sync_peer = RpcSyncPeer::new(rpc_client, 10);
             let l2_sync_context = L2SyncContext::new(
                 sync_peer,
-                ctx.l2_block_manager.clone(),
+                ctx.storage.l2().clone(),
                 ctx.sync_manager.clone(),
             );
             // NOTE: this might block for some time during first run with empty db until genesis
@@ -227,10 +227,10 @@ fn init_logging(rt: &Handle) {
 #[derive(Clone)]
 pub struct CoreContext {
     pub database: Arc<CommonDb>,
+    pub storage: Arc<NodeStorage>,
     pub pool: threadpool::ThreadPool,
     pub params: Arc<Params>,
     pub sync_manager: Arc<SyncManager>,
-    pub l2_block_manager: Arc<L2BlockManager>,
     pub status_channel: StatusChannel,
     pub engine: Arc<RpcExecEngineCtl<EngineRpcClient>>,
     pub relayer_handle: Arc<RelayerHandle>,
@@ -239,12 +239,12 @@ pub struct CoreContext {
 
 fn do_startup_checks(
     database: &impl Database,
+    storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
     bitcoin_client: &impl ReaderRpc,
     handle: &Handle,
 ) -> anyhow::Result<()> {
-    let chain_state_db = database.chain_state_db();
-    let last_state_idx = match chain_state_db.get_last_state_idx() {
+    let last_state_idx = match storage.chainstate().get_last_write_idx_blocking() {
         Ok(idx) => idx,
         Err(DbError::NotBootstrapped) => {
             // genesis is not done
@@ -253,8 +253,12 @@ fn do_startup_checks(
         }
         err => err?,
     };
-    let Some(last_chain_state) = chain_state_db.get_toplevel_state(last_state_idx)? else {
-        anyhow::bail!(format!("Missing chain state idx: {}", last_state_idx));
+
+    let Some(last_chain_state) = storage
+        .chainstate()
+        .get_toplevel_chainstate_blocking(last_state_idx)?
+    else {
+        anyhow::bail!("Missing chain state idx: {last_state_idx}");
     };
 
     // Check that we can connect to bitcoin client and block we believe to be matured in L1 is
@@ -303,7 +307,7 @@ fn start_core_tasks(
     config: &Config,
     params: Arc<Params>,
     database: Arc<CommonDb>,
-    storage: &NodeStorage,
+    storage: Arc<NodeStorage>,
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
@@ -321,6 +325,7 @@ fn start_core_tasks(
     // do startup checks
     do_startup_checks(
         database.as_ref(),
+        storage.as_ref(),
         engine.as_ref(),
         bitcoin_client.as_ref(),
         executor.handle(),
@@ -330,7 +335,7 @@ fn start_core_tasks(
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
         database.clone(),
-        storage,
+        storage.clone(),
         engine.clone(),
         pool.clone(),
         params.clone(),
@@ -359,10 +364,10 @@ fn start_core_tasks(
 
     Ok(CoreContext {
         database,
+        storage,
         pool,
         params,
         sync_manager,
-        l2_block_manager: storage.l2().clone(),
         status_channel,
         engine,
         relayer_handle,
@@ -382,10 +387,10 @@ fn start_sequencer_tasks(
 ) -> anyhow::Result<()> {
     let CoreContext {
         database,
+        storage,
         pool,
         params,
         sync_manager,
-        l2_block_manager,
         status_channel,
         bitcoin_client,
         ..
@@ -428,7 +433,8 @@ fn start_sequencer_tasks(
 
     // Spawn duty tasks.
     let cupdate_rx = sync_manager.create_cstate_subscription();
-    let t_l2_block_manager = l2_block_manager.clone();
+    let t_storage = storage.clone();
+    let t_params = params.clone();
     let t_database = database.clone();
     let t_checkpoint_handle = checkpoint_handle.clone();
     let t_params = params.clone();
@@ -438,8 +444,8 @@ fn start_sequencer_tasks(
             duty_tracker,
             cupdate_rx,
             t_database,
-            t_l2_block_manager,
             t_checkpoint_handle,
+            t_storage,
             t_params,
         )
         .map_err(Into::into)
@@ -492,8 +498,8 @@ async fn start_rpc(
 ) -> anyhow::Result<()> {
     let CoreContext {
         database,
+        storage,
         sync_manager,
-        l2_block_manager,
         status_channel,
         relayer_handle,
         ..
@@ -506,7 +512,7 @@ async fn start_rpc(
         status_channel.clone(),
         database.clone(),
         sync_manager,
-        l2_block_manager.clone(),
+        storage.clone(),
         checkpoint_handle,
         relayer_handle,
     );
@@ -515,7 +521,7 @@ async fn start_rpc(
     let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
     methods.merge(admin_rpc.into_rpc())?;
 
-    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(l2_block_manager, database);
+    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(storage.clone(), database);
     methods.merge(debug_rpc.into_rpc())?;
 
     let rpc_host = config.client.rpc_host;

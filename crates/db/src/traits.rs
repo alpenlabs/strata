@@ -12,8 +12,7 @@ use strata_primitives::{
 };
 use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
-    client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
-    sync_event::SyncEvent,
+    client_state::ClientState, l1::L1Tx, operation::*, state_op::WriteBatch, sync_event::SyncEvent,
 };
 use zkaleido::ProofReceipt;
 
@@ -214,27 +213,23 @@ pub trait ChainstateDatabase {
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
     /// previous writes must be purged first in order to be replaced.
-    fn write_state_update(&self, idx: u64, batch: WriteBatch) -> DbResult<()>;
+    fn put_write_batch(&self, idx: u64, batch: WriteBatch) -> DbResult<()>;
+
+    /// Gets the write batch stored to compute a height.
+    fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
 
     /// Tells the database to purge state before a certain block index (height).
-    fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()>;
+    fn purge_entries_before(&self, before_idx: u64) -> DbResult<()>;
 
     /// Rolls back any writes and state checkpoints after a specified block.
     fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()>;
 
     /// Gets the last written state.
-    fn get_last_state_idx(&self) -> DbResult<u64>;
+    fn get_last_write_idx(&self) -> DbResult<u64>;
 
     /// Gets the earliest written state.  This corresponds to calls to
     /// `purge_historical_state_before`.
-    fn get_earliest_state_idx(&self) -> DbResult<u64>;
-
-    /// Gets the write batch stored to compute a height.
-    fn get_writes_at(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
-
-    /// Gets the toplevel chain state at a particular block slot, if it can be
-    /// retrieved.
-    fn get_toplevel_state(&self, idx: u64) -> DbResult<Option<Chainstate>>;
+    fn get_earliest_write_idx(&self) -> DbResult<u64>;
 }
 
 /// Db trait for Checkpoint data

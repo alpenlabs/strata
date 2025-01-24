@@ -11,6 +11,7 @@ use strata_state::{
     client_state::ClientState,
     operation::{self, ClientUpdateOutput},
 };
+use strata_storage::NodeStorage;
 use tracing::*;
 
 use super::client_transition;
@@ -19,6 +20,7 @@ use crate::errors::Error;
 pub struct StateTracker<D: Database> {
     params: Arc<Params>,
     database: Arc<D>,
+    storage: Arc<NodeStorage>,
 
     cur_state_idx: u64,
 
@@ -29,12 +31,14 @@ impl<D: Database> StateTracker<D> {
     pub fn new(
         params: Arc<Params>,
         database: Arc<D>,
+        storage: Arc<NodeStorage>,
         cur_state_idx: u64,
         cur_state: Arc<ClientState>,
     ) -> Self {
         Self {
             params,
             database,
+            storage,
             cur_state_idx,
             cur_state,
         }
@@ -73,7 +77,8 @@ impl<D: Database> StateTracker<D> {
         check_bail_trigger(BAIL_SYNC_EVENT);
 
         // Compute the state transition.
-        let outp = client_transition::process_event(&self.cur_state, &ev, db, &self.params)?;
+        let context = client_transition::StorageEventContext::new(&self.storage);
+        let outp = client_transition::process_event(&self.cur_state, &ev, &context, &self.params)?;
 
         // Clone the state and apply the operations to it.
         let mut new_state = self.cur_state.as_ref().clone();

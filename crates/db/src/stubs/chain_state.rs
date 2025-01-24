@@ -1,7 +1,7 @@
 use std::collections::*;
 
 use parking_lot::Mutex;
-use strata_state::{chain_state::Chainstate, state_op, state_op::WriteBatch};
+use strata_state::{chain_state::Chainstate, state_op::WriteBatch};
 use tracing::*;
 
 use crate::{errors::DbError, traits::*, DbResult};
@@ -46,13 +46,13 @@ impl StubChainstateDb {
 }
 
 impl ChainstateDatabase for StubChainstateDb {
-    fn write_genesis_state(&self, toplevel: &Chainstate) -> DbResult<()> {
+    fn write_genesis_state(&self, toplevel: Chainstate) -> DbResult<()> {
         let mut st = self.state.lock();
         st.toplevels.insert(0, toplevel.clone());
         Ok(())
     }
 
-    fn write_state_update(&self, idx: u64, batch: &WriteBatch) -> DbResult<()> {
+    fn put_write_batch(&self, idx: u64, batch: WriteBatch) -> DbResult<()> {
         let mut st = self.state.lock();
 
         let last_idx = st.find_last_write_batch();
@@ -60,21 +60,20 @@ impl ChainstateDatabase for StubChainstateDb {
             return Err(DbError::OooInsert("chainstate", idx));
         }
 
-        let toplevel = st
+        let _toplevel = st
             .toplevels
             .get(&last_idx)
             .cloned()
             .expect("chainstatedb: nonsense");
 
         // Compute new state and insert things.
-        let new_state = state_op::apply_write_batch_to_chainstate(toplevel, batch);
-        st.toplevels.insert(idx, new_state);
         st.write_batches.insert(idx, batch.clone());
+        st.toplevels.insert(idx, batch.into_toplevel());
 
         Ok(())
     }
 
-    fn purge_historical_state_before(&self, before_idx: u64) -> DbResult<()> {
+    fn purge_entries_before(&self, before_idx: u64) -> DbResult<()> {
         let mut st = self.state.lock();
 
         if !st.toplevels.contains_key(&before_idx) {
@@ -133,12 +132,12 @@ impl ChainstateDatabase for StubChainstateDb {
         Ok(())
     }
 
-    fn get_last_state_idx(&self) -> DbResult<u64> {
+    fn get_last_write_idx(&self) -> DbResult<u64> {
         let st = self.state.lock();
         Ok(st.find_last_write_batch())
     }
 
-    fn get_earliest_state_idx(&self) -> DbResult<u64> {
+    fn get_earliest_write_idx(&self) -> DbResult<u64> {
         let st = self.state.lock();
         let idx = st
             .toplevels
@@ -148,16 +147,8 @@ impl ChainstateDatabase for StubChainstateDb {
         Ok(idx)
     }
 
-    fn get_writes_at(&self, idx: u64) -> DbResult<Option<WriteBatch>> {
+    fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatch>> {
         let st = self.state.lock();
         Ok(st.write_batches.get(&idx).cloned())
-    }
-
-    fn get_toplevel_state(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<strata_state::chain_state::Chainstate>> {
-        let st = self.state.lock();
-        Ok(st.toplevels.get(&idx).cloned())
     }
 }

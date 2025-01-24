@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use strata_db::traits::{Database, L2BlockDatabase};
+use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::{Params, RollupParams};
 use strata_state::{
@@ -16,6 +16,7 @@ use strata_state::{
     id::L2BlockId,
 };
 use strata_status::StatusChannel;
+use strata_storage::NodeStorage;
 use strata_tasks::ShutdownGuard;
 use tokio::sync::{mpsc, RwLock};
 use tracing::warn;
@@ -27,10 +28,11 @@ use super::{
 use crate::utils::now_millis;
 
 /// Container to pass context to worker
-#[derive(Debug)]
 pub struct WorkerContext<D, E> {
     params: Arc<Params>,
-    database: Arc<D>,
+    // TODO remove
+    _database: Arc<D>,
+    storage: Arc<NodeStorage>,
     engine: Arc<E>,
     status_channel: StatusChannel,
 }
@@ -40,12 +42,14 @@ impl<D, E> WorkerContext<D, E> {
     pub fn new(
         params: Arc<Params>,
         database: Arc<D>,
+        storage: Arc<NodeStorage>,
         engine: Arc<E>,
         status_channel: StatusChannel,
     ) -> Self {
         Self {
             params,
-            database,
+            _database: database,
+            storage,
             engine,
             status_channel,
         }
@@ -164,7 +168,7 @@ where
     let full_template = generate_block_template_inner(
         config,
         ctx.params.as_ref(),
-        ctx.database.as_ref(),
+        ctx.storage.as_ref(),
         ctx.engine.as_ref(),
         &ctx.status_channel,
     )?;
@@ -180,19 +184,19 @@ where
     Ok(template)
 }
 
-fn generate_block_template_inner<D: Database, E: ExecEngineCtl>(
+fn generate_block_template_inner(
     config: BlockGenerationConfig,
     params: &Params,
-    database: &D,
-    engine: &E,
+    storage: &NodeStorage,
+    engine: &impl ExecEngineCtl,
     status_channel: &StatusChannel,
 ) -> Result<FullBlockTemplate, Error> {
     // get parent block
-    let parent_block_id = config.parent_block_id();
-    let l2db = database.l2_db();
-    let parent = l2db
-        .get_block_data(parent_block_id)?
-        .ok_or(Error::UnknownTemplateId(parent_block_id))?;
+    let parent_blkid = config.parent_block_id();
+    let l2man = storage.l2();
+    let parent = l2man
+        .get_block_data_blocking(&parent_blkid)?
+        .ok_or(Error::UnknownTemplateId(parent_blkid))?;
 
     let parent_ts = parent.header().timestamp();
 
@@ -211,7 +215,7 @@ fn generate_block_template_inner<D: Database, E: ExecEngineCtl>(
     let l1_state = status_channel.l1_view();
 
     let (header, body, accessory) =
-        prepare_block(slot, parent, &l1_state, ts, database, engine, params)?;
+        prepare_block(slot, parent, &l1_state, ts, storage, engine, params)?;
 
     Ok(FullBlockTemplate::new(header, body, accessory))
 }

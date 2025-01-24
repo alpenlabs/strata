@@ -63,7 +63,7 @@ impl WriteBatch {
 /// On a given in-memory chainstate, applies a write batch.
 ///
 /// This must succeed.  Pancis if it does not.
-pub fn apply_write_batch_to_chainstate(chainstate: Chainstate, batch: &WriteBatch) -> Chainstate {
+pub fn apply_write_batch_to_chainstate(_chainstate: Chainstate, batch: &WriteBatch) -> Chainstate {
     // This replaces the whole toplevel state.  This probably makes you think
     // it doesn't make sense to take the chainstate arg at all.  But this will
     // probably make more sense in the future when we make the state structure
