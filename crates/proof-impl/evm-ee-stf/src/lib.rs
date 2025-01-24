@@ -72,8 +72,7 @@ pub fn process_block_transaction(
     // TODO: Optimize receipt iteration by implementing bloom filters or adding hints to
     // `ElBlockStfInput`. This will allow for efficient filtering of `WithdrawalIntentEvents`.
     let withdrawal_intents =
-        collect_withdrawal_intents(receipts.into_iter().map(|el| Some(el.receipt)))
-            .collect::<Vec<_>>();
+        collect_withdrawal_intents(receipts.into_iter().map(Some)).collect::<Vec<_>>();
 
     // Construct the public parameters for the proof
     EvmBlockStfOutput {
