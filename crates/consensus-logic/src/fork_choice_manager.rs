@@ -7,7 +7,7 @@ use strata_chaintsn::transition::process_block;
 use strata_common::bail_manager::{check_bail_trigger, BAIL_ADVANCE_CONSENSUS_STATE};
 use strata_db::{
     errors::DbError,
-    traits::{BlockStatus, ChainstateDatabase, Database},
+    traits::{BlockStatus, Database},
 };
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
