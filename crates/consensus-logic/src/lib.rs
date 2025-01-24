@@ -3,6 +3,7 @@
 
 pub mod checkpoint;
 pub mod client_transition;
+pub mod config;
 pub mod ctl;
 pub mod duty;
 pub mod fork_choice_manager;

@@ -1,6 +1,6 @@
 //! Consensus logic worker task.
 
-use std::sync::Arc;
+use std::{sync::Arc, thread};
 
 use strata_db::{
     traits::*,
@@ -12,10 +12,14 @@ use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::
 use strata_status::StatusTx;
 use strata_storage::{managers::checkpoint::CheckpointDbManager, L2BlockManager};
 use strata_tasks::ShutdownGuard;
-use tokio::sync::{broadcast, mpsc};
+use tokio::{
+    sync::{broadcast, mpsc},
+    time,
+};
 use tracing::*;
 
 use crate::{
+    config::CsmExecConfig,
     errors::Error,
     genesis,
     message::{ClientUpdateNotif, CsmMessage},
@@ -30,6 +34,9 @@ use crate::{
 pub struct WorkerState<D: Database> {
     /// Consensus parameters.
     params: Arc<Params>,
+
+    /// CSM worker config, *not* params.
+    config: CsmExecConfig,
 
     /// Underlying database hierarchy that writes ultimately end up on.
     // TODO should we move this out?
@@ -67,8 +74,17 @@ impl<D: Database> WorkerState<D> {
             Arc::new(cur_state),
         );
 
+        // TODO make configurable
+        let config = CsmExecConfig {
+            retry_base_dur: time::Duration::from_millis(1000),
+            // These settings makes the last retry delay be 6 seconds.
+            retry_cnt_max: 20,
+            retry_backoff_mult: 1120,
+        };
+
         Ok(Self {
             params,
+            config,
             database,
             l2_block_manager,
             state_tracker,
@@ -140,6 +156,58 @@ fn process_msg<D: Database, E: ExecEngineCtl>(
             Ok(())
         }
     }
+}
+
+/// Repeatedly calls `handle_sync_event`, retrying on failure, up to a limit
+/// after which we return with the most recent error.
+fn handle_sync_event_with_retry<D: Database>(
+    state: &mut WorkerState<D>,
+    engine: &impl ExecEngineCtl,
+    ev_idx: u64,
+    status_tx: &Arc<StatusTx>,
+    shutdown: &ShutdownGuard,
+) -> anyhow::Result<()> {
+    // Fetch the sync event so that we can debug print it.
+    // FIXME make it so we don't have to fetch it again here
+    let sync_event_db = state.database.sync_event_provider();
+    let Some(_ev) = sync_event_db.get_sync_event(ev_idx)? else {
+        error!(%ev_idx, "tried to process missing sync event, aborting handle_sync_event!");
+        return Ok(());
+    };
+
+    let mut tries = 0;
+    let mut wait_dur = state.config.retry_base_dur;
+
+    loop {
+        tries += 1;
+
+        // TODO demote to trace after we figure out the current issues
+        debug!("trying sync event");
+
+        let Err(e) = handle_sync_event(state, engine, ev_idx, status_tx) else {
+            // Happy case, we want this to happen.
+            trace!("completed sync event");
+            break;
+        };
+
+        // If we hit the try limit, abort.
+        if tries > state.config.retry_cnt_max {
+            error!(err = %e, %tries, "failed to exec sync event, hit tries limit, aborting");
+            return Err(e);
+        }
+
+        // Sleep and increase the wait dur.
+        error!(err = %e, %tries, "failed to exec sync event, retrying...");
+        thread::sleep(wait_dur);
+        wait_dur = state.config.compute_retry_backoff(wait_dur);
+
+        if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
+            break;
+        }
+    }
+
+    Ok(())
 }
 
 fn handle_sync_event<D: Database, E: ExecEngineCtl>(
