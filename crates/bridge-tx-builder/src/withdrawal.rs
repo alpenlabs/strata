@@ -220,7 +220,7 @@ mod tests {
 
         let user_pk = XOnlyPk::new(Buf32(pubkeys[user_index].x_only_public_key().0.serialize()));
 
-        let user_descriptor = user_pk.to_descriptor();
+        let user_descriptor = user_pk.to_descriptor().expect("infallible");
 
         let assigned_operator_idx = assigned_operator_idx as OperatorIdx;
 
@@ -287,7 +287,7 @@ mod tests {
 
         let withdrawal_info = CooperativeWithdrawalInfo::new(
             deposit_outpoint,
-            user_descriptor,
+            user_descriptor.unwrap(),
             assigned_operator_idx,
             0,
         );
@@ -331,7 +331,7 @@ mod tests {
 
         let withdrawal_info = CooperativeWithdrawalInfo::new(
             deposit_outpoint,
-            user_descriptor,
+            user_descriptor.unwrap(),
             assigned_operator_idx,
             0,
         );

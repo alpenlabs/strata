@@ -757,8 +757,9 @@ impl XOnlyPk {
     }
 
     /// Converts [`XOnlyPk`] to [`Descriptor`].
-    pub fn to_descriptor(&self) -> Descriptor {
+    pub fn to_descriptor(&self) -> Result<Descriptor, ParseError> {
         Descriptor::new_p2tr(&self.to_xonly_public_key().serialize())
+            .map_err(|_| ParseError::InvalidPoint(self.0))
     }
 }
 
@@ -1331,8 +1332,8 @@ mod tests {
 
     #[test]
     fn test_xonly_pk_to_descriptor() {
-        let xonly_pk = XOnlyPk::new(Buf32::from([1u8; 32]));
-        let descriptor = xonly_pk.to_descriptor();
+        let xonly_pk = XOnlyPk::new(Buf32::from([2u8; 32]));
+        let descriptor = xonly_pk.to_descriptor().unwrap();
         assert_eq!(descriptor.type_tag(), DescriptorType::P2tr);
 
         let payload = descriptor.payload();

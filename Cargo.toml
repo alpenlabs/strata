@@ -203,7 +203,7 @@ bdk_esplora = { version = "0.20.1", features = [
 bdk_wallet = "1.0.0"
 bincode = "1.3"
 bitcoin = { version = "=0.32.5", features = ["serde"] }
-bitcoin-bosd = { version = "0.3.0", default-features = false }
+bitcoin-bosd = { version = "0.4.0", default-features = false }
 borsh = { version = "1.5.0", features = ["derive"] }
 bytes = "1.6.0"
 cfg-if = "1.0.0"

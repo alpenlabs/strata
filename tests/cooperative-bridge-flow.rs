@@ -87,7 +87,7 @@ async fn full_flow() {
 
     let withdrawal_info = CooperativeWithdrawalInfo::new(
         outpoint,
-        user_x_only_pk.to_descriptor(),
+        user_x_only_pk.to_descriptor().unwrap(),
         assigned_operator_idx,
         0,
     );
