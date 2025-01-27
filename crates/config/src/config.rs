@@ -18,8 +18,8 @@ pub struct SequencerConfig {}
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum ClientMode {
-    Sequencer(SequencerConfig),
     FullNode(FullNodeConfig),
+    Sequencer(SequencerConfig),
 }
 
 #[derive(Debug, Clone, Deserialize)]
