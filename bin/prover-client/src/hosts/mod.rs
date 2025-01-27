@@ -1,6 +1,6 @@
 use strata_primitives::proof::ProofZkVm;
 use strata_rpc_types::ProofKey;
-use strata_zkvm::{VerificationKey, ZkVmHost};
+use zkaleido::{VerificationKey, ZkVmHost};
 
 pub mod native;
 #[cfg(feature = "risc0")]

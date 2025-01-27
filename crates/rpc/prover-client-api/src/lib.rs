@@ -6,7 +6,7 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use strata_primitives::{buf::Buf32, l2::L2BlockId};
 use strata_rpc_types::ProofKey;
 use strata_state::l1::L1BlockId;
-use strata_zkvm::ProofReceipt;
+use zkaleido::ProofReceipt;
 
 /// RPCs related to information about the client itself.
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "dev_strata"))]

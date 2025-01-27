@@ -5,7 +5,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::params::RollupParams;
 use strata_state::{batch::BatchCheckpoint, l1::L1TxProof, tx::DepositInfo};
-use strata_zkvm::ZkVmEnv;
+use zkaleido::ZkVmEnv;
 
 use crate::scan::process_blockscan;
 
@@ -45,7 +45,7 @@ mod tests {
         bitcoin::{get_btc_chain, get_btc_mainnet_block},
         l2::gen_params,
     };
-    use strata_zkvm::ZkVmProver;
+    use zkaleido::ZkVmProver;
 
     use super::*;
     use crate::prover::BtcBlockspaceProver;

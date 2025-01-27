@@ -13,8 +13,8 @@ strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
-strata-zkvm.workspace = true
 strata-zkvm-hosts.workspace = true
+zkaleido.workspace = true
 
 # sp1
 strata-sp1-adapter = { workspace = true, optional = true, features = [

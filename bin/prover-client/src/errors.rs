@@ -1,6 +1,6 @@
 use strata_db::DbError;
 use strata_primitives::proof::ProofKey;
-use strata_zkvm::ZkVmError;
+use zkaleido::ZkVmError;
 use thiserror::Error;
 
 use crate::status::ProvingTaskStatus;

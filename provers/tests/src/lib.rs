@@ -2,7 +2,7 @@
 extern crate cfg_if;
 use std::{fs, path::PathBuf, sync::LazyLock};
 
-use strata_zkvm::{ProofReceipt, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
+use zkaleido::{ProofReceipt, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
 mod btc;
 mod checkpoint;
 mod cl;

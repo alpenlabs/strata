@@ -26,7 +26,7 @@ strata-rpc-api = { workspace = true, features = ["client"] }
 strata-rpc-types.workspace = true
 strata-rpc-utils.workspace = true
 strata-state.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 alloy-rpc-types.workspace = true
 anyhow.workspace = true

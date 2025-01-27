@@ -1,7 +1,7 @@
 use bitcoin::Block;
 use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{ZkVmHost, ZkVmResult};
+use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
 

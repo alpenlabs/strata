@@ -7,7 +7,7 @@ use strata_primitives::{params::RollupParams, proof::RollupVerifyingKey};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_state::batch::{BatchInfo, CheckpointProofOutput};
-use strata_zkvm::{Proof, ZkVmEnv};
+use zkaleido::{Proof, ZkVmEnv};
 
 pub mod prover;
 

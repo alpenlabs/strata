@@ -19,7 +19,7 @@ strata-state.workspace = true
 strata-status.workspace = true
 strata-storage.workspace = true
 strata-tasks.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 anyhow.workspace = true
 bitcoin.workspace = true

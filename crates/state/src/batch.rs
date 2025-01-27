@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_crypto::verify_schnorr_sig;
 use strata_primitives::buf::{Buf32, Buf64};
-use strata_zkvm::{Proof, ProofReceipt, PublicValues};
+use zkaleido::{Proof, ProofReceipt, PublicValues};
 
 use crate::id::L2BlockId;
 

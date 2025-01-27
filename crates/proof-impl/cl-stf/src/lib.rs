@@ -12,7 +12,7 @@ use strata_state::{
     tx::DepositInfo,
 };
 pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateCache};
-use strata_zkvm::ZkVmEnv;
+use zkaleido::ZkVmEnv;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ChainStateSnapshot {

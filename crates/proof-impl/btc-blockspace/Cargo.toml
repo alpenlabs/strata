@@ -12,7 +12,7 @@ strata-bridge-tx-builder.workspace = true
 strata-l1tx.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 [dev-dependencies]
 hex.workspace = true

@@ -9,7 +9,7 @@ strata-crypto.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-state.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 borsh.workspace = true
 

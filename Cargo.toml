@@ -115,6 +115,10 @@ strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
 strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 
+zkaleido = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1" }
+zkaleido-risc0-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1" }
+zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1" }
+
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 # reth dependencies:
 alloy-consensus = { version = "0.7.3", default-features = false }

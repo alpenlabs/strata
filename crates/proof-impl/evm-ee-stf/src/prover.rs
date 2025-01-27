@@ -1,4 +1,4 @@
-use strata_zkvm::{ProofType, PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
+use zkaleido::{ProofType, PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
 
 use crate::primitives::{EvmEeProofInput, EvmEeProofOutput};
 
@@ -14,7 +14,7 @@ impl ZkVmProver for EvmEeProver {
 
     fn prepare_input<'a, B>(el_inputs: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
-        B: strata_zkvm::ZkVmInputBuilder<'a>,
+        B: zkaleido::ZkVmInputBuilder<'a>,
     {
         let mut input_builder = B::new();
         input_builder.write_serde(&el_inputs.len())?;
@@ -28,7 +28,7 @@ impl ZkVmProver for EvmEeProver {
 
     fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>
     where
-        H: strata_zkvm::ZkVmHost,
+        H: zkaleido::ZkVmHost,
     {
         H::extract_borsh_public_output(public_values)
     }

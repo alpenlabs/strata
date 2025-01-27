@@ -1,6 +1,6 @@
 use bitcoin::consensus::serialize;
 use strata_state::l1::L1TxProof;
-use strata_zkvm::{
+use zkaleido::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };
 

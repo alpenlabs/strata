@@ -9,7 +9,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, l1::payload::L1Payload};
 use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
-use strata_zkvm::ProofReceipt;
+use zkaleido::ProofReceipt;
 
 /// Represents data for a payload we're still planning to post to L1.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]

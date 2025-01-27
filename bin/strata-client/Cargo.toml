@@ -29,7 +29,7 @@ strata-status.workspace = true
 strata-storage.workspace = true
 strata-sync.workspace = true
 strata-tasks.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 alloy-rpc-types.workspace = true
 anyhow.workspace = true

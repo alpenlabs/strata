@@ -1,6 +1,6 @@
 use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
-use strata_zkvm::{ZkVmHost, ZkVmResult};
+use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::{el::ElProofGenerator, ProofGenerator};
 

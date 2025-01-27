@@ -20,7 +20,7 @@ use strata_state::{
     l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
 };
-use strata_zkvm::{ProofReceipt, ZkVmError, ZkVmResult};
+use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
 use tokio::sync::mpsc;
 use tracing::*;
 

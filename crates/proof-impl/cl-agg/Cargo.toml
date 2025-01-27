@@ -6,4 +6,4 @@ version = "0.1.0"
 [dependencies]
 borsh.workspace = true
 strata-proofimpl-cl-stf.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true

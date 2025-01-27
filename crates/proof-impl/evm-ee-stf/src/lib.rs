@@ -28,7 +28,7 @@ use processor::{EvmConfig, EvmProcessor};
 use revm::{primitives::SpecId, InMemoryDB};
 use revm_primitives::alloy_primitives::B256;
 use strata_reth_evm::collect_withdrawal_intents;
-use strata_zkvm::ZkVmEnv;
+use zkaleido::ZkVmEnv;
 use utils::generate_exec_update;
 
 // TODO: Read the evm config from the genesis config. This should be done in compile time.

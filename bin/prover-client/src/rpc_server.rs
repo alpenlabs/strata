@@ -12,7 +12,7 @@ use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_state::{id::L2BlockId, l1::L1BlockId};
-use strata_zkvm::ProofReceipt;
+use zkaleido::ProofReceipt;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
 
