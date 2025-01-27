@@ -11,7 +11,7 @@ use strata_primitives::{
     params::{Params, RollupParams},
     proof::RollupVerifyingKey,
 };
-use strata_risc0_adapter;
+use zkaleido_risc0_adapter;
 use strata_state::{
     batch::{
         BatchCheckpoint, BatchCheckpointWithCommitment, CheckpointProofOutput, CommitmentInfo,
@@ -213,7 +213,7 @@ pub fn verify_proof(
     // checkpoint
     match rollup_vk {
         RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-            strata_risc0_adapter::verify_groth16(proof, vk.as_ref(), public_params_raw)
+            zkaleido_risc0_adapter::verify_groth16(proof, vk.as_ref(), public_params_raw)
         }
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
             zkaleido_sp1_adapter::verify_groth16(proof, vk.as_ref(), public_params_raw)

@@ -22,7 +22,7 @@ pub use generators::TestProverGenerators;
 
 cfg_if! {
     if #[cfg(feature = "risc0")] {
-        use strata_risc0_adapter::Risc0Host;
+        use zkaleido_risc0_adapter::Risc0Host;
 
         /// Test prover generator for the RISC0 Host.
         pub static TEST_RISC0_GENERATORS: LazyLock<TestProverGenerators<Risc0Host>> =

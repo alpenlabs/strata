@@ -68,12 +68,12 @@ pub enum ZkVmHostInstance {
 
     /// Represents the Risc0 ZKVM host implementation.
     ///
-    /// This variant uses the [`strata_risc0_adapter::Risc0Host`] implementation and is only
+    /// This variant uses the [`zkaleido_risc0_adapter::Risc0Host`] implementation and is only
     /// available when the `risc0` feature flag is enabled. Attempting to use this variant
     /// without enabling the `risc0` feature will result in a compile-time error or a runtime
     /// panic.
     #[cfg(feature = "risc0")]
-    Risc0(&'static strata_risc0_adapter::Risc0Host),
+    Risc0(&'static zkaleido_risc0_adapter::Risc0Host),
 }
 
 /// Resolves the appropriate ZKVM host instance based on the provided [`ProofKey`].

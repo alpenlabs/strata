@@ -15,7 +15,7 @@ cfg_if! {
 cfg_if! {
     if #[cfg(feature = "risc0")] {
         pub mod risc0;
-        use strata_risc0_adapter::Risc0Host;
+        use zkaleido_risc0_adapter::Risc0Host;
 
         pub fn get_risc0_host(vm: ProofVm) -> &'static Risc0Host {
             risc0::get_host(vm)

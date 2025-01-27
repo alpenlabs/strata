@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 risc0-zkvm = "1.2"
-strata-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
+zkaleido-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
   "prover",
 ], optional = true }
 
@@ -42,4 +42,4 @@ methods = [
 
 [features]
 default = ["prover"]
-prover = ["dep:strata-risc0-adapter"]
+prover = ["dep:zkaleido-risc0-adapter"]

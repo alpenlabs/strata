@@ -1,11 +1,11 @@
 use std::sync::LazyLock;
 
 use strata_primitives::proof::ProofContext;
-use strata_risc0_adapter::Risc0Host;
 use strata_risc0_guest_builder::{
     GUEST_RISC0_BTC_BLOCKSPACE_ELF, GUEST_RISC0_CHECKPOINT_ELF, GUEST_RISC0_CL_AGG_ELF,
     GUEST_RISC0_CL_STF_ELF, GUEST_RISC0_EVM_EE_STF_ELF, GUEST_RISC0_L1_BATCH_ELF,
 };
+use zkaleido_risc0_adapter::Risc0Host;
 
 static BTC_BLOCKSPACE_HOST: LazyLock<Risc0Host> =
     std::sync::LazyLock::new(|| Risc0Host::init(GUEST_RISC0_BTC_BLOCKSPACE_ELF));

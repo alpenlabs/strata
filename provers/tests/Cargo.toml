@@ -25,10 +25,10 @@ zkaleido-sp1-adapter = { workspace = true, optional = true, features = [
 ] }
 
 # risc0
-strata-risc0-adapter = { workspace = true, optional = true, features = [
+strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
   "prover",
 ] }
-strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
+zkaleido-risc0-adapter = { workspace = true, optional = true, features = [
   "prover",
 ] }
 
@@ -48,11 +48,11 @@ default = ["native"]
 mock = [
   "strata-sp1-guest-builder/mock",
   "zkaleido-sp1-adapter/mock",
-  "strata-risc0-adapter/mock",
+  "zkaleido-risc0-adapter/mock",
 ]
 native = ["strata-native-zkvm-adapter", "strata-zkvm-hosts/native"]
 risc0 = [
-  "strata-risc0-adapter",
+  "zkaleido-risc0-adapter",
   "strata-risc0-guest-builder",
   "strata-zkvm-hosts/risc0",
 ]
