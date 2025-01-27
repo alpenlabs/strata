@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use bitcoin::{
     absolute::LockTime,
@@ -7,12 +7,12 @@ use bitcoin::{
     hashes::Hash,
     opcodes::all::OP_RETURN,
     script::{self, PushBytesBuf},
-    Amount, Block, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
+    Address, Amount, Block, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{
     buf::Buf32,
-    l1::{L1BlockRecord, OutputRef},
+    l1::{BitcoinAddress, L1BlockRecord, OutputRef},
 };
 use strata_state::l1::{
     get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
@@ -255,4 +255,14 @@ pub fn build_test_deposit_script(magic: Vec<u8>, dest_addr: Vec<u8>) -> ScriptBu
         .push_slice(PushBytesBuf::try_from(data).unwrap());
 
     builder.into_script()
+}
+
+pub fn test_taproot_addr() -> BitcoinAddress {
+    let addr =
+        Address::from_str("bcrt1pnmrmugapastum8ztvgwcn8hvq2avmcwh2j4ssru7rtyygkpqq98q4wyd6s")
+            .unwrap()
+            .require_network(bitcoin::Network::Regtest)
+            .unwrap();
+
+    BitcoinAddress::parse(&addr.to_string(), bitcoin::Network::Regtest).unwrap()
 }

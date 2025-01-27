@@ -85,12 +85,11 @@ fn parse_deposit_script<'a>(
 mod tests {
 
     use bitcoin::Amount;
-    use strata_test_utils::bitcoin::{build_test_deposit_script, create_test_deposit_tx};
-
-    use crate::deposit::{
-        deposit_tx::extract_deposit_info,
-        test_utils::{get_deposit_tx_config, test_taproot_addr},
+    use strata_test_utils::bitcoin::{
+        build_test_deposit_script, create_test_deposit_tx, test_taproot_addr,
     };
+
+    use crate::deposit::{deposit_tx::extract_deposit_info, test_utils::get_deposit_tx_config};
 
     #[test]
     fn check_deposit_parser() {

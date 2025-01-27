@@ -1,17 +1,5 @@
-use std::str::FromStr;
-
-use bitcoin::Address;
-use strata_primitives::{l1::BitcoinAddress, params::DepositTxParams};
-
-pub fn test_taproot_addr() -> BitcoinAddress {
-    let addr =
-        Address::from_str("bcrt1pnmrmugapastum8ztvgwcn8hvq2avmcwh2j4ssru7rtyygkpqq98q4wyd6s")
-            .unwrap()
-            .require_network(bitcoin::Network::Regtest)
-            .unwrap();
-
-    BitcoinAddress::parse(&addr.to_string(), bitcoin::Network::Regtest).unwrap()
-}
+use strata_primitives::params::DepositTxParams;
+use strata_test_utils::bitcoin::test_taproot_addr;
 
 pub fn get_deposit_tx_config() -> DepositTxParams {
     DepositTxParams {

@@ -33,11 +33,13 @@ fn parse_deposits(
     extract_deposit_info(tx, &filter_conf.deposit_config).into_iter()
 }
 
+pub type DaBlobRaw<'a> = &'a [&'a [u8]];
+
 /// Parse da blobs from [`Transaction`].
-fn parse_da<'a>(
+fn parse_da_blobs<'a>(
     _tx: &'a Transaction,
     _filter_conf: &TxFilterConfig,
-) -> impl Iterator<Item = &'a [u8]> {
+) -> impl Iterator<Item = DaBlobRaw<'a>> {
     // TODO: implement this when we have da
     std::iter::empty()
 }
@@ -74,18 +76,8 @@ fn parse_checkpoint_envelopes<'a>(
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use bitcoin::{
-        absolute::{Height, LockTime},
-        key::{Parity, UntweakedKeypair},
-        secp256k1::{XOnlyPublicKey, SECP256K1},
-        taproot::{ControlBlock, LeafVersion, TaprootMerkleBranch},
-        transaction::Version,
-        Address, Amount, Network, ScriptBuf, TapNodeHash, Transaction, TxOut,
-    };
-    use rand::{rngs::OsRng, RngCore};
-    use strata_btcio::test_utils::{build_reveal_transaction_test, generate_envelope_script_test};
+    use bitcoin::{Amount, ScriptBuf};
+    use strata_btcio::test_utils::create_checkpoint_envelope_tx;
     use strata_primitives::{
         l1::{payload::L1Payload, BitcoinAmount},
         params::Params,
@@ -94,80 +86,20 @@ mod test {
     use strata_test_utils::{
         bitcoin::{
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
+            test_taproot_addr,
         },
         l2::gen_params,
         ArbitraryGenerator,
     };
 
     use super::TxFilterConfig;
-    use crate::{
-        deposit::test_utils::test_taproot_addr,
-        filter::{parse_checkpoint_envelopes, parse_deposit_requests, parse_deposits},
-    };
+    use crate::filter::{parse_checkpoint_envelopes, parse_deposit_requests, parse_deposits};
 
-    const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
+    const TEST_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
 
     /// Helper function to create filter config
     fn create_tx_filter_config(params: &Params) -> TxFilterConfig {
         TxFilterConfig::derive_from(params.rollup()).expect("can't get filter config")
-    }
-
-    /// Helper function to create a test transaction with given txid and outputs
-    fn create_test_tx(outputs: Vec<TxOut>) -> Transaction {
-        Transaction {
-            version: Version(1),
-            lock_time: LockTime::Blocks(Height::from_consensus(1).unwrap()),
-            input: vec![],
-            output: outputs,
-        }
-    }
-
-    /// Helper function to create a TxOut with a given address and value
-    fn create_test_txout(value: u64, address: &Address) -> TxOut {
-        TxOut {
-            value: Amount::from_sat(value),
-            script_pubkey: address.script_pubkey(),
-        }
-    }
-
-    fn parse_addr(addr: &str) -> Address {
-        Address::from_str(addr)
-            .unwrap()
-            .require_network(Network::Regtest)
-            .unwrap()
-    }
-
-    // Create an envelope transaction. The focus here is to create a tapscript, rather than a
-    // completely valid control block. Includes `n_envelopes` envelopes in the tapscript.
-    fn create_checkpoint_envelope_tx(params: &Params, n_envelopes: u32) -> Transaction {
-        let address = parse_addr(OTHER_ADDR);
-        let inp_tx = create_test_tx(vec![create_test_txout(100000000, &address)]);
-        let payloads: Vec<_> = (0..n_envelopes)
-            .map(|_| {
-                let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
-                L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
-            })
-            .collect();
-        let script = generate_envelope_script_test(&payloads, params).unwrap();
-        // Create controlblock
-        let mut rand_bytes = [0; 32];
-        OsRng.fill_bytes(&mut rand_bytes);
-        let key_pair = UntweakedKeypair::from_seckey_slice(SECP256K1, &rand_bytes).unwrap();
-        let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
-        let nodehash: [TapNodeHash; 0] = [];
-        let cb = ControlBlock {
-            leaf_version: LeafVersion::TapScript,
-            output_key_parity: Parity::Even,
-            internal_key: public_key,
-            merkle_branch: TaprootMerkleBranch::from(nodehash),
-        };
-
-        // Create transaction using control block
-        let mut tx = build_reveal_transaction_test(inp_tx, address, 100, 10, &script, &cb).unwrap();
-        tx.input[0].witness.push([1; 3]);
-        tx.input[0].witness.push(script);
-        tx.input[0].witness.push(cb.serialize());
-        tx
     }
 
     #[test]
@@ -178,7 +110,13 @@ mod test {
 
         // Testing multiple envelopes are parsed
         let num_envelopes = 2;
-        let tx = create_checkpoint_envelope_tx(&params, num_envelopes);
+        let l1_payloads: Vec<_> = (0..num_envelopes)
+            .map(|_| {
+                let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
+                L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
+            })
+            .collect();
+        let tx = create_checkpoint_envelope_tx(&params, TEST_ADDR, l1_payloads.clone());
         let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
 
         assert_eq!(checkpoints.len(), 2, "Should filter relevant envelopes");
@@ -187,7 +125,7 @@ mod test {
         params.rollup.checkpoint_tag = "invalid_checkpoint_tag".to_string();
         let filter_config = create_tx_filter_config(&params);
 
-        let tx = create_checkpoint_envelope_tx(&params, 2);
+        let tx = create_checkpoint_envelope_tx(&params, TEST_ADDR, l1_payloads);
         let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
         assert!(checkpoints.is_empty(), "There should be no envelopes");
     }

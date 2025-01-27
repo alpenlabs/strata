@@ -328,7 +328,7 @@ async fn process_block<R: ReaderRpc>(
 
     // Index ops
     let ops_indexer = OpIndexer::new(ClientOpsVisitor::new());
-    let tx_refs = ops_indexer
+    let tx_entries = ops_indexer
         .index_block(&block, state.filter_config())
         .collect();
 
@@ -337,7 +337,7 @@ async fn process_block<R: ReaderRpc>(
         .index_block(&block, state.filter_config())
         .collect();
 
-    let block_data = BlockData::new(height, block, tx_refs);
+    let block_data = BlockData::new(height, block, tx_entries);
 
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");

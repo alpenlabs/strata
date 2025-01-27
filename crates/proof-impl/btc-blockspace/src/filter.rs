@@ -31,7 +31,7 @@ impl OpsVisitor for ProverOpsVisitor {
         self.ops
     }
 
-    fn visit_da<'a>(&mut self, data: impl Iterator<Item = &'a [u8]>) {
+    fn visit_da<'a>(&mut self, data: &'a [&'a [u8]]) {
         let mut hasher = Sha256::new();
         for d in data {
             hasher.update(d);

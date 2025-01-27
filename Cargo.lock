@@ -12877,6 +12877,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "bitcoin",
+ "borsh",
  "bytes",
  "corepc-node",
  "digest 0.10.7",

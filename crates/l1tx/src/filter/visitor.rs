@@ -5,7 +5,8 @@ use strata_state::{
 };
 
 use super::{
-    parse_checkpoint_envelopes, parse_da, parse_deposit_requests, parse_deposits, TxFilterConfig,
+    parse_checkpoint_envelopes, parse_da_blobs, parse_deposit_requests, parse_deposits,
+    TxFilterConfig,
 };
 use crate::messages::ProtocolTxEntry;
 
@@ -20,7 +21,7 @@ pub trait OpsVisitor {
     fn visit_deposit_request(&mut self, _d: DepositRequestInfo) {}
 
     // Do stuffs with DA.
-    fn visit_da<'a>(&mut self, _d: impl Iterator<Item = &'a [u8]>) {}
+    fn visit_da<'a>(&mut self, _d: &'a [&'a [u8]]) {}
 
     fn collect(self) -> Vec<ProtocolOperation>;
 }
@@ -30,14 +31,14 @@ pub trait BlockIndexer {
 
     fn collect(self) -> Self::Output;
 
-    fn index_tx(&mut self, tx: &Transaction, config: &TxFilterConfig);
+    fn index_tx(&mut self, txidx: u32, tx: &Transaction, config: &TxFilterConfig);
 
     fn index_block(mut self, block: &Block, config: &TxFilterConfig) -> Self
     where
         Self: Sized,
     {
-        for (_i, tx) in block.txdata.iter().enumerate() {
-            self.index_tx(tx, config);
+        for (i, tx) in block.txdata.iter().enumerate() {
+            self.index_tx(i as u32, tx, config);
         }
         self
     }
@@ -74,7 +75,7 @@ impl DepositRequestIndexer {
 impl<V: OpsVisitor + Clone> BlockIndexer for OpIndexer<V> {
     type Output = Vec<ProtocolTxEntry>;
 
-    fn index_tx(&mut self, tx: &Transaction, config: &TxFilterConfig) {
+    fn index_tx(&mut self, txidx: u32, tx: &Transaction, config: &TxFilterConfig) {
         let mut visitor = self.visitor.clone();
         for chp in parse_checkpoint_envelopes(tx, config) {
             visitor.visit_checkpoint(chp);
@@ -82,10 +83,11 @@ impl<V: OpsVisitor + Clone> BlockIndexer for OpIndexer<V> {
         for dp in parse_deposits(tx, config) {
             visitor.visit_deposit(dp);
         }
-        let da = parse_da(tx, config);
-        visitor.visit_da(da);
+        for da in parse_da_blobs(tx, config) {
+            visitor.visit_da(da);
+        }
 
-        let entry = ProtocolTxEntry::new(1, visitor.collect());
+        let entry = ProtocolTxEntry::new(txidx, visitor.collect());
         self.tx_entries.push(entry);
     }
 
@@ -101,7 +103,7 @@ impl BlockIndexer for DepositRequestIndexer {
         self.requests
     }
 
-    fn index_tx(&mut self, tx: &Transaction, config: &TxFilterConfig) {
+    fn index_tx(&mut self, _txidx: u32, tx: &Transaction, config: &TxFilterConfig) {
         self.requests = parse_deposit_requests(tx, config).collect();
     }
 }
