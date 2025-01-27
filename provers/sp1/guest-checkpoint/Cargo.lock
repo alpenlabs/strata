@@ -1225,7 +1225,7 @@ name = "guest-sp1-checkpoint"
 version = "0.1.0"
 dependencies = [
  "strata-proofimpl-checkpoint",
- "strata-sp1-adapter",
+ "zkaleido-sp1-adapter",
 ]
 
 [[package]]
@@ -2767,7 +2767,7 @@ dependencies = [
  "strata-l1tx",
  "strata-primitives",
  "strata-state",
- "strata-zkvm",
+ "zkaleido",
 ]
 
 [[package]]
@@ -2784,7 +2784,7 @@ dependencies = [
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-l1-batch",
  "strata-state",
- "strata-zkvm",
+ "zkaleido",
 ]
 
 [[package]]
@@ -2797,7 +2797,7 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
- "strata-zkvm",
+ "zkaleido",
 ]
 
 [[package]]
@@ -2825,8 +2825,8 @@ dependencies = [
  "strata-reth-evm",
  "strata-reth-primitives",
  "strata-state",
- "strata-zkvm",
  "thiserror 1.0.68",
+ "zkaleido",
 ]
 
 [[package]]
@@ -2867,23 +2867,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-sp1-adapter"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "borsh",
- "hex",
- "serde",
- "sha2",
- "sp1-primitives",
- "sp1-verifier",
- "sp1-zkvm",
- "strata-primitives",
- "strata-zkvm",
- "tracing",
-]
-
-[[package]]
 name = "strata-state"
 version = "0.1.0"
 dependencies = [
@@ -2898,20 +2881,8 @@ dependencies = [
  "strata-bridge-tx-builder",
  "strata-crypto",
  "strata-primitives",
- "strata-zkvm",
  "tracing",
-]
-
-[[package]]
-name = "strata-zkvm"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "bincode",
- "borsh",
- "serde",
- "thiserror 1.0.68",
- "tracing",
+ "zkaleido",
 ]
 
 [[package]]

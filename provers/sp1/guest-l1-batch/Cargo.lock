@@ -1070,7 +1070,7 @@ name = "guest-sp1-l1-batch"
 version = "0.1.0"
 dependencies = [
  "strata-proofimpl-l1-batch",
- "strata-sp1-adapter",
+ "zkaleido-sp1-adapter",
 ]
 
 [[package]]
@@ -2460,7 +2460,7 @@ dependencies = [
  "strata-l1tx",
  "strata-primitives",
  "strata-state",
- "strata-zkvm",
+ "zkaleido",
 ]
 
 [[package]]
@@ -2510,21 +2510,15 @@ dependencies = [
  "strata-bridge-tx-builder",
  "strata-crypto",
  "strata-primitives",
- "strata-zkvm",
  "tracing",
+ "zkaleido",
 ]
 
 [[package]]
-name = "strata-zkvm"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "bincode",
- "borsh",
- "serde",
- "thiserror 1.0.68",
- "tracing",
-]
+name = "strsim"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strsim"

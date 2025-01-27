@@ -68,7 +68,7 @@ pub trait ProofGenerator {
     /// Retrieves a proof from cache or generates it if not found.
     fn get_proof(&self, input: &Self::Input) -> ZkVmResult<ProofReceipt> {
         // 1. Create the unique proof ID
-        let proof_id = format!("{}_{}.proof", self.get_proof_id(input), self.get_host());
+        let proof_id = format!("{}_{:?}.proof", self.get_proof_id(input), self.get_host());
         println!("Getting proof for {}", proof_id);
         let proof_file = get_cache_dir().join(proof_id);
 
