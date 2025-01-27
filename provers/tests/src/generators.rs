@@ -7,8 +7,8 @@ use cl::ClProofGenerator;
 use el::ElProofGenerator;
 use l1_batch::L1BatchProofGenerator;
 use l2_batch::L2BatchProofGenerator;
-use zkaleido::ZkVmHost;
 use strata_zkvm_hosts::ProofVm;
+use zkaleido::ZkVmHost;
 
 use super::{btc, checkpoint, cl, el, l1_batch, l2_batch};
 

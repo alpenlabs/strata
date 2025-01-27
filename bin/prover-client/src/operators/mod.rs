@@ -20,9 +20,9 @@ use std::sync::Arc;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_rocksdb::prover::db::ProofDb;
-use zkaleido::{ZkVmHost, ZkVmProver};
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument};
+use zkaleido::{ZkVmHost, ZkVmProver};
 
 use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 

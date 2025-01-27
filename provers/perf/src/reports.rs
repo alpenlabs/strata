@@ -1,6 +1,6 @@
 use sp1_sdk::ProverClient;
-use zkaleido_sp1_adapter::SP1Host;
 use zkaleido::{ProofType, ZkVmInputBuilder, ZkVmResult};
+use zkaleido_sp1_adapter::SP1Host;
 
 use crate::{ProofReport, ZkVmHostPerf};
 

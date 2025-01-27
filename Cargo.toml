@@ -22,7 +22,6 @@ members = [
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
   "crates/proof-impl/l1-batch",
-  "crates/zkvm/zkvm",
   "crates/zkvm/hosts",
   "crates/reth/db",
   "crates/reth/evm",
@@ -116,6 +115,7 @@ strata-test-utils = { path = "crates/test-utils" }
 strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 
 zkaleido = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1" }
+zkaleido-native-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1" }
 zkaleido-risc0-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1" }
 zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1" }
 

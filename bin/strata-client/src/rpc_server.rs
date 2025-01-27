@@ -52,9 +52,9 @@ use strata_state::{
 };
 use strata_status::StatusChannel;
 use strata_storage::L2BlockManager;
-use zkaleido::ProofReceipt;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
+use zkaleido::ProofReceipt;
 
 use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 

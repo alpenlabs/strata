@@ -1,8 +1,8 @@
 use std::sync::LazyLock;
 
 use strata_primitives::proof::ProofContext;
-use zkaleido_sp1_adapter::SP1Host;
 use strata_sp1_guest_builder::*;
+use zkaleido_sp1_adapter::SP1Host;
 
 pub static BTC_BLOCKSPACE_HOST: LazyLock<SP1Host> = std::sync::LazyLock::new(|| {
     {

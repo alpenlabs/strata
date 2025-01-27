@@ -11,7 +11,6 @@ use strata_primitives::{
     params::{Params, RollupParams},
     proof::RollupVerifyingKey,
 };
-use zkaleido_risc0_adapter;
 use strata_state::{
     batch::{
         BatchCheckpoint, BatchCheckpointWithCommitment, CheckpointProofOutput, CommitmentInfo,
@@ -22,6 +21,7 @@ use strata_state::{
 use tokio::sync::mpsc;
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
+use zkaleido_risc0_adapter;
 use zkaleido_sp1_adapter;
 
 use crate::csm::ctl::CsmController;
