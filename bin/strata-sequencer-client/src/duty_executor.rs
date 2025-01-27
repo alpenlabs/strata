@@ -72,6 +72,7 @@ async fn handle_duty<R>(
 ) where
     R: StrataSequencerApiClient + Send + Sync,
 {
+    debug!("handle_duty: {:?}", duty);
     let duty_result = match duty.clone() {
         Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, idata).await,
         Duty::CommitBatch(duty) => handle_commit_batch_duty(rpc, duty, idata).await,
