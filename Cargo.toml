@@ -16,9 +16,6 @@ members = [
   "crates/key-derivation",
   "crates/l1tx",
   "crates/primitives",
-  "crates/zkvm/adapters/risc0",
-  "crates/zkvm/adapters/sp1",
-  "crates/zkvm/adapters/native",
   "crates/proof-impl/btc-blockspace",
   "crates/proof-impl/checkpoint",
   "crates/proof-impl/cl-agg",
@@ -92,7 +89,6 @@ strata-evmexec = { path = "crates/evmexec" }
 strata-key-derivation = { path = "crates/key-derivation" }
 strata-l1tx = { path = "crates/l1tx" }
 strata-mmr = { path = "crates/util/mmr" }
-strata-native-zkvm-adapter = { path = "crates/zkvm/adapters/native" }
 strata-primitives = { path = "crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
 strata-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }
@@ -107,19 +103,16 @@ strata-reth-exex = { path = "crates/reth/exex" }
 strata-reth-node = { path = "crates/reth/node" }
 strata-reth-primitives = { path = "crates/reth/primitives" }
 strata-reth-rpc = { path = "crates/reth/rpc" }
-strata-risc0-adapter = { path = "crates/zkvm/adapters/risc0" }
 strata-rocksdb = { path = "crates/rocksdb-store" }
 strata-rpc-api = { path = "crates/rpc/api" }
 strata-rpc-types = { path = "crates/rpc/types" }
 strata-rpc-utils = { path = "crates/rpc/utils" }
-strata-sp1-adapter = { path = "crates/zkvm/adapters/sp1" }
 strata-state = { path = "crates/state" }
 strata-status = { path = "crates/status" }
 strata-storage = { path = "crates/storage" }
 strata-sync = { path = "crates/sync" }
 strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
-strata-zkvm = { path = "crates/zkvm/zkvm" }
 strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
