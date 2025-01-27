@@ -187,17 +187,19 @@ pub fn verify_proof(
 ) -> ZkVmResult<()> {
     let rollup_vk = rollup_params.rollup_vk;
     let checkpoint_idx = checkpoint.batch_info().idx();
-    let proof = checkpoint.proof();
     info!(%checkpoint_idx, "verifying proof");
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
-    if rollup_params.proof_publish_mode.allow_empty() && proof_receipt.is_empty() {
+    if rollup_params.proof_publish_mode.allow_empty()
+        && proof_receipt.proof().is_empty()
+        && proof_receipt.public_values().is_empty()
+    {
         warn!(%checkpoint_idx, "verifying empty proof as correct");
         return Ok(());
     }
 
-    let expected_public_output = checkpoint.get_proof_output();
+    let expected_public_output = checkpoint.proof_output();
     let actual_public_output: CheckpointProofOutput =
         borsh::from_slice(proof_receipt.public_values().as_bytes())
             .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
@@ -207,16 +209,15 @@ pub fn verify_proof(
             "Public output mismatch during proof verification".to_string(),
         ));
     }
-    let public_params_raw = proof_receipt.public_values().as_bytes();
 
     // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
     // checkpoint
     match rollup_vk {
         RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-            zkaleido_risc0_adapter::verify_groth16(proof, vk.as_ref(), public_params_raw)
+            zkaleido_risc0_adapter::verify_groth16(proof_receipt, vk.as_ref())
         }
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
-            zkaleido_sp1_adapter::verify_groth16(proof, vk.as_ref(), public_params_raw)
+            zkaleido_sp1_adapter::verify_groth16(proof_receipt, vk.as_ref())
         }
         // In Native Execution mode, we do not actually generate the proof to verify. Checking
         // public parameters is sufficient.
