@@ -8,6 +8,10 @@ impl ZkVmProver for EvmEeProver {
     type Input = EvmEeProofInput;
     type Output = EvmEeProofOutput;
 
+    fn name() -> String {
+        "EVM EE STF".to_string()
+    }
+
     fn proof_type() -> ProofType {
         ProofType::Compressed
     }

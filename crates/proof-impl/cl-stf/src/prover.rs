@@ -19,6 +19,10 @@ impl ZkVmProver for ClStfProver {
     type Input = ClStfInput;
     type Output = L2BatchProofOutput;
 
+    fn name() -> String {
+        "CL STF".to_string()
+    }
+
     fn proof_type() -> zkaleido::ProofType {
         zkaleido::ProofType::Compressed
     }

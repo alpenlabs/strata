@@ -15,6 +15,10 @@ impl ZkVmProver for CheckpointProver {
     type Input = CheckpointProverInput;
     type Output = CheckpointProofOutput;
 
+    fn name() -> String {
+        "Checkpoint".to_string()
+    }
+
     fn proof_type() -> zkaleido::ProofType {
         zkaleido::ProofType::Groth16
     }

@@ -15,6 +15,10 @@ impl ZkVmProver for BtcBlockspaceProver {
     type Input = BlockScanProofInput;
     type Output = BlockScanResult;
 
+    fn name() -> String {
+        "Bitcoin Blockspace".to_string()
+    }
+
     fn proof_type() -> ProofType {
         ProofType::Compressed
     }

@@ -20,6 +20,10 @@ impl ZkVmProver for L1BatchProver {
     type Input = L1BatchProofInput;
     type Output = L1BatchProofOutput;
 
+    fn name() -> String {
+        "L1 Batch".to_string()
+    }
+
     fn proof_type() -> zkaleido::ProofType {
         zkaleido::ProofType::Compressed
     }

@@ -15,6 +15,10 @@ impl ZkVmProver for ClAggProver {
     type Input = ClAggInput;
     type Output = L2BatchProofOutput;
 
+    fn name() -> String {
+        "CL Agg".to_string()
+    }
+
     fn proof_type() -> zkaleido::ProofType {
         zkaleido::ProofType::Compressed
     }
