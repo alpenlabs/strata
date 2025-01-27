@@ -4,7 +4,7 @@ extern crate cfg_if;
 cfg_if! {
     if #[cfg(feature = "native")] {
         pub mod native;
-        use strata_native_zkvm_adapter::NativeHost;
+        use zkaleido_native_adapter::NativeHost;
 
         pub fn get_native_host(vm: ProofVm) -> &'static NativeHost {
             native::get_host(vm)

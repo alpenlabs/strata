@@ -33,7 +33,7 @@ zkaleido-risc0-adapter = { workspace = true, optional = true, features = [
 ] }
 
 # native
-strata-native-zkvm-adapter = { workspace = true, optional = true }
+zkaleido-native-adapter = { workspace = true, optional = true }
 
 anyhow.workspace = true
 bincode.workspace = true
@@ -50,7 +50,7 @@ mock = [
   "zkaleido-sp1-adapter/mock",
   "zkaleido-risc0-adapter/mock",
 ]
-native = ["strata-native-zkvm-adapter", "strata-zkvm-hosts/native"]
+native = ["zkaleido-native-adapter", "strata-zkvm-hosts/native"]
 risc0 = [
   "zkaleido-risc0-adapter",
   "strata-risc0-guest-builder",

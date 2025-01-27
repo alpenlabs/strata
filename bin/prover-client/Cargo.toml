@@ -12,7 +12,6 @@ strata-btcio.workspace = true
 strata-common.workspace = true
 strata-db.workspace = true
 strata-l1tx.workspace = true
-strata-native-zkvm-adapter.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
@@ -27,6 +26,7 @@ strata-rpc-types.workspace = true
 strata-rpc-utils.workspace = true
 strata-state.workspace = true
 zkaleido.workspace = true
+zkaleido-native-adapter.workspace = true
 
 alloy-rpc-types.workspace = true
 anyhow.workspace = true

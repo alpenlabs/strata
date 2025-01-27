@@ -42,7 +42,7 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(feature = "native")] {
-        use strata_native_zkvm_adapter::NativeHost;
+        use zkaleido_native_adapter::NativeHost;
 
         /// Test prover generator for the Native Host.
         pub static TEST_NATIVE_GENERATORS: LazyLock<TestProverGenerators<NativeHost>> =

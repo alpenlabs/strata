@@ -40,7 +40,7 @@ pub fn process_blockspace_proof_outer(zkvm: &impl ZkVmEnv) {
 mod tests {
     use std::sync::Arc;
 
-    use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
+    use zkaleido_native_adapter::{NativeHost, NativeMachine};
     use strata_test_utils::{
         bitcoin::{get_btc_chain, get_btc_mainnet_block},
         l2::gen_params,

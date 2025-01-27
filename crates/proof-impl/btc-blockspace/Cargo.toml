@@ -17,5 +17,5 @@ zkaleido.workspace = true
 [dev-dependencies]
 hex.workspace = true
 rand.workspace = true
-strata-native-zkvm-adapter.workspace = true
+zkaleido-native-adapter.workspace = true
 strata-test-utils.workspace = true

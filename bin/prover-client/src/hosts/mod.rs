@@ -54,9 +54,9 @@ pub fn get_verification_key(key: &ProofKey) -> VerificationKey {
 pub enum ZkVmHostInstance {
     /// Represents the native ZKVM host implementation.
     ///
-    /// This variant uses the [`strata_native_zkvm_adapter::NativeHost`] implementation
+    /// This variant uses the [`zkaleido_native_adapter::NativeHost`] implementation
     /// to provide ZKVM functionality without requiring any feature flags.
-    Native(strata_native_zkvm_adapter::NativeHost),
+    Native(zkaleido_native_adapter::NativeHost),
 
     /// Represents the SP1 ZKVM host implementation.
     ///

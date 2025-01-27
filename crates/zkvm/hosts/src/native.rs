@@ -1,6 +1,6 @@
 use std::sync::{Arc, LazyLock};
 
-use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
+use zkaleido_native_adapter::{NativeHost, NativeMachine};
 use strata_proofimpl_btc_blockspace::logic::process_blockspace_proof_outer;
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
 use strata_proofimpl_cl_agg::process_cl_agg;
