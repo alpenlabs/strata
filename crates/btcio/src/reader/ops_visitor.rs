@@ -44,21 +44,24 @@ impl OpsVisitor for ClientOpsVisitor {
 
 // #[cfg(test)]
 // mod test {
-// //Helper function to create a test block with given transactions
-//  fn create_test_block(transactions: Vec<Transaction>) -> Block {
-//      let bhash = BlockHash::from_byte_array([0; 32]);
-//      Block {
-//          header: Header {
-//              version: BVersion::ONE,
-//              prev_blockhash: bhash,
-//              merkle_root: TxMerkleNode::from_byte_array(*bhash.as_byte_array()),
-//              time: 100,
-//              bits: CompactTarget::from_consensus(1),
-//              nonce: 1,
-//          },
-//          txdata: transactions,
-//      }
-//  }
+//     use bitcoin::{block::Header, BlockHash, CompactTarget, TxMerkleNode};
+//     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
+//
+//     //Helper function to create a test block with given transactions
+//     fn create_test_block(transactions: Vec<Transaction>) -> Block {
+//         let bhash = BlockHash::from_byte_array([0; 32]);
+//         Block {
+//             header: Header {
+//                 version: BVersion::ONE,
+//                 prev_blockhash: bhash,
+//                 merkle_root: TxMerkleNode::from_byte_array(*bhash.as_byte_array()),
+//                 time: 100,
+//                 bits: CompactTarget::from_consensus(1),
+//                 nonce: 1,
+//             },
+//             txdata: transactions,
+//         }
+//     }
 //     #[test]
 //     fn test_filter_relevant_txs_deposit() {
 //         let params = gen_params();

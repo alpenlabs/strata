@@ -46,7 +46,7 @@ fn parse_da<'a>(
 /// the checkpoint envelope.
 // TODO: we need to change envelope structure and possibly have envelopes for checkpoints and
 // DA separately
-fn parse_envelopes<'a>(
+fn parse_checkpoint_envelopes<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> impl Iterator<Item = SignedBatchCheckpoint> + 'a {
@@ -91,15 +91,18 @@ mod test {
         params::Params,
     };
     use strata_state::batch::SignedBatchCheckpoint;
-    use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
+    use strata_test_utils::{
+        bitcoin::{
+            build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
+        },
+        l2::gen_params,
+        ArbitraryGenerator,
+    };
 
     use super::TxFilterConfig;
     use crate::{
-        deposit::test_utils::{
-            build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
-            test_taproot_addr,
-        },
-        filter::{parse_deposit_requests, parse_deposits, parse_envelopes},
+        deposit::test_utils::test_taproot_addr,
+        filter::{parse_checkpoint_envelopes, parse_deposit_requests, parse_deposits},
     };
 
     const OTHER_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
@@ -176,7 +179,7 @@ mod test {
         // Testing multiple envelopes are parsed
         let num_envelopes = 2;
         let tx = create_checkpoint_envelope_tx(&params, num_envelopes);
-        let checkpoints: Vec<_> = parse_envelopes(&tx, &filter_config).collect();
+        let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
 
         assert_eq!(checkpoints.len(), 2, "Should filter relevant envelopes");
 
@@ -185,7 +188,7 @@ mod test {
         let filter_config = create_tx_filter_config(&params);
 
         let tx = create_checkpoint_envelope_tx(&params, 2);
-        let checkpoints: Vec<_> = parse_envelopes(&tx, &filter_config).collect();
+        let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
         assert!(checkpoints.is_empty(), "There should be no envelopes");
     }
 

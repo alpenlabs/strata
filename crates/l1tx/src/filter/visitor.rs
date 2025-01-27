@@ -4,7 +4,9 @@ use strata_state::{
     tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
 };
 
-use super::{parse_da, parse_deposit_requests, parse_deposits, parse_envelopes, TxFilterConfig};
+use super::{
+    parse_checkpoint_envelopes, parse_da, parse_deposit_requests, parse_deposits, TxFilterConfig,
+};
 use crate::messages::ProtocolTxEntry;
 
 pub trait OpsVisitor {
@@ -74,7 +76,7 @@ impl<V: OpsVisitor + Clone> BlockIndexer for OpIndexer<V> {
 
     fn index_tx(&mut self, tx: &Transaction, config: &TxFilterConfig) {
         let mut visitor = self.visitor.clone();
-        for chp in parse_envelopes(tx, config) {
+        for chp in parse_checkpoint_envelopes(tx, config) {
             visitor.visit_checkpoint(chp);
         }
         for dp in parse_deposits(tx, config) {

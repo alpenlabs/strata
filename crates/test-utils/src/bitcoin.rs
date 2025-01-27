@@ -1,13 +1,19 @@
 use std::collections::HashMap;
 
 use bitcoin::{
+    absolute::LockTime,
     block::Header,
     consensus::{deserialize, serialize},
     hashes::Hash,
-    Block, Transaction,
+    opcodes::all::OP_RETURN,
+    script::{self, PushBytesBuf},
+    Amount, Block, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use strata_l1tx::filter::TxFilterConfig;
-use strata_primitives::{buf::Buf32, l1::L1BlockRecord};
+use strata_primitives::{
+    buf::Buf32,
+    l1::{L1BlockRecord, OutputRef},
+};
 use strata_state::l1::{
     get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
 };
@@ -175,4 +181,78 @@ pub fn get_btc_chain() -> BtcChainSegment {
 pub fn get_test_tx_filter_config() -> TxFilterConfig {
     let config = gen_params();
     TxFilterConfig::derive_from(config.rollup()).expect("can't derive filter config")
+}
+
+pub fn create_test_deposit_tx(
+    amt: Amount,
+    addr_script: &ScriptBuf,
+    opreturn_script: &ScriptBuf,
+) -> Transaction {
+    let previous_output: OutputRef = ArbitraryGenerator::new().generate();
+
+    let inputs = vec![TxIn {
+        previous_output: *previous_output.outpoint(),
+        script_sig: Default::default(),
+        sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+        witness: Witness::new(),
+    }];
+
+    // Construct the outputs
+    let outputs = vec![
+        TxOut {
+            value: amt, // 10 BTC in satoshis
+            script_pubkey: addr_script.clone(),
+        },
+        TxOut {
+            value: Amount::ZERO, // Amount is zero for OP_RETURN
+            script_pubkey: opreturn_script.clone(),
+        },
+    ];
+
+    // Create the transaction
+    Transaction {
+        version: bitcoin::transaction::Version(2),
+        lock_time: LockTime::ZERO,
+        input: inputs,
+        output: outputs,
+    }
+}
+
+pub fn build_no_op_deposit_request_script(
+    magic: Vec<u8>,
+    dummy_block: Vec<u8>,
+    dest_addr: Vec<u8>,
+) -> ScriptBuf {
+    let builder = script::Builder::new()
+        .push_slice(PushBytesBuf::try_from(magic).unwrap())
+        .push_slice(PushBytesBuf::try_from(dummy_block).unwrap())
+        .push_slice(PushBytesBuf::try_from(dest_addr).unwrap());
+
+    builder.into_script()
+}
+
+pub fn build_test_deposit_request_script(
+    magic: Vec<u8>,
+    dummy_block: Vec<u8>,
+    dest_addr: Vec<u8>,
+) -> ScriptBuf {
+    let mut data = magic;
+    data.extend(dummy_block);
+    data.extend(dest_addr);
+    let builder = script::Builder::new()
+        .push_opcode(OP_RETURN)
+        .push_slice(PushBytesBuf::try_from(data).unwrap());
+
+    builder.into_script()
+}
+
+pub fn build_test_deposit_script(magic: Vec<u8>, dest_addr: Vec<u8>) -> ScriptBuf {
+    let mut data = magic;
+    data.extend(dest_addr);
+
+    let builder = script::Builder::new()
+        .push_opcode(OP_RETURN)
+        .push_slice(PushBytesBuf::try_from(data).unwrap());
+
+    builder.into_script()
 }

@@ -105,15 +105,16 @@ pub fn parse_deposit_request_script(
 #[cfg(test)]
 mod tests {
     use bitcoin::{absolute::LockTime, Amount, Transaction};
+    use strata_test_utils::bitcoin::{
+        build_no_op_deposit_request_script, build_test_deposit_request_script,
+        create_test_deposit_tx,
+    };
 
     use super::extract_deposit_request_info;
     use crate::deposit::{
         deposit_request::parse_deposit_request_script,
         error::DepositParseError,
-        test_utils::{
-            build_no_op_deposit_request_script, build_test_deposit_request_script,
-            create_test_deposit_tx, get_deposit_tx_config, test_taproot_addr,
-        },
+        test_utils::{get_deposit_tx_config, test_taproot_addr},
     };
 
     #[test]
