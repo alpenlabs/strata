@@ -59,7 +59,7 @@ $DATATOOL_PATH -b regtest genparams \
     -s $seqpubkey \
     -b $op1pubkey \
     -b $op2pubkey \
-    -b $op3pubkey \
-    -b $op4pubkey \
-    -b $op5pubkey \
     --output $ROLLUP_PARAMS_FILE
+    # -b $op3pubkey \
+    # -b $op4pubkey \
+    # -b $op5pubkey \
