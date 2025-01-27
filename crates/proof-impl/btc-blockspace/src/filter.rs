@@ -2,17 +2,52 @@
 //! deposits, forced inclusion transactions as well as state updates
 
 use bitcoin::Block;
-use strata_l1tx::filter::{filter_protocol_op_tx_refs, visitor::OpsVisitor, TxFilterConfig};
+use digest::Digest;
+use sha2::Sha256;
+use strata_l1tx::filter::{
+    visitor::{BlockIndexer, OpIndexer, OpsVisitor},
+    TxFilterConfig,
+};
 use strata_primitives::{block_credential::CredRule, params::RollupParams};
 use strata_state::{
-    batch::BatchCheckpoint,
+    batch::{BatchCheckpoint, SignedBatchCheckpoint},
     tx::{DepositInfo, ProtocolOperation},
 };
 
 /// Ops visitor for Prover.
-pub struct ProverOpsVisitor;
+#[derive(Debug, Clone)]
+struct ProverOpsVisitor {
+    ops: Vec<ProtocolOperation>,
+}
 
-impl OpsVisitor for ProverOpsVisitor {}
+impl ProverOpsVisitor {
+    pub fn new() -> Self {
+        Self { ops: Vec::new() }
+    }
+}
+
+impl OpsVisitor for ProverOpsVisitor {
+    fn collect(self) -> Vec<ProtocolOperation> {
+        self.ops
+    }
+
+    fn visit_da<'a>(&mut self, data: impl Iterator<Item = &'a [u8]>) {
+        let mut hasher = Sha256::new();
+        for d in data {
+            hasher.update(d);
+        }
+        let hash: [u8; 32] = hasher.finalize().into();
+        self.ops.push(ProtocolOperation::DaCommitment(hash.into()));
+    }
+
+    fn visit_deposit(&mut self, d: DepositInfo) {
+        self.ops.push(ProtocolOperation::Deposit(d));
+    }
+
+    fn visit_checkpoint(&mut self, chkpt: SignedBatchCheckpoint) {
+        self.ops.push(ProtocolOperation::Checkpoint(chkpt));
+    }
+}
 
 pub fn extract_relevant_info(
     block: &Block,
@@ -24,9 +59,10 @@ pub fn extract_relevant_info(
 
     // Just pass a no-op to the filter function as prover does not have to do anything with the raw
     // data like storing in db.
-    let txrefs = filter_protocol_op_tx_refs(block, rollup_params, filter_config, &ProverOpsVisitor);
+    let indexer = OpIndexer::new(ProverOpsVisitor::new());
+    let tx_refs = indexer.index_block(block, filter_config).collect();
 
-    for op in txrefs.into_iter().flat_map(|t| t.proto_ops().to_vec()) {
+    for op in tx_refs.into_iter().flat_map(|t| t.proto_ops().to_vec()) {
         match op {
             ProtocolOperation::Deposit(deposit_info) => {
                 deposits.push(deposit_info.clone());

@@ -12879,6 +12879,7 @@ dependencies = [
  "bitcoin",
  "bytes",
  "corepc-node",
+ "digest 0.10.7",
  "hex",
  "mockall",
  "musig2",
@@ -13258,6 +13259,7 @@ version = "0.1.0"
 dependencies = [
  "bitcoin",
  "borsh",
+ "digest 0.10.7",
  "hex",
  "rand",
  "serde",
