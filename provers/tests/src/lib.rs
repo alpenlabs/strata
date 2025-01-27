@@ -32,7 +32,7 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(feature = "sp1")] {
-        use strata_sp1_adapter::SP1Host;
+        use zkaleido_sp1_adapter::SP1Host;
 
         /// Test prover generator for the SP1 Host.
         pub static TEST_SP1_GENERATORS: LazyLock<TestProverGenerators<SP1Host>> =

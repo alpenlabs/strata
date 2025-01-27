@@ -17,10 +17,10 @@ strata-zkvm-hosts.workspace = true
 zkaleido.workspace = true
 
 # sp1
-strata-sp1-adapter = { workspace = true, optional = true, features = [
+strata-sp1-guest-builder = { path = "../sp1", optional = true, features = [
   "prover",
 ] }
-strata-sp1-guest-builder = { path = "../sp1", optional = true, features = [
+zkaleido-sp1-adapter = { workspace = true, optional = true, features = [
   "prover",
 ] }
 
@@ -47,7 +47,7 @@ serde_json.workspace = true
 default = ["native"]
 mock = [
   "strata-sp1-guest-builder/mock",
-  "strata-sp1-adapter/mock",
+  "zkaleido-sp1-adapter/mock",
   "strata-risc0-adapter/mock",
 ]
 native = ["strata-native-zkvm-adapter", "strata-zkvm-hosts/native"]
@@ -57,7 +57,7 @@ risc0 = [
   "strata-zkvm-hosts/risc0",
 ]
 sp1 = [
-  "strata-sp1-adapter",
+  "zkaleido-sp1-adapter",
   "strata-sp1-guest-builder",
   "strata-zkvm-hosts/sp1",
 ]

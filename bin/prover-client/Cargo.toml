@@ -50,8 +50,8 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid.workspace = true
 
 # sp1
-strata-sp1-adapter = { workspace = true, optional = true }
 strata-sp1-guest-builder = { path = "../../provers/sp1", optional = true }
+zkaleido-sp1-adapter = { workspace = true, optional = true }
 
 # risc0
 strata-risc0-adapter = { workspace = true, optional = true }
@@ -62,8 +62,8 @@ strata-test-utils.workspace = true
 
 [features]
 default = []
-sp1 = ["strata-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]
-sp1-mock = ["sp1", "strata-sp1-adapter/mock", "strata-sp1-guest-builder/mock"]
+sp1 = ["zkaleido-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]
+sp1-mock = ["sp1", "zkaleido-sp1-adapter/mock", "strata-sp1-guest-builder/mock"]
 
 risc0 = ["strata-risc0-adapter/prover", "strata-risc0-guest-builder/prover"]
 risc0-mock = ["risc0", "strata-risc0-adapter/mock"]

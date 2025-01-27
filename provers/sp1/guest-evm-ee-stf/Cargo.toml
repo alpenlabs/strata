@@ -7,7 +7,7 @@ version = "0.1.0"
 
 [dependencies]
 strata-proofimpl-evm-ee-stf = { path = "../../../crates/proof-impl/evm-ee-stf" }
-strata-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1", features = [
+zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1", features = [
   "zkvm",
 ] }
 
@@ -19,4 +19,4 @@ sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", packa
 tiny-keccak = { git = "https://github.com/sp1-patches/tiny-keccak", branch = "patch-v2.0.2" }
 
 [features]
-mock = ["strata-sp1-adapter/mock"]
+mock = ["zkaleido-sp1-adapter/mock"]

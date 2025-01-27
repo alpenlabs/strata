@@ -60,11 +60,11 @@ pub enum ZkVmHostInstance {
 
     /// Represents the SP1 ZKVM host implementation.
     ///
-    /// This variant uses the [`strata_sp1_adapter::SP1Host`] implementation and is only
+    /// This variant uses the [`zkaleido_sp1_adapter::SP1Host`] implementation and is only
     /// available when the `sp1` feature flag is enabled. Attempting to use this variant
     /// without enabling the `sp1` feature will result in a compile-time error or a runtime panic.
     #[cfg(feature = "sp1")]
-    SP1(&'static strata_sp1_adapter::SP1Host),
+    SP1(&'static zkaleido_sp1_adapter::SP1Host),
 
     /// Represents the Risc0 ZKVM host implementation.
     ///

@@ -26,7 +26,7 @@ cfg_if! {
 cfg_if! {
     if #[cfg(feature = "sp1")] {
         pub mod sp1;
-        use strata_sp1_adapter::SP1Host;
+        use zkaleido_sp1_adapter::SP1Host;
 
         pub fn get_sp1_host(vm: ProofVm) -> &'static SP1Host {
             sp1::get_host(vm)

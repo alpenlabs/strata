@@ -12,7 +12,6 @@ use strata_primitives::{
     proof::RollupVerifyingKey,
 };
 use strata_risc0_adapter;
-use strata_sp1_adapter;
 use strata_state::{
     batch::{
         BatchCheckpoint, BatchCheckpointWithCommitment, CheckpointProofOutput, CommitmentInfo,
@@ -20,9 +19,10 @@ use strata_state::{
     l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
 };
-use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
 use tokio::sync::mpsc;
 use tracing::*;
+use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
+use zkaleido_sp1_adapter;
 
 use crate::csm::ctl::CsmController;
 
@@ -216,7 +216,7 @@ pub fn verify_proof(
             strata_risc0_adapter::verify_groth16(proof, vk.as_ref(), public_params_raw)
         }
         RollupVerifyingKey::SP1VerifyingKey(vk) => {
-            strata_sp1_adapter::verify_groth16(proof, vk.as_ref(), public_params_raw)
+            zkaleido_sp1_adapter::verify_groth16(proof, vk.as_ref(), public_params_raw)
         }
         // In Native Execution mode, we do not actually generate the proof to verify. Checking
         // public parameters is sufficient.
