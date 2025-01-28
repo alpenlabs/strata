@@ -4,6 +4,8 @@ pub mod bridge_duty_index;
 pub mod bridge_relay;
 pub mod chainstate;
 pub mod checkpoint;
+pub mod client_state;
+pub mod envelope;
 pub mod l1;
 pub mod l1tx_broadcast;
 pub mod l2;
