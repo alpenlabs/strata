@@ -4,6 +4,7 @@ pub mod block;
 pub mod filter;
 pub mod logic;
 pub mod merkle;
+mod ops_visitor;
 pub mod prover;
 pub mod scan;
 pub mod tx;

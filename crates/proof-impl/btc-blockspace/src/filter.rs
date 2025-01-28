@@ -2,52 +2,17 @@
 //! deposits, forced inclusion transactions as well as state updates
 
 use bitcoin::Block;
-use digest::Digest;
-use sha2::Sha256;
 use strata_l1tx::filter::{
-    visitor::{BlockIndexer, OpIndexer, OpsVisitor},
+    visitor::{BlockIndexer, OpIndexer},
     TxFilterConfig,
 };
 use strata_primitives::{block_credential::CredRule, params::RollupParams};
 use strata_state::{
-    batch::{BatchCheckpoint, SignedBatchCheckpoint},
+    batch::BatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
 
-/// Ops visitor for Prover.
-#[derive(Debug, Clone)]
-struct ProverOpsVisitor {
-    ops: Vec<ProtocolOperation>,
-}
-
-impl ProverOpsVisitor {
-    pub fn new() -> Self {
-        Self { ops: Vec::new() }
-    }
-}
-
-impl OpsVisitor for ProverOpsVisitor {
-    fn collect(self) -> Vec<ProtocolOperation> {
-        self.ops
-    }
-
-    fn visit_da<'a>(&mut self, data: &'a [&'a [u8]]) {
-        let mut hasher = Sha256::new();
-        for d in data {
-            hasher.update(d);
-        }
-        let hash: [u8; 32] = hasher.finalize().into();
-        self.ops.push(ProtocolOperation::DaCommitment(hash.into()));
-    }
-
-    fn visit_deposit(&mut self, d: DepositInfo) {
-        self.ops.push(ProtocolOperation::Deposit(d));
-    }
-
-    fn visit_checkpoint(&mut self, chkpt: SignedBatchCheckpoint) {
-        self.ops.push(ProtocolOperation::Checkpoint(chkpt));
-    }
-}
+use crate::ops_visitor::ProverOpsVisitor;
 
 pub fn extract_relevant_info(
     block: &Block,

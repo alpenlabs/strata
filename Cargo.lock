@@ -13266,6 +13266,7 @@ dependencies = [
  "serde",
  "sha2 0.10.8",
  "strata-bridge-tx-builder",
+ "strata-btcio",
  "strata-l1tx",
  "strata-primitives",
  "strata-state",
