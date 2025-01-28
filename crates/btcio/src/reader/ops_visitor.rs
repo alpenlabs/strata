@@ -50,7 +50,7 @@ mod test {
         Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode,
     };
     use strata_l1tx::filter::{
-        visitor::{BlockIndexer, OpIndexer},
+        visitor::{BlockIndexer, DepositRequestIndexer, OpIndexer},
         TxFilterConfig,
     };
     use strata_primitives::{
@@ -152,24 +152,19 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
+        let deposit_req_indexer = DepositRequestIndexer::new();
+        let dep_reqs = deposit_req_indexer
+            .index_block(&block, &filter_config)
+            .collect();
 
-        assert_eq!(tx_entries.len(), 1, "Should find one relevant transaction");
+        assert_eq!(dep_reqs.len(), 1, "Should find one deposit request");
 
-        for op in tx_entries[0].proto_ops() {
-            if let ProtocolOperation::DepositRequest(deposit_req_info) = op {
-                assert_eq!(
-                    deposit_req_info.address, dest_addr,
-                    "EE address should match"
-                );
-                assert_eq!(
-                    deposit_req_info.take_back_leaf_hash, dummy_block,
-                    "Control block should match"
-                );
-            } else {
-                panic!("Expected DepositRequest info");
-            }
+        for dep_req_info in dep_reqs {
+            assert_eq!(dep_req_info.address, dest_addr, "EE address should match");
+            assert_eq!(
+                dep_req_info.take_back_leaf_hash, dummy_block,
+                "Control block should match"
+            );
         }
     }
 

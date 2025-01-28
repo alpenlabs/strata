@@ -123,7 +123,6 @@ mod test {
 
         // Test with invalid checkpoint tag
         params.rollup.checkpoint_tag = "invalid_checkpoint_tag".to_string();
-        let filter_config = create_tx_filter_config(&params);
 
         let tx = create_checkpoint_envelope_tx(&params, TEST_ADDR, l1_payloads);
         let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();

@@ -87,8 +87,11 @@ impl<V: OpsVisitor + Clone> BlockIndexer for OpIndexer<V> {
             visitor.visit_da(da);
         }
 
-        let entry = ProtocolTxEntry::new(txidx, visitor.collect());
-        self.tx_entries.push(entry);
+        let ops = visitor.collect();
+        if !ops.is_empty() {
+            let entry = ProtocolTxEntry::new(txidx, ops);
+            self.tx_entries.push(entry);
+        }
     }
 
     fn collect(self) -> Self::Output {
@@ -104,6 +107,6 @@ impl BlockIndexer for DepositRequestIndexer {
     }
 
     fn index_tx(&mut self, _txidx: u32, tx: &Transaction, config: &TxFilterConfig) {
-        self.requests = parse_deposit_requests(tx, config).collect();
+        self.requests.extend(parse_deposit_requests(tx, config));
     }
 }
