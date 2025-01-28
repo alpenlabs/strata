@@ -53,7 +53,7 @@ impl EpochCommitment {
         }
     }
 
-    /// Creates a "null" epoch with
+    /// Creates a "null" epoch with 0 slot, epoch 0, and zeroed blkid.
     pub fn null() -> Self {
         Self::new(0, 0, L2BlockId::from(Buf32::zero()))
     }
@@ -75,7 +75,8 @@ impl EpochCommitment {
         L2BlockCommitment::new(self.last_slot, self.last_blkid)
     }
 
-    /// Returns if the terminal blkid is zero.
+    /// Returns if the terminal blkid is zero.  This signifies a special case
+    /// for the genesis epoch (0) before the it is completed.
     pub fn is_null(&self) -> bool {
         Buf32::from(self.last_blkid).is_zero()
     }

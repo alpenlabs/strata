@@ -218,17 +218,17 @@ pub trait ChainstateDatabase {
     /// Gets the write batch stored to compute a height.
     fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
 
-    /// Tells the database to purge state before a certain block index (height).
+    /// Tells the database to purge state before a certain index.
     fn purge_entries_before(&self, before_idx: u64) -> DbResult<()>;
 
-    /// Rolls back any writes and state checkpoints after a specified block.
+    /// Rolls back any writes after a specified index.
     fn rollback_writes_to(&self, new_tip_idx: u64) -> DbResult<()>;
 
     /// Gets the last written state.
     fn get_last_write_idx(&self) -> DbResult<u64>;
 
     /// Gets the earliest written state.  This corresponds to calls to
-    /// `purge_historical_state_before`.
+    /// `purge_entries_before`.
     fn get_earliest_write_idx(&self) -> DbResult<u64>;
 }
 
