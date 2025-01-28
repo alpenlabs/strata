@@ -3,12 +3,13 @@ from strata_utils import get_balance
 
 from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
+from mixins import bridge_mixin
 from utils import get_bridge_pubkey, wait_until, wait_until_with_value
 from utils.constants import UNSPENDABLE_ADDRESS
 
 
 @flexitest.register
-class BridgeWithdrawReassignmentTest(testenv.BridgeTestBase):
+class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
     """
     Makes two DRT deposits, then triggers the withdrawal.
     The bridge client associated with assigned operator id is stopped.
