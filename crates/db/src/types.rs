@@ -202,10 +202,6 @@ impl CheckpointEntry {
     pub fn is_proof_ready(&self) -> bool {
         self.proving_status == CheckpointProvingStatus::ProofReady
     }
-
-    // pub fn is_proof_nonempty(&self) -> bool {
-    //     !self.proof.is_empty()
-    // }
 }
 
 impl From<CheckpointEntry> for BatchCheckpoint {
