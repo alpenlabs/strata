@@ -465,7 +465,14 @@ fn start_sequencer_tasks(
 
     let cupdate_rx = sync_manager.create_cstate_subscription();
     executor.spawn_critical("checkpoint-tracker", |shutdown| {
-        checkpoint_worker(shutdown, cupdate_rx, params, database, checkpoint_handle)
+        checkpoint_worker(
+            shutdown,
+            cupdate_rx,
+            params,
+            database,
+            storage,
+            checkpoint_handle,
+        )
     });
 
     Ok(())

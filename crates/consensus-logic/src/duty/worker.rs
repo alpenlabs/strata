@@ -211,16 +211,12 @@ struct DutyExecStatus {
 }
 
 #[allow(clippy::too_many_arguments)] // FIXME
-pub fn duty_dispatch_task<
-    D: Database + Sync + Send + 'static,
-    E: ExecEngineCtl + Sync + Send + 'static,
->(
+pub fn duty_dispatch_task<E: ExecEngineCtl + Sync + Send + 'static>(
     shutdown: ShutdownGuard,
     executor: TaskExecutor,
     mut updates: broadcast::Receiver<DutyBatch>,
     identity_key: IdentityKey,
     sync_manager: Arc<SyncManager>,
-    database: Arc<D>,
     storage: Arc<NodeStorage>,
     engine: Arc<E>,
     envelope_handle: Arc<EnvelopeHandle>,
@@ -287,7 +283,6 @@ pub fn duty_dispatch_task<
             let duty = duty.duty().clone();
             let identiy_key = identity_key.clone();
             let sync_manager = sync_manager.clone();
-            let database = database.clone();
             let storage = storage.clone();
             let engine = engine.clone();
             let envelope_handle = envelope_handle.clone();
@@ -300,7 +295,6 @@ pub fn duty_dispatch_task<
                     duty,
                     identiy_key,
                     sync_manager,
-                    database,
                     storage,
                     engine,
                     envelope_handle,
@@ -325,11 +319,10 @@ pub fn duty_dispatch_task<
 /// thread pool so we don't have to worry about it blocking *too* much other
 /// work.
 #[allow(clippy::too_many_arguments)] // TODO: fix this
-fn duty_exec_task<D: Database, E: ExecEngineCtl>(
+fn duty_exec_task<E: ExecEngineCtl>(
     duty: Duty,
     identity_key: IdentityKey,
     sync_manager: Arc<SyncManager>,
-    database: Arc<D>,
     storage: Arc<NodeStorage>,
     engine: Arc<E>,
     envelope_handle: Arc<EnvelopeHandle>,
@@ -342,7 +335,6 @@ fn duty_exec_task<D: Database, E: ExecEngineCtl>(
         &duty,
         &identity_key,
         &sync_manager,
-        database.as_ref(),
         storage.as_ref(),
         engine.as_ref(),
         envelope_handle.as_ref(),
@@ -366,7 +358,6 @@ fn perform_duty(
     duty: &Duty,
     identity_key: &IdentityKey,
     sync_manager: &SyncManager,
-    database: &impl Database,
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
     envelope_handle: &EnvelopeHandle,
@@ -395,7 +386,6 @@ fn perform_duty(
                 parent,
                 &l1_view,
                 identity_key,
-                database,
                 storage,
                 engine,
                 params,
