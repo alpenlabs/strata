@@ -7,6 +7,8 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from factory import seqrpc
+from load.cfg import LoadConfig
+from load.service import LoadGeneratorService
 from utils import *
 from utils.constants import *
 
@@ -393,6 +395,30 @@ class BridgeClientFactory(flexitest.Factory):
         rpc_url = f"ws://localhost:{rpc_port}"
 
         svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
+        svc.start()
+        _inject_service_create_rpc(svc, rpc_url, name)
+        return svc
+
+
+class LoadGeneratorFactory(flexitest.Factory):
+    def __init__(self, port_range: list[int]):
+        super().__init__(port_range)
+
+    @flexitest.with_ectx("ctx")
+    def create_simple_loadgen(
+        self,
+        load_cfg: LoadConfig,
+        ctx: flexitest.EnvContext,
+    ) -> flexitest.Service:
+        name = "load_generator"
+
+        datadir = ctx.make_service_dir(name)
+        rpc_port = self.next_port()
+        logfile = os.path.join(datadir, "service.log")
+
+        rpc_url = f"ws://localhost:{rpc_port}"
+
+        svc = LoadGeneratorService(logfile, load_cfg)
         svc.start()
         _inject_service_create_rpc(svc, rpc_url, name)
         return svc

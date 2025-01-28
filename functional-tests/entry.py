@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+from gevent import monkey
+
+monkey.patch_all()
 
 import argparse
 import os
@@ -6,10 +9,12 @@ import sys
 
 import flexitest
 
+
 from envs import net_settings, testenv
 from factory import factory
 from utils import *
 from utils.constants import *
+
 
 TEST_DIR: str = "tests"
 
@@ -72,6 +77,7 @@ def main(argv):
     reth_fac = factory.RethFactory([12600 + i for i in range(100 * 3)])
     prover_client_fac = factory.ProverClientFactory([12900 + i for i in range(100 * 3)])
     bridge_client_fac = factory.BridgeClientFactory([13200 + i for i in range(100)])
+    load_gen_fac = factory.LoadGeneratorFactory([14000 + i for i in range(100)])
     seq_signer_fac = factory.StrataSequencerFactory()
 
     factories = {
@@ -82,6 +88,7 @@ def main(argv):
         "reth": reth_fac,
         "prover_client": prover_client_fac,
         "bridge_client": bridge_client_fac,
+        "load_generator": load_gen_fac,
     }
 
     global_envs = {
@@ -99,6 +106,7 @@ def main(argv):
             2
         ),  # TODO: Need to generate at least horizon blocks, based on params
         "prover": testenv.BasicEnvConfig(101),
+        "load": testenv.LoadEnvConfig(),
     }
 
     setup_root_logger()
@@ -109,6 +117,7 @@ def main(argv):
     results = rt.run_tests(tests)
     rt.save_json_file("results.json", results)
     flexitest.dump_results(results)
+    # TODO(load): dump load test stats into separate file.
 
     flexitest.fail_on_error(results)
 

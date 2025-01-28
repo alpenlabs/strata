@@ -9,6 +9,8 @@ from strata_utils import (
 )
 
 from envs.rollup_params_cfg import RollupConfig
+from load.cfg import LoadConfig
+from load.jobs.reth import EthJob
 from utils import *
 from utils.constants import *
 
@@ -403,3 +405,21 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             svcs[name] = br
 
         return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)
+
+
+# TODO: refactor out the common code from all envs as this is becoming messy.
+# Currenty, it's not ideal either, as it heavily depends on BasicEnvConfig.
+# TODO(load): make it more generic - right now it targets reth service and has hardcoded job.
+class LoadEnvConfig(BasicEnvConfig):
+    def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
+        basic_live_env = super().init(ctx)
+
+        svcs = basic_live_env.svcs
+        reth = svcs["reth"]
+
+        web3_port = reth.get_prop("eth_rpc_http_port")
+        load_fac = ctx.get_factory("load_generator")
+        load_cfg: LoadConfig = LoadConfig([EthJob], f"http://localhost:{web3_port}", 50)
+        svcs["load_generator"] = load_fac.create_simple_loadgen(load_cfg)
+
+        return BasicLiveEnv(svcs, basic_live_env._bridge_pk, basic_live_env._rollup_cfg)
