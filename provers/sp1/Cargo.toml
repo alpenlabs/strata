@@ -19,5 +19,5 @@ sp1-sdk = "4.0.0"
 [features]
 default = ["prover"]
 mock = []
-prover = ["strata-sp1-adapter"]
+prover = ["zkaleido-sp1-adapter"]
 docker-build = []
