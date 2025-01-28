@@ -47,6 +47,7 @@ members = [
   # binaries listed separately
   "bin/bridge-client",
   "bin/datatool",
+  "bin/dbtool",
   "bin/strata-cli",
   "bin/strata-client",
   "bin/strata-reth",
@@ -59,6 +60,7 @@ members = [
 default-members = [
   "bin/bridge-client",
   "bin/datatool",
+  "bin/dbtool",
   "bin/prover-client",
   "bin/strata-reth",
   "bin/strata-client",

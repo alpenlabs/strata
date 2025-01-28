@@ -13039,6 +13039,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-dbtool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argh",
+ "bincode",
+ "borsh",
+ "hex",
+ "rockbound",
+ "serde",
+ "strata-rocksdb",
+]
+
+[[package]]
 name = "strata-eectl"
 version = "0.1.0"
 dependencies = [
