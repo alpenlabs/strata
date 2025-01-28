@@ -16,10 +16,7 @@ use strata_consensus_logic::{
     genesis,
     sync_manager::{self, SyncManager},
 };
-use strata_db::{
-    traits::{BroadcastDatabase, ChainstateDatabase, Database},
-    DbError,
-};
+use strata_db::{traits::BroadcastDatabase, DbError};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, ProofPublishMode};
@@ -36,9 +33,7 @@ use strata_sequencer::{
     duty::{types::DutyTracker, worker as duty_worker},
 };
 use strata_status::StatusChannel;
-use strata_storage::{
-    create_node_storage, ops::bridge_relay::BridgeMsgOps, L2BlockManager, NodeStorage,
-};
+use strata_storage::{create_node_storage, ops::bridge_relay::BridgeMsgOps, NodeStorage};
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{
@@ -238,7 +233,6 @@ pub struct CoreContext {
 }
 
 fn do_startup_checks(
-    database: &impl Database,
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
     bitcoin_client: &impl ReaderRpc,
@@ -280,7 +274,7 @@ fn do_startup_checks(
 
     // Check that tip L2 block exists (and engine can be connected to)
     let chain_tip = last_chain_state.chain_tip_blkid();
-    match engine.check_block_exists(chain_tip) {
+    match engine.check_block_exists(*chain_tip) {
         Ok(true) => {
             info!("startup: last l2 block is synced")
         }
@@ -324,7 +318,6 @@ fn start_core_tasks(
 
     // do startup checks
     do_startup_checks(
-        database.as_ref(),
         storage.as_ref(),
         engine.as_ref(),
         bitcoin_client.as_ref(),

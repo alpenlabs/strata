@@ -8,7 +8,7 @@ use bitcoin::{
     secp256k1::{PublicKey, XOnlyPublicKey},
     Transaction as BTransaction, Txid,
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
 use parking_lot::RwLock;
 use strata_bridge_relay::relayer::RelayerHandle;
@@ -373,7 +373,6 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
         let prev_slot = l2_blk_bundle.block().header().header().blockidx() - 1;
 
-        let chain_state_db = self.database.clone();
         let chain_state = self
             .storage
             .chainstate()
@@ -934,7 +933,7 @@ impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRp
             .await?;
         match chain_state {
             Some(cs) => Ok(Some(RpcChainState {
-                tip_blkid: cs.chain_tip_blkid(),
+                tip_blkid: *cs.chain_tip_blkid(),
                 tip_slot: cs.chain_tip_slot(),
                 cur_epoch: cs.cur_epoch(),
             })),
