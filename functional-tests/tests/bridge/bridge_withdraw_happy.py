@@ -4,7 +4,7 @@ from strata_utils import extract_p2tr_pubkey, get_balance, xonlypk_to_descriptor
 from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
 from mixins import bridge_mixin
-from utils import confirm_btc_withdrawal, get_bridge_pubkey
+from utils import check_initial_eth_balance, confirm_btc_withdrawal, get_bridge_pubkey
 
 
 @flexitest.register

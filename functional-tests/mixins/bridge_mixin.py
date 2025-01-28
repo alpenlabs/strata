@@ -1,4 +1,3 @@
-from test.test__interpreters import DestroyTests
 import time
 
 import flexitest

@@ -3,6 +3,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import get_balance, string_to_opreturn_descriptor
 
 from envs import net_settings, testenv
+from mixins import bridge_mixin
 from utils import check_initial_eth_balance, get_bridge_pubkey, wait_until
 
 # Local constants
@@ -14,21 +15,20 @@ ETH_PRIVATE_KEY = "0x00000000000000000000000000000000000000000000000000000000000
 
 
 @flexitest.register
-class BridgeWithdrawHappyOpReturnTest(testenv.BridgeTestBase):
+class BridgeWithdrawHappyOpReturnTest(bridge_mixin.BridgeMixin):
     """
     Makes two DRT deposits to the same EL address, then makes a withdrawal to an OP_RETURN.
 
     Checks if the balance of the EL address is expected
     and if the BTC has an OP_RETURN block.
+
+    NOTE: The withdrawal destination is a Bitcoin Output Script Descriptor (BOSD).
     """
 
     def __init__(self, ctx: flexitest.InitContext):
         fast_batch_settings = net_settings.get_fast_batch_settings()
         ctx.set_env(
-            testenv.BasicEnvConfig(
-                pre_generate_blocks=101,
-                rollup_settings=fast_batch_settings,
-            )
+            testenv.BasicEnvConfig(pre_generate_blocks=101, rollup_settings=fast_batch_settings)
         )
 
     def main(self, ctx: flexitest.RunContext):
@@ -60,14 +60,14 @@ class BridgeWithdrawHappyOpReturnTest(testenv.BridgeTestBase):
         btc_url = self.btcrpc.base_url
         btc_user = self.btc.get_prop("rpc_user")
         btc_password = self.btc.get_prop("rpc_password")
+        bridge_pk = get_bridge_pubkey(self.seqrpc)
+        self.debug(f"Bridge pubkey: {bridge_pk}")
+
         original_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
         self.debug(f"BTC balance before withdraw: {original_balance}")
 
         # Make sure starting ETH balance is 0
         check_initial_eth_balance(self.rethrpc, el_address, self.debug)
-
-        bridge_pk = get_bridge_pubkey(self.seqrpc)
-        self.debug(f"Bridge pubkey: {bridge_pk}")
 
         # make two deposits
         self.deposit(ctx, el_address, bridge_pk)
