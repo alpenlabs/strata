@@ -13,7 +13,7 @@ strata-sp1-adapter = { path = "../../crates/zkvm/adapters/sp1", features = [
 bincode.workspace = true
 cargo_metadata = "0.19.1"
 sha2.workspace = true
-sp1-helper = { git = "https://github.com/alpenlabs/sp1.git", branch = "feat/docker-optional-workspace-dev-v4" }
+sp1-helper = { git = "https://github.com/succinctlabs/sp1.git", rev = "6c5a7f2846cd3610ecd38b1641f0e370fd07ee83" }
 sp1-sdk = "4.0.0"
 
 [features]
