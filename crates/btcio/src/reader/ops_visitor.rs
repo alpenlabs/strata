@@ -3,7 +3,7 @@ use sha2::Sha256;
 use strata_l1tx::filter::visitor::OpsVisitor;
 use strata_state::{
     batch::SignedBatchCheckpoint,
-    tx::{DepositInfo, ProtocolOperation},
+    tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
 };
 
 /// Ops visitor for rollup client.
@@ -35,6 +35,10 @@ impl OpsVisitor for ClientOpsVisitor {
 
     fn visit_deposit(&mut self, d: DepositInfo) {
         self.ops.push(ProtocolOperation::Deposit(d));
+    }
+
+    fn visit_deposit_request(&mut self, d: DepositRequestInfo) {
+        self.ops.push(ProtocolOperation::DepositRequest(d));
     }
 
     fn visit_checkpoint(&mut self, chkpt: SignedBatchCheckpoint) {

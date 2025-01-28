@@ -80,9 +80,16 @@ impl<V: OpsVisitor + Clone> BlockIndexer for OpIndexer<V> {
         for chp in parse_checkpoint_envelopes(tx, config) {
             visitor.visit_checkpoint(chp);
         }
+
         for dp in parse_deposits(tx, config) {
             visitor.visit_deposit(dp);
         }
+
+        // TODO: remove this later when we do not require deposit request ops
+        for dp in parse_deposit_requests(tx, config) {
+            visitor.visit_deposit_request(dp);
+        }
+
         for da in parse_da_blobs(tx, config) {
             visitor.visit_da(da);
         }
