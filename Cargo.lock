@@ -12189,6 +12189,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp1-build"
+version = "4.0.1"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=6c5a7f2846cd3610ecd38b1641f0e370fd07ee83#6c5a7f2846cd3610ecd38b1641f0e370fd07ee83"
+dependencies = [
+ "anyhow",
+ "cargo_metadata 0.18.1",
+ "chrono",
+ "clap",
+ "dirs",
+]
+
+[[package]]
 name = "sp1-core-executor"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12340,10 +12352,9 @@ dependencies = [
 [[package]]
 name = "sp1-helper"
 version = "4.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0fb17d71032c21ba86f741485714a260249afda15c7dd6b92f43f595356cf93"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=6c5a7f2846cd3610ecd38b1641f0e370fd07ee83#6c5a7f2846cd3610ecd38b1641f0e370fd07ee83"
 dependencies = [
- "sp1-build",
+ "sp1-build 4.0.1 (git+https://github.com/succinctlabs/sp1.git?rev=6c5a7f2846cd3610ecd38b1641f0e370fd07ee83)",
 ]
 
 [[package]]
@@ -12583,7 +12594,7 @@ dependencies = [
  "reqwest-middleware",
  "serde",
  "serde_json",
- "sp1-build",
+ "sp1-build 4.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sp1-core-executor",
  "sp1-core-machine",
  "sp1-cuda",
