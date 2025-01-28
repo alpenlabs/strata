@@ -33,4 +33,5 @@ thiserror.workspace = true
 default = []
 native = ["strata-native-zkvm-adapter"]
 risc0 = ["strata-risc0-adapter/prover", "strata-risc0-guest-builder/prover"]
-sp1 = ["strata-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]
+sp1-elf-import = ["strata-sp1-adapter/prover"]
+sp1 = ["sp1-elf-import", "strata-sp1-guest-builder/prover"]
