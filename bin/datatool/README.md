@@ -32,17 +32,19 @@ Alternatively, instead of passing `-f`, you can pass `-E` and define either
 `STRATA_SEQ_KEY` or `STRATA_OP_KEY` to pass the seed keys to the program.
 
 ## Generating VerifyingKey
-Before proceeding, make sure that you have SP1 correctly set up by following the installation instructions provided [here](https://docs.succinct.xyz/getting-started/install.html)
 
+Before proceeding, make sure that you have SP1 correctly set up by following the installation instructions provided [here](https://docs.succinct.xyz/getting-started/install.html)
 
 To ensure that the RollupParams contain the correct verifying key, build the binary in release mode and confirm that SP1 is set up correctly by following its installation instructions.
 
 For production usage—since SP1 verification key generation is platform and workspace dependent—build the data tool in release mode with the sp1-docker feature:
+
 ```bash
 cargo build --bin strata-datatool -F "sp1-docker" --release
 ```
 
 Because building the guest code in Docker can be time-consuming, you can generate the verification key locally for testing or development using:
+
 ```bash
 cargo build --bin strata-datatool -F "sp1" --release
 ```

@@ -12177,9 +12177,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "4.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82249c52570bdb8c499e352a5309ca8051f80068df42d4b4500987592f9eb57c"
+version = "4.0.0"
+source = "git+https://github.com/alpenlabs/sp1.git?branch=feat%2Fdocker-optional-workspace-dev-v4#e23474ada496ffaf55b8d11fce95abb9b76261cc"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.18.1",
@@ -12190,8 +12189,9 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "4.0.0"
-source = "git+https://github.com/alpenlabs/sp1.git?branch=feat%2Fdocker-optional-workspace-dev-v4#e23474ada496ffaf55b8d11fce95abb9b76261cc"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82249c52570bdb8c499e352a5309ca8051f80068df42d4b4500987592f9eb57c"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.18.1",
@@ -12352,10 +12352,9 @@ dependencies = [
 [[package]]
 name = "sp1-helper"
 version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfeb036e069d9c621c99579e90175e71f2a59232b2ecdb3c44a31f5e601e5259"
+source = "git+https://github.com/alpenlabs/sp1.git?branch=feat%2Fdocker-optional-workspace-dev-v4#e23474ada496ffaf55b8d11fce95abb9b76261cc"
 dependencies = [
- "sp1-build 4.0.0 (git+https://github.com/alpenlabs/sp1.git?branch=feat%2Fdocker-optional-workspace-dev-v4)",
+ "sp1-build 4.0.0",
 ]
 
 [[package]]
@@ -12595,7 +12594,7 @@ dependencies = [
  "reqwest-middleware",
  "serde",
  "serde_json",
- "sp1-build 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sp1-build 4.0.1",
  "sp1-core-executor",
  "sp1-core-machine",
  "sp1-cuda",
