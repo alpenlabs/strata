@@ -85,8 +85,12 @@ async fn full_flow() {
     let assigned_operator_idx = OsRng.gen_range(0..num_operators) as OperatorIdx;
     event!(Level::INFO, event = "assigning withdrawal", operator_idx = %assigned_operator_idx);
 
-    let withdrawal_info =
-        CooperativeWithdrawalInfo::new(outpoint, user_x_only_pk, assigned_operator_idx, 0);
+    let withdrawal_info = CooperativeWithdrawalInfo::new(
+        outpoint,
+        user_x_only_pk.to_descriptor().unwrap(),
+        assigned_operator_idx,
+        0,
+    );
 
     event!(Level::DEBUG, action = "creating withdrawal duty", withdrawal_info = ?withdrawal_info);
     let duty = BridgeDuty::Withdrawal(withdrawal_info);

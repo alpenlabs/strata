@@ -1,10 +1,10 @@
 import flexitest
-from strata_utils import get_balance
+from strata_utils import extract_p2tr_pubkey, get_balance, xonlypk_to_descriptor
 
 from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
 from mixins import bridge_mixin
-from utils import confirm_btc_withdrawal, get_bridge_pubkey
+from utils import check_initial_eth_balance, confirm_btc_withdrawal, get_bridge_pubkey
 
 
 @flexitest.register
@@ -14,6 +14,8 @@ class BridgeWithdrawHappyTest(bridge_mixin.BridgeMixin):
 
     Checks if the balance of the EL address is expected
     and if the BTC balance of the change address is expected.
+
+    NOTE: The withdrawal destination is a Bitcoin Output Script Descriptor (BOSD).
     """
 
     def __init__(self, ctx: flexitest.InitContext):
@@ -44,21 +46,27 @@ class BridgeWithdrawHappyTest(bridge_mixin.BridgeMixin):
         btc_url = self.btcrpc.base_url
         btc_user = self.btc.get_prop("rpc_user")
         btc_password = self.btc.get_prop("rpc_password")
+        bridge_pk = get_bridge_pubkey(self.seqrpc)
+        self.debug(f"Bridge pubkey: {bridge_pk}")
+
         original_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
-        self.debug(f"BTC balance before withdraw: {original_balance}")
+        self.debug(f"BTC balance before deposit: {original_balance}")
 
         # Make sure starting ETH balance is 0
         check_initial_eth_balance(self.rethrpc, el_address, self.debug)
 
-        bridge_pk = get_bridge_pubkey(self.seqrpc)
-        self.debug(f"Bridge pubkey: {bridge_pk}")
-
-        # make two deposits
+        # Perform two deposits
         self.deposit(ctx, el_address, bridge_pk)
         self.deposit(ctx, el_address, bridge_pk)
+        original_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
+        self.debug(f"BTC balance after deposit: {original_balance}")
 
-        # Withdraw
-        self.withdraw(ctx, el_address, withdraw_address)
+        # withdraw
+        xonlypk = extract_p2tr_pubkey(withdraw_address)
+        self.debug(f"XOnly PK: {xonlypk}")
+        bosd = xonlypk_to_descriptor(xonlypk)
+        self.debug(f"BOSD: {bosd}")
+        _, withdraw_tx_receipt, _ = self.withdraw(ctx, el_address, bosd)
 
         # Confirm BTC side
         # We expect final BTC balance to be D BTC minus operator fees
@@ -74,10 +82,3 @@ class BridgeWithdrawHappyTest(bridge_mixin.BridgeMixin):
         )
 
         return True
-
-
-def check_initial_eth_balance(rethrpc, address, debug_fn=print):
-    """Asserts that the initial ETH balance for `address` is zero."""
-    balance = int(rethrpc.eth_getBalance(address), 16)
-    debug_fn(f"Strata Balance before deposits: {balance}")
-    assert balance == 0, "Strata balance is not expected (should be zero initially)"

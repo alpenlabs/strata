@@ -8,6 +8,12 @@ anyhow.workspace = true
 arbitrary.workspace = true
 bincode.workspace = true
 bitcoin = { workspace = true, features = ["serde", "rand-std"] }
+bitcoin-bosd = { workspace = true, features = [
+  "address",
+  "serde",
+  "borsh",
+  "arbitrary",
+] }
 borsh.workspace = true
 digest.workspace = true
 hex.workspace = true

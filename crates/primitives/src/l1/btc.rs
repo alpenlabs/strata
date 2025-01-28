@@ -18,6 +18,7 @@ use bitcoin::{
     Address, AddressType, Amount, Network, OutPoint, Psbt, ScriptBuf, Sequence, TapNodeHash,
     Transaction, TxIn, TxOut, Txid, Witness,
 };
+use bitcoin_bosd::Descriptor;
 use borsh::{BorshDeserialize, BorshSerialize};
 use rand::rngs::OsRng;
 use revm_primitives::FixedBytes;
@@ -105,6 +106,7 @@ pub struct BitcoinAddress {
 }
 
 impl BitcoinAddress {
+    /// Parses a [`BitcoinAddress`] from a string.
     pub fn parse(address_str: &str, network: Network) -> Result<Self, ParseError> {
         let address = address_str
             .parse::<Address<NetworkUnchecked>>()
@@ -118,6 +120,13 @@ impl BitcoinAddress {
             network,
             address: checked_address,
         })
+    }
+
+    /// Parses a [`BitcoinAddress`] from raw bytes representation of a bitcoin Script.
+    pub fn from_bytes(bytes: &[u8], network: Network) -> Result<Self, ParseError> {
+        let script_buf = ScriptBuf::from_bytes(bytes.to_vec());
+        let address = Address::from_script(&script_buf, network)?;
+        Ok(Self { network, address })
     }
 }
 
@@ -303,6 +312,7 @@ impl Sum for BitcoinAmount {
     }
 }
 
+/// [Borsh](borsh)-friendly Bitcoin [`Psbt`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BitcoinPsbt(Psbt);
 
@@ -702,8 +712,12 @@ pub struct XOnlyPk(Buf32);
 
 impl XOnlyPk {
     /// Construct a new [`XOnlyPk`] directly from a [`Buf32`].
-    pub fn new(val: Buf32) -> Self {
-        Self(val)
+    pub fn new(val: Buf32) -> Result<Self, ParseError> {
+        if Self::is_valid_xonly_public_key(&val) {
+            Ok(Self(val))
+        } else {
+            Err(ParseError::InvalidPoint(val))
+        }
     }
 
     /// Get the underlying [`Buf32`].
@@ -730,6 +744,11 @@ impl XOnlyPk {
         }
     }
 
+    /// Convert the [`XOnlyPk`] to a `rust-bitcoin`'s [`XOnlyPublicKey`].
+    pub fn to_xonly_public_key(&self) -> XOnlyPublicKey {
+        XOnlyPublicKey::from_slice(self.0.as_bytes()).expect("XOnlyPk is valid")
+    }
+
     /// Convert the [`XOnlyPk`] to an [`Address`].
     pub fn to_p2tr_address(&self, network: Network) -> Result<Address, ParseError> {
         let buf: [u8; 32] = self.0 .0;
@@ -740,9 +759,29 @@ impl XOnlyPk {
             network,
         ))
     }
+
+    /// Converts [`XOnlyPk`] to [`Descriptor`].
+    pub fn to_descriptor(&self) -> Result<Descriptor, ParseError> {
+        Descriptor::new_p2tr(&self.to_xonly_public_key().serialize())
+            .map_err(|_| ParseError::InvalidPoint(self.0))
+    }
+
+    /// Checks if the [`Buf32`] is a valid [`XOnlyPublicKey`].
+    fn is_valid_xonly_public_key(buf: &Buf32) -> bool {
+        XOnlyPublicKey::from_slice(buf.as_bytes()).is_ok()
+    }
 }
 
-/// Represents a raw, byte-encoded Bitcoin transaction with custom [`Arbitrary`] support.  
+impl TryFrom<XOnlyPk> for Descriptor {
+    type Error = ParseError;
+
+    fn try_from(value: XOnlyPk) -> Result<Self, Self::Error> {
+        let inner_xonly_pk = XOnlyPublicKey::try_from(value.0)?;
+        Ok(inner_xonly_pk.into())
+    }
+}
+
+/// Represents a raw, byte-encoded Bitcoin transaction with custom [`Arbitrary`] support.
 /// Provides conversions (via [`TryFrom`]) to and from [`Transaction`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct RawBitcoinTx(Vec<u8>);
@@ -849,6 +888,7 @@ mod tests {
         taproot::{ControlBlock, LeafVersion, TaprootBuilder, TaprootMerkleBranch},
         Address, Amount, Network, ScriptBuf, TapNodeHash, Transaction, TxOut, XOnlyPublicKey,
     };
+    use bitcoin_bosd::DescriptorType;
     use rand::{rngs::OsRng, Rng};
     use strata_test_utils::ArbitraryGenerator;
 
@@ -857,6 +897,7 @@ mod tests {
         RawBitcoinTx, XOnlyPk,
     };
     use crate::{
+        buf::Buf32,
         errors::ParseError,
         l1::{BitcoinPsbt, TaprootSpendPath},
     };
@@ -1296,5 +1337,16 @@ mod tests {
         let raw_tx = RawBitcoinTx::from_raw_bytes(generator.generate());
         let res: Result<Transaction, _> = raw_tx.try_into();
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_xonly_pk_to_descriptor() {
+        let xonly_pk = XOnlyPk::new(Buf32::from([2u8; 32])).unwrap();
+        let descriptor = xonly_pk.to_descriptor().unwrap();
+        assert_eq!(descriptor.type_tag(), DescriptorType::P2tr);
+
+        let payload = descriptor.payload();
+        assert_eq!(payload.len(), 32);
+        assert_eq!(payload, xonly_pk.0.as_bytes());
     }
 }

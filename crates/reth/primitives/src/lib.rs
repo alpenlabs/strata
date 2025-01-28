@@ -1,8 +1,8 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 
 use alloy_sol_types::sol;
-use revm_primitives::alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
+use strata_primitives::bitcoin_bosd::Descriptor;
 
 /// Type for withdrawal_intents in rpc.
 /// Distinct from `strata_state::bridge_ops::WithdrawalIntent`
@@ -12,16 +12,16 @@ pub struct WithdrawalIntent {
     /// Amount to be withdrawn in sats.
     pub amt: u64,
 
-    /// Destination public key for the withdrawal
-    pub dest_pk: B256,
+    /// Dynamic-sized bytes BOSD descriptor for the withdrawal destinations in L1.
+    pub destination: Descriptor,
 }
 
 sol! {
     #[allow(missing_docs)]
     event WithdrawalIntentEvent(
-        /// Withdrawal amount in sats
+        /// Withdrawal amount in sats.
         uint64 amount,
-        /// 32 bytes pubkey for withdrawal address in L1
-        bytes32 dest_pk,
+        /// BOSD descriptor for withdrawal destinations in L1.
+        bytes destination,
     );
 }

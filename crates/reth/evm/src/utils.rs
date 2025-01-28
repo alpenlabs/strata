@@ -1,6 +1,7 @@
 use alloy_sol_types::SolEvent;
 use reth_primitives::Receipt;
 use revm_primitives::U256;
+use strata_primitives::bitcoin_bosd::Descriptor;
 use strata_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
 
 use crate::constants::BRIDGEOUT_ADDRESS;
@@ -22,7 +23,11 @@ pub fn wei_to_sats(wei: U256) -> (U256, U256) {
 }
 
 /// Collects withdrawal intents from bridge-out events in the receipts.
-/// Returns a vector of `WithdrawalIntent`.
+/// Returns a vector of [`WithdrawalIntent`]s.
+///
+/// # Note
+///
+/// A [`Descriptor`], if invalid does not create an [`WithdrawalIntent`].
 pub fn collect_withdrawal_intents(
     receipts: impl Iterator<Item = Option<Receipt>>,
 ) -> impl Iterator<Item = WithdrawalIntent> {
@@ -32,10 +37,14 @@ pub fn collect_withdrawal_intents(
         .filter(|log| log.address == BRIDGEOUT_ADDRESS)
         .filter_map(|log| {
             WithdrawalIntentEvent::decode_log(&log, true)
-                .map(|evt| WithdrawalIntent {
-                    amt: evt.amount,
-                    dest_pk: evt.dest_pk,
-                })
                 .ok()
+                .and_then(|evt| {
+                    Descriptor::from_bytes(&evt.destination)
+                        .ok()
+                        .map(|valid_descriptor| WithdrawalIntent {
+                            amt: evt.amount,
+                            destination: valid_descriptor,
+                        })
+                })
         })
 }

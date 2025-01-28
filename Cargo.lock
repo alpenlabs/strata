@@ -2145,6 +2145,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitcoin-bosd"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3792f996c90611de104eb4bbf050856a6c9e74667d679421697b9e2c76b14d4a"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "hex-conservative 0.2.1",
+ "secp256k1",
+ "serde",
+ "thiserror 2.0.11",
+]
+
+[[package]]
 name = "bitcoin-internals"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12748,7 +12763,7 @@ dependencies = [
  "strata-rpc-types",
  "strata-state",
  "strata-storage",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "threadpool",
  "tokio",
  "tracing",
@@ -12771,7 +12786,7 @@ dependencies = [
  "strata-primitives",
  "strata-rpc-api",
  "strata-rpc-types",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "toml 0.5.11",
  "tracing",
 ]
@@ -12816,7 +12831,7 @@ dependencies = [
  "strata-primitives",
  "strata-storage",
  "strata-test-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
 ]
@@ -12830,7 +12845,7 @@ dependencies = [
  "serde",
  "strata-primitives",
  "strata-test-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -12865,7 +12880,7 @@ dependencies = [
  "strata-storage",
  "strata-tasks",
  "strata-test-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "threadpool",
  "tokio",
  "tracing",
@@ -12884,7 +12899,7 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "strata-test-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -12968,7 +12983,7 @@ dependencies = [
  "strata-tasks",
  "strata-test-utils",
  "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "threadpool",
  "tokio",
  "toml 0.5.11",
@@ -12986,7 +13001,7 @@ dependencies = [
  "opentelemetry_sdk",
  "serde",
  "strata-primitives",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
  "tracing-opentelemetry",
@@ -13030,7 +13045,7 @@ dependencies = [
  "strata-tasks",
  "strata-test-utils",
  "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "threadpool",
  "tokio",
  "tracing",
@@ -13086,7 +13101,7 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -13096,7 +13111,7 @@ version = "0.1.0"
 dependencies = [
  "strata-primitives",
  "strata-state",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -13132,7 +13147,7 @@ dependencies = [
  "strata-state",
  "strata-storage",
  "strata-test-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tower 0.4.13",
  "tracing",
@@ -13152,7 +13167,7 @@ dependencies = [
  "bitcoin",
  "secp256k1",
  "strata-primitives",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "zeroize",
 ]
 
@@ -13172,7 +13187,7 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "strata-test-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -13185,7 +13200,7 @@ dependencies = [
  "digest 0.10.7",
  "hex",
  "sha2 0.10.8",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -13207,6 +13222,7 @@ dependencies = [
  "arbitrary",
  "bincode",
  "bitcoin",
+ "bitcoin-bosd",
  "borsh",
  "digest 0.10.7",
  "hex",
@@ -13220,7 +13236,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "strata-test-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
  "zeroize",
 ]
@@ -13315,7 +13331,7 @@ dependencies = [
  "strata-reth-primitives",
  "strata-state",
  "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -13378,7 +13394,7 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.19",
@@ -13418,7 +13434,7 @@ dependencies = [
 
 [[package]]
 name = "strata-python-utils"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "bdk_bitcoind_rpc",
@@ -13467,7 +13483,7 @@ dependencies = [
  "strata-reth-exex",
  "strata-reth-node",
  "strata-reth-rpc",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -13530,7 +13546,7 @@ dependencies = [
  "strata-reth-db",
  "strata-reth-node",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
 ]
@@ -13575,8 +13591,8 @@ name = "strata-reth-primitives"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
- "revm-primitives",
  "serde",
+ "strata-primitives",
 ]
 
 [[package]]
@@ -13617,7 +13633,7 @@ dependencies = [
  "strata-proofimpl-evm-ee-stf",
  "strata-reth-db",
  "strata-rpc-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
 ]
@@ -13678,7 +13694,7 @@ dependencies = [
  "strata-test-utils",
  "strata-zkvm",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -13699,7 +13715,7 @@ dependencies = [
  "strata-rpc-types",
  "strata-state",
  "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -13715,7 +13731,7 @@ dependencies = [
  "strata-db",
  "strata-primitives",
  "strata-state",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -13784,7 +13800,7 @@ dependencies = [
  "strata-primitives",
  "strata-rpc-types",
  "strata-state",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
 ]
@@ -13824,7 +13840,7 @@ dependencies = [
  "strata-rpc-types",
  "strata-state",
  "strata-storage",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
 ]
@@ -13836,7 +13852,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "futures-util",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
 ]
@@ -13876,7 +13892,7 @@ dependencies = [
  "bincode",
  "borsh",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -13900,7 +13916,7 @@ dependencies = [
  "strata-risc0-guest-builder",
  "strata-sp1-adapter",
  "strata-sp1-guest-builder",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]

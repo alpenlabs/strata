@@ -282,7 +282,7 @@ fn process_deposit_updates(
                     let intent = &ready_withdrawals[next_intent_to_assign];
                     let op_idx = ops_seq[next_intent_to_assign % ops_seq.len()];
 
-                    let outp = WithdrawOutput::new(*intent.dest_pk(), *intent.amt());
+                    let outp = WithdrawOutput::new(intent.destination().clone(), *intent.amt());
                     let cmd = DispatchCommand::new(vec![outp]);
                     state.assign_withdrawal_command(
                         deposit_idx,

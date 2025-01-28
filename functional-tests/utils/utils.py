@@ -51,6 +51,7 @@ def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
     try:
         blk = bitcoin_rpc.proxy.generatetoaddress(n, addr)
         print(f"made blocks {blk}")
+        return blk
     except Exception as ex:
         logging.warning(f"{ex} while generating address")
         return
@@ -582,3 +583,10 @@ def confirm_btc_withdrawal(
     assert (
         btc_balance == original_balance + expected_increase
     ), "BTC balance after withdrawal is not as expected"
+
+
+def check_initial_eth_balance(rethrpc, address, debug_fn=print):
+    """Asserts that the initial ETH balance for `address` is zero."""
+    balance = int(rethrpc.eth_getBalance(address), 16)
+    debug_fn(f"Strata Balance before deposits: {balance}")
+    assert balance == 0, "Strata balance is not expected (should be zero initially)"

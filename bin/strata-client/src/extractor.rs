@@ -149,18 +149,18 @@ pub(super) fn extract_withdrawal_infos(
     let withdrawal_infos = deposits.filter_map(|deposit| {
         if let DepositState::Dispatched(dispatched_state) = deposit.deposit_state() {
             let deposit_outpoint = deposit.output().outpoint();
-            let user_pk = dispatched_state
+            let user_descriptor = dispatched_state
                 .cmd()
                 .withdraw_outputs()
                 .first()
                 .expect("there should be a withdraw output in a dispatched deposit")
-                .dest_addr();
+                .destination();
             let assigned_operator_idx = dispatched_state.assignee();
             let exec_deadline = dispatched_state.exec_deadline();
 
             let withdrawal_info = CooperativeWithdrawalInfo::new(
                 *deposit_outpoint,
-                *user_pk,
+                user_descriptor.clone(),
                 assigned_operator_idx,
                 exec_deadline,
             );
@@ -185,7 +185,7 @@ mod tests {
         script::Builder,
         taproot::LeafVersion,
         transaction::Version,
-        ScriptBuf, Sequence, TxIn, TxOut, Witness,
+        ScriptBuf, Sequence, TxIn, TxOut, Witness, XOnlyPublicKey,
     };
     use rand::rngs::OsRng;
     use strata_bridge_tx_builder::prelude::{create_taproot_addr, SpendPath};
@@ -303,11 +303,11 @@ mod tests {
                 .withdraw_outputs()
                 .first()
                 .expect("should have at least one `WithdrawOutput");
-            let user_pk = withdraw_output.dest_addr();
+            let user_descriptor = withdraw_output.destination();
 
             let expected_info = CooperativeWithdrawalInfo::new(
                 *needle.output().outpoint(),
-                *user_pk,
+                user_descriptor.clone(),
                 dispatched_state.assignee(),
                 dispatched_state.exec_deadline(),
             );
@@ -517,6 +517,17 @@ mod tests {
         (tx.into(), deposit_request)
     }
 
+    /// Generate a valid [`Buf32`] for [`XOnlyPublicKey`].
+    fn generate_valid_xonly_pk_buf32() -> Buf32 {
+        let mut arb = ArbitraryGenerator::new();
+        loop {
+            let random_buf: Buf32 = arb.generate();
+            if XOnlyPublicKey::from_slice(&random_buf.0).is_ok() {
+                return random_buf;
+            }
+        }
+    }
+
     /// Generate a random chain state with some dispatched deposits.
     ///
     /// # Returns
@@ -578,11 +589,15 @@ mod tests {
 
             num_dispatched += 1;
 
-            let random_buf: Buf32 = arb.generate();
+            let random_buf = generate_valid_xonly_pk_buf32();
             let dest_addr = XOnlyPk::new(random_buf);
+            let dest_descriptor = dest_addr
+                .expect("infallible due to generate_valid_xonly_pk_buf32")
+                .to_descriptor()
+                .expect("infallible due to generate_valid_xonly_pk_buf32");
 
             let dispatched_state = DepositState::Dispatched(DispatchedState::new(
-                DispatchCommand::new(vec![WithdrawOutput::new(dest_addr, amt)]),
+                DispatchCommand::new(vec![WithdrawOutput::new(dest_descriptor, amt)]),
                 random_assignee,
                 0,
             ));

@@ -3,7 +3,7 @@ import time
 import flexitest
 from strata_utils import (
     deposit_request_transaction,
-    extract_p2tr_pubkey,
+    is_valid_bosd,
 )
 from web3 import middleware
 
@@ -68,27 +68,30 @@ class BridgeMixin(BaseMixin):
         self,
         ctx: flexitest.RunContext,
         el_address: str,
-        withdraw_address: str,
+        destination: str,
     ):
         """
-        Perform a withdrawal from the L2 to the given BTC withdraw address.
+        Perform a withdrawal from the L2 to the given BTC withdraw destination.
         Returns (l2_tx_hash, tx_receipt, total_gas_used).
+
+        NOTE: The withdrawal destination is a Bitcoin Output Script Descriptor (BOSD).
         """
         cfg: RollupConfig = ctx.env.rollup_cfg()
         # D BTC
         deposit_amount = cfg.deposit_amount
-        # Build the p2tr pubkey from the withdraw address
-        change_address_pk = extract_p2tr_pubkey(withdraw_address)
-        self.debug(f"Change Address PK: {change_address_pk}")
+        # Build the BOSD descriptor from the withdraw address
+        # Assert is a valid BOSD
+        assert is_valid_bosd(destination), "Invalid BOSD"
+        self.debug(f"Withdrawal Destination: {destination}")
 
         # Estimate gas
         estimated_withdraw_gas = self.__estimate_withdraw_gas(
-            deposit_amount, el_address, change_address_pk
+            deposit_amount, el_address, destination
         )
         self.debug(f"Estimated withdraw gas: {estimated_withdraw_gas}")
 
         l2_tx_hash = self.__make_withdraw(
-            deposit_amount, el_address, change_address_pk, estimated_withdraw_gas
+            deposit_amount, el_address, destination, estimated_withdraw_gas
         ).hex()
         self.debug(f"Sent withdrawal transaction with hash: {l2_tx_hash}")
 
@@ -115,13 +118,17 @@ class BridgeMixin(BaseMixin):
         self,
         deposit_amount,
         el_address,
-        change_address_pk,
+        destination,
         gas,
     ):
         """
         Withdrawal Request Transaction in Strata's EVM.
+
+        NOTE: The withdrawal destination is a Bitcoin Output Script Descriptor (BOSD).
         """
-        data_bytes = bytes.fromhex(change_address_pk)
+        assert is_valid_bosd(destination), "Invalid BOSD"
+
+        data_bytes = bytes.fromhex(destination)
 
         transaction = {
             "from": el_address,
@@ -133,12 +140,16 @@ class BridgeMixin(BaseMixin):
         l2_tx_hash = self.web3.eth.send_transaction(transaction)
         return l2_tx_hash
 
-    def __estimate_withdraw_gas(self, deposit_amount, el_address, change_address_pk):
+    def __estimate_withdraw_gas(self, deposit_amount, el_address, destination):
         """
         Estimate the gas for the withdrawal transaction.
+
+        NOTE: The withdrawal destination is a Bitcoin Output Script Descriptor (BOSD).
         """
 
-        data_bytes = bytes.fromhex(change_address_pk)
+        assert is_valid_bosd(destination), "Invalid BOSD"
+
+        data_bytes = bytes.fromhex(destination)
 
         transaction = {
             "from": el_address,
