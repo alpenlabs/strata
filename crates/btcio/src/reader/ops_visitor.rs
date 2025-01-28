@@ -6,7 +6,8 @@ use strata_state::{
     tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
 };
 
-/// Ops visitor for rollup client.
+/// Ops visitor for rollup client. This is intended to get Da commitment as well as process/store da
+/// blob.
 #[derive(Clone, Debug)]
 pub struct ClientOpsVisitor {
     ops: Vec<ProtocolOperation>,
@@ -24,12 +25,13 @@ impl OpsVisitor for ClientOpsVisitor {
         self.ops
     }
 
-    fn visit_da<'a>(&mut self, data: &'a [&'a [u8]]) {
+    fn visit_da<'a>(&mut self, chunks: impl Iterator<Item = &'a [u8]>) {
         let mut hasher = Sha256::new();
-        for d in data {
-            hasher.update(d);
+        for chunk in chunks {
+            hasher.update(chunk);
         }
         let hash: [u8; 32] = hasher.finalize().into();
+        // TODO: store da in db
         self.ops.push(ProtocolOperation::DaCommitment(hash.into()));
     }
 

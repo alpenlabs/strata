@@ -6,7 +6,8 @@ use strata_state::{
     tx::{DepositInfo, ProtocolOperation},
 };
 
-/// Ops visitor for Prover.
+/// Ops visitor for Prover. Basically this efficiently gets da commitment from chunks without doing
+/// anything else with the chunks.
 #[derive(Debug, Clone)]
 pub(crate) struct ProverOpsVisitor {
     ops: Vec<ProtocolOperation>,
@@ -23,10 +24,10 @@ impl OpsVisitor for ProverOpsVisitor {
         self.ops
     }
 
-    fn visit_da<'a>(&mut self, data: &'a [&'a [u8]]) {
+    fn visit_da<'a>(&mut self, chunks: impl Iterator<Item = &'a [u8]>) {
         let mut hasher = Sha256::new();
-        for d in data {
-            hasher.update(d);
+        for chunk in chunks {
+            hasher.update(chunk);
         }
         let hash: [u8; 32] = hasher.finalize().into();
         self.ops.push(ProtocolOperation::DaCommitment(hash.into()));

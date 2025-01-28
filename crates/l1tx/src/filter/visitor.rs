@@ -21,7 +21,7 @@ pub trait OpsVisitor {
     fn visit_deposit_request(&mut self, _d: DepositRequestInfo) {}
 
     // Do stuffs with DA.
-    fn visit_da<'a>(&mut self, _d: &'a [&'a [u8]]) {}
+    fn visit_da<'a>(&mut self, _d: impl Iterator<Item = &'a [u8]>) {}
 
     fn collect(self) -> Vec<ProtocolOperation>;
 }

@@ -33,15 +33,13 @@ fn parse_deposits(
     extract_deposit_info(tx, &filter_conf.deposit_config).into_iter()
 }
 
-pub type DaBlobRaw<'a> = &'a [&'a [u8]];
-
 /// Parse da blobs from [`Transaction`].
 fn parse_da_blobs<'a>(
     _tx: &'a Transaction,
     _filter_conf: &TxFilterConfig,
-) -> impl Iterator<Item = DaBlobRaw<'a>> {
-    // TODO: implement this when we have da
-    std::iter::empty()
+) -> impl Iterator<Item = impl Iterator<Item = &'a [u8]> + 'a> {
+    // TODO: actually implement this when we have da
+    std::iter::empty::<std::slice::Iter<'a, &'a [u8]>>().map(|inner| inner.copied())
 }
 
 /// Parses envelope from the given transaction. Currently, the only envelope recognizable is
