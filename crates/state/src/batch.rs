@@ -44,6 +44,15 @@ impl BatchCheckpoint {
         CheckpointProofOutput::new(self.batch_info().clone(), self.bootstrap_state().clone())
     }
 
+    pub fn into_proof_receipt(self) -> ProofReceipt {
+        let proof = self.proof;
+        let output = CheckpointProofOutput::new(self.batch_info, self.bootstrap);
+        let public_values = PublicValues::new(
+            borsh::to_vec(&output).expect("could not serialize checkpoint proof output"),
+        );
+        ProofReceipt::new(proof, public_values)
+    }
+
     pub fn proof(&self) -> &Proof {
         &self.proof
     }
@@ -57,19 +66,6 @@ impl BatchCheckpoint {
         buf.extend(self.proof.as_bytes());
 
         strata_primitives::hash::raw(&buf)
-    }
-}
-
-impl From<BatchCheckpoint> for ProofReceipt {
-    fn from(batch_checkpoint: BatchCheckpoint) -> Self {
-        let proof = batch_checkpoint.proof;
-        let output =
-            CheckpointProofOutput::new(batch_checkpoint.batch_info, batch_checkpoint.bootstrap);
-        let public_values = PublicValues::new(
-            borsh::to_vec(&output).expect("could not serialize checkpoint proof output"),
-        );
-
-        ProofReceipt::new(proof, public_values)
     }
 }
 

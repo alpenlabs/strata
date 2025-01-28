@@ -413,7 +413,7 @@ pub fn filter_verified_checkpoints(
 
     for checkpoint in checkpoints {
         let curr_idx = checkpoint.batch_checkpoint.batch_info().idx;
-        let proof_receipt: ProofReceipt = checkpoint.batch_checkpoint.clone().into();
+        let proof_receipt: ProofReceipt = checkpoint.batch_checkpoint.clone().into_proof_receipt();
         if curr_idx != expected_idx {
             warn!(%expected_idx, %curr_idx, "Received invalid checkpoint idx, ignoring.");
             continue;

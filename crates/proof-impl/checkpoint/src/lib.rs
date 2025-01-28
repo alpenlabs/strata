@@ -89,7 +89,10 @@ pub fn process_checkpoint_proof(
             } else {
                 // Use previous checkpoint's bootstrap state and include previous proof
                 let bootstrap = prev_checkpoint.bootstrap_state().clone();
-                (bootstrap, Some(prev_checkpoint.clone().into()))
+                (
+                    bootstrap,
+                    Some(prev_checkpoint.clone().into_proof_receipt()),
+                )
             }
         }
     };
