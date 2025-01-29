@@ -13793,6 +13793,7 @@ dependencies = [
 name = "strata-sp1-guest-builder"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bincode",
  "cargo_metadata 0.19.1",
  "once_cell",
