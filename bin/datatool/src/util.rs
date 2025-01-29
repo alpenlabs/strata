@@ -298,7 +298,7 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         println!("{params_buf}");
     }
 
-    if let Some(elf_path) = &cmd.elf_path {
+    if let Some(elf_path) = &cmd.elf_dir {
         export_elf(elf_path)?;
     }
 

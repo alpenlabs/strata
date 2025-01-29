@@ -1,46 +1,68 @@
-use std::path::PathBuf;
-
-use anyhow::{Context, Result};
+use std::{
+    io::{Error, ErrorKind},
+    path::Path,
+};
 
 include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
-pub fn export_elf(elf_path: &PathBuf) -> Result<()> {
-    // Create output directory if it doesn't exist
-    fs::create_dir_all(elf_path).context("Failed to create ELF output directory")?;
+/// Exports ELF files to the specified directory.
+///
+/// Creates the output directory if it doesn't exist and copies all `.elf` files
+/// from guest program directories into it.
+///
+/// # Arguments
+///
+/// * `elf_path` - The path to the directory where ELF files will be exported.
+///
+/// # Errors
+///
+/// Returns an error if directory creation or file operations fail.
+pub fn export_elf<P: AsRef<Path>>(elf_path: P) -> Result<(), Error> {
+    let elf_path = elf_path.as_ref();
+    fs::create_dir_all(elf_path)?;
 
-    // Get the current crate's directory
-    let cargo_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let builder_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
 
-    // Iterate over entries in cargo_dir
-    for entry in fs::read_dir(&cargo_dir)
-        .with_context(|| format!("Failed to read directory {:?}", cargo_dir))?
+    for entry in fs::read_dir(builder_dir)? {
+        let path = entry?.path();
+        migrate_guest_program(&path, elf_path)?;
+    }
+
+    Ok(())
+}
+
+/// Migrates guest program ELF to the destination.
+fn migrate_guest_program(source: &Path, destination: &Path) -> Result<(), Error> {
+    if source.is_dir()
+        && source
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|name| name.starts_with("guest-"))
     {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            if let Some(folder_name) = path.file_name().and_then(|n| n.to_str()) {
-                if folder_name.starts_with("guest-") {
-                    let cache_dir = path.join("cache");
-                    if cache_dir.is_dir() {
-                        for file in fs::read_dir(&cache_dir).with_context(|| {
-                            format!("Failed to read cache directory {:?}", cache_dir)
-                        })? {
-                            let file = file?;
-                            let file_path = file.path();
-                            if file_path.is_file()
-                                && file_path.extension().and_then(|s| s.to_str()) == Some("elf")
-                            {
-                                let file_name = file_path.file_name().unwrap();
-                                let dest_file = elf_path.join(file_name);
-                                fs::copy(&file_path, &dest_file).with_context(|| {
-                                    format!("Failed to copy {:?} to {:?}", file_path, dest_file)
-                                })?;
-                            }
-                        }
-                    }
-                }
+        let cache_dir = source.join("cache");
+        if cache_dir.is_dir() {
+            for file in fs::read_dir(&cache_dir)? {
+                let file_path = file?.path();
+                migrate_elf(&file_path, destination)?;
             }
         }
+    }
+    Ok(())
+}
+
+/// Migrates a single ELF file to the destination directory.
+fn migrate_elf(source_file: &Path, destination_dir: &Path) -> Result<(), Error> {
+    if source_file.is_file()
+        && source_file
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("elf"))
+    {
+        let file_name = source_file
+            .file_name()
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Invalid file name"))?;
+        let destination_file = destination_dir.join(file_name);
+        fs::copy(source_file, &destination_file)?;
     }
     Ok(())
 }

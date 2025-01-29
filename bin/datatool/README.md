@@ -48,3 +48,9 @@ Because building the guest code in Docker can be time-consuming, you can generat
 ```bash
 cargo build --bin strata-datatool -F "sp1" --release
 ```
+
+Additionally, the generated ELF can be exported after building the datatool as specified above:
+
+```bash
+strata-datatool genparams --elf-path <ELF-PATH>
+```

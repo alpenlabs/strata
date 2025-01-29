@@ -187,7 +187,7 @@ pub(crate) struct SubcParams {
     pub(crate) proof_timeout: Option<u32>,
 
     #[argh(option, description = "directory to export the generated ELF")]
-    pub(crate) elf_path: Option<PathBuf>,
+    pub(crate) elf_dir: Option<PathBuf>,
 }
 
 pub(crate) struct CmdContext {
