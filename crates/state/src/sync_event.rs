@@ -1,6 +1,7 @@
 use std::fmt;
 
 use arbitrary::Arbitrary;
+use async_trait::async_trait;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -45,4 +46,13 @@ impl fmt::Display for SyncEvent {
             Self::NewTipBlock(id) => f.write_fmt(format_args!("newtip:{id}")),
         }
     }
+}
+
+/// Interface to submit event to CSM in blocking or async fashion.
+#[async_trait]
+pub trait EventSubmitter {
+    /// Submit event blocking
+    fn submit_event(&self, sync_event: SyncEvent) -> anyhow::Result<()>;
+    /// Submit event async
+    async fn submit_event_async(&self, sync_event: SyncEvent) -> anyhow::Result<()>;
 }

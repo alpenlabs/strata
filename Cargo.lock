@@ -13079,6 +13079,7 @@ name = "strata-consensus-logic"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bitcoin",
  "borsh",
  "futures",
@@ -13846,7 +13847,9 @@ dependencies = [
 name = "strata-state"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
+ "async-trait",
  "bitcoin",
  "borsh",
  "digest 0.10.7",

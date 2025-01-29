@@ -12,7 +12,9 @@ strata-crypto.workspace = true
 strata-primitives.workspace = true
 zkaleido.workspace = true
 
+anyhow.workspace = true
 arbitrary.workspace = true
+async-trait.workspace = true
 bitcoin.workspace = true
 borsh.workspace = true
 digest.workspace = true
