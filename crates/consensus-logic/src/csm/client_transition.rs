@@ -41,7 +41,7 @@ impl<'c> StorageEventContext<'c> {
     }
 }
 
-impl<'c> EventContext for StorageEventContext<'c> {
+impl EventContext for StorageEventContext<'_> {
     fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
         self.storage
             .l1()
