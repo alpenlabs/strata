@@ -116,7 +116,7 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
             .cloned()
             .collect::<Vec<_>>();
         keys_to_remove.iter().for_each(|k| {
-            cache.pop(&k);
+            cache.pop(k);
         });
         keys_to_remove.len()
     }
