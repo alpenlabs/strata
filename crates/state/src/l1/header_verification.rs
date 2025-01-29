@@ -70,22 +70,6 @@ pub struct HeaderVerificationState {
     pub last_11_blocks_timestamps: TimestampStore,
 }
 
-/// Summary of the HeaderVerificationState that is propagated to the CheckpointProof as public
-/// output
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
-pub struct HeaderVerificationStateSnapshot {
-    /// Hash of the [`HeaderVerificationState`]
-    pub hash: Buf32,
-
-    /// [HeaderVerificationState::last_verified_block_num]
-    ///
-    /// Note: This field and struct is here only since `BatchInfo` requires that
-    pub block_num: u64,
-
-    /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)
-    pub acc_pow: u128,
-}
-
 impl HeaderVerificationState {
     /// Computes the [`CompactTarget`] from a difficulty adjustment.
     ///
@@ -235,23 +219,6 @@ impl HeaderVerificationState {
         new_self.total_accumulated_pow += header.difficulty(params.inner());
 
         new_self
-    }
-
-    // Need to improve upon this?
-    pub fn compute_initial_snapshot(&self) -> HeaderVerificationStateSnapshot {
-        HeaderVerificationStateSnapshot {
-            hash: self.compute_hash().unwrap(),
-            block_num: self.last_verified_block_num as u64 + 1, // because inclusive
-            acc_pow: self.total_accumulated_pow,
-        }
-    }
-
-    pub fn compute_final_snapshot(&self) -> HeaderVerificationStateSnapshot {
-        HeaderVerificationStateSnapshot {
-            hash: self.compute_hash().unwrap(),
-            block_num: self.last_verified_block_num as u64,
-            acc_pow: self.total_accumulated_pow,
-        }
     }
 
     /// Calculate the hash of the verification state

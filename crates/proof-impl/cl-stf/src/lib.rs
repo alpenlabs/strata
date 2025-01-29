@@ -8,24 +8,16 @@ use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
-    id::L2BlockId,
     tx::DepositInfo,
 };
 pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateCache};
 use zkaleido::ZkVmEnv;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct ChainStateSnapshot {
-    pub hash: Buf32,
-    pub slot: u64,
-    pub l2_blockid: L2BlockId,
-}
-
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct L2BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
-    pub initial_snapshot: ChainStateSnapshot,
-    pub final_snapshot: ChainStateSnapshot,
+    pub initial_state_hash: Buf32,
+    pub final_state_hash: Buf32,
     pub rollup_params_commitment: Buf32,
 }
 
@@ -95,23 +87,11 @@ fn process_cl_stf(
     let new_state =
         verify_and_transition(prev_state.clone(), new_block, exec_update, rollup_params);
 
-    let initial_snapshot = ChainStateSnapshot {
-        hash: prev_state.compute_state_root(),
-        slot: prev_state.chain_tip_slot(),
-        l2_blockid: *prev_state.chain_tip_blkid(),
-    };
-
-    let final_snapshot = ChainStateSnapshot {
-        hash: new_state.compute_state_root(),
-        slot: new_state.chain_tip_slot(),
-        l2_blockid: *new_state.chain_tip_blkid(),
-    };
-
     L2BatchProofOutput {
         // TODO: Accumulate the deposits
         deposits: Vec::new(),
-        initial_snapshot,
-        final_snapshot,
+        initial_state_hash: prev_state.compute_state_root(),
+        final_state_hash: new_state.compute_state_root(),
         rollup_params_commitment: *rollup_params_commitment,
     }
 }
@@ -152,7 +132,7 @@ pub fn batch_process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
         );
 
         assert_eq!(
-            cl_update.initial_snapshot.hash, cl_update_acc.final_snapshot.hash,
+            cl_update.initial_state_hash, cl_update_acc.final_state_hash,
             "Snapshot hash mismatch between consecutive updates."
         );
 
@@ -162,8 +142,8 @@ pub fn batch_process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
 
     let output = L2BatchProofOutput {
         deposits,
-        initial_snapshot: initial_cl_update.initial_snapshot,
-        final_snapshot: cl_update_acc.final_snapshot,
+        initial_state_hash: initial_cl_update.initial_state_hash,
+        final_state_hash: cl_update_acc.final_state_hash,
         rollup_params_commitment: cl_update_acc.rollup_params_commitment,
     };
 

@@ -11,8 +11,10 @@ use strata_primitives::{
     buf::Buf32,
     l1::payload::{L1Payload, PayloadIntent},
 };
-use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
-use zkaleido::ProofReceipt;
+use strata_state::batch::{
+    BatchCheckpoint, BatchInfo, BatchTransition, BootstrapState, CommitmentInfo,
+};
+use zkaleido::Proof;
 
 /// Represents an intent to publish to some DA, which will be bundled for efficiency.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -187,12 +189,15 @@ pub struct CheckpointEntry {
     /// Info related to the batch
     pub batch_info: BatchInfo,
 
+    /// Transition data for L1 and L2 states, which is verified by the proof.
+    pub batch_transition: BatchTransition,
+
     /// Includes the initial and final hashed state of both the `L1StateTransition` and
     /// `L2StateTransition` that happened in this batch
     pub bootstrap: BootstrapState,
 
-    /// Proof with public values
-    pub proof: ProofReceipt,
+    /// Proof
+    pub proof: Proof,
 
     /// Proving Status
     pub proving_status: CheckpointProvingStatus,
@@ -207,8 +212,9 @@ pub struct CheckpointEntry {
 impl CheckpointEntry {
     pub fn new(
         batch_info: BatchInfo,
+        batch_transition: BatchTransition,
         bootstrap: BootstrapState,
-        proof: ProofReceipt,
+        proof: Proof,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
         commitment: Option<CheckpointCommitment>,
@@ -216,6 +222,7 @@ impl CheckpointEntry {
         Self {
             batch_info,
             bootstrap,
+            batch_transition,
             proof,
             proving_status,
             confirmation_status,
@@ -224,15 +231,25 @@ impl CheckpointEntry {
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        BatchCheckpoint::new(self.batch_info, self.bootstrap, self.proof.proof().clone())
+        BatchCheckpoint::new(
+            self.batch_info,
+            self.batch_transition,
+            self.bootstrap,
+            self.proof,
+        )
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
-    pub fn new_pending_proof(info: BatchInfo, bootstrap: BootstrapState) -> Self {
+    pub fn new_pending_proof(
+        info: BatchInfo,
+        transition: BatchTransition,
+        bootstrap: BootstrapState,
+    ) -> Self {
         Self::new(
             info,
+            transition,
             bootstrap,
-            ProofReceipt::default(),
+            Proof::default(),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
             None,

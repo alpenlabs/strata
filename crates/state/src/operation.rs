@@ -245,7 +245,7 @@ pub fn apply_writes_to_state(
                         .last_finalized_checkpoint
                         .as_ref()
                         .is_none_or(|prev_chp| {
-                            checkpt.batch_info.idx() == prev_chp.batch_info.idx() + 1
+                            checkpt.batch_info.epoch() == prev_chp.batch_info.epoch() + 1
                         })
                     {
                         panic!("operation: mismatched indices of pending checkpoint");

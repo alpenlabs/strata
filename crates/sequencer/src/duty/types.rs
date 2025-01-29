@@ -5,7 +5,10 @@ use std::{collections::HashSet, time};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use strata_state::{batch::BatchCheckpoint, id::L2BlockId};
+use strata_state::{
+    batch::{BatchInfo, BatchTransition, BootstrapState},
+    id::L2BlockId,
+};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -97,23 +100,44 @@ impl BlockSigningDuty {
 /// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 pub struct BatchCheckpointDuty {
-    checkpoint: BatchCheckpoint,
+    /// Checkpoint/batch info
+    batch_info: BatchInfo,
+
+    /// Checkpoint/batch transition which needs to be proven
+    batch_transition: BatchTransition,
+
+    /// Bootstrapping state based on which the `batch_transition` will be verified
+    bootstrap_state: BootstrapState,
 }
 
 impl BatchCheckpointDuty {
-    /// Create new duty from [`BatchCheckpoint`]
-    pub fn new(checkpoint: BatchCheckpoint) -> Self {
-        Self { checkpoint }
+    pub fn new(
+        batch_info: BatchInfo,
+        batch_transition: BatchTransition,
+        bootstrap_state: BootstrapState,
+    ) -> Self {
+        Self {
+            batch_info,
+            batch_transition,
+            bootstrap_state,
+        }
     }
 
     /// Gen checkpoint index.
     pub fn idx(&self) -> u64 {
-        self.checkpoint.batch_info().idx()
+        self.batch_info.epoch()
     }
 
-    /// Get reference to checkpoint.
-    pub fn checkpoint(&self) -> &BatchCheckpoint {
-        &self.checkpoint
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.batch_info
+    }
+
+    pub fn batch_transition(&self) -> &BatchTransition {
+        &self.batch_transition
+    }
+
+    pub fn bootstrap_state(&self) -> &BootstrapState {
+        &self.bootstrap_state
     }
 }
 

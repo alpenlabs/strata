@@ -11,11 +11,7 @@ pub fn process_cl_agg(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
         "At least one CL proof is required for aggregation"
     );
 
-    let mut cl_proof_pp_start: L2BatchProofOutput = zkvm.read_verified_borsh(cl_stf_vk);
-    // `BatchInfo` has range which is inclusive. This makes it compatible and avoids off by 1 issue.
-    // TODO: Do this in a better way
-    cl_proof_pp_start.initial_snapshot.slot += 1;
-
+    let cl_proof_pp_start: L2BatchProofOutput = zkvm.read_verified_borsh(cl_stf_vk);
     let mut cl_proof_pp_prev = cl_proof_pp_start.clone();
     let mut acc_deposits = cl_proof_pp_start.deposits.clone();
 
@@ -36,8 +32,8 @@ pub fn process_cl_agg(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
     // proof of the batch
     let public_params = L2BatchProofOutput {
         deposits: acc_deposits,
-        initial_snapshot: cl_proof_pp_start.initial_snapshot,
-        final_snapshot: cl_proof_pp_prev.final_snapshot,
+        initial_state_hash: cl_proof_pp_start.initial_state_hash,
+        final_state_hash: cl_proof_pp_prev.final_state_hash,
         rollup_params_commitment,
     };
 
@@ -50,8 +46,8 @@ fn validate_proof_consistency(
     next_proof_cs_snap: &L2BatchProofOutput,
 ) {
     assert_eq!(
-        current_proof_cs_snap.final_snapshot.hash, // post-state root of the current proof
-        next_proof_cs_snap.initial_snapshot.hash,  // initial state root of the next proof
+        current_proof_cs_snap.final_state_hash, // post-state root of the current proof
+        next_proof_cs_snap.initial_state_hash,  // initial state root of the next proof
         "State root mismatch between proofs"
     );
 }

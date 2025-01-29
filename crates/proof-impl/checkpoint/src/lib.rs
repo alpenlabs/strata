@@ -6,7 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{params::RollupParams, proof::RollupVerifyingKey};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
-use strata_state::batch::{BatchInfo, CheckpointProofOutput};
+use strata_state::batch::{BatchTransition, CheckpointProofOutput};
 use zkaleido::{ProofReceipt, ZkVmEnv};
 
 pub mod prover;
@@ -38,65 +38,50 @@ pub fn process_checkpoint_proof(
     );
 
     // Create BatchInfo based on `l1_batch` and `l2_batch`
-    let mut batch_info = BatchInfo::new(
-        0,
+    let batch_transition = BatchTransition::new(
         (
-            l1_batch_output.initial_snapshot.block_num,
-            l1_batch_output.final_snapshot.block_num,
+            l1_batch_output.initial_state_hash,
+            l1_batch_output.final_state_hash,
         ),
         (
-            l2_batch_output.initial_snapshot.slot,
-            l2_batch_output.final_snapshot.slot,
-        ),
-        (
-            l1_batch_output.initial_snapshot.hash,
-            l1_batch_output.final_snapshot.hash,
-        ),
-        (
-            l2_batch_output.initial_snapshot.hash,
-            l2_batch_output.final_snapshot.hash,
-        ),
-        l2_batch_output.final_snapshot.l2_blockid,
-        (
-            l1_batch_output.initial_snapshot.acc_pow,
-            l1_batch_output.final_snapshot.acc_pow,
+            l2_batch_output.initial_state_hash,
+            l2_batch_output.final_state_hash,
         ),
         l1_batch_output.rollup_params_commitment,
     );
 
     let (bootstrap, opt_prev_output) = match l1_batch_output.prev_checkpoint.as_ref() {
         // Genesis batch: initialize with initial bootstrap state
-        None => (batch_info.get_initial_bootstrap_state(), None),
+        None => (batch_transition.get_initial_bootstrap_state(), None),
         Some(prev_checkpoint) => {
             // Ensure sequential state transition
             assert_eq!(
-                prev_checkpoint.batch_info().get_final_bootstrap_state(),
-                batch_info.get_initial_bootstrap_state()
+                prev_checkpoint
+                    .batch_transition()
+                    .get_final_bootstrap_state(),
+                batch_transition.get_initial_bootstrap_state()
             );
 
             assert_eq!(
-                prev_checkpoint.batch_info().rollup_params_commitment(),
-                batch_info.rollup_params_commitment()
+                prev_checkpoint
+                    .batch_transition()
+                    .rollup_params_commitment(),
+                batch_transition.rollup_params_commitment()
             );
-
-            batch_info.idx = prev_checkpoint.batch_info().idx + 1;
 
             // If there exist proof for the prev_batch, use the prev_batch bootstrap state, else set
             // the current batch initial info as bootstrap
             if prev_checkpoint.proof().is_empty() {
                 // No proof in previous checkpoint: use initial bootstrap state
-                (batch_info.get_initial_bootstrap_state(), None)
+                (batch_transition.get_initial_bootstrap_state(), None)
             } else {
                 // Use previous checkpoint's bootstrap state and include previous proof
                 let bootstrap = prev_checkpoint.bootstrap_state().clone();
-                (
-                    bootstrap,
-                    Some(prev_checkpoint.clone().into_proof_receipt()),
-                )
+                (bootstrap, Some(prev_checkpoint.get_proof_receipt()))
             }
         }
     };
-    let output = CheckpointProofOutput::new(batch_info, bootstrap);
+    let output = CheckpointProofOutput::new(batch_transition, bootstrap);
     (output, opt_prev_output)
 }
 
