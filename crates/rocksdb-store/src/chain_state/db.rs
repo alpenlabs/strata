@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 use strata_db::{errors::DbError, traits::*, DbResult};
+use strata_state::state_op::WriteBatch;
 
-use super::schemas::{ChainstateSchema, WriteBatchSchema};
+use super::schemas::WriteBatchSchema;
 use crate::{
     utils::{get_first_idx, get_last_idx},
     DbOpsConfig,
@@ -20,21 +21,26 @@ impl ChainstateDb {
     }
 
     fn get_first_idx(&self) -> DbResult<Option<u64>> {
-        get_first_idx::<ChainstateSchema>(&self.db)
+        get_first_idx::<WriteBatchSchema>(&self.db)
     }
 
     fn get_last_idx(&self) -> DbResult<Option<u64>> {
-        get_last_idx::<ChainstateSchema>(&self.db)
+        get_last_idx::<WriteBatchSchema>(&self.db)
     }
 }
 
 impl ChainstateDatabase for ChainstateDb {
     fn write_genesis_state(&self, toplevel: strata_state::chain_state::Chainstate) -> DbResult<()> {
         let genesis_key = 0;
+
+        // This should only ever be called once.
         if self.get_first_idx()?.is_some() || self.get_last_idx()?.is_some() {
             return Err(DbError::OverwriteStateUpdate(genesis_key));
         }
-        self.db.put::<ChainstateSchema>(&genesis_key, &toplevel)?;
+
+        let fake_wb = WriteBatch::new_replace(toplevel);
+        self.db.put::<WriteBatchSchema>(&genesis_key, &fake_wb)?;
+
         Ok(())
     }
 
@@ -43,11 +49,22 @@ impl ChainstateDatabase for ChainstateDb {
             return Err(DbError::OverwriteStateUpdate(idx));
         }
 
-        let mut write_batch = SchemaBatch::new();
-        write_batch.put::<WriteBatchSchema>(&idx, &batch)?;
-        let post_state = batch.into_toplevel();
-        write_batch.put::<ChainstateSchema>(&idx, &post_state)?;
-        self.db.write_schemas(write_batch)?;
+        // Make sure we always have a contiguous range of batches.
+        // FIXME this *could* be a race condition / TOCTOU issue, but we're only
+        // going to be writing from a single thread anyways so it should be fine
+        match self.get_last_idx()? {
+            Some(last_idx) => {
+                if idx != last_idx + 1 {
+                    return Err(DbError::OooInsert("Chainstate", idx));
+                }
+            }
+            None => return Err(DbError::NotBootstrapped),
+        }
+
+        self.db.put::<WriteBatchSchema>(&idx, &batch)?;
+
+        #[cfg(test)]
+        eprintln!("db inserted index {idx}");
 
         Ok(())
     }
@@ -68,10 +85,10 @@ impl ChainstateDatabase for ChainstateDb {
 
         let mut del_batch = SchemaBatch::new();
         for idx in first_idx..before_idx {
-            del_batch.delete::<ChainstateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
+
         Ok(())
     }
 
@@ -96,10 +113,10 @@ impl ChainstateDatabase for ChainstateDb {
 
         let mut del_batch = SchemaBatch::new();
         for idx in new_tip_idx + 1..=last_idx {
-            del_batch.delete::<ChainstateSchema>(&idx)?;
             del_batch.delete::<WriteBatchSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
+
         Ok(())
     }
 
@@ -157,7 +174,7 @@ mod tests {
         let batch = WriteBatch::new_replace(genesis_state.clone());
 
         let res = db.put_write_batch(1, batch.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Chainstate", 1))));
+        assert!(res.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
 
         db.write_genesis_state(genesis_state).unwrap();
 
@@ -182,6 +199,7 @@ mod tests {
 
         db.write_genesis_state(genesis_state).unwrap();
         for i in 1..=5 {
+            eprintln!("test inserting index {i}");
             assert_eq!(db.get_earliest_write_idx().unwrap(), 0);
             db.put_write_batch(i, batch.clone()).unwrap();
             assert_eq!(db.get_last_write_idx().unwrap(), i);
@@ -196,6 +214,7 @@ mod tests {
 
         db.write_genesis_state(genesis_state).unwrap();
         for i in 1..=5 {
+            eprintln!("test inserting index {i}");
             assert_eq!(db.get_earliest_write_idx().unwrap(), 0);
             db.put_write_batch(i, batch.clone()).unwrap();
             assert_eq!(db.get_last_write_idx().unwrap(), i);

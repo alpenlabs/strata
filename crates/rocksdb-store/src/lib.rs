@@ -24,7 +24,6 @@ pub const ROCKSDB_NAME: &str = "strata-client";
 
 pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     SequenceSchema::COLUMN_FAMILY_NAME,
-    ChainstateSchema::COLUMN_FAMILY_NAME,
     ClientUpdateOutputSchema::COLUMN_FAMILY_NAME,
     ClientStateSchema::COLUMN_FAMILY_NAME,
     L1BlockSchema::COLUMN_FAMILY_NAME,
@@ -93,7 +92,7 @@ pub use writer::db::RBL1WriterDb;
 use writer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
 
 use crate::{
-    chain_state::schemas::{ChainstateSchema, WriteBatchSchema},
+    chain_state::schemas::WriteBatchSchema,
     client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema},
     l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema},
     sequence::SequenceSchema,
