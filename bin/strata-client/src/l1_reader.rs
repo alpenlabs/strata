@@ -36,7 +36,7 @@ pub fn start_reader_tasks(
             Arc::new(config.btcio.reader.clone()),
             params.clone(),
             status_channel,
-            move |ev| csm.clone().submit_event(ev),
+            csm.clone(),
         ),
     );
     Ok(())

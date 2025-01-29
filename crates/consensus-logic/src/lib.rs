@@ -4,9 +4,9 @@
 pub mod csm;
 pub mod fork_choice_manager;
 pub mod genesis;
-pub mod util;
 pub mod reorg;
 pub mod sync_manager;
 pub mod unfinalized_tracker;
+pub mod util;
 
 pub mod errors;

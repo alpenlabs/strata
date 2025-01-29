@@ -9,16 +9,16 @@ use strata_primitives::{
 use strata_state::{
     batch::{BatchCheckpoint, BatchCheckpointWithCommitment, CommitmentInfo},
     l1::{generate_l1_tx, L1Tx},
-    sync_event::SyncEvent,
+    sync_event::{EventSubmitter, SyncEvent},
     tx::ProtocolOperation,
 };
 use strata_storage::L1BlockManager;
 use tracing::*;
 
-pub(crate) fn handle_bitcoin_event(
+pub(crate) async fn handle_bitcoin_event<E: EventSubmitter>(
     event: L1Event,
     l1mgr: &L1BlockManager,
-    submit_event: &impl Fn(SyncEvent) -> anyhow::Result<()>,
+    event_submitter: &E,
     params: &Params,
     seq_pubkey: &Option<XOnlyPublicKey>,
 ) -> anyhow::Result<()> {
@@ -26,12 +26,12 @@ pub(crate) fn handle_bitcoin_event(
         L1Event::RevertTo(revert_blk_num) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
-            l1mgr.revert_to_height(revert_blk_num)?;
+            l1mgr.revert_to_height_async(revert_blk_num).await?;
             debug!(%revert_blk_num, "wrote revert");
 
             // Write to sync event db.
             let ev = SyncEvent::L1Revert(revert_blk_num);
-            submit_event(ev)?;
+            event_submitter.submit_event_async(ev).await?;
 
             Ok(())
         }
@@ -51,13 +51,15 @@ pub(crate) fn handle_bitcoin_event(
             let manifest = generate_block_manifest(blockdata.block(), epoch);
             let l1txs: Vec<_> = generate_l1txs(&blockdata);
             let num_txs = l1txs.len();
-            l1mgr.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
+            l1mgr
+                .put_block_data_async(blockdata.block_num(), manifest, l1txs.clone())
+                .await?;
             info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
             // Write to sync event db if it's something we care about.
             let blkid: Buf32 = blockdata.block().block_hash().into();
             let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
-            submit_event(ev)?;
+            event_submitter.submit_event_async(ev).await?;
 
             // Check for da batch and send event accordingly
             debug!(?height, "Checking for da batch");
@@ -65,7 +67,7 @@ pub(crate) fn handle_bitcoin_event(
             debug!(?checkpoints, "Received checkpoints");
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
-                submit_event(ev)?;
+                event_submitter.submit_event_async(ev).await?;
             }
 
             // TODO: Check for deposits and forced inclusions and emit appropriate events
@@ -75,7 +77,7 @@ pub(crate) fn handle_bitcoin_event(
 
         L1Event::GenesisVerificationState(height, header_verification_state) => {
             let ev = SyncEvent::L1BlockGenesis(height, header_verification_state);
-            submit_event(ev)?;
+            event_submitter.submit_event_async(ev).await?;
             Ok(())
         }
     }
@@ -86,7 +88,7 @@ fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
 ) -> Vec<BatchCheckpointWithCommitment> {
-    let protocol_ops_txs = blockdata.protocol_ops_txs();
+    let protocol_ops_txs = blockdata.protocol_txs();
 
     let signed_checkpts = protocol_ops_txs.iter().flat_map(|txref| {
         txref.proto_ops().iter().filter_map(|op| match op {
@@ -146,7 +148,7 @@ fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
     blockdata
-        .protocol_ops_txs()
+        .protocol_txs()
         .iter()
         .map(|ops_txs| {
             generate_l1_tx(
