@@ -19,7 +19,7 @@ use strata_zkvm::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,
-    types::{CheckpointEntry, L1TxEntry, PayloadEntry},
+    types::{BundledPayloadEntry, CheckpointEntry, IntentEntry, L1TxEntry},
     DbResult,
 };
 
@@ -246,29 +246,29 @@ pub trait CheckpointDatabase {
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
 
-/// NOTE: We might have to merge this with the [`Database`]
-/// A trait encapsulating provider and store traits to interact with the underlying database for
-/// [`PayloadEntry`]
-pub trait SequencerDatabase {
-    type L1PayloadDB: L1PayloadDatabase;
+/// Encapsulates provider and store traits to create/update [`BundledPayloadEntry`] in the
+/// database and to fetch [`BundledPayloadEntry`] and indices from the database
+pub trait L1WriterDatabase {
+    /// Store the [`BundledPayloadEntry`].
+    fn put_payload_entry(&self, idx: u64, payloadentry: BundledPayloadEntry) -> DbResult<()>;
 
-    fn payload_db(&self) -> &Arc<Self::L1PayloadDB>;
-}
+    /// Get a [`BundledPayloadEntry`] by its index.
+    fn get_payload_entry_by_idx(&self, idx: u64) -> DbResult<Option<BundledPayloadEntry>>;
 
-/// A trait encapsulating provider and store traits to create/update [`PayloadEntry`] in the
-/// database and to fetch [`PayloadEntry`] and indices from the database
-pub trait L1PayloadDatabase {
-    /// Store the [`PayloadEntry`].
-    fn put_payload_entry(&self, payloadid: Buf32, payloadentry: PayloadEntry) -> DbResult<()>;
+    /// Get the next payload index
+    fn get_next_payload_idx(&self) -> DbResult<u64>;
 
-    /// Get a [`PayloadEntry`] by its hash
-    fn get_payload_by_id(&self, id: Buf32) -> DbResult<Option<PayloadEntry>>;
+    /// Store the [`IntentEntry`].
+    fn put_intent_entry(&self, payloadid: Buf32, payloadentry: IntentEntry) -> DbResult<()>;
 
-    /// Get the payload ID corresponding to the index
-    fn get_payload_id(&self, payloadidx: u64) -> DbResult<Option<Buf32>>;
+    /// Get a [`IntentEntry`] by its hash
+    fn get_intent_by_id(&self, id: Buf32) -> DbResult<Option<IntentEntry>>;
 
-    /// Get the last payload index
-    fn get_last_payload_idx(&self) -> DbResult<Option<u64>>;
+    /// Get a [`IntentEntry`] by its idx
+    fn get_intent_by_idx(&self, idx: u64) -> DbResult<Option<IntentEntry>>;
+
+    /// Get  the next intent index
+    fn get_next_intent_idx(&self) -> DbResult<u64>;
 }
 
 pub trait ProofDatabase {

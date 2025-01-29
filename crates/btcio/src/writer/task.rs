@@ -3,18 +3,20 @@ use std::{sync::Arc, time::Duration};
 use bitcoin::Address;
 use strata_config::btcio::WriterConfig;
 use strata_db::{
-    traits::SequencerDatabase,
-    types::{L1TxStatus, PayloadEntry, PayloadL1Status},
+    traits::L1WriterDatabase,
+    types::{BundledPayloadEntry, IntentEntry, L1BundleStatus, L1TxStatus},
 };
 use strata_primitives::{
     l1::payload::{PayloadDest, PayloadIntent},
     params::Params,
 };
 use strata_status::StatusChannel;
-use strata_storage::ops::envelope::{Context, EnvelopeDataOps};
+use strata_storage::ops::writer::{Context, EnvelopeDataOps};
 use strata_tasks::TaskExecutor;
+use tokio::sync::mpsc::{self, Sender};
 use tracing::*;
 
+use super::bundler::{bundler_task, get_initial_unbundled_entries};
 use crate::{
     broadcaster::L1BroadcastHandle,
     rpc::{traits::WriterRpc, BitcoinClient},
@@ -27,57 +29,73 @@ use crate::{
 /// A handle to the Envelope task.
 pub struct EnvelopeHandle {
     ops: Arc<EnvelopeDataOps>,
+    intent_tx: Sender<IntentEntry>,
 }
 
 impl EnvelopeHandle {
-    pub fn new(ops: Arc<EnvelopeDataOps>) -> Self {
-        Self { ops }
+    pub fn new(ops: Arc<EnvelopeDataOps>, intent_tx: Sender<IntentEntry>) -> Self {
+        Self { ops, intent_tx }
     }
 
+    /// Checks if it is duplicate, if not creates a new [`IntentEntry`] from `intent` and puts it in
+    /// the database.
     pub fn submit_intent(&self, intent: PayloadIntent) -> anyhow::Result<()> {
+        let id = *intent.commitment();
+
+        // Check if the intent is meant for L1
         if intent.dest() != PayloadDest::L1 {
-            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
+            warn!(commitment = %id, "Received intent not meant for L1");
             return Ok(());
         }
 
-        let entry = PayloadEntry::new_unsigned(intent.payload().clone());
-        debug!(commitment = %intent.commitment(), "Received intent");
-        if self
-            .ops
-            .get_payload_entry_blocking(*intent.commitment())?
-            .is_some()
-        {
-            warn!(commitment = %intent.commitment(), "Received duplicate intent");
+        debug!(commitment = %id, "Received intent for processing");
+
+        // Check if it is duplicate
+        if self.ops.get_intent_by_id_blocking(id)?.is_some() {
+            warn!(commitment = %id, "Received duplicate intent");
             return Ok(());
         }
 
-        Ok(self
-            .ops
-            .put_payload_entry_blocking(*intent.commitment(), entry)?)
+        // Create and store IntentEntry
+        let entry = IntentEntry::new_unbundled(intent);
+        self.ops.put_intent_entry_blocking(id, entry.clone())?;
+
+        // Send to bundler
+        if let Err(e) = self.intent_tx.blocking_send(entry) {
+            warn!("Could not send intent entry to bundler: {:?}", e);
+        }
+        Ok(())
     }
 
+    /// Checks if it is duplicate, if not creates a new [`IntentEntry`] from `intent` and puts it in
+    /// the database
     pub async fn submit_intent_async(&self, intent: PayloadIntent) -> anyhow::Result<()> {
+        let id = *intent.commitment();
+
+        // Check if the intent is meant for L1
         if intent.dest() != PayloadDest::L1 {
-            warn!(commitment = %intent.commitment(), "Received intent not meant for L1");
+            warn!(commitment = %id, "Received intent not meant for L1");
             return Ok(());
         }
 
-        let entry = PayloadEntry::new_unsigned(intent.payload().clone());
-        debug!(commitment = %intent.commitment(), "Received intent");
+        debug!(commitment = %id, "Received intent for processing");
 
-        if self
-            .ops
-            .get_payload_entry_async(*intent.commitment())
-            .await?
-            .is_some()
-        {
-            warn!(commitment = %intent.commitment(), "Received duplicate intent");
+        // Check if it is duplicate
+        if self.ops.get_intent_by_id_async(id).await?.is_some() {
+            warn!(commitment = %id, "Received duplicate intent");
             return Ok(());
         }
-        Ok(self
-            .ops
-            .put_payload_entry_async(*intent.commitment(), entry)
-            .await?)
+
+        // Create and store IntentEntry
+        let entry = IntentEntry::new_unbundled(intent);
+        self.ops.put_intent_entry_blocking(id, entry.clone())?;
+
+        // Send to bundler
+        if let Err(e) = self.intent_tx.send(entry).await {
+            warn!("Could not send intent entry to bundler: {:?}", e);
+        }
+
+        Ok(())
     }
 }
 
@@ -90,7 +108,7 @@ impl EnvelopeHandle {
 ///
 /// [`Result<EnvelopeHandle>`](anyhow::Result)
 #[allow(clippy::too_many_arguments)]
-pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
+pub fn start_envelope_task<D: L1WriterDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
     bitcoin_client: Arc<BitcoinClient>,
     config: Arc<WriterConfig>,
@@ -101,26 +119,27 @@ pub fn start_envelope_task<D: SequencerDatabase + Send + Sync + 'static>(
     pool: threadpool::ThreadPool,
     broadcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<Arc<EnvelopeHandle>> {
-    let envelope_data_ops = Arc::new(Context::new(db).into_ops(pool));
-    let next_watch_payload_idx = get_next_payloadidx_to_watch(envelope_data_ops.as_ref())?;
+    let writer_ops = Arc::new(Context::new(db).into_ops(pool));
+    let next_watch_payload_idx = get_next_payloadidx_to_watch(writer_ops.as_ref())?;
+    let (intent_tx, intent_rx) = mpsc::channel::<IntentEntry>(64);
 
-    let envelope_handle = Arc::new(EnvelopeHandle::new(envelope_data_ops.clone()));
+    let envelope_handle = Arc::new(EnvelopeHandle::new(writer_ops.clone(), intent_tx));
     let ctx = Arc::new(WriterContext::new(
         params,
-        config,
+        config.clone(),
         sequencer_address,
         bitcoin_client,
         status_channel,
     ));
 
+    let wops = writer_ops.clone();
     executor.spawn_critical_async("btcio::watcher_task", async move {
-        watcher_task(
-            next_watch_payload_idx,
-            ctx,
-            envelope_data_ops,
-            broadcast_handle,
-        )
-        .await
+        watcher_task(next_watch_payload_idx, ctx, wops.clone(), broadcast_handle).await
+    });
+
+    let unbundled = get_initial_unbundled_entries(writer_ops.as_ref())?;
+    executor.spawn_critical_async_with_shutdown("btcio::bundler_task", |shutdown| async move {
+        bundler_task(unbundled, writer_ops, config.clone(), intent_rx, shutdown).await
     });
 
     Ok(envelope_handle)
@@ -135,7 +154,7 @@ fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u6
         let Some(payload) = insc_ops.get_payload_entry_by_idx_blocking(next_idx - 1)? else {
             break;
         };
-        if payload.status == PayloadL1Status::Finalized {
+        if payload.status == L1BundleStatus::Finalized {
             break;
         };
         next_idx -= 1;
@@ -152,7 +171,7 @@ fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u6
 /// The envelope will be monitored until it acquires the status of
 /// [`BlobL1Status::Finalized`]
 pub async fn watcher_task<W: WriterRpc>(
-    next_blbidx_to_watch: u64,
+    next_watch_payload_idx: u64,
     context: Arc<WriterContext<W>>,
     insc_ops: Arc<EnvelopeDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
@@ -161,7 +180,7 @@ pub async fn watcher_task<W: WriterRpc>(
     let interval = tokio::time::interval(Duration::from_millis(context.config.write_poll_dur_ms));
     tokio::pin!(interval);
 
-    let mut curr_payloadidx = next_blbidx_to_watch;
+    let mut curr_payloadidx = next_watch_payload_idx;
     loop {
         interval.as_mut().tick().await;
 
@@ -172,7 +191,7 @@ pub async fn watcher_task<W: WriterRpc>(
             match payloadentry.status {
                 // If unsigned or needs resign, create new signed commit/reveal txs and update the
                 // entry
-                PayloadL1Status::Unsigned | PayloadL1Status::NeedsResign => {
+                L1BundleStatus::Unsigned | L1BundleStatus::NeedsResign => {
                     debug!(?payloadentry.status, %curr_payloadidx, "Processing unsigned payloadentry");
                     match create_and_sign_payload_envelopes(
                         &payloadentry,
@@ -183,10 +202,11 @@ pub async fn watcher_task<W: WriterRpc>(
                     {
                         Ok((cid, rid)) => {
                             let mut updated_entry = payloadentry.clone();
-                            updated_entry.status = PayloadL1Status::Unpublished;
+                            updated_entry.status = L1BundleStatus::Unpublished;
                             updated_entry.commit_txid = cid;
                             updated_entry.reveal_txid = rid;
-                            update_existing_entry(curr_payloadidx, updated_entry, &insc_ops)
+                            insc_ops
+                                .put_payload_entry_async(curr_payloadidx, updated_entry)
                                 .await?;
 
                             debug!(%curr_payloadidx, "Signed payload");
@@ -203,13 +223,13 @@ pub async fn watcher_task<W: WriterRpc>(
                     }
                 }
                 // If finalized, nothing to do, move on to process next entry
-                PayloadL1Status::Finalized => {
+                L1BundleStatus::Finalized => {
                     curr_payloadidx += 1;
                 }
                 // If entry is signed but not finalized or excluded yet, check broadcast txs status
-                PayloadL1Status::Published
-                | PayloadL1Status::Confirmed
-                | PayloadL1Status::Unpublished => {
+                L1BundleStatus::Published
+                | L1BundleStatus::Confirmed
+                | L1BundleStatus::Unpublished => {
                     debug!(%curr_payloadidx, "Checking payloadentry's broadcast status");
                     let commit_tx = broadcast_handle
                         .get_tx_entry_by_id_async(payloadentry.commit_txid)
@@ -230,18 +250,20 @@ pub async fn watcher_task<W: WriterRpc>(
                             // Update payloadentry with new status
                             let mut updated_entry = payloadentry.clone();
                             updated_entry.status = new_status.clone();
-                            update_existing_entry(curr_payloadidx, updated_entry, &insc_ops)
+                            insc_ops
+                                .put_payload_entry_async(curr_payloadidx, updated_entry)
                                 .await?;
 
-                            if new_status == PayloadL1Status::Finalized {
+                            if new_status == L1BundleStatus::Finalized {
                                 curr_payloadidx += 1;
                             }
                         }
                         _ => {
                             warn!(%curr_payloadidx, "Corresponding commit/reveal entry for payloadentry not found in broadcast db. Sign and create transactions again.");
                             let mut updated_entry = payloadentry.clone();
-                            updated_entry.status = PayloadL1Status::Unsigned;
-                            update_existing_entry(curr_payloadidx, updated_entry, &insc_ops)
+                            updated_entry.status = L1BundleStatus::Unsigned;
+                            insc_ops
+                                .put_payload_entry_async(curr_payloadidx, updated_entry)
                                 .await?;
                         }
                     }
@@ -255,15 +277,15 @@ pub async fn watcher_task<W: WriterRpc>(
 }
 
 async fn update_l1_status(
-    payloadentry: &PayloadEntry,
-    new_status: &PayloadL1Status,
+    payloadentry: &BundledPayloadEntry,
+    new_status: &L1BundleStatus,
     status_channel: &StatusChannel,
 ) {
     // Update L1 status. Since we are processing one payloadentry at a time, if the entry is
     // finalized/confirmed, then it means it is published as well
-    if *new_status == PayloadL1Status::Published
-        || *new_status == PayloadL1Status::Confirmed
-        || *new_status == PayloadL1Status::Finalized
+    if *new_status == L1BundleStatus::Published
+        || *new_status == L1BundleStatus::Confirmed
+        || *new_status == L1BundleStatus::Finalized
     {
         let status_updates = [
             L1StatusUpdate::LastPublishedTxid(payloadentry.reveal_txid.into()),
@@ -273,44 +295,33 @@ async fn update_l1_status(
     }
 }
 
-async fn update_existing_entry(
-    idx: u64,
-    updated_entry: PayloadEntry,
-    insc_ops: &EnvelopeDataOps,
-) -> anyhow::Result<()> {
-    let msg = format!("Expect to find payloadentry {idx} in db");
-    let id = insc_ops.get_payload_entry_id_async(idx).await?.expect(&msg);
-    Ok(insc_ops.put_payload_entry_async(id, updated_entry).await?)
-}
-
 /// Determine the status of the `PayloadEntry` based on the status of its commit and reveal
 /// transactions in bitcoin.
 fn determine_payload_next_status(
     commit_status: &L1TxStatus,
     reveal_status: &L1TxStatus,
-) -> PayloadL1Status {
+) -> L1BundleStatus {
     match (&commit_status, &reveal_status) {
         // If reveal is finalized, both are finalized
-        (_, L1TxStatus::Finalized { .. }) => PayloadL1Status::Finalized,
+        (_, L1TxStatus::Finalized { .. }) => L1BundleStatus::Finalized,
         // If reveal is confirmed, both are confirmed
-        (_, L1TxStatus::Confirmed { .. }) => PayloadL1Status::Confirmed,
+        (_, L1TxStatus::Confirmed { .. }) => L1BundleStatus::Confirmed,
         // If reveal is published regardless of commit, the payload is published
-        (_, L1TxStatus::Published) => PayloadL1Status::Published,
+        (_, L1TxStatus::Published) => L1BundleStatus::Published,
         // if commit has invalid inputs, needs resign
-        (L1TxStatus::InvalidInputs, _) => PayloadL1Status::NeedsResign,
+        (L1TxStatus::InvalidInputs, _) => L1BundleStatus::NeedsResign,
         // If commit is unpublished, both are upublished
-        (L1TxStatus::Unpublished, _) => PayloadL1Status::Unpublished,
+        (L1TxStatus::Unpublished, _) => L1BundleStatus::Unpublished,
         // If commit is published but not reveal, the payload is unpublished
-        (_, L1TxStatus::Unpublished) => PayloadL1Status::Unpublished,
+        (_, L1TxStatus::Unpublished) => L1BundleStatus::Unpublished,
         // If reveal has invalid inputs, these need resign because we can do nothing with just
         // commit tx confirmed. This should not occur in practice
-        (_, L1TxStatus::InvalidInputs) => PayloadL1Status::NeedsResign,
+        (_, L1TxStatus::InvalidInputs) => L1BundleStatus::NeedsResign,
     }
 }
 
 #[cfg(test)]
 mod test {
-    use strata_primitives::buf::Buf32;
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -332,26 +343,22 @@ mod test {
     fn test_initialize_writer_state_with_existing_payloads() {
         let iops = get_envelope_ops();
 
-        let mut e1: PayloadEntry = ArbitraryGenerator::new().generate();
-        e1.status = PayloadL1Status::Finalized;
-        let payload_hash: Buf32 = [1; 32].into();
-        iops.put_payload_entry_blocking(payload_hash, e1).unwrap();
-        let expected_idx = iops.get_next_payload_idx_blocking().unwrap();
+        let mut e1: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        e1.status = L1BundleStatus::Finalized;
+        iops.put_payload_entry_blocking(0, e1).unwrap();
 
-        let mut e2: PayloadEntry = ArbitraryGenerator::new().generate();
-        e2.status = PayloadL1Status::Published;
-        let payload_hash: Buf32 = [2; 32].into();
-        iops.put_payload_entry_blocking(payload_hash, e2).unwrap();
+        let mut e2: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        e2.status = L1BundleStatus::Published;
+        iops.put_payload_entry_blocking(1, e2).unwrap();
+        let expected_idx = 1; // All entries before this do not need to be watched.
 
-        let mut e3: PayloadEntry = ArbitraryGenerator::new().generate();
-        e3.status = PayloadL1Status::Unsigned;
-        let payload_hash: Buf32 = [3; 32].into();
-        iops.put_payload_entry_blocking(payload_hash, e3).unwrap();
+        let mut e3: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        e3.status = L1BundleStatus::Unsigned;
+        iops.put_payload_entry_blocking(2, e3).unwrap();
 
-        let mut e4: PayloadEntry = ArbitraryGenerator::new().generate();
-        e4.status = PayloadL1Status::Unsigned;
-        let payload_hash: Buf32 = [4; 32].into();
-        iops.put_payload_entry_blocking(payload_hash, e4).unwrap();
+        let mut e4: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        e4.status = L1BundleStatus::Unsigned;
+        iops.put_payload_entry_blocking(3, e4).unwrap();
 
         let idx = get_next_payloadidx_to_watch(&iops).unwrap();
 
@@ -363,30 +370,30 @@ mod test {
         // When both are unpublished
         let (commit_status, reveal_status) = (L1TxStatus::Unpublished, L1TxStatus::Unpublished);
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Unpublished);
+        assert_eq!(next, L1BundleStatus::Unpublished);
 
         // When both are Finalized
         let fin = L1TxStatus::Finalized { confirmations: 5 };
         let (commit_status, reveal_status) = (fin.clone(), fin);
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Finalized);
+        assert_eq!(next, L1BundleStatus::Finalized);
 
         // When both are Confirmed
         let conf = L1TxStatus::Confirmed { confirmations: 5 };
         let (commit_status, reveal_status) = (conf.clone(), conf.clone());
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Confirmed);
+        assert_eq!(next, L1BundleStatus::Confirmed);
 
         // When both are Published
         let publ = L1TxStatus::Published;
         let (commit_status, reveal_status) = (publ.clone(), publ.clone());
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::Published);
+        assert_eq!(next, L1BundleStatus::Published);
 
         // When both have invalid
         let (commit_status, reveal_status) = (L1TxStatus::InvalidInputs, L1TxStatus::InvalidInputs);
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::NeedsResign);
+        assert_eq!(next, L1BundleStatus::NeedsResign);
 
         // When reveal has invalid inputs but commit is confirmed. I doubt this would happen in
         // practice for our case.
@@ -394,6 +401,6 @@ mod test {
         // published.
         let (commit_status, reveal_status) = (conf.clone(), L1TxStatus::InvalidInputs);
         let next = determine_payload_next_status(&commit_status, &reveal_status);
-        assert_eq!(next, PayloadL1Status::NeedsResign);
+        assert_eq!(next, L1BundleStatus::NeedsResign);
     }
 }

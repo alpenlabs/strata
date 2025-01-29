@@ -7,8 +7,8 @@ pub mod client_state;
 pub mod l1;
 pub mod l2;
 pub mod prover;
-pub mod sequencer;
 pub mod sync_event;
+pub mod writer;
 
 pub mod macros;
 mod sequence;
@@ -35,9 +35,10 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     L2BlockStatusSchema::COLUMN_FAMILY_NAME,
     L2BlockHeightSchema::COLUMN_FAMILY_NAME,
     WriteBatchSchema::COLUMN_FAMILY_NAME,
-    // Seqdb schemas
-    SeqBlobIdSchema::COLUMN_FAMILY_NAME,
-    SeqBlobSchema::COLUMN_FAMILY_NAME,
+    // Payload/intent schemas
+    PayloadSchema::COLUMN_FAMILY_NAME,
+    IntentSchema::COLUMN_FAMILY_NAME,
+    IntentIdxSchema::COLUMN_FAMILY_NAME,
     // Bcast schemas
     BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
     BcastL1TxSchema::COLUMN_FAMILY_NAME,
@@ -87,12 +88,9 @@ use l2::{
     schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema},
 };
 use rockbound::{schema::ColumnFamilyName, Schema};
-pub use sequencer::db::RBSeqBlobDb;
-use sequencer::{
-    db::SequencerDB,
-    schemas::{SeqBlobIdSchema, SeqBlobSchema},
-};
 pub use sync_event::db::SyncEventDb;
+pub use writer::db::RBL1WriterDb;
+use writer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
 
 use crate::{
     chain_state::schemas::{ChainstateSchema, WriteBatchSchema},
@@ -175,10 +173,9 @@ pub fn init_broadcaster_database(
     BroadcastDb::new(l1_broadcast_db.into()).into()
 }
 
-pub fn init_sequencer_database(
+pub fn init_writer_database(
     rbdb: Arc<rockbound::OptimisticTransactionDB>,
     ops_config: DbOpsConfig,
-) -> Arc<SequencerDB<RBSeqBlobDb>> {
-    let seqdb = RBSeqBlobDb::new(rbdb, ops_config).into();
-    SequencerDB::new(seqdb).into()
+) -> Arc<RBL1WriterDb> {
+    RBL1WriterDb::new(rbdb, ops_config).into()
 }

@@ -17,13 +17,15 @@ pub struct ReaderConfig {
 /// Configuration for btcio writer/signer.
 #[derive(Debug, Clone, Deserialize)]
 pub struct WriterConfig {
-    /// How often to invoke the writer
+    /// How often to invoke the writer.
     pub write_poll_dur_ms: u64,
     /// How the fees for are determined.
     // FIXME: This should actually be a part of signer.
     pub fee_policy: FeePolicy,
-    /// How much amount(in sats) to send to reveal address
+    /// How much amount(in sats) to send to reveal address.
     pub reveal_amount: u64,
+    /// How often to bundle write intents.
+    pub bundle_interval_ms: u64,
 }
 
 /// Definition of how fees are determined while creating l1 transactions.
@@ -42,6 +44,7 @@ impl Default for WriterConfig {
             write_poll_dur_ms: 1_000,
             fee_policy: FeePolicy::Smart,
             reveal_amount: 1_000,
+            bundle_interval_ms: 500,
         }
     }
 }

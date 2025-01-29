@@ -111,6 +111,7 @@ mod test {
             write_poll_dur_ms = 200
             fee_policy = "smart"
             reveal_amount = 100
+            bundle_interval_ms = 1000
 
             [relayer]
             refresh_interval = 10
@@ -154,6 +155,7 @@ mod test {
             write_poll_dur_ms = 200
             fee_policy = "smart"
             reveal_amount = 100
+            bundle_interval_ms = 1000
 
             [exec.reth]
             rpc_url = "http://localhost:8551"

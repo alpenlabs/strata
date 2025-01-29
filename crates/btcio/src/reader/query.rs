@@ -324,7 +324,8 @@ async fn process_block<R: ReaderRpc>(
     let txs = block.txdata.len();
 
     let params = ctx.params.clone();
-    let filtered_txs = filter_protocol_op_tx_refs(&block, state.filter_config());
+    let filtered_txs =
+        filter_protocol_op_tx_refs(&block, ctx.params.rollup(), state.filter_config());
     let block_data = BlockData::new(height, block, filtered_txs);
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");

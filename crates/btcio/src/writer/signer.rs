@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bitcoin::{consensus, Transaction};
-use strata_db::types::{L1TxEntry, PayloadEntry};
+use strata_db::types::{BundledPayloadEntry, L1TxEntry};
 use strata_primitives::buf::Buf32;
 use tracing::*;
 
@@ -20,12 +20,12 @@ type BlobIdx = u64;
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
 pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
-    payloadentry: &PayloadEntry,
+    payloadentry: &BundledPayloadEntry,
     broadcast_handle: &L1BroadcastHandle,
     ctx: Arc<WriterContext<W>>,
 ) -> Result<(Buf32, Buf32), EnvelopeError> {
     trace!("Creating and signing payload envelopes");
-    let (commit, reveal) = build_envelope_txs(&payloadentry.payload, ctx.as_ref()).await?;
+    let (commit, reveal) = build_envelope_txs(&payloadentry.payloads, ctx.as_ref()).await?;
 
     let ctxid = commit.compute_txid();
     debug!(commit_txid = ?ctxid, "Signing commit transaction");
@@ -59,8 +59,8 @@ pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
 
 #[cfg(test)]
 mod test {
-    use strata_db::types::{PayloadEntry, PayloadL1Status};
-    use strata_primitives::{hash, l1::payload::L1Payload};
+    use strata_db::types::{BundledPayloadEntry, L1BundleStatus};
+    use strata_primitives::l1::payload::L1Payload;
 
     use super::*;
     use crate::{
@@ -75,14 +75,14 @@ mod test {
         let ctx = get_writer_context();
 
         // First insert an unsigned blob
-        let entry = PayloadEntry::new_unsigned(L1Payload::new_da([1; 100].to_vec()));
+        let payload = L1Payload::new_da([1; 100].to_vec());
+        let entry = BundledPayloadEntry::new_unsigned(vec![payload]);
 
-        assert_eq!(entry.status, PayloadL1Status::Unsigned);
+        assert_eq!(entry.status, L1BundleStatus::Unsigned);
         assert_eq!(entry.commit_txid, Buf32::zero());
         assert_eq!(entry.reveal_txid, Buf32::zero());
 
-        let intent_hash = hash::raw(entry.payload.data());
-        iops.put_payload_entry_async(intent_hash, entry.clone())
+        iops.put_payload_entry_async(0, entry.clone())
             .await
             .unwrap();
 
