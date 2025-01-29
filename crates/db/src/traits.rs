@@ -243,7 +243,8 @@ pub trait CheckpointDatabase {
     /// Store a [`CheckpointEntry`]
     ///
     /// `batchidx` for the Checkpoint is expected to increase monotonically and
-    /// correspond to the value of [`strata_state::chain_state::Chainstate::epoch`].
+    /// correspond to the value of `cur_epoch` in
+    /// [`strata_state::chain_state::Chainstate`].
     fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
 }
 
