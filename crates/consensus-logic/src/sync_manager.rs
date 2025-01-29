@@ -79,7 +79,7 @@ pub fn start_sync_tasks<
 >(
     executor: &TaskExecutor,
     database: Arc<D>,
-    storage: Arc<NodeStorage>,
+    storage: &Arc<NodeStorage>,
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,

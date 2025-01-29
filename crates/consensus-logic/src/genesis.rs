@@ -15,16 +15,17 @@ use strata_state::{
     genesis::GenesisStateData,
     header::L2BlockHeader,
     l1::{L1HeaderRecord, L1ViewState},
+    operation::ClientUpdateOutput,
     prelude::*,
 };
-use strata_storage::{L1BlockManager, L2BlockManager, NodeStorage};
+use strata_storage::{ClientStateManager, L1BlockManager, L2BlockManager, NodeStorage};
 use tracing::*;
 
 use crate::errors::Error;
 
 /// Inserts into the database an initial basic client state that we can begin
 /// waiting for genesis with.
-pub fn init_client_state(params: &Params, database: &impl Database) -> anyhow::Result<()> {
+pub fn init_client_state(params: &Params, csman: &ClientStateManager) -> anyhow::Result<()> {
     debug!("initializing client state in database!");
 
     let init_state = ClientState::from_genesis_params(
@@ -33,8 +34,7 @@ pub fn init_client_state(params: &Params, database: &impl Database) -> anyhow::R
     );
 
     // Write the state into the database.
-    let cs_db = database.client_state_db();
-    cs_db.write_client_state_checkpoint(0, init_state)?;
+    csman.put_update_blocking(0, ClientUpdateOutput::new_state(init_state))?;
 
     Ok(())
 }
@@ -159,12 +159,10 @@ pub fn make_genesis_chainstate(
 }
 
 /// Check if the database needs to have client init done to it.
-pub fn check_needs_client_init(database: &impl Database) -> anyhow::Result<bool> {
-    let cs_db = database.client_state_db();
-
+pub fn check_needs_client_init(storage: &NodeStorage) -> anyhow::Result<bool> {
     // Check if we've written any genesis state checkpoint.  These we perform a
     // bit more carefully and check errors more granularly.
-    match cs_db.get_last_checkpoint_idx() {
+    match storage.client_state().get_last_state_idx_blocking() {
         Ok(_) => {}
         Err(DbError::NotBootstrapped) => return Ok(true),
 
@@ -175,6 +173,7 @@ pub fn check_needs_client_init(database: &impl Database) -> anyhow::Result<bool>
     Ok(false)
 }
 
+/// Checks if we have a genesis block written to the L2 block database.
 pub fn check_needs_genesis(l2man: &L2BlockManager) -> anyhow::Result<bool> {
     // Check if there's any genesis block written.
     match l2man.get_blocks_at_height_blocking(0) {

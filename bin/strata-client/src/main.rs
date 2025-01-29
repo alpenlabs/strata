@@ -98,7 +98,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Initialize core databases
     let database = init_core_dbs(rbdb.clone(), ops_config);
-    let storage = Arc::new(create_node_storage(database.clone(), pool.clone()));
+    let storage = Arc::new(create_node_storage(database.clone(), pool.clone())?);
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
@@ -110,9 +110,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
 
     // Check if we have to do genesis.
-    if genesis::check_needs_client_init(database.as_ref())? {
+    if genesis::check_needs_client_init(storage.as_ref())? {
         info!("need to init client state!");
-        genesis::init_client_state(&params, database.as_ref())?;
+        genesis::init_client_state(&params, storage.client_state())?;
     }
 
     info!("init finished, starting main tasks");
@@ -310,7 +310,7 @@ fn start_core_tasks(
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
     // init status tasks
-    let status_channel = init_status_channel(database.as_ref())?;
+    let status_channel = init_status_channel(storage.as_ref())?;
 
     let engine = init_engine_controller(
         config,
@@ -332,7 +332,7 @@ fn start_core_tasks(
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
         database.clone(),
-        storage.clone(),
+        &storage,
         engine.clone(),
         pool.clone(),
         params.clone(),

@@ -50,7 +50,7 @@ fn get_block_hash(l2_block: L2BlockBundle) -> Result<B256> {
 }
 
 fn get_last_checkpoint_state<D: Database>(db: &D) -> Result<Option<ClientState>> {
-    let last_checkpoint_idx = db.client_state_db().get_last_checkpoint_idx();
+    let last_checkpoint_idx = db.client_state_db().get_last_state_idx();
 
     if let Err(DbError::NotBootstrapped) = last_checkpoint_idx {
         // before genesis block ready; use hardcoded genesis state
@@ -58,7 +58,8 @@ fn get_last_checkpoint_state<D: Database>(db: &D) -> Result<Option<ClientState>>
     }
 
     last_checkpoint_idx
-        .and_then(|ckpt_idx| db.client_state_db().get_state_checkpoint(ckpt_idx))
+        .and_then(|ckpt_idx| db.client_state_db().get_client_update(ckpt_idx))
+        .map(|res| res.map(|update| update.into_state()))
         .context("Failed to get last checkpoint state")
 }
 

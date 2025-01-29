@@ -7,11 +7,13 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
+use tracing::*;
 
 use crate::{
     batch::{BatchInfo, BootstrapState},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
+    operation::{ClientUpdateOutput, SyncAction},
 };
 
 /// High level client's state of the network.  This is local to the client, not
@@ -326,4 +328,172 @@ impl L1Checkpoint {
             height,
         }
     }
+}
+
+/// Wrapper around [`ClientState`] used for modifying it and producing sync
+/// actions.
+pub struct ClientStateMut {
+    state: ClientState,
+    actions: Vec<SyncAction>,
+}
+
+impl ClientStateMut {
+    pub fn new(state: ClientState) -> Self {
+        Self {
+            state,
+            actions: Vec::new(),
+        }
+    }
+
+    pub fn state(&self) -> &ClientState {
+        &self.state
+    }
+
+    pub fn into_update(self) -> ClientUpdateOutput {
+        ClientUpdateOutput::new(self.state, self.actions)
+    }
+
+    pub fn push_action(&mut self, a: SyncAction) {
+        self.actions.push(a);
+    }
+
+    pub fn push_actions(&mut self, a: impl Iterator<Item = SyncAction>) {
+        self.actions.extend(a);
+    }
+
+    // Semantical mutation fns.
+    // TODO remove logs from this, break down into simpler logical units
+
+    // TODO remove sync state
+    pub fn set_sync_state(&mut self, ss: SyncState) {
+        self.state.set_sync_state(ss);
+    }
+
+    pub fn activate_chain(&mut self) {
+        self.state.chain_active = true;
+    }
+
+    pub fn update_verification_state(&mut self, l1_vs: HeaderVerificationState) {
+        debug!(?l1_vs, "received HeaderVerificationState");
+
+        if self.state.genesis_verification_hash().is_none() {
+            info!(?l1_vs, "Setting genesis L1 verification state");
+            self.state.genesis_l1_verification_state_hash = Some(l1_vs.compute_hash().unwrap());
+        }
+
+        self.state.l1_view_mut().header_verification_state = Some(l1_vs);
+    }
+
+    pub fn rollback_l1_blocks(&mut self, height: u64) {
+        let l1v = self.state.l1_view_mut();
+        let buried_height = l1v.buried_l1_height();
+
+        if height < buried_height {
+            error!(%height, %buried_height, "unable to roll back past buried height");
+            panic!("operation: emitted invalid write");
+        }
+
+        let new_unacc_len = (height - buried_height) as usize;
+        let l1_vs = l1v.tip_verification_state();
+        if let Some(l1_vs) = l1_vs {
+            // TODO: handle other things
+            let mut rollbacked_l1_vs = l1_vs.clone();
+            rollbacked_l1_vs.last_verified_block_num = height as u32;
+            rollbacked_l1_vs.last_verified_block_hash = l1v.local_unaccepted_blocks[new_unacc_len];
+        }
+        l1v.local_unaccepted_blocks.truncate(new_unacc_len);
+
+        // Keep pending checkpoints whose l1 height is less than or equal to rollback height
+        l1v.verified_checkpoints
+            .retain(|ckpt| ckpt.height <= height);
+    }
+
+    // TODO convert to L1BlockCommitment?
+    pub fn accept_l1_block(&mut self, l1blkid: L1BlockId) {
+        debug!(?l1blkid, "received AcceptL1Block");
+        // TODO make this also do something
+        let l1v = self.state.l1_view_mut();
+        l1v.local_unaccepted_blocks.push(l1blkid);
+        l1v.next_expected_block += 1;
+    }
+
+    // TODO convert to L2BlockCommitment?
+    pub fn accept_l2_block(&mut self, blkid: L2BlockId, height: u64) {
+        // TODO do any other bookkeeping
+        debug!(%height, %blkid, "received AcceptL2Block");
+        let ss = self.state.expect_sync_mut();
+        ss.tip_blkid = blkid;
+        ss.tip_height = height;
+    }
+
+    pub fn update_buried(&mut self, new_idx: u64) {
+        let l1v = self.state.l1_view_mut();
+
+        // Check that it's increasing.
+        let old_idx = l1v.buried_l1_height();
+
+        if new_idx < old_idx {
+            panic!("operation: emitted non-greater buried height");
+        }
+
+        // Check that it's not higher than what we know about.
+        if new_idx > l1v.tip_height() {
+            panic!("operation: new buried height above known L1 tip");
+        }
+
+        // If everything checks out we can just remove them.
+        let diff = (new_idx - old_idx) as usize;
+        let _blocks = l1v
+            .local_unaccepted_blocks
+            .drain(..diff)
+            .collect::<Vec<_>>();
+
+        // TODO merge these blocks into the L1 MMR in the client state if
+        // we haven't already
+    }
+
+    pub fn accept_checkpoints(&mut self, ckpts: &[L1Checkpoint]) {
+        // Extend the pending checkpoints
+        self.state
+            .l1_view_mut()
+            .verified_checkpoints
+            .extend(ckpts.iter().cloned());
+    }
+
+    pub fn finalize_checkpoint(&mut self, l1height: u64) {
+        let l1v = self.state.l1_view_mut();
+
+        let finalized_checkpts: Vec<_> = l1v
+            .verified_checkpoints
+            .iter()
+            .take_while(|ckpt| ckpt.height <= l1height)
+            .collect();
+
+        let new_finalized = finalized_checkpts.last().cloned().cloned();
+        let total_finalized = finalized_checkpts.len();
+        debug!(?new_finalized, ?total_finalized, "Finalized checkpoints");
+
+        // Remove the finalized from pending and then mark the last one as last_finalized
+        // checkpoint
+        l1v.verified_checkpoints.drain(..total_finalized);
+
+        if let Some(ckpt) = new_finalized {
+            // Check if heights match accordingly
+            if !l1v
+                .last_finalized_checkpoint
+                .as_ref()
+                .is_none_or(|prev_ckpt| ckpt.batch_info.idx() == prev_ckpt.batch_info.idx() + 1)
+            {
+                panic!("operation: mismatched indices of pending checkpoint");
+            }
+
+            let fin_blockid = *ckpt.batch_info.l2_blockid();
+            l1v.last_finalized_checkpoint = Some(ckpt);
+
+            // Update finalized blockid in StateSync
+            self.state.expect_sync_mut().finalized_blkid = fin_blockid;
+        }
+    }
+
+    // TODO add operation stuff
 }

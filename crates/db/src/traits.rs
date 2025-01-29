@@ -12,7 +12,8 @@ use strata_primitives::{
 };
 use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
-    client_state::ClientState, l1::L1Tx, operation::*, state_op::WriteBatch, sync_event::SyncEvent,
+    client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
+    sync_event::SyncEvent,
 };
 use zkaleido::ProofReceipt;
 
@@ -123,33 +124,14 @@ pub trait ClientStateDatabase {
     /// [``SyncEventDatabase``].  Will error if `idx - 1` does not exist (unless
     /// `idx` is 0) or if trying to overwrite a state, as this is almost
     /// certainly a bug.
-    fn write_client_update_output(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()>;
+    fn put_client_update(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()>;
 
-    /// Writes a new consensus checkpoint that we can cheaply resume from.  Will
-    /// error if trying to overwrite a state.
-    fn write_client_state_checkpoint(&self, idx: u64, state: ClientState) -> DbResult<()>;
+    /// Gets the output client state writes for some input index.
+    fn get_client_update(&self, idx: u64) -> DbResult<Option<ClientUpdateOutput>>;
 
     /// Gets the idx of the last written state.  Or returns error if a bootstrap
     /// state has not been written yet.
-    fn get_last_write_idx(&self) -> DbResult<u64>;
-
-    /// Gets the output client state writes for some input index.
-    fn get_client_state_writes(&self, idx: u64) -> DbResult<Option<Vec<ClientStateWrite>>>;
-
-    /// Gets the actions output from a client state transition.
-    fn get_client_update_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>>;
-
-    /// Gets the last consensus checkpoint idx.
-    fn get_last_checkpoint_idx(&self) -> DbResult<u64>;
-
-    /// Gets the idx of the last checkpoint up to the given input idx.  This is
-    /// the idx we should resume at when playing out consensus writes since the
-    /// saved checkpoint, which may be the same as the given idx (if we didn't
-    /// receive any sync events since the last checkpoint.
-    fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64>;
-
-    /// Gets a state checkpoint at a previously written index, if it exists.
-    fn get_state_checkpoint(&self, idx: u64) -> DbResult<Option<ClientState>>;
+    fn get_last_state_idx(&self) -> DbResult<u64>;
 }
 
 /// L2 data store for CL blocks.  Does not store anything about what we think

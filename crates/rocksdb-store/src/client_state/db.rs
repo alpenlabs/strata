@@ -4,7 +4,7 @@ use rockbound::{OptimisticTransactionDB, Schema, SchemaDBOperationsExt};
 use strata_db::{errors::*, traits::*, DbResult};
 use strata_state::operation::*;
 
-use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
+use super::schemas::ClientUpdateOutputSchema;
 use crate::DbOpsConfig;
 
 pub struct ClientStateDb {
@@ -38,7 +38,7 @@ impl ClientStateDb {
 }
 
 impl ClientStateDatabase for ClientStateDb {
-    fn write_client_update_output(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
+    fn put_client_update(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
         let expected_idx = match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(last_idx) => last_idx + 1,
             None => 1,
@@ -50,74 +50,15 @@ impl ClientStateDatabase for ClientStateDb {
         Ok(())
     }
 
-    fn write_client_state_checkpoint(
-        &self,
-        idx: u64,
-        state: strata_state::client_state::ClientState,
-    ) -> DbResult<()> {
-        // FIXME this should probably be a transaction
-        if self.db.get::<ClientStateSchema>(&idx)?.is_some() {
-            return Err(DbError::OverwriteConsensusCheckpoint(idx));
-        }
-        self.db.put::<ClientStateSchema>(&idx, &state)?;
-        Ok(())
+    fn get_client_update(&self, idx: u64) -> DbResult<Option<ClientUpdateOutput>> {
+        Ok(self.db.get::<ClientUpdateOutputSchema>(&idx)?)
     }
 
-    fn get_last_write_idx(&self) -> DbResult<u64> {
+    fn get_last_state_idx(&self) -> DbResult<u64> {
         match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(idx) => Ok(idx),
             None => Err(DbError::NotBootstrapped),
         }
-    }
-
-    fn get_client_state_writes(&self, idx: u64) -> DbResult<Option<Vec<ClientStateWrite>>> {
-        let output = self.db.get::<ClientUpdateOutputSchema>(&idx)?;
-        match output {
-            Some(out) => Ok(Some(out.writes().to_owned())),
-            None => Ok(None),
-        }
-    }
-
-    fn get_client_update_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>> {
-        let output = self.db.get::<ClientUpdateOutputSchema>(&idx)?;
-        match output {
-            Some(out) => Ok(Some(out.actions().to_owned())),
-            None => Ok(None),
-        }
-    }
-
-    fn get_last_checkpoint_idx(&self) -> DbResult<u64> {
-        match self.get_last_idx::<ClientStateSchema>()? {
-            Some(idx) => Ok(idx),
-            None => Err(DbError::NotBootstrapped),
-        }
-    }
-
-    fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64> {
-        let mut iterator = self.db.iter::<ClientStateSchema>()?;
-        iterator.seek_to_last();
-        let rev_iterator = iterator.rev();
-
-        for res in rev_iterator {
-            match res {
-                Ok(item) => {
-                    let (tip, _) = item.into_tuple();
-                    if tip <= idx {
-                        return Ok(tip);
-                    }
-                }
-                Err(e) => return Err(DbError::Other(e.to_string())),
-            }
-        }
-
-        Err(DbError::NotBootstrapped)
-    }
-
-    fn get_state_checkpoint(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<strata_state::client_state::ClientState>> {
-        Ok(self.db.get::<ClientStateSchema>(&idx)?)
     }
 }
 

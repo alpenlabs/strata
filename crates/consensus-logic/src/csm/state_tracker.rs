@@ -8,10 +8,10 @@ use strata_common::bail_manager::{check_bail_trigger, BAIL_SYNC_EVENT};
 use strata_db::traits::*;
 use strata_primitives::params::Params;
 use strata_state::{
-    client_state::ClientState,
+    client_state::{ClientState, ClientStateMut},
     operation::{self, ClientUpdateOutput},
 };
-use strata_storage::NodeStorage;
+use strata_storage::{ClientStateManager, NodeStorage};
 use tracing::*;
 
 use super::client_transition;
@@ -23,7 +23,6 @@ pub struct StateTracker<D: Database> {
     storage: Arc<NodeStorage>,
 
     cur_state_idx: u64,
-
     cur_state: Arc<ClientState>,
 }
 
@@ -54,6 +53,7 @@ impl<D: Database> StateTracker<D> {
 
     /// Given the next event index, computes the state application if the
     /// requisite data is available.  Returns the output and the new state.
+    // TODO maybe remove output return value
     pub fn advance_consensus_state(
         &mut self,
         ev_idx: u64,
@@ -66,41 +66,41 @@ impl<D: Database> StateTracker<D> {
         // Load the event from the database.
         let db = self.database.as_ref();
         let sync_event_db = db.sync_event_db();
-        let client_state_db = db.client_state_db();
         let ev = sync_event_db
             .get_sync_event(ev_idx)?
             .ok_or(Error::MissingSyncEvent(ev_idx))?;
 
-        debug!(?ev, "Processing event");
+        debug!(?ev, "processing sync event");
 
         #[cfg(feature = "debug-utils")]
         check_bail_trigger(BAIL_SYNC_EVENT);
 
         // Compute the state transition.
         let context = client_transition::StorageEventContext::new(&self.storage);
-        let outp = client_transition::process_event(&self.cur_state, &ev, &context, &self.params)?;
+        let mut state_mut = ClientStateMut::new(self.cur_state.as_ref().clone());
+        client_transition::process_event(&mut state_mut, &ev, &context, &self.params)?;
 
         // Clone the state and apply the operations to it.
-        let mut new_state = self.cur_state.as_ref().clone();
-        operation::apply_writes_to_state(&mut new_state, outp.writes().iter().cloned());
-
-        // Update bookkeeping.
-        self.cur_state = Arc::new(new_state);
-        self.cur_state_idx = ev_idx;
-        debug!(%ev_idx, "computed new consensus state");
+        let outp = state_mut.into_update();
 
         // Store the outputs.
-        // TODO ideally avoid clone
-        client_state_db.write_client_update_output(ev_idx, outp.clone())?;
+        let state = self
+            .storage
+            .client_state()
+            .put_update_blocking(ev_idx, outp.clone())?;
+
+        // Update bookkeeping.
+        self.cur_state = state;
+        self.cur_state_idx = ev_idx;
+        debug!(%ev_idx, "computed new consensus state");
 
         Ok((outp, self.cur_state.clone()))
     }
 
-    /// Writes the current state to the database as a new checkpoint.
+    /// Does nothing.
+    // TODO remove this function
     pub fn store_checkpoint(&self) -> anyhow::Result<()> {
-        let client_state_db = self.database.client_state_db();
-        let state = self.cur_state.as_ref().clone(); // TODO avoid clone
-        client_state_db.write_client_state_checkpoint(self.cur_state_idx, state)?;
+        warn!("tried to store client state checkpoint, we don't have this anymore");
         Ok(())
     }
 }
@@ -118,71 +118,28 @@ impl<D: Database> StateTracker<D> {
 /// - `cs_db`: An implementation of the [`ClientStateDatabase`] trait, used for retrieving
 ///   checkpoint and state data.
 /// - `idx`: The index from which to replay state writes, starting from the last checkpoint.
-pub fn reconstruct_cur_state(
-    cs_db: &impl ClientStateDatabase,
-) -> anyhow::Result<(u64, ClientState)> {
-    let last_ckpt_idx = cs_db.get_last_checkpoint_idx()?;
+pub fn reconstruct_cur_state(csman: &ClientStateManager) -> anyhow::Result<(u64, ClientState)> {
+    let last_state_idx = csman.get_last_state_idx_blocking()?;
 
-    // genesis state.
-    if last_ckpt_idx == 0 {
+    // We used to do something here, but now we just print a log.
+    if last_state_idx == 0 {
         debug!("starting from init state");
-        let state = cs_db
-            .get_state_checkpoint(0)?
-            .ok_or(Error::MissingCheckpoint(0))?;
-        return Ok((0, state));
     }
 
-    // If we're not in genesis, then we probably have to replay some writes.
-    let last_write_idx = cs_db.get_last_write_idx()?;
-
-    let state = reconstruct_state(cs_db, last_write_idx)?;
-
-    Ok((last_write_idx, state))
+    let state = csman
+        .get_state_blocking(last_state_idx)?
+        .ok_or(Error::MissingConsensusWrites(last_state_idx))?;
+    Ok((last_state_idx, state))
 }
 
-/// Reconstructs the
-/// [`ClientStateWrite`](strata_state::operation::ClientStateWrite)
-///
-/// Under the hood fetches the nearest checkpoint before the reuested idx
-/// and then replays all the [`ClientStateWrite`](strata_state::operation::ClientStateWrite)s
-/// from that checkpoint up to the requested index `idx`
-/// such that we have accurate [`ClientState`].
-///
-/// # Parameters
-///
-/// - `cs_db`: anything that implements the [`ClientStateDatabase`] trait.
-/// - `idx`: index to look ahead from.
-pub fn reconstruct_state(
-    cs_db: &impl ClientStateDatabase,
-    idx: u64,
-) -> anyhow::Result<ClientState> {
-    match cs_db.get_state_checkpoint(idx)? {
-        Some(cl) => {
-            // if the checkpoint was created at the idx itself, return the checkpoint
-            debug!(%idx, "no writes to replay");
-            Ok(cl)
-        }
+/// Fetches the client state at some idx from the database.
+// TODO remove this
+pub fn reconstruct_state(csman: &ClientStateManager, idx: u64) -> anyhow::Result<ClientState> {
+    match csman.get_state_blocking(idx)? {
+        Some(cl) => Ok(cl),
         None => {
-            // get the previously written checkpoint
-            let prev_ckpt_idx = cs_db.get_prev_checkpoint_at(idx)?;
-
-            // get the previous checkpoint Client State
-            let mut state = cs_db
-                .get_state_checkpoint(prev_ckpt_idx)?
-                .ok_or(Error::MissingCheckpoint(idx))?;
-
-            // write the client state
-            let write_replay_start = prev_ckpt_idx + 1;
-            debug!(%prev_ckpt_idx, %idx, "reconstructing state from checkpoint");
-
-            for i in write_replay_start..=idx {
-                let writes = cs_db
-                    .get_client_state_writes(i)?
-                    .ok_or(Error::MissingConsensusWrites(i))?;
-                operation::apply_writes_to_state(&mut state, writes.into_iter());
-            }
-
-            Ok(state)
+            error!("we don't support state reconstruction anymore");
+            return Err(Error::MissingConsensusWrites(idx).into());
         }
     }
 }
@@ -236,6 +193,7 @@ mod tests {
                 let _ = client_state_db.write_client_state_checkpoint(idx, state);
             }
         }
+
         // for the 13th, 14th, 15th state, we require fetching the 12th index ClientState and
         // applying the writes.
         for i in 13..17 {

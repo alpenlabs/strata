@@ -15,7 +15,7 @@ use strata_primitives::{
 use strata_rocksdb::CommonDb;
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
-use strata_storage::L2BlockManager;
+use strata_storage::{L2BlockManager, NodeStorage};
 use tokio::runtime::Handle;
 use tracing::*;
 
@@ -117,13 +117,12 @@ pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinC
 }
 
 // initializes the status bundle that we can pass around cheaply for status/metrics
-pub fn init_status_channel<D>(database: &D) -> anyhow::Result<StatusChannel>
-where
-    D: Database + Send + Sync + 'static,
-{
+pub fn init_status_channel(storage: &NodeStorage) -> anyhow::Result<StatusChannel> {
     // init client state
-    let cs_db = database.client_state_db().as_ref();
-    let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(cs_db)?;
+    let csman = storage.client_state();
+    let (cur_state_idx, cur_state) = csman
+        .get_most_recent_state_blocking()
+        .ok_or(InitError::MissingInitClientState)?;
 
     // init the CsmStatus
     let mut status = CsmStatus::default();
@@ -134,7 +133,12 @@ where
         ..Default::default()
     };
 
-    Ok(StatusChannel::new(cur_state, l1_status, None))
+    // TODO avoid clone, change status channel to use arc
+    Ok(StatusChannel::new(
+        cur_state.as_ref().clone(),
+        l1_status,
+        None,
+    ))
 }
 
 pub fn init_engine_controller(

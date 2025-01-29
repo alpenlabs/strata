@@ -7,6 +7,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum InitError {
+    #[error("missing init client state")]
+    MissingInitClientState,
+
     #[error("io: {0}")]
     Io(#[from] io::Error),
 

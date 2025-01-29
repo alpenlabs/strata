@@ -66,6 +66,7 @@ use zkaleido::ProofReceipt;
 
 use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
+#[deprecated]
 fn fetch_l2blk<D: Database + Sync + Send + 'static>(
     l2_db: &Arc<<D as Database>::L2DB>,
     blkid: L2BlockId,
@@ -648,23 +649,12 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
     // FIXME: possibly create a separate rpc type corresponding to ClientUpdateOutput
     async fn get_client_update_output(&self, idx: u64) -> RpcResult<Option<ClientUpdateOutput>> {
-        let db = self.database.clone();
-
-        let res = wait_blocking("fetch_client_update_output", move || {
-            let client_state_db = db.client_state_db();
-
-            let writes = client_state_db.get_client_state_writes(idx)?;
-            let actions = client_state_db.get_client_update_actions(idx)?;
-
-            match (writes, actions) {
-                (Some(w), Some(a)) => Ok(Some(ClientUpdateOutput::new(w, a))),
-                // normally this is just that they're both missing
-                _ => Ok(None),
-            }
-        })
-        .await?;
-
-        Ok(res)
+        Ok(self
+            .storage
+            .client_state()
+            .get_update_async(idx)
+            .map_err(Error::Db)
+            .await?)
     }
 }
 
@@ -901,12 +891,12 @@ impl StrataSequencerApiServer for SequencerServerImpl {
 
 pub struct StrataDebugRpcImpl<D> {
     storage: Arc<NodeStorage>,
-    database: Arc<D>,
+    _database: Arc<D>,
 }
 
 impl<D: Database + Sync + Send + 'static> StrataDebugRpcImpl<D> {
-    pub fn new(storage: Arc<NodeStorage>, database: Arc<D>) -> Self {
-        Self { storage, database }
+    pub fn new(storage: Arc<NodeStorage>, _database: Arc<D>) -> Self {
+        Self { storage, _database }
     }
 }
 
@@ -941,19 +931,12 @@ impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRp
     }
 
     async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
-        let database = self.database.clone();
-        let cs = wait_blocking("clientstate_at_idx", move || {
-            let client_state_db = database.client_state_db();
-            match reconstruct_state(client_state_db.as_ref(), idx) {
-                Ok(client_state) => Ok(Some(client_state)),
-                Err(e) => {
-                    error!(%idx, %e, "failed to reconstruct client state");
-                    Err(Error::Other(e.to_string()))
-                }
-            }
-        })
-        .await?;
-        Ok(cs)
+        Ok(self
+            .storage
+            .client_state()
+            .get_state_async(idx)
+            .map_err(Error::Db)
+            .await?)
     }
 
     async fn set_bail_context(&self, _ctx: String) -> RpcResult<()> {

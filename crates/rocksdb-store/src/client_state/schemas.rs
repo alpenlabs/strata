@@ -1,4 +1,4 @@
-use strata_state::{client_state::ClientState, operation::ClientUpdateOutput};
+use strata_state::operation::ClientUpdateOutput;
 
 use crate::{define_table_with_seek_key_codec, define_table_without_codec, impl_borsh_value_codec};
 
@@ -6,10 +6,4 @@ use crate::{define_table_with_seek_key_codec, define_table_without_codec, impl_b
 define_table_with_seek_key_codec!(
     /// Table to store client state updates.
     (ClientUpdateOutputSchema) u64 => ClientUpdateOutput
-);
-
-// Consensus State Schema and corresponding codecs implementation
-define_table_with_seek_key_codec!(
-    /// Table to store client states.
-    (ClientStateSchema) u64 => ClientState
 );

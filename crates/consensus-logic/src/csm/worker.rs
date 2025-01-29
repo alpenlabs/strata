@@ -12,7 +12,7 @@ use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::SyncAction};
 use strata_status::StatusChannel;
-use strata_storage::{CheckpointDbManager, NodeStorage};
+use strata_storage::{CheckpointDbManager, ClientStateManager, L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::{
     sync::{broadcast, mpsc},
@@ -43,7 +43,7 @@ pub struct WorkerState<D: Database> {
     // TODO should we move this out?
     database: Arc<D>,
 
-    /// L2 block manager.
+    /// Node storage handle.
     storage: Arc<NodeStorage>,
 
     /// Checkpoint manager.
@@ -66,8 +66,8 @@ impl<D: Database> WorkerState<D> {
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
         checkpoint_manager: Arc<CheckpointDbManager>,
     ) -> anyhow::Result<Self> {
-        let client_state_db = database.client_state_db().as_ref();
-        let (cur_state_idx, cur_state) = state_tracker::reconstruct_cur_state(client_state_db)?;
+        let (cur_state_idx, cur_state) =
+            state_tracker::reconstruct_cur_state(storage.client_state())?;
         let state_tracker = state_tracker::StateTracker::new(
             params.clone(),
             database.clone(),
@@ -241,17 +241,10 @@ fn handle_sync_event<D: Database>(
     // Make sure that the new state index is set as expected.
     assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
 
-    // Write the client state checkpoint periodically based on the event idx..
-    if ev_idx % state.params.run.client_checkpoint_interval as u64 == 0 {
-        let client_state_db = state.database.client_state_db();
-        client_state_db.write_client_state_checkpoint(ev_idx, new_state.as_ref().clone())?;
-    }
-
-    // FIXME clean this up
+    // FIXME clean this up and make them take Arcs
     let mut status = CsmStatus::default();
     status.set_last_sync_ev_idx(ev_idx);
     status.update_from_client_state(new_state.as_ref());
-
     status_channel.update_client_state(new_state.as_ref().clone());
 
     trace!(?new_state, "sending client update notif");
