@@ -65,6 +65,26 @@ pub(super) fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result
     }
 }
 
+/// Exports an ELF file to the specified path.
+///
+/// When the `sp1` feature is enabled, uses `strata_sp1_guest_builder` for the export.
+///
+/// # Arguments
+///
+/// * `elf_path` - The destination path for the ELF file.
+///
+/// # Errors
+///
+/// Returns an error if the export process fails.
+fn export_elf(elf_path: &PathBuf) -> anyhow::Result<()> {
+    #[cfg(feature = "sp1")]
+    {
+        strata_sp1_guest_builder::export_elf(elf_path)?
+    }
+
+    Ok(())
+}
+
 /// Returns the appropriate [`RollupVerifyingKey`] based on the enabled features.
 ///
 /// # Behavior
@@ -276,6 +296,10 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         eprintln!("wrote to file {out_path:?}");
     } else {
         println!("{params_buf}");
+    }
+
+    if let Some(elf_path) = &cmd.elf_path {
+        export_elf(elf_path)?;
     }
 
     Ok(())

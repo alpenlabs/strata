@@ -185,6 +185,9 @@ pub(crate) struct SubcParams {
         description = "permit blank proofs after timeout in millis (default strict)"
     )]
     pub(crate) proof_timeout: Option<u32>,
+
+    #[argh(option, description = "directory to export the generated ELF")]
+    pub(crate) elf_path: Option<PathBuf>,
 }
 
 pub(crate) struct CmdContext {
