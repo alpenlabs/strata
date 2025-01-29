@@ -8,6 +8,7 @@ use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
+    reader::query::bitcoin_data_reader_task,
     rpc::{traits::ReaderRpc, BitcoinClient},
     writer::start_envelope_task,
 };
@@ -50,7 +51,6 @@ mod el_sync;
 mod errors;
 mod extractor;
 mod helpers;
-mod l1_reader;
 mod network;
 mod rpc_client;
 mod rpc_server;
@@ -343,15 +343,17 @@ fn start_core_tasks(
     let l1db = database.l1_db().clone();
     let l1_manager = Arc::new(L1BlockManager::new(pool.clone(), l1db));
     // Start the L1 tasks to get that going.
-    l1_reader::start_reader_tasks(
-        executor,
-        sync_manager.get_params(),
-        config,
-        bitcoin_client.clone(),
-        storage.as_ref(),
-        sync_manager.get_csm_ctl(),
-        status_channel.clone(),
-    )?;
+    executor.spawn_critical_async(
+        "bitcoin_data_reader_task",
+        bitcoin_data_reader_task(
+            bitcoin_client.clone(),
+            l1_manager.clone(),
+            Arc::new(config.btcio.reader.clone()),
+            sync_manager.get_params(),
+            status_channel.clone(),
+            sync_manager.get_csm_ctl(),
+        ),
+    );
 
     // Start relayer task.
     let relayer_handle = strata_bridge_relay::relayer::start_bridge_relayer_task(

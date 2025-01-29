@@ -55,12 +55,19 @@ struct ReaderContext<R: ReaderRpc> {
 pub async fn bitcoin_data_reader_task<E: EventSubmitter>(
     client: Arc<impl ReaderRpc>,
     l1_manager: Arc<L1BlockManager>,
-    target_next_block: u64,
     config: Arc<ReaderConfig>,
     params: Arc<Params>,
     status_channel: StatusChannel,
     event_submitter: Arc<E>,
 ) -> anyhow::Result<()> {
+    // TODO switch to checking the L1 tip in the consensus/client state
+    let horz_height = params.rollup().horizon_l1_height;
+    let target_next_block = l1_manager
+        .get_chain_tip()?
+        .map(|i| i + 1)
+        .unwrap_or(horz_height);
+    assert!(target_next_block >= horz_height);
+
     let seq_pubkey = match params.rollup.cred_rule {
         CredRule::Unchecked => None,
         CredRule::SchnorrKey(buf32) => Some(
