@@ -342,7 +342,7 @@ fn start_core_tasks(
         sync_manager.get_params(),
         config,
         bitcoin_client.clone(),
-        database.clone(),
+        storage.as_ref(),
         sync_manager.get_csm_ctl(),
         status_channel.clone(),
     )?;
