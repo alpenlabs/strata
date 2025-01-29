@@ -59,8 +59,7 @@ use strata_state::{
     sync_event::SyncEvent,
 };
 use strata_status::StatusChannel;
-use strata_storage::{L2BlockManager, NodeStorage};
-use strata_zkvm::ProofReceipt;
+use strata_storage::NodeStorage;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 use zkaleido::ProofReceipt;
