@@ -1,5 +1,5 @@
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
-use strata_zkvm::ZkVmEnv;
+use zkaleido::ZkVmEnv;
 
 mod prover;
 pub use prover::*;

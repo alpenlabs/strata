@@ -8,7 +8,7 @@ use strata_state::{
     l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot, L1TxProof},
     tx::DepositInfo,
 };
-use strata_zkvm::ZkVmEnv;
+use zkaleido::ZkVmEnv;
 
 /// Represents the public parameters of the L1BlockScan batch proof.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]

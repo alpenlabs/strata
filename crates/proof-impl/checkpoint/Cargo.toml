@@ -14,7 +14,7 @@ strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

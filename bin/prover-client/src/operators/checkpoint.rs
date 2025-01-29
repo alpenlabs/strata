@@ -12,9 +12,9 @@ use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcCheckpointInfo;
 use strata_state::id::L2BlockId;
-use strata_zkvm::AggregationInput;
 use tokio::sync::Mutex;
 use tracing::{error, info};
+use zkaleido::AggregationInput;
 
 use super::{cl_agg::ClAggOperator, l1_batch::L1BatchOperator, ProvingOp};
 use crate::{

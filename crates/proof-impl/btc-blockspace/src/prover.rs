@@ -1,6 +1,6 @@
 use bitcoin::consensus::serialize;
 use strata_state::l1::L1TxProof;
-use strata_zkvm::{
+use zkaleido::{
     ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
 };
 
@@ -14,6 +14,10 @@ pub struct BtcBlockspaceProver;
 impl ZkVmProver for BtcBlockspaceProver {
     type Input = BlockScanProofInput;
     type Output = BlockScanResult;
+
+    fn name() -> String {
+        "Bitcoin Blockspace".to_string()
+    }
 
     fn proof_type() -> ProofType {
         ProofType::Compressed

@@ -1,5 +1,5 @@
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
-use strata_sp1_adapter::Sp1ZkVmEnv;
+use zkaleido_sp1_adapter::Sp1ZkVmEnv;
 
 mod vks;
 

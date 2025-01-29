@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rockbound::{OptimisticTransactionDB, SchemaDBOperationsExt, TransactionRetry};
 use strata_db::{errors::DbError, traits::ProofDatabase, DbResult};
 use strata_primitives::proof::{ProofContext, ProofKey};
-use strata_zkvm::ProofReceipt;
+use zkaleido::ProofReceipt;
 
 use super::schemas::{ProofDepsSchema, ProofSchema};
 use crate::DbOpsConfig;
@@ -91,7 +91,7 @@ mod tests {
         proof::{ProofContext, ProofZkVm},
     };
     use strata_state::l1::L1BlockId;
-    use strata_zkvm::{Proof, PublicValues};
+    use zkaleido::{Proof, PublicValues};
 
     use super::*;
     use crate::test_utils::get_rocksdb_tmp_instance_for_prover;

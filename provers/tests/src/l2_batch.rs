@@ -1,5 +1,5 @@
 use strata_proofimpl_cl_agg::{ClAggInput, ClAggProver};
-use strata_zkvm::{ZkVmHost, ZkVmResult};
+use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::{cl::ClProofGenerator, ProofGenerator};
 

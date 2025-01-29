@@ -11,7 +11,7 @@ strata-db.workspace = true
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
 strata-state.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 bitcoin.workspace = true
 hex.workspace = true

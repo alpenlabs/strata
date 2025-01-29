@@ -1,6 +1,6 @@
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_test_utils::l2::gen_params;
-use strata_zkvm::{AggregationInput, ZkVmHost, ZkVmResult};
+use zkaleido::{AggregationInput, ZkVmHost, ZkVmResult};
 
 use super::{l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator, ProofGenerator};
 

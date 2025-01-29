@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 risc0-zkvm = "1.2"
-strata-risc0-adapter = { path = "../../crates/zkvm/adapters/risc0", features = [
+zkaleido-risc0-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1", features = [
   "prover",
 ], optional = true }
 
@@ -25,7 +25,7 @@ strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 [build-dependencies]
 risc0-build = "1.1.2"
@@ -42,4 +42,4 @@ methods = [
 
 [features]
 default = ["prover"]
-prover = ["dep:strata-risc0-adapter"]
+prover = ["dep:zkaleido-risc0-adapter"]

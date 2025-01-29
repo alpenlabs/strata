@@ -1,5 +1,5 @@
 use strata_proofimpl_cl_agg::process_cl_agg;
-use strata_sp1_adapter::Sp1ZkVmEnv;
+use zkaleido_sp1_adapter::Sp1ZkVmEnv;
 
 mod vks;
 

@@ -12,7 +12,6 @@ strata-btcio.workspace = true
 strata-common.workspace = true
 strata-db.workspace = true
 strata-l1tx.workspace = true
-strata-native-zkvm-adapter.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
@@ -26,7 +25,8 @@ strata-rpc-api = { workspace = true, features = ["client"] }
 strata-rpc-types.workspace = true
 strata-rpc-utils.workspace = true
 strata-state.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
+zkaleido-native-adapter.workspace = true
 
 alloy-rpc-types.workspace = true
 anyhow.workspace = true
@@ -50,20 +50,20 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid.workspace = true
 
 # sp1
-strata-sp1-adapter = { workspace = true, optional = true }
 strata-sp1-guest-builder = { path = "../../provers/sp1", optional = true }
+zkaleido-sp1-adapter = { workspace = true, optional = true }
 
 # risc0
-strata-risc0-adapter = { workspace = true, optional = true }
 strata-risc0-guest-builder = { path = "../../provers/risc0", optional = true }
+zkaleido-risc0-adapter = { workspace = true, optional = true }
 
 [dev-dependencies]
 strata-test-utils.workspace = true
 
 [features]
 default = []
-sp1 = ["strata-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]
-sp1-mock = ["sp1", "strata-sp1-adapter/mock", "strata-sp1-guest-builder/mock"]
+sp1 = ["zkaleido-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]
+sp1-mock = ["sp1", "zkaleido-sp1-adapter/mock", "strata-sp1-guest-builder/mock"]
 
-risc0 = ["strata-risc0-adapter/prover", "strata-risc0-guest-builder/prover"]
-risc0-mock = ["risc0", "strata-risc0-adapter/mock"]
+risc0 = ["zkaleido-risc0-adapter/prover", "strata-risc0-guest-builder/prover"]
+risc0-mock = ["risc0", "zkaleido-risc0-adapter/mock"]

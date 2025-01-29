@@ -1,6 +1,6 @@
 use strata_proofimpl_evm_ee_stf::{primitives::EvmEeProofInput, prover::EvmEeProver};
 use strata_test_utils::evm_ee::EvmSegment;
-use strata_zkvm::{ZkVmHost, ZkVmResult};
+use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
 

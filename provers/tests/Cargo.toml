@@ -13,27 +13,27 @@ strata-proofimpl-evm-ee-stf.workspace = true
 strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
-strata-zkvm.workspace = true
 strata-zkvm-hosts.workspace = true
+zkaleido.workspace = true
 
 # sp1
-strata-sp1-adapter = { workspace = true, optional = true, features = [
+strata-sp1-guest-builder = { path = "../sp1", optional = true, features = [
   "prover",
 ] }
-strata-sp1-guest-builder = { path = "../sp1", optional = true, features = [
+zkaleido-sp1-adapter = { workspace = true, optional = true, features = [
   "prover",
 ] }
 
 # risc0
-strata-risc0-adapter = { workspace = true, optional = true, features = [
+strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
   "prover",
 ] }
-strata-risc0-guest-builder = { path = "../risc0", optional = true, features = [
+zkaleido-risc0-adapter = { workspace = true, optional = true, features = [
   "prover",
 ] }
 
 # native
-strata-native-zkvm-adapter = { workspace = true, optional = true }
+zkaleido-native-adapter = { workspace = true, optional = true }
 
 anyhow.workspace = true
 bincode.workspace = true
@@ -47,17 +47,17 @@ serde_json.workspace = true
 default = ["native"]
 mock = [
   "strata-sp1-guest-builder/mock",
-  "strata-sp1-adapter/mock",
-  "strata-risc0-adapter/mock",
+  "zkaleido-sp1-adapter/mock",
+  "zkaleido-risc0-adapter/mock",
 ]
-native = ["strata-native-zkvm-adapter", "strata-zkvm-hosts/native"]
+native = ["zkaleido-native-adapter", "strata-zkvm-hosts/native"]
 risc0 = [
-  "strata-risc0-adapter",
+  "zkaleido-risc0-adapter",
   "strata-risc0-guest-builder",
   "strata-zkvm-hosts/risc0",
 ]
 sp1 = [
-  "strata-sp1-adapter",
+  "zkaleido-sp1-adapter",
   "strata-sp1-guest-builder",
   "strata-zkvm-hosts/sp1",
 ]

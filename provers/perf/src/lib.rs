@@ -1,4 +1,3 @@
-use strata_zkvm::{ProofType, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult};
 use strata_zkvm_tests::{
     proof_generators::{
         BtcBlockProofGenerator, CheckpointProofGenerator, ClProofGenerator, ElProofGenerator,
@@ -6,6 +5,7 @@ use strata_zkvm_tests::{
     },
     ProofGenerator,
 };
+use zkaleido::{ProofType, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult};
 
 mod reports;
 /// A proof report containing a performance stats about proof generation.

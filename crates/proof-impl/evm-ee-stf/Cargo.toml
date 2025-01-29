@@ -8,7 +8,7 @@ strata-primitives.workspace = true
 strata-reth-evm.workspace = true
 strata-reth-primitives.workspace = true
 strata-state.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 alloy-consensus = { workspace = true, features = ["serde-bincode-compat"] }
 alloy-eips.workspace = true

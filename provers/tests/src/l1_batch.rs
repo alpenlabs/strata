@@ -1,7 +1,7 @@
 use bitcoin::params::MAINNET;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
 use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params};
-use strata_zkvm::{ZkVmHost, ZkVmResult};
+use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
 

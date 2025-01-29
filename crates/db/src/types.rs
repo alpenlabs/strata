@@ -12,7 +12,7 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadIntent},
 };
 use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
-use strata_zkvm::ProofReceipt;
+use zkaleido::ProofReceipt;
 
 /// Represents an intent to publish to some DA, which will be bundled for efficiency.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -241,10 +241,6 @@ impl CheckpointEntry {
 
     pub fn is_proof_ready(&self) -> bool {
         self.proving_status == CheckpointProvingStatus::ProofReady
-    }
-
-    pub fn is_proof_nonempty(&self) -> bool {
-        !self.proof.is_empty()
     }
 }
 

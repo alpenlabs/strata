@@ -316,7 +316,7 @@ fn apply_action<D: Database>(
                 let entry = CheckpointEntry::new(
                     batch_ckp.batch_info().clone(),
                     batch_ckp.bootstrap_state().clone(),
-                    batch_ckp.get_proof_receipt(),
+                    batch_ckp.clone().into_proof_receipt(),
                     pstatus,
                     cstatus,
                     Some(c.commitment.clone().into()),
@@ -336,7 +336,7 @@ fn apply_action<D: Database>(
                 let entry = CheckpointEntry::new(
                     batch_ckp.batch_info().clone(),
                     batch_ckp.bootstrap_state().clone(),
-                    batch_ckp.get_proof_receipt(),
+                    batch_ckp.clone().into_proof_receipt(),
                     pstatus,
                     cstatus,
                     Some(c.commitment.clone().into()),

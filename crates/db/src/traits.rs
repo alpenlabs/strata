@@ -15,7 +15,7 @@ use strata_state::{
     client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
     sync_event::SyncEvent,
 };
-use strata_zkvm::ProofReceipt;
+use zkaleido::ProofReceipt;
 
 use crate::{
     entities::bridge_tx_state::BridgeTxState,

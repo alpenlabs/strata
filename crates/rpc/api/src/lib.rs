@@ -12,7 +12,7 @@ use strata_state::{
     block::L2Block, client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput,
     sync_event::SyncEvent,
 };
-use strata_zkvm::ProofReceipt;
+use zkaleido::ProofReceipt;
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
 pub trait StrataApi {

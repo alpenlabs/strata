@@ -10,7 +10,7 @@ version = "0.1.0"
 strata-bridge-tx-builder.workspace = true
 strata-crypto.workspace = true
 strata-primitives.workspace = true
-strata-zkvm.workspace = true
+zkaleido.workspace = true
 
 arbitrary.workspace = true
 bitcoin.workspace = true

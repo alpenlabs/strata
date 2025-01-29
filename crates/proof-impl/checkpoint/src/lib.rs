@@ -7,7 +7,7 @@ use strata_primitives::{params::RollupParams, proof::RollupVerifyingKey};
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_state::batch::{BatchInfo, CheckpointProofOutput};
-use strata_zkvm::{Proof, ZkVmEnv};
+use zkaleido::{ProofReceipt, ZkVmEnv};
 
 pub mod prover;
 
@@ -25,10 +25,7 @@ pub struct CheckpointProofInput {
 pub fn process_checkpoint_proof(
     l1_batch_output: &L1BatchProofOutput,
     l2_batch_output: &L2BatchProofOutput,
-) -> (
-    CheckpointProofOutput,
-    Option<(CheckpointProofOutput, Proof)>,
-) {
+) -> (CheckpointProofOutput, Option<ProofReceipt>) {
     assert_eq!(
         l1_batch_output.deposits, l2_batch_output.deposits,
         "Deposits mismatch between L1 and L2"
@@ -92,14 +89,9 @@ pub fn process_checkpoint_proof(
             } else {
                 // Use previous checkpoint's bootstrap state and include previous proof
                 let bootstrap = prev_checkpoint.bootstrap_state().clone();
-                let prev_checkpoint_output = CheckpointProofOutput::new(
-                    prev_checkpoint.batch_info().clone(),
-                    bootstrap.clone(),
-                );
-                let prev_checkpoint_proof = prev_checkpoint.proof().clone();
                 (
                     bootstrap,
-                    Some((prev_checkpoint_output, prev_checkpoint_proof)),
+                    Some(prev_checkpoint.clone().into_proof_receipt()),
                 )
             }
         }
@@ -126,9 +118,8 @@ pub fn process_checkpoint_proof_outer(
 
     let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp);
 
-    if let Some(prev_checkpoint) = prev_checkpoint {
-        let (checkpoint, proof) = prev_checkpoint;
-        zkvm.verify_groth16_proof(&proof, &rollup_vk.0, &borsh::to_vec(&checkpoint).unwrap());
+    if let Some(prev_receipt) = prev_checkpoint {
+        zkvm.verify_groth16_receipt(&prev_receipt, &rollup_vk.0);
     }
 
     zkvm.commit_borsh(&output);

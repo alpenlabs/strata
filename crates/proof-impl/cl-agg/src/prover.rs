@@ -1,5 +1,5 @@
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
-use strata_zkvm::{
+use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
     ZkVmResult,
 };
@@ -15,13 +15,17 @@ impl ZkVmProver for ClAggProver {
     type Input = ClAggInput;
     type Output = L2BatchProofOutput;
 
-    fn proof_type() -> strata_zkvm::ProofType {
-        strata_zkvm::ProofType::Compressed
+    fn name() -> String {
+        "CL Agg".to_string()
+    }
+
+    fn proof_type() -> zkaleido::ProofType {
+        zkaleido::ProofType::Compressed
     }
 
     fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
-        B: strata_zkvm::ZkVmInputBuilder<'a>,
+        B: zkaleido::ZkVmInputBuilder<'a>,
     {
         let len = input.batch.len() as u32;
         let mut input_builder = B::new();
@@ -39,7 +43,7 @@ impl ZkVmProver for ClAggProver {
 
     fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>
     where
-        H: strata_zkvm::ZkVmHost,
+        H: zkaleido::ZkVmHost,
     {
         H::extract_borsh_public_output(public_values)
     }

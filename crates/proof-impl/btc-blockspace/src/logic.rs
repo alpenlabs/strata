@@ -5,7 +5,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::params::RollupParams;
 use strata_state::{batch::BatchCheckpoint, l1::L1TxProof, tx::DepositInfo};
-use strata_zkvm::ZkVmEnv;
+use zkaleido::ZkVmEnv;
 
 use crate::scan::process_blockscan;
 
@@ -40,12 +40,12 @@ pub fn process_blockspace_proof_outer(zkvm: &impl ZkVmEnv) {
 mod tests {
     use std::sync::Arc;
 
-    use strata_native_zkvm_adapter::{NativeHost, NativeMachine};
     use strata_test_utils::{
         bitcoin::{get_btc_chain, get_btc_mainnet_block},
         l2::gen_params,
     };
-    use strata_zkvm::ZkVmProver;
+    use zkaleido::ZkVmProver;
+    use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
     use super::*;
     use crate::prover::BtcBlockspaceProver;

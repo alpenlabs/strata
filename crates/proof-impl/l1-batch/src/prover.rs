@@ -2,7 +2,7 @@ use bitcoin::{consensus::serialize, Block};
 use strata_primitives::params::RollupParams;
 use strata_proofimpl_btc_blockspace::block::witness_commitment_from_coinbase;
 use strata_state::l1::{HeaderVerificationState, L1TxProof};
-use strata_zkvm::{PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
+use zkaleido::{PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
 
 use crate::logic::L1BatchProofOutput;
 
@@ -20,13 +20,17 @@ impl ZkVmProver for L1BatchProver {
     type Input = L1BatchProofInput;
     type Output = L1BatchProofOutput;
 
-    fn proof_type() -> strata_zkvm::ProofType {
-        strata_zkvm::ProofType::Compressed
+    fn name() -> String {
+        "L1 Batch".to_string()
+    }
+
+    fn proof_type() -> zkaleido::ProofType {
+        zkaleido::ProofType::Compressed
     }
 
     fn prepare_input<'a, B>(input: &'a Self::Input) -> ZkVmInputResult<B::Input>
     where
-        B: strata_zkvm::ZkVmInputBuilder<'a>,
+        B: zkaleido::ZkVmInputBuilder<'a>,
     {
         let mut input_builder = B::new();
         input_builder.write_borsh(&input.state)?;
@@ -46,7 +50,7 @@ impl ZkVmProver for L1BatchProver {
 
     fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>
     where
-        H: strata_zkvm::ZkVmHost,
+        H: zkaleido::ZkVmHost,
     {
         H::extract_borsh_public_output(public_values)
     }
