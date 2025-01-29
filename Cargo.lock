@@ -13026,8 +13026,7 @@ dependencies = [
  "strata-storage",
  "strata-tasks",
  "strata-test-utils",
- "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "threadpool",
  "tokio",
  "tracing",
@@ -13085,8 +13084,7 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "strata-test-utils",
- "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
  "zkaleido",
 ]
@@ -13305,8 +13303,8 @@ dependencies = [
  "strata-reth-evm",
  "strata-reth-primitives",
  "strata-state",
- "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
+ "zkaleido",
 ]
 
 [[package]]
@@ -13365,8 +13363,7 @@ dependencies = [
  "strata-sp1-guest-builder",
  "strata-state",
  "strata-test-utils",
- "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.19",
@@ -13676,8 +13673,8 @@ dependencies = [
  "strata-primitives",
  "strata-rpc-types",
  "strata-state",
- "strata-zkvm",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
+ "zkaleido",
 ]
 
 [[package]]
@@ -13829,18 +13826,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-zkvm"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "bincode",
- "borsh",
- "serde",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
 name = "strata-zkvm-hosts"
 version = "0.1.0"
 dependencies = [
@@ -13857,7 +13842,10 @@ dependencies = [
  "strata-proofimpl-l1-batch",
  "strata-risc0-guest-builder",
  "strata-sp1-guest-builder",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
+ "zkaleido-native-adapter",
+ "zkaleido-risc0-adapter",
+ "zkaleido-sp1-adapter",
 ]
 
 [[package]]
