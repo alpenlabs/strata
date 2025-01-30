@@ -21,6 +21,10 @@ maturin = "1.8.1"
 [tool.ruff]
 line-length = 100
 indent-width = 4
+# Disabled for the entire file because of money-patching.
+# Ignoring lint for the block of code is not currently supported:
+# https://github.com/astral-sh/ruff/issues/3711
+exclude = ["entry.py"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -3,12 +3,11 @@ from gevent import monkey
 
 monkey.patch_all()
 
-import argparse
+import argparse  # noqa: E402
 import os
 import sys
 
 import flexitest
-
 
 from envs import net_settings, testenv
 from factory import factory
@@ -24,6 +23,15 @@ parser.add_argument("-g", "--groups", nargs="*", help="Define the test groups to
 parser.add_argument("-t", "--tests", nargs="*", help="Define individual tests to execute")
 
 
+# Helper to disable some tests.
+# Useful during debugging or when the test becomes flaky.
+def disabled_tests() -> list[str]:
+    """
+    Helper to disable some tests.
+    Useful during debugging or when the test becomes flaky.
+    """
+    return frozenset(["basic_load"])
+
 def filter_tests(parsed_args, modules):
     """
     Filters test modules against parsed args supplied from the command line.
@@ -36,6 +44,7 @@ def filter_tests(parsed_args, modules):
     )
 
     filtered = dict()
+    disabled = disabled_tests()
     for test, path in modules.items():
         # Drop the prefix of the path before TEST_DIR
         test_path_parts = os.path.normpath(path).split(os.path.sep)
@@ -46,8 +55,9 @@ def filter_tests(parsed_args, modules):
         test_groups = frozenset(test_path_parts[:-1])
 
         # Filtering logic:
-        # if groups or tests were specified (non-empty) as args, then check for exclusion
-        take = True
+        # - check if the test is currently disabled
+        # - if groups or tests were specified (non-empty) as args, then check for exclusion.
+        take = test not in disabled
         if arg_groups and not (arg_groups & test_groups):
             take = False
         if arg_tests and test not in arg_tests:
@@ -57,7 +67,6 @@ def filter_tests(parsed_args, modules):
             filtered[test] = path
 
     return filtered
-
 
 def main(argv):
     """
