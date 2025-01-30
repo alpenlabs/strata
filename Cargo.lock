@@ -13374,6 +13374,7 @@ dependencies = [
  "bincode",
  "bitcoin",
  "borsh",
+ "cfg-if",
  "hex",
  "jsonrpsee",
  "musig2",

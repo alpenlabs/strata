@@ -52,5 +52,5 @@ cargo build --bin strata-datatool -F "sp1" --release
 Additionally, the generated ELF can be exported after building the datatool as specified above:
 
 ```bash
-strata-datatool genparams --elf-path <ELF-PATH>
+strata-datatool genparams --elf-dir <ELF-PATH>
 ```

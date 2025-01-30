@@ -242,7 +242,7 @@ rocksdb_prover/
 .idea/
 
 # ZkVm ELF
-elf
+elfs/
 
 # macOS specific files
 .DS_Store
