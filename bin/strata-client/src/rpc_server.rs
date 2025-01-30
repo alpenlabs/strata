@@ -893,7 +893,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             Err(Error::InvalidCheckpointSignature(idx))?;
         }
 
-        let payload = L1Payload::new_da(
+        let payload = L1Payload::new_checkpoint(
             borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?,
         );
         let sighash = signed_checkpoint.checkpoint().hash();
