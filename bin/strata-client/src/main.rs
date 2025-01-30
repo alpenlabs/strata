@@ -154,6 +154,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 &mut methods,
             )?;
         }
+
         ClientMode::FullNode(fullnode_config) => {
             let sequencer_rpc = &fullnode_config.sequencer_rpc;
             info!(?sequencer_rpc, "initing fullnode task");
@@ -178,6 +179,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         }
     }
 
+    // FIXME we don't have the `CoreContext` anymore after this point
     executor.spawn_critical_async(
         "main-rpc",
         start_rpc(
@@ -219,6 +221,7 @@ fn init_logging(rt: &Handle) {
     }
 }
 
+/// Shared low-level services that secondary services depend on.
 #[derive(Clone)]
 pub struct CoreContext {
     pub database: Arc<CommonDb>,
@@ -411,7 +414,7 @@ fn start_sequencer_tasks(
         broadcast_handle.clone(),
     )?;
 
-    let template_manager_handle = start_template_manager_task(ctx, executor);
+    let template_manager_handle = start_template_manager_task(&ctx, executor);
     let duty_tracker = Arc::new(RwLock::new(DutyTracker::new_empty()));
 
     let admin_rpc = rpc_server::SequencerServerImpl::new(
@@ -427,8 +430,6 @@ fn start_sequencer_tasks(
     // Spawn duty tasks.
     let cupdate_rx = sync_manager.create_cstate_subscription();
     let t_storage = storage.clone();
-    let t_params = params.clone();
-    let t_database = database.clone();
     let t_checkpoint_handle = checkpoint_handle.clone();
     let t_params = params.clone();
     executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
@@ -436,9 +437,8 @@ fn start_sequencer_tasks(
             shutdown,
             duty_tracker,
             cupdate_rx,
-            t_database,
-            t_checkpoint_handle,
             t_storage,
+            t_checkpoint_handle,
             t_params,
         )
         .map_err(Into::into)
@@ -489,6 +489,7 @@ fn start_broadcaster_tasks(
     Arc::new(broadcast_handle)
 }
 
+// FIXME this shouldn't take ownership of `CoreContext`
 async fn start_rpc(
     ctx: CoreContext,
     shutdown_signal: ShutdownSignal,
@@ -511,17 +512,17 @@ async fn start_rpc(
     let strata_rpc = rpc_server::StrataRpcImpl::new(
         status_channel.clone(),
         database.clone(),
-        sync_manager,
+        sync_manager.clone(),
         storage.clone(),
         checkpoint_handle,
-        relayer_handle,
+        relayer_handle.clone(),
     );
     methods.merge(strata_rpc.into_rpc())?;
 
     let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
     methods.merge(admin_rpc.into_rpc())?;
 
-    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(storage.clone(), database);
+    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(storage.clone(), database.clone());
     methods.merge(debug_rpc.into_rpc())?;
 
     let rpc_host = config.client.rpc_host;
@@ -554,22 +555,32 @@ async fn start_rpc(
     Ok(())
 }
 
+// TODO move this close to where we launch the template manager
 fn start_template_manager_task(
-    ctx: CoreContext,
+    ctx: &CoreContext,
     executor: &TaskExecutor,
 ) -> block_template::TemplateManagerHandle {
     let CoreContext {
         database,
+        storage,
         engine,
         params,
         status_channel,
-        l2_block_manager,
         sync_manager,
         ..
     } = ctx;
+
+    // TODO make configurable
     let (tx, rx) = mpsc::channel(100);
 
-    let worker_ctx = block_template::WorkerContext::new(params, database, engine, status_channel);
+    let worker_ctx = block_template::WorkerContext::new(
+        params.clone(),
+        database.clone(),
+        storage.clone(),
+        engine.clone(),
+        status_channel.clone(),
+    );
+
     let shared_state: block_template::SharedState = Default::default();
 
     let t_shared_state = shared_state.clone();
@@ -577,5 +588,10 @@ fn start_template_manager_task(
         block_template::worker(shutdown, worker_ctx, t_shared_state, rx)
     });
 
-    block_template::TemplateManagerHandle::new(tx, shared_state, l2_block_manager, sync_manager)
+    block_template::TemplateManagerHandle::new(
+        tx,
+        shared_state,
+        storage.l2().clone(),
+        sync_manager.clone(),
+    )
 }

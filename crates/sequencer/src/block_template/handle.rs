@@ -17,6 +17,7 @@ pub enum TemplateManagerRequest {
         BlockGenerationConfig,
         oneshot::Sender<Result<BlockTemplate, Error>>,
     ),
+
     /// Provide [`BlockCompletionData`] for an existing template to create
     /// a complete [`L2BlockBundle`]
     CompleteBlockTemplate(
@@ -27,7 +28,6 @@ pub enum TemplateManagerRequest {
 }
 
 /// Handle for communication with the template manager worker.
-#[allow(missing_debug_implementations)]
 pub struct TemplateManagerHandle {
     tx: mpsc::Sender<TemplateManagerRequest>,
     shared: SharedState,
@@ -37,6 +37,7 @@ pub struct TemplateManagerHandle {
 
 impl TemplateManagerHandle {
     /// Create new instance.
+    // TODO make this not pub
     pub fn new(
         tx: mpsc::Sender<TemplateManagerRequest>,
         shared: SharedState,
