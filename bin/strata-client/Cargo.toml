@@ -65,4 +65,5 @@ strata-test-utils.workspace = true
 debug-utils = [
   "strata-common/debug-utils",
   "strata-consensus-logic/debug-utils",
+  "strata-sequencer/debug-utils",
 ]
