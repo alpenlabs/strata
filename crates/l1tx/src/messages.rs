@@ -1,5 +1,6 @@
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::buf::Buf32;
 use strata_state::{l1::HeaderVerificationState, tx::ProtocolOperation};
 
 /// L1 events that we observe and want the persistence task to work on.
@@ -42,6 +43,21 @@ impl ProtocolTxEntry {
     /// Returns a reference to the protocol operation
     pub fn proto_ops(&self) -> &[ProtocolOperation] {
         &self.proto_ops
+    }
+}
+
+/// Da data retrieved from L1 transaction.
+#[derive(Clone, Debug)]
+pub struct DaEntry {
+    #[allow(unused)]
+    commitment: Buf32,
+    #[allow(unused)]
+    blob: Vec<u8>,
+}
+
+impl DaEntry {
+    pub fn new(commitment: Buf32, blob: Vec<u8>) -> Self {
+        Self { commitment, blob }
     }
 }
 

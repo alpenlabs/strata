@@ -3,7 +3,7 @@
 
 use bitcoin::Block;
 use strata_l1tx::filter::{
-    visitor::{BlockIndexer, OpIndexer},
+    indexer::{BlockIndexer, OpIndexer},
     TxFilterConfig,
 };
 use strata_primitives::{block_credential::CredRule, params::RollupParams};
@@ -12,7 +12,7 @@ use strata_state::{
     tx::{DepositInfo, ProtocolOperation},
 };
 
-use crate::ops_visitor::ProverOpsVisitor;
+use crate::tx_indexer::ProverTxIndexer;
 
 pub fn extract_relevant_info(
     block: &Block,
@@ -24,8 +24,8 @@ pub fn extract_relevant_info(
 
     // Just pass a no-op to the filter function as prover does not have to do anything with the raw
     // data like storing in db.
-    let indexer = OpIndexer::new(ProverOpsVisitor::new());
-    let tx_refs = indexer.index_block(block, filter_config).collect();
+    let indexer = OpIndexer::new(ProverTxIndexer::new());
+    let (tx_refs, _, _) = indexer.index_block(block, filter_config).collect();
 
     for op in tx_refs.into_iter().flat_map(|t| t.proto_ops().to_vec()) {
         match op {

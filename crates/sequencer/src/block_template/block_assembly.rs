@@ -196,7 +196,7 @@ fn fetch_deposit_update_txs(h: u64, l1man: &L1BlockManager) -> Result<Vec<Deposi
         let tx = l1man.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
 
         for op in tx.protocol_ops() {
-            if let Deposit(dep) = op {
+            if let Deposit(_dep) = op {
                 deposit_update_txs.push(DepositUpdateTx::new(tx.clone(), tx_ref.position()))
             }
         }

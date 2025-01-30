@@ -9,7 +9,7 @@ use bitcoin::{Block, BlockHash};
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
     filter::{
-        visitor::{BlockIndexer, DepositRequestIndexer, OpIndexer},
+        indexer::{BlockIndexer, OpIndexer},
         TxFilterConfig,
     },
     messages::{BlockData, L1Event},
@@ -24,7 +24,7 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    reader::{ops_visitor::ClientOpsVisitor, state::ReaderState},
+    reader::{state::ReaderState, tx_indexer::ClientTxIndexer},
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -327,15 +327,12 @@ async fn process_block<R: ReaderRpc>(
     let params = ctx.params.clone();
 
     // Index ops
-    let ops_indexer = OpIndexer::new(ClientOpsVisitor::new());
-    let tx_entries = ops_indexer
+    let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
+    let (tx_entries, _dep_reqs, _da_entries) = ops_indexer
         .index_block(&block, state.filter_config())
         .collect();
 
-    // Index deposit requests
-    let _dep_reqs = DepositRequestIndexer::new()
-        .index_block(&block, state.filter_config())
-        .collect();
+    // TODO: do stuffs with dep_reqs and da_entries
 
     let block_data = BlockData::new(height, block, tx_entries);
 

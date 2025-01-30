@@ -22,7 +22,7 @@ pub enum ProtocolOperation {
     Checkpoint(SignedBatchCheckpoint),
     // Da Commitment
     DaCommitment(Buf32),
-    // TODO: add other kinds like proofs and state diffs
+    // TODO: add other kinds like proofs
 }
 
 #[derive(

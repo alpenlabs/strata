@@ -1,29 +1,25 @@
 use digest::Digest;
 use sha2::Sha256;
-use strata_l1tx::filter::visitor::OpsVisitor;
+use strata_l1tx::filter::indexer::TxIndexer;
 use strata_state::{
     batch::SignedBatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
 
-/// Ops visitor for Prover. Basically this efficiently gets da commitment from chunks without doing
+/// Ops indexer for Prover. Basically this efficiently gets da commitment from chunks without doing
 /// anything else with the chunks.
 #[derive(Debug, Clone)]
-pub(crate) struct ProverOpsVisitor {
+pub(crate) struct ProverTxIndexer {
     ops: Vec<ProtocolOperation>,
 }
 
-impl ProverOpsVisitor {
+impl ProverTxIndexer {
     pub fn new() -> Self {
         Self { ops: Vec::new() }
     }
 }
 
-impl OpsVisitor for ProverOpsVisitor {
-    fn collect(self) -> Vec<ProtocolOperation> {
-        self.ops
-    }
-
+impl TxIndexer for ProverTxIndexer {
     fn visit_da<'a>(&mut self, chunks: impl Iterator<Item = &'a [u8]>) {
         let mut hasher = Sha256::new();
         for chunk in chunks {
@@ -40,6 +36,16 @@ impl OpsVisitor for ProverOpsVisitor {
     fn visit_checkpoint(&mut self, chkpt: SignedBatchCheckpoint) {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
+
+    fn collect(
+        self,
+    ) -> (
+        Vec<ProtocolOperation>,
+        Vec<strata_state::tx::DepositRequestInfo>,
+        Vec<strata_l1tx::messages::DaEntry>,
+    ) {
+        (self.ops, Vec::new(), Vec::new())
+    }
 }
 
 /// These are mostly similar to the ones in `strata_btcio::reader::ops_visitor` except for the
@@ -53,7 +59,7 @@ mod test {
     };
     use strata_btcio::test_utils::create_checkpoint_envelope_tx;
     use strata_l1tx::filter::{
-        visitor::{BlockIndexer, OpIndexer},
+        indexer::{BlockIndexer, OpIndexer},
         TxFilterConfig,
     };
     use strata_primitives::{
@@ -67,7 +73,7 @@ mod test {
         ArbitraryGenerator,
     };
 
-    use super::ProverOpsVisitor;
+    use super::ProverTxIndexer;
 
     const TEST_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
 
@@ -108,8 +114,8 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ProverOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
+        let ops_indexer = OpIndexer::new(ProverTxIndexer::new());
+        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert_eq!(tx_entries.len(), 1, "Should find one relevant transaction");
 
@@ -140,8 +146,8 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let ops_indexer = OpIndexer::new(ProverOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
+        let ops_indexer = OpIndexer::new(ProverTxIndexer::new());
+        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert!(
             tx_entries.is_empty(),
@@ -175,8 +181,8 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let ops_indexer = OpIndexer::new(ProverOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
+        let ops_indexer = OpIndexer::new(ProverTxIndexer::new());
+        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert_eq!(tx_entries.len(), 2, "Should find two relevant transactions");
 
@@ -239,9 +245,8 @@ mod test {
         // Create a block with single tx that has multiple ops
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ProverOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
-        println!("TX ENTRIES: {:?}", tx_entries);
+        let ops_indexer = OpIndexer::new(ProverTxIndexer::new());
+        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert_eq!(
             tx_entries.len(),

@@ -6,8 +6,8 @@ use strata_state::{
 };
 use tracing::warn;
 
+pub mod indexer;
 pub mod types;
-pub mod visitor;
 
 pub use types::TxFilterConfig;
 

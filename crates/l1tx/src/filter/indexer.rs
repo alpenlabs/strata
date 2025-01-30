@@ -8,9 +8,9 @@ use super::{
     parse_checkpoint_envelopes, parse_da_blobs, parse_deposit_requests, parse_deposits,
     TxFilterConfig,
 };
-use crate::messages::ProtocolTxEntry;
+use crate::messages::{DaEntry, ProtocolTxEntry};
 
-pub trait OpsVisitor {
+pub trait TxIndexer {
     // Do stuffs with `SignedBatchCheckpoint`.
     fn visit_checkpoint(&mut self, _chkpt: SignedBatchCheckpoint) {}
 
@@ -23,14 +23,17 @@ pub trait OpsVisitor {
     // Do stuffs with DA.
     fn visit_da<'a>(&mut self, _d: impl Iterator<Item = &'a [u8]>) {}
 
-    fn collect(self) -> Vec<ProtocolOperation>;
+    // Collect data
+    fn collect(
+        self,
+    ) -> (
+        Vec<ProtocolOperation>,
+        Vec<DepositRequestInfo>,
+        Vec<DaEntry>,
+    );
 }
 
 pub trait BlockIndexer {
-    type Output;
-
-    fn collect(self) -> Self::Output;
-
     fn index_tx(&mut self, txidx: u32, tx: &Transaction, config: &TxFilterConfig);
 
     fn index_block(mut self, block: &Block, config: &TxFilterConfig) -> Self
@@ -45,36 +48,29 @@ pub trait BlockIndexer {
 }
 
 #[derive(Clone, Debug)]
-pub struct OpIndexer<V: OpsVisitor> {
+pub struct OpIndexer<V: TxIndexer> {
     visitor: V,
     tx_entries: Vec<ProtocolTxEntry>,
+    dep_reqs: Vec<DepositRequestInfo>,
+    da_entries: Vec<DaEntry>,
 }
 
-impl<V: OpsVisitor> OpIndexer<V> {
+impl<V: TxIndexer> OpIndexer<V> {
     pub fn new(visitor: V) -> Self {
         Self {
             visitor,
             tx_entries: Vec::new(),
+            dep_reqs: Vec::new(),
+            da_entries: Vec::new(),
         }
+    }
+
+    pub fn collect(self) -> (Vec<ProtocolTxEntry>, Vec<DepositRequestInfo>, Vec<DaEntry>) {
+        (self.tx_entries, self.dep_reqs, self.da_entries)
     }
 }
 
-#[derive(Clone, Default)]
-pub struct DepositRequestIndexer {
-    requests: Vec<DepositRequestInfo>,
-}
-
-impl DepositRequestIndexer {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
-    }
-}
-
-impl<V: OpsVisitor + Clone> BlockIndexer for OpIndexer<V> {
-    type Output = Vec<ProtocolTxEntry>;
-
+impl<V: TxIndexer + Clone> BlockIndexer for OpIndexer<V> {
     fn index_tx(&mut self, txidx: u32, tx: &Transaction, config: &TxFilterConfig) {
         let mut visitor = self.visitor.clone();
         for chp in parse_checkpoint_envelopes(tx, config) {
@@ -94,26 +90,13 @@ impl<V: OpsVisitor + Clone> BlockIndexer for OpIndexer<V> {
             visitor.visit_da(da);
         }
 
-        let ops = visitor.collect();
+        let (ops, dep_reqs, da_entries) = visitor.collect();
         if !ops.is_empty() {
             let entry = ProtocolTxEntry::new(txidx, ops);
             self.tx_entries.push(entry);
         }
-    }
 
-    fn collect(self) -> Self::Output {
-        self.tx_entries
-    }
-}
-
-impl BlockIndexer for DepositRequestIndexer {
-    type Output = Vec<DepositRequestInfo>;
-
-    fn collect(self) -> Self::Output {
-        self.requests
-    }
-
-    fn index_tx(&mut self, _txidx: u32, tx: &Transaction, config: &TxFilterConfig) {
-        self.requests.extend(parse_deposit_requests(tx, config));
+        self.dep_reqs.extend_from_slice(&dep_reqs);
+        self.da_entries.extend_from_slice(&da_entries);
     }
 }

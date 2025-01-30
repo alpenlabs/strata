@@ -1,38 +1,49 @@
 use digest::Digest;
 use sha2::Sha256;
-use strata_l1tx::filter::visitor::OpsVisitor;
+use strata_l1tx::{filter::indexer::TxIndexer, messages::DaEntry};
+use strata_primitives::buf::Buf32;
 use strata_state::{
     batch::SignedBatchCheckpoint,
     tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
 };
 
-/// Ops visitor for rollup client. This is intended to get Da commitment as well as process/store da
-/// blob.
+/// Ops indexer for rollup client. Collects extra info like da blobs and deposit requests
 #[derive(Clone, Debug)]
-pub struct ClientOpsVisitor {
+pub struct ClientTxIndexer {
     ops: Vec<ProtocolOperation>,
-    // TODO: Add l1 manager to store da to db
+    deposit_requests: Vec<DepositRequestInfo>,
+    da_entries: Vec<DaEntry>,
 }
 
-impl ClientOpsVisitor {
+impl ClientTxIndexer {
     pub fn new() -> Self {
-        Self { ops: Vec::new() }
+        Self {
+            ops: Vec::new(),
+            deposit_requests: Vec::new(),
+            da_entries: Vec::new(),
+        }
+    }
+
+    fn ops(&self) -> &[ProtocolOperation] {
+        &self.ops
     }
 }
 
-impl OpsVisitor for ClientOpsVisitor {
-    fn collect(self) -> Vec<ProtocolOperation> {
-        self.ops
-    }
-
+impl TxIndexer for ClientTxIndexer {
     fn visit_da<'a>(&mut self, chunks: impl Iterator<Item = &'a [u8]>) {
         let mut hasher = Sha256::new();
+        let mut blob = Vec::new();
+
         for chunk in chunks {
             hasher.update(chunk);
+            blob.extend_from_slice(chunk);
         }
         let hash: [u8; 32] = hasher.finalize().into();
-        // TODO: store da in db
-        self.ops.push(ProtocolOperation::DaCommitment(hash.into()));
+        let commitment: Buf32 = hash.into();
+
+        self.ops.push(ProtocolOperation::DaCommitment(commitment));
+        // Collect da
+        self.da_entries.push(DaEntry::new(commitment, blob));
     }
 
     fn visit_deposit(&mut self, d: DepositInfo) {
@@ -40,11 +51,22 @@ impl OpsVisitor for ClientOpsVisitor {
     }
 
     fn visit_deposit_request(&mut self, d: DepositRequestInfo) {
-        self.ops.push(ProtocolOperation::DepositRequest(d));
+        self.ops.push(ProtocolOperation::DepositRequest(d.clone()));
+        self.deposit_requests.push(d);
     }
 
     fn visit_checkpoint(&mut self, chkpt: SignedBatchCheckpoint) {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
+    }
+
+    fn collect(
+        self,
+    ) -> (
+        Vec<ProtocolOperation>,
+        Vec<DepositRequestInfo>,
+        Vec<DaEntry>,
+    ) {
+        (self.ops, self.deposit_requests, self.da_entries)
     }
 }
 
@@ -56,7 +78,7 @@ mod test {
         Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode,
     };
     use strata_l1tx::filter::{
-        visitor::{BlockIndexer, DepositRequestIndexer, OpIndexer},
+        indexer::{BlockIndexer, OpIndexer},
         TxFilterConfig,
     };
     use strata_primitives::{
@@ -73,7 +95,7 @@ mod test {
         ArbitraryGenerator,
     };
 
-    use crate::{reader::ops_visitor::ClientOpsVisitor, test_utils::create_checkpoint_envelope_tx};
+    use crate::{reader::tx_indexer::ClientTxIndexer, test_utils::create_checkpoint_envelope_tx};
 
     const TEST_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
 
@@ -114,8 +136,8 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
+        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert_eq!(tx_entries.len(), 1, "Should find one relevant transaction");
 
@@ -158,10 +180,8 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let deposit_req_indexer = DepositRequestIndexer::new();
-        let dep_reqs = deposit_req_indexer
-            .index_block(&block, &filter_config)
-            .collect();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
+        let (_, dep_reqs, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert_eq!(dep_reqs.len(), 1, "Should find one deposit request");
 
@@ -187,8 +207,8 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let ops_indexer = OpIndexer::new(ClientOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
+        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert!(
             tx_entries.is_empty(),
@@ -222,8 +242,8 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let ops_indexer = OpIndexer::new(ClientOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
+        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert_eq!(tx_entries.len(), 2, "Should find two relevant transactions");
 
@@ -286,9 +306,8 @@ mod test {
         // Create a block with single tx that has multiple ops
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientOpsVisitor::new());
-        let tx_entries = ops_indexer.index_block(&block, &filter_config).collect();
-        println!("TX ENTRIES: {:?}", tx_entries);
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
+        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
 
         assert_eq!(
             tx_entries.len(),
