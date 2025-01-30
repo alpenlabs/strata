@@ -582,6 +582,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitcoin-bosd"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3792f996c90611de104eb4bbf050856a6c9e74667d679421697b9e2c76b14d4a"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "hex-conservative",
+ "secp256k1",
+ "serde",
+ "thiserror 2.0.11",
+]
+
+[[package]]
 name = "bitcoin-internals"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -662,9 +677,9 @@ dependencies = [
 
 [[package]]
 name = "borsh"
-version = "1.5.1"
+version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6362ed55def622cddc70a4746a68554d7b687713770de539e59a739b249f8ed"
+checksum = "5430e3be710b68d984d1391c854eb431a9d548640711faa54eecb1df93db91cc"
 dependencies = [
  "borsh-derive",
  "cfg_aliases",
@@ -672,16 +687,15 @@ dependencies = [
 
 [[package]]
 name = "borsh-derive"
-version = "1.5.1"
+version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3ef8005764f53cd4dca619f5bf64cafd4664dada50ece25e4d81de54c80cc0b"
+checksum = "f8b668d39970baad5356d7c83a86fee3a539e6f93bf6764c97368243e17a0487"
 dependencies = [
  "once_cell",
  "proc-macro-crate",
  "proc-macro2",
  "quote",
  "syn 2.0.87",
- "syn_derive",
 ]
 
 [[package]]
@@ -1677,7 +1691,7 @@ dependencies = [
  "derive_more",
  "serde",
  "serde_with",
- "thiserror 2.0.9",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -1899,29 +1913,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro-error"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
-dependencies = [
- "proc-macro-error-attr",
- "proc-macro2",
- "quote",
- "version_check",
-]
-
-[[package]]
-name = "proc-macro-error-attr"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
-dependencies = [
- "proc-macro2",
- "quote",
- "version_check",
-]
-
-[[package]]
 name = "proc-macro-error-attr2"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2112,7 +2103,7 @@ dependencies = [
  "once_cell",
  "rustc-hash",
  "serde",
- "thiserror 2.0.9",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -2451,18 +2442,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.214"
+version = "1.0.217"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f55c3193aca71c12ad7890f1785d2b73e1b9f63a0bbc353c08ef26fe03fc56b5"
+checksum = "02fc4265df13d6fa1d00ecff087228cc0a2b5f3c0e87e258d8b94a156e984c70"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.214"
+version = "1.0.217"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de523f781f095e28fa605cdce0f8307e451cc0fd14e2eb4cd2e98a355b147766"
+checksum = "5a9bf7cf98d04a2b28aead066b7496853d4779c9cc183c440dbac457641e19a0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2626,7 +2617,7 @@ dependencies = [
  "lazy_static",
  "sha2",
  "substrate-bn-succinct",
- "thiserror 2.0.9",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -2677,7 +2668,7 @@ dependencies = [
  "musig2",
  "serde",
  "strata-primitives",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -2691,7 +2682,7 @@ dependencies = [
  "strata-eectl",
  "strata-primitives",
  "strata-state",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -2710,7 +2701,7 @@ version = "0.1.0"
 dependencies = [
  "strata-primitives",
  "strata-state",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -2726,7 +2717,7 @@ dependencies = [
  "strata-bridge-tx-builder",
  "strata-primitives",
  "strata-state",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -2738,6 +2729,7 @@ dependencies = [
  "arbitrary",
  "bincode",
  "bitcoin",
+ "bitcoin-bosd",
  "borsh",
  "digest 0.10.7",
  "hex",
@@ -2750,7 +2742,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "tracing",
  "zeroize",
 ]
@@ -2825,7 +2817,7 @@ dependencies = [
  "strata-reth-evm",
  "strata-reth-primitives",
  "strata-state",
- "thiserror 1.0.68",
+ "thiserror 2.0.11",
  "zkaleido",
 ]
 
@@ -2862,8 +2854,8 @@ name = "strata-reth-primitives"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
- "revm-primitives",
  "serde",
+ "strata-primitives",
 ]
 
 [[package]]
@@ -2984,18 +2976,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "syn_derive"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1329189c02ff984e9736652b1631330da25eaa6bc639089ed4915d25446cbe7b"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
 name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3025,11 +3005,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.9"
+version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f072643fd0190df67a8bab670c20ef5d8737177d6ac6b2e9a236cb096206b2cc"
+checksum = "d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc"
 dependencies = [
- "thiserror-impl 2.0.9",
+ "thiserror-impl 2.0.11",
 ]
 
 [[package]]
@@ -3045,9 +3025,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.9"
+version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b50fa271071aae2e6ee85f842e2e28ba8cd2c5fb67f11fcb1fd70b276f9e7d4"
+checksum = "26afc1baea8a989337eeb52b6e72a039780ce45c3edfcc9c5b9d112feeb173c2"
 dependencies = [
  "proc-macro2",
  "quote",

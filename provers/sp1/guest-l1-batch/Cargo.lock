@@ -432,6 +432,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitcoin-bosd"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3792f996c90611de104eb4bbf050856a6c9e74667d679421697b9e2c76b14d4a"
+dependencies = [
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "hex-conservative",
+ "secp256k1",
+ "serde",
+ "thiserror 2.0.11",
+]
+
+[[package]]
 name = "bitcoin-internals"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2368,7 +2383,7 @@ dependencies = [
  "musig2",
  "serde",
  "strata-primitives",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -2393,7 +2408,7 @@ dependencies = [
  "strata-bridge-tx-builder",
  "strata-primitives",
  "strata-state",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -2405,6 +2420,7 @@ dependencies = [
  "arbitrary",
  "bincode",
  "bitcoin",
+ "bitcoin-bosd",
  "borsh",
  "digest 0.10.7",
  "hex",
@@ -2417,7 +2433,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
  "zeroize",
 ]
