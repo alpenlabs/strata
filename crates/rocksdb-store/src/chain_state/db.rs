@@ -45,6 +45,10 @@ impl ChainstateDatabase for ChainstateDb {
     }
 
     fn put_write_batch(&self, idx: u64, batch: strata_state::state_op::WriteBatch) -> DbResult<()> {
+        if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
+            return Err(DbError::OverwriteStateUpdate(idx));
+        }
+
         // Make sure we always have a contiguous range of batches.
         // FIXME this *could* be a race condition / TOCTOU issue, but we're only
         // going to be writing from a single thread anyways so it should be fine
@@ -55,10 +59,6 @@ impl ChainstateDatabase for ChainstateDb {
                 }
             }
             None => return Err(DbError::NotBootstrapped),
-        }
-
-        if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
-            return Err(DbError::OverwriteStateUpdate(idx));
         }
 
         // TODO maybe do this in a tx to make sure we don't race/TOCTOU it
