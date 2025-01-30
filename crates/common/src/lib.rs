@@ -5,3 +5,4 @@ pub mod logging;
 
 #[cfg(feature = "debug-utils")]
 pub mod bail_manager;
+pub mod ws_client;

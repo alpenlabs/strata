@@ -5,8 +5,12 @@ use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
-    HexBytes, HexBytes32, L2BlockStatus, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus,
-    RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
+    HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcBridgeDuties, RpcChainState,
+    RpcCheckpointConfStatus, RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
+};
+use strata_sequencer::{
+    block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate},
+    duty::types::Duty,
 };
 use strata_state::{
     block::L2Block, client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput,
@@ -173,6 +177,22 @@ pub trait StrataSequencerApi {
 
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
+
+    #[method(name = "strata_getSequencerDuties")]
+    async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>>;
+
+    #[method(name = "strata_getBlockTemplate")]
+    async fn get_block_template(&self, config: BlockGenerationConfig) -> RpcResult<BlockTemplate>;
+
+    #[method(name = "strata_completeBlockTemplate")]
+    async fn complete_block_template(
+        &self,
+        template_id: L2BlockId,
+        completion: BlockCompletionData,
+    ) -> RpcResult<L2BlockId>;
+
+    #[method(name = "strata_completeCheckpointSignature")]
+    async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()>;
 }
 
 /// rpc endpoints that are only available for debugging purpose and subject to change.

@@ -17,6 +17,7 @@ class BlockFinalizationTest(testenv.StrataTester):
         premine_blocks = 101
         settings = net_settings.get_fast_batch_settings()
         settings.genesis_trigger = premine_blocks + 5
+        settings.proof_timeout = 5
 
         ctx.set_env(testenv.BasicEnvConfig(premine_blocks, rollup_settings=settings))
 

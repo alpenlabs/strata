@@ -1,13 +1,11 @@
 //! Sequencer duties.
 
-use std::time;
+use std::{collections::HashSet, time};
 
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use strata_state::{
-    batch::{BatchInfo, BootstrapState},
-    id::L2BlockId,
-};
+use strata_state::{batch::BatchCheckpoint, id::L2BlockId};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -29,7 +27,7 @@ pub enum Expiry {
 }
 
 /// Duties the sequencer might carry out.
-#[derive(Clone, Debug, BorshSerialize)]
+#[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum Duty {
     /// Goal to sign a block.
@@ -47,6 +45,7 @@ impl Duty {
         }
     }
 
+    /// Returns a unique identifier for the duty.
     pub fn id(&self) -> Buf32 {
         match self {
             // We want Batch commitment duty to be unique by the checkpoint idx
@@ -57,58 +56,64 @@ impl Duty {
 }
 
 /// Describes information associated with signing a block.
-#[derive(Clone, Debug, BorshSerialize)]
+#[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 pub struct BlockSigningDuty {
     /// Slot to sign for.
     slot: u64,
     /// Parent to build on
     parent: L2BlockId,
+    /// Target timestamp for block
+    target_ts: u64,
 }
 
 impl BlockSigningDuty {
-    pub fn new_simple(slot: u64, parent: L2BlockId) -> Self {
-        Self { slot, parent }
+    /// Create new block signing duty from components.
+    pub fn new_simple(slot: u64, parent: L2BlockId, target_ts: u64) -> Self {
+        Self {
+            slot,
+            parent,
+            target_ts,
+        }
     }
 
+    /// Returns target slot for block signing duty.
     pub fn target_slot(&self) -> u64 {
         self.slot
     }
 
+    /// Returns parent block id for block signing duty.
     pub fn parent(&self) -> L2BlockId {
         self.parent
+    }
+
+    /// Returns target ts for block signing duty.
+    pub fn target_ts(&self) -> u64 {
+        self.target_ts
     }
 }
 
 /// This duty is created whenever a previous batch is found on L1 and verified.
 /// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
 /// batch proof in the proof db.
-#[derive(Clone, Debug, BorshSerialize)]
+#[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 pub struct BatchCheckpointDuty {
-    /// Checkpoint/batch info which needs to be proven
-    batch_info: BatchInfo,
-
-    /// Bootstrapping info based on which the `info` will be verified
-    bootstrap_state: BootstrapState,
+    checkpoint: BatchCheckpoint,
 }
 
 impl BatchCheckpointDuty {
-    pub fn new(batch_info: BatchInfo, bootstrap_state: BootstrapState) -> Self {
-        Self {
-            batch_info,
-            bootstrap_state,
-        }
+    /// Create new duty from [`BatchCheckpoint`]
+    pub fn new(checkpoint: BatchCheckpoint) -> Self {
+        Self { checkpoint }
     }
 
+    /// Gen checkpoint index.
     pub fn idx(&self) -> u64 {
-        self.batch_info.idx()
+        self.checkpoint.batch_info().idx()
     }
 
-    pub fn batch_info(&self) -> &BatchInfo {
-        &self.batch_info
-    }
-
-    pub fn bootstrap_state(&self) -> &BootstrapState {
-        &self.bootstrap_state
+    /// Get reference to checkpoint.
+    pub fn checkpoint(&self) -> &BatchCheckpoint {
+        &self.checkpoint
     }
 }
 
@@ -116,6 +121,7 @@ impl BatchCheckpointDuty {
 #[derive(Clone, Debug)]
 pub struct DutyTracker {
     duties: Vec<DutyEntry>,
+    duty_ids: HashSet<Buf32>,
     finalized_block: Option<L2BlockId>,
 }
 
@@ -124,6 +130,7 @@ impl DutyTracker {
     pub fn new_empty() -> Self {
         Self {
             duties: Vec::new(),
+            duty_ids: HashSet::new(),
             finalized_block: None,
         }
     }
@@ -136,6 +143,7 @@ impl DutyTracker {
     /// Updates the tracker with a new world state, purging relevant duties.
     pub fn update(&mut self, update: &StateUpdate) -> usize {
         let mut kept_duties = Vec::new();
+        let mut duty_ids = HashSet::new();
 
         if update.latest_finalized_block.is_some() {
             self.set_finalized_block(update.latest_finalized_block);
@@ -175,27 +183,38 @@ impl DutyTracker {
                 }
             }
 
+            duty_ids.insert(d.id());
             kept_duties.push(d);
         }
 
         self.duties = kept_duties;
+        self.duty_ids = duty_ids;
         old_cnt - self.duties.len()
     }
 
     /// Adds some more duties.
     pub fn add_duties(&mut self, blkid: L2BlockId, slot: u64, duties: impl Iterator<Item = Duty>) {
-        self.duties.extend(duties.map(|d| DutyEntry {
-            id: d.id(),
-            duty: d,
-            created_blkid: blkid,
-            created_slot: slot,
+        self.duties.extend(duties.filter_map(|duty| {
+            let id = duty.id();
+            if self.duty_ids.contains(&id) {
+                return None;
+            }
+
+            Some(DutyEntry {
+                id,
+                duty,
+                created_blkid: blkid,
+                created_slot: slot,
+            })
         }));
     }
 
+    /// Sets the finalized block.
     pub fn set_finalized_block(&mut self, blkid: Option<L2BlockId>) {
         self.finalized_block = blkid;
     }
 
+    /// Get finalized block.
     pub fn get_finalized_block(&self) -> Option<L2BlockId> {
         self.finalized_block
     }
@@ -206,6 +225,7 @@ impl DutyTracker {
     }
 }
 
+/// Represents a single duty inside duty tracker.
 #[derive(Clone, Debug)]
 pub struct DutyEntry {
     /// Duty data itself.
@@ -222,10 +242,12 @@ pub struct DutyEntry {
 }
 
 impl DutyEntry {
+    /// Get reference to Duty.
     pub fn duty(&self) -> &Duty {
         &self.duty
     }
 
+    /// Get duty ID.
     pub fn id(&self) -> Buf32 {
         self.id
     }
@@ -251,6 +273,7 @@ pub struct StateUpdate {
 }
 
 impl StateUpdate {
+    /// Create a new state update.
     pub fn new(
         last_block_slot: u64,
         cur_timestamp: time::Instant,
@@ -271,10 +294,12 @@ impl StateUpdate {
         }
     }
 
+    /// Create state update without blocks or batch info.
     pub fn new_simple(last_block_slot: u64, cur_timestamp: time::Instant) -> Self {
         Self::new(last_block_slot, cur_timestamp, Vec::new(), None)
     }
 
+    /// Check if a given L2 block is marked as finalized in this update.
     pub fn is_finalized(&self, id: &L2BlockId) -> bool {
         self.newly_finalized_blocks.binary_search(id).is_ok()
     }
@@ -287,6 +312,7 @@ pub enum Identity {
     Sequencer(Buf32),
 }
 
+/// Represents a group of duties created from a single sync event.
 #[derive(Clone, Debug)]
 pub struct DutyBatch {
     sync_ev_idx: u64,
@@ -294,6 +320,7 @@ pub struct DutyBatch {
 }
 
 impl DutyBatch {
+    /// Create a new duty batch for a single sync event.
     pub fn new(sync_ev_idx: u64, duties: Vec<DutyEntry>) -> Self {
         Self {
             sync_ev_idx,
@@ -301,10 +328,12 @@ impl DutyBatch {
         }
     }
 
+    /// Returns sync event idx that this duty batch was created from.
     pub fn sync_ev_idx(&self) -> u64 {
         self.sync_ev_idx
     }
 
+    /// Returns reference to duties in this batch.
     pub fn duties(&self) -> &[DutyEntry] {
         &self.duties
     }
@@ -313,6 +342,7 @@ impl DutyBatch {
 /// Sequencer key used for signing-related duties.
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum IdentityKey {
+    /// Sequencer private key used for signing.
     Sequencer(Buf32),
 }
 
@@ -322,11 +352,14 @@ pub enum IdentityKey {
 /// with real cryptographic signatures and putting keys in the rollup params.
 #[derive(Clone, Debug)]
 pub struct IdentityData {
+    /// Unique identifying info.
     pub ident: Identity,
+    /// Signing key.
     pub key: IdentityKey,
 }
 
 impl IdentityData {
+    /// Create new IdentityData from components.
     pub fn new(ident: Identity, key: IdentityKey) -> Self {
         Self { ident, key }
     }

@@ -33,6 +33,7 @@ members = [
   "crates/rpc/prover-client-api",
   "crates/rpc/types",
   "crates/rpc/utils",
+  "crates/sequencer",
   "crates/state",
   "crates/status",
   "crates/storage",
@@ -52,6 +53,7 @@ members = [
   "bin/strata-cli",
   "bin/strata-client",
   "bin/strata-reth",
+  "bin/strata-sequencer-client",
   "bin/prover-client",
   "provers/perf",
 
@@ -66,6 +68,7 @@ default-members = [
   "bin/prover-client",
   "bin/strata-reth",
   "bin/strata-client",
+  "bin/strata-sequencer-client",
 ]
 
 resolver = "2"
@@ -106,6 +109,7 @@ strata-rocksdb = { path = "crates/rocksdb-store" }
 strata-rpc-api = { path = "crates/rpc/api" }
 strata-rpc-types = { path = "crates/rpc/types" }
 strata-rpc-utils = { path = "crates/rpc/utils" }
+strata-sequencer = { path = "crates/sequencer" }
 strata-state = { path = "crates/state" }
 strata-status = { path = "crates/status" }
 strata-storage = { path = "crates/storage" }

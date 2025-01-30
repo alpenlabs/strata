@@ -24,6 +24,7 @@ strata-rocksdb.workspace = true
 strata-rpc-api = { workspace = true, default-features = true }
 strata-rpc-types.workspace = true
 strata-rpc-utils.workspace = true
+strata-sequencer.workspace = true
 strata-state.workspace = true
 strata-status.workspace = true
 strata-storage.workspace = true
@@ -64,4 +65,5 @@ strata-test-utils.workspace = true
 debug-utils = [
   "strata-common/debug-utils",
   "strata-consensus-logic/debug-utils",
+  "strata-sequencer/debug-utils",
 ]

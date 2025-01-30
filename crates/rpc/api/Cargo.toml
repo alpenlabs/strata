@@ -10,6 +10,7 @@ strata-common.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
+strata-sequencer.workspace = true
 strata-state.workspace = true
 zkaleido.workspace = true
 

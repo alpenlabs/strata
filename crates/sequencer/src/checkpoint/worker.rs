@@ -1,56 +1,120 @@
-use strata_db::traits::ChainstateDatabase;
+//! worker to monitor chainstate and create checkpoint entries.
+
+use std::sync::Arc;
+
+use strata_consensus_logic::csm::message::ClientUpdateNotif;
+use strata_db::{
+    traits::{ChainstateDatabase, Database},
+    types::CheckpointEntry,
+};
 use strata_primitives::{buf::Buf32, params::Params};
-use strata_state::{batch::BatchInfo, client_state::ClientState, id::L2BlockId};
-use tracing::*;
+use strata_state::{
+    batch::{BatchInfo, BootstrapState},
+    client_state::ClientState,
+};
+use strata_tasks::ShutdownGuard;
+use thiserror::Error;
+use tokio::sync::broadcast;
+use tracing::{debug, warn};
 
-use super::types::{BlockSigningDuty, Duty, Identity};
-use crate::{duty::types::BatchCheckpointDuty, errors::Error};
+use crate::checkpoint::CheckpointHandle;
 
-/// Extracts new duties given a consensus state and a identity.
-pub fn extract_duties(
-    state: &ClientState,
-    _ident: &Identity,
-    _params: &Params,
-    chs_db: &impl ChainstateDatabase,
-    rollup_params_commitment: Buf32,
-) -> Result<Vec<Duty>, Error> {
-    // If a sync state isn't present then we probably don't have anything we
-    // want to do.  We might change this later.
-    let Some(ss) = state.sync() else {
-        return Ok(Vec::new());
-    };
-
-    let tip_height = ss.chain_tip_height();
-    let tip_blkid = *ss.chain_tip_blkid();
-
-    // Since we're not rotating sequencers, for now we just *always* produce a
-    // new block.
-    let duty_data = BlockSigningDuty::new_simple(tip_height + 1, tip_blkid);
-    let mut duties = vec![Duty::SignBlock(duty_data)];
-
-    duties.extend(extract_batch_duties(
-        state,
-        tip_height,
-        tip_blkid,
-        chs_db,
-        rollup_params_commitment,
-    )?);
-
-    Ok(duties)
+#[derive(Debug, Error)]
+enum Error {
+    #[error("chain is not active yet")]
+    ChainInactive,
+    #[error("missing expected chainstate for blockidx {0}")]
+    MissingIdxChainstate(u64),
+    #[error("db: {0}")]
+    Db(#[from] strata_db::errors::DbError),
 }
 
-fn extract_batch_duties(
+/// Worker to monitor client state updates and create checkpoint entries
+/// pending proof when previous proven checkpoint is finalized.
+pub fn checkpoint_worker<D: Database>(
+    shutdown: ShutdownGuard,
+    mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    params: Arc<Params>,
+    database: Arc<D>,
+    checkpoint_handle: Arc<CheckpointHandle>,
+) -> anyhow::Result<()> {
+    let rollup_params_commitment = params.rollup().compute_hash();
+    let chs_db = database.chain_state_db();
+
+    loop {
+        if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
+            break;
+        }
+        let update = match cupdate_rx.blocking_recv() {
+            Ok(u) => u,
+            Err(broadcast::error::RecvError::Closed) => {
+                break;
+            }
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                warn!(%skipped, "overloaded, skipping dispatching some duties");
+                continue;
+            }
+        };
+
+        let state = update.new_state();
+
+        let next_checkpoint_idx = get_next_batch_idx(state);
+        // check if entry is already present
+        if checkpoint_handle
+            .get_checkpoint_blocking(next_checkpoint_idx)?
+            .is_some()
+        {
+            continue;
+        }
+
+        let (batch_info, bootstrap_state) =
+            match get_next_batch::<D>(state, chs_db, rollup_params_commitment) {
+                Err(error) => {
+                    warn!(?error, "Failed to get next batch");
+                    continue;
+                }
+                Ok((b, bs)) => (b, bs),
+            };
+
+        let checkpoint_idx = batch_info.idx();
+        // sanity check
+        assert!(checkpoint_idx == next_checkpoint_idx);
+
+        // else save a pending proof checkpoint entry
+        debug!("save checkpoint pending proof: {}", checkpoint_idx);
+        let entry = CheckpointEntry::new_pending_proof(batch_info, bootstrap_state);
+        if let Err(e) = checkpoint_handle.put_checkpoint_and_notify_blocking(checkpoint_idx, entry)
+        {
+            warn!(?e, "Failed to save checkpoint at idx: {}", checkpoint_idx);
+        }
+    }
+    Ok(())
+}
+
+fn get_next_batch_idx(state: &ClientState) -> u64 {
+    match state.l1_view().last_finalized_checkpoint() {
+        None => 0,
+        Some(prev_checkpoint) => prev_checkpoint.batch_info.idx + 1,
+    }
+}
+
+fn get_next_batch<D: Database>(
     state: &ClientState,
-    tip_height: u64,
-    tip_id: L2BlockId,
-    chs_db: &impl ChainstateDatabase,
+    chs_db: &D::ChainstateDB,
     rollup_params_commitment: Buf32,
-) -> Result<Vec<Duty>, Error> {
-    if !state.is_chain_active() {
-        debug!("chain not active, no duties created");
-        // There are no duties if the chain is not yet active
-        return Ok(vec![]);
+) -> Result<(BatchInfo, BootstrapState), Error> {
+    let Some(sync_state) = state.sync() else {
+        // before genesis
+        return Err(Error::ChainInactive);
     };
+
+    let tip_height = sync_state.chain_tip_height();
+    let tip_id = *sync_state.chain_tip_blkid();
+
+    if tip_height == 0 {
+        return Err(Error::ChainInactive);
+    }
 
     match state.l1_view().last_finalized_checkpoint() {
         // Cool, we are producing first batch!
@@ -60,12 +124,7 @@ fn extract_batch_duties(
                 ?tip_id,
                 "No finalized checkpoint, creating new checkpiont"
             );
-            // But wait until we've move past genesis, perhaps this can be
-            // configurable. Right now this is not ideal because we will be wasting proving resource
-            // just for a couple of initial blocks in the first batch
-            if tip_height == 0 {
-                return Ok(vec![]);
-            }
+
             let first_checkpoint_idx = 0;
 
             let current_l1_state = state
@@ -78,7 +137,6 @@ fn extract_batch_duties(
                 state.genesis_l1_height() + 1,
                 current_l1_state.last_verified_block_num as u64,
             );
-
             let genesis_l1_state_hash = state
                 .genesis_verification_hash()
                 .ok_or(Error::ChainInactive)?;
@@ -111,8 +169,7 @@ fn extract_batch_duties(
             );
 
             let genesis_bootstrap = new_batch.get_initial_bootstrap_state();
-            let batch_duty = BatchCheckpointDuty::new(new_batch, genesis_bootstrap);
-            Ok(vec![Duty::CommitBatch(batch_duty)])
+            Ok((new_batch, genesis_bootstrap))
         }
         Some(prev_checkpoint) => {
             let checkpoint = prev_checkpoint.batch_info.clone();
@@ -128,8 +185,8 @@ fn extract_batch_duties(
             let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
             let l1_transition = (checkpoint.l1_transition.1, current_l1_state_hash);
 
-            // Also, rather than tip heights, we might need to limit the max range a prover will be
-            // proving
+            // Also, rather than tip heights, we might need to limit the max range a prover will
+            // be proving
             let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
             let current_chain_state = chs_db
                 .get_toplevel_state(tip_height)?
@@ -158,8 +215,7 @@ fn extract_batch_duties(
             } else {
                 new_batch.get_initial_bootstrap_state()
             };
-            let batch_duty = BatchCheckpointDuty::new(new_batch, bootstrap_state);
-            Ok(vec![Duty::CommitBatch(batch_duty)])
+            Ok((new_batch, bootstrap_state))
         }
     }
 }

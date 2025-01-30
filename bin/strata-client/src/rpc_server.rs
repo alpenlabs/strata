@@ -10,17 +10,17 @@ use bitcoin::{
 };
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
+use parking_lot::RwLock;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
 use strata_common::bail_manager::BAIL_SENDER;
 use strata_consensus_logic::{
-    checkpoint::CheckpointHandle, csm::state_tracker::reconstruct_state, l1_handler::verify_proof,
-    sync_manager::SyncManager,
+    csm::state_tracker::reconstruct_state, l1_handler::verify_proof, sync_manager::SyncManager,
 };
 use strata_db::{
     traits::*,
-    types::{CheckpointProvingStatus, L1TxEntry, L1TxStatus},
+    types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus},
 };
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
@@ -33,12 +33,20 @@ use strata_rpc_api::{
     StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
 };
 use strata_rpc_types::{
-    errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, L2BlockStatus, RpcBlockHeader,
-    RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo, RpcClientStatus,
-    RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
+    errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, HexBytes64, L2BlockStatus,
+    RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo,
+    RpcClientStatus, RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
+use strata_sequencer::{
+    block_template::{
+        BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
+    },
+    checkpoint::{verify_checkpoint_sig, CheckpointHandle},
+    duty::types::{Duty, DutyEntry, DutyTracker},
+};
 use strata_state::{
+    batch::{BatchCheckpoint, SignedBatchCheckpoint},
     block::{L2Block, L2BlockBundle},
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
@@ -715,21 +723,28 @@ pub struct SequencerServerImpl {
     envelope_handle: Arc<EnvelopeHandle>,
     broadcast_handle: Arc<L1BroadcastHandle>,
     checkpoint_handle: Arc<CheckpointHandle>,
+    template_manager_handle: TemplateManagerHandle,
     params: Arc<Params>,
+    duty_tracker: Arc<RwLock<DutyTracker>>,
 }
 
 impl SequencerServerImpl {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         envelope_handle: Arc<EnvelopeHandle>,
         broadcast_handle: Arc<L1BroadcastHandle>,
         params: Arc<Params>,
         checkpoint_handle: Arc<CheckpointHandle>,
+        template_manager_handle: TemplateManagerHandle,
+        duty_tracker: Arc<RwLock<DutyTracker>>,
     ) -> Self {
         Self {
             envelope_handle,
             broadcast_handle,
             params,
             checkpoint_handle,
+            template_manager_handle,
+            duty_tracker,
         }
     }
 }
@@ -804,7 +819,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         debug!(%idx, "Proof is pending, setting proof reaedy");
 
         self.checkpoint_handle
-            .put_checkpoint_and_notify(idx, entry)
+            .put_checkpoint(idx, entry)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
         debug!(%idx, "Success");
@@ -821,6 +836,76 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .get_tx_status(id)
             .await
             .map_err(|e| Error::Other(e.to_string()))?)
+    }
+
+    async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>> {
+        let duties = self
+            .duty_tracker
+            .read()
+            .duties()
+            .iter()
+            .map(DutyEntry::duty)
+            .cloned()
+            .collect();
+        Ok(duties)
+    }
+
+    async fn get_block_template(&self, config: BlockGenerationConfig) -> RpcResult<BlockTemplate> {
+        self.template_manager_handle
+            .generate_block_template(config)
+            .await
+            .map_err(to_jsonrpsee_error(""))
+    }
+
+    async fn complete_block_template(
+        &self,
+        template_id: L2BlockId,
+        completion: BlockCompletionData,
+    ) -> RpcResult<L2BlockId> {
+        self.template_manager_handle
+            .complete_block_template(template_id, completion)
+            .await
+            .map_err(to_jsonrpsee_error("failed to complete block template"))
+    }
+
+    async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()> {
+        println!("complete_checkpoint_signature: {}; {:?}", idx, sig);
+        let entry = self
+            .checkpoint_handle
+            .get_checkpoint(idx)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?
+            .ok_or(Error::MissingCheckpointInDb(idx))?;
+
+        if entry.proving_status != CheckpointProvingStatus::ProofReady {
+            Err(Error::MissingCheckpointProof(idx))?;
+        }
+
+        if entry.confirmation_status == CheckpointConfStatus::Confirmed
+            || entry.confirmation_status == CheckpointConfStatus::Finalized
+        {
+            Err(Error::CheckpointAlreadyPosted(idx))?;
+        }
+
+        let checkpoint = BatchCheckpoint::from(entry);
+        let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, sig.0.into());
+
+        if !verify_checkpoint_sig(&signed_checkpoint, &self.params) {
+            Err(Error::InvalidCheckpointSignature(idx))?;
+        }
+
+        let payload = L1Payload::new_checkpoint(
+            borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?,
+        );
+        let sighash = signed_checkpoint.checkpoint().hash();
+
+        let blob_intent = PayloadIntent::new(PayloadDest::L1, sighash, payload);
+        self.envelope_handle
+            .submit_intent_async(blob_intent)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+
+        Ok(())
     }
 }
 

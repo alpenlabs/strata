@@ -30,6 +30,7 @@ tests/                 @alpenlabs/rust @alpenlabs/ci
 /crates/reth/        @alpenlabs/evm
 /crates/rocksdb*/    @alpenlabs/database
 /crates/rpc/         @alpenlabs/chain-core @alpenlabs/btc
+/crates/sequencer/   @alpenlabs/chain-core
 /crates/state/       @alpenlabs/chain-core
 /crates/status/      @alpenlabs/chain-core
 /crates/storage/     @alpenlabs/chain-core
@@ -43,12 +44,13 @@ tests/                 @alpenlabs/rust @alpenlabs/ci
 /prover/             @alpenlabs/prover
 
 # Binaries/CLIs
-bin/                @alpenlabs/bin                   # catch all
-bin/bridge-client/  @alpenlabs/bin @alpenlabs/bridge
-bin/datatool/       @alpenlabs/bin @alpenlabs/bin-datatool
-bin/prover*/        @alpenlabs/bin @alpenlabs/prover
-bin/strata-client/  @alpenlabs/bin @alpenlabs/bin-strata-client
-bin/strata-reth/    @alpenlabs/bin @alpenlabs/evm
+bin/                          @alpenlabs/bin                   # catch all
+bin/bridge-client/            @alpenlabs/bin @alpenlabs/bridge
+bin/datatool/                 @alpenlabs/bin @alpenlabs/bin-datatool
+bin/prover*/                  @alpenlabs/bin @alpenlabs/prover
+bin/strata-client/            @alpenlabs/bin @alpenlabs/bin-strata-client
+bin/strata-reth/              @alpenlabs/bin @alpenlabs/evm
+bin/strata-sequencer-client/  @alpenlabs/bin @alpenlabs/bin-strata-client
 
 # Functional tests
 functional-tests/             @alpenlabs/python               # catch all

@@ -118,6 +118,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
         seq_fac = ctx.get_factory("sequencer")
+        seq_signer_fac = ctx.get_factory("sequencer_signer")
         reth_fac = ctx.get_factory("reth")
         bridge_fac = ctx.get_factory("bridge_client")
 
@@ -216,14 +217,19 @@ class BasicEnvConfig(flexitest.EnvConfig):
             "reth_socket": f"localhost:{reth_port}",
             "reth_secret_path": reth_secret_path,
         }
-        sequencer = seq_fac.create_sequencer(bitcoind_config, reth_config, seqaddr, params)
+        sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
         if self.auto_generate_blocks:
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
+        seq_host = sequencer.get_prop("rpc_host")
+        seq_port = sequencer.get_prop("rpc_port")
+        sequencer_signer = seq_signer_fac.create_sequencer_signer(seq_host, seq_port)
+
         svcs["sequencer"] = sequencer
+        svcs["sequencer_signer"] = sequencer_signer
         svcs["reth"] = reth
 
         operator_message_interval = self.message_interval or settings.message_interval
@@ -280,6 +286,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
         seq_fac = ctx.get_factory("sequencer")
+        seq_signer_fac = ctx.get_factory("sequencer_signer")
         reth_fac = ctx.get_factory("reth")
         fn_fac = ctx.get_factory("fullnode")
         bridge_fac = ctx.get_factory("bridge_client")
@@ -343,11 +350,16 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "reth_socket": f"localhost:{reth_authrpc_port}",
             "reth_secret_path": reth_secret_path,
         }
-        sequencer = seq_fac.create_sequencer(bitcoind_config, reth_config, seqaddr, params)
+        sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
+
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
         if self.auto_generate_blocks:
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
+
+        seq_host = sequencer.get_prop("rpc_host")
+        seq_port = sequencer.get_prop("rpc_port")
+        sequencer_signer = seq_signer_fac.create_sequencer_signer(seq_host, seq_port)
 
         fullnode_reth_port = fullnode_reth.get_prop("rpc_port")
         fullnode_reth_config = {
@@ -367,6 +379,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         svcs = {
             "bitcoin": bitcoind,
             "seq_node": sequencer,
+            "sequencer_signer": sequencer_signer,
             "seq_reth": reth,
             "follower_1_node": fullnode,
             "follower_1_reth": fullnode_reth,

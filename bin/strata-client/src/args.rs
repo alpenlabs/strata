@@ -39,8 +39,8 @@ pub struct Args {
     #[argh(option, short = 'n', description = "L1 network to run on")]
     pub network: Option<Network>,
 
-    #[argh(option, short = 'k', description = "path to sequencer root key")]
-    pub sequencer_key: Option<PathBuf>,
+    #[argh(switch, description = "start sequencer bookkeeping tasks")]
+    pub sequencer: bool,
 
     #[argh(option, description = "sequencer rpc host:port")]
     pub sequencer_rpc: Option<String>,
@@ -50,9 +50,6 @@ pub struct Args {
 
     #[argh(option, description = "path to reth authrpc jwtsecret")]
     pub reth_jwtsecret: PathBuf,
-
-    #[argh(option, short = 's', description = "sequencer bitcoin address")]
-    pub sequencer_bitcoin_address: Option<String>,
 
     // TODO: allow only for dev/test mode ?
     #[argh(option, short = 'p', description = "custom rollup config path")]
@@ -80,17 +77,13 @@ impl Args {
                 rpc_port: require(args.rpc_port, "args: no client --rpc-port provided")?,
                 datadir: require(args.datadir, "args: no client --datadir provided")?,
                 client_mode: {
-                    if let Some(sequencer_key) = args.sequencer_key {
-                        ClientMode::Sequencer(SequencerConfig {
-                            sequencer_key,
-                            sequencer_bitcoin_address: args.sequencer_bitcoin_address,
-                        })
+                    if args.sequencer {
+                        ClientMode::Sequencer(SequencerConfig {})
                     } else if let Some(sequencer_rpc) = args.sequencer_rpc {
                         ClientMode::FullNode(FullNodeConfig { sequencer_rpc })
                     } else {
                         return Err(
-                            "args: no client --sequencer-key or --sequencer-bitcion-address provided or --sequencer-rpc provided"
-                                .to_string(),
+                            "args: no client --sequencer or --sequencer-rpc provided".to_string()
                         );
                     }
                 },
@@ -139,13 +132,9 @@ impl Args {
         if let Some(datadir) = args.datadir {
             config.client.datadir = datadir;
         }
-        // sequencer_key has priority over sequencer_rpc if both are provided
 
-        if let Some(sequencer_key) = args.sequencer_key {
-            config.client.client_mode = ClientMode::Sequencer(SequencerConfig {
-                sequencer_key,
-                sequencer_bitcoin_address: args.sequencer_bitcoin_address,
-            });
+        if args.sequencer {
+            config.client.client_mode = ClientMode::Sequencer(SequencerConfig {});
         } else if let Some(sequencer_rpc) = args.sequencer_rpc {
             config.client.client_mode = ClientMode::FullNode(FullNodeConfig { sequencer_rpc });
         }
