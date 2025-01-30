@@ -45,10 +45,6 @@ impl ChainstateDatabase for ChainstateDb {
     }
 
     fn put_write_batch(&self, idx: u64, batch: strata_state::state_op::WriteBatch) -> DbResult<()> {
-        if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
-            return Err(DbError::OverwriteStateUpdate(idx));
-        }
-
         // Make sure we always have a contiguous range of batches.
         // FIXME this *could* be a race condition / TOCTOU issue, but we're only
         // going to be writing from a single thread anyways so it should be fine
@@ -61,6 +57,11 @@ impl ChainstateDatabase for ChainstateDb {
             None => return Err(DbError::NotBootstrapped),
         }
 
+        if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
+            return Err(DbError::OverwriteStateUpdate(idx));
+        }
+
+        // TODO maybe do this in a tx to make sure we don't race/TOCTOU it
         self.db.put::<WriteBatchSchema>(&idx, &batch)?;
 
         #[cfg(test)]
@@ -103,10 +104,12 @@ impl ChainstateDatabase for ChainstateDb {
             None => return Err(DbError::NotBootstrapped),
         };
 
+        // In this case, we'd still be before the rollback idx.
         if last_idx < new_tip_idx {
             return Err(DbError::RevertAboveCurrent(new_tip_idx, last_idx));
         }
 
+        // In this case, we'd have to roll back past the first idx.
         if first_idx > new_tip_idx {
             return Err(DbError::MissingL2State(new_tip_idx));
         }
