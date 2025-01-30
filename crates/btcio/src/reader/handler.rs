@@ -4,7 +4,6 @@ use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, L1BlockRecord},
-    params::Params,
 };
 use strata_state::{
     batch::{BatchCheckpoint, BatchCheckpointWithCommitment, CommitmentInfo},
@@ -12,21 +11,27 @@ use strata_state::{
     sync_event::{EventSubmitter, SyncEvent},
     tx::ProtocolOperation,
 };
-use strata_storage::L1BlockManager;
 use tracing::*;
 
-pub(crate) async fn handle_bitcoin_event<E: EventSubmitter>(
+use super::query::ReaderContext;
+use crate::rpc::traits::ReaderRpc;
+
+pub(crate) async fn handle_bitcoin_event<R: ReaderRpc, E: EventSubmitter>(
     event: L1Event,
-    l1mgr: &L1BlockManager,
+    ctx: &ReaderContext<R>,
     event_submitter: &E,
-    params: &Params,
-    seq_pubkey: &Option<XOnlyPublicKey>,
 ) -> anyhow::Result<()> {
+    let ReaderContext {
+        seq_pubkey,
+        params,
+        l1_manager,
+        ..
+    } = ctx;
     match event {
         L1Event::RevertTo(revert_blk_num) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
-            l1mgr.revert_to_height_async(revert_blk_num).await?;
+            l1_manager.revert_to_height_async(revert_blk_num).await?;
             debug!(%revert_blk_num, "wrote revert");
 
             // Write to sync event db.
@@ -51,7 +56,7 @@ pub(crate) async fn handle_bitcoin_event<E: EventSubmitter>(
             let manifest = generate_block_manifest(blockdata.block(), epoch);
             let l1txs: Vec<_> = generate_l1txs(&blockdata);
             let num_txs = l1txs.len();
-            l1mgr
+            l1_manager
                 .put_block_data_async(blockdata.block_num(), manifest, l1txs.clone())
                 .await?;
             info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
@@ -88,7 +93,7 @@ fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
 ) -> Vec<BatchCheckpointWithCommitment> {
-    let protocol_ops_txs = blockdata.protocol_txs();
+    let protocol_ops_txs = blockdata.protocol_ops_txs();
 
     let signed_checkpts = protocol_ops_txs.iter().flat_map(|txref| {
         txref.proto_ops().iter().filter_map(|op| match op {

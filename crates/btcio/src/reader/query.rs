@@ -31,24 +31,19 @@ use crate::{
 };
 
 /// Context that encapsulates common items needed for L1 reader.
-struct ReaderContext<R: ReaderRpc> {
+pub(crate) struct ReaderContext<R: ReaderRpc> {
     /// Bitcoin reader client
-    client: Arc<R>,
-
+    pub client: Arc<R>,
     /// L1db manager
-    l1_manager: Arc<L1BlockManager>,
-
+    pub l1_manager: Arc<L1BlockManager>,
     /// Config
-    config: Arc<ReaderConfig>,
-
+    pub config: Arc<ReaderConfig>,
     /// Params
-    params: Arc<Params>,
-
+    pub params: Arc<Params>,
     /// Status transmitter
-    status_channel: StatusChannel,
-
+    pub status_channel: StatusChannel,
     /// Sequencer Pubkey
-    seq_pubkey: Option<XOnlyPublicKey>,
+    pub seq_pubkey: Option<XOnlyPublicKey>,
 }
 
 /// The main task that initializes the reader state and starts reading from bitcoin.
@@ -60,13 +55,8 @@ pub async fn bitcoin_data_reader_task<E: EventSubmitter>(
     status_channel: StatusChannel,
     event_submitter: Arc<E>,
 ) -> anyhow::Result<()> {
-    // TODO switch to checking the L1 tip in the consensus/client state
-    let horz_height = params.rollup().horizon_l1_height;
-    let target_next_block = l1_manager
-        .get_chain_tip()?
-        .map(|i| i + 1)
-        .unwrap_or(horz_height);
-    assert!(target_next_block >= horz_height);
+    let target_next_block =
+        calculate_target_next_block(l1_manager.as_ref(), params.rollup().horizon_l1_height)?;
 
     let seq_pubkey = match params.rollup.cred_rule {
         CredRule::Unchecked => None,
@@ -87,6 +77,20 @@ pub async fn bitcoin_data_reader_task<E: EventSubmitter>(
     do_reader_task(ctx, target_next_block, event_submitter.as_ref()).await
 }
 
+/// Calculates target next block to start polling l1 from.
+fn calculate_target_next_block(
+    l1_manager: &L1BlockManager,
+    horz_height: u64,
+) -> anyhow::Result<u64> {
+    // TODO switch to checking the L1 tip in the consensus/client state
+    let target_next_block = l1_manager
+        .get_chain_tip()?
+        .map(|i| i + 1)
+        .unwrap_or(horz_height);
+    assert!(target_next_block >= horz_height);
+    Ok(target_next_block)
+}
+
 /// Inner function that actually does the reading task.
 async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
     ctx: ReaderContext<R>,
@@ -96,7 +100,6 @@ async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
     info!(%target_next_block, "started L1 reader task!");
 
     let poll_dur = Duration::from_millis(ctx.config.client_poll_dur_ms as u64);
-
     let mut state = init_reader_state(&ctx, target_next_block).await?;
     let best_blkid = state.best_block();
     info!(%best_blkid, "initialized L1 reader state");
@@ -107,14 +110,7 @@ async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
 
         // See if epoch/filter rules have changed
         if let Some(l1ev) = check_epoch_change(&ctx, &mut state)? {
-            handle_bitcoin_event(
-                l1ev,
-                ctx.l1_manager.as_ref(),
-                event_submitter,
-                ctx.params.as_ref(),
-                &ctx.seq_pubkey,
-            )
-            .await?;
+            handle_bitcoin_event(l1ev, &ctx, event_submitter).await?;
         };
 
         let poll_span = debug_span!("l1poll", %cur_best_height);
@@ -124,31 +120,12 @@ async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
             .await
         {
             Err(err) => {
-                warn!(%cur_best_height, err = %err, "failed to poll Bitcoin client");
-                status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
-
-                if let Some(err) = err.downcast_ref::<reqwest::Error>() {
-                    // recoverable errors
-                    if err.is_connect() {
-                        status_updates.push(L1StatusUpdate::RpcConnected(false));
-                    }
-                    // unrecoverable errors
-                    if err.is_builder() {
-                        panic!("btcio: couldn't build the L1 client");
-                    }
-                }
+                handle_poll_error(&err, &mut status_updates);
             }
             Ok(events) => {
                 // handle events
                 for ev in events {
-                    handle_bitcoin_event(
-                        ev,
-                        ctx.l1_manager.as_ref(),
-                        event_submitter,
-                        ctx.params.as_ref(),
-                        &ctx.seq_pubkey,
-                    )
-                    .await?;
+                    handle_bitcoin_event(ev, &ctx, event_submitter).await?;
                 }
             }
         };
@@ -166,6 +143,21 @@ async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
     }
 }
 
+/// Handles errors encountered during polling.
+fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdate>) {
+    warn!(err = %err, "failed to poll Bitcoin client");
+    status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
+
+    if let Some(reqwest_err) = err.downcast_ref::<reqwest::Error>() {
+        if reqwest_err.is_connect() {
+            status_updates.push(L1StatusUpdate::RpcConnected(false));
+        }
+        if reqwest_err.is_builder() {
+            panic!("btcio: couldn't build the L1 client");
+        }
+    }
+}
+
 /// Checks for epoch changes and any L1 reverts necessary. Internally updates reader's state.
 fn check_epoch_change<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
@@ -174,9 +166,11 @@ fn check_epoch_change<R: ReaderRpc>(
     let new_epoch = ctx.status_channel.epoch().unwrap_or(0);
     // TODO: check if new_epoch < current epoch. should panic if so?
     let curr_epoch = state.epoch();
+
     if curr_epoch != new_epoch {
         state.set_epoch(new_epoch);
     }
+
     // TODO: pass in chainstate to `derive_from`
     let new_config = TxFilterConfig::derive_from(ctx.params.rollup())?;
     let curr_filter_config = state.filter_config().clone();
@@ -291,8 +285,8 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
     let scan_start_height = state.next_height();
     for fetch_height in scan_start_height..=client_height {
         match fetch_and_process_block(ctx, fetch_height, state, status_updates).await {
-            Ok((blkid, ev)) => {
-                events.push(ev);
+            Ok((blkid, evs)) => {
+                events.extend_from_slice(&evs);
                 info!(%fetch_height, %blkid, "accepted new block");
             }
             Err(e) => {
@@ -333,14 +327,14 @@ async fn fetch_and_process_block<R: ReaderRpc>(
     height: u64,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
-) -> anyhow::Result<(BlockHash, L1Event)> {
+) -> anyhow::Result<(BlockHash, Vec<L1Event>)> {
     let block = ctx.client.get_block_at(height).await?;
-    let (ev, l1blkid) = process_block(ctx, state, status_updates, height, block).await?;
+    let (evs, l1blkid) = process_block(ctx, state, status_updates, height, block).await?;
 
     // Insert to new block, incrementing cur_height.
     let _deep = state.accept_new_block(l1blkid);
 
-    Ok((l1blkid, ev))
+    Ok((l1blkid, evs))
 }
 
 /// Processes a bitcoin Block to return corresponding `L1Event` and `BlockHash`.
@@ -350,7 +344,7 @@ async fn process_block<R: ReaderRpc>(
     status_updates: &mut Vec<L1StatusUpdate>,
     height: u64,
     block: Block,
-) -> anyhow::Result<(L1Event, BlockHash)> {
+) -> anyhow::Result<(Vec<L1Event>, BlockHash)> {
     let txs = block.txdata.len();
     let params = ctx.params.clone();
 
@@ -374,16 +368,18 @@ async fn process_block<R: ReaderRpc>(
 
     trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
 
+    let block_ev = L1Event::BlockData(block_data, state.epoch());
+    let mut l1_events = vec![block_ev];
+
     if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
         let l1_verification_state =
             get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
         let ev = L1Event::GenesisVerificationState(height, l1_verification_state);
-        return Ok((ev, l1blkid));
+        l1_events.push(ev);
     }
 
-    let ev = L1Event::BlockData(block_data, state.epoch());
-    Ok((ev, l1blkid))
+    Ok((l1_events, l1blkid))
 }
 
 /// Gets the [`HeaderVerificationState`] for the particular block
