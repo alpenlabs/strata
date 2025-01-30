@@ -18,3 +18,14 @@ class LoadConfig:
         self.user_classes = user_classes
         self.host = host
         self.spawn_rate = spawn_rate
+
+
+class LoadConfigBuilder:
+    """
+    A builder for the load config.
+    """
+
+    def __init__(self):
+        pass
+
+    def __call__(self, )

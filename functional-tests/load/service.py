@@ -10,7 +10,7 @@ from locust.stats import stats_history, stats_printer
 from load.cfg import LoadConfig
 
 
-# TODO(load): enchance it to be able to increase/decrease the load from test runtime.
+# TODO(load): enhance it to be able to increase/decrease the load from test runtime.
 class LoadGeneratorService(flexitest.Service):
     """
     A separate flexitest service that is able to generate load as specified in the LoadConfig.

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 from gevent import monkey
 
+# This is important for locust to work with flexitest.
+# Because of this line, ruff linter is disabled for the whole file :(
+# Currently, it's not possible to disable ruff for the block of code.
 monkey.patch_all()
 
-import argparse  # noqa: E402
+import argparse
 import os
 import sys
 
@@ -23,8 +26,6 @@ parser.add_argument("-g", "--groups", nargs="*", help="Define the test groups to
 parser.add_argument("-t", "--tests", nargs="*", help="Define individual tests to execute")
 
 
-# Helper to disable some tests.
-# Useful during debugging or when the test becomes flaky.
 def disabled_tests() -> list[str]:
     """
     Helper to disable some tests.
