@@ -869,6 +869,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 
     async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()> {
+        println!("complete_checkpoint_signature: {}; {:?}", idx, sig);
         let entry = self
             .checkpoint_handle
             .get_checkpoint(idx)

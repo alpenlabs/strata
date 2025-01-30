@@ -82,6 +82,7 @@ pub fn checkpoint_worker<D: Database>(
         assert!(checkpoint_idx == next_checkpoint_idx);
 
         // else save a pending proof checkpoint entry
+        debug!("save checkpoint pending proof: {}", checkpoint_idx);
         let entry = CheckpointEntry::new_pending_proof(batch_info, bootstrap_state);
         if let Err(e) = checkpoint_handle.put_checkpoint_and_notify_blocking(checkpoint_idx, entry)
         {
