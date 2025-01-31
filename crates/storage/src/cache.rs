@@ -98,6 +98,42 @@ impl<K: Clone + Eq + Hash, V: Clone> CacheTable<K, V> {
         cache.pop(k);
     }
 
+    /// Removes all entries for which the predicate fails.  Returns the number
+    /// of entries removed.
+    ///
+    /// This unfortunately has to clone as many keys from the cache as pass the
+    /// predicate, which means it's capped at the maximum size of the cache, so
+    /// that's not *so* bad.
+    ///
+    /// This might remove slots that are in the process of being filled.  Those
+    /// operations will complete, but we won't retain those values.
+    pub fn purge_if(&self, mut pred: impl FnMut(&K) -> bool) -> usize {
+        let mut cache = self.cache.lock();
+        let keys_to_remove = cache
+            .iter()
+            .map(|(k, _v)| k)
+            .filter(|k| pred(k)) // why can't I just pass pred?
+            .cloned()
+            .collect::<Vec<_>>();
+        keys_to_remove.iter().for_each(|k| {
+            cache.pop(k);
+        });
+        keys_to_remove.len()
+    }
+
+    /// Removes all entries from the cache.  Returns the number of entries
+    /// removed.
+    ///
+    /// This might remove slots that are in the process of being filled.  Those
+    /// operations will complete, but we won't retain those values.
+    #[allow(dead_code)]
+    pub fn clear(&self) -> usize {
+        let mut cache = self.cache.lock();
+        let len = cache.len();
+        cache.clear();
+        len
+    }
+
     /// Inserts an entry into the table, dropping the previous value.
     #[allow(dead_code)]
     pub fn insert(&self, k: K, v: V) {

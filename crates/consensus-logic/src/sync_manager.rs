@@ -79,7 +79,7 @@ pub fn start_sync_tasks<
 >(
     executor: &TaskExecutor,
     database: Arc<D>,
-    storage: &NodeStorage,
+    storage: Arc<NodeStorage>,
     engine: Arc<E>,
     pool: threadpool::ThreadPool,
     params: Arc<Params>,
@@ -97,7 +97,7 @@ pub fn start_sync_tasks<
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
     let fcm_database = database.clone();
-    let fcm_l2_block_manager = storage.l2().clone();
+    let fcm_storage = storage.clone();
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
     let fcm_params = params.clone();
@@ -109,7 +109,7 @@ pub fn start_sync_tasks<
             shutdown,
             handle,
             fcm_database,
-            fcm_l2_block_manager,
+            fcm_storage,
             fcm_engine,
             fcm_rx,
             fcm_csm_controller,
@@ -122,7 +122,7 @@ pub fn start_sync_tasks<
     let client_worker_state = worker::WorkerState::open(
         params.clone(),
         database,
-        storage.l2().clone(),
+        storage.clone(),
         cupdate_tx,
         storage.checkpoint().clone(),
     )?;

@@ -16,10 +16,7 @@ use strata_consensus_logic::{
     genesis,
     sync_manager::{self, SyncManager},
 };
-use strata_db::{
-    traits::{BroadcastDatabase, ChainstateDatabase, Database},
-    DbError,
-};
+use strata_db::{traits::BroadcastDatabase, DbError};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, ProofPublishMode};
@@ -36,9 +33,7 @@ use strata_sequencer::{
     duty::{types::DutyTracker, worker as duty_worker},
 };
 use strata_status::StatusChannel;
-use strata_storage::{
-    create_node_storage, ops::bridge_relay::BridgeMsgOps, L2BlockManager, NodeStorage,
-};
+use strata_storage::{create_node_storage, ops::bridge_relay::BridgeMsgOps, NodeStorage};
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{
@@ -103,7 +98,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Initialize core databases
     let database = init_core_dbs(rbdb.clone(), ops_config);
-    let manager = create_node_storage(database.clone(), pool.clone());
+    let storage = Arc::new(create_node_storage(database.clone(), pool.clone()));
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
@@ -111,7 +106,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bridge_msg_ctx = strata_storage::ops::bridge_relay::Context::new(bridge_msg_db);
     let bridge_msg_ops = Arc::new(bridge_msg_ctx.into_ops(pool.clone()));
 
-    let checkpoint_handle: Arc<_> = CheckpointHandle::new(manager.checkpoint().clone()).into();
+    let checkpoint_handle: Arc<_> = CheckpointHandle::new(storage.checkpoint().clone()).into();
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
 
     // Check if we have to do genesis.
@@ -128,7 +123,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         &config,
         params.clone(),
         database,
-        &manager,
+        storage.clone(),
         bridge_msg_ops,
         bitcoin_client,
     )?;
@@ -159,6 +154,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
                 &mut methods,
             )?;
         }
+
         ClientMode::FullNode(fullnode_config) => {
             let sequencer_rpc = &fullnode_config.sequencer_rpc;
             info!(?sequencer_rpc, "initing fullnode task");
@@ -167,7 +163,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             let sync_peer = RpcSyncPeer::new(rpc_client, 10);
             let l2_sync_context = L2SyncContext::new(
                 sync_peer,
-                ctx.l2_block_manager.clone(),
+                ctx.storage.l2().clone(),
                 ctx.sync_manager.clone(),
             );
             // NOTE: this might block for some time during first run with empty db until genesis
@@ -183,6 +179,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         }
     }
 
+    // FIXME we don't have the `CoreContext` anymore after this point
     executor.spawn_critical_async(
         "main-rpc",
         start_rpc(
@@ -224,13 +221,14 @@ fn init_logging(rt: &Handle) {
     }
 }
 
+/// Shared low-level services that secondary services depend on.
 #[derive(Clone)]
 pub struct CoreContext {
     pub database: Arc<CommonDb>,
+    pub storage: Arc<NodeStorage>,
     pub pool: threadpool::ThreadPool,
     pub params: Arc<Params>,
     pub sync_manager: Arc<SyncManager>,
-    pub l2_block_manager: Arc<L2BlockManager>,
     pub status_channel: StatusChannel,
     pub engine: Arc<RpcExecEngineCtl<EngineRpcClient>>,
     pub relayer_handle: Arc<RelayerHandle>,
@@ -238,13 +236,12 @@ pub struct CoreContext {
 }
 
 fn do_startup_checks(
-    database: &impl Database,
+    storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
     bitcoin_client: &impl ReaderRpc,
     handle: &Handle,
 ) -> anyhow::Result<()> {
-    let chain_state_db = database.chain_state_db();
-    let last_state_idx = match chain_state_db.get_last_state_idx() {
+    let last_state_idx = match storage.chainstate().get_last_write_idx_blocking() {
         Ok(idx) => idx,
         Err(DbError::NotBootstrapped) => {
             // genesis is not done
@@ -253,8 +250,12 @@ fn do_startup_checks(
         }
         err => err?,
     };
-    let Some(last_chain_state) = chain_state_db.get_toplevel_state(last_state_idx)? else {
-        anyhow::bail!(format!("Missing chain state idx: {}", last_state_idx));
+
+    let Some(last_chain_state) = storage
+        .chainstate()
+        .get_toplevel_chainstate_blocking(last_state_idx)?
+    else {
+        anyhow::bail!("Missing chain state idx: {last_state_idx}");
     };
 
     // Check that we can connect to bitcoin client and block we believe to be matured in L1 is
@@ -275,8 +276,8 @@ fn do_startup_checks(
     }
 
     // Check that tip L2 block exists (and engine can be connected to)
-    let chain_tip = last_chain_state.chain_tip_blockid();
-    match engine.check_block_exists(chain_tip) {
+    let chain_tip = last_chain_state.chain_tip_blkid();
+    match engine.check_block_exists(*chain_tip) {
         Ok(true) => {
             info!("startup: last l2 block is synced")
         }
@@ -303,7 +304,7 @@ fn start_core_tasks(
     config: &Config,
     params: Arc<Params>,
     database: Arc<CommonDb>,
-    storage: &NodeStorage,
+    storage: Arc<NodeStorage>,
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
@@ -320,7 +321,7 @@ fn start_core_tasks(
 
     // do startup checks
     do_startup_checks(
-        database.as_ref(),
+        storage.as_ref(),
         engine.as_ref(),
         bitcoin_client.as_ref(),
         executor.handle(),
@@ -330,7 +331,7 @@ fn start_core_tasks(
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
         database.clone(),
-        storage,
+        storage.clone(),
         engine.clone(),
         pool.clone(),
         params.clone(),
@@ -344,7 +345,7 @@ fn start_core_tasks(
         sync_manager.get_params(),
         config,
         bitcoin_client.clone(),
-        database.clone(),
+        storage.as_ref(),
         sync_manager.get_csm_ctl(),
         status_channel.clone(),
     )?;
@@ -359,10 +360,10 @@ fn start_core_tasks(
 
     Ok(CoreContext {
         database,
+        storage,
         pool,
         params,
         sync_manager,
-        l2_block_manager: storage.l2().clone(),
         status_channel,
         engine,
         relayer_handle,
@@ -382,10 +383,10 @@ fn start_sequencer_tasks(
 ) -> anyhow::Result<()> {
     let CoreContext {
         database,
+        storage,
         pool,
         params,
         sync_manager,
-        l2_block_manager,
         status_channel,
         bitcoin_client,
         ..
@@ -413,7 +414,7 @@ fn start_sequencer_tasks(
         broadcast_handle.clone(),
     )?;
 
-    let template_manager_handle = start_template_manager_task(ctx, executor);
+    let template_manager_handle = start_template_manager_task(&ctx, executor);
     let duty_tracker = Arc::new(RwLock::new(DutyTracker::new_empty()));
 
     let admin_rpc = rpc_server::SequencerServerImpl::new(
@@ -428,8 +429,7 @@ fn start_sequencer_tasks(
 
     // Spawn duty tasks.
     let cupdate_rx = sync_manager.create_cstate_subscription();
-    let t_l2_block_manager = l2_block_manager.clone();
-    let t_database = database.clone();
+    let t_storage = storage.clone();
     let t_checkpoint_handle = checkpoint_handle.clone();
     let t_params = params.clone();
     executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
@@ -437,8 +437,7 @@ fn start_sequencer_tasks(
             shutdown,
             duty_tracker,
             cupdate_rx,
-            t_database,
-            t_l2_block_manager,
+            t_storage,
             t_checkpoint_handle,
             t_params,
         )
@@ -459,7 +458,14 @@ fn start_sequencer_tasks(
 
     let cupdate_rx = sync_manager.create_cstate_subscription();
     executor.spawn_critical("checkpoint-tracker", |shutdown| {
-        checkpoint_worker(shutdown, cupdate_rx, params, database, checkpoint_handle)
+        checkpoint_worker(
+            shutdown,
+            cupdate_rx,
+            params,
+            database,
+            storage,
+            checkpoint_handle,
+        )
     });
 
     Ok(())
@@ -483,6 +489,7 @@ fn start_broadcaster_tasks(
     Arc::new(broadcast_handle)
 }
 
+// FIXME this shouldn't take ownership of `CoreContext`
 async fn start_rpc(
     ctx: CoreContext,
     shutdown_signal: ShutdownSignal,
@@ -492,8 +499,8 @@ async fn start_rpc(
 ) -> anyhow::Result<()> {
     let CoreContext {
         database,
+        storage,
         sync_manager,
-        l2_block_manager,
         status_channel,
         relayer_handle,
         ..
@@ -505,17 +512,17 @@ async fn start_rpc(
     let strata_rpc = rpc_server::StrataRpcImpl::new(
         status_channel.clone(),
         database.clone(),
-        sync_manager,
-        l2_block_manager.clone(),
+        sync_manager.clone(),
+        storage.clone(),
         checkpoint_handle,
-        relayer_handle,
+        relayer_handle.clone(),
     );
     methods.merge(strata_rpc.into_rpc())?;
 
     let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
     methods.merge(admin_rpc.into_rpc())?;
 
-    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(l2_block_manager, database);
+    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(storage.clone(), database.clone());
     methods.merge(debug_rpc.into_rpc())?;
 
     let rpc_host = config.client.rpc_host;
@@ -548,22 +555,32 @@ async fn start_rpc(
     Ok(())
 }
 
+// TODO move this close to where we launch the template manager
 fn start_template_manager_task(
-    ctx: CoreContext,
+    ctx: &CoreContext,
     executor: &TaskExecutor,
 ) -> block_template::TemplateManagerHandle {
     let CoreContext {
         database,
+        storage,
         engine,
         params,
         status_channel,
-        l2_block_manager,
         sync_manager,
         ..
     } = ctx;
+
+    // TODO make configurable
     let (tx, rx) = mpsc::channel(100);
 
-    let worker_ctx = block_template::WorkerContext::new(params, database, engine, status_channel);
+    let worker_ctx = block_template::WorkerContext::new(
+        params.clone(),
+        database.clone(),
+        storage.clone(),
+        engine.clone(),
+        status_channel.clone(),
+    );
+
     let shared_state: block_template::SharedState = Default::default();
 
     let t_shared_state = shared_state.clone();
@@ -571,5 +588,10 @@ fn start_template_manager_task(
         block_template::worker(shutdown, worker_ctx, t_shared_state, rx)
     });
 
-    block_template::TemplateManagerHandle::new(tx, shared_state, l2_block_manager, sync_manager)
+    block_template::TemplateManagerHandle::new(
+        tx,
+        shared_state,
+        storage.l2().clone(),
+        sync_manager.clone(),
+    )
 }

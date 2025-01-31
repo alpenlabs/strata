@@ -17,6 +17,7 @@ use strata_state::{
     l1::{L1HeaderRecord, L1ViewState},
     prelude::*,
 };
+use strata_storage::{L1BlockManager, L2BlockManager, NodeStorage};
 use tracing::*;
 
 use crate::errors::Error;
@@ -47,7 +48,7 @@ pub fn init_client_state(params: &Params, database: &impl Database) -> anyhow::R
 /// that.
 pub fn init_genesis_chainstate(
     params: &Params,
-    database: &impl Database,
+    storage: &NodeStorage,
 ) -> anyhow::Result<Chainstate> {
     debug!("preparing database genesis chainstate!");
 
@@ -55,7 +56,7 @@ pub fn init_genesis_chainstate(
     let genesis_blk_height = params.rollup.genesis_l1_height;
 
     // Query the pre-genesis blocks we need before we do anything else.
-    let l1_db = database.l1_db();
+    let l1_db = storage.l1();
     let pregenesis_mfs =
         load_pre_genesis_l1_manifests(l1_db.as_ref(), horizon_blk_height, genesis_blk_height)?;
 
@@ -64,10 +65,8 @@ pub fn init_genesis_chainstate(
     let gchstate = make_genesis_chainstate(&gblock, pregenesis_mfs, params);
 
     // Now insert things into the database.
-    let chs_db = database.chain_state_db();
-    let l2_db = database.l2_db();
-    chs_db.write_genesis_state(&gchstate)?;
-    l2_db.put_block_data(gblock)?;
+    storage.chainstate().write_genesis_state(gchstate.clone())?;
+    storage.l2().put_block_data_blocking(gblock)?;
 
     // TODO make ^this be atomic so we can't accidentally not write both, or
     // make it so we can overwrite the genesis chainstate if there's no other
@@ -84,13 +83,13 @@ pub fn construct_operator_table(opconfig: &OperatorConfig) -> OperatorTable {
 }
 
 fn load_pre_genesis_l1_manifests(
-    l1_db: &impl L1Database,
+    l1man: &L1BlockManager,
     horizon_height: u64,
     genesis_height: u64,
 ) -> anyhow::Result<Vec<L1BlockRecord>> {
     let mut manifests = Vec::new();
     for height in horizon_height..=genesis_height {
-        let Some(mf) = l1_db.get_block_manifest(height)? else {
+        let Some(mf) = l1man.get_block_manifest(height)? else {
             return Err(Error::MissingL1BlockHeight(height).into());
         };
 
@@ -176,11 +175,9 @@ pub fn check_needs_client_init(database: &impl Database) -> anyhow::Result<bool>
     Ok(false)
 }
 
-pub fn check_needs_genesis(database: &impl Database) -> anyhow::Result<bool> {
-    let l2_db = database.l2_db();
-
+pub fn check_needs_genesis(l2man: &L2BlockManager) -> anyhow::Result<bool> {
     // Check if there's any genesis block written.
-    match l2_db.get_blocks_at_height(0) {
+    match l2man.get_blocks_at_height_blocking(0) {
         Ok(blkids) => Ok(blkids.is_empty()),
 
         Err(DbError::NotBootstrapped) => Ok(true),

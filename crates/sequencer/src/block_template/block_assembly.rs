@@ -2,7 +2,6 @@ use std::{thread, time};
 
 // TODO: use local error type
 use strata_consensus_logic::errors::Error;
-use strata_db::traits::{ChainstateDatabase, Database, L1Database};
 use strata_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
     errors::EngineError,
@@ -23,6 +22,7 @@ use strata_state::{
     state_op::*,
     tx::ProtocolOperation::Deposit,
 };
+use strata_storage::{L1BlockManager, NodeStorage};
 use tracing::*;
 
 /// Max number of L1 block entries to include per L2Block.
@@ -32,19 +32,19 @@ const MAX_L1_ENTRIES_PER_BLOCK: usize = 100;
 
 /// Build contents for a new L2 block with the provided configuration.
 /// Needs to be signed to be a valid L2Block.
-pub fn prepare_block<D: Database, E: ExecEngineCtl>(
+pub fn prepare_block(
     slot: u64,
     prev_block: L2BlockBundle,
     l1_state: &LocalL1State,
     ts: u64,
-    database: &D,
-    engine: &E,
+    storage: &NodeStorage,
+    engine: &impl ExecEngineCtl,
     params: &Params,
 ) -> Result<(L2BlockHeader, L2BlockBody, L2BlockAccessory), Error> {
-    let prev_block_id = prev_block.header().get_blockid();
-    debug!("preparing block");
-    let l1_db = database.l1_db();
-    let chs_db = database.chain_state_db();
+    let prev_blkid = prev_block.header().get_blockid();
+    debug!(%slot, %prev_blkid, "preparing block");
+    let l1man = storage.l1();
+    let chsman = storage.chainstate();
 
     let prev_global_sr = *prev_block.header().state_root();
 
@@ -52,9 +52,9 @@ pub fn prepare_block<D: Database, E: ExecEngineCtl>(
     // TODO make this get the prev block slot from somewhere more reliable in
     // case we skip slots
     let prev_slot = prev_block.header().blockidx();
-    let prev_chstate = chs_db
-        .get_toplevel_state(prev_slot)?
-        .ok_or(Error::MissingBlockChainstate(prev_block_id))?;
+    let prev_chstate = chsman
+        .get_toplevel_chainstate_blocking(prev_slot)?
+        .ok_or(Error::MissingBlockChainstate(prev_blkid))?;
 
     // Figure out the save L1 blkid.
     // FIXME this is somewhat janky, should get it from the MMR
@@ -66,7 +66,7 @@ pub fn prepare_block<D: Database, E: ExecEngineCtl>(
     let l1_seg = prepare_l1_segment(
         l1_state,
         &prev_chstate,
-        l1_db.as_ref(),
+        l1man.as_ref(),
         MAX_L1_ENTRIES_PER_BLOCK,
         params.rollup(),
     )?;
@@ -76,7 +76,7 @@ pub fn prepare_block<D: Database, E: ExecEngineCtl>(
     let (exec_seg, block_acc) = prepare_exec_data(
         slot,
         ts,
-        prev_block_id,
+        prev_blkid,
         prev_global_sr,
         &prev_chstate,
         safe_l1_blkid,
@@ -86,7 +86,7 @@ pub fn prepare_block<D: Database, E: ExecEngineCtl>(
 
     // Assemble the body and fake header.
     let body = L2BlockBody::new(l1_seg, exec_seg);
-    let fake_header = L2BlockHeader::new(slot, ts, prev_block_id, &body, Buf32::zero());
+    let fake_header = L2BlockHeader::new(slot, ts, prev_blkid, &body, Buf32::zero());
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
@@ -94,7 +94,7 @@ pub fn prepare_block<D: Database, E: ExecEngineCtl>(
 
     let new_state_root = post_state.compute_state_root();
 
-    let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
+    let header = L2BlockHeader::new(slot, ts, prev_blkid, &body, new_state_root);
 
     Ok((header, body, block_acc))
 }
@@ -102,7 +102,7 @@ pub fn prepare_block<D: Database, E: ExecEngineCtl>(
 fn prepare_l1_segment(
     local_l1_state: &LocalL1State,
     prev_chstate: &Chainstate,
-    l1_db: &impl L1Database,
+    l1man: &L1BlockManager,
     max_l1_entries: usize,
     _params: &RollupParams,
 ) -> Result<L1Segment, Error> {
@@ -115,8 +115,8 @@ fn prepare_l1_segment(
     if maturation_queue_size == 0 {
         let mut payloads = Vec::new();
         for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
-            let rec = load_header_record(*h, l1_db)?;
-            let deposit_update_tx = fetch_deposit_update_txs(*h, l1_db)?;
+            let rec = load_header_record(*h, l1man)?;
+            let deposit_update_tx = fetch_deposit_update_txs(*h, l1man)?;
             payloads.push(
                 L1HeaderPayload::new(*h, rec)
                     .with_deposit_update_txs(deposit_update_tx)
@@ -159,8 +159,8 @@ fn prepare_l1_segment(
     // Load the blocks.
     let mut payloads = Vec::new();
     for (h, _b) in fresh_blocks {
-        let rec = load_header_record(*h, l1_db)?;
-        let deposit_update_tx = fetch_deposit_update_txs(*h, l1_db)?;
+        let rec = load_header_record(*h, l1man)?;
+        let deposit_update_tx = fetch_deposit_update_txs(*h, l1man)?;
         payloads.push(
             L1HeaderPayload::new(*h, rec)
                 .with_deposit_update_txs(deposit_update_tx)
@@ -175,8 +175,8 @@ fn prepare_l1_segment(
     Ok(L1Segment::new(payloads))
 }
 
-fn load_header_record(h: u64, l1_db: &impl L1Database) -> Result<L1HeaderRecord, Error> {
-    let mf = l1_db
+fn load_header_record(h: u64, l1man: &L1BlockManager) -> Result<L1HeaderRecord, Error> {
+    let mf = l1man
         .get_block_manifest(h)?
         .ok_or(Error::MissingL1BlockHeight(h))?;
     // TODO need to include tx root proof we can verify
@@ -186,17 +186,14 @@ fn load_header_record(h: u64, l1_db: &impl L1Database) -> Result<L1HeaderRecord,
     ))
 }
 
-fn fetch_deposit_update_txs(
-    h: u64,
-    l1_db: &impl L1Database,
-) -> Result<Vec<DepositUpdateTx>, Error> {
-    let relevant_tx_ref = l1_db
+fn fetch_deposit_update_txs(h: u64, l1man: &L1BlockManager) -> Result<Vec<DepositUpdateTx>, Error> {
+    let relevant_tx_ref = l1man
         .get_block_txs(h)?
         .ok_or(Error::MissingL1BlockHeight(h))?;
 
     let mut deposit_update_txs = Vec::new();
     for tx_ref in relevant_tx_ref {
-        let tx = l1_db.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
+        let tx = l1man.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
 
         if let Deposit(_dep) = tx.protocol_operation() {
             deposit_update_txs.push(DepositUpdateTx::new(tx, tx_ref.position()));

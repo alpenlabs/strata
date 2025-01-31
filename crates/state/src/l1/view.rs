@@ -1,5 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::l1::L1BlockId;
 
 use super::{L1HeaderRecord, L1MaturationEntry};
 use crate::prelude::StateQueue;
@@ -43,6 +44,10 @@ impl L1ViewState {
 
     pub fn safe_block(&self) -> &L1HeaderRecord {
         &self.safe_block
+    }
+
+    pub fn safe_blkid(&self) -> &L1BlockId {
+        &self.safe_block.blkid
     }
 
     pub fn safe_height(&self) -> u64 {

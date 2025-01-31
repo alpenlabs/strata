@@ -12,7 +12,7 @@ use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::SyncAction};
 use strata_status::StatusChannel;
-use strata_storage::{CheckpointDbManager, L2BlockManager};
+use strata_storage::{CheckpointDbManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::{
     sync::{broadcast, mpsc},
@@ -44,7 +44,7 @@ pub struct WorkerState<D: Database> {
     database: Arc<D>,
 
     /// L2 block manager.
-    l2_block_manager: Arc<L2BlockManager>,
+    storage: Arc<NodeStorage>,
 
     /// Checkpoint manager.
     checkpoint_manager: Arc<CheckpointDbManager>,
@@ -62,7 +62,7 @@ impl<D: Database> WorkerState<D> {
     pub fn open(
         params: Arc<Params>,
         database: Arc<D>,
-        l2_block_manager: Arc<L2BlockManager>,
+        storage: Arc<NodeStorage>,
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
         checkpoint_manager: Arc<CheckpointDbManager>,
     ) -> anyhow::Result<Self> {
@@ -71,6 +71,7 @@ impl<D: Database> WorkerState<D> {
         let state_tracker = state_tracker::StateTracker::new(
             params.clone(),
             database.clone(),
+            storage.clone(),
             cur_state_idx,
             Arc::new(cur_state),
         );
@@ -87,7 +88,7 @@ impl<D: Database> WorkerState<D> {
             params,
             config,
             database,
-            l2_block_manager,
+            storage,
             state_tracker,
             cupdate_tx,
             checkpoint_manager,
@@ -281,7 +282,8 @@ fn apply_action<D: Database>(
             // TODO not sure what this should entail yet
             warn!(?blkid, "marking block invalid!");
             state
-                .l2_block_manager
+                .storage
+                .l2()
                 .set_block_status_blocking(&blkid, BlockStatus::Invalid)?;
         }
 
@@ -299,8 +301,8 @@ fn apply_action<D: Database>(
 
             // TODO: use l1blkid during chain state genesis ?
 
-            let chstate = genesis::init_genesis_chainstate(&state.params, state.database.as_ref())
-                .map_err(|err| {
+            let chstate =
+                genesis::init_genesis_chainstate(&state.params, &state.storage).map_err(|err| {
                     error!(err = %err, "failed to compute chain genesis");
                     Error::GenesisFailed(err.to_string())
                 })?;

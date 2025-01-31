@@ -7,7 +7,7 @@ use strata_chaintsn::transition::process_block;
 use strata_common::bail_manager::{check_bail_trigger, BAIL_ADVANCE_CONSENSUS_STATE};
 use strata_db::{
     errors::DbError,
-    traits::{BlockStatus, ChainstateDatabase, Database},
+    traits::{BlockStatus, Database},
 };
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
@@ -16,7 +16,7 @@ use strata_state::{
     client_state::ClientState, prelude::*, state_op::StateCache, sync_event::SyncEvent,
 };
 use strata_status::StatusChannel;
-use strata_storage::L2BlockManager;
+use strata_storage::{L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::{
     runtime::Handle,
@@ -37,10 +37,11 @@ pub struct ForkChoiceManager<D: Database> {
     params: Arc<Params>,
 
     /// Underlying state database.
+    // TODO remove
     database: Arc<D>,
 
-    /// L2 block manager.
-    l2_block_manager: Arc<L2BlockManager>,
+    /// Common node storage interface.
+    storage: Arc<NodeStorage>,
 
     /// Current CSM state, as of the last time we were updated about it.
     cur_csm_state: Arc<ClientState>,
@@ -61,7 +62,7 @@ impl<D: Database> ForkChoiceManager<D> {
     pub fn new(
         params: Arc<Params>,
         database: Arc<D>,
-        l2_block_manager: Arc<L2BlockManager>,
+        storage: Arc<NodeStorage>,
         cur_csm_state: Arc<ClientState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
         cur_best_block: L2BlockId,
@@ -70,7 +71,7 @@ impl<D: Database> ForkChoiceManager<D> {
         Self {
             params,
             database,
-            l2_block_manager,
+            storage,
             cur_csm_state,
             chain_tracker,
             cur_best_block,
@@ -83,17 +84,16 @@ impl<D: Database> ForkChoiceManager<D> {
     }
 
     fn set_block_status(&self, id: &L2BlockId, status: BlockStatus) -> Result<(), DbError> {
-        self.l2_block_manager
-            .set_block_status_blocking(id, status)?;
+        self.storage.l2().set_block_status_blocking(id, status)?;
         Ok(())
     }
 
     fn get_block_status(&self, id: &L2BlockId) -> Result<Option<BlockStatus>, DbError> {
-        self.l2_block_manager.get_block_status_blocking(id)
+        self.storage.l2().get_block_status_blocking(id)
     }
 
     fn get_block_data(&self, id: &L2BlockId) -> Result<Option<L2BlockBundle>, DbError> {
-        self.l2_block_manager.get_block_data_blocking(id)
+        self.storage.l2().get_block_data_blocking(id)
     }
 
     fn get_block_index(&self, blkid: &L2BlockId) -> anyhow::Result<u64> {
@@ -114,7 +114,7 @@ impl<D: Database> ForkChoiceManager<D> {
 /// Creates the forkchoice manager state from a database and rollup params.
 pub fn init_forkchoice_manager<D: Database>(
     database: &Arc<D>,
-    l2_block_manager: &Arc<L2BlockManager>,
+    storage: &Arc<NodeStorage>,
     params: &Arc<Params>,
     init_csm_state: Arc<ClientState>,
 ) -> anyhow::Result<ForkChoiceManager<D>> {
@@ -124,7 +124,8 @@ pub fn init_forkchoice_manager<D: Database>(
     let chain_tip_height = sync_state.chain_tip_height();
 
     let finalized_blockid = *sync_state.finalized_blkid();
-    let finalized_block = l2_block_manager
+    let finalized_block = storage
+        .l2()
         .get_block_data_blocking(&finalized_blockid)?
         .ok_or(Error::MissingL2Block(finalized_blockid))?;
     let finalized_height = finalized_block.header().blockidx();
@@ -137,17 +138,16 @@ pub fn init_forkchoice_manager<D: Database>(
     chain_tracker.load_unfinalized_blocks(
         finalized_height,
         chain_tip_height,
-        l2_block_manager.as_ref(),
+        storage.l2().as_ref(),
     )?;
 
-    let (cur_tip_blkid, cur_tip_index) =
-        determine_start_tip(&chain_tracker, l2_block_manager.as_ref())?;
+    let (cur_tip_blkid, cur_tip_index) = determine_start_tip(&chain_tracker, storage.l2())?;
 
     // Actually assemble the forkchoice manager state.
     let fcm = ForkChoiceManager::new(
         params.clone(),
         database.clone(),
-        l2_block_manager.clone(),
+        storage.clone(),
         init_csm_state,
         chain_tracker,
         cur_tip_blkid,
@@ -197,7 +197,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
     handle: Handle,
     database: Arc<D>,
-    l2_block_manager: Arc<L2BlockManager>,
+    storage: Arc<NodeStorage>,
     engine: Arc<E>,
     fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: Arc<CsmController>,
@@ -223,7 +223,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
 
     // Now that we have the database state in order, we can actually init the
     // FCM.
-    let fcm = match init_forkchoice_manager(&database, &l2_block_manager, &params, init_state) {
+    let fcm = match init_forkchoice_manager(&database, &storage, &params, init_state) {
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");
@@ -374,7 +374,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
             let best_block = pick_best_block(
                 &cur_tip,
                 fcm_state.chain_tracker.chain_tips_iter(),
-                &fcm_state.l2_block_manager,
+                fcm_state.storage.l2(),
             )?;
 
             // Figure out what our job is now.
@@ -536,7 +536,7 @@ fn apply_tip_update<D: Database>(
     reorg: &reorg::Reorg,
     fc_manager: &mut ForkChoiceManager<D>,
 ) -> anyhow::Result<Chainstate> {
-    let chs_db = fc_manager.database.chain_state_db();
+    let chsman = fc_manager.storage.as_ref().chainstate();
 
     // See if we need to roll back recent changes.
     let pivot_blkid = reorg.pivot();
@@ -544,8 +544,8 @@ fn apply_tip_update<D: Database>(
 
     // Load the post-state of the pivot block as the block to start computing
     // blocks going forwards with.
-    let mut pre_state = chs_db
-        .get_toplevel_state(pivot_idx)?
+    let mut pre_state = chsman
+        .get_toplevel_chainstate_blocking(pivot_idx)?
         .ok_or(Error::MissingIdxChainstate(pivot_idx))?;
 
     let mut updates = Vec::new();
@@ -586,14 +586,14 @@ fn apply_tip_update<D: Database>(
     // compute new states.
     if pivot_idx < fc_manager.cur_index {
         debug!(?pivot_blkid, %pivot_idx, "rolling back chainstate");
-        chs_db.rollback_writes_to(pivot_idx)?;
+        chsman.rollback_writes_to_blocking(pivot_idx)?;
     }
 
     // Now that we've verified the new chain is really valid, we can go and
     // apply the changes to commit to the new chain.
     for (idx, blkid, writes) in updates {
         debug!(?blkid, "applying CL state update");
-        chs_db.write_state_update(idx, &writes)?;
+        chsman.put_write_batch_blocking(idx, writes)?;
         fc_manager.cur_best_block = *blkid;
         fc_manager.cur_index = idx;
     }

@@ -1,6 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
+use strata_primitives::{buf::Buf32, hash::compute_borsh_hash, l2::L2BlockCommitment};
 
 use crate::{
     bridge_ops,
@@ -18,17 +18,14 @@ use crate::{
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct Chainstate {
     /// Most recent seen block.
-    pub(crate) last_block: L2BlockId,
-
-    /// The slot of the last produced block.
-    pub(crate) slot: u64,
+    pub(crate) last_block: L2BlockCommitment,
 
     /// The checkpoint epoch period we're currently in, and so the index we
     /// expect the next checkpoint to be for.
     ///
     /// Immediately after genesis, this is 0, so the first checkpoint batch is
     /// checkpoint 0, moving us into checkpoint period 1.
-    pub(crate) epoch: u64,
+    pub(crate) cur_epoch: u64,
 
     /// Rollup's view of L1 state.
     pub(crate) l1_state: l1::L1ViewState,
@@ -47,29 +44,12 @@ pub struct Chainstate {
     pub(crate) deposits_table: bridge_state::DepositsTable,
 }
 
-/// Hashed Chain State. This is used to compute the state root of the [`Chainstate`]
-// TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
-// It should be replaced once we swap out Chainstate's type definitions with SSZ type definitions
-// which defines all of this more rigorously
-#[derive(BorshSerialize, BorshDeserialize, Clone, Copy)]
-pub struct HashedChainState {
-    pub last_block: Buf32,
-    pub slot: u64,
-    pub epoch: u64,
-    pub l1_state_hash: Buf32,
-    pub pending_withdraws_hash: Buf32,
-    pub exec_env_hash: Buf32,
-    pub operators_hash: Buf32,
-    pub deposits_hash: Buf32,
-}
-
 impl Chainstate {
     // TODO remove genesis blkid since apparently we don't need it anymore
     pub fn from_genesis(gdata: &GenesisStateData) -> Self {
         Self {
-            last_block: gdata.genesis_blkid(),
-            slot: 0,
-            epoch: 0,
+            last_block: L2BlockCommitment::new(0, gdata.genesis_blkid()),
+            cur_epoch: 0,
             l1_state: gdata.l1_state().clone(),
             pending_withdraws: StateQueue::new_empty(),
             exec_env_state: gdata.exec_state().clone(),
@@ -80,31 +60,30 @@ impl Chainstate {
 
     /// Returns the slot last processed on the chainstate.
     pub fn chain_tip_slot(&self) -> u64 {
-        self.slot
+        self.last_block.slot()
     }
 
     /// Returns the blockid of the last processed block, which was used to
     /// construct this chainstate (unless we're currently in the process of
     /// modifying this chainstate copy).
-    pub fn chain_tip_blockid(&self) -> L2BlockId {
-        self.last_block
+    pub fn chain_tip_blkid(&self) -> &L2BlockId {
+        self.last_block.blkid()
     }
 
     pub fn l1_view(&self) -> &L1ViewState {
         &self.l1_state
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.epoch
+    pub fn cur_epoch(&self) -> u64 {
+        self.cur_epoch
     }
 
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
         let hashed_state = HashedChainState {
-            last_block: self.last_block.into(),
-            slot: self.slot,
-            epoch: self.epoch,
+            last_block: compute_borsh_hash(&self.last_block),
+            cur_epoch: self.cur_epoch,
             l1_state_hash: compute_borsh_hash(&self.l1_state),
             pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
             exec_env_hash: compute_borsh_hash(&self.exec_env_state),
@@ -131,13 +110,28 @@ impl Chainstate {
     }
 }
 
+/// Hashed Chain State. This is used to compute the state root of the [`Chainstate`]
+// TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
+// It should be replaced once we swap out Chainstate's type definitions with SSZ type definitions
+// which defines all of this more rigorously
+#[derive(BorshSerialize, BorshDeserialize, Clone, Copy)]
+pub struct HashedChainState {
+    pub last_block: Buf32,
+    pub cur_epoch: u64,
+    pub l1_state_hash: Buf32,
+    pub pending_withdraws_hash: Buf32,
+    pub exec_env_hash: Buf32,
+    pub operators_hash: Buf32,
+    pub deposits_hash: Buf32,
+}
+
 // NOTE: This is a helper setter that is supposed to be used only in tests.
 // This is being used in `strata_btcio::reader` to test the reader's behaviour when the epoch
 // changes.
 #[cfg(any(test, feature = "test_utils"))]
 impl Chainstate {
     pub fn set_epoch(&mut self, ep: u64) {
-        self.epoch = ep;
+        self.cur_epoch = ep;
     }
 }
 

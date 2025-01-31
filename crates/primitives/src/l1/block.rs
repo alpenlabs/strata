@@ -45,6 +45,39 @@ impl From<L1BlockId> for BlockHash {
     }
 }
 
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+    Deserialize,
+    Serialize,
+)]
+pub struct L1BlockCommitment {
+    height: u64,
+    blkid: L1BlockId,
+}
+
+impl L1BlockCommitment {
+    pub fn new(height: u64, blkid: L1BlockId) -> Self {
+        Self { height, blkid }
+    }
+
+    pub fn height(&self) -> u64 {
+        self.height
+    }
+
+    pub fn blkid(&self) -> &L1BlockId {
+        &self.blkid
+    }
+}
+
 /// Reference to a transaction in a block.  This is the block index and the
 /// position of the transaction in the block.
 #[derive(
@@ -68,6 +101,7 @@ impl L1TxRef {
     pub fn blk_idx(&self) -> u64 {
         self.0
     }
+
     pub fn position(&self) -> u32 {
         self.1
     }

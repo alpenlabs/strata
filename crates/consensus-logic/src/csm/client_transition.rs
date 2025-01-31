@@ -8,7 +8,8 @@ use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabas
 use strata_primitives::prelude::*;
 use strata_state::{
     batch::{BatchCheckpoint, BatchCheckpointWithCommitment, BatchInfo},
-    block,
+    block::{self, L2BlockBundle},
+    chain_state::Chainstate,
     client_state::*,
     header::L2Header,
     id::L2BlockId,
@@ -16,17 +17,59 @@ use strata_state::{
     operation::*,
     sync_event::SyncEvent,
 };
+use strata_storage::NodeStorage;
 use tracing::*;
 use zkaleido::ProofReceipt;
 
 use crate::{errors::*, genesis::make_genesis_block, l1_handler::verify_proof};
 
+/// Interface for external context necessary specifically for event validation.
+pub trait EventContext {
+    fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error>;
+    fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error>;
+    fn get_toplevel_chainstate(&self, slot: u64) -> Result<Chainstate, Error>;
+}
+
+/// Event context using the main node storage interfaace.
+pub struct StorageEventContext<'c> {
+    storage: &'c NodeStorage,
+}
+
+impl<'c> StorageEventContext<'c> {
+    pub fn new(storage: &'c NodeStorage) -> Self {
+        Self { storage }
+    }
+}
+
+impl EventContext for StorageEventContext<'_> {
+    fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
+        self.storage
+            .l1()
+            .get_block_manifest(height)?
+            .ok_or(Error::MissingL1BlockHeight(height))
+    }
+
+    fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
+        self.storage
+            .l2()
+            .get_block_data_blocking(blkid)?
+            .ok_or(Error::MissingL2Block(*blkid))
+    }
+
+    fn get_toplevel_chainstate(&self, slot: u64) -> Result<Chainstate, Error> {
+        self.storage
+            .chainstate()
+            .get_toplevel_chainstate_blocking(slot)?
+            .ok_or(Error::MissingIdxChainstate(slot))
+    }
+}
+
 /// Processes the event given the current consensus state, producing some
 /// output.  This can return database errors.
-pub fn process_event<D: Database>(
+pub fn process_event(
     state: &ClientState,
     ev: &SyncEvent,
-    database: &D,
+    context: &impl EventContext,
     params: &Params,
 ) -> Result<ClientUpdateOutput, Error> {
     let mut writes = Vec::new();
@@ -45,10 +88,7 @@ pub fn process_event<D: Database>(
 
             // FIXME this doesn't do any SPV checks to make sure we only go to
             // a longer chain, it just does it unconditionally
-            let l1_db = database.l1_db();
-            let block_mf = l1_db
-                .get_block_manifest(*height)?
-                .ok_or(Error::MissingL1BlockHeight(*height))?;
+            let block_mf = context.get_l1_block_manifest(*height)?;
 
             let l1v = state.l1_view();
             let l1_vs = state.l1_view().tip_verification_state();
@@ -58,9 +98,7 @@ pub fn process_event<D: Database>(
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
                 let mut updated_l1vs = l1_vs.clone();
                 for height in (l1_vs_height + 1..l1v.tip_height()) {
-                    let block_mf = l1_db
-                        .get_block_manifest(height)?
-                        .ok_or(Error::MissingL1BlockHeight(height))?;
+                    let block_mf = context.get_l1_block_manifest(height)?;
                     let header: Header =
                         bitcoin::consensus::deserialize(block_mf.header()).unwrap();
                     updated_l1vs =
@@ -75,9 +113,7 @@ pub fn process_event<D: Database>(
             if next_exp_height > params.rollup().horizon_l1_height {
                 // TODO check that the new block we're trying to add has the same parent as the tip
                 // block
-                let cur_tip_block = l1_db
-                    .get_block_manifest(cur_seen_tip_height)?
-                    .ok_or(Error::MissingL1BlockHeight(cur_seen_tip_height))?;
+                let cur_tip_block = context.get_l1_block_manifest(cur_seen_tip_height)?;
             }
 
             if *height == next_exp_height {
@@ -93,7 +129,7 @@ pub fn process_event<D: Database>(
             let maturable_height = next_exp_height.saturating_sub(safe_depth);
 
             if maturable_height > params.rollup().horizon_l1_height && state.is_chain_active() {
-                let (wrs, acts) = handle_mature_l1_height(maturable_height, state, database);
+                let (wrs, acts) = handle_mature_l1_height(maturable_height, state, context);
                 writes.extend(wrs);
                 actions.extend(acts);
             }
@@ -137,7 +173,8 @@ pub fn process_event<D: Database>(
         }
 
         SyncEvent::L1Revert(to_height) => {
-            let l1_db = database.l1_db();
+            // TODO not sure why this was here
+            //let l1_db = database.l1_db();
 
             let buried = state.l1_view().buried_l1_height();
             if *to_height < buried {
@@ -154,7 +191,8 @@ pub fn process_event<D: Database>(
             if let Some(ss) = state.sync() {
                 // TODO load it up and figure out what's there, see if we have to
                 // load the state updates from L1 or something
-                let l2_db = database.l2_db();
+                // TODO not sure why this was here
+                //let l2_db = database.l2_db();
 
                 let proof_verified_checkpoints =
                     filter_verified_checkpoints(state, checkpoints, params.rollup());
@@ -190,18 +228,13 @@ pub fn process_event<D: Database>(
         }
 
         SyncEvent::NewTipBlock(blkid) => {
+            // TODO remove ^this sync event type and all associated fields
             debug!(?blkid, "Received NewTipBlock");
-            let l2_db = database.l2_db();
-            let block = l2_db
-                .get_block_data(*blkid)?
-                .ok_or(Error::MissingL2Block(*blkid))?;
+            let block = context.get_l2_block_data(blkid)?;
 
             // TODO: get chainstate idx from blkid OR pass correct idx in sync event
-            let block_idx = block.header().blockidx();
-            let chainstate_db = database.chain_state_db();
-            let chainstate = chainstate_db
-                .get_toplevel_state(block_idx)?
-                .ok_or(Error::MissingIdxChainstate(block_idx))?;
+            let slot = block.header().blockidx();
+            let chainstate = context.get_toplevel_chainstate(slot)?;
 
             debug!(?chainstate, "Chainstate for new tip block");
             // height of last matured L1 block in chain state
@@ -228,7 +261,7 @@ pub fn process_event<D: Database>(
             ));
             actions.push(SyncAction::UpdateTip(*blkid));
 
-            let (wrs, acts) = handle_checkpoint_finalization(state, blkid, params, database);
+            let (wrs, acts) = handle_checkpoint_finalization(state, blkid, params, context);
             writes.extend(wrs);
             actions.extend(acts);
         }
@@ -261,7 +294,7 @@ pub fn process_event<D: Database>(
 fn handle_mature_l1_height(
     maturable_height: u64,
     state: &ClientState,
-    database: &impl Database,
+    context: &impl EventContext,
 ) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
     let mut writes = Vec::new();
     let mut actions = Vec::new();
@@ -280,23 +313,18 @@ fn handle_mature_l1_height(
             // If l2 blocks is not in db then finalization will happen when
             // l2Block is fetched from the network and the corresponding
             //checkpoint is already finalized.
-            let l2_blockid = checkpt.batch_info.l2_blockid;
+            let l2_blkid = checkpt.batch_info.l2_blockid;
 
-            match database.l2_db().get_block_data(l2_blockid) {
-                Ok(Some(_)) => {
+            match context.get_l2_block_data(&l2_blkid) {
+                Ok(_) => {
                     debug!(%maturable_height, "Writing CheckpointFinalized");
                     writes.push(ClientStateWrite::CheckpointFinalized(maturable_height));
                     // Emit sync action for finalizing a l2 block
-                    info!(%maturable_height, %l2_blockid, "l2 block found in db, push FinalizeBlock SyncAction");
-                    actions.push(SyncAction::FinalizeBlock(l2_blockid));
-                }
-                Ok(None) => {
-                    warn!(
-                        %maturable_height,%l2_blockid, "l2 block not in db yet, skipping finalize"
-                    );
+                    info!(%maturable_height, %l2_blkid, "L1 block found in db, push FinalizeBlock SyncAction");
+                    actions.push(SyncAction::FinalizeBlock(l2_blkid));
                 }
                 Err(e) => {
-                    error!(%e, "error while fetching block data from l2_db");
+                    error!(%maturable_height, %l2_blkid, %e, "error while fetching block data");
                 }
             }
         } else {
@@ -334,7 +362,7 @@ fn handle_checkpoint_finalization(
     state: &ClientState,
     blkid: &L2BlockId,
     params: &Params,
-    database: &impl Database,
+    context: &impl EventContext,
 ) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
     let mut writes = Vec::new();
     let mut actions = Vec::new();
@@ -352,7 +380,7 @@ fn handle_checkpoint_finalization(
 
             // The l1 height should be handled only if it is less than maturable height
             if l1_height < maturable_height {
-                let (wrs, acts) = handle_mature_l1_height(l1_height, state, database);
+                let (wrs, acts) = handle_mature_l1_height(l1_height, state, context);
                 writes.extend(wrs);
                 actions.extend(acts);
             }
@@ -472,6 +500,30 @@ mod tests {
     use super::*;
     use crate::genesis;
 
+    pub struct DummyEventContext {
+        // nothing
+    }
+
+    impl DummyEventContext {
+        pub fn new() -> Self {
+            Self {}
+        }
+    }
+
+    impl EventContext for DummyEventContext {
+        fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
+            Ok(ArbitraryGenerator::new().generate())
+        }
+
+        fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
+            Err(Error::MissingL2Block(*blkid))
+        }
+
+        fn get_toplevel_chainstate(&self, slot: u64) -> Result<Chainstate, Error> {
+            Err(Error::MissingIdxChainstate(slot))
+        }
+    }
+
     struct TestEvent<'a> {
         event: SyncEvent,
         expected_writes: &'a [ClientStateWrite],
@@ -490,11 +542,13 @@ mod tests {
         database: &impl Database,
         params: &Params,
     ) {
+        let context = DummyEventContext::new();
+
         for case in test_cases {
             println!("Running test case: {}", case.description);
             let mut outputs = Vec::new();
             for (i, test_event) in case.events.iter().enumerate() {
-                let output = process_event(state, &test_event.event, database, params).unwrap();
+                let output = process_event(state, &test_event.event, &context, params).unwrap();
                 outputs.push(output.clone());
                 assert_eq!(
                     output.writes(),

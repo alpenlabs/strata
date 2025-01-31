@@ -4,10 +4,9 @@ use std::{sync::Arc, time};
 
 use parking_lot::RwLock;
 use strata_consensus_logic::csm::message::ClientUpdateNotif;
-use strata_db::traits::*;
 use strata_primitives::params::Params;
 use strata_state::{client_state::ClientState, prelude::*};
-use strata_storage::L2BlockManager;
+use strata_storage::{L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::sync::broadcast;
 use tracing::*;
@@ -22,22 +21,19 @@ use crate::{
 };
 
 /// Watch client state updates and generate sequencer duties.
-pub fn duty_tracker_task<D: Database>(
+pub fn duty_tracker_task(
     shutdown: ShutdownGuard,
     duty_tracker: Arc<RwLock<DutyTracker>>,
     cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
-    database: Arc<D>,
-    l2_block_manager: Arc<L2BlockManager>,
+    storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
     params: Arc<Params>,
 ) -> Result<(), Error> {
-    let client_state_db = database.client_state_db();
     duty_tracker_task_inner(
         shutdown,
         duty_tracker,
         cupdate_rx,
-        client_state_db.as_ref(),
-        l2_block_manager.as_ref(),
+        storage.as_ref(),
         checkpoint_handle.as_ref(),
         params.as_ref(),
     )
@@ -47,18 +43,31 @@ fn duty_tracker_task_inner(
     shutdown: ShutdownGuard,
     duty_tracker: Arc<RwLock<DutyTracker>>,
     mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
-    client_state_db: &impl ClientStateDatabase,
-    l2_block_manager: &L2BlockManager,
+    storage: &NodeStorage,
     checkpoint_handle: &CheckpointHandle,
     params: &Params,
 ) -> Result<(), Error> {
-    let idx = client_state_db.get_last_checkpoint_idx()?;
-    let last_checkpoint_state = client_state_db.get_state_checkpoint(idx)?;
-    let last_finalized_blk = match last_checkpoint_state {
-        Some(state) => state.sync().map(|sync| *sync.finalized_blkid()),
-        None => None,
-    };
-    duty_tracker.write().set_finalized_block(last_finalized_blk);
+    let chsman = storage.chainstate();
+
+    // FIXME this had to be bodged while doing some refactoring, it should be
+    // restored to something more correct after we merge the client state PR
+    // FIXME these shouldn't be using these magic indexes like this, still
+    // derive these from the chainstate probably?
+    match chsman.get_last_write_idx_blocking() {
+        Ok(idx) => {
+            let last_fin_chainstate = chsman
+                .get_toplevel_chainstate_blocking(idx)?
+                .expect("duty: get init chainstate");
+            let last_fin_blkid = *last_fin_chainstate.chain_tip_blkid();
+            duty_tracker
+                .write()
+                .set_finalized_block(Some(last_fin_blkid));
+        }
+        Err(e) => {
+            warn!(err = %e, "failed to load finalized block from disk, assuming none");
+            duty_tracker.write().set_finalized_block(None);
+        }
+    }
 
     loop {
         if shutdown.should_shutdown() {
@@ -85,7 +94,7 @@ fn duty_tracker_task_inner(
         if let Err(e) = update_tracker(
             duty_tracker.clone(),
             new_state,
-            l2_block_manager,
+            storage.l2(),
             checkpoint_handle,
             params,
         ) {

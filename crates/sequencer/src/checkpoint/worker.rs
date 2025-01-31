@@ -3,28 +3,28 @@
 use std::sync::Arc;
 
 use strata_consensus_logic::csm::message::ClientUpdateNotif;
-use strata_db::{
-    traits::{ChainstateDatabase, Database},
-    types::CheckpointEntry,
-};
+use strata_db::{traits::Database, types::CheckpointEntry};
 use strata_primitives::{buf::Buf32, params::Params};
 use strata_state::{
     batch::{BatchInfo, BootstrapState},
     client_state::ClientState,
 };
+use strata_storage::NodeStorage;
 use strata_tasks::ShutdownGuard;
 use thiserror::Error;
 use tokio::sync::broadcast;
-use tracing::{debug, warn};
+use tracing::*;
 
-use crate::checkpoint::CheckpointHandle;
+use super::CheckpointHandle;
 
 #[derive(Debug, Error)]
 enum Error {
     #[error("chain is not active yet")]
     ChainInactive,
+
     #[error("missing expected chainstate for blockidx {0}")]
     MissingIdxChainstate(u64),
+
     #[error("db: {0}")]
     Db(#[from] strata_db::errors::DbError),
 }
@@ -35,11 +35,11 @@ pub fn checkpoint_worker<D: Database>(
     shutdown: ShutdownGuard,
     mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
     params: Arc<Params>,
-    database: Arc<D>,
+    _database: Arc<D>,
+    storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
 ) -> anyhow::Result<()> {
     let rollup_params_commitment = params.rollup().compute_hash();
-    let chs_db = database.chain_state_db();
 
     loop {
         if shutdown.should_shutdown() {
@@ -69,7 +69,7 @@ pub fn checkpoint_worker<D: Database>(
         }
 
         let (batch_info, bootstrap_state) =
-            match get_next_batch::<D>(state, chs_db, rollup_params_commitment) {
+            match get_next_batch(state, storage.as_ref(), rollup_params_commitment) {
                 Err(error) => {
                     warn!(?error, "Failed to get next batch");
                     continue;
@@ -99,19 +99,28 @@ fn get_next_batch_idx(state: &ClientState) -> u64 {
     }
 }
 
-fn get_next_batch<D: Database>(
+fn get_next_batch(
     state: &ClientState,
-    chs_db: &D::ChainstateDB,
+    storage: &NodeStorage,
     rollup_params_commitment: Buf32,
 ) -> Result<(BatchInfo, BootstrapState), Error> {
-    let Some(sync_state) = state.sync() else {
+    let chsman = storage.chainstate();
+
+    if !state.is_chain_active() {
         // before genesis
+        debug!("chain not active, no duties created");
+        return Err(Error::ChainInactive);
+    };
+
+    let Some(sync_state) = state.sync() else {
         return Err(Error::ChainInactive);
     };
 
     let tip_height = sync_state.chain_tip_height();
     let tip_id = *sync_state.chain_tip_blkid();
 
+    // Still not ready to make a batch?  This should be only if the epoch is
+    // something else.
     if tip_height == 0 {
         return Err(Error::ChainInactive);
     }
@@ -146,13 +155,13 @@ fn get_next_batch<D: Database>(
             // Start from first non-genesis l2 block height
             let l2_range = (1, tip_height);
 
-            let initial_chain_state = chs_db
-                .get_toplevel_state(0)?
+            let initial_chain_state = chsman
+                .get_toplevel_chainstate_blocking(0)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let initial_chain_state_root = initial_chain_state.compute_state_root();
 
-            let current_chain_state = chs_db
-                .get_toplevel_state(tip_height)?
+            let current_chain_state = chsman
+                .get_toplevel_chainstate_blocking(tip_height)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let current_chain_state_root = current_chain_state.compute_state_root();
             let l2_transition = (initial_chain_state_root, current_chain_state_root);
@@ -188,8 +197,8 @@ fn get_next_batch<D: Database>(
             // Also, rather than tip heights, we might need to limit the max range a prover will
             // be proving
             let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
-            let current_chain_state = chs_db
-                .get_toplevel_state(tip_height)?
+            let current_chain_state = chsman
+                .get_toplevel_chainstate_blocking(tip_height)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let current_chain_state_root = current_chain_state.compute_state_root();
             let l2_transition = (checkpoint.l2_transition.1, current_chain_state_root);
