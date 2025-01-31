@@ -12,8 +12,8 @@ use reth_primitives::{
     TransactionSigned,
 };
 use reth_provider::{
-    BlockReader, BlockReaderIdExt, ChainSpecProvider, EvmEnvProvider, ProviderBlock,
-    ProviderHeader, ProviderReceipt, ProviderTx, ReceiptProvider, StateProviderFactory,
+    BlockReader, BlockReaderIdExt, ChainSpecProvider, ProviderBlock, ProviderHeader,
+    ProviderReceipt, ProviderTx, ReceiptProvider, StateProviderFactory,
 };
 use reth_rpc_eth_api::{
     helpers::{LoadPendingBlock, SpawnBlocking},
@@ -39,8 +39,7 @@ where
             Block = reth_primitives::Block,
             Receipt = reth_primitives::Receipt,
             Header = reth_primitives::Header,
-        > + EvmEnvProvider
-                      + ChainSpecProvider<ChainSpec: EthChainSpec + EthereumHardforks>
+        > + ChainSpecProvider<ChainSpec: EthChainSpec + EthereumHardforks>
                       + StateProviderFactory,
         Pool: TransactionPool<Transaction: PoolTransaction<Consensus = ProviderTx<N::Provider>>>,
         Evm: ConfigureEvm<Header = Header, Transaction = TransactionSigned>,
