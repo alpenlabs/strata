@@ -13,21 +13,24 @@ from load.cfg import LoadConfig
 # TODO(load): enhance it to be able to increase/decrease the load from test runtime.
 class LoadGeneratorService(flexitest.Service):
     """
-    A separate flexitest service that is able to generate load as specified in the LoadConfig.
+    A separate flexitest service that is able to generate the load as specified by `LoadConfig`.
     """
 
-    # Locust Environment for running the load.
     env: Environment
-    # Locust local runner that actually dispatches the load.
+    """Locust Environment for running the load against."""
+
     runner: LocalRunner
-    # A thin config that specifies load params: jobs, host, rate, etc.
+    """Locust local runner that actually dispatches the load."""
+
     cfg: LoadConfig
-    # Whether the LoadGenerator (as a flexitest service) is started.
+    """A config that specifies load params: jobs, host, rate, etc."""
+
     _is_started: bool
+    """Whether the LoadGenerator (as a flexitest service) is started."""
 
     def __init__(self, logfile, cfg: LoadConfig):
         self._is_started = False
-        self.env = Environment(user_classes=cfg.user_classes, events=events)
+        self.env = Environment(user_classes=cfg.jobs, events=events)
         self.runner = self.env.create_local_runner()
         self.cfg = cfg
 

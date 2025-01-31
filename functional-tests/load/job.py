@@ -2,11 +2,19 @@ import web3
 import web3.middleware
 from locust import HttpUser
 
-FUND_AMOUNT = 1_000_000_000_000_000_000_000  # 1000 ETH
+
+class StrataLoadJob(HttpUser):
+    """
+    A common layer for all the load jobs in the load tests.
+    """
+
+    pass
 
 
 # TODO(load): configure the structured logging as we do in the tests.
-class BaseEthJob(HttpUser):
+class BaseRethLoadJob(StrataLoadJob):
+    fund_amount: int = 1_000_000_000_000_000_000_000  # 1000 ETH
+
     def on_start(self):
         root_w3, genesis_acc = self.w3_with_genesis_acc()
         self._root_w3 = root_w3
@@ -46,9 +54,8 @@ class BaseEthJob(HttpUser):
     def _fund_account(self, acc):
         print(f"FUNDING ACCOUNT {acc}")
         source = self._root_w3.address
-        to_transfer = FUND_AMOUNT
         tx_hash = self._root_w3.eth.send_transaction(
-            {"to": acc, "value": hex(to_transfer), "gas": hex(100000), "from": source}
+            {"to": acc, "value": hex(self.fund_amount), "gas": hex(100000), "from": source}
         )
 
         tx_receipt = self._root_w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)

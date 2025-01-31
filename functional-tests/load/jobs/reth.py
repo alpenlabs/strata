@@ -1,9 +1,9 @@
 from locust import task
 
-from load.job import BaseEthJob
+from load.job import BaseRethLoadJob
 
 
-class EthJob(BaseEthJob):
+class EthJob(BaseRethLoadJob):
     def on_start(self):
         super().on_start()
 

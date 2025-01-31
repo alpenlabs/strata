@@ -16,7 +16,8 @@ from envs import net_settings, testenv
 from factory import factory
 from utils import *
 from utils.constants import *
-
+from load.cfg import RethLoadConfigBuilder
+from load.jobs import EthJob
 
 TEST_DIR: str = "tests"
 
@@ -87,7 +88,7 @@ def main(argv):
     reth_fac = factory.RethFactory([12600 + i for i in range(100 * 3)])
     prover_client_fac = factory.ProverClientFactory([12900 + i for i in range(100 * 3)])
     bridge_client_fac = factory.BridgeClientFactory([13200 + i for i in range(100)])
-    load_gen_fac = factory.LoadGeneratorFactory([14000 + i for i in range(100)])
+    load_gen_fac = factory.LoadGeneratorFactory([13300 + i for i in range(100)])
     seq_signer_fac = factory.StrataSequencerFactory()
 
     factories = {
@@ -100,6 +101,9 @@ def main(argv):
         "bridge_client": bridge_client_fac,
         "load_generator": load_gen_fac,
     }
+
+    reth_load_env = testenv.LoadEnvConfig()
+    reth_load_env.with_load_builder(RethLoadConfigBuilder().with_jobs([EthJob]).with_rate(15))
 
     global_envs = {
         # Basic env is the default env for all tests.
@@ -116,7 +120,7 @@ def main(argv):
             2
         ),  # TODO: Need to generate at least horizon blocks, based on params
         "prover": testenv.BasicEnvConfig(101),
-        "load": testenv.LoadEnvConfig(),
+        "load_reth": reth_load_env,
     }
 
     setup_root_logger()
