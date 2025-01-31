@@ -48,7 +48,7 @@ pub fn sync_chainstate_to_el(
         let payload = ExecPayloadData::from_l2_block_bundle(&l2block);
 
         engine.submit_payload(payload)?;
-        engine.update_safe_block(block_id)?;
+        engine.update_head_block(block_id)?;
     }
 
     Ok(())
