@@ -87,16 +87,16 @@ mod tests {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
         let db = setup_db();
 
-        let res = db.write_client_update_output(2, output.clone());
+        let res = db.put_client_update(2, output.clone());
         assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 2))));
 
-        let res = db.write_client_update_output(1, output.clone());
+        let res = db.put_client_update(1, output.clone());
         assert!(res.is_ok());
 
-        let res = db.write_client_update_output(1, output.clone());
+        let res = db.put_client_update(1, output.clone());
         assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 1))));
 
-        let res = db.write_client_update_output(3, output.clone());
+        let res = db.put_client_update(3, output.clone());
         assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 3))));
     }
 
@@ -104,25 +104,26 @@ mod tests {
     fn test_get_last_write_idx() {
         let db = setup_db();
 
-        let idx = db.get_last_write_idx();
+        let idx = db.get_last_state_idx();
         assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
 
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
-        let _ = db.write_client_update_output(1, output.clone());
+        let _ = db.put_client_update(1, output.clone());
 
-        let idx = db.get_last_write_idx();
+        let idx = db.get_last_state_idx();
         assert!(idx.is_ok_and(|x| matches!(x, 1)));
     }
 
     #[test]
-    fn test_get_consensus_writes() {
+    fn test_get_consensus_state() {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
-        let _ = db.write_client_update_output(1, output.clone());
+        let _ = db.put_client_update(1, output.clone());
 
-        let writes = db.get_client_state_writes(1).unwrap().unwrap();
-        assert_eq!(&writes, output.writes());
+        let update = db.get_client_update(1).unwrap().unwrap();
+        let state = update.state();
+        assert_eq!(state, output.state());
     }
 
     #[test]
@@ -130,68 +131,10 @@ mod tests {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
-        let _ = db.write_client_update_output(1, output.clone());
+        let _ = db.put_client_update(1, output.clone());
 
-        let actions = db.get_client_update_actions(1).unwrap().unwrap();
-        assert_eq!(&actions, output.actions());
-    }
-
-    #[test]
-    fn test_write_consensus_checkpoint() {
-        let state: ClientState = ArbitraryGenerator::new().generate();
-        let db = setup_db();
-
-        let _ = db.write_client_state_checkpoint(3, state.clone());
-
-        let idx = db.get_last_checkpoint_idx().unwrap();
-        assert_eq!(idx, 3);
-
-        let res = db.write_client_state_checkpoint(3, state.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OverwriteConsensusCheckpoint(3))));
-
-        // TODO: verify if it is possible to write checkpoint in any order
-        let res = db.write_client_state_checkpoint(1, state);
-        assert!(res.is_ok());
-
-        // Note: The ordering is managed by rocksdb. So might be alright..
-        let idx = db.get_last_checkpoint_idx().unwrap();
-        assert_eq!(idx, 3);
-    }
-
-    #[test]
-    fn test_get_previous_checkpoint_at() {
-        let state: ClientState = ArbitraryGenerator::new().generate();
-
-        let db = setup_db();
-
-        let res = db.get_prev_checkpoint_at(1);
-        assert!(res.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
-
-        // Add a checkpoint
-        _ = db.write_client_state_checkpoint(1, state.clone());
-
-        let res = db.get_prev_checkpoint_at(1);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        let res = db.get_prev_checkpoint_at(2);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        let res = db.get_prev_checkpoint_at(100);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        // Add a new checkpoint
-        _ = db.write_client_state_checkpoint(5, state.clone());
-
-        let res = db.get_prev_checkpoint_at(1);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        let res = db.get_prev_checkpoint_at(2);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        let res = db.get_prev_checkpoint_at(5);
-        assert!(res.is_ok_and(|x| matches!(x, 5)));
-
-        let res = db.get_prev_checkpoint_at(100);
-        assert!(res.is_ok_and(|x| matches!(x, 5)));
+        let update = db.get_client_update(1).unwrap().unwrap();
+        let actions = update.actions();
+        assert_eq!(actions, output.actions());
     }
 }
