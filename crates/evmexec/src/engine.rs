@@ -128,8 +128,6 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             withdrawals: Some(withdrawals),
             parent_beacon_block_root: None,
             suggested_fee_recipient: COINBASE_ADDRESS,
-            max_blobs_per_block: None,
-            target_blobs_per_block: None,
         });
 
         let mut fcs = *self.fork_choice_state.lock().await;

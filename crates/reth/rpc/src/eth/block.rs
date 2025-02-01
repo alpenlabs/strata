@@ -38,7 +38,7 @@ where
             let timestamp = block.timestamp();
 
             return block
-                .body
+                .body()
                 .transactions()
                 .iter()
                 .zip(receipts.iter())

@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use alloy_rpc_types::{serde_helpers::JsonStorageKey, BlockNumHash, EIP1186AccountProofResponse};
 use eyre::eyre;
 use futures_util::TryStreamExt;
-use reth_evm::execute::{BlockExecutionInput, BlockExecutorProvider, Executor};
+use reth_evm::execute::{BlockExecutorProvider, Executor};
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::{FullNodeComponents, NodeTypes};
 use reth_primitives::{BlockExt, BlockWithSenders, EthPrimitives};
@@ -83,12 +83,9 @@ impl<
     }
 }
 
-fn get_accessed_states<
-    'a,
-    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
->(
+fn get_accessed_states<Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>>(
     ctx: &ExExContext<Node>,
-    block: &'a BlockWithSenders,
+    block: &BlockWithSenders,
     block_idx: u64,
 ) -> eyre::Result<AccessedState> {
     let executor: <Node as FullNodeComponents>::Executor = ctx.block_executor().clone();
@@ -97,10 +94,7 @@ fn get_accessed_states<
     let cache_db_provider = CacheDBProvider::new(provider);
     let cache_db = CacheDB::new(&cache_db_provider);
 
-    let block_exec_input: BlockExecutionInput<'a, BlockWithSenders> =
-        BlockExecutionInput::new(block, block.difficulty);
-
-    executor.executor(cache_db).execute(block_exec_input)?;
+    executor.executor(cache_db).execute(block)?;
 
     let acessed_state = cache_db_provider.get_accessed_state();
     Ok(acessed_state)
