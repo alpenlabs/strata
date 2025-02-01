@@ -170,6 +170,6 @@ class BridgeDepositHappyTest(testenv.StrataTester):
         assert new_balance > original_balance, "balance did not increase"
 
         # Make sure that the balance is the default deposit amount of BTC in Strata "wei"
-        assert new_balance - original_balance == rollup_deposit_amount * (
-            10**10
-        ), "balance is not the default rollup_deposit_amount"
+        assert new_balance - original_balance == rollup_deposit_amount * (10**10), (
+            "balance is not the default rollup_deposit_amount"
+        )

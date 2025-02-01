@@ -21,10 +21,10 @@ class L1ClientStatusTest(testenv.StrataTester):
         )
 
         proto_ver = seqrpc.strata_protocolVersion()
-        self.debug(f"protocol version { proto_ver}")
+        self.debug(f"protocol version {proto_ver}")
         assert proto_ver == 1, "query protocol version"
 
         client_status = seqrpc.strata_clientStatus()
-        self.debug(f"client status { client_status}")
+        self.debug(f"client status {client_status}")
 
         return True

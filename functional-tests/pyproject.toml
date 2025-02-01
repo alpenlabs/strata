@@ -14,7 +14,7 @@ web3 = "^7.7.0"
 py-solc-x = "^2.0.3"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "0.8.4"
+ruff = "0.9.4"
 maturin = "1.8.1"
 
 [tool.ruff]

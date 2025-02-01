@@ -35,11 +35,11 @@ class L1StatusTest(testenv.StrataTester):
         cur_time = l1stat["last_update"] // 1000
 
         # check if height on bitcoin is same as, it is seen in sequencer
-        self.debug(f'L1 stat curr height: {l1stat["cur_height"]}')
-        self.debug(f'Received from bitcoin: {received_block["height"]}')
-        assert (
-            l1stat["cur_height"] == received_block["height"]
-        ), "sequencer height doesn't match the bitcoin node height"
+        self.debug(f"L1 stat curr height: {l1stat['cur_height']}")
+        self.debug(f"Received from bitcoin: {received_block['height']}")
+        assert l1stat["cur_height"] == received_block["height"], (
+            "sequencer height doesn't match the bitcoin node height"
+        )
 
         # generate 2 more btc blocks
         generate_n_blocks(btcrpc, 2)

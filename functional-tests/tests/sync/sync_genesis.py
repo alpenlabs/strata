@@ -49,7 +49,7 @@ class SyncGenesisTest(testenv.StrataTester):
             stat = seqrpc.strata_clientStatus()
             tip_slot = stat["chain_tip_slot"]
             tip_blkid = stat["chain_tip"]
-            self.debug(f"cur tip slot {tip_slot} blkid { tip_blkid}")
+            self.debug(f"cur tip slot {tip_slot} blkid {tip_blkid}")
             assert tip_slot >= last_slot, "cur slot went backwards"
             assert tip_slot > last_slot, "seem to not be making progress"
             last_slot = tip_slot

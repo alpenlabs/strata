@@ -86,7 +86,7 @@ class BridgeDepositReclaimDrtSeenTest(testenv.StrataTester):
         blocks_to_generate = DEFAULT_TAKEBACK_TIMEOUT // chunks
         self.debug(f"Generating {DEFAULT_TAKEBACK_TIMEOUT} blocks in {chunks} chunks")
         for i in range(chunks):
-            self.debug(f"Generating {blocks_to_generate} blocks in chunk {i+1}/{chunks}")
+            self.debug(f"Generating {blocks_to_generate} blocks in chunk {i + 1}/{chunks}")
             btcrpc.proxy.generatetoaddress(blocks_to_generate, UNSPENDABLE_ADDRESS)
 
         # Make sure that the BTC refund address has the expected balance
