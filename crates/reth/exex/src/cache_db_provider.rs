@@ -79,7 +79,7 @@ impl DatabaseRef for CacheDBProvider {
     fn basic_ref(&self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
         let account_info = self
             .provider
-            .basic_account(address)?
+            .basic_account(&address)?
             .map(|account| account.into());
 
         // Record the account value to the state.
@@ -94,7 +94,7 @@ impl DatabaseRef for CacheDBProvider {
     fn code_by_hash_ref(&self, code_hash: B256) -> Result<Bytecode, Self::Error> {
         let bytecode = self
             .provider
-            .bytecode_by_hash(code_hash)?
+            .bytecode_by_hash(&code_hash)?
             .map(|code| Bytecode::new_raw(code.bytes()))
             .ok_or_else(|| {
                 ProviderError::Database(DatabaseError::Other(format!(
