@@ -50,7 +50,7 @@ fn merkle_root_r(hashes: &mut [Buf32]) -> Buf32 {
         return hashes[0];
     }
 
-    for idx in 0..((hashes.len() + 1) / 2) {
+    for idx in 0..hashes.len().div_ceil(2) {
         let idx1 = 2 * idx;
         let idx2 = std::cmp::min(idx1 + 1, hashes.len() - 1);
         let mut vec = Vec::with_capacity(64);

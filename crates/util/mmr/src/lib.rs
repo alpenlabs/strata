@@ -50,7 +50,7 @@ impl<H: MerkleHasher + Clone> MerkleMr<H> {
         let mut roots = vec![zero(); compact.cap_log2 as usize];
         let mut at = 0;
         for i in 0..compact.cap_log2 {
-            if compact.entries >> i & 1 != 0 {
+            if (compact.entries >> i) & 1 != 0 {
                 roots[i as usize] = compact.roots[at as usize];
                 at += 1;
             }
