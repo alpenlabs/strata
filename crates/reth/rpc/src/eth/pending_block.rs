@@ -15,13 +15,13 @@ use reth_provider::{
     BlockReader, BlockReaderIdExt, ChainSpecProvider, ProviderBlock, ProviderHeader,
     ProviderReceipt, ProviderTx, ReceiptProvider, StateProviderFactory,
 };
+use reth_revm::primitives::{BlockEnv, ExecutionResult};
 use reth_rpc_eth_api::{
     helpers::{LoadPendingBlock, SpawnBlocking},
     EthApiTypes, FromEthApiError, RpcNodeCore,
 };
 use reth_rpc_eth_types::{EthApiError, PendingBlock};
 use reth_transaction_pool::{PoolTransaction, TransactionPool};
-use revm::primitives::{BlockEnv, ExecutionResult};
 
 use crate::StrataEthApi;
 
@@ -70,7 +70,7 @@ where
             .block_with_senders(block_id, Default::default())
             .map_err(Self::Error::from_eth_err)?
             .ok_or(EthApiError::HeaderNotFound(block_id.into()))?
-            .seal(latest.hash());
+            .seal_slow();
 
         let receipts = self
             .provider()
@@ -130,7 +130,6 @@ where
             extra_data: Default::default(),
             parent_beacon_block_root: is_cancun.then_some(B256::ZERO),
             requests_hash: is_prague.then_some(EMPTY_REQUESTS_HASH),
-            target_blobs_per_block: None,
         };
 
         // seal the block

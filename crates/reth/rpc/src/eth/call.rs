@@ -2,12 +2,12 @@ use alloy_primitives::{TxKind, U256};
 use alloy_rpc_types_eth::transaction::TransactionRequest;
 use reth_evm::ConfigureEvm;
 use reth_provider::ProviderHeader;
+use reth_revm::primitives::{BlockEnv, TxEnv};
 use reth_rpc_eth_api::{
     helpers::{estimate::EstimateCall, Call, EthCall, LoadBlock, LoadState, SpawnBlocking},
     FromEthApiError, FullEthApiTypes, IntoEthApiError,
 };
 use reth_rpc_eth_types::{revm_utils::CallFees, EthApiError, RpcInvalidTransactionError};
-use revm::primitives::{BlockEnv, TxEnv};
 
 use crate::{StrataEthApi, StrataNodeCore};
 

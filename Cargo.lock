@@ -13707,6 +13707,7 @@ dependencies = [
  "reth-node-builder",
  "reth-primitives",
  "reth-provider",
+ "reth-revm",
  "reth-rpc",
  "reth-rpc-eth-api",
  "reth-rpc-eth-types",

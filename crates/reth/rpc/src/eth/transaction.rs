@@ -71,7 +71,7 @@ where
     }
 }
 
-impl<N> TransactionCompat for StrataEthApi<N>
+impl<N> TransactionCompat<TransactionSigned> for StrataEthApi<N>
 where
     N: FullNodeComponents<Provider: ReceiptProvider<Receipt = reth_primitives::Receipt>>,
 {
@@ -80,7 +80,7 @@ where
 
     fn fill(
         &self,
-        tx: RecoveredTx,
+        tx: RecoveredTx<TransactionSigned>,
         tx_info: TransactionInfo,
     ) -> Result<Self::Transaction, Self::Error> {
         let from = tx.signer();
@@ -89,7 +89,7 @@ where
             transaction,
             signature,
             ..
-        } = tx.into_signed();
+        } = tx.into_tx();
 
         let inner = match transaction {
             reth_primitives::Transaction::Legacy(tx) => {
