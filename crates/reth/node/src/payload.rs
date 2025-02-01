@@ -208,12 +208,6 @@ impl From<StrataBuiltPayload> for StrataExecutionPayloadEnvelopeV2 {
     }
 }
 
-impl From<StrataBuiltPayload> for ExecutionPayloadEnvelopeV2 {
-    fn from(value: StrataBuiltPayload) -> Self {
-        value.inner.into()
-    }
-}
-
 impl From<StrataBuiltPayload> for ExecutionPayloadEnvelopeV3 {
     fn from(value: StrataBuiltPayload) -> Self {
         value.inner.into()
