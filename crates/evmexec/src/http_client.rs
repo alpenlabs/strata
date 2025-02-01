@@ -7,7 +7,7 @@ use alloy_rpc_types::engine::{
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
 #[cfg(test)]
 use mockall::automock;
-use reth_primitives::Block;
+use reth_primitives::{Block, SealedBlock, TransactionSigned};
 use reth_rpc_api::{EngineApiClient, EthApiClient};
 use reth_rpc_layer::{AuthClientLayer, AuthClientService};
 use revm_primitives::alloy_primitives::BlockHash;
@@ -109,6 +109,9 @@ impl EngineRpc for EngineRpcClient {
         >>::block_by_hash(&self.client, block_hash, true)
         .await?;
 
-        Ok(block.map(|b| b.try_into().unwrap()))
+        Ok(block.map(|b| {
+            let sealed_block: SealedBlock = b.try_into().unwrap();
+            Block::<TransactionSigned>::from(sealed_block)
+        }))
     }
 }

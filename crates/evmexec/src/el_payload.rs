@@ -1,7 +1,7 @@
 use alloy_rpc_types::engine::ExecutionPayloadV1;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use reth_rpc_types_compat::engine::try_payload_v1_to_block;
+use reth_primitives::{Block, TransactionSigned};
 use revm_primitives::{FixedBytes, B256};
 use strata_primitives::{
     buf::{Buf20, Buf32},
@@ -54,8 +54,9 @@ pub fn make_update_input_from_payload_and_ops(
 ) -> Result<UpdateInput, ElPayloadError> {
     let extra_payload = create_evm_extra_payload(el_payload.block_hash);
     let v1_payload = ExecutionPayloadV1::from(el_payload);
-    let evm_block = try_payload_v1_to_block(v1_payload)
-        .map_err(|err| ElPayloadError::BlockConversionError(err.to_string()))?;
+    let evm_block: Block<TransactionSigned> = v1_payload
+        .try_into_block()
+        .map_err(|e| ElPayloadError::BlockConversionError(e.to_string()))?;
 
     Ok(UpdateInput::new(
         evm_block.number,
