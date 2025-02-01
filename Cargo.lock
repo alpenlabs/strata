@@ -335,7 +335,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "derive_more",
- "k256",
  "serde",
 ]
 
@@ -8532,7 +8531,7 @@ dependencies = [
  "reth-revm",
  "reth-tasks",
  "reth-transaction-pool",
- "revm 19.4.0",
+ "revm",
  "tokio",
  "tracing",
 ]
@@ -8647,7 +8646,7 @@ dependencies = [
  "reth-primitives-traits",
  "reth-storage-api",
  "reth-trie",
- "revm 19.4.0",
+ "revm",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -9219,7 +9218,7 @@ dependencies = [
  "reth-trie",
  "reth-trie-parallel",
  "reth-trie-sparse",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "thiserror 2.0.11",
  "tokio",
  "tracing",
@@ -9250,7 +9249,7 @@ dependencies = [
  "reth-revm",
  "reth-rpc-types-compat",
  "reth-trie",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "serde",
  "serde_json",
  "tokio",
@@ -9404,7 +9403,7 @@ dependencies = [
  "reth-revm",
  "reth-storage-api",
  "reth-transaction-pool",
- "revm 19.4.0",
+ "revm",
  "tracing",
 ]
 
@@ -9440,8 +9439,8 @@ dependencies = [
  "reth-prune-types",
  "reth-revm",
  "reth-storage-errors",
- "revm 19.4.0",
- "revm-primitives 15.1.0",
+ "revm",
+ "revm-primitives",
 ]
 
 [[package]]
@@ -9461,7 +9460,7 @@ dependencies = [
  "reth-primitives",
  "reth-primitives-traits",
  "reth-revm",
- "revm-primitives 15.1.0",
+ "revm-primitives",
 ]
 
 [[package]]
@@ -9476,7 +9475,7 @@ dependencies = [
  "reth-consensus",
  "reth-prune-types",
  "reth-storage-errors",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "thiserror 2.0.11",
 ]
 
@@ -9493,7 +9492,7 @@ dependencies = [
  "reth-primitives-traits",
  "reth-trie",
  "reth-trie-common",
- "revm 19.4.0",
+ "revm",
  "serde",
  "serde_with",
 ]
@@ -9972,7 +9971,7 @@ dependencies = [
  "reth-tracing",
  "reth-transaction-pool",
  "reth-trie-db",
- "revm 19.4.0",
+ "revm",
 ]
 
 [[package]]
@@ -10081,7 +10080,7 @@ dependencies = [
  "reth-chainspec",
  "reth-errors",
  "reth-primitives",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "serde",
  "thiserror 2.0.11",
  "tokio",
@@ -10134,7 +10133,7 @@ dependencies = [
  "reth-primitives-traits",
  "reth-static-file-types",
  "reth-zstd-compressors",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "secp256k1",
  "serde",
  "serde_with",
@@ -10160,7 +10159,7 @@ dependencies = [
  "op-alloy-consensus",
  "rayon",
  "reth-codecs",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "secp256k1",
  "serde",
  "serde_with",
@@ -10205,7 +10204,7 @@ dependencies = [
  "reth-storage-errors",
  "reth-trie",
  "reth-trie-db",
- "revm 19.4.0",
+ "revm",
  "strum",
  "tokio",
  "tracing",
@@ -10267,7 +10266,7 @@ dependencies = [
  "reth-storage-api",
  "reth-storage-errors",
  "reth-trie",
- "revm 19.4.0",
+ "revm",
 ]
 
 [[package]]
@@ -10326,9 +10325,9 @@ dependencies = [
  "reth-rpc-types-compat",
  "reth-tasks",
  "reth-transaction-pool",
- "revm 19.4.0",
+ "revm",
  "revm-inspectors",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "serde",
  "serde_json",
  "thiserror 2.0.11",
@@ -10469,9 +10468,9 @@ dependencies = [
  "reth-tasks",
  "reth-transaction-pool",
  "reth-trie-common",
- "revm 19.4.0",
+ "revm",
  "revm-inspectors",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "tokio",
  "tracing",
 ]
@@ -10507,9 +10506,9 @@ dependencies = [
  "reth-tasks",
  "reth-transaction-pool",
  "reth-trie",
- "revm 19.4.0",
+ "revm",
  "revm-inspectors",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "schnellru",
  "serde",
  "thiserror 2.0.11",
@@ -10697,7 +10696,7 @@ dependencies = [
  "reth-storage-errors",
  "reth-trie",
  "reth-trie-db",
- "revm 19.4.0",
+ "revm",
 ]
 
 [[package]]
@@ -10785,8 +10784,8 @@ dependencies = [
  "reth-primitives-traits",
  "reth-storage-api",
  "reth-tasks",
- "revm-interpreter 15.1.0",
- "revm-primitives 15.1.0",
+ "revm-interpreter",
+ "revm-primitives",
  "rustc-hash 2.1.0",
  "schnellru",
  "serde",
@@ -10818,7 +10817,7 @@ dependencies = [
  "reth-storage-errors",
  "reth-trie-common",
  "reth-trie-sparse",
- "revm 19.4.0",
+ "revm",
  "tracing",
 ]
 
@@ -10859,7 +10858,7 @@ dependencies = [
  "reth-primitives",
  "reth-storage-errors",
  "reth-trie",
- "revm 19.4.0",
+ "revm",
  "tracing",
 ]
 
@@ -10911,21 +10910,6 @@ dependencies = [
 
 [[package]]
 name = "revm"
-version = "18.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15689a3c6a8d14b647b4666f2e236ef47b5a5133cdfd423f545947986fff7013"
-dependencies = [
- "auto_impl",
- "cfg-if",
- "dyn-clone",
- "revm-interpreter 14.0.0",
- "revm-precompile 15.0.0",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "revm"
 version = "19.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1538aea4d103a8044820eede9b1254e1b5a2a2abaf3f9a67bef19f8865cf1826"
@@ -10933,8 +10917,8 @@ dependencies = [
  "auto_impl",
  "cfg-if",
  "dyn-clone",
- "revm-interpreter 15.1.0",
- "revm-precompile 16.0.0",
+ "revm-interpreter",
+ "revm-precompile",
  "serde",
  "serde_json",
 ]
@@ -10953,19 +10937,9 @@ dependencies = [
  "boa_engine",
  "boa_gc",
  "colorchoice",
- "revm 19.4.0",
+ "revm",
  "serde_json",
  "thiserror 2.0.11",
-]
-
-[[package]]
-name = "revm-interpreter"
-version = "14.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74e3f11d0fed049a4a10f79820c59113a79b38aed4ebec786a79d5c667bfeb51"
-dependencies = [
- "revm-primitives 14.0.0",
- "serde",
 ]
 
 [[package]]
@@ -10974,26 +10948,8 @@ version = "15.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0f632e761f171fb2f6ace8d1552a5793e0350578d4acec3e79ade1489f4c2a6"
 dependencies = [
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "serde",
-]
-
-[[package]]
-name = "revm-precompile"
-version = "15.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e381060af24b750069a2b2d2c54bba273d84e8f5f9e8026fc9262298e26cc336"
-dependencies = [
- "aurora-engine-modexp",
- "c-kzg",
- "cfg-if",
- "k256",
- "once_cell",
- "revm-primitives 14.0.0",
- "ripemd",
- "secp256k1",
- "sha2 0.10.8",
- "substrate-bn",
 ]
 
 [[package]]
@@ -11008,31 +10964,11 @@ dependencies = [
  "cfg-if",
  "k256",
  "once_cell",
- "revm-primitives 15.1.0",
+ "revm-primitives",
  "ripemd",
  "secp256k1",
  "sha2 0.10.8",
  "substrate-bn",
-]
-
-[[package]]
-name = "revm-primitives"
-version = "14.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3702f132bb484f4f0d0ca4f6fbde3c82cfd745041abbedd6eda67730e1868ef0"
-dependencies = [
- "alloy-eip2930",
- "alloy-eip7702 0.4.2",
- "alloy-primitives",
- "auto_impl",
- "bitflags 2.8.0",
- "bitvec",
- "c-kzg",
- "cfg-if",
- "dyn-clone",
- "enumn",
- "hex",
- "serde",
 ]
 
 [[package]]
@@ -13234,7 +13170,7 @@ dependencies = [
  "reth-rpc-eth-api",
  "reth-rpc-layer",
  "reth-rpc-types-compat",
- "revm-primitives 14.0.0",
+ "revm-primitives",
  "serde",
  "serde_json",
  "strata-db",
@@ -13317,7 +13253,7 @@ dependencies = [
  "num_enum 0.7.3",
  "rand",
  "reth-primitives",
- "revm-primitives 14.0.0",
+ "revm-primitives",
  "secp256k1",
  "serde",
  "serde_json",
@@ -13407,8 +13343,8 @@ dependencies = [
  "k256",
  "reth-primitives",
  "reth-primitives-traits",
- "revm 18.0.0",
- "revm-primitives 14.0.0",
+ "revm",
+ "revm-primitives",
  "rlp",
  "serde",
  "serde_json",
@@ -13530,7 +13466,7 @@ dependencies = [
  "musig2",
  "pyo3",
  "pyo3-build-config",
- "revm-primitives 14.0.0",
+ "revm-primitives",
  "secp256k1",
  "shrex",
  "strata-btcio",
@@ -13581,7 +13517,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "borsh",
- "revm-primitives 14.0.0",
+ "revm-primitives",
  "rockbound",
  "serde",
  "serde_json",
@@ -13598,8 +13534,8 @@ version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
  "reth-primitives",
- "revm 18.0.0",
- "revm-primitives 14.0.0",
+ "revm",
+ "revm-primitives",
  "secp256k1",
  "strata-crypto",
  "strata-primitives",
@@ -13625,7 +13561,7 @@ dependencies = [
  "reth-rpc-types-compat",
  "reth-trie",
  "reth-trie-common",
- "revm-primitives 14.0.0",
+ "revm-primitives",
  "rockbound",
  "serde",
  "serde_json",
@@ -13664,8 +13600,8 @@ dependencies = [
  "reth-provider",
  "reth-transaction-pool",
  "reth-trie-db",
- "revm 18.0.0",
- "revm-primitives 14.0.0",
+ "revm",
+ "revm-primitives",
  "serde",
  "strata-reth-evm",
  "strata-reth-primitives",
@@ -13714,8 +13650,8 @@ dependencies = [
  "reth-rpc-server-types",
  "reth-tasks",
  "reth-transaction-pool",
- "revm 18.0.0",
- "revm-primitives 14.0.0",
+ "revm",
+ "revm-primitives",
  "serde",
  "serde_json",
  "strata-proofimpl-evm-ee-stf",
@@ -13973,7 +13909,7 @@ dependencies = [
  "musig2",
  "rand",
  "rand_core",
- "revm 18.0.0",
+ "revm",
  "rockbound",
  "serde_json",
  "strata-btcio",

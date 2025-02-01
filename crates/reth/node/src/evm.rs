@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
 use reth_chainspec::ChainSpec;
-use reth_evm::{ConfigureEvm, ConfigureEvmEnv, NextBlockEnvAttributes};
+use reth_evm::{env::EvmEnv, ConfigureEvm, ConfigureEvmEnv, NextBlockEnvAttributes};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{Header, TransactionSigned};
 use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
-use revm_primitives::{
-    Address, AnalysisKind, BlockEnv, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, U256,
-};
+use revm_primitives::{Address, AnalysisKind, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv};
 use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
@@ -30,13 +28,8 @@ impl ConfigureEvmEnv for StrataEvmConfig {
     type Transaction = TransactionSigned;
     type Error = core::convert::Infallible;
 
-    fn fill_cfg_env(
-        &self,
-        cfg_env: &mut CfgEnvWithHandlerCfg,
-        header: &Self::Header,
-        total_difficulty: U256,
-    ) {
-        self.inner.fill_cfg_env(cfg_env, header, total_difficulty);
+    fn fill_cfg_env(&self, cfg_env: &mut CfgEnvWithHandlerCfg, header: &Self::Header) {
+        self.inner.fill_cfg_env(cfg_env, header);
         // TODO: check if it's still needed.
         cfg_env.perf_analyse_created_bytecodes = AnalysisKind::Analyse;
     }
@@ -60,7 +53,7 @@ impl ConfigureEvmEnv for StrataEvmConfig {
         &self,
         parent: &Self::Header,
         attributes: NextBlockEnvAttributes,
-    ) -> Result<(CfgEnvWithHandlerCfg, BlockEnv), Self::Error> {
+    ) -> Result<EvmEnv, Self::Error> {
         self.inner.next_cfg_and_block_env(parent, attributes)
     }
 }
