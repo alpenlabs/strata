@@ -99,6 +99,6 @@ class BridgeDutiesTest(testenv.StrataTester):
         assert len(duties) == len(expected_duties), "num duties must match"
         assert duties == expected_duties, "duties in response should match expected ones"
         assert duties_resp["start_index"] == start_index, "start index must match"
-        assert (
-            duties_resp["stop_index"] > start_index
-        ), "stop_index must be greater than start_index"
+        assert duties_resp["stop_index"] > start_index, (
+            "stop_index must be greater than start_index"
+        )

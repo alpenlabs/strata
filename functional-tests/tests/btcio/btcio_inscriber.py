@@ -29,8 +29,8 @@ class L1WriterTest(testenv.StrataTester):
         blobdata = "2c4253d512da5bb4223f10e8e6017ede69cc63d6e6126916f4b68a1830b7f805"
         tx = submit_da_blob(btcrpc, seqrpc, blobdata)
 
-        assert any(
-            [blobdata in w.hex() for w in tx.inputs[0].witnesses]
-        ), "Tx should have submitted blobdata in its witness"
+        assert any([blobdata in w.hex() for w in tx.inputs[0].witnesses]), (
+            "Tx should have submitted blobdata in its witness"
+        )
 
         return True
