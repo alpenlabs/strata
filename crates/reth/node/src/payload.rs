@@ -12,7 +12,7 @@ use reth::rpc::compat::engine::payload::block_to_payload_v2;
 use reth_chain_state::ExecutedBlock;
 use reth_node_api::{BuiltPayload, PayloadAttributes, PayloadBuilderAttributes};
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
-use reth_primitives::SealedBlock;
+use reth_primitives::{EthPrimitives, SealedBlock};
 use revm_primitives::alloy_primitives::{Address, B256, U256};
 use serde::{Deserialize, Serialize};
 use strata_reth_primitives::WithdrawalIntent;
@@ -112,6 +112,8 @@ impl StrataBuiltPayload {
 }
 
 impl BuiltPayload for StrataBuiltPayload {
+    type Primitives = EthPrimitives;
+
     fn block(&self) -> &SealedBlock {
         self.inner.block()
     }
@@ -203,6 +205,12 @@ impl From<StrataBuiltPayload> for StrataExecutionPayloadEnvelopeV2 {
             inner: value.inner.into(),
             withdrawal_intents: value.withdrawal_intents,
         }
+    }
+}
+
+impl From<StrataBuiltPayload> for ExecutionPayloadEnvelopeV2 {
+    fn from(value: StrataBuiltPayload) -> Self {
+        value.inner.into()
     }
 }
 
