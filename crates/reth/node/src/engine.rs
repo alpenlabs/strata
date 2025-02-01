@@ -4,21 +4,20 @@ use alloy_rpc_types::engine::{
     ExecutionPayload, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
     ExecutionPayloadSidecar, ExecutionPayloadV1, PayloadError,
 };
+use reth::rpc::compat::engine::payload::block_to_payload;
 use reth_chainspec::ChainSpec;
 use reth_node_api::{
-    payload::PayloadTypes, validate_version_specific_fields, AddOnsContext,
+    payload::PayloadTypes, validate_version_specific_fields, AddOnsContext, BuiltPayload,
     EngineApiMessageVersion, EngineObjectValidationError, EngineTypes, EngineValidator,
-    PayloadOrAttributes, PayloadValidator,
+    NodePrimitives, PayloadOrAttributes, PayloadValidator,
 };
 use reth_node_builder::{rpc::EngineValidatorBuilder, FullNodeComponents, NodeTypesWithEngine};
 use reth_payload_validator::ExecutionPayloadValidator;
 use reth_primitives::{Block, SealedBlockFor};
 use serde::{Deserialize, Serialize};
 
-use super::payload::{
-    StrataBuiltPayload, StrataExecutionPayloadEnvelopeV2, StrataPayloadBuilderAttributes,
-};
-use crate::{node::StrataPrimitives, StrataPayloadAttributes};
+use super::payload::{StrataBuiltPayload, StrataPayloadBuilderAttributes};
+use crate::{node::StrataPrimitives, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes};
 
 /// Custom engine types for strata to use custom payload attributes and payload
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -33,18 +32,10 @@ impl<T: PayloadTypes> PayloadTypes for StrataEngineTypes<T> {
     type PayloadBuilderAttributes = T::PayloadBuilderAttributes;
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct StrataPayloadTypes;
-
-impl PayloadTypes for StrataPayloadTypes {
-    type BuiltPayload = StrataBuiltPayload;
-    type PayloadAttributes = StrataPayloadAttributes;
-    type PayloadBuilderAttributes = StrataPayloadBuilderAttributes;
-}
-
 impl<T: PayloadTypes> EngineTypes for StrataEngineTypes<T>
 where
-    T::BuiltPayload: TryInto<ExecutionPayloadV1>
+    T::BuiltPayload: BuiltPayload<Primitives: NodePrimitives<Block = reth_primitives::Block>>
+        + TryInto<ExecutionPayloadV1>
         + TryInto<StrataExecutionPayloadEnvelopeV2>
         + TryInto<ExecutionPayloadEnvelopeV3>
         + TryInto<ExecutionPayloadEnvelopeV4>,
@@ -53,6 +44,23 @@ where
     type ExecutionPayloadEnvelopeV2 = StrataExecutionPayloadEnvelopeV2;
     type ExecutionPayloadEnvelopeV3 = ExecutionPayloadEnvelopeV3;
     type ExecutionPayloadEnvelopeV4 = ExecutionPayloadEnvelopeV4;
+
+    fn block_to_payload(
+        block: SealedBlockFor<
+            <<Self::BuiltPayload as BuiltPayload>::Primitives as NodePrimitives>::Block,
+        >,
+    ) -> (ExecutionPayload, ExecutionPayloadSidecar) {
+        block_to_payload(block)
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct StrataPayloadTypes;
+
+impl PayloadTypes for StrataPayloadTypes {
+    type BuiltPayload = StrataBuiltPayload;
+    type PayloadAttributes = StrataPayloadAttributes;
+    type PayloadBuilderAttributes = StrataPayloadBuilderAttributes;
 }
 
 /// Strata engine validator

@@ -11,11 +11,11 @@ use reth_node_ethereum::{
     node::{EthereumConsensusBuilder, EthereumNetworkBuilder, EthereumPoolBuilder},
     BasicBlockExecutorProvider, EthExecutionStrategyFactory,
 };
-use reth_primitives::{BlockBody, PooledTransactionsElement};
+use reth_primitives::{BlockBody, PooledTransaction};
 use reth_provider::{
     providers::{ChainStorage, NodeTypesForProvider},
     BlockBodyReader, BlockBodyWriter, ChainSpecProvider, ChainStorageReader, ChainStorageWriter,
-    DBProvider, DatabaseProvider, EthStorage, ProviderResult, ReadBodyInput,
+    DBProvider, DatabaseProvider, EthStorage, ProviderResult, ReadBodyInput, StorageLocation,
 };
 use reth_transaction_pool::{PoolTransaction, TransactionPool};
 use revm_primitives::alloy_primitives;
@@ -40,16 +40,19 @@ impl<Provider: DBProvider<Tx: DbTxMut>> BlockBodyWriter<Provider, BlockBody> for
         &self,
         provider: &Provider,
         bodies: Vec<(u64, Option<BlockBody>)>,
+        write_to: StorageLocation,
     ) -> ProviderResult<()> {
-        self.0.write_block_bodies(provider, bodies)
+        self.0.write_block_bodies(provider, bodies, write_to)
     }
 
     fn remove_block_bodies_above(
         &self,
         provider: &Provider,
         block: alloy_primitives::BlockNumber,
+        remove_from: StorageLocation,
     ) -> ProviderResult<()> {
-        self.0.remove_block_bodies_above(provider, block)
+        self.0
+            .remove_block_bodies_above(provider, block, remove_from)
     }
 }
 
@@ -210,7 +213,7 @@ where
             Storage = StrataStorage,
             Engine = StrataEngineTypes,
         >,
-        Pool: TransactionPool<Transaction: PoolTransaction<Pooled = PooledTransactionsElement>>,
+        Pool: TransactionPool<Transaction: PoolTransaction<Pooled = PooledTransaction>>,
     >,
     StrataEngineValidator: EngineValidator<<N::Types as NodeTypesWithEngine>::Engine>,
 {
@@ -237,7 +240,7 @@ where
             Storage = StrataStorage,
             Engine = StrataEngineTypes,
         >,
-        Pool: TransactionPool<Transaction: PoolTransaction<Pooled = PooledTransactionsElement>>,
+        Pool: TransactionPool<Transaction: PoolTransaction<Pooled = PooledTransaction>>,
     >,
     StrataEngineValidator: EngineValidator<<N::Types as NodeTypesWithEngine>::Engine>,
 {
