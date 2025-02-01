@@ -5,7 +5,7 @@ use reth_evm::{env::EvmEnv, ConfigureEvm, ConfigureEvmEnv, NextBlockEnvAttribute
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{Header, TransactionSigned};
 use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
-use revm_primitives::{Address, AnalysisKind, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv};
+use revm_primitives::{Address, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv};
 use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
@@ -21,6 +21,10 @@ impl StrataEvmConfig {
             inner: EthEvmConfig::new(chain_spec),
         }
     }
+
+    pub fn inner(&self) -> &EthEvmConfig {
+        &self.inner
+    }
 }
 
 impl ConfigureEvmEnv for StrataEvmConfig {
@@ -30,8 +34,6 @@ impl ConfigureEvmEnv for StrataEvmConfig {
 
     fn fill_cfg_env(&self, cfg_env: &mut CfgEnvWithHandlerCfg, header: &Self::Header) {
         self.inner.fill_cfg_env(cfg_env, header);
-        // TODO: check if it's still needed.
-        cfg_env.perf_analyse_created_bytecodes = AnalysisKind::Analyse;
     }
 
     fn fill_tx_env(&self, tx_env: &mut TxEnv, transaction: &TransactionSigned, sender: Address) {

@@ -14,8 +14,9 @@ use reth_basic_payload_builder::*;
 use reth_chain_state::ExecutedBlock;
 use reth_chainspec::{ChainSpec, ChainSpecProvider, EthereumHardforks};
 use reth_errors::RethError;
-use reth_evm::{system_calls::SystemCaller, ConfigureEvmEnv, NextBlockEnvAttributes};
-use reth_evm_ethereum::{eip6110::parse_deposits_from_receipts, EthEvmConfig};
+use reth_ethereum_payload_builder::EthereumBuilderConfig;
+use reth_evm::{env::EvmEnv, system_calls::SystemCaller, ConfigureEvmEnv, NextBlockEnvAttributes};
+use reth_evm_ethereum::eip6110::parse_deposits_from_receipts;
 use reth_node_api::{
     ConfigureEvm, FullNodeTypes, NodeTypesWithEngine, PayloadBuilderAttributes, TxTy,
 };
@@ -53,6 +54,8 @@ use crate::{
 pub struct StrataPayloadBuilder {
     /// The type responsible for creating the evm.
     evm_config: StrataEvmConfig,
+    /// Payload builder configuration.
+    builder_config: EthereumBuilderConfig,
 }
 
 impl StrataPayloadBuilder {
@@ -62,11 +65,12 @@ impl StrataPayloadBuilder {
         &self,
         attributes: &StrataPayloadBuilderAttributes,
         parent: &Header,
-    ) -> Result<(CfgEnvWithHandlerCfg, BlockEnv), <StrataEvmConfig as ConfigureEvmEnv>::Error> {
+    ) -> Result<EvmEnv, <StrataEvmConfig as ConfigureEvmEnv>::Error> {
         let next_attributes = NextBlockEnvAttributes {
             timestamp: attributes.timestamp(),
             suggested_fee_recipient: attributes.suggested_fee_recipient(),
             prev_randao: attributes.prev_randao(),
+            gas_limit: parent.gas_limit,
         };
         self.evm_config
             .next_cfg_and_block_env(parent, next_attributes)
@@ -85,11 +89,20 @@ where
         &self,
         args: BuildArguments<Pool, Client, Self::Attributes, Self::BuiltPayload>,
     ) -> Result<BuildOutcome<Self::BuiltPayload>, PayloadBuilderError> {
-        let (cfg_env, block_env) = self
+        let EvmEnv {
+            cfg_env_with_handler_cfg,
+            block_env,
+        } = self
             .cfg_and_block_env(&args.config.attributes, &args.config.parent_header)
             .map_err(PayloadBuilderError::other)?;
 
-        try_build_payload(self.evm_config.clone(), args, cfg_env, block_env)
+        try_build_payload(
+            self.evm_config.clone(),
+            self.builder_config.clone(),
+            args,
+            cfg_env_with_handler_cfg,
+            block_env,
+        )
     }
 
     fn build_empty_payload(
@@ -99,11 +112,8 @@ where
     ) -> Result<Self::BuiltPayload, PayloadBuilderError> {
         let PayloadConfig {
             parent_header,
-            extra_data,
             attributes,
         } = config;
-
-        let chain_spec = client.chain_spec();
 
         // use default eth payload builder
         let eth_build_payload =
@@ -111,13 +121,13 @@ where
                 Pool,
                 Client,
             >>::build_empty_payload(
-                &reth_ethereum_payload_builder::EthereumPayloadBuilder::new(EthEvmConfig::new(
-                    chain_spec.clone(),
-                )),
+                &reth_ethereum_payload_builder::EthereumPayloadBuilder::new(
+                    self.evm_config.inner().clone(),
+                    self.builder_config.clone(),
+                ),
                 client,
                 PayloadConfig {
                     parent_header,
-                    extra_data,
                     attributes: attributes.0,
                 },
             )?;
@@ -150,14 +160,16 @@ impl StrataPayloadServiceBuilder {
     {
         let payload_builder = StrataPayloadBuilder {
             evm_config: StrataEvmConfig::new(ctx.chain_spec()),
+            builder_config: EthereumBuilderConfig::new(
+                ctx.payload_builder_config().extra_data_bytes(),
+            ),
         };
         let conf = ctx.payload_builder_config();
 
         let payload_job_config = BasicPayloadJobGeneratorConfig::default()
             .interval(conf.interval())
             .deadline(conf.deadline())
-            .max_payload_tasks(conf.max_payload_tasks())
-            .extradata(conf.extradata_bytes());
+            .max_payload_tasks(conf.max_payload_tasks());
 
         let payload_generator = BasicPayloadJobGenerator::with_builder(
             ctx.provider().clone(),
@@ -209,6 +221,7 @@ where
 #[inline]
 pub fn try_build_payload<EvmConfig, Pool, Client>(
     evm_config: EvmConfig,
+    builder_config: EthereumBuilderConfig,
     args: BuildArguments<Pool, Client, StrataPayloadBuilderAttributes, StrataBuiltPayload>,
     initialized_cfg: CfgEnvWithHandlerCfg,
     initialized_block_env: BlockEnv,
@@ -230,7 +243,6 @@ where
     let PayloadConfig {
         parent_header,
         attributes,
-        extra_data,
     } = config;
 
     // convert to eth payload
@@ -322,7 +334,7 @@ where
         }
 
         // convert tx to a signed transaction
-        let tx: reth_primitives::RecoveredTx = pool_tx.to_consensus();
+        let tx = pool_tx.to_consensus();
 
         // There's only limited amount of blob space available per block, so we need to check if
         // the EIP-4844 can still fit in the block
@@ -346,7 +358,7 @@ where
         }
 
         // Configure the environment for the tx.
-        *evm.tx_mut() = evm_config.tx_env(tx.as_signed(), tx.signer());
+        *evm.tx_mut() = evm_config.tx_env(tx.tx(), tx.signer());
 
         let ResultAndState { result, state } = match evm.transact() {
             Ok(res) => res,
@@ -415,7 +427,7 @@ where
 
         // append sender and transaction to the respective lists
         executed_senders.push(tx.signer());
-        executed_txs.push(tx.into_signed());
+        executed_txs.push(tx.into_tx());
     }
 
     // drop evm so db is released.
@@ -498,7 +510,7 @@ where
         vec![requests.clone().unwrap_or_default()],
     );
     let receipts_root = execution_outcome
-        .receipts_root_slow(block_number)
+        .ethereum_receipts_root(block_number)
         .expect("Number is in range");
     let logs_bloom = execution_outcome
         .block_logs_bloom(block_number)
@@ -543,14 +555,17 @@ where
         excess_blob_gas = if chain_spec.is_cancun_active_at_timestamp(attributes.timestamp()) {
             let parent_excess_blob_gas = parent_header.excess_blob_gas.unwrap_or_default();
             let parent_blob_gas_used = parent_header.blob_gas_used.unwrap_or_default();
+            let parent_target_blob_gas_per_block =
+                parent_header.excess_blob_gas.unwrap_or_default();
             Some(calc_excess_blob_gas(
                 parent_excess_blob_gas,
                 parent_blob_gas_used,
+                parent_target_blob_gas_per_block,
             ))
         } else {
             // for the first post-fork block, both parent.blob_gas_used and
             // parent.excess_blob_gas are evaluated as 0
-            Some(calc_excess_blob_gas(0, 0))
+            Some(calc_excess_blob_gas(0, 0, 0))
         };
 
         blob_gas_used = Some(sum_blob_gas_used);
@@ -573,12 +588,11 @@ where
         gas_limit: block_gas_limit,
         difficulty: U256::ZERO,
         gas_used: cumulative_gas_used,
-        extra_data,
+        extra_data: builder_config.extra_data,
         parent_beacon_block_root: attributes.parent_beacon_block_root(),
         blob_gas_used,
         excess_blob_gas,
         requests_hash,
-        target_blobs_per_block: None,
     };
 
     let withdrawals = chain_spec
