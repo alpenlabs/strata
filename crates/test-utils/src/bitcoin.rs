@@ -117,7 +117,7 @@ impl BtcChainSegment {
         }
     }
 
-    pub fn get_block_manifest(&self, height: u32) -> L1BlockRecord {
+    pub fn get_block_record(&self, height: u32) -> L1BlockRecord {
         let header = self.get_header(height);
         L1BlockRecord::new(
             header.block_hash().into(),
@@ -126,10 +126,10 @@ impl BtcChainSegment {
         )
     }
 
-    pub fn get_block_manifests(&self, from_height: u32, len: usize) -> Vec<L1BlockRecord> {
+    pub fn get_block_records(&self, from_height: u32, len: usize) -> Vec<L1BlockRecord> {
         let mut blocks = Vec::with_capacity(len);
         for i in 0..len {
-            let block = self.get_block_manifest(from_height + i as u32);
+            let block = self.get_block_record(from_height + i as u32);
             blocks.push(block);
         }
         blocks

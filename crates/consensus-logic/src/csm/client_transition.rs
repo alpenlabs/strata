@@ -495,7 +495,7 @@ mod tests {
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{l1::L1BlockId, operation};
     use strata_test_utils::{
-        bitcoin::{gen_l1_chain, get_btc_chain},
+        bitcoin::{gen_l1_chain, get_btc_chain, BtcChainSegment},
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,
     };
@@ -504,18 +504,21 @@ mod tests {
     use crate::genesis;
 
     pub struct DummyEventContext {
-        // nothing
+        chainseg: BtcChainSegment,
     }
 
     impl DummyEventContext {
         pub fn new() -> Self {
-            Self {}
+            Self {
+                chainseg: get_btc_chain(),
+            }
         }
     }
 
     impl EventContext for DummyEventContext {
         fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
-            Ok(ArbitraryGenerator::new().generate())
+            let rec = self.chainseg.get_block_record(height as u32);
+            Ok(L1BlockManifest::new(rec, height))
         }
 
         fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
@@ -538,12 +541,7 @@ mod tests {
         state_assertions: Box<dyn Fn(&ClientState)>, // Closure to verify state after all events
     }
 
-    fn run_test_cases(
-        test_cases: &[TestCase],
-        state: &mut ClientState,
-        database: &impl Database,
-        params: &Params,
-    ) {
+    fn run_test_cases(test_cases: &[TestCase], state: &mut ClientState, params: &Params) {
         let context = DummyEventContext::new();
 
         for case in test_cases {
@@ -574,7 +572,6 @@ mod tests {
 
     #[test]
     fn test_genesis() {
-        let database = get_common_db();
         let params = gen_params();
         let mut state = gen_client_state(Some(&params));
 
@@ -582,23 +579,12 @@ mod tests {
         let genesis = params.rollup().genesis_l1_height;
 
         let chain = get_btc_chain();
-        let l1_chain = chain.get_block_manifests(horizon as u32, 10);
         let l1_verification_state =
             chain.get_verification_state(genesis as u32 + 1, &MAINNET.clone().into());
 
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();
-
-        let l1_db = database.l1_db();
-        for (i, b) in l1_chain.iter().enumerate() {
-            l1_db
-                .put_block_data(
-                    i as u64 + horizon,
-                    L1BlockManifest::new(b.clone(), 0),
-                    Vec::new(),
-                )
-                .expect("test: insert blocks");
-        }
+        let l1_chain = chain.get_block_records(horizon as u32, 10);
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash()).collect();
 
         let test_cases = [
@@ -743,6 +729,6 @@ mod tests {
             },
         ];
 
-        run_test_cases(&test_cases, &mut state, database.as_ref(), &params);
+        run_test_cases(&test_cases, &mut state, &params);
     }
 }
