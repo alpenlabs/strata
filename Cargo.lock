@@ -13796,6 +13796,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "cargo_metadata 0.19.1",
+ "cfg-if",
  "once_cell",
  "sha2 0.10.8",
  "sp1-helper",

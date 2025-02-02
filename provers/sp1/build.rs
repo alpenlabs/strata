@@ -4,16 +4,18 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[cfg(not(debug_assertions))]
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(feature = "sp1-dev")] {
 use bincode::{deserialize, serialize};
-#[cfg(not(debug_assertions))]
 use cargo_metadata::MetadataCommand;
-#[cfg(not(debug_assertions))]
 use sha2::{Digest, Sha256};
-#[cfg(not(debug_assertions))]
 use sp1_helper::{build_program_with_args, BuildArgs};
-#[cfg(not(debug_assertions))]
 use sp1_sdk::{HashableKey, ProverClient, SP1VerifyingKey};
+
+    }
+}
 
 // Guest program names
 const EVM_EE_STF: &str = "guest-evm-ee-stf";
@@ -167,7 +169,7 @@ fn get_output_dir() -> PathBuf {
 }
 
 /// Checks if the cache is valid by comparing the expected ID with the saved ID.
-#[cfg(not(debug_assertions))]
+#[cfg(feature = "sp1-dev")]
 fn is_cache_valid(expected_id: &[u8; 32], paths: &[PathBuf; 4]) -> bool {
     // Check if any required files are missing
     if paths.iter().any(|path| !path.exists()) {
@@ -184,7 +186,7 @@ fn is_cache_valid(expected_id: &[u8; 32], paths: &[PathBuf; 4]) -> bool {
 }
 
 /// Ensures the cache is valid and returns the ELF contents and SP1 Verifying Key.
-#[cfg(not(debug_assertions))]
+#[cfg(feature = "sp1-dev")]
 fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
     let cache_dir = format!("{}/cache", program);
     let paths = ["elf", "id", "vk", "pk"]
@@ -221,7 +223,7 @@ fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
 }
 
 /// Generates the ELF contents and VK hash for a given program.
-#[cfg(not(debug_assertions))]
+#[cfg(feature = "sp1-dev")]
 fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     let mut build_args = BuildArgs {
         ..Default::default()
@@ -259,7 +261,7 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     (vk.hash_u32(), vk.bytes32())
 }
 
-#[cfg(debug_assertions)]
+#[cfg(not(feature = "sp1-dev"))]
 fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
     (
         [0u32; 8],
@@ -268,7 +270,7 @@ fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
 }
 
 /// Copies the compiled ELF file of the specified program to its cache directory.
-#[cfg(not(debug_assertions))]
+#[cfg(feature = "sp1-dev")]
 fn migrate_elf(program: &str) {
     // Get the build directory from the environment
     let sp1_build_dir =

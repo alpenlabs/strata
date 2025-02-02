@@ -64,9 +64,10 @@ strata-test-utils.workspace = true
 [features]
 default = []
 sp1 = ["zkaleido-sp1-adapter/prover"]
-sp1-dev = ["sp1", "strata-sp1-guest-builder/prover"]
-sp1-mock = [
-  "sp1-dev",
+sp1-mock = ["sp1", "zkaleido-sp1-adapter/mock"]
+sp1-builder = ["sp1", "strata-sp1-guest-builder/prover"]
+sp1-mock-builder = [
+  "sp1-builder",
   "zkaleido-sp1-adapter/mock",
   "strata-sp1-guest-builder/mock",
 ]

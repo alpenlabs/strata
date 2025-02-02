@@ -2,13 +2,12 @@ use std::sync::LazyLock;
 
 use cfg_if::cfg_if;
 use strata_primitives::proof::ProofContext;
-#[cfg(feature = "sp1-dev")]
+#[cfg(feature = "sp1-builder")]
 use strata_sp1_guest_builder::*;
 use zkaleido_sp1_adapter::SP1Host;
 
-// Define a common base ELF path when not in "sp1-dev" mode
 cfg_if! {
-    if #[cfg(not(feature = "sp1-dev"))] {
+    if #[cfg(not(feature = "sp1-builder"))] {
         use std::env;
         pub static ELF_BASE_PATH: LazyLock<String> = LazyLock::new(|| {
             env::var("ELF_BASE_PATH").unwrap_or_else(|_| "elfs/sp1".to_string())
@@ -18,7 +17,7 @@ cfg_if! {
 
 // BTC_BLOCKSPACE_HOST
 cfg_if! {
-    if #[cfg(feature = "sp1-dev")] {
+    if #[cfg(feature = "sp1-builder")] {
         pub static BTC_BLOCKSPACE_HOST: LazyLock<SP1Host> =
             LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_BTC_BLOCKSPACE_PK));
     } else {
@@ -33,7 +32,7 @@ cfg_if! {
 
 // L1_BATCH_HOST
 cfg_if! {
-    if #[cfg(feature = "sp1-dev")] {
+    if #[cfg(feature = "sp1-builder")] {
         pub static L1_BATCH_HOST: LazyLock<SP1Host> =
             LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_L1_BATCH_PK));
     } else {
@@ -48,7 +47,7 @@ cfg_if! {
 
 // EVM_EE_STF_HOST
 cfg_if! {
-    if #[cfg(feature = "sp1-dev")] {
+    if #[cfg(feature = "sp1-builder")] {
         pub static EVM_EE_STF_HOST: LazyLock<SP1Host> =
             LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_EVM_EE_STF_PK));
     } else {
@@ -63,7 +62,7 @@ cfg_if! {
 
 // CL_STF_HOST
 cfg_if! {
-    if #[cfg(feature = "sp1-dev")] {
+    if #[cfg(feature = "sp1-builder")] {
         pub static CL_STF_HOST: LazyLock<SP1Host> =
             LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_CL_STF_PK));
     } else {
@@ -78,7 +77,7 @@ cfg_if! {
 
 // CL_AGG_HOST
 cfg_if! {
-    if #[cfg(feature = "sp1-dev")] {
+    if #[cfg(feature = "sp1-builder")] {
         pub static CL_AGG_HOST: LazyLock<SP1Host> =
             LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_CL_AGG_PK));
     } else {
@@ -93,7 +92,7 @@ cfg_if! {
 
 // CHECKPOINT_HOST
 cfg_if! {
-    if #[cfg(feature = "sp1-dev")] {
+    if #[cfg(feature = "sp1-builder")] {
         pub static CHECKPOINT_HOST: LazyLock<SP1Host> =
             LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK));
     } else {

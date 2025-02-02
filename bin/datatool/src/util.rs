@@ -77,7 +77,7 @@ pub(super) fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result
 ///
 /// Returns an error if the export process fails.
 fn export_elf(_elf_path: &PathBuf) -> anyhow::Result<()> {
-    #[cfg(feature = "sp1")]
+    #[cfg(feature = "sp1-builder")]
     {
         strata_sp1_guest_builder::export_elf(_elf_path)?
     }
@@ -100,7 +100,7 @@ fn export_elf(_elf_path: &PathBuf) -> anyhow::Result<()> {
 /// only one ZKVM can be supported at a time.
 fn resolve_rollup_vk() -> RollupVerifyingKey {
     // Use SP1 if only `sp1` feature is enabled
-    #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+    #[cfg(all(feature = "sp1-builder", not(feature = "risc0-builder")))]
     {
         use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
         let vk_buf32: Buf32 = GUEST_CHECKPOINT_VK_HASH_STR
@@ -110,7 +110,7 @@ fn resolve_rollup_vk() -> RollupVerifyingKey {
     }
 
     // Use Risc0 if only `risc0` feature is enabled
-    #[cfg(all(feature = "risc0", not(feature = "sp1")))]
+    #[cfg(all(feature = "risc0-builder", not(feature = "sp1-builder")))]
     {
         use strata_risc0_guest_builder::GUEST_RISC0_CHECKPOINT_ID;
         let vk_u8: [u8; 32] = bytemuck::cast(GUEST_RISC0_CHECKPOINT_ID);
@@ -119,7 +119,7 @@ fn resolve_rollup_vk() -> RollupVerifyingKey {
     }
 
     // Panic if both `sp1` and `risc0` feature are enabled
-    #[cfg(all(feature = "risc0", feature = "sp1"))]
+    #[cfg(all(feature = "risc0-builder", feature = "sp1-builder"))]
     {
         panic!(
             "Conflicting ZKVM features: both 'sp1' and 'risc0' are enabled. \
@@ -128,7 +128,7 @@ fn resolve_rollup_vk() -> RollupVerifyingKey {
     }
 
     // If neither `risc0` nor `sp1` is enabled, use the Native verifying key
-    #[cfg(all(not(feature = "risc0"), not(feature = "sp1")))]
+    #[cfg(all(not(feature = "risc0-builder"), not(feature = "sp1-builder")))]
     {
         RollupVerifyingKey::NativeVerifyingKey(Buf32::zero())
     }
