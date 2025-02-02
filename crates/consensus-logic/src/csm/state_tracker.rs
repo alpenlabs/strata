@@ -139,7 +139,7 @@ pub fn reconstruct_state(csman: &ClientStateManager, idx: u64) -> anyhow::Result
         Some(cl) => Ok(cl),
         None => {
             error!("we don't support state reconstruction anymore");
-            return Err(Error::MissingConsensusWrites(idx).into());
+            Err(Error::MissingConsensusWrites(idx).into())
         }
     }
 }

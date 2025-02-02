@@ -479,10 +479,10 @@ impl ClientStateMut {
 
         if let Some(ckpt) = new_finalized {
             // Check if heights match accordingly
-            if !l1v
+            if l1v
                 .last_finalized_checkpoint
                 .as_ref()
-                .is_none_or(|prev_ckpt| ckpt.batch_info.idx() == prev_ckpt.batch_info.idx() + 1)
+                .is_some_and(|prev_ckpt| ckpt.batch_info.idx() != prev_ckpt.batch_info.idx() + 1)
             {
                 panic!("operation: mismatched indices of pending checkpoint");
             }
