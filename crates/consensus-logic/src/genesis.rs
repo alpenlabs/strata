@@ -1,4 +1,4 @@
-use strata_db::{errors::DbError, traits::*};
+use strata_db::errors::DbError;
 use strata_primitives::{
     buf::{Buf32, Buf64},
     evm_exec::create_evm_extra_payload,

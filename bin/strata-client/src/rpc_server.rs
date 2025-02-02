@@ -245,7 +245,6 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // FIXME: sync state should have a block number
         let sync_state = self.status_channel.sync_state();
         let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
-        let db = self.database.clone();
 
         let fetch_limit = self.sync_manager.params().run().l2_blocks_fetch_limit;
         if count > fetch_limit {

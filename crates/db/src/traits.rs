@@ -11,9 +11,8 @@ use strata_primitives::{
     proof::{ProofContext, ProofKey},
 };
 use strata_state::{
-    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate,
-    client_state::ClientState, l1::L1Tx, operation::*, prelude::*, state_op::WriteBatch,
-    sync_event::SyncEvent,
+    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate, l1::L1Tx,
+    operation::*, state_op::WriteBatch, sync_event::SyncEvent,
 };
 use zkaleido::ProofReceipt;
 

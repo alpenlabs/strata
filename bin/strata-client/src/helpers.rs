@@ -5,8 +5,6 @@ use bitcoin::{Address, Network};
 use format_serde_error::SerdeError;
 use strata_btcio::rpc::{traits::WalletRpc, BitcoinClient};
 use strata_config::Config;
-use strata_consensus_logic::csm::state_tracker;
-use strata_db::traits::Database;
 use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
 use strata_primitives::{
     l1::L1Status,

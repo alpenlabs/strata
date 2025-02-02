@@ -9,7 +9,7 @@ use strata_db::traits::*;
 use strata_primitives::params::Params;
 use strata_state::{
     client_state::{ClientState, ClientStateMut},
-    operation::{self, ClientUpdateOutput},
+    operation::ClientUpdateOutput,
 };
 use strata_storage::{ClientStateManager, NodeStorage};
 use tracing::*;
