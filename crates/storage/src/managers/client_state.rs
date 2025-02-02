@@ -94,7 +94,7 @@ impl ClientStateManager {
 
     // Convenience functions.
 
-    /// Gets the higest known state and its idx.
+    /// Gets the highest known state and its idx.
     pub async fn get_most_recent_state(&self) -> Option<(u64, Arc<ClientState>)> {
         let cur = self.cur_state.lock().await;
         cur.get_clone().map(|state| (cur.get_idx(), state))
