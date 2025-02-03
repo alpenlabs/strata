@@ -36,5 +36,5 @@ class ProverClientTest(testenv.StrataTester):
         self.debug(f"using task id: {task_id}")
         assert task_id is not None
 
-        time_out = 60
+        time_out = 30
         wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)

@@ -7,13 +7,12 @@ use std::{
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(feature = "sp1-dev")] {
-use bincode::{deserialize, serialize};
-use cargo_metadata::MetadataCommand;
-use sha2::{Digest, Sha256};
-use sp1_helper::{build_program_with_args, BuildArgs};
-use sp1_sdk::{HashableKey, ProverClient, SP1VerifyingKey};
-
+    if #[cfg(all(feature = "sp1-dev", not(debug_assertions)))] {
+        use bincode::{deserialize, serialize};
+        use cargo_metadata::MetadataCommand;
+        use sha2::{Digest, Sha256};
+        use sp1_helper::{build_program_with_args, BuildArgs};
+        use sp1_sdk::{HashableKey, ProverClient, SP1VerifyingKey};
     }
 }
 
@@ -169,7 +168,7 @@ fn get_output_dir() -> PathBuf {
 }
 
 /// Checks if the cache is valid by comparing the expected ID with the saved ID.
-#[cfg(feature = "sp1-dev")]
+#[cfg(all(feature = "sp1-dev", not(debug_assertions)))]
 fn is_cache_valid(expected_id: &[u8; 32], paths: &[PathBuf; 4]) -> bool {
     // Check if any required files are missing
     if paths.iter().any(|path| !path.exists()) {
@@ -186,7 +185,7 @@ fn is_cache_valid(expected_id: &[u8; 32], paths: &[PathBuf; 4]) -> bool {
 }
 
 /// Ensures the cache is valid and returns the ELF contents and SP1 Verifying Key.
-#[cfg(feature = "sp1-dev")]
+#[cfg(all(feature = "sp1-dev", not(debug_assertions)))]
 fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
     let cache_dir = format!("{}/cache", program);
     let paths = ["elf", "id", "vk", "pk"]
@@ -223,8 +222,19 @@ fn ensure_cache_validity(program: &str) -> Result<SP1VerifyingKey, String> {
 }
 
 /// Generates the ELF contents and VK hash for a given program.
-#[cfg(feature = "sp1-dev")]
+#[cfg(all(feature = "sp1-dev", not(debug_assertions)))]
 fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
+    // Check if the Clippy linter is enabled by examining the "RUSTC_WORKSPACE_WRAPPER" environment
+    // variable. If it contains "clippy-driver", Clippy is active; in that case, return mock ELF
+    // contents and VK hash.
+    let is_clippy_enabled = std::env::var("RUSTC_WORKSPACE_WRAPPER")
+        .map(|val| val.contains("clippy-driver"))
+        .unwrap_or(false);
+
+    if is_clippy_enabled {
+        return get_mock_elf_contents_and_vk_hash();
+    }
+
     let mut build_args = BuildArgs {
         ..Default::default()
     };
@@ -261,8 +271,12 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     (vk.hash_u32(), vk.bytes32())
 }
 
-#[cfg(not(feature = "sp1-dev"))]
+#[cfg(debug_assertions)]
 fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
+    get_mock_elf_contents_and_vk_hash()
+}
+
+fn get_mock_elf_contents_and_vk_hash() -> ([u32; 8], String) {
     (
         [0u32; 8],
         "0x0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
@@ -270,7 +284,7 @@ fn generate_elf_contents_and_vk_hash(_program: &str) -> ([u32; 8], String) {
 }
 
 /// Copies the compiled ELF file of the specified program to its cache directory.
-#[cfg(feature = "sp1-dev")]
+#[cfg(all(feature = "sp1-dev", not(debug_assertions)))]
 fn migrate_elf(program: &str) {
     // Get the build directory from the environment
     let sp1_build_dir =
