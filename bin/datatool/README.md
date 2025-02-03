@@ -37,16 +37,16 @@ Before proceeding, make sure that you have SP1 correctly set up by following the
 
 To ensure that the RollupParams contain the correct verifying key, build the binary in release mode and confirm that SP1 is set up correctly by following its installation instructions.
 
-For production usage—since SP1 verification key generation is platform and workspace dependent—build the data tool in release mode with the sp1-docker feature:
+For production usage—since SP1 verification key generation is platform and workspace dependent—build the data tool in release mode with the sp1-docker-builder feature:
 
 ```bash
-cargo build --bin strata-datatool -F "sp1-docker" --release
+cargo build --bin strata-datatool -F "sp1-docker-builder" --release
 ```
 
 Because building the guest code in Docker can be time-consuming, you can generate the verification key locally for testing or development using:
 
 ```bash
-cargo build --bin strata-datatool -F "sp1" --release
+cargo build --bin strata-datatool -F "sp1-builder" --release
 ```
 
 Additionally, the generated ELF can be exported after building the datatool as specified above:
