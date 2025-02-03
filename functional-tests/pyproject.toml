@@ -12,6 +12,7 @@ bitcoinlib = "^0.7.1"
 websockets = "^13.1"
 web3 = "^7.7.0"
 py-solc-x = "^2.0.3"
+locust = "^2.32.6"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "0.9.4"
@@ -20,6 +21,10 @@ maturin = "1.8.1"
 [tool.ruff]
 line-length = 100
 indent-width = 4
+# Disabled for the entire file because of monkey-patching.
+# Ignoring lint for the block of code is not currently supported:
+# https://github.com/astral-sh/ruff/issues/3711
+exclude = ["entry.py"]
 
 [tool.ruff.format]
 quote-style = "double"

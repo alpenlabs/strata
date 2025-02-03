@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+from gevent import monkey
+
+# This is important for locust to work with flexitest.
+# Because of this line, ruff linter is disabled for the whole file :(
+# Currently, it's not possible to disable ruff for the block of code.
+monkey.patch_all()
 
 import argparse
 import os
@@ -10,6 +16,8 @@ from envs import net_settings, testenv
 from factory import factory
 from utils import *
 from utils.constants import *
+from load.cfg import RethLoadConfigBuilder
+from load.jobs import EthJob
 
 TEST_DIR: str = "tests"
 
@@ -18,6 +26,13 @@ parser = argparse.ArgumentParser(prog="entry.py")
 parser.add_argument("-g", "--groups", nargs="*", help="Define the test groups to execute")
 parser.add_argument("-t", "--tests", nargs="*", help="Define individual tests to execute")
 
+
+def disabled_tests() -> list[str]:
+    """
+    Helper to disable some tests.
+    Useful during debugging or when the test becomes flaky.
+    """
+    return frozenset(["basic_load"])
 
 def filter_tests(parsed_args, modules):
     """
@@ -31,6 +46,7 @@ def filter_tests(parsed_args, modules):
     )
 
     filtered = dict()
+    disabled = disabled_tests()
     for test, path in modules.items():
         # Drop the prefix of the path before TEST_DIR
         test_path_parts = os.path.normpath(path).split(os.path.sep)
@@ -41,8 +57,9 @@ def filter_tests(parsed_args, modules):
         test_groups = frozenset(test_path_parts[:-1])
 
         # Filtering logic:
-        # if groups or tests were specified (non-empty) as args, then check for exclusion
-        take = True
+        # - check if the test is currently disabled
+        # - if groups or tests were specified (non-empty) as args, then check for exclusion.
+        take = test not in disabled
         if arg_groups and not (arg_groups & test_groups):
             take = False
         if arg_tests and test not in arg_tests:
@@ -52,7 +69,6 @@ def filter_tests(parsed_args, modules):
             filtered[test] = path
 
     return filtered
-
 
 def main(argv):
     """
@@ -72,6 +88,7 @@ def main(argv):
     reth_fac = factory.RethFactory([12600 + i for i in range(100 * 3)])
     prover_client_fac = factory.ProverClientFactory([12900 + i for i in range(100 * 3)])
     bridge_client_fac = factory.BridgeClientFactory([13200 + i for i in range(100)])
+    load_gen_fac = factory.LoadGeneratorFactory([13300 + i for i in range(100)])
     seq_signer_fac = factory.StrataSequencerFactory()
 
     factories = {
@@ -82,7 +99,11 @@ def main(argv):
         "reth": reth_fac,
         "prover_client": prover_client_fac,
         "bridge_client": bridge_client_fac,
+        "load_generator": load_gen_fac,
     }
+
+    reth_load_env = testenv.LoadEnvConfig()
+    reth_load_env.with_load_builder(RethLoadConfigBuilder().with_jobs([EthJob]).with_rate(15))
 
     global_envs = {
         # Basic env is the default env for all tests.
@@ -99,6 +120,7 @@ def main(argv):
             2
         ),  # TODO: Need to generate at least horizon blocks, based on params
         "prover": testenv.BasicEnvConfig(101),
+        "load_reth": reth_load_env,
     }
 
     setup_root_logger()
@@ -109,6 +131,7 @@ def main(argv):
     results = rt.run_tests(tests)
     rt.save_json_file("results.json", results)
     flexitest.dump_results(results)
+    # TODO(load): dump load test stats into separate file.
 
     flexitest.fail_on_error(results)
 

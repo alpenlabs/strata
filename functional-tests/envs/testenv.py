@@ -9,6 +9,7 @@ from strata_utils import (
 )
 
 from envs.rollup_params_cfg import RollupConfig
+from load.cfg import LoadConfig, LoadConfigBuilder
 from utils import *
 from utils.constants import *
 
@@ -403,3 +404,29 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             svcs[name] = br
 
         return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)
+
+
+# TODO: Maybe, we need to make it dynamic to enhance any EnvConfig with load testing capabilities.
+class LoadEnvConfig(BasicEnvConfig):
+    _load_cfgs: list[Callable[[dict[str, flexitest.Service]], LoadConfig]] = []
+
+    def with_load_builder(self, builder: LoadConfigBuilder):
+        self._load_cfgs.append(builder)
+        return self
+
+    def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
+        basic_live_env = super().init(ctx)
+
+        if not self._load_cfgs:
+            raise Exception(
+                "LoadEnv has no load builders! Specify load builders or just use BasicEnv."
+            )
+
+        # Create load generator services for all the builders.
+        svcs = basic_live_env.svcs
+        load_fac = ctx.get_factory("load_generator")
+        for builder in self._load_cfgs:
+            load_cfg: LoadConfig = builder(svcs)
+            svcs[f"load_generator.{builder.name}"] = load_fac.create_simple_loadgen(load_cfg)
+
+        return BasicLiveEnv(svcs, basic_live_env._bridge_pk, basic_live_env._rollup_cfg)
