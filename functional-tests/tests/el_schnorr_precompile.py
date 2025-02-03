@@ -4,8 +4,8 @@ from web3 import Web3
 from envs import testenv
 from utils.schnorr import (
     get_precompile_input,
-    make_schnorr_precompile_call,
     get_test_schnnor_secret_key,
+    make_schnorr_precompile_call,
 )
 
 
@@ -27,7 +27,6 @@ class SchnorrPrecompileTest(testenv.StrataTester):
         reth = ctx.get_service("reth")
         web3: Web3 = reth.create_web3()
 
-        # secret key
         secret_key = get_test_schnnor_secret_key()
         msg = "AlpenStrata"
         precompile_input = get_precompile_input(secret_key, msg)

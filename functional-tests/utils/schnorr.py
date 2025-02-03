@@ -1,9 +1,10 @@
 import hashlib
+
 from strata_utils import sign_schnorr_sig
 from web3 import Web3
+
 from utils import wait_until_with_value
 from utils.constants import PRECOMPILE_SCHNORR_ADDRESS
-from typing import Tuple
 
 
 def get_precompile_input(secret_key: str, msg: str) -> str:
@@ -15,7 +16,7 @@ def get_precompile_input(secret_key: str, msg: str) -> str:
         msg (str): The message to sign.
 
     Returns:
-        str: Schnorr precompile input i.e concatenated hex string of the public key, message hash, and signature.
+        str: Schnorr precompile input.
     """
     msg_bytes = msg.encode("utf-8")
     message_hash = hashlib.sha256(msg_bytes).hexdigest()
@@ -24,7 +25,7 @@ def get_precompile_input(secret_key: str, msg: str) -> str:
     return public_key.hex() + message_hash + signature.hex()
 
 
-def make_schnorr_precompile_call(web3: Web3, precompile_input: str) -> Tuple[str, str]:
+def make_schnorr_precompile_call(web3: Web3, precompile_input: str) -> tuple[str, str]:
     """
     Executes a Schnorr precompile call.
 
