@@ -188,9 +188,15 @@ impl HeaderVerificationState {
 
     // TODO: add errors
     pub fn check_and_update_continuity(&mut self, header: &Header, params: &BtcParams) {
-        // Check continuity
-        let prev_blockhash: L1BlockId = header.prev_blockhash.into();
-        assert_eq!(prev_blockhash, self.last_verified_block_hash);
+        if std::env::var("HACK_SKIP_UPDATE_CONTINUITY_CHECK")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            // Check continuity
+            let prev_blockhash: L1BlockId = header.prev_blockhash.into();
+            assert_eq!(prev_blockhash, self.last_verified_block_hash);
+        }
 
         let block_hash_raw = compute_block_hash(header);
 

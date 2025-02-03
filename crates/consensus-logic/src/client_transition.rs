@@ -59,7 +59,7 @@ pub fn process_event<D: Database>(
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
                 let mut updated_l1vs = l1_vs.clone();
 
-                for block_height in (l1_vs_height + 1..=*height) {
+                for block_height in (l1_vs_height..*height) {
                     let block_mf = l1prov
                         .get_block_manifest(block_height)?
                         .ok_or(Error::MissingL1BlockHeight(block_height))?;
