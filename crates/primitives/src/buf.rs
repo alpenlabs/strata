@@ -237,7 +237,7 @@ mod tests {
     fn test_buf32_serialization() {
         assert_eq!(
             serde_json::to_string(&Buf32::from([0; 32])).unwrap(),
-            String::from("\"0x0000000000000000000000000000000000000000000000000000000000000000\"")
+            String::from("\"0000000000000000000000000000000000000000000000000000000000000000\"")
         );
 
         assert_eq!(
@@ -246,7 +246,7 @@ mod tests {
                 1, 1, 1, 170u8
             ]))
             .unwrap(),
-            String::from("\"0x01010101010101010101010101010101010101010101010101010101010101aa\"")
+            String::from("\"01010101010101010101010101010101010101010101010101010101010101aa\"")
         );
     }
 
@@ -262,5 +262,21 @@ mod tests {
         assert_eq!(buf20, Buf20::from([0; 20]));
         assert_eq!(buf32, Buf32::from([0; 32]));
         assert_eq!(buf64, Buf64::from([0; 64]));
+    }
+
+    #[test]
+    fn test_buf32_parse() {
+        "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
+            .parse::<Buf32>()
+            .unwrap();
+    }
+
+    #[test]
+    fn test_buf32_from_str() {
+        Buf32::from_str("a9f913c3d7fe56c462228ad22bb7631742a121a6a138d57c1fc4a351314948fa")
+            .unwrap();
+
+        Buf32::from_str("81060cb3997dcefc463e3db0a776efb5360e458064a666459b8807f60c0201c2")
+            .unwrap();
     }
 }
