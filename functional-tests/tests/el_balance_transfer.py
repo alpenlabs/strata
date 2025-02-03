@@ -1,8 +1,15 @@
 import flexitest
 from web3 import Web3
-from utils.eth import make_token_transfer
 
 from envs import testenv
+from utils.eth import make_native_token_transfer
+
+NATIVE_TOKEN_TRANSFER_PARAMS = {
+    "DEST_ADDRESS": "0x0000000000000000000000000000000000000001",
+    "BASEFEE_ADDRESS": "5400000000000000000000000000000000000010",
+    "BENEFICIARY_ADDRESS": "5400000000000000000000000000000000000011",
+    "TRANSFER_AMOUNT": Web3.to_wei(1, "ether"),
+}
 
 
 @flexitest.register
@@ -12,13 +19,14 @@ class ElBalanceTransferTest(testenv.StrataTester):
 
     def main(self, ctx: flexitest.RunContext):
         reth = ctx.get_service("reth")
-
         web3: Web3 = reth.create_web3()
 
         source = web3.address
-        dest = web3.to_checksum_address("0x0000000000000000000000000000000000000001")
-        basefee_address = web3.to_checksum_address("5400000000000000000000000000000000000010")
-        beneficiary_address = web3.to_checksum_address("5400000000000000000000000000000000000011")
+        dest = web3.to_checksum_address(NATIVE_TOKEN_TRANSFER_PARAMS["DEST_ADDRESS"])
+        basefee_address = web3.to_checksum_address(NATIVE_TOKEN_TRANSFER_PARAMS["BASEFEE_ADDRESS"])
+        beneficiary_address = web3.to_checksum_address(
+            NATIVE_TOKEN_TRANSFER_PARAMS["BENEFICIARY_ADDRESS"]
+        )
 
         self.debug(f"{web3.is_connected()}")
         original_block_no = web3.eth.block_number
@@ -28,8 +36,9 @@ class ElBalanceTransferTest(testenv.StrataTester):
         beneficiary_original_balance = web3.eth.get_balance(beneficiary_address)
 
         self.debug(f"{original_block_no}, {dest_original_balance}")
-        transfer_amount = 1_000_000_000_000_000_000
-        _tx_receipt = make_token_transfer(web3, transfer_amount, dest)
+
+        transfer_amount = NATIVE_TOKEN_TRANSFER_PARAMS["TRANSFER_AMOUNT"]
+        _tx_receipt = make_native_token_transfer(web3, transfer_amount, dest)
 
         final_block_no = web3.eth.block_number
         dest_final_balance = web3.eth.get_balance(dest)

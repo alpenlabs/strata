@@ -4,7 +4,7 @@ TRANSFER_GAS = 100_000
 TRANSACTION_TIMEOUT = 30
 
 
-def make_token_transfer(web3: Web3, amount: int, beneficiary: str) -> dict:
+def make_native_token_transfer(web3: Web3, amount: int, beneficiary: str) -> dict:
     """
     Performs a token transfer transaction and waits for its receipt.
 

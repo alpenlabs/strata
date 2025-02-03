@@ -1,5 +1,5 @@
-from web3 import Web3
 import flexitest
+from web3 import Web3
 
 from envs import testenv
 from utils import (
@@ -7,9 +7,13 @@ from utils import (
     wait_for_proof_with_time_out,
     wait_until_with_value,
 )
-from utils.eth import make_token_transfer
+from utils.eth import make_native_token_transfer
 
-PROOF_TIMEOUT = 30
+# Constants for native token transfer
+NATIVE_TOKEN_TRANSFER_PARAMS = {
+    "TRANSFER_AMOUNT": Web3.to_wei(1, "ether"),
+    "RECIPIENT": "0x5400000000000000000000000000000000000011",
+}
 
 
 @flexitest.register
@@ -32,9 +36,9 @@ class ProverClientTest(testenv.StrataTester):
             error_with="EE blocks not generated",
         )
 
-        transfer_amount = 1_000_000_000_000_000_000
-        recipient = "5400000000000000000000000000000000000011"
-        tx_receipt = make_token_transfer(web3, transfer_amount, recipient)
+        transfer_amount = NATIVE_TOKEN_TRANSFER_PARAMS["TRANSFER_AMOUNT"]
+        recipient = NATIVE_TOKEN_TRANSFER_PARAMS["RECIPIENT"]
+        tx_receipt = make_native_token_transfer(web3, transfer_amount, recipient)
 
         ee_prover_params = {
             "start_block": tx_receipt["blockNumber"] - 1,
@@ -60,5 +64,4 @@ class ProverClientTest(testenv.StrataTester):
         task_id = task_ids[0]
         self.debug(f"Using task ID: {task_id}")
 
-        time_out = 30
-        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
+        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)
