@@ -64,7 +64,6 @@ impl ClientStateDatabase for ClientStateDb {
 
 #[cfg(test)]
 mod tests {
-    use strata_state::client_state::ClientState;
     use strata_test_utils::*;
 
     use super::*;
