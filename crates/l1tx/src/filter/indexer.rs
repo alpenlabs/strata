@@ -1,14 +1,14 @@
 use bitcoin::{Block, Transaction};
 use strata_state::{
     batch::SignedBatchCheckpoint,
-    tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
+    tx::{DepositInfo, DepositRequestInfo},
 };
 
 use super::{
     parse_checkpoint_envelopes, parse_da_blobs, parse_deposit_requests, parse_deposits,
     TxFilterConfig,
 };
-use crate::messages::{DaEntry, ProtocolTxEntry};
+use crate::messages::{DaEntry, L1TxExtract, ProtocolTxEntry};
 
 pub trait TxIndexer {
     // Do stuffs with `SignedBatchCheckpoint`.
@@ -24,13 +24,7 @@ pub trait TxIndexer {
     fn visit_da<'a>(&mut self, _d: impl Iterator<Item = &'a [u8]>) {}
 
     // Collect data
-    fn collect(
-        self,
-    ) -> (
-        Vec<ProtocolOperation>,
-        Vec<DepositRequestInfo>,
-        Vec<DaEntry>,
-    );
+    fn collect(self) -> L1TxExtract;
 }
 
 pub trait BlockIndexer {
@@ -65,6 +59,18 @@ impl<V: TxIndexer> OpIndexer<V> {
         }
     }
 
+    pub fn tx_entries(&self) -> &[ProtocolTxEntry] {
+        &self.tx_entries
+    }
+
+    pub fn deposit_requests(&self) -> &[DepositRequestInfo] {
+        &self.dep_reqs
+    }
+
+    pub fn da_entries(&self) -> &[DaEntry] {
+        &self.da_entries
+    }
+
     pub fn collect(self) -> (Vec<ProtocolTxEntry>, Vec<DepositRequestInfo>, Vec<DaEntry>) {
         (self.tx_entries, self.dep_reqs, self.da_entries)
     }
@@ -90,13 +96,13 @@ impl<V: TxIndexer + Clone> BlockIndexer for OpIndexer<V> {
             visitor.visit_da(da);
         }
 
-        let (ops, dep_reqs, da_entries) = visitor.collect();
-        if !ops.is_empty() {
-            let entry = ProtocolTxEntry::new(txidx, ops);
+        let tx_extract = visitor.collect();
+        if !tx_extract.protocol_ops().is_empty() {
+            let entry = ProtocolTxEntry::new(txidx, tx_extract.protocol_ops().to_vec());
             self.tx_entries.push(entry);
         }
 
-        self.dep_reqs.extend_from_slice(&dep_reqs);
-        self.da_entries.extend_from_slice(&da_entries);
+        self.dep_reqs.extend_from_slice(tx_extract.deposit_reqs());
+        self.da_entries.extend_from_slice(tx_extract.da_entries());
     }
 }

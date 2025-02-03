@@ -1,7 +1,10 @@
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::buf::Buf32;
-use strata_state::{l1::HeaderVerificationState, tx::ProtocolOperation};
+use strata_state::{
+    l1::HeaderVerificationState,
+    tx::{DepositRequestInfo, ProtocolOperation},
+};
 
 /// L1 events that we observe and want the persistence task to work on.
 #[derive(Clone, Debug)]
@@ -43,6 +46,39 @@ impl ProtocolTxEntry {
     /// Returns a reference to the protocol operation
     pub fn proto_ops(&self) -> &[ProtocolOperation] {
         &self.proto_ops
+    }
+}
+
+/// Consolidation of items extractable from an L1 Transaction.
+pub struct L1TxExtract {
+    protocol_ops: Vec<ProtocolOperation>,
+    deposit_reqs: Vec<DepositRequestInfo>,
+    da_entries: Vec<DaEntry>,
+}
+
+impl L1TxExtract {
+    pub fn new(
+        protocol_ops: Vec<ProtocolOperation>,
+        deposit_reqs: Vec<DepositRequestInfo>,
+        da_entries: Vec<DaEntry>,
+    ) -> Self {
+        Self {
+            protocol_ops,
+            deposit_reqs,
+            da_entries,
+        }
+    }
+
+    pub fn protocol_ops(&self) -> &[ProtocolOperation] {
+        &self.protocol_ops
+    }
+
+    pub fn deposit_reqs(&self) -> &[DepositRequestInfo] {
+        &self.deposit_reqs
+    }
+
+    pub fn da_entries(&self) -> &[DaEntry] {
+        &self.da_entries
     }
 }
 

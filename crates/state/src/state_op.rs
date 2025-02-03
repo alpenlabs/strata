@@ -231,8 +231,8 @@ impl StateCache {
 
         // TODO add it to the MMR so we can reference it in the future
         let (header_record, deposit_txs, _) = matured_block.into_parts();
-        for tx in deposit_txs {
-            if let Deposit(deposit_info) = tx.tx().protocol_operation() {
+        for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
+            if let Deposit(deposit_info) = op {
                 trace!("we got some deposit_txs");
                 let amt = deposit_info.amt;
                 let deposit_intent = DepositIntent::new(amt, &deposit_info.address);

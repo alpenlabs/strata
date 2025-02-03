@@ -1,6 +1,9 @@
 use digest::Digest;
 use sha2::Sha256;
-use strata_l1tx::{filter::indexer::TxIndexer, messages::DaEntry};
+use strata_l1tx::{
+    filter::indexer::TxIndexer,
+    messages::{DaEntry, L1TxExtract},
+};
 use strata_primitives::buf::Buf32;
 use strata_state::{
     batch::SignedBatchCheckpoint,
@@ -59,14 +62,8 @@ impl TxIndexer for ClientTxIndexer {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
-    fn collect(
-        self,
-    ) -> (
-        Vec<ProtocolOperation>,
-        Vec<DepositRequestInfo>,
-        Vec<DaEntry>,
-    ) {
-        (self.ops, self.deposit_requests, self.da_entries)
+    fn collect(self) -> L1TxExtract {
+        L1TxExtract::new(self.ops, self.deposit_requests, self.da_entries)
     }
 }
 
