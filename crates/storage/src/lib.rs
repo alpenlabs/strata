@@ -8,6 +8,7 @@ use std::sync::Arc;
 pub use managers::{
     chainstate::ChainstateManager, checkpoint::CheckpointDbManager,
     client_state::ClientStateManager, l1::L1BlockManager, l2::L2BlockManager,
+    sync_event::SyncEventManager,
 };
 pub use ops::l1tx_broadcast::BroadcastDbOps;
 use strata_db::{traits::Database, DbResult};
@@ -19,6 +20,8 @@ pub struct NodeStorage {
     l1_block_manager: Arc<L1BlockManager>,
     l2_block_manager: Arc<L2BlockManager>,
     chainstate_manager: Arc<ChainstateManager>,
+
+    sync_event_manager: Arc<SyncEventManager>,
     client_state_manager: Arc<ClientStateManager>,
 
     // TODO maybe move this into a different one?
@@ -38,6 +41,10 @@ impl NodeStorage {
         &self.chainstate_manager
     }
 
+    pub fn sync_event(&self) -> &Arc<SyncEventManager> {
+        &self.sync_event_manager
+    }
+
     pub fn client_state(&self) -> &Arc<ClientStateManager> {
         &self.client_state_manager
     }
@@ -55,8 +62,13 @@ where
 {
     let l1_block_manager = Arc::new(L1BlockManager::new(pool.clone(), db.clone()));
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), db.clone()));
-    let client_state_manager = Arc::new(ClientStateManager::new(pool.clone(), db.clone())?);
     let chainstate_manager = Arc::new(ChainstateManager::new(pool.clone(), db.clone()));
+
+    let sync_event_manager = Arc::new(SyncEventManager::new(
+        pool.clone(),
+        db.sync_event_db().clone(),
+    ));
+    let client_state_manager = Arc::new(ClientStateManager::new(pool.clone(), db.clone())?);
 
     // (see above)
     let checkpoint_manager = Arc::new(CheckpointDbManager::new(pool.clone(), db.clone()));
@@ -64,8 +76,10 @@ where
     Ok(NodeStorage {
         l1_block_manager,
         l2_block_manager,
-        client_state_manager,
         chainstate_manager,
+
+        sync_event_manager,
+        client_state_manager,
 
         // (see above)
         checkpoint_manager,

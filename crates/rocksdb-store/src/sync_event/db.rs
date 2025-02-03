@@ -52,7 +52,7 @@ impl SyncEventDatabase for SyncEventDb {
             .map_err(|err| DbError::TransactionError(err.to_string()))
     }
 
-    fn clear_sync_event(&self, start_idx: u64, end_idx: u64) -> DbResult<()> {
+    fn clear_sync_event_range(&self, start_idx: u64, end_idx: u64) -> DbResult<()> {
         if start_idx >= end_idx {
             return Err(DbError::Other(
                 "start_idx must be less than end_idx".to_string(),

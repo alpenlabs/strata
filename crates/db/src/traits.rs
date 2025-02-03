@@ -104,7 +104,7 @@ pub trait SyncEventDatabase {
     /// Atomically clears sync events in a range, defined as a half-open
     /// interval.  This should only be used for deeply buried events where we'll
     /// never need to look at them again.
-    fn clear_sync_event(&self, start_idx: u64, end_idx: u64) -> DbResult<()>;
+    fn clear_sync_event_range(&self, start_idx: u64, end_idx: u64) -> DbResult<()>;
 
     /// Returns the index of the most recently written sync event.
     fn get_last_idx(&self) -> DbResult<Option<u64>>;
