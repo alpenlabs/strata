@@ -21,7 +21,6 @@ use bitcoin::{
 use bitcoin_bosd::Descriptor;
 use borsh::{BorshDeserialize, BorshSerialize};
 use rand::rngs::OsRng;
-use revm_primitives::FixedBytes;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};
@@ -736,9 +735,7 @@ impl XOnlyPk {
             let pubkey_bytes = &script_pubkey.as_bytes()[2..34];
             let output_key: XOnlyPublicKey = XOnlyPublicKey::from_slice(pubkey_bytes)?;
 
-            let serialized_key: FixedBytes<32> = output_key.serialize().into();
-
-            Ok(Self(Buf32(serialized_key.into())))
+            Ok(Self(Buf32(output_key.serialize())))
         } else {
             Err(ParseError::UnsupportedAddress(checked_addr.address_type()))
         }

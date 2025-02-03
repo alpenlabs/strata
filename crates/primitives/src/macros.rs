@@ -110,22 +110,6 @@ pub mod internal {
                 }
             }
 
-            impl ::std::convert::From<$name>
-                for ::revm_primitives::alloy_primitives::FixedBytes<$len>
-            {
-                fn from(value: $name) -> Self {
-                    value.0.into()
-                }
-            }
-
-            impl ::std::convert::From<::revm_primitives::alloy_primitives::FixedBytes<$len>>
-                for $name
-            {
-                fn from(value: ::revm_primitives::alloy_primitives::FixedBytes<$len>) -> Self {
-                    value.0.into()
-                }
-            }
-
             impl ::std::default::Default for $name {
                 fn default() -> Self {
                     Self([0; $len])

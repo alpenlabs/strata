@@ -1,5 +1,5 @@
 use borsh::BorshDeserialize;
-use revm_primitives::B256;
+use revm_primitives::{FixedBytes, B256};
 use strata_primitives::evm_exec::EVMExtraPayload;
 use strata_state::block::{L2Block, L2BlockBundle};
 use thiserror::Error;
@@ -12,7 +12,7 @@ pub(crate) struct EVML2Block {
 
 impl EVML2Block {
     pub fn block_hash(&self) -> B256 {
-        self.extra_payload.block_hash().into()
+        FixedBytes(*self.extra_payload.block_hash().as_ref())
     }
 }
 

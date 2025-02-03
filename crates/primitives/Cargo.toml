@@ -15,13 +15,12 @@ bitcoin-bosd = { workspace = true, features = [
   "arbitrary",
 ] }
 borsh.workspace = true
+const-hex = "1.14"
 digest.workspace = true
 hex.workspace = true
 musig2 = { workspace = true, features = ["serde"] }
 num_enum.workspace = true
 rand = { workspace = true, optional = true }
-reth-primitives.workspace = true
-revm-primitives.workspace = true
 secp256k1 = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true

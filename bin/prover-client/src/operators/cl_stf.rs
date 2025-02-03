@@ -72,7 +72,7 @@ impl ClStfOperator {
     pub async fn get_exec_id(&self, cl_block_id: L2BlockId) -> Result<Buf32, ProvingTaskError> {
         let header = self.get_l2_block_header(cl_block_id).await?;
         let block = self.evm_ee_operator.get_block(header.block_idx).await?;
-        Ok(block.header.hash.into())
+        Ok(Buf32(block.header.hash.into()))
     }
 
     /// Retrieves the specified number of ancestor block IDs for the given block ID.
