@@ -104,6 +104,8 @@ pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinC
         bitcoind_url,
         config.bitcoind_rpc.rpc_user.clone(),
         config.bitcoind_rpc.rpc_password.clone(),
+        config.bitcoind_rpc.retry_count,
+        config.bitcoind_rpc.retry_interval,
     )
     .map_err(anyhow::Error::from)?;
 

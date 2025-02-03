@@ -45,6 +45,10 @@ pub struct BitcoindConfig {
     pub rpc_user: String,
     pub rpc_password: String,
     pub network: Network,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_count: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_interval: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -109,6 +113,9 @@ mod test {
             reveal_amount = 100
             bundle_interval_ms = 1000
 
+            [btcio.broadcaster]
+            poll_interval_ms = 1000
+
             [relayer]
             refresh_interval = 10
             stale_duration = 120
@@ -156,6 +163,9 @@ mod test {
             fee_policy = "smart"
             reveal_amount = 100
             bundle_interval_ms = 1000
+
+            [btcio.broadcaster]
+            poll_interval_ms = 1000
 
             [exec.reth]
             rpc_url = "http://localhost:8551"

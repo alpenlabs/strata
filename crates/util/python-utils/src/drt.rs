@@ -518,7 +518,8 @@ mod tests {
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client = BitcoinClient::new(url.clone(), user.clone(), password.clone()).unwrap();
+        let client =
+            BitcoinClient::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
 
         let mut wallet = taproot_wallet().unwrap();
         let address = wallet.reveal_next_address(KeychainKind::External).address;
@@ -546,7 +547,8 @@ mod tests {
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client = BitcoinClient::new(url.clone(), user.clone(), password.clone()).unwrap();
+        let client =
+            BitcoinClient::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
         let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
             .expect("valid wallet client");
 
@@ -633,7 +635,8 @@ mod tests {
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client = BitcoinClient::new(url.clone(), user.clone(), password.clone()).unwrap();
+        let client =
+            BitcoinClient::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
         let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
             .expect("valid wallet client");
 
@@ -706,7 +709,8 @@ mod tests {
         let bitcoind = BitcoinD::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client = BitcoinClient::new(url.clone(), user.clone(), password.clone()).unwrap();
+        let client =
+            BitcoinClient::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
         let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
             .expect("valid wallet client");
 

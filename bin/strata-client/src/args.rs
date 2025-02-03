@@ -36,6 +36,17 @@ pub struct Args {
     #[argh(option, description = "bitcoind RPC password")]
     pub bitcoind_password: Option<String>,
 
+    /// Max retries for Bitcoin RPC calls.
+    #[argh(option, description = "max retries for bitcoin RPC (default: 3)")]
+    pub bitcoind_retry_count: Option<u8>,
+
+    /// Timeout duration for btc request retries in ms. Defaults to `1000`.
+    #[argh(
+        option,
+        description = "max interval between bitcoin RPC retries in ms (default: 1000)"
+    )]
+    pub bitcoind_retry_interval: Option<u64>,
+
     #[argh(option, short = 'n', description = "L1 network to run on")]
     pub network: Option<Network>,
 
@@ -71,6 +82,8 @@ impl Args {
                     "args: no bitcoin --rpc-password provided",
                 )?,
                 network: require(args.network, "args: no bitcoin --network provided")?,
+                retry_count: args.bitcoind_retry_count,
+                retry_interval: args.bitcoind_retry_interval,
             },
             client: ClientConfig {
                 rpc_host: require(args.rpc_host, "args: no client --rpc-host provided")?,
@@ -122,6 +135,12 @@ impl Args {
         }
         if let Some(rpc_password) = args.bitcoind_password {
             config.bitcoind_rpc.rpc_password = rpc_password;
+        }
+        if let Some(retry_count) = args.bitcoind_retry_count {
+            config.bitcoind_rpc.retry_count = Some(retry_count);
+        }
+        if let Some(retry_interval) = args.bitcoind_retry_interval {
+            config.bitcoind_rpc.retry_interval = Some(retry_interval);
         }
         if let Some(rpc_host) = args.rpc_host {
             config.client.rpc_host = rpc_host;

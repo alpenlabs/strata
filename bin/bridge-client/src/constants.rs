@@ -6,7 +6,7 @@ pub(super) const DEFAULT_RPC_HOST: &str = "127.0.0.1";
 
 pub(super) const DEFAULT_DUTY_TIMEOUT_SEC: u64 = 600;
 /// The default bridge rocksdb database retry count, if not overridden by the user.
-pub(super) const ROCKSDB_RETRY_COUNT: u16 = 3;
+pub(super) const DEFAULT_ROCKSDB_RETRY_COUNT: u16 = 3;
 
 /// The default RPC retry count, if not overridden by the user.
-pub(super) const MAX_RPC_RETRY_COUNT: u16 = 5;
+pub(super) const DEFAULT_MAX_RPC_RETRY_COUNT: u16 = 5;
