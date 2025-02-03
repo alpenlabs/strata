@@ -1,7 +1,6 @@
-import time
-
 import flexitest
 from web3 import Web3
+from utils.eth import make_token_transfer
 
 from envs import testenv
 
@@ -29,14 +28,8 @@ class ElBalanceTransferTest(testenv.StrataTester):
         beneficiary_original_balance = web3.eth.get_balance(beneficiary_address)
 
         self.debug(f"{original_block_no}, {dest_original_balance}")
-
-        to_transfer = 1_000_000_000_000_000_000
-
-        web3.eth.send_transaction(
-            {"to": dest, "value": hex(to_transfer), "gas": hex(100000), "from": source}
-        )
-
-        time.sleep(2)
+        transfer_amount = 1_000_000_000_000_000_000
+        _tx_receipt = make_token_transfer(web3, transfer_amount, dest)
 
         final_block_no = web3.eth.block_number
         dest_final_balance = web3.eth.get_balance(dest)
@@ -47,7 +40,7 @@ class ElBalanceTransferTest(testenv.StrataTester):
         self.debug(f"{final_block_no}, {dest_final_balance}")
 
         assert original_block_no < final_block_no
-        assert dest_original_balance + to_transfer == dest_final_balance
+        assert dest_original_balance + transfer_amount == dest_final_balance
 
         basefee_balance_change = basefee_final_balance - basefee_original_balance
         assert basefee_balance_change > 0
@@ -58,6 +51,6 @@ class ElBalanceTransferTest(testenv.StrataTester):
             source_balance_change
             + basefee_balance_change
             + beneficiary_balance_change
-            + to_transfer
+            + transfer_amount
             == 0
         ), "total balance change is not balanced"
