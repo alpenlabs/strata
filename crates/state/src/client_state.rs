@@ -10,7 +10,7 @@ use strata_primitives::buf::Buf32;
 use tracing::*;
 
 use crate::{
-    batch::{BatchInfo, BatchTransition, BootstrapState},
+    batch::{BatchInfo, BatchTransition, CheckpointBaseState},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
     operation::{ClientUpdateOutput, SyncAction},
@@ -306,9 +306,8 @@ pub struct L1Checkpoint {
     /// The inner checkpoint batch transition
     pub batch_transition: BatchTransition,
 
-    /// The inner checkpoint batch info
-    // TODO why is this called bootstrap state?
-    pub bootstrap_state: BootstrapState,
+    /// Reference state against which batch transitions is verified
+    pub checkpoint_base_state: CheckpointBaseState,
 
     /// If the checkpoint included proof
     pub is_proved: bool,
@@ -321,14 +320,14 @@ impl L1Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
         batch_transition: BatchTransition,
-        bootstrap_state: BootstrapState,
+        checkpoint_base_state: CheckpointBaseState,
         is_proved: bool,
         height: u64,
     ) -> Self {
         Self {
             batch_info,
             batch_transition,
-            bootstrap_state,
+            checkpoint_base_state,
             is_proved,
             height,
         }

@@ -12,7 +12,7 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadIntent},
 };
 use strata_state::batch::{
-    BatchCheckpoint, BatchInfo, BatchTransition, BootstrapState, CommitmentInfo,
+    BatchCheckpoint, BatchInfo, BatchTransition, CheckpointBaseState, CommitmentInfo,
 };
 use zkaleido::Proof;
 
@@ -192,9 +192,8 @@ pub struct CheckpointEntry {
     /// Transition data for L1 and L2 states, which is verified by the proof.
     pub batch_transition: BatchTransition,
 
-    /// Includes the initial and final hashed state of both the `L1StateTransition` and
-    /// `L2StateTransition` that happened in this batch
-    pub bootstrap: BootstrapState,
+    /// Reference state against which checkpoint transitions and proofs are verified
+    pub checkpoint_base_state: CheckpointBaseState,
 
     /// Proof
     pub proof: Proof,
@@ -213,7 +212,7 @@ impl CheckpointEntry {
     pub fn new(
         batch_info: BatchInfo,
         batch_transition: BatchTransition,
-        bootstrap: BootstrapState,
+        checkpoint_base_state: CheckpointBaseState,
         proof: Proof,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
@@ -221,7 +220,7 @@ impl CheckpointEntry {
     ) -> Self {
         Self {
             batch_info,
-            bootstrap,
+            checkpoint_base_state,
             batch_transition,
             proof,
             proving_status,
@@ -234,7 +233,7 @@ impl CheckpointEntry {
         BatchCheckpoint::new(
             self.batch_info,
             self.batch_transition,
-            self.bootstrap,
+            self.checkpoint_base_state,
             self.proof,
         )
     }
@@ -243,12 +242,12 @@ impl CheckpointEntry {
     pub fn new_pending_proof(
         info: BatchInfo,
         transition: BatchTransition,
-        bootstrap: BootstrapState,
+        checkpoint_base_state: CheckpointBaseState,
     ) -> Self {
         Self::new(
             info,
             transition,
-            bootstrap,
+            checkpoint_base_state,
             Proof::default(),
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,

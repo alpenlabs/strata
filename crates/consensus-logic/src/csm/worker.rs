@@ -366,7 +366,7 @@ fn apply_action(
                 let entry = CheckpointEntry::new(
                     batch_ckp.batch_info().clone(),
                     batch_ckp.batch_transition().clone(),
-                    batch_ckp.bootstrap_state().clone(),
+                    batch_ckp.checkpoint_base_state().clone(),
                     batch_ckp.proof().clone(),
                     pstatus,
                     cstatus,
@@ -387,7 +387,7 @@ fn apply_action(
                 let entry = CheckpointEntry::new(
                     batch_ckp.batch_info().clone(),
                     batch_ckp.batch_transition().clone(),
-                    batch_ckp.bootstrap_state().clone(),
+                    batch_ckp.checkpoint_base_state().clone(),
                     batch_ckp.proof().clone(),
                     pstatus,
                     cstatus,

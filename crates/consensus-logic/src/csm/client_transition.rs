@@ -207,7 +207,7 @@ pub fn process_event(
                             L1Checkpoint::new(
                                 batch_checkpoint.batch_info().clone(),
                                     batch_checkpoint.batch_transition().clone(),
-                                batch_checkpoint.bootstrap_state().clone(),
+                                batch_checkpoint.checkpoint_base_state().clone(),
                                 !batch_checkpoint.proof().is_empty(),
                                 *height,
                             )

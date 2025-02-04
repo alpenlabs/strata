@@ -8,7 +8,7 @@ use zkaleido::{Proof, ProofReceipt, PublicValues};
 use crate::id::L2BlockId;
 
 /// Consolidates all information required to describe and verify a batch checkpoint.
-/// This includes metadata about the batch, the state transitions, bootstrap info,
+/// This includes metadata about the batch, the state transitions, checkpoint base state,
 /// and the proof itself. The proof verifies that the transition in [`BatchTransition`]
 /// is valid for the batch described by [`BatchInfo`].
 #[derive(
@@ -21,8 +21,8 @@ pub struct BatchCheckpoint {
     /// Transition data for L1 and L2 states, which is verified by the proof.
     transition: BatchTransition,
 
-    /// Bootstrap info based on which the checkpoint transition and proof is verified
-    bootstrap: BootstrapState,
+    /// Reference state against which checkpoint transitions and corresponding proof is verified
+    checkpoint_base_state: CheckpointBaseState,
 
     /// Proof for the batch obtained from prover manager
     proof: Proof,
@@ -32,13 +32,13 @@ impl BatchCheckpoint {
     pub fn new(
         batch_info: BatchInfo,
         transition: BatchTransition,
-        bootstrap: BootstrapState,
+        checkpoint_base_state: CheckpointBaseState,
         proof: Proof,
     ) -> Self {
         Self {
             batch_info,
             transition,
-            bootstrap,
+            checkpoint_base_state,
             proof,
         }
     }
@@ -51,8 +51,8 @@ impl BatchCheckpoint {
         &self.transition
     }
 
-    pub fn bootstrap_state(&self) -> &BootstrapState {
-        &self.bootstrap
+    pub fn checkpoint_base_state(&self) -> &CheckpointBaseState {
+        &self.checkpoint_base_state
     }
 
     pub fn proof(&self) -> &Proof {
@@ -62,7 +62,7 @@ impl BatchCheckpoint {
     pub fn get_proof_output(&self) -> CheckpointProofOutput {
         CheckpointProofOutput::new(
             self.batch_transition().clone(),
-            self.bootstrap_state().clone(),
+            self.checkpoint_base_state().clone(),
         )
     }
 
@@ -177,14 +177,14 @@ impl BatchTransition {
         }
     }
 
-    /// Creates a [`BootstrapState`] by taking the initial state of the [`BatchInfo`]
-    pub fn get_initial_bootstrap_state(&self) -> BootstrapState {
-        BootstrapState::new(self.l1_transition.0, self.l2_transition.0)
+    /// Creates a [`checkpoint_base_stateState`] by taking the initial state of the [`BatchInfo`]
+    pub fn get_initial_checkpoint_base_state(&self) -> CheckpointBaseState {
+        CheckpointBaseState::new(self.l1_transition.0, self.l2_transition.0)
     }
 
-    /// Creates a [`BootstrapState`] by taking the final state of the [`BatchInfo`]
-    pub fn get_final_bootstrap_state(&self) -> BootstrapState {
-        BootstrapState::new(self.l1_transition.1, self.l2_transition.1)
+    /// Creates a [`checkpoint_base_stateState`] by taking the final state of the [`BatchInfo`]
+    pub fn get_final_checkpoint_base_state(&self) -> CheckpointBaseState {
+        CheckpointBaseState::new(self.l1_transition.1, self.l2_transition.1)
     }
 
     pub fn rollup_params_commitment(&self) -> Buf32 {
@@ -225,19 +225,20 @@ impl BatchInfo {
     }
 }
 
-/// Initial state to bootstrap the proving process
+/// Represents the reference state against which checkpoint transitions and proofs are verified.
 ///
-/// TODO: This needs to be replaced with GenesisState if we prove each Checkpoint
-/// recursively. Using a BootstrapState is a temporary solution
+/// NOTE/TODO: This state serves as the starting point for verifying a checkpoint proof. If we move
+/// towards a strict mode where we prove each checkpoint recursively, this should be replaced with
+/// `GenesisState`.
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
-pub struct BootstrapState {
+pub struct CheckpointBaseState {
     pub initial_l1_state: Buf32,
     pub initial_l2_state: Buf32,
 }
 
-impl BootstrapState {
+impl CheckpointBaseState {
     pub fn new(initial_l1_state: Buf32, initial_l2_state: Buf32) -> Self {
         Self {
             initial_l1_state,
@@ -249,17 +250,17 @@ impl BootstrapState {
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
 pub struct CheckpointProofOutput {
     pub batch_transition: BatchTransition,
-    pub bootstrap_state: BootstrapState,
+    pub checkpoint_base_state: CheckpointBaseState,
 }
 
 impl CheckpointProofOutput {
     pub fn new(
         batch_transition: BatchTransition,
-        bootstrap_state: BootstrapState,
+        checkpoint_base_state: CheckpointBaseState,
     ) -> CheckpointProofOutput {
         Self {
             batch_transition,
-            bootstrap_state,
+            checkpoint_base_state,
         }
     }
 }
