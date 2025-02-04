@@ -186,8 +186,9 @@ mod tests {
         for _ in 1..=n {
             let _ = insert_event(&db);
         }
+
         // Delete events 2..4
-        let res = db.clear_sync_event(2, 4);
+        let res = db.clear_sync_event_range(2, 4);
         assert!(res.is_ok());
 
         let ev1 = db.get_sync_event(1).unwrap();
@@ -210,7 +211,7 @@ mod tests {
         for _ in 1..=n {
             let _ = insert_event(&db);
         }
-        let res = db.clear_sync_event(6, 7);
+        let res = db.clear_sync_event_range(6, 7);
         assert!(res.is_err_and(|x| matches!(x, DbError::Other(ref msg) if msg == "end_idx must be less than or equal to last_key")));
     }
 
@@ -221,7 +222,7 @@ mod tests {
         for _ in 1..=n {
             let _ = insert_event(&db);
         }
-        let res = db.clear_sync_event(2, 3);
+        let res = db.clear_sync_event_range(2, 3);
         assert!(res.is_ok());
 
         let new_idx = db.get_last_idx().unwrap().unwrap();

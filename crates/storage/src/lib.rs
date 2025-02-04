@@ -60,7 +60,7 @@ pub fn create_node_storage<D>(db: Arc<D>, pool: threadpool::ThreadPool) -> DbRes
 where
     D: Database + Sync + Send + 'static,
 {
-    let l1_block_manager = Arc::new(L1BlockManager::new(pool.clone(), db.clone()));
+    let l1_block_manager = Arc::new(L1BlockManager::new(pool.clone(), db.l1_db().clone()));
     let l2_block_manager = Arc::new(L2BlockManager::new(pool.clone(), db.clone()));
     let chainstate_manager = Arc::new(ChainstateManager::new(pool.clone(), db.clone()));
 
