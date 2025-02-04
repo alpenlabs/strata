@@ -4,6 +4,8 @@
 
 use std::{sync::Arc, thread};
 
+#[cfg(feature = "debug-utils")]
+use strata_common::bail_manager::{check_bail_trigger, BAIL_SYNC_EVENT};
 use strata_db::{
     traits::*,
     types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus},
@@ -11,7 +13,10 @@ use strata_db::{
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{
-    client_state::ClientState, csm_status::CsmStatus, operation::SyncAction, sync_event::SyncEvent,
+    client_state::{ClientState, ClientStateMut},
+    csm_status::CsmStatus,
+    operation::{ClientUpdateOutput, SyncAction},
+    sync_event::SyncEvent,
 };
 use strata_status::StatusChannel;
 use strata_storage::{CheckpointDbManager, NodeStorage};
@@ -23,9 +28,9 @@ use tokio::{
 use tracing::*;
 
 use super::{
+    client_transition,
     config::CsmExecConfig,
     message::{ClientUpdateNotif, CsmMessage},
-    state_tracker,
 };
 use crate::{errors::Error, genesis};
 
@@ -47,8 +52,11 @@ pub struct WorkerState {
     /// Checkpoint manager.
     checkpoint_manager: Arc<CheckpointDbManager>,
 
-    /// Tracker used to remember the current consensus state.
-    state_tracker: state_tracker::StateTracker,
+    /// Current state index.
+    cur_state_idx: u64,
+
+    /// Current state ref.
+    cur_state: Arc<ClientState>,
 
     /// Broadcast channel used to publish state updates.
     cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
@@ -69,13 +77,6 @@ impl WorkerState {
             .get_most_recent_state_blocking()
             .ok_or(Error::MissingClientState(0))?;
 
-        let state_tracker = state_tracker::StateTracker::new(
-            params.clone(),
-            storage.clone(),
-            cur_state_idx,
-            cur_state,
-        );
-
         // TODO make configurable
         let config = CsmExecConfig {
             retry_base_dur: time::Duration::from_millis(1000),
@@ -88,7 +89,8 @@ impl WorkerState {
             params,
             config,
             storage,
-            state_tracker,
+            cur_state_idx,
+            cur_state,
             cupdate_tx,
             checkpoint_manager,
         })
@@ -96,12 +98,12 @@ impl WorkerState {
 
     /// Gets the index of the current state.
     pub fn cur_event_idx(&self) -> u64 {
-        self.state_tracker.cur_state_idx()
+        self.cur_state_idx
     }
 
     /// Gets a ref to the consensus state from the inner state tracker.
     pub fn cur_state(&self) -> &Arc<ClientState> {
-        self.state_tracker.cur_state()
+        &self.cur_state
     }
 
     /// Gets a reference to checkpoint manager
@@ -118,6 +120,51 @@ impl WorkerState {
         Ok(self
             .get_sync_event(idx)?
             .ok_or(Error::MissingSyncEvent(idx))?)
+    }
+
+    /// Given the next event index, computes the state application if the
+    /// requisite data is available.  Returns the output and the new state.
+    ///
+    /// This is copied from the old `StateTracker` type which we removed to
+    /// simplify things.
+    // TODO maybe remove output return value
+    pub fn advance_consensus_state(
+        &mut self,
+        ev_idx: u64,
+    ) -> anyhow::Result<(ClientUpdateOutput, Arc<ClientState>)> {
+        let prev_ev_idx = ev_idx - 1;
+        if prev_ev_idx != self.cur_state_idx {
+            return Err(Error::SkippedEventIdx(prev_ev_idx, self.cur_state_idx).into());
+        }
+
+        // Load the event from the database.
+        let ev = self.get_sync_event_ok(ev_idx)?;
+
+        debug!(?ev, "processing sync event");
+
+        #[cfg(feature = "debug-utils")]
+        check_bail_trigger(BAIL_SYNC_EVENT);
+
+        // Compute the state transition.
+        let context = client_transition::StorageEventContext::new(&self.storage);
+        let mut state_mut = ClientStateMut::new(self.cur_state.as_ref().clone());
+        client_transition::process_event(&mut state_mut, &ev, &context, &self.params)?;
+
+        // Clone the state and apply the operations to it.
+        let outp = state_mut.into_update();
+
+        // Store the outputs.
+        let state = self
+            .storage
+            .client_state()
+            .put_update_blocking(ev_idx, outp.clone())?;
+
+        // Update bookkeeping.
+        self.cur_state = state;
+        self.cur_state_idx = ev_idx;
+        debug!(%ev_idx, "computed new consensus state");
+
+        Ok((outp, self.cur_state.clone()))
     }
 }
 
@@ -164,7 +211,7 @@ fn process_msg(
         CsmMessage::EventInput(idx) => {
             // If we somehow missed a sync event we need to try to rerun those,
             // just in case.
-            let cur_ev_idx = state.state_tracker.cur_state_idx();
+            let cur_ev_idx = state.cur_event_idx();
             let next_exp_idx = cur_ev_idx + 1;
             for ev_idx in next_exp_idx..=*idx {
                 if ev_idx < *idx {
@@ -238,7 +285,7 @@ fn handle_sync_event(
     status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
-    let (outp, new_state) = state.state_tracker.advance_consensus_state(ev_idx)?;
+    let (outp, new_state) = state.advance_consensus_state(ev_idx)?;
     let outp = Arc::new(outp);
 
     // Apply the actions produced from the state transition.
@@ -247,7 +294,7 @@ fn handle_sync_event(
     }
 
     // Make sure that the new state index is set as expected.
-    assert_eq!(state.state_tracker.cur_state_idx(), ev_idx);
+    assert_eq!(state.cur_event_idx(), ev_idx);
 
     // FIXME clean this up and make them take Arcs
     let mut status = CsmStatus::default();
