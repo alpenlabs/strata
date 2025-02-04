@@ -8,7 +8,7 @@ use super::{
     parse_checkpoint_envelopes, parse_da_blobs, parse_deposit_requests, parse_deposits,
     TxFilterConfig,
 };
-use crate::messages::{DaEntry, L1TxExtract, ProtocolTxEntry};
+use crate::messages::{DaEntry, L1BlockExtract, L1TxExtract, ProtocolTxEntry};
 
 pub trait TxIndexer {
     // Do stuffs with `SignedBatchCheckpoint`.
@@ -39,6 +39,9 @@ pub trait BlockIndexer {
         }
         self
     }
+
+    // Collect data
+    fn collect(self) -> L1BlockExtract;
 }
 
 #[derive(Clone, Debug)]
@@ -70,10 +73,6 @@ impl<V: TxIndexer> OpIndexer<V> {
     pub fn da_entries(&self) -> &[DaEntry] {
         &self.da_entries
     }
-
-    pub fn collect(self) -> (Vec<ProtocolTxEntry>, Vec<DepositRequestInfo>, Vec<DaEntry>) {
-        (self.tx_entries, self.dep_reqs, self.da_entries)
-    }
 }
 
 impl<V: TxIndexer + Clone> BlockIndexer for OpIndexer<V> {
@@ -104,5 +103,9 @@ impl<V: TxIndexer + Clone> BlockIndexer for OpIndexer<V> {
 
         self.dep_reqs.extend_from_slice(tx_extract.deposit_reqs());
         self.da_entries.extend_from_slice(tx_extract.da_entries());
+    }
+
+    fn collect(self) -> L1BlockExtract {
+        L1BlockExtract::new(self.tx_entries, self.dep_reqs, self.da_entries)
     }
 }

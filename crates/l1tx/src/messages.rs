@@ -51,8 +51,11 @@ impl ProtocolTxEntry {
 
 /// Consolidation of items extractable from an L1 Transaction.
 pub struct L1TxExtract {
+    // Protocol operations relevant to STF.
     protocol_ops: Vec<ProtocolOperation>,
+    // Deposit requests which the node stores for non-stf related bookkeeping.
     deposit_reqs: Vec<DepositRequestInfo>,
+    // DA entries which the node stores for state reconstruction.
     da_entries: Vec<DaEntry>,
 }
 
@@ -79,6 +82,46 @@ impl L1TxExtract {
 
     pub fn da_entries(&self) -> &[DaEntry] {
         &self.da_entries
+    }
+}
+
+/// Consolidation of items extractable from an L1 Block.
+pub struct L1BlockExtract {
+    // Transaction entries that contain protocol operations.
+    tx_entries: Vec<ProtocolTxEntry>,
+    // Deposit requests which the node stores for non-stf related bookkeeping.
+    deposit_reqs: Vec<DepositRequestInfo>,
+    // DA entries which the node stores for state reconstruction.
+    da_entries: Vec<DaEntry>,
+}
+
+impl L1BlockExtract {
+    pub fn new(
+        tx_entries: Vec<ProtocolTxEntry>,
+        deposit_reqs: Vec<DepositRequestInfo>,
+        da_entries: Vec<DaEntry>,
+    ) -> Self {
+        Self {
+            tx_entries,
+            deposit_reqs,
+            da_entries,
+        }
+    }
+
+    pub fn tx_entries(&self) -> &[ProtocolTxEntry] {
+        &self.tx_entries
+    }
+
+    pub fn deposit_reqs(&self) -> &[DepositRequestInfo] {
+        &self.deposit_reqs
+    }
+
+    pub fn da_entries(&self) -> &[DaEntry] {
+        &self.da_entries
+    }
+
+    pub fn into_parts(self) -> (Vec<ProtocolTxEntry>, Vec<DepositRequestInfo>, Vec<DaEntry>) {
+        (self.tx_entries, self.deposit_reqs, self.da_entries)
     }
 }
 

@@ -134,7 +134,10 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
+        let (tx_entries, _, _) = ops_indexer
+            .index_block(&block, &filter_config)
+            .collect()
+            .into_parts();
 
         assert_eq!(tx_entries.len(), 1, "Should find one relevant transaction");
 
@@ -178,7 +181,10 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (_, dep_reqs, _) = ops_indexer.index_block(&block, &filter_config).collect();
+        let (_, dep_reqs, _) = ops_indexer
+            .index_block(&block, &filter_config)
+            .collect()
+            .into_parts();
 
         assert_eq!(dep_reqs.len(), 1, "Should find one deposit request");
 
@@ -205,7 +211,10 @@ mod test {
         let block = create_test_block(vec![irrelevant_tx]);
 
         let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
+        let (tx_entries, _, _) = ops_indexer
+            .index_block(&block, &filter_config)
+            .collect()
+            .into_parts();
 
         assert!(
             tx_entries.is_empty(),
@@ -240,7 +249,10 @@ mod test {
         let block = create_test_block(vec![tx1, tx2]);
 
         let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
+        let (tx_entries, _, _) = ops_indexer
+            .index_block(&block, &filter_config)
+            .collect()
+            .into_parts();
 
         assert_eq!(tx_entries.len(), 2, "Should find two relevant transactions");
 
@@ -304,7 +316,10 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer.index_block(&block, &filter_config).collect();
+        let (tx_entries, _, _) = ops_indexer
+            .index_block(&block, &filter_config)
+            .collect()
+            .into_parts();
 
         assert_eq!(
             tx_entries.len(),

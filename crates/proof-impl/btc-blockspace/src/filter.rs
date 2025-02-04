@@ -22,10 +22,11 @@ pub fn extract_relevant_info(
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    // Just pass a no-op to the filter function as prover does not have to do anything with the raw
-    // data like storing in db.
     let indexer = OpIndexer::new(ProverTxIndexer::new());
-    let (tx_refs, _, _) = indexer.index_block(block, filter_config).collect();
+    let (tx_refs, _, _) = indexer
+        .index_block(block, filter_config)
+        .collect()
+        .into_parts();
 
     for op in tx_refs.into_iter().flat_map(|t| t.proto_ops().to_vec()) {
         match op {

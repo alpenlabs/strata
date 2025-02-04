@@ -330,7 +330,8 @@ async fn process_block<R: ReaderRpc>(
     let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
     let (tx_entries, _dep_reqs, _da_entries) = ops_indexer
         .index_block(&block, state.filter_config())
-        .collect();
+        .collect()
+        .into_parts();
 
     // TODO: do stuffs with dep_reqs and da_entries
 
