@@ -37,3 +37,4 @@ rustdoc.all = "warn"
 
 [features]
 debug-utils = ["strata-common/debug-utils"]
+default = ["zeroize"]
