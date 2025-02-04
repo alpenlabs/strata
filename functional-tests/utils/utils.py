@@ -442,7 +442,7 @@ def get_bridge_pubkey_from_cfg(cfg_params) -> str:
     Get the bridge pubkey from the config.
     """
     # Slight hack to convert to appropriate operator pubkey from cfg values.
-    op_pks = ["02" + pk[2:] for pk in cfg_params.operator_config.get_operators_pubkeys()]
+    op_pks = ["02" + pk for pk in cfg_params.operator_config.get_operators_pubkeys()]
     op_x_only_pks = [convert_to_xonly_pk(pk) for pk in op_pks]
     agg_pubkey = musig_aggregate_pks(op_x_only_pks)
     return agg_pubkey

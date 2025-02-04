@@ -40,7 +40,7 @@ pub fn generate_exec_update(el_proof_pp: &EvmBlockStfOutput) -> ExecSegment {
         create_evm_extra_payload(Buf32(*el_proof_pp.new_blockhash)),
     );
 
-    let update_output = UpdateOutput::new_from_state(el_proof_pp.new_state_root.into())
+    let update_output = UpdateOutput::new_from_state((*el_proof_pp.new_state_root).into())
         .with_withdrawals(withdrawals);
 
     let exec_update = ExecUpdate::new(update_input, update_output);
