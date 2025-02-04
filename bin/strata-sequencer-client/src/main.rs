@@ -23,7 +23,10 @@ use helpers::load_seqkey;
 use rpc_client::rpc_client;
 use strata_common::logging;
 use strata_tasks::TaskManager;
-use tokio::{runtime::Handle, sync::mpsc};
+use tokio::{
+    runtime::Handle,
+    sync::{mpsc, Mutex},
+};
 use tracing::info;
 
 const SHUTDOWN_TIMEOUT_MS: u64 = 5000;
@@ -53,6 +56,7 @@ fn main_inner(args: Args) -> Result<()> {
 
     let config = get_config(args.clone())?;
     let idata = load_seqkey(&config.sequencer_key)?;
+    let shared_idata = Arc::new(Mutex::new(idata));
 
     let task_manager = TaskManager::new(handle.clone());
     let executor = task_manager.executor();
@@ -70,7 +74,7 @@ fn main_inner(args: Args) -> Result<()> {
     );
     executor.spawn_critical_async(
         "duty-runner",
-        duty_executor_worker(rpc, duty_rx, handle.clone(), idata),
+        duty_executor_worker(rpc, duty_rx, handle.clone(), shared_idata.clone()),
     );
 
     task_manager.start_signal_listeners();

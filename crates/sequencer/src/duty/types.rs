@@ -6,6 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use strata_state::{batch::BatchCheckpoint, id::L2BlockId};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -306,7 +307,7 @@ impl StateUpdate {
 }
 
 /// Describes an identity that might be assigned duties.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize, Zeroize, ZeroizeOnDrop)]
 pub enum Identity {
     /// Sequencer with an identity key.
     Sequencer(Buf32),
@@ -340,7 +341,7 @@ impl DutyBatch {
 }
 
 /// Sequencer key used for signing-related duties.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize, Zeroize, ZeroizeOnDrop)]
 pub enum IdentityKey {
     /// Sequencer private key used for signing.
     Sequencer(Buf32),
@@ -350,7 +351,7 @@ pub enum IdentityKey {
 ///
 /// This is really just a stub that we should replace
 /// with real cryptographic signatures and putting keys in the rollup params.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ZeroizeOnDrop)]
 pub struct IdentityData {
     /// Unique identifying info.
     pub ident: Identity,
@@ -362,5 +363,11 @@ impl IdentityData {
     /// Create new IdentityData from components.
     pub fn new(ident: Identity, key: IdentityKey) -> Self {
         Self { ident, key }
+    }
+}
+
+impl Zeroize for IdentityData {
+    fn zeroize(&mut self) {
+        self.key.zeroize(); // Zeroize the private key
     }
 }

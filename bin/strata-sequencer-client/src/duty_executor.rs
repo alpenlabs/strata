@@ -9,8 +9,13 @@ use strata_sequencer::{
     utils::now_millis,
 };
 use thiserror::Error;
-use tokio::{runtime::Handle, select, sync::mpsc};
+use tokio::{
+    runtime::Handle,
+    select,
+    sync::{mpsc, Mutex},
+};
 use tracing::{debug, error};
+use zeroize::Zeroize;
 
 use crate::helpers::{sign_checkpoint, sign_header};
 
@@ -28,7 +33,7 @@ pub(crate) async fn duty_executor_worker<R>(
     rpc: Arc<R>,
     mut duty_rx: mpsc::Receiver<Duty>,
     handle: Handle,
-    idata: IdentityData,
+    idata: Arc<Mutex<IdentityData>>,
 ) -> anyhow::Result<()>
 where
     R: StrataSequencerApiClient + Send + Sync + 'static,
@@ -48,9 +53,12 @@ where
                         continue;
                     }
                     seen_duties.insert(duty.id());
+
                     handle.spawn(handle_duty(rpc.clone(), duty, idata.clone(), failed_duties_tx.clone()));
                 } else {
                     // tx is closed, we are done
+                    let mut idata = idata.lock().await;
+                    idata.zeroize();
                     return Ok(());
                 }
             }
@@ -67,15 +75,15 @@ where
 async fn handle_duty<R>(
     rpc: Arc<R>,
     duty: Duty,
-    idata: IdentityData,
+    idata: Arc<Mutex<IdentityData>>,
     failed_duties_tx: mpsc::Sender<Buf32>,
 ) where
     R: StrataSequencerApiClient + Send + Sync,
 {
     debug!("handle_duty: {:?}", duty);
     let duty_result = match duty.clone() {
-        Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, idata).await,
-        Duty::CommitBatch(duty) => handle_commit_batch_duty(rpc, duty, idata).await,
+        Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, idata.clone()).await,
+        Duty::CommitBatch(duty) => handle_commit_batch_duty(rpc, duty, idata.clone()).await,
     };
 
     if let Err(e) = duty_result {
@@ -87,7 +95,7 @@ async fn handle_duty<R>(
 async fn handle_sign_block_duty<R>(
     rpc: Arc<R>,
     duty: BlockSigningDuty,
-    idata: IdentityData,
+    idata: Arc<Mutex<IdentityData>>,
 ) -> Result<(), DutyExecError>
 where
     R: StrataSequencerApiClient + Send + Sync,
@@ -107,6 +115,7 @@ where
         .await
         .map_err(DutyExecError::GenerateTemplate)?;
 
+    let idata = idata.lock().await;
     let signature = sign_header(template.header(), &idata.key);
     let completion = BlockCompletionData::from_signature(signature);
 
@@ -120,11 +129,12 @@ where
 async fn handle_commit_batch_duty<R>(
     rpc: Arc<R>,
     duty: BatchCheckpointDuty,
-    idata: IdentityData,
+    idata: Arc<Mutex<IdentityData>>,
 ) -> Result<(), DutyExecError>
 where
     R: StrataSequencerApiClient + Send + Sync,
 {
+    let idata = idata.lock().await;
     let sig = sign_checkpoint(duty.checkpoint(), &idata.key);
 
     rpc.complete_checkpoint_signature(duty.checkpoint().batch_info().idx(), HexBytes64(sig.0))
