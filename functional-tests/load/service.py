@@ -44,7 +44,7 @@ class LoadGeneratorService(flexitest.Service):
 
         gevent.spawn(stats_printer(self.env.stats))
         gevent.spawn(stats_history, self.env.runner)
-        self.runner.start(1, spawn_rate=self.cfg.spawn_rate)
+        self.runner.start(len(self.cfg.jobs), spawn_rate=self.cfg.spawn_rate)
         self._is_started = True
 
     def stop(self):
