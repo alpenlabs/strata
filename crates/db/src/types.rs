@@ -186,17 +186,8 @@ pub enum L1TxStatus {
 /// Entry corresponding to a BatchCommitment
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CheckpointEntry {
-    /// Info related to the batch
-    pub batch_info: BatchInfo,
-
-    /// Transition data for L1 and L2 states, which is verified by the proof.
-    pub batch_transition: BatchTransition,
-
-    /// Reference state against which checkpoint transitions and proofs are verified
-    pub checkpoint_base_state: CheckpointBaseState,
-
-    /// Proof
-    pub proof: Proof,
+    /// The batch checkpoint containing metadata, state transitions, and proof data.
+    pub checkpoint: BatchCheckpoint,
 
     /// Proving Status
     pub proving_status: CheckpointProvingStatus,
@@ -210,19 +201,13 @@ pub struct CheckpointEntry {
 
 impl CheckpointEntry {
     pub fn new(
-        batch_info: BatchInfo,
-        batch_transition: BatchTransition,
-        checkpoint_base_state: CheckpointBaseState,
-        proof: Proof,
+        checkpoint: BatchCheckpoint,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
         commitment: Option<CheckpointCommitment>,
     ) -> Self {
         Self {
-            batch_info,
-            checkpoint_base_state,
-            batch_transition,
-            proof,
+            checkpoint,
             proving_status,
             confirmation_status,
             commitment,
@@ -230,12 +215,7 @@ impl CheckpointEntry {
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        BatchCheckpoint::new(
-            self.batch_info,
-            self.batch_transition,
-            self.checkpoint_base_state,
-            self.proof,
-        )
+        self.checkpoint
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
@@ -244,11 +224,10 @@ impl CheckpointEntry {
         transition: BatchTransition,
         checkpoint_base_state: CheckpointBaseState,
     ) -> Self {
+        let checkpoint =
+            BatchCheckpoint::new(info, transition, checkpoint_base_state, Proof::default());
         Self::new(
-            info,
-            transition,
-            checkpoint_base_state,
-            Proof::default(),
+            checkpoint,
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
             None,

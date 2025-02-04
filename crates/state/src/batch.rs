@@ -21,7 +21,7 @@ pub struct BatchCheckpoint {
     /// Transition data for L1 and L2 states, which is verified by the proof.
     transition: BatchTransition,
 
-    /// Reference state against which checkpoint transitions and corresponding proof is verified
+    /// Reference state against which batch transitions and corresponding proof is verified
     checkpoint_base_state: CheckpointBaseState,
 
     /// Proof for the batch obtained from prover manager
@@ -57,6 +57,10 @@ impl BatchCheckpoint {
 
     pub fn proof(&self) -> &Proof {
         &self.proof
+    }
+
+    pub fn update_proof(&mut self, proof: Proof) {
+        self.proof = proof
     }
 
     pub fn get_proof_output(&self) -> CheckpointProofOutput {
@@ -177,12 +181,12 @@ impl BatchTransition {
         }
     }
 
-    /// Creates a [`checkpoint_base_stateState`] by taking the initial state of the [`BatchInfo`]
+    /// Creates a [`CheckpointBaseState`] by taking the initial state of the [`BatchTransition`]
     pub fn get_initial_checkpoint_base_state(&self) -> CheckpointBaseState {
         CheckpointBaseState::new(self.l1_transition.0, self.l2_transition.0)
     }
 
-    /// Creates a [`checkpoint_base_stateState`] by taking the final state of the [`BatchInfo`]
+    /// Creates a [`CheckpointBaseState`] by taking the final state of the [`BatchTransition`]
     pub fn get_final_checkpoint_base_state(&self) -> CheckpointBaseState {
         CheckpointBaseState::new(self.l1_transition.1, self.l2_transition.1)
     }
@@ -225,7 +229,7 @@ impl BatchInfo {
     }
 }
 
-/// Represents the reference state against which checkpoint transitions and proofs are verified.
+/// Represents the reference state against which batch transitions and proofs are verified.
 ///
 /// NOTE/TODO: This state serves as the starting point for verifying a checkpoint proof. If we move
 /// towards a strict mode where we prove each checkpoint recursively, this should be replaced with

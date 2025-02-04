@@ -322,7 +322,7 @@ impl From<BatchInfo> for RpcCheckpointInfo {
 
 impl From<CheckpointEntry> for RpcCheckpointInfo {
     fn from(value: CheckpointEntry) -> Self {
-        let mut item: Self = value.batch_info.into();
+        let mut item: Self = value.checkpoint.batch_info().clone().into();
         item.commitment = value.commitment.map(Into::into);
         item.confirmation_status = Some(value.confirmation_status.into());
         item

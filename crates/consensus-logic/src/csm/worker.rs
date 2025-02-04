@@ -364,10 +364,7 @@ fn apply_action(
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Confirmed;
                 let entry = CheckpointEntry::new(
-                    batch_ckp.batch_info().clone(),
-                    batch_ckp.batch_transition().clone(),
-                    batch_ckp.checkpoint_base_state().clone(),
-                    batch_ckp.proof().clone(),
+                    batch_ckp.clone(),
                     pstatus,
                     cstatus,
                     Some(c.commitment.clone().into()),
@@ -385,10 +382,7 @@ fn apply_action(
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Finalized;
                 let entry = CheckpointEntry::new(
-                    batch_ckp.batch_info().clone(),
-                    batch_ckp.batch_transition().clone(),
-                    batch_ckp.checkpoint_base_state().clone(),
-                    batch_ckp.proof().clone(),
+                    batch_ckp.clone(),
                     pstatus,
                     cstatus,
                     Some(c.commitment.clone().into()),
