@@ -116,12 +116,12 @@ impl StrataRpcImpl {
         };
 
         // in current implementation, chainstate idx == l2 block idx
-        let (_, end_slot) = last_checkpoint.batch_info.l2_range;
+        let (_, end_commitment) = last_checkpoint.batch_info.l2_range;
 
         Ok(self
             .storage
             .chainstate()
-            .get_toplevel_chainstate_async(end_slot)
+            .get_toplevel_chainstate_async(end_commitment.slot())
             .await?
             .map(Arc::new))
     }

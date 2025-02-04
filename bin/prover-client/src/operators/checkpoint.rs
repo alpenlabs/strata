@@ -4,6 +4,8 @@ use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::{
     buf::Buf32,
+    l1::L1BlockCommitment,
+    l2::L2BlockCommitment,
     params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
@@ -80,19 +82,13 @@ impl CheckpointOperator {
         // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
         // include the range in terms of block_id.
         // https://alpenlabs.atlassian.net/browse/STR-756
-        let start_l1_block_id = self
-            .l1_batch_operator
-            .get_block_at(checkpoint_info.l1_range.0)
-            .await?;
-        let end_l1_block_id = self
-            .l1_batch_operator
-            .get_block_at(checkpoint_info.l1_range.1)
-            .await?;
+        let start_l1_block_id = checkpoint_info.l1_range.0.blkid();
+        let end_l1_block_id = checkpoint_info.l1_range.1.blkid();
 
         let l1_batch_keys = self
             .l1_batch_operator
             .create_task(
-                (start_l1_block_id, end_l1_block_id),
+                (*start_l1_block_id, *end_l1_block_id),
                 task_tracker.clone(),
                 db,
             )
@@ -102,9 +98,9 @@ impl CheckpointOperator {
         // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
         // include the range in terms of block_id.
         // https://alpenlabs.atlassian.net/browse/STR-756
-        let start_l2_idx = self.get_l2id(checkpoint_info.l2_range.0).await?;
-        let end_l2_idx = self.get_l2id(checkpoint_info.l2_range.1).await?;
-        let l2_range = vec![(start_l2_idx, end_l2_idx)];
+        let start_l2_idx = checkpoint_info.l2_range.0.blkid();
+        let end_l2_idx = checkpoint_info.l2_range.1.blkid();
+        let l2_range = vec![(*start_l2_idx, *end_l2_idx)];
 
         let l2_batch_keys = self
             .l2_batch_operator
@@ -145,12 +141,25 @@ impl CheckpointOperator {
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+        let (start_l1_height, end_l1_height) = l1_range;
+        let (start_l2_height, end_l2_height) = l2_range;
+
+        let start_l1_block_id = self.l1_batch_operator.get_block_at(start_l1_height).await?;
+        let start_l1_commitment = L1BlockCommitment::new(start_l1_height, start_l1_block_id);
+
+        let end_l1_block_id = self.l1_batch_operator.get_block_at(end_l1_height).await?;
+        let end_l1_commitment = L1BlockCommitment::new(end_l1_height, end_l1_block_id);
+
+        let start_l2_block_id = self.get_l2id(start_l2_height).await?;
+        let start_l2_commitment = L2BlockCommitment::new(start_l2_height, start_l2_block_id);
+
+        let end_l2_block_id = self.get_l2id(end_l2_height).await?;
+        let end_l2_commitment = L2BlockCommitment::new(end_l2_height, end_l2_block_id);
+
         let checkpoint_info = RpcCheckpointInfo {
             idx: checkpoint_idx,
-            l1_range,
-            l2_range,
-            // TODO: likely unused and should be removed.
-            l2_blockid: Buf32::default().into(),
+            l1_range: (start_l1_commitment, end_l1_commitment),
+            l2_range: (start_l2_commitment, end_l2_commitment),
             commitment: None,
             confirmation_status: None,
         };
