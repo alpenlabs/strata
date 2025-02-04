@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 
-use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
@@ -73,15 +72,10 @@ impl SyncManager {
 
 /// Starts the sync tasks using provided settings.
 #[allow(clippy::too_many_arguments)]
-pub fn start_sync_tasks<
-    D: Database + Sync + Send + 'static,
-    E: ExecEngineCtl + Sync + Send + 'static,
->(
+pub fn start_sync_tasks<E: ExecEngineCtl + Sync + Send + 'static>(
     executor: &TaskExecutor,
-    database: Arc<D>,
     storage: &Arc<NodeStorage>,
     engine: Arc<E>,
-    _pool: threadpool::ThreadPool,
     params: Arc<Params>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<SyncManager> {
@@ -96,7 +90,6 @@ pub fn start_sync_tasks<
 
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
-    let fcm_database = database.clone();
     let fcm_storage = storage.clone();
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
@@ -108,7 +101,6 @@ pub fn start_sync_tasks<
         fork_choice_manager::tracker_task(
             shutdown,
             handle,
-            fcm_database,
             fcm_storage,
             fcm_engine,
             fcm_rx,

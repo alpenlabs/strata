@@ -331,10 +331,8 @@ fn start_core_tasks(
     // Start the sync manager.
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
-        database.clone(),
         &storage,
         engine.clone(),
-        pool.clone(),
         params.clone(),
         status_channel.clone(),
     )?
