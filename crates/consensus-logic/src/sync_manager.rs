@@ -81,14 +81,14 @@ pub fn start_sync_tasks<
     database: Arc<D>,
     storage: &Arc<NodeStorage>,
     engine: Arc<E>,
-    pool: threadpool::ThreadPool,
+    _pool: threadpool::ThreadPool,
     params: Arc<Params>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
     let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
-    let csm_controller = Arc::new(CsmController::new(database.clone(), pool, csm_tx));
+    let csm_controller = Arc::new(CsmController::new(storage.sync_event().clone(), csm_tx));
 
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
     // not be benefitting from the reduced cloning
