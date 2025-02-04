@@ -121,7 +121,6 @@ pub fn start_sync_tasks<
     // Prepare the client worker state and start the thread for that.
     let client_worker_state = worker::WorkerState::open(
         params.clone(),
-        database,
         storage.clone(),
         cupdate_tx,
         storage.checkpoint().clone(),

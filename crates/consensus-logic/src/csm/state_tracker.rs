@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 #[cfg(feature = "debug-utils")]
 use strata_common::bail_manager::{check_bail_trigger, BAIL_SYNC_EVENT};
-use strata_db::traits::*;
 use strata_primitives::params::Params;
 use strata_state::{
     client_state::{ClientState, ClientStateMut},
     operation::ClientUpdateOutput,
+    sync_event::SyncEvent,
 };
 use strata_storage::{ClientStateManager, NodeStorage};
 use tracing::*;
@@ -17,26 +17,23 @@ use tracing::*;
 use super::client_transition;
 use crate::errors::Error;
 
-pub struct StateTracker<D: Database> {
+pub struct StateTracker {
     params: Arc<Params>,
-    database: Arc<D>,
     storage: Arc<NodeStorage>,
 
     cur_state_idx: u64,
     cur_state: Arc<ClientState>,
 }
 
-impl<D: Database> StateTracker<D> {
+impl StateTracker {
     pub fn new(
         params: Arc<Params>,
-        database: Arc<D>,
         storage: Arc<NodeStorage>,
         cur_state_idx: u64,
         cur_state: Arc<ClientState>,
     ) -> Self {
         Self {
             params,
-            database,
             storage,
             cur_state_idx,
             cur_state,
@@ -49,6 +46,15 @@ impl<D: Database> StateTracker<D> {
 
     pub fn cur_state(&self) -> &Arc<ClientState> {
         &self.cur_state
+    }
+
+    /// Fetches a sync event from storage.
+    fn get_sync_event(&self, idx: u64) -> anyhow::Result<SyncEvent> {
+        Ok(self
+            .storage
+            .sync_event()
+            .get_sync_event_blocking(idx)?
+            .ok_or(Error::MissingSyncEvent(idx))?)
     }
 
     /// Given the next event index, computes the state application if the
@@ -64,11 +70,7 @@ impl<D: Database> StateTracker<D> {
         }
 
         // Load the event from the database.
-        let db = self.database.as_ref();
-        let sync_event_db = db.sync_event_db();
-        let ev = sync_event_db
-            .get_sync_event(ev_idx)?
-            .ok_or(Error::MissingSyncEvent(ev_idx))?;
+        let ev = self.get_sync_event(ev_idx)?;
 
         debug!(?ev, "processing sync event");
 

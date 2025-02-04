@@ -10,7 +10,9 @@ use strata_db::{
 };
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
-use strata_state::{client_state::ClientState, csm_status::CsmStatus, operation::SyncAction};
+use strata_state::{
+    client_state::ClientState, csm_status::CsmStatus, operation::SyncAction, sync_event::SyncEvent,
+};
 use strata_status::StatusChannel;
 use strata_storage::{CheckpointDbManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
@@ -32,16 +34,12 @@ use crate::{errors::Error, genesis};
 /// Unable to be shared across threads.  Any data we want to export we'll do
 /// through another handle.
 #[allow(unused)]
-pub struct WorkerState<D: Database> {
+pub struct WorkerState {
     /// Consensus parameters.
     params: Arc<Params>,
 
     /// CSM worker config, *not* params.
     config: CsmExecConfig,
-
-    /// Underlying database hierarchy that writes ultimately end up on.
-    // TODO should we move this out?
-    database: Arc<D>,
 
     /// Node storage handle.
     storage: Arc<NodeStorage>,
@@ -50,18 +48,17 @@ pub struct WorkerState<D: Database> {
     checkpoint_manager: Arc<CheckpointDbManager>,
 
     /// Tracker used to remember the current consensus state.
-    state_tracker: state_tracker::StateTracker<D>,
+    state_tracker: state_tracker::StateTracker,
 
     /// Broadcast channel used to publish state updates.
     cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
 }
 
-impl<D: Database> WorkerState<D> {
+impl WorkerState {
     /// Constructs a new instance by reconstructing the current consensus state
     /// from the provided database layer.
     pub fn open(
         params: Arc<Params>,
-        database: Arc<D>,
         storage: Arc<NodeStorage>,
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
         checkpoint_manager: Arc<CheckpointDbManager>,
@@ -70,7 +67,6 @@ impl<D: Database> WorkerState<D> {
             state_tracker::reconstruct_cur_state(storage.client_state())?;
         let state_tracker = state_tracker::StateTracker::new(
             params.clone(),
-            database.clone(),
             storage.clone(),
             cur_state_idx,
             Arc::new(cur_state),
@@ -87,7 +83,6 @@ impl<D: Database> WorkerState<D> {
         Ok(Self {
             params,
             config,
-            database,
             storage,
             state_tracker,
             cupdate_tx,
@@ -109,13 +104,24 @@ impl<D: Database> WorkerState<D> {
     pub fn checkpoint_db(&self) -> &CheckpointDbManager {
         self.checkpoint_manager.as_ref()
     }
+
+    fn get_sync_event(&self, idx: u64) -> anyhow::Result<Option<SyncEvent>> {
+        Ok(self.storage.sync_event().get_sync_event_blocking(idx)?)
+    }
+
+    /// Fetches a sync event from storage.
+    fn get_sync_event_ok(&self, idx: u64) -> anyhow::Result<SyncEvent> {
+        Ok(self
+            .get_sync_event(idx)?
+            .ok_or(Error::MissingSyncEvent(idx))?)
+    }
 }
 
 /// Receives messages from channel to update consensus state with.
 // TODO consolidate all these channels into container/"io" types
-pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
+pub fn client_worker_task<E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
-    mut state: WorkerState<D>,
+    mut state: WorkerState,
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
     status_channel: StatusChannel,
@@ -143,8 +149,8 @@ pub fn client_worker_task<D: Database, E: ExecEngineCtl>(
     Ok(())
 }
 
-fn process_msg<D: Database>(
-    state: &mut WorkerState<D>,
+fn process_msg(
+    state: &mut WorkerState,
     engine: &impl ExecEngineCtl,
     msg: &CsmMessage,
     status_channel: &StatusChannel,
@@ -170,17 +176,15 @@ fn process_msg<D: Database>(
 
 /// Repeatedly calls `handle_sync_event`, retrying on failure, up to a limit
 /// after which we return with the most recent error.
-fn handle_sync_event_with_retry<D: Database>(
-    state: &mut WorkerState<D>,
+fn handle_sync_event_with_retry(
+    state: &mut WorkerState,
     engine: &impl ExecEngineCtl,
     ev_idx: u64,
     status_channel: &StatusChannel,
     shutdown: &ShutdownGuard,
 ) -> anyhow::Result<()> {
-    // Fetch the sync event so that we can debug print it.
-    // FIXME make it so we don't have to fetch it again here
-    let sync_event_db = state.database.sync_event_db();
-    let Some(ev) = sync_event_db.get_sync_event(ev_idx)? else {
+    // Fetch the sync event we're looking at.
+    let Some(ev) = state.get_sync_event(ev_idx)? else {
         error!(%ev_idx, "tried to process missing sync event, aborting handle_sync_event!");
         return Ok(());
     };
@@ -223,8 +227,8 @@ fn handle_sync_event_with_retry<D: Database>(
     Ok(())
 }
 
-fn handle_sync_event<D: Database>(
-    state: &mut WorkerState<D>,
+fn handle_sync_event(
+    state: &mut WorkerState,
     engine: &impl ExecEngineCtl,
     ev_idx: u64,
     status_channel: &StatusChannel,
@@ -256,9 +260,9 @@ fn handle_sync_event<D: Database>(
     Ok(())
 }
 
-fn apply_action<D: Database>(
+fn apply_action(
     action: SyncAction,
-    state: &mut WorkerState<D>,
+    state: &mut WorkerState,
     engine: &impl ExecEngineCtl,
     status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
