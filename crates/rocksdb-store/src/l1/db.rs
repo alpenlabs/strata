@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rockbound::{
     rocksdb::ReadOptions, schema::KeyEncoder, OptimisticTransactionDB, SchemaBatch,
-    SchemaDBOperations, SchemaDBOperationsExt,
+    SchemaDBOperationsExt,
 };
 use strata_db::{errors::DbError, traits::*, DbResult};
 use strata_mmr::CompactMmr;
@@ -179,39 +179,6 @@ impl L1Database for L1Db {
 
     fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>> {
         Ok(self.db.get::<L1BlockSchema>(&idx)?)
-    }
-
-    fn get_txs_from(&self, start_idx: u64) -> DbResult<(Vec<L1Tx>, u64)> {
-        let start_key = KeyEncoder::<L1BlockSchema>::encode_key(&start_idx)
-            .map_err(|err| DbError::CodecError(err.to_string()))?;
-
-        // Get a snapshot so that we only get the data present in the db at this point in time.
-        // This prevents a possible case when this operation does not yield a result as entries keep
-        // on getting added.
-        let snapshot = self.db.db().snapshot();
-
-        let mut options = ReadOptions::default();
-        options.set_snapshot(&snapshot);
-        options.set_iterate_lower_bound(start_key);
-
-        let mut l1_txs = vec![];
-        let res = self.db.iter_with_opts::<L1BlockSchema>(options)?;
-
-        let mut latest_index = start_idx;
-        for entry in res {
-            let entry = entry?;
-            latest_index = entry.key;
-
-            let block_hash = entry.into_tuple().1.block_hash();
-
-            let l1_tx = self.db.get::<TxnSchema>(&block_hash)?;
-
-            if let Some(l1_tx_list) = l1_tx {
-                l1_txs.extend(l1_tx_list.into_iter());
-            }
-        }
-
-        Ok((l1_txs, latest_index))
     }
 }
 

@@ -16,10 +16,7 @@ use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
 use strata_common::bail_manager::BAIL_SENDER;
 use strata_consensus_logic::{l1_handler::verify_proof, sync_manager::SyncManager};
-use strata_db::{
-    traits::*,
-    types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus},
-};
+use strata_db::types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus};
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
@@ -64,20 +61,18 @@ use zkaleido::ProofReceipt;
 
 use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
-pub struct StrataRpcImpl<D> {
+pub struct StrataRpcImpl {
     status_channel: StatusChannel,
-    database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
 }
 
-impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
+impl StrataRpcImpl {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         status_channel: StatusChannel,
-        database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         storage: Arc<NodeStorage>,
         checkpoint_handle: Arc<CheckpointHandle>,
@@ -85,7 +80,6 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
     ) -> Self {
         Self {
             status_channel,
-            database,
             sync_manager,
             storage,
             checkpoint_handle,
@@ -160,7 +154,7 @@ fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> RpcBlockHeader {
 }
 
 #[async_trait]
-impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
+impl StrataApiServer for StrataRpcImpl {
     async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>> {
         let l2_blocks = self
             .storage
@@ -477,11 +471,10 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // call takes a lot of time (for example, when there are hundreds of thousands of
         // deposits/withdrawals).
 
-        let l1_db = self.database.l1_db();
         let network = self.sync_manager.params().rollup().network;
 
         let (deposit_duties, latest_index) =
-            extract_deposit_requests(l1_db, start_index, network).await?;
+            extract_deposit_requests(self.storage.l1().as_ref(), start_index, network).await?;
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
@@ -595,23 +588,23 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
     // FIXME: possibly create a separate rpc type corresponding to SyncEvent
     async fn get_sync_event(&self, idx: u64) -> RpcResult<Option<SyncEvent>> {
-        let db = self.database.clone();
-
-        let ev: Option<SyncEvent> = wait_blocking("fetch_sync_event", move || {
-            Ok(db.sync_event_db().get_sync_event(idx)?)
-        })
-        .await?;
+        let ev: Option<SyncEvent> = self
+            .storage
+            .sync_event()
+            .get_sync_event_async(idx)
+            .await
+            .map_err(Error::Db)?;
 
         Ok(ev)
     }
 
     async fn get_last_sync_event_idx(&self) -> RpcResult<u64> {
-        let db = self.database.clone();
-
-        let last = wait_blocking("fetch_last_sync_event_idx", move || {
-            Ok(db.sync_event_db().get_last_idx()?)
-        })
-        .await?;
+        let last = self
+            .storage
+            .sync_event()
+            .get_last_idx_async()
+            .await
+            .map_err(Error::Db)?;
 
         // FIXME returning MAX if we haven't produced one yet, should figure
         // something else out
@@ -626,22 +619,6 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
             .get_update_async(idx)
             .map_err(Error::Db)
             .await?)
-    }
-}
-
-/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
-/// external task and merges the errors into the standard RPC error type.
-async fn wait_blocking<F, R>(name: &'static str, f: F) -> Result<R, Error>
-where
-    F: Fn() -> Result<R, Error> + Sync + Send + 'static,
-    R: Sync + Send + 'static,
-{
-    match tokio::task::spawn_blocking(f).await {
-        Ok(v) => v,
-        Err(_) => {
-            error!(%name, "background task aborted for unknown reason");
-            Err(Error::BlockingAbort(name.to_owned()))
-        }
     }
 }
 
@@ -860,19 +837,18 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 }
 
-pub struct StrataDebugRpcImpl<D> {
+pub struct StrataDebugRpcImpl {
     storage: Arc<NodeStorage>,
-    _database: Arc<D>,
 }
 
-impl<D: Database + Sync + Send + 'static> StrataDebugRpcImpl<D> {
-    pub fn new(storage: Arc<NodeStorage>, _database: Arc<D>) -> Self {
-        Self { storage, _database }
+impl StrataDebugRpcImpl {
+    pub fn new(storage: Arc<NodeStorage>) -> Self {
+        Self { storage }
     }
 }
 
 #[async_trait]
-impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRpcImpl<D> {
+impl StrataDebugApiServer for StrataDebugRpcImpl {
     async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>> {
         let l2_block = self
             .storage

@@ -124,12 +124,4 @@ impl L1BlockManager {
         // TODO: Might need to use a cache here, but let's keep it for when we use it
         self.ops.get_tx_async(tx_ref).await
     }
-
-    pub fn get_txs_from(&self, start_idx: u64) -> DbResult<(Vec<L1Tx>, u64)> {
-        self.ops.get_txs_from_blocking(start_idx)
-    }
-
-    pub async fn get_txs_from_async(&self, start_idx: u64) -> DbResult<(Vec<L1Tx>, u64)> {
-        self.ops.get_txs_from_async(start_idx).await
-    }
 }
