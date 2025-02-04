@@ -63,13 +63,17 @@ impl WorkerState {
         cupdate_tx: broadcast::Sender<Arc<ClientUpdateNotif>>,
         checkpoint_manager: Arc<CheckpointDbManager>,
     ) -> anyhow::Result<Self> {
-        let (cur_state_idx, cur_state) =
-            state_tracker::reconstruct_cur_state(storage.client_state())?;
+        let csman = storage.client_state();
+
+        let (cur_state_idx, cur_state) = csman
+            .get_most_recent_state_blocking()
+            .ok_or(Error::MissingClientState(0))?;
+
         let state_tracker = state_tracker::StateTracker::new(
             params.clone(),
             storage.clone(),
             cur_state_idx,
-            Arc::new(cur_state),
+            cur_state,
         );
 
         // TODO make configurable

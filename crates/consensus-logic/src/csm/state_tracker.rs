@@ -11,7 +11,7 @@ use strata_state::{
     operation::ClientUpdateOutput,
     sync_event::SyncEvent,
 };
-use strata_storage::{ClientStateManager, NodeStorage};
+use strata_storage::NodeStorage;
 use tracing::*;
 
 use super::client_transition;
@@ -98,56 +98,4 @@ impl StateTracker {
 
         Ok((outp, self.cur_state.clone()))
     }
-
-    /// Does nothing.
-    // TODO remove this function
-    pub fn store_checkpoint(&self) -> anyhow::Result<()> {
-        warn!("tried to store client state checkpoint, we don't have this anymore");
-        Ok(())
-    }
-}
-
-/// Reconstructs the [`ClientState`].
-///
-/// It does so by fetching the last available checkpoint
-/// and replaying all relevant
-/// [`ClientStateWrite`](strata_state::operation::ClientStateWrite)
-/// from that checkpoint up to the specified index `idx`,
-/// ensuring an accurate and up-to-date state.
-///
-/// # Parameters
-///
-/// - `cs_db`: An implementation of the [`ClientStateDatabase`] trait, used for retrieving
-///   checkpoint and state data.
-/// - `idx`: The index from which to replay state writes, starting from the last checkpoint.
-pub fn reconstruct_cur_state(csman: &ClientStateManager) -> anyhow::Result<(u64, ClientState)> {
-    let last_state_idx = csman.get_last_state_idx_blocking()?;
-
-    // We used to do something here, but now we just print a log.
-    if last_state_idx == 0 {
-        debug!("starting from init state");
-    }
-
-    let state = csman
-        .get_state_blocking(last_state_idx)?
-        .ok_or(Error::MissingConsensusWrites(last_state_idx))?;
-    Ok((last_state_idx, state))
-}
-
-/// Fetches the client state at some idx from the database.
-// TODO remove this
-pub fn reconstruct_state(csman: &ClientStateManager, idx: u64) -> anyhow::Result<ClientState> {
-    match csman.get_state_blocking(idx)? {
-        Some(cl) => Ok(cl),
-        None => {
-            error!("we don't support state reconstruction anymore");
-            Err(Error::MissingConsensusWrites(idx).into())
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    // We don't do state reconstruction anymore, although maybe we should add
-    // some more tests *around* this.
 }
