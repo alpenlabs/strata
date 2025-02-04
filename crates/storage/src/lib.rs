@@ -5,13 +5,14 @@ pub mod ops;
 
 use std::sync::Arc;
 
+use anyhow::Context;
 pub use managers::{
     chainstate::ChainstateManager, checkpoint::CheckpointDbManager,
     client_state::ClientStateManager, l1::L1BlockManager, l2::L2BlockManager,
     sync_event::SyncEventManager,
 };
 pub use ops::l1tx_broadcast::BroadcastDbOps;
-use strata_db::{traits::Database, DbResult};
+use strata_db::traits::Database;
 
 /// A consolidation of database managers.
 // TODO move this to its own module
@@ -56,7 +57,10 @@ impl NodeStorage {
 
 /// Given a raw database, creates storage managers and returns a [`NodeStorage`]
 /// instance around the underlying raw database.
-pub fn create_node_storage<D>(db: Arc<D>, pool: threadpool::ThreadPool) -> DbResult<NodeStorage>
+pub fn create_node_storage<D>(
+    db: Arc<D>,
+    pool: threadpool::ThreadPool,
+) -> anyhow::Result<NodeStorage>
 where
     D: Database + Sync + Send + 'static,
 {
@@ -68,7 +72,8 @@ where
         pool.clone(),
         db.sync_event_db().clone(),
     ));
-    let client_state_manager = Arc::new(ClientStateManager::new(pool.clone(), db.clone())?);
+    let client_state_manager =
+        Arc::new(ClientStateManager::new(pool.clone(), db.clone()).context("open client state")?);
 
     // (see above)
     let checkpoint_manager = Arc::new(CheckpointDbManager::new(pool.clone(), db.clone()));

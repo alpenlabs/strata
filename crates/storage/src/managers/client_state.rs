@@ -7,6 +7,7 @@ use strata_db::{traits::Database, DbError, DbResult};
 use strata_state::{client_state::ClientState, operation::ClientUpdateOutput};
 use threadpool::ThreadPool;
 use tokio::sync::Mutex;
+use tracing::*;
 
 use crate::{cache, ops};
 
@@ -31,12 +32,19 @@ impl ClientStateManager {
 
         // Figure out the current state so we can access it.
         let mut cur_state = CurStateTracker::new_empty();
-        let last_idx = ops.get_last_state_idx_blocking()?;
-        let last_state = ops
-            .get_client_update_blocking(last_idx)?
-            .ok_or(DbError::UnknownIdx(last_idx))?
-            .into_state();
-        cur_state.set(last_idx, Arc::new(last_state));
+        match ops.get_last_state_idx_blocking() {
+            Ok(last_idx) => {
+                let last_state = ops
+                    .get_client_update_blocking(last_idx)?
+                    .ok_or(DbError::UnknownIdx(last_idx))?
+                    .into_state();
+                cur_state.set(last_idx, Arc::new(last_state));
+            }
+            Err(DbError::NotBootstrapped) => {
+                warn!("haven't bootstrapped yet, unable to prepopulate the cur state cache");
+            }
+            Err(e) => return Err(e.into()),
+        }
 
         Ok(Self {
             ops,

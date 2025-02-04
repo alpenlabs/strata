@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Context;
 use rockbound::{OptimisticTransactionDB, Schema, SchemaDBOperationsExt};
 use strata_db::{errors::*, traits::*, DbResult};
 use strata_state::operation::*;
@@ -41,11 +42,16 @@ impl ClientStateDatabase for ClientStateDb {
     fn put_client_update(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
         let expected_idx = match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(last_idx) => last_idx + 1,
-            None => 1,
+
+            // We don't have a separate way to insert the init client state, so
+            // we special case this here.
+            None => 0,
         };
+
         if idx != expected_idx {
             return Err(DbError::OooInsert("consensus_store", idx));
         }
+
         self.db.put::<ClientUpdateOutputSchema>(&idx, &output)?;
         Ok(())
     }
