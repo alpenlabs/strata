@@ -65,7 +65,7 @@ impl ClStfOperator {
                 ProvingTaskError::InvalidWitness(format!("L2 Block {} not found", blkid))
             })?;
 
-        Ok(header)
+        Ok(header.header)
     }
 
     /// Retrieves the evm_ee block hash corresponding to the given L2 block ID
@@ -106,6 +106,7 @@ impl ClStfOperator {
                 error!(%blkid, "L2 Block not found");
                 ProvingTaskError::InvalidWitness(format!("L2 Block {} not found", blkid))
             })?
+            .header
             .prev_block
             .into();
 

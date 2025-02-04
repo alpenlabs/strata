@@ -6,7 +6,10 @@
 
 use bitcoin::{hashes::Hash, Network, Txid, Wtxid};
 use serde::{Deserialize, Serialize};
-use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry};
+use strata_db::{
+    traits::BlockStatus,
+    types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry},
+};
 use strata_primitives::{
     bridge::OperatorIdx,
     l1::{BitcoinAmount, L1TxRef, OutputRef},
@@ -173,6 +176,39 @@ pub struct RpcBlockHeader {
     /// The root hash of the state tree
     #[serde(with = "hex::serde")]
     pub state_root: [u8; 32],
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum RpcBlockStatus {
+    #[serde(rename = "unchecked")]
+    Uncheked,
+    #[serde(rename = "valid")]
+    Valid,
+    #[serde(rename = "invalid")]
+    Invalid,
+}
+
+impl From<BlockStatus> for RpcBlockStatus {
+    fn from(value: BlockStatus) -> Self {
+        match value {
+            BlockStatus::Unchecked => RpcBlockStatus::Invalid,
+            BlockStatus::Valid => RpcBlockStatus::Valid,
+            BlockStatus::Invalid => RpcBlockStatus::Invalid,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RpcBlockHeaderWithStatus {
+    #[serde(flatten)]
+    pub header: RpcBlockHeader,
+    pub status: RpcBlockStatus,
+}
+
+impl From<RpcBlockHeaderWithStatus> for RpcBlockHeader {
+    fn from(value: RpcBlockHeaderWithStatus) -> Self {
+        value.header
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
