@@ -325,7 +325,10 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
         self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {
                 head_block_hash: Some(block_hash),
-                ..Default::default()
+                // NOTE: reth accepts safe and finalized block hashes to be zero
+                // and does not update the existing values
+                safe_block_hash: Some(B256::ZERO),
+                finalized_block_hash: Some(B256::ZERO),
             };
             self.inner
                 .update_block_state(fork_choice_state)

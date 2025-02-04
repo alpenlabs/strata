@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, BlockHash};
+use el_sync::sync_chainstate_to_el;
 use jsonrpsee::Methods;
 use parking_lot::lock_api::RwLock;
 use rpc_client::sync_client;
@@ -45,6 +46,7 @@ use tracing::*;
 use crate::{args::Args, helpers::*};
 
 mod args;
+mod el_sync;
 mod errors;
 mod extractor;
 mod helpers;
@@ -284,8 +286,8 @@ fn do_startup_checks(
         }
         Ok(false) => {
             // Current chain tip tip block is not known by the EL.
-            // TODO: Try to sync EL using existing block payloads from DB.
-            anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
+            warn!("missing expected evm block, block_id = {}", chain_tip);
+            sync_chainstate_to_el(storage, engine)?;
         }
         Err(error) => {
             // Likely network issue
