@@ -384,18 +384,27 @@ impl ClientStateMut {
         self.state.l1_view_mut().header_verification_state = Some(l1_vs);
     }
 
+    /// Rolls back blocks and stuff to a particular height.
+    ///
+    /// # Panics
+    ///
+    /// If the new height is below the buried height.
     pub fn rollback_l1_blocks(&mut self, height: u64) {
         let l1v = self.state.l1_view_mut();
         let buried_height = l1v.buried_l1_height();
 
         if height < buried_height {
             error!(%height, %buried_height, "unable to roll back past buried height");
-            panic!("operation: emitted invalid write");
+            panic!("clientstate: rollback below buried height");
         }
 
         let new_unacc_len = (height - buried_height) as usize;
         let l1_vs = l1v.tip_verification_state();
         if let Some(l1_vs) = l1_vs {
+            if height > l1_vs.last_verified_block_num as u64 {
+                panic!("clientstate: attempted rollback above current tip");
+            }
+
             // TODO: handle other things
             let mut rollbacked_l1_vs = l1_vs.clone();
             rollbacked_l1_vs.last_verified_block_num = height as u32;
@@ -426,6 +435,7 @@ impl ClientStateMut {
         ss.tip_height = height;
     }
 
+    /// Updates the buried L1 block.
     pub fn update_buried(&mut self, new_idx: u64) {
         let l1v = self.state.l1_view_mut();
 
@@ -433,12 +443,12 @@ impl ClientStateMut {
         let old_idx = l1v.buried_l1_height();
 
         if new_idx < old_idx {
-            panic!("operation: emitted non-greater buried height");
+            panic!("clientstate: emitted non-greater buried height");
         }
 
         // Check that it's not higher than what we know about.
         if new_idx > l1v.tip_height() {
-            panic!("operation: new buried height above known L1 tip");
+            panic!("clientstate: new buried height above known L1 tip");
         }
 
         // If everything checks out we can just remove them.
@@ -452,6 +462,8 @@ impl ClientStateMut {
         // we haven't already
     }
 
+    /// Does validation logic to accept a list of checkpoints.
+    // TODO This should probably be removed.
     pub fn accept_checkpoints(&mut self, ckpts: &[L1Checkpoint]) {
         // Extend the pending checkpoints
         self.state
@@ -460,6 +472,8 @@ impl ClientStateMut {
             .extend(ckpts.iter().cloned());
     }
 
+    /// Finalizes checkpoints based on L1 height.
+    // TODO This should probably be broken out to happen fallibly as part of the client transition
     pub fn finalize_checkpoint(&mut self, l1height: u64) {
         let l1v = self.state.l1_view_mut();
 
@@ -484,7 +498,7 @@ impl ClientStateMut {
                 .as_ref()
                 .is_some_and(|prev_ckpt| ckpt.batch_info.idx() != prev_ckpt.batch_info.idx() + 1)
             {
-                panic!("operation: mismatched indices of pending checkpoint");
+                panic!("clientstate: mismatched indices of pending checkpoint");
             }
 
             let fin_blockid = *ckpt.batch_info.l2_blockid();
