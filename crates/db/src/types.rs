@@ -264,6 +264,7 @@ pub enum CheckpointConfStatus {
     Finalized,
 }
 
+// TODO: why is this needed? can this information be part of `L1Checkpoint`?
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CheckpointCommitment {
     pub blockhash: Buf32,

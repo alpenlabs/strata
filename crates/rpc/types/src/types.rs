@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
-    l1::{BitcoinAmount, L1TxRef, OutputRef},
+    l1::{BitcoinAmount, L1BlockCommitment, L1TxRef, OutputRef},
+    l2::L2BlockCommitment,
     prelude::L1Status,
 };
 use strata_state::{
@@ -292,15 +293,10 @@ impl From<CheckpointEntry> for RpcCheckpointConfStatus {
 pub struct RpcCheckpointInfo {
     /// The index of the checkpoint
     pub idx: u64,
-    /// L1 height  the checkpoint covers
-    /// TODO: use std::ops::Range
-    pub l1_range: (u64, u64),
-    /// L2 height the checkpoint covers
-    /// TODO: use std::ops::Range
-    pub l2_range: (u64, u64),
-    /// L2 block that this checkpoint covers
-    /// TODO: likely unused and should be removed.
-    pub l2_blockid: L2BlockId,
+    /// L1 range  the checkpoint covers
+    pub l1_range: (L1BlockCommitment, L1BlockCommitment),
+    /// L2 range the checkpoint covers
+    pub l2_range: (L2BlockCommitment, L2BlockCommitment),
     /// Info on txn where checkpoint is committed on chain
     pub commitment: Option<RpcCheckpointCommitmentInfo>,
     /// Confirmation status of checkpoint
@@ -313,7 +309,6 @@ impl From<BatchInfo> for RpcCheckpointInfo {
             idx: value.epoch,
             l1_range: value.l1_range,
             l2_range: value.l2_range,
-            l2_blockid: value.l2_blockid,
             commitment: None,
             confirmation_status: None,
         }

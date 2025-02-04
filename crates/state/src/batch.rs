@@ -2,7 +2,11 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_crypto::verify_schnorr_sig;
-use strata_primitives::buf::{Buf32, Buf64};
+use strata_primitives::{
+    buf::{Buf32, Buf64},
+    l1::L1BlockCommitment,
+    l2::L2BlockCommitment,
+};
 use zkaleido::{Proof, ProofReceipt, PublicValues};
 
 use crate::id::L2BlockId;
@@ -134,10 +138,10 @@ pub struct BatchInfo {
     pub epoch: u64,
 
     /// L1 height range(inclusive) the checkpoint covers
-    pub l1_range: (u64, u64),
+    pub l1_range: (L1BlockCommitment, L1BlockCommitment),
 
     /// L2 height range(inclusive) the checkpoint covers
-    pub l2_range: (u64, u64),
+    pub l2_range: (L2BlockCommitment, L2BlockCommitment),
 
     /// The last L2 block upto which this checkpoint covers since the previous checkpoint
     pub l2_blockid: L2BlockId,
@@ -199,8 +203,8 @@ impl BatchTransition {
 impl BatchInfo {
     pub fn new(
         checkpoint_idx: u64,
-        l1_range: (u64, u64),
-        l2_range: (u64, u64),
+        l1_range: (L1BlockCommitment, L1BlockCommitment),
+        l2_range: (L2BlockCommitment, L2BlockCommitment),
         l2_blockid: L2BlockId,
     ) -> Self {
         Self {
@@ -220,9 +224,18 @@ impl BatchInfo {
     }
 
     /// check for whether the l2 block is covered by the checkpoint
-    pub fn includes_l2_block(&self, block_height: u64) -> bool {
-        let (_, last_l2_height) = self.l2_range;
-        if block_height <= last_l2_height {
+    pub fn includes_l2_block(&self, l2_block_height: u64) -> bool {
+        let (_, last_l2_commitment) = self.l2_range;
+        if l2_block_height <= last_l2_commitment.slot() {
+            return true;
+        }
+        false
+    }
+
+    /// check for whether the l1 block is covered by the checkpoint
+    pub fn includes_l1_block(&self, l1_block_height: u64) -> bool {
+        let (_, last_l1_commitment) = self.l1_range;
+        if l1_block_height <= last_l1_commitment.height() {
             return true;
         }
         false
