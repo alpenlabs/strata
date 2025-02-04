@@ -22,7 +22,7 @@ use strata_state::{
     tx::ProtocolOperation,
 };
 use strata_storage::L1BlockManager;
-use tracing::{debug, error};
+use tracing::*;
 
 /// The `vout` corresponding to the deposit related Taproot address on the Deposit Request
 /// Transaction.
@@ -147,11 +147,16 @@ async fn get_txs_from_height(l1man: &L1BlockManager, height: u64) -> RpcResult<(
     let mut txs = Vec::new();
     if height <= tip {
         for h in height..=tip {
-            let h_tx_refs = l1man
+            // We don't actually care if we don't have txs at a particular
+            // height, we can continue unconditionally.
+            let Some(h_tx_refs) = l1man
                 .get_block_txs_async(h)
                 .await
                 .map_err(RpcServerError::Db)?
-                .ok_or(RpcServerError::MissingL1BlockManifest(h))?;
+            else {
+                warn!(%height, "missing tx entries for block, continuing");
+                continue;
+            };
 
             for txr in h_tx_refs {
                 let tx = l1man
