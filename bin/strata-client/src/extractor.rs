@@ -30,7 +30,8 @@ use tracing::{debug, error};
 /// This is always going to be the first [`OutPoint`].
 pub const DEPOSIT_REQUEST_VOUT: u32 = 0;
 
-/// Extract the deposit duties from the [`L1Database`] starting from a given block height.
+/// Extract the deposit duties from the L1 database starting from a given block
+/// height.
 ///
 /// This duty will be the same for every operator (for now). So, an
 /// [`OperatorIdx`](strata_primitives::bridge::OperatorIdx) need not be passed as a
