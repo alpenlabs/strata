@@ -5,10 +5,7 @@ use std::{collections::HashSet, time};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use strata_state::{
-    batch::{BatchInfo, BatchTransition, BootstrapState},
-    id::L2BlockId,
-};
+use strata_state::{batch::BatchCheckpoint, id::L2BlockId};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -44,7 +41,7 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.idx()),
+            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.0.batch_info().epoch()),
         }
     }
 
@@ -52,7 +49,7 @@ impl Duty {
     pub fn id(&self) -> Buf32 {
         match self {
             // We want Batch commitment duty to be unique by the checkpoint idx
-            Self::CommitBatch(duty) => compute_borsh_hash(&duty.idx()),
+            Self::CommitBatch(duty) => compute_borsh_hash(&duty.0.batch_info().epoch()),
             _ => compute_borsh_hash(self),
         }
     }
@@ -99,45 +96,22 @@ impl BlockSigningDuty {
 /// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
 /// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
-pub struct BatchCheckpointDuty {
-    /// Checkpoint/batch info
-    batch_info: BatchInfo,
-
-    /// Checkpoint/batch transition which needs to be proven
-    batch_transition: BatchTransition,
-
-    /// Bootstrapping state based on which the `batch_transition` will be verified
-    bootstrap_state: BootstrapState,
-}
+pub struct BatchCheckpointDuty(BatchCheckpoint);
 
 impl BatchCheckpointDuty {
-    pub fn new(
-        batch_info: BatchInfo,
-        batch_transition: BatchTransition,
-        bootstrap_state: BootstrapState,
-    ) -> Self {
-        Self {
-            batch_info,
-            batch_transition,
-            bootstrap_state,
-        }
+    /// Creates a new `BatchCheckpointDuty` from a `BatchCheckpoint`.
+    pub fn new(batch_checkpoint: BatchCheckpoint) -> Self {
+        Self(batch_checkpoint)
     }
 
-    /// Gen checkpoint index.
-    pub fn idx(&self) -> u64 {
-        self.batch_info.epoch()
+    /// Consumes `self`, returning the inner `BatchCheckpoint`.
+    pub fn into_inner(self) -> BatchCheckpoint {
+        self.0
     }
 
-    pub fn batch_info(&self) -> &BatchInfo {
-        &self.batch_info
-    }
-
-    pub fn batch_transition(&self) -> &BatchTransition {
-        &self.batch_transition
-    }
-
-    pub fn bootstrap_state(&self) -> &BootstrapState {
-        &self.bootstrap_state
+    /// Returns a reference to the inner `BatchCheckpoint`.
+    pub fn inner(&self) -> &BatchCheckpoint {
+        &self.0
     }
 }
 
