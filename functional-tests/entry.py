@@ -17,7 +17,7 @@ from factory import factory
 from utils import *
 from utils.constants import *
 from load.cfg import RethLoadConfigBuilder
-from load.jobs import EthJob
+from load.reth import EthJob, EthTransactions
 
 TEST_DIR: str = "tests"
 
@@ -32,7 +32,7 @@ def disabled_tests() -> list[str]:
     Helper to disable some tests.
     Useful during debugging or when the test becomes flaky.
     """
-    return frozenset(["basic_load"])
+    return frozenset([""])
 
 def filter_tests(parsed_args, modules):
     """
@@ -103,7 +103,7 @@ def main(argv):
     }
 
     reth_load_env = testenv.LoadEnvConfig()
-    reth_load_env.with_load_builder(RethLoadConfigBuilder().with_jobs([EthJob]).with_rate(15))
+    reth_load_env.with_load_builder(RethLoadConfigBuilder().with_jobs([EthTransactions, EthJob]).with_rate(30))
 
     global_envs = {
         # Basic env is the default env for all tests.
