@@ -110,9 +110,11 @@ pub fn init_forkchoice_manager(
 ) -> anyhow::Result<ForkChoiceManager> {
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
-    let sync_state = init_csm_state.sync().expect("csm state should be init");
-    let chain_tip_height = sync_state.chain_tip_height();
 
+    // TODO: get finalized block id without depending on client state
+    // or ensure client state and chain state are in-sync during startup
+    let sync_state = init_csm_state.sync().expect("csm state should be init");
+    let chain_tip_height = storage.chainstate().get_last_write_idx_blocking()?;
     let finalized_blockid = *sync_state.finalized_blkid();
     let finalized_block = storage
         .l2()

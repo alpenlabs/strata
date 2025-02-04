@@ -5,6 +5,7 @@ use tokio::sync::watch;
 pub static BAIL_DUTY_SIGN_BLOCK: &str = "duty_sign_block";
 pub static BAIL_ADVANCE_CONSENSUS_STATE: &str = "advance_consensus_state";
 pub static BAIL_SYNC_EVENT: &str = "sync_event";
+pub static BAIL_SYNC_EVENT_NEW_TIP: &str = "sync_event_new_tip";
 
 struct BailWatch {
     sender: watch::Sender<Option<String>>,
