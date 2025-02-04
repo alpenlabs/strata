@@ -208,7 +208,7 @@ pub(super) fn extract_withdrawal_infos(
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Not;
+    use std::{ops::Not, sync::Arc};
 
     use bitcoin::{
         absolute::LockTime,
@@ -244,6 +244,7 @@ mod tests {
         tx::DepositRequestInfo,
     };
     use strata_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
+    use threadpool::ThreadPool;
 
     use super::*;
 
@@ -270,10 +271,11 @@ mod tests {
         )
         .await;
 
-        let (deposit_infos, latest_idx) =
-            extract_deposit_requests(&l1_db.clone(), 0, Network::Regtest)
-                .await
-                .expect("should be able to extract deposit requests");
+        let l1man = L1BlockManager::new(ThreadPool::new(1), l1_db);
+
+        let (deposit_infos, latest_idx) = extract_deposit_requests(&l1man, 0, Network::Regtest)
+            .await
+            .expect("should be able to extract deposit requests");
 
         assert_eq!(
             latest_idx,
