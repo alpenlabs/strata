@@ -193,7 +193,7 @@ where
                 warn!(?block_id, "Signed block is not valid");
                 SignBlockFollupResult::Failed
             }
-            RpcBlockStatus::Uncheked => {
+            RpcBlockStatus::Unchecked => {
                 info!(?block_id, "Signed block not yet processed");
                 SignBlockFollupResult::Retry
             }

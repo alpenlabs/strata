@@ -181,7 +181,7 @@ pub struct RpcBlockHeader {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum RpcBlockStatus {
     #[serde(rename = "unchecked")]
-    Uncheked,
+    Unchecked,
     #[serde(rename = "valid")]
     Valid,
     #[serde(rename = "invalid")]
@@ -191,7 +191,7 @@ pub enum RpcBlockStatus {
 impl From<BlockStatus> for RpcBlockStatus {
     fn from(value: BlockStatus) -> Self {
         match value {
-            BlockStatus::Unchecked => RpcBlockStatus::Invalid,
+            BlockStatus::Unchecked => RpcBlockStatus::Unchecked,
             BlockStatus::Valid => RpcBlockStatus::Valid,
             BlockStatus::Invalid => RpcBlockStatus::Invalid,
         }
