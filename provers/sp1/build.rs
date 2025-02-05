@@ -1,6 +1,8 @@
 use std::{
     collections::{HashMap, HashSet},
-    env, fs,
+    env,
+    fs::{self, File},
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -108,6 +110,19 @@ pub const {0}_VK_HASH_STR: &str = "{3}";
             e
         )
     });
+
+    // Build the output string from the hashmap
+    let mut output = String::new();
+    for (key, (array, text)) in &results {
+        output.push_str(&format!("Key: {}\n", key));
+        output.push_str(&format!("Array: {:?}\n", array));
+        output.push_str(&format!("Text: {}\n\n", text));
+    }
+
+    // Write the output string to a text file named "output.txt"
+    let mut file = File::create("output.txt").expect("Unable to create file");
+    file.write_all(output.as_bytes())
+        .expect("Unable to write data");
 }
 
 /// Recursively builds the given program along with its dependencies.
