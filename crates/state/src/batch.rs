@@ -222,12 +222,14 @@ impl BatchTransition {
         }
     }
 
-    /// Creates a [`CheckpointBaseState`] by taking the initial state of the [`BatchTransition`]
+    /// Creates a [`CheckpointBaseStateCommitment`] by taking the initial state of the
+    /// [`BatchTransition`]
     pub fn get_initial_checkpoint_base_state(&self) -> CheckpointBaseStateCommitment {
         CheckpointBaseStateCommitment::new(self.l1_transition.0, self.l2_transition.0)
     }
 
-    /// Creates a [`CheckpointBaseState`] by taking the final state of the [`BatchTransition`]
+    /// Creates a [`CheckpointBaseStateCommitment`] by taking the final state of the
+    /// [`BatchTransition`]
     pub fn get_final_checkpoint_base_state(&self) -> CheckpointBaseStateCommitment {
         CheckpointBaseStateCommitment::new(self.l1_transition.1, self.l2_transition.1)
     }

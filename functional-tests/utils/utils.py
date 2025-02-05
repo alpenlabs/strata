@@ -172,14 +172,14 @@ def check_nth_checkpoint_finalized(
         timeout=3,
     )
 
-    assert syncstat["finalized_block_id"] != batch_info["l2_blockid"], (
+    assert syncstat["finalized_block_id"] != batch_info["l2_range"][1]["blkid"], (
         "Checkpoint block should not yet finalize"
     )
     assert batch_info["idx"] == idx
     checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
     assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
 
-    to_finalize_blkid = batch_info["l2_blockid"]
+    to_finalize_blkid = batch_info["l2_range"][1]["blkid"]
 
     # Submit checkpoint if proof_timeout is not set
     if proof_timeout is None:

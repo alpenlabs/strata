@@ -122,7 +122,7 @@ def check_nth_checkpoint_finalized_on_reorg(
     btcrpc.proxy.generatetoaddress(finality_depth + 1, new_addr)
 
     batch_info = seqrpc.strata_getCheckpointInfo(checkpt_idx)
-    to_finalize_blkid = batch_info["l2_blockid"]
+    to_finalize_blkid = batch_info["l2_range"][1]["blkid"]
 
     # Check finalized
     wait_until(
