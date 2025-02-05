@@ -1,18 +1,30 @@
 use std::{collections::HashSet, sync::Arc};
 
-use strata_primitives::buf::Buf32;
 use strata_rpc_api::StrataSequencerApiClient;
 use strata_rpc_types::HexBytes64;
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig},
-    duty::types::{BatchCheckpointDuty, BlockSigningDuty, Duty, IdentityData},
+    duty::types::{BatchCheckpointDuty, BlockSigningDuty, Duty, DutyId, IdentityData},
     utils::now_millis,
 };
 use thiserror::Error;
-use tokio::{runtime::Handle, select, sync::mpsc};
+use tokio::{
+    runtime::Handle,
+    select,
+    sync::mpsc,
+    time::{Duration, Instant},
+};
 use tracing::{debug, error};
 
-use crate::helpers::{sign_checkpoint, sign_header};
+use crate::{
+    followup_tasks::FollowupTask,
+    helpers::{sign_checkpoint, sign_header},
+    DelayedFollowupTask,
+};
+
+// delay after which to check if built block was added to chain
+// should be > l2 block time
+const FOLLOWUP_SIGNBLOCK_DUTY_AFTER_MS: u64 = 10000;
 
 #[derive(Debug, Error)]
 enum DutyExecError {
@@ -26,9 +38,12 @@ enum DutyExecError {
 
 pub(crate) async fn duty_executor_worker<R>(
     rpc: Arc<R>,
-    mut duty_rx: mpsc::Receiver<Duty>,
-    handle: Handle,
     idata: IdentityData,
+    mut duty_rx: mpsc::Receiver<Duty>,
+    failed_duties_tx: mpsc::Sender<DutyId>,
+    mut failed_duties_rx: mpsc::Receiver<DutyId>,
+    followup_task_tx: mpsc::Sender<DelayedFollowupTask>,
+    handle: Handle,
 ) -> anyhow::Result<()>
 where
     R: StrataSequencerApiClient + Send + Sync + 'static,
@@ -36,7 +51,6 @@ where
     // Keep track of seen duties to avoid processing the same duty multiple times.
     // Does not need to be persisted, as new duties are generated based on current chain state.
     let mut seen_duties = HashSet::new();
-    let (failed_duties_tx, mut failed_duties_rx) = mpsc::channel::<Buf32>(8);
 
     loop {
         select! {
@@ -48,7 +62,7 @@ where
                         continue;
                     }
                     seen_duties.insert(duty.id());
-                    handle.spawn(handle_duty(rpc.clone(), duty, idata.clone(), failed_duties_tx.clone()));
+                    handle.spawn(handle_duty(rpc.clone(), duty, idata.clone(), failed_duties_tx.clone(), followup_task_tx.clone()));
                 } else {
                     // tx is closed, we are done
                     return Ok(());
@@ -68,14 +82,17 @@ async fn handle_duty<R>(
     rpc: Arc<R>,
     duty: Duty,
     idata: IdentityData,
-    failed_duties_tx: mpsc::Sender<Buf32>,
+    failed_duties_tx: mpsc::Sender<DutyId>,
+    followup_task_tx: mpsc::Sender<DelayedFollowupTask>,
 ) where
     R: StrataSequencerApiClient + Send + Sync,
 {
     debug!("handle_duty: {:?}", duty);
     let duty_result = match duty.clone() {
-        Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, idata).await,
-        Duty::CommitBatch(duty) => handle_commit_batch_duty(rpc, duty, idata).await,
+        Duty::SignBlock(sign_duty) => {
+            handle_sign_block_duty(rpc, sign_duty, idata, duty.id(), followup_task_tx).await
+        }
+        Duty::CommitBatch(batch_duty) => handle_commit_batch_duty(rpc, batch_duty, idata).await,
     };
 
     if let Err(e) = duty_result {
@@ -88,6 +105,8 @@ async fn handle_sign_block_duty<R>(
     rpc: Arc<R>,
     duty: BlockSigningDuty,
     idata: IdentityData,
+    duty_id: DutyId,
+    followup_task_tx: mpsc::Sender<DelayedFollowupTask>,
 ) -> Result<(), DutyExecError>
 where
     R: StrataSequencerApiClient + Send + Sync,
@@ -113,6 +132,14 @@ where
     rpc.complete_block_template(template.template_id(), completion)
         .await
         .map_err(DutyExecError::CompleteTemplate)?;
+
+    // add a followup task to check if signed block was added to chain
+    let followup = FollowupTask::followup_sign_block(template.template_id(), duty_id);
+    let task = DelayedFollowupTask::new(
+        followup,
+        Instant::now() + Duration::from_millis(FOLLOWUP_SIGNBLOCK_DUTY_AFTER_MS),
+    );
+    let _ = followup_task_tx.send(task).await;
 
     Ok(())
 }
