@@ -5,8 +5,9 @@ use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
-    HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcBridgeDuties, RpcChainState,
-    RpcCheckpointConfStatus, RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
+    HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcBlockHeaderWithStatus, RpcBridgeDuties,
+    RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate,
+    RpcSyncStatus,
 };
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate},
@@ -49,7 +50,10 @@ pub trait StrataApi {
     async fn get_headers_at_idx(&self, index: u64) -> RpcResult<Option<Vec<RpcBlockHeader>>>;
 
     #[method(name = "getHeaderById")]
-    async fn get_header_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcBlockHeader>>;
+    async fn get_header_by_id(
+        &self,
+        block_id: L2BlockId,
+    ) -> RpcResult<Option<RpcBlockHeaderWithStatus>>;
 
     #[method(name = "getExecUpdateById")]
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcExecUpdate>>;

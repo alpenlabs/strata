@@ -34,8 +34,9 @@ use strata_rpc_api::{
 };
 use strata_rpc_types::{
     errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, HexBytes64, L2BlockStatus,
-    RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo,
-    RpcClientStatus, RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
+    RpcBlockHeader, RpcBlockHeaderWithStatus, RpcBridgeDuties, RpcChainState,
+    RpcCheckpointConfStatus, RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcExecUpdate,
+    RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_sequencer::{
@@ -301,18 +302,29 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         Ok(blk_header)
     }
 
-    async fn get_header_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<RpcBlockHeader>> {
-        let db = self.database.clone();
-        // let blkid = L2BlockId::from(Buf32::from(blkid.0));
+    async fn get_header_by_id(
+        &self,
+        blkid: L2BlockId,
+    ) -> RpcResult<Option<RpcBlockHeaderWithStatus>> {
+        let l2_block_manager = self.storage.l2();
 
-        Ok(wait_blocking("fetch_block", move || {
-            let l2_db = db.l2_db();
+        let (block, status) = tokio::try_join!(
+            l2_block_manager.get_block_data_async(&blkid),
+            l2_block_manager.get_block_status_async(&blkid)
+        )
+        .map_err(Error::Db)?;
 
-            fetch_l2blk::<D>(l2_db, blkid)
-        })
-        .await
-        .map(|blk| conv_blk_header_to_rpc(blk.header()))
-        .ok())
+        Ok(block.map(|block| RpcBlockHeaderWithStatus {
+            header: conv_blk_header_to_rpc(block.header()),
+            status: status
+                .unwrap_or_else(|| {
+                    // should never happen unless db issues
+                    warn!(?blkid, "found l2block without status");
+                    // assume its an unchecked block
+                    BlockStatus::Unchecked
+                })
+                .into(),
+        }))
     }
 
     async fn get_exec_update_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<RpcExecUpdate>> {

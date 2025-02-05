@@ -9,6 +9,7 @@ mod config;
 mod duty_executor;
 mod duty_fetcher;
 mod errors;
+mod followup_tasks;
 mod helpers;
 mod rpc_client;
 
@@ -19,9 +20,11 @@ use config::Config;
 use duty_executor::duty_executor_worker;
 use duty_fetcher::duty_fetcher_worker;
 use errors::{AppError, Result};
+use followup_tasks::{followup_tasks_worker, DelayedFollowupTask};
 use helpers::load_seqkey;
 use rpc_client::rpc_client;
 use strata_common::logging;
+use strata_sequencer::duty::types::DutyId;
 use strata_tasks::TaskManager;
 use tokio::{runtime::Handle, sync::mpsc};
 use tracing::info;
@@ -63,6 +66,8 @@ fn main_inner(args: Args) -> Result<()> {
     let rpc = Arc::new(rpc_client(&ws_url));
 
     let (duty_tx, duty_rx) = mpsc::channel(64);
+    let (failed_duties_tx, failed_duties_rx) = mpsc::channel::<DutyId>(8);
+    let (followup_task_tx, followup_task_rx) = mpsc::channel::<DelayedFollowupTask>(8);
 
     executor.spawn_critical_async(
         "duty-fetcher",
@@ -70,8 +75,29 @@ fn main_inner(args: Args) -> Result<()> {
     );
     executor.spawn_critical_async(
         "duty-runner",
-        duty_executor_worker(rpc, duty_rx, handle.clone(), idata),
+        duty_executor_worker(
+            rpc.clone(),
+            idata,
+            duty_rx,
+            failed_duties_tx.clone(),
+            failed_duties_rx,
+            followup_task_tx.clone(),
+            handle.clone(),
+        ),
     );
+    if config.followup_tasks_enabled {
+        executor.spawn_critical_async(
+            "followup-runner",
+            followup_tasks_worker(
+                rpc,
+                failed_duties_tx,
+                followup_task_tx,
+                followup_task_rx,
+                config,
+                handle.clone(),
+            ),
+        );
+    }
 
     task_manager.start_signal_listeners();
     task_manager.monitor(Some(Duration::from_millis(SHUTDOWN_TIMEOUT_MS)))?;
