@@ -7,21 +7,22 @@
 // This pattern allows testing the actual business logic of the RPCs inside a unit test rather
 // than having to worry about all the harnessing that is necessary to test the RPC itself.
 
-use std::sync::Arc;
+// FIXME ^which pattern is this talking about?
 
 use bitcoin::{
     hashes::Hash, params::Params, Address, Amount, Network, OutPoint, TapNodeHash, Transaction,
 };
 use jsonrpsee::core::RpcResult;
 use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
-use strata_db::traits::L1Database;
 use strata_primitives::l1::BitcoinAddress;
 use strata_rpc_types::RpcServerError;
 use strata_state::{
     bridge_state::{DepositState, DepositsTable},
+    l1::L1Tx,
     tx::ProtocolOperation,
 };
-use tracing::{debug, error};
+use strata_storage::L1BlockManager;
+use tracing::*;
 
 /// The `vout` corresponding to the deposit related Taproot address on the Deposit Request
 /// Transaction.
@@ -29,7 +30,8 @@ use tracing::{debug, error};
 /// This is always going to be the first [`OutPoint`].
 pub const DEPOSIT_REQUEST_VOUT: u32 = 0;
 
-/// Extract the deposit duties from the [`L1Database`] starting from a given block height.
+/// Extract the deposit duties from the L1 database starting from a given block
+/// height.
 ///
 /// This duty will be the same for every operator (for now). So, an
 /// [`OperatorIdx`](strata_primitives::bridge::OperatorIdx) need not be passed as a
@@ -43,14 +45,12 @@ pub const DEPOSIT_REQUEST_VOUT: u32 = 0;
 /// # Errors
 ///
 /// If there is an issue accessing entries from the database.
-pub(super) async fn extract_deposit_requests<L1DB: L1Database>(
-    l1_db: &Arc<L1DB>,
+pub(super) async fn extract_deposit_requests(
+    l1man: &L1BlockManager,
     block_height: u64,
     network: Network,
 ) -> RpcResult<(impl Iterator<Item = DepositInfo>, u64)> {
-    let (l1_txs, latest_idx) = l1_db
-        .get_txs_from(block_height)
-        .map_err(RpcServerError::Db)?;
+    let (l1_txs, latest_idx) = get_txs_from_height(l1man, block_height).await?;
 
     let deposit_info_iter = l1_txs.into_iter().filter_map(move |l1_tx| {
         let tx: Transaction = match l1_tx.tx_data().try_into() {
@@ -134,6 +134,44 @@ pub(super) async fn extract_deposit_requests<L1DB: L1Database>(
     Ok((deposit_info_iter, latest_idx))
 }
 
+/// Fetches all L1 transactions from the provided height to the chain tip.
+///
+/// Note that this could return a LOT of data!
+async fn get_txs_from_height(l1man: &L1BlockManager, height: u64) -> RpcResult<(Vec<L1Tx>, u64)> {
+    let tip = l1man
+        .get_chain_tip_async()
+        .await
+        .map_err(RpcServerError::Db)?
+        .ok_or(RpcServerError::BeforeGenesis)?;
+
+    let mut txs = Vec::new();
+    if height <= tip {
+        for h in height..=tip {
+            // We don't actually care if we don't have txs at a particular
+            // height, we can continue unconditionally.
+            let Some(h_tx_refs) = l1man
+                .get_block_txs_async(h)
+                .await
+                .map_err(RpcServerError::Db)?
+            else {
+                warn!(%height, "missing tx entries for block, continuing");
+                continue;
+            };
+
+            for txr in h_tx_refs {
+                let tx = l1man
+                    .get_tx_async(txr)
+                    .await
+                    .map_err(RpcServerError::Db)?
+                    .expect("extractor: database inconsistent, missing expected tx");
+                txs.push(tx);
+            }
+        }
+    }
+
+    Ok((txs, tip))
+}
+
 /// Extract the withdrawal duties from the chain state.
 ///
 /// This can be expensive if the chain state has a lot of deposits.
@@ -176,7 +214,7 @@ pub(super) fn extract_withdrawal_infos(
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Not;
+    use std::{ops::Not, sync::Arc};
 
     use bitcoin::{
         absolute::LockTime,
@@ -212,6 +250,7 @@ mod tests {
         tx::DepositRequestInfo,
     };
     use strata_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
+    use threadpool::ThreadPool;
 
     use super::*;
 
@@ -238,10 +277,11 @@ mod tests {
         )
         .await;
 
-        let (deposit_infos, latest_idx) =
-            extract_deposit_requests(&l1_db.clone(), 0, Network::Regtest)
-                .await
-                .expect("should be able to extract deposit requests");
+        let l1man = L1BlockManager::new(ThreadPool::new(1), l1_db);
+
+        let (deposit_infos, latest_idx) = extract_deposit_requests(&l1man, 0, Network::Regtest)
+            .await
+            .expect("should be able to extract deposit requests");
 
         assert_eq!(
             latest_idx,

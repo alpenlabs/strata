@@ -5,6 +5,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("missing client state index {0}")]
+    MissingClientState(u64),
+
     #[error("invalid sync event index {0}")]
     MissingSyncEvent(u64),
 

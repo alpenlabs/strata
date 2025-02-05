@@ -19,25 +19,33 @@ use crate::{
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct ClientUpdateOutput {
-    writes: Vec<ClientStateWrite>,
+    state: ClientState,
     actions: Vec<SyncAction>,
 }
 
 impl ClientUpdateOutput {
-    pub fn new(writes: Vec<ClientStateWrite>, actions: Vec<SyncAction>) -> Self {
-        Self { writes, actions }
+    pub fn new(state: ClientState, actions: Vec<SyncAction>) -> Self {
+        Self { state, actions }
     }
 
-    pub fn writes(&self) -> &[ClientStateWrite] {
-        &self.writes
+    pub fn new_state(state: ClientState) -> Self {
+        Self::new(state, Vec::new())
+    }
+
+    pub fn state(&self) -> &ClientState {
+        &self.state
     }
 
     pub fn actions(&self) -> &[SyncAction] {
         &self.actions
     }
 
-    pub fn into_parts(self) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
-        (self.writes, self.actions)
+    pub fn into_state(self) -> ClientState {
+        self.state
+    }
+
+    pub fn into_parts(self) -> (ClientState, Vec<SyncAction>) {
+        (self.state, self.actions)
     }
 }
 

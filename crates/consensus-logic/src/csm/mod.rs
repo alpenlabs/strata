@@ -10,5 +10,4 @@ pub mod client_transition;
 pub mod config;
 pub mod ctl;
 pub mod message;
-pub mod state_tracker;
 pub mod worker;

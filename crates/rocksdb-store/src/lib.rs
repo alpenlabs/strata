@@ -20,43 +20,6 @@ use strata_db::database::CommonDatabase;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-pub const ROCKSDB_NAME: &str = "strata-client";
-
-pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
-    SequenceSchema::COLUMN_FAMILY_NAME,
-    ClientUpdateOutputSchema::COLUMN_FAMILY_NAME,
-    ClientStateSchema::COLUMN_FAMILY_NAME,
-    L1BlockSchema::COLUMN_FAMILY_NAME,
-    MmrSchema::COLUMN_FAMILY_NAME,
-    SyncEventSchema::COLUMN_FAMILY_NAME,
-    TxnSchema::COLUMN_FAMILY_NAME,
-    L2BlockSchema::COLUMN_FAMILY_NAME,
-    L2BlockStatusSchema::COLUMN_FAMILY_NAME,
-    L2BlockHeightSchema::COLUMN_FAMILY_NAME,
-    WriteBatchSchema::COLUMN_FAMILY_NAME,
-    // Payload/intent schemas
-    PayloadSchema::COLUMN_FAMILY_NAME,
-    IntentSchema::COLUMN_FAMILY_NAME,
-    IntentIdxSchema::COLUMN_FAMILY_NAME,
-    // Bcast schemas
-    BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
-    BcastL1TxSchema::COLUMN_FAMILY_NAME,
-    // Bridge relay schemas
-    BridgeMsgIdSchema::COLUMN_FAMILY_NAME,
-    ScopeMsgIdSchema::COLUMN_FAMILY_NAME,
-    // Bridge signature schemas
-    BridgeTxStateTxidSchema::COLUMN_FAMILY_NAME,
-    BridgeTxStateSchema::COLUMN_FAMILY_NAME,
-    // Bridge duty schemas
-    BridgeDutyTxidSchema::COLUMN_FAMILY_NAME,
-    BridgeDutyStatusSchema::COLUMN_FAMILY_NAME,
-    // Bridge duty checkpoint
-    BridgeDutyCheckpointSchema::COLUMN_FAMILY_NAME,
-    // Checkpoint schemas
-    BatchCheckpointSchema::COLUMN_FAMILY_NAME,
-    // TODO add col families for other store types
-];
-
 use std::{fs, path::Path, sync::Arc};
 
 use bridge::schemas::{
@@ -93,11 +56,55 @@ use writer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
 
 use crate::{
     chain_state::schemas::WriteBatchSchema,
-    client_state::schemas::{ClientStateSchema, ClientUpdateOutputSchema},
+    client_state::schemas::ClientUpdateOutputSchema,
     l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema},
     sequence::SequenceSchema,
     sync_event::schemas::SyncEventSchema,
 };
+
+pub const ROCKSDB_NAME: &str = "strata-client";
+
+#[rustfmt::skip]
+pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
+    // Core
+    SequenceSchema::COLUMN_FAMILY_NAME,
+    ClientUpdateOutputSchema::COLUMN_FAMILY_NAME,
+    L1BlockSchema::COLUMN_FAMILY_NAME,
+    MmrSchema::COLUMN_FAMILY_NAME,
+    SyncEventSchema::COLUMN_FAMILY_NAME,
+    TxnSchema::COLUMN_FAMILY_NAME,
+    L2BlockSchema::COLUMN_FAMILY_NAME,
+    L2BlockStatusSchema::COLUMN_FAMILY_NAME,
+    L2BlockHeightSchema::COLUMN_FAMILY_NAME,
+    WriteBatchSchema::COLUMN_FAMILY_NAME,
+
+    // Payload/intent schemas
+    PayloadSchema::COLUMN_FAMILY_NAME,
+    IntentSchema::COLUMN_FAMILY_NAME,
+    IntentIdxSchema::COLUMN_FAMILY_NAME,
+
+    // Bcast schemas
+    BcastL1TxIdSchema::COLUMN_FAMILY_NAME,
+    BcastL1TxSchema::COLUMN_FAMILY_NAME,
+
+    // Bridge relay schemas
+    BridgeMsgIdSchema::COLUMN_FAMILY_NAME,
+    ScopeMsgIdSchema::COLUMN_FAMILY_NAME,
+
+    // Bridge signature schemas
+    BridgeTxStateTxidSchema::COLUMN_FAMILY_NAME,
+    BridgeTxStateSchema::COLUMN_FAMILY_NAME,
+
+    // Bridge duty schemas
+    BridgeDutyTxidSchema::COLUMN_FAMILY_NAME,
+    BridgeDutyStatusSchema::COLUMN_FAMILY_NAME,
+
+    // Bridge duty checkpoint
+    BridgeDutyCheckpointSchema::COLUMN_FAMILY_NAME,
+
+    // Checkpoint schemas
+    BatchCheckpointSchema::COLUMN_FAMILY_NAME,
+];
 
 /// database operations configuration
 #[derive(Clone, Copy, Debug)]

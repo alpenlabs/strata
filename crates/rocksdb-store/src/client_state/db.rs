@@ -4,7 +4,7 @@ use rockbound::{OptimisticTransactionDB, Schema, SchemaDBOperationsExt};
 use strata_db::{errors::*, traits::*, DbResult};
 use strata_state::operation::*;
 
-use super::schemas::{ClientStateSchema, ClientUpdateOutputSchema};
+use super::schemas::ClientUpdateOutputSchema;
 use crate::DbOpsConfig;
 
 pub struct ClientStateDb {
@@ -38,92 +38,37 @@ impl ClientStateDb {
 }
 
 impl ClientStateDatabase for ClientStateDb {
-    fn write_client_update_output(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
+    fn put_client_update(&self, idx: u64, output: ClientUpdateOutput) -> DbResult<()> {
         let expected_idx = match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(last_idx) => last_idx + 1,
-            None => 1,
+
+            // We don't have a separate way to insert the init client state, so
+            // we special case this here.
+            None => 0,
         };
+
         if idx != expected_idx {
             return Err(DbError::OooInsert("consensus_store", idx));
         }
+
         self.db.put::<ClientUpdateOutputSchema>(&idx, &output)?;
         Ok(())
     }
 
-    fn write_client_state_checkpoint(
-        &self,
-        idx: u64,
-        state: strata_state::client_state::ClientState,
-    ) -> DbResult<()> {
-        // FIXME this should probably be a transaction
-        if self.db.get::<ClientStateSchema>(&idx)?.is_some() {
-            return Err(DbError::OverwriteConsensusCheckpoint(idx));
-        }
-        self.db.put::<ClientStateSchema>(&idx, &state)?;
-        Ok(())
+    fn get_client_update(&self, idx: u64) -> DbResult<Option<ClientUpdateOutput>> {
+        Ok(self.db.get::<ClientUpdateOutputSchema>(&idx)?)
     }
 
-    fn get_last_write_idx(&self) -> DbResult<u64> {
+    fn get_last_state_idx(&self) -> DbResult<u64> {
         match self.get_last_idx::<ClientUpdateOutputSchema>()? {
             Some(idx) => Ok(idx),
             None => Err(DbError::NotBootstrapped),
         }
     }
-
-    fn get_client_state_writes(&self, idx: u64) -> DbResult<Option<Vec<ClientStateWrite>>> {
-        let output = self.db.get::<ClientUpdateOutputSchema>(&idx)?;
-        match output {
-            Some(out) => Ok(Some(out.writes().to_owned())),
-            None => Ok(None),
-        }
-    }
-
-    fn get_client_update_actions(&self, idx: u64) -> DbResult<Option<Vec<SyncAction>>> {
-        let output = self.db.get::<ClientUpdateOutputSchema>(&idx)?;
-        match output {
-            Some(out) => Ok(Some(out.actions().to_owned())),
-            None => Ok(None),
-        }
-    }
-
-    fn get_last_checkpoint_idx(&self) -> DbResult<u64> {
-        match self.get_last_idx::<ClientStateSchema>()? {
-            Some(idx) => Ok(idx),
-            None => Err(DbError::NotBootstrapped),
-        }
-    }
-
-    fn get_prev_checkpoint_at(&self, idx: u64) -> DbResult<u64> {
-        let mut iterator = self.db.iter::<ClientStateSchema>()?;
-        iterator.seek_to_last();
-        let rev_iterator = iterator.rev();
-
-        for res in rev_iterator {
-            match res {
-                Ok(item) => {
-                    let (tip, _) = item.into_tuple();
-                    if tip <= idx {
-                        return Ok(tip);
-                    }
-                }
-                Err(e) => return Err(DbError::Other(e.to_string())),
-            }
-        }
-
-        Err(DbError::NotBootstrapped)
-    }
-
-    fn get_state_checkpoint(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<strata_state::client_state::ClientState>> {
-        Ok(self.db.get::<ClientStateSchema>(&idx)?)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use strata_state::client_state::ClientState;
     use strata_test_utils::*;
 
     use super::*;
@@ -137,7 +82,9 @@ mod tests {
     #[test]
     fn test_get_last_idx() {
         let db = setup_db();
-        let idx = db.get_last_idx::<ClientUpdateOutputSchema>().unwrap();
+        let idx = db
+            .get_last_idx::<ClientUpdateOutputSchema>()
+            .expect("test: insert");
         assert_eq!(idx, None);
     }
 
@@ -146,111 +93,48 @@ mod tests {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
         let db = setup_db();
 
-        let res = db.write_client_update_output(2, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 2))));
+        let res = db.put_client_update(2, output.clone());
+        assert!(matches!(res, Err(DbError::OooInsert("consensus_store", 2))));
 
-        let res = db.write_client_update_output(1, output.clone());
-        assert!(res.is_ok());
+        db.put_client_update(0, output.clone())
+            .expect("test: insert");
 
-        let res = db.write_client_update_output(1, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 1))));
+        let res = db.put_client_update(0, output.clone());
+        assert!(matches!(res, Err(DbError::OooInsert("consensus_store", 0))));
 
-        let res = db.write_client_update_output(3, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 3))));
+        let res = db.put_client_update(2, output.clone());
+        assert!(matches!(res, Err(DbError::OooInsert("consensus_store", 2))));
     }
 
     #[test]
     fn test_get_last_write_idx() {
         let db = setup_db();
 
-        let idx = db.get_last_write_idx();
-        assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
+        let idx = db.get_last_state_idx();
+        assert!(matches!(idx, Err(DbError::NotBootstrapped)));
 
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
-        let _ = db.write_client_update_output(1, output.clone());
+        db.put_client_update(0, output.clone())
+            .expect("test: insert");
+        db.put_client_update(1, output.clone())
+            .expect("test: insert");
 
-        let idx = db.get_last_write_idx();
-        assert!(idx.is_ok_and(|x| matches!(x, 1)));
+        let idx = db.get_last_state_idx().expect("test: get last");
+        assert_eq!(idx, 1);
     }
 
     #[test]
-    fn test_get_consensus_writes() {
-        let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
-
-        let db = setup_db();
-        let _ = db.write_client_update_output(1, output.clone());
-
-        let writes = db.get_client_state_writes(1).unwrap().unwrap();
-        assert_eq!(&writes, output.writes());
-    }
-
-    #[test]
-    fn test_get_consensus_actions() {
+    fn test_get_consensus_update() {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
-        let _ = db.write_client_update_output(1, output.clone());
+        db.put_client_update(0, output.clone())
+            .expect("test: insert");
 
-        let actions = db.get_client_update_actions(1).unwrap().unwrap();
-        assert_eq!(&actions, output.actions());
-    }
+        db.put_client_update(1, output.clone())
+            .expect("test: insert");
 
-    #[test]
-    fn test_write_consensus_checkpoint() {
-        let state: ClientState = ArbitraryGenerator::new().generate();
-        let db = setup_db();
-
-        let _ = db.write_client_state_checkpoint(3, state.clone());
-
-        let idx = db.get_last_checkpoint_idx().unwrap();
-        assert_eq!(idx, 3);
-
-        let res = db.write_client_state_checkpoint(3, state.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OverwriteConsensusCheckpoint(3))));
-
-        // TODO: verify if it is possible to write checkpoint in any order
-        let res = db.write_client_state_checkpoint(1, state);
-        assert!(res.is_ok());
-
-        // Note: The ordering is managed by rocksdb. So might be alright..
-        let idx = db.get_last_checkpoint_idx().unwrap();
-        assert_eq!(idx, 3);
-    }
-
-    #[test]
-    fn test_get_previous_checkpoint_at() {
-        let state: ClientState = ArbitraryGenerator::new().generate();
-
-        let db = setup_db();
-
-        let res = db.get_prev_checkpoint_at(1);
-        assert!(res.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
-
-        // Add a checkpoint
-        _ = db.write_client_state_checkpoint(1, state.clone());
-
-        let res = db.get_prev_checkpoint_at(1);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        let res = db.get_prev_checkpoint_at(2);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        let res = db.get_prev_checkpoint_at(100);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        // Add a new checkpoint
-        _ = db.write_client_state_checkpoint(5, state.clone());
-
-        let res = db.get_prev_checkpoint_at(1);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        let res = db.get_prev_checkpoint_at(2);
-        assert!(res.is_ok_and(|x| matches!(x, 1)));
-
-        let res = db.get_prev_checkpoint_at(5);
-        assert!(res.is_ok_and(|x| matches!(x, 5)));
-
-        let res = db.get_prev_checkpoint_at(100);
-        assert!(res.is_ok_and(|x| matches!(x, 5)));
+        let update = db.get_client_update(1).expect("test: get").unwrap();
+        assert_eq!(update, output);
     }
 }

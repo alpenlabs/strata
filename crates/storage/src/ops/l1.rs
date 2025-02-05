@@ -17,6 +17,5 @@ inst_ops_simple! {
         get_blockid_range(start_idx: u64, end_idx: u64) => Vec<L1BlockId>;
         get_block_txs(idx: u64) => Option<Vec<L1TxRef>>;
         get_tx(tx_ref: L1TxRef) => Option<L1Tx>;
-        get_txs_from(start_idx: u64) => (Vec<L1Tx>, u64);
     }
 }

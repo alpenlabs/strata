@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 
-use strata_db::traits::Database;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
@@ -73,22 +72,17 @@ impl SyncManager {
 
 /// Starts the sync tasks using provided settings.
 #[allow(clippy::too_many_arguments)]
-pub fn start_sync_tasks<
-    D: Database + Sync + Send + 'static,
-    E: ExecEngineCtl + Sync + Send + 'static,
->(
+pub fn start_sync_tasks<E: ExecEngineCtl + Sync + Send + 'static>(
     executor: &TaskExecutor,
-    database: Arc<D>,
-    storage: Arc<NodeStorage>,
+    storage: &Arc<NodeStorage>,
     engine: Arc<E>,
-    pool: threadpool::ThreadPool,
     params: Arc<Params>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<SyncManager> {
     // Create channels.
     let (fcm_tx, fcm_rx) = mpsc::channel::<ForkChoiceMessage>(64);
     let (csm_tx, csm_rx) = mpsc::channel::<CsmMessage>(64);
-    let csm_controller = Arc::new(CsmController::new(database.clone(), pool, csm_tx));
+    let csm_controller = Arc::new(CsmController::new(storage.sync_event().clone(), csm_tx));
 
     // TODO should this be in an `Arc`?  it's already fairly compact so we might
     // not be benefitting from the reduced cloning
@@ -96,7 +90,6 @@ pub fn start_sync_tasks<
 
     // Start the fork choice manager thread.  If we haven't done genesis yet
     // this will just wait until the CSM says we have.
-    let fcm_database = database.clone();
     let fcm_storage = storage.clone();
     let fcm_engine = engine.clone();
     let fcm_csm_controller = csm_controller.clone();
@@ -108,7 +101,6 @@ pub fn start_sync_tasks<
         fork_choice_manager::tracker_task(
             shutdown,
             handle,
-            fcm_database,
             fcm_storage,
             fcm_engine,
             fcm_rx,
@@ -121,7 +113,6 @@ pub fn start_sync_tasks<
     // Prepare the client worker state and start the thread for that.
     let client_worker_state = worker::WorkerState::open(
         params.clone(),
-        database,
         storage.clone(),
         cupdate_tx,
         storage.checkpoint().clone(),
