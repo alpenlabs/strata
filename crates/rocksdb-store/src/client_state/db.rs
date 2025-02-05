@@ -96,8 +96,7 @@ mod tests {
         let res = db.put_client_update(2, output.clone());
         assert!(matches!(res, Err(DbError::OooInsert("consensus_store", 2))));
 
-        let _ = db
-            .put_client_update(0, output.clone())
+        db.put_client_update(0, output.clone())
             .expect("test: insert");
 
         let res = db.put_client_update(0, output.clone());
@@ -115,11 +114,9 @@ mod tests {
         assert!(matches!(idx, Err(DbError::NotBootstrapped)));
 
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
-        let _ = db
-            .put_client_update(0, output.clone())
+        db.put_client_update(0, output.clone())
             .expect("test: insert");
-        let _ = db
-            .put_client_update(1, output.clone())
+        db.put_client_update(1, output.clone())
             .expect("test: insert");
 
         let idx = db.get_last_state_idx().expect("test: get last");
@@ -131,12 +128,10 @@ mod tests {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
-        let _ = db
-            .put_client_update(0, output.clone())
+        db.put_client_update(0, output.clone())
             .expect("test: insert");
 
-        let _ = db
-            .put_client_update(1, output.clone())
+        db.put_client_update(1, output.clone())
             .expect("test: insert");
 
         let update = db.get_client_update(1).expect("test: get").unwrap();
