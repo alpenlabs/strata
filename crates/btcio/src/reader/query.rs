@@ -529,7 +529,7 @@ mod test {
     #[tokio::test]
     async fn test_new_filter_rule() {
         let mut chstate: Chainstate = ArbitraryGenerator::new().generate();
-        let curr_epoch = chstate.epoch();
+        let curr_epoch = chstate.cur_epoch();
 
         // Create client state with a finalized checkpoint
         let mut clstate: ClientState = ArbitraryGenerator::new().generate();

@@ -93,18 +93,21 @@ fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
 ) -> Vec<BatchCheckpointWithCommitment> {
-    let protocol_ops_txs = blockdata.protocol_ops_txs();
+    let relevant_txs = blockdata.relevant_txs();
 
-    let signed_checkpts = protocol_ops_txs.iter().flat_map(|txref| {
-        txref.proto_ops().iter().filter_map(|op| match op {
-            ProtocolOperation::Checkpoint(envelope) => {
-                Some((envelope, &blockdata.block().txdata[txref.index() as usize]))
-            }
+    let signed_checkpts = relevant_txs.iter().flat_map(|txref| {
+        txref.contents().protocol_ops().iter().map(|x| match x {
+            ProtocolOperation::Checkpoint(envelope) => Some((
+                envelope,
+                &blockdata.block().txdata[txref.index() as usize],
+                txref.index(),
+            )),
             _ => None,
         })
     });
 
-    let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
+    let sig_verified_checkpoints = signed_checkpts.filter_map(|ckpt_data| {
+        let (signed_checkpoint, tx, position) = ckpt_data?;
         if let Some(seq_pubkey) = seq_pubkey {
             if !signed_checkpoint.verify_sig(&seq_pubkey.into()) {
                 error!(
@@ -117,16 +120,10 @@ fn check_for_da_batch(
         }
         let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
 
-        let blockhash = Buf32::from(*blockdata.block().block_hash().as_byte_array());
-        let txid = Buf32::from(*tx.compute_txid().as_byte_array());
-        let wtxid = Buf32::from(*tx.compute_wtxid().as_byte_array());
+        let blockhash = (*blockdata.block().block_hash().as_byte_array()).into();
+        let txid = (*tx.compute_txid().as_byte_array()).into();
+        let wtxid = (*tx.compute_wtxid().as_byte_array()).into();
         let block_height = blockdata.block_num();
-        let position = blockdata
-            .block()
-            .txdata
-            .iter()
-            .position(|x| x == tx)
-            .unwrap() as u32;
         let commitment_info = CommitmentInfo::new(blockhash, txid, wtxid, block_height, position);
 
         Some(BatchCheckpointWithCommitment::new(
@@ -153,13 +150,13 @@ fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
     blockdata
-        .protocol_txs()
+        .relevant_txs()
         .iter()
-        .map(|ops_txs| {
+        .map(|tx_entry| {
             generate_l1_tx(
                 blockdata.block(),
-                ops_txs.index(),
-                ops_txs.proto_ops().to_vec(),
+                tx_entry.index(),
+                tx_entry.contents().protocol_ops().to_vec(),
             )
         })
         .collect()

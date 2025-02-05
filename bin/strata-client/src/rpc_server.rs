@@ -15,14 +15,8 @@ use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
 use strata_common::bail_manager::BAIL_SENDER;
-use strata_consensus_logic::{
-    checkpoint::CheckpointHandle, csm::state_tracker::reconstruct_state, sync_manager::SyncManager,
-    util::verify_proof,
-};
-use strata_db::{
-    traits::*,
-    types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus},
-};
+use strata_consensus_logic::{sync_manager::SyncManager, util::verify_proof};
+use strata_db::types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus};
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
