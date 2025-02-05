@@ -10,7 +10,7 @@ use strata_sequencer::{
 };
 use thiserror::Error;
 use tokio::{runtime::Handle, select, sync::mpsc};
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::helpers::{sign_checkpoint, sign_header};
 
@@ -95,6 +95,7 @@ where
     if now_millis() < duty.target_ts() {
         // wait until target time
         // TODO: ensure duration is within some bounds
+        info!(?duty, "got duty too early; sleeping till target time");
         tokio::time::sleep(tokio::time::Duration::from_millis(
             duty.target_ts() - now_millis(),
         ))
@@ -107,12 +108,18 @@ where
         .await
         .map_err(DutyExecError::GenerateTemplate)?;
 
+    let id = template.template_id();
+
+    info!(?duty, ?id, "got block template");
+
     let signature = sign_header(template.header(), &idata.key);
     let completion = BlockCompletionData::from_signature(signature);
 
     rpc.complete_block_template(template.template_id(), completion)
         .await
         .map_err(DutyExecError::CompleteTemplate)?;
+
+    info!(?duty, ?id, "block signing complete");
 
     Ok(())
 }
