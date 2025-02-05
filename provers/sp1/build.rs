@@ -259,7 +259,7 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     #[cfg(feature = "docker-build")]
     {
         build_args.docker = true;
-        build_args.workspace_directory = Some("../../..".to_owned());
+        build_args.workspace_directory = Some("../..".to_owned());
     }
 
     // Build the program with the specified arguments
