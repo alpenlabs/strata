@@ -27,6 +27,7 @@ zeroize.workspace = true
 
 [features]
 default = []
-risc0 = ["strata-risc0-guest-builder", "bytemuck"]
-sp1 = ["strata-sp1-guest-builder"]
-sp1-docker = ["sp1", "strata-sp1-guest-builder/docker-build"]
+risc0-builder = ["strata-risc0-guest-builder", "bytemuck"]
+sp1-builder = ["strata-sp1-guest-builder/sp1-dev"]
+sp1-mock-builder = ["sp1-builder", "strata-sp1-guest-builder/mock"]
+sp1-docker-builder = ["sp1-builder", "strata-sp1-guest-builder/docker-build"]

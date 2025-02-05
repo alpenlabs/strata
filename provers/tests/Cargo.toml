@@ -19,6 +19,7 @@ zkaleido.workspace = true
 # sp1
 strata-sp1-guest-builder = { path = "../sp1", optional = true, features = [
   "prover",
+  "sp1-dev",
 ] }
 zkaleido-sp1-adapter = { workspace = true, optional = true, features = [
   "prover",
