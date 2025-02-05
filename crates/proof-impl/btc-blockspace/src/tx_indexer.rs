@@ -37,7 +37,7 @@ impl TxIndexer for ProverTxIndexer {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
-    fn collect(self) -> L1TxExtract {
+    fn finalize(self) -> L1TxExtract {
         L1TxExtract::new(self.ops, Vec::new(), Vec::new())
     }
 }
@@ -108,11 +108,8 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ProverTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ProverTxIndexer::new(), &filter_config);
+        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert_eq!(tx_entries.len(), 1, "Should find one relevant transaction");
 
@@ -143,11 +140,8 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let ops_indexer = OpIndexer::new(ProverTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ProverTxIndexer::new(), &filter_config);
+        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert!(
             tx_entries.is_empty(),
@@ -181,11 +175,8 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let ops_indexer = OpIndexer::new(ProverTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ProverTxIndexer::new(), &filter_config);
+        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert_eq!(tx_entries.len(), 2, "Should find two relevant transactions");
 
@@ -248,11 +239,8 @@ mod test {
         // Create a block with single tx that has multiple ops
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ProverTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ProverTxIndexer::new(), &filter_config);
+        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert_eq!(
             tx_entries.len(),

@@ -1,6 +1,6 @@
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, hash};
 use strata_state::{
     l1::HeaderVerificationState,
     tx::{DepositRequestInfo, ProtocolOperation},
@@ -83,6 +83,16 @@ impl L1TxExtract {
     pub fn da_entries(&self) -> &[DaEntry] {
         &self.da_entries
     }
+
+    pub fn into_parts(
+        self,
+    ) -> (
+        Vec<ProtocolOperation>,
+        Vec<DepositRequestInfo>,
+        Vec<DaEntry>,
+    ) {
+        (self.protocol_ops, self.deposit_reqs, self.da_entries)
+    }
 }
 
 /// Consolidation of items extractable from an L1 Block.
@@ -135,7 +145,14 @@ pub struct DaEntry {
 }
 
 impl DaEntry {
-    pub fn new(commitment: Buf32, blob: Vec<u8>) -> Self {
+    /// Creates a new `DaEntry` instance that doesn't check that the commitment actually corresponds
+    /// to the blob.
+    pub fn new_unchecked(commitment: Buf32, blob: Vec<u8>) -> Self {
+        Self { commitment, blob }
+    }
+
+    pub fn new(blob: Vec<u8>) -> Self {
+        let commitment = hash::raw(&blob);
         Self { commitment, blob }
     }
 }

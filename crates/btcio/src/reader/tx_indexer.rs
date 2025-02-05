@@ -46,7 +46,8 @@ impl TxIndexer for ClientTxIndexer {
 
         self.ops.push(ProtocolOperation::DaCommitment(commitment));
         // Collect da
-        self.da_entries.push(DaEntry::new(commitment, blob));
+        self.da_entries
+            .push(DaEntry::new_unchecked(commitment, blob));
     }
 
     fn visit_deposit(&mut self, d: DepositInfo) {
@@ -62,7 +63,7 @@ impl TxIndexer for ClientTxIndexer {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
-    fn collect(self) -> L1TxExtract {
+    fn finalize(self) -> L1TxExtract {
         L1TxExtract::new(self.ops, self.deposit_requests, self.da_entries)
     }
 }
@@ -133,11 +134,8 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
+        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert_eq!(tx_entries.len(), 1, "Should find one relevant transaction");
 
@@ -180,11 +178,8 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (_, dep_reqs, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
+        let (_, dep_reqs, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert_eq!(dep_reqs.len(), 1, "Should find one deposit request");
 
@@ -210,11 +205,8 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
+        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert!(
             tx_entries.is_empty(),
@@ -248,11 +240,8 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
+        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert_eq!(tx_entries.len(), 2, "Should find two relevant transactions");
 
@@ -315,11 +304,8 @@ mod test {
         // Create a block with single tx that has multiple ops
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-        let (tx_entries, _, _) = ops_indexer
-            .index_block(&block, &filter_config)
-            .collect()
-            .into_parts();
+        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
+        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
 
         assert_eq!(
             tx_entries.len(),

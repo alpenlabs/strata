@@ -159,9 +159,9 @@ async fn update_epoch_and_filter_config<R: ReaderRpc>(
         state.set_epoch(new_epoch);
         // TODO: pass in chainstate to `derive_from`
         let new_config = TxFilterConfig::derive_from(ctx.params.rollup())?;
-        let curr_filter_config = state.filter_config().clone();
+        let curr_filter_config = state.filter_config();
 
-        if new_config != curr_filter_config {
+        if new_config != *curr_filter_config {
             state.set_filter_config(new_config.clone());
             return Ok(Some(new_config));
         }
@@ -327,11 +327,9 @@ async fn process_block<R: ReaderRpc>(
     let params = ctx.params.clone();
 
     // Index ops
-    let ops_indexer = OpIndexer::new(ClientTxIndexer::new());
-    let (tx_entries, _dep_reqs, _da_entries) = ops_indexer
-        .index_block(&block, state.filter_config())
-        .collect()
-        .into_parts();
+    let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), state.filter_config());
+    let (tx_entries, _dep_reqs, _da_entries) =
+        ops_indexer.index_block(&block).finalize().into_parts();
 
     // TODO: do stuffs with dep_reqs and da_entries
 

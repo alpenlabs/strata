@@ -22,11 +22,8 @@ pub fn extract_relevant_info(
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    let indexer = OpIndexer::new(ProverTxIndexer::new());
-    let (tx_refs, _, _) = indexer
-        .index_block(block, filter_config)
-        .collect()
-        .into_parts();
+    let indexer = OpIndexer::new(ProverTxIndexer::new(), filter_config);
+    let (tx_refs, _, _) = indexer.index_block(block).finalize().into_parts();
 
     for op in tx_refs.into_iter().flat_map(|t| t.proto_ops().to_vec()) {
         match op {
