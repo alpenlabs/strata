@@ -213,7 +213,7 @@ pub fn tracker_task<E: ExecEngineCtl>(
 
     // Now that we have the database state in order, we can actually init the
     // FCM.
-    let fcm = match init_forkchoice_manager(&storage, &params, init_state) {
+    let mut fcm = match init_forkchoice_manager(&storage, &params, init_state) {
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");
@@ -221,6 +221,36 @@ pub fn tracker_task<E: ExecEngineCtl>(
         }
     };
     info!(%finalized_blockid, "forkchoice manager started");
+
+    {
+        info!("check for unprocessed l2blocks");
+        // check if there are unprocessed L2 blocks in db. if there are, we need to process them.
+        let l2_block_manager = storage.l2();
+        let mut slot = fcm.cur_index;
+        loop {
+            let blocksids = l2_block_manager.get_blocks_at_height_blocking(slot)?;
+            if blocksids.is_empty() {
+                break;
+            }
+            warn!(?blocksids, ?slot, "found extra l2blocks");
+            for blockid in blocksids {
+                let status = l2_block_manager.get_block_status_blocking(&blockid)?;
+                if let Some(BlockStatus::Invalid) = status {
+                    continue;
+                }
+                warn!(?blockid, "processing l2block");
+                process_fc_message(
+                    ForkChoiceMessage::NewBlock(blockid),
+                    &mut fcm,
+                    engine.as_ref(),
+                    &csm_ctl,
+                    &status_channel,
+                )?;
+            }
+            slot += 1;
+        }
+        info!("completed check for unprocessed l2blocks");
+    }
 
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
