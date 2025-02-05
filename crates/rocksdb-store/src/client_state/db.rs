@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Context;
 use rockbound::{OptimisticTransactionDB, Schema, SchemaDBOperationsExt};
 use strata_db::{errors::*, traits::*, DbResult};
 use strata_state::operation::*;
@@ -83,7 +82,9 @@ mod tests {
     #[test]
     fn test_get_last_idx() {
         let db = setup_db();
-        let idx = db.get_last_idx::<ClientUpdateOutputSchema>().unwrap();
+        let idx = db
+            .get_last_idx::<ClientUpdateOutputSchema>()
+            .expect("test: insert");
         assert_eq!(idx, None);
     }
 
@@ -93,16 +94,17 @@ mod tests {
         let db = setup_db();
 
         let res = db.put_client_update(2, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 2))));
+        assert!(matches!(res, Err(DbError::OooInsert("consensus_store", 2))));
 
-        let res = db.put_client_update(1, output.clone());
-        assert!(res.is_ok());
+        let _ = db
+            .put_client_update(0, output.clone())
+            .expect("test: insert");
 
-        let res = db.put_client_update(1, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 1))));
+        let res = db.put_client_update(0, output.clone());
+        assert!(matches!(res, Err(DbError::OooInsert("consensus_store", 0))));
 
-        let res = db.put_client_update(3, output.clone());
-        assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("consensus_store", 3))));
+        let res = db.put_client_update(2, output.clone());
+        assert!(matches!(res, Err(DbError::OooInsert("consensus_store", 2))));
     }
 
     #[test]
@@ -110,36 +112,34 @@ mod tests {
         let db = setup_db();
 
         let idx = db.get_last_state_idx();
-        assert!(idx.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
+        assert!(matches!(idx, Err(DbError::NotBootstrapped)));
 
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
-        let _ = db.put_client_update(1, output.clone());
+        let _ = db
+            .put_client_update(0, output.clone())
+            .expect("test: insert");
+        let _ = db
+            .put_client_update(1, output.clone())
+            .expect("test: insert");
 
-        let idx = db.get_last_state_idx();
-        assert!(idx.is_ok_and(|x| matches!(x, 1)));
+        let idx = db.get_last_state_idx().expect("test: get last");
+        assert_eq!(idx, 1);
     }
 
     #[test]
-    fn test_get_consensus_state() {
+    fn test_get_consensus_update() {
         let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
 
         let db = setup_db();
-        let _ = db.put_client_update(1, output.clone());
+        let _ = db
+            .put_client_update(0, output.clone())
+            .expect("test: insert");
 
-        let update = db.get_client_update(1).unwrap().unwrap();
-        let state = update.state();
-        assert_eq!(state, output.state());
-    }
+        let _ = db
+            .put_client_update(1, output.clone())
+            .expect("test: insert");
 
-    #[test]
-    fn test_get_consensus_actions() {
-        let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
-
-        let db = setup_db();
-        let _ = db.put_client_update(1, output.clone());
-
-        let update = db.get_client_update(1).unwrap().unwrap();
-        let actions = update.actions();
-        assert_eq!(actions, output.actions());
+        let update = db.get_client_update(1).expect("test: get").unwrap();
+        assert_eq!(update, output);
     }
 }

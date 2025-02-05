@@ -43,7 +43,7 @@ impl ClientStateManager {
             Err(DbError::NotBootstrapped) => {
                 warn!("haven't bootstrapped yet, unable to prepopulate the cur state cache");
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(e),
         }
 
         Ok(Self {
