@@ -5,11 +5,9 @@ use strata_crypto::verify_schnorr_sig;
 use strata_primitives::{
     buf::{Buf32, Buf64},
     l1::L1BlockCommitment,
-    l2::L2BlockCommitment,
+    l2::{L2BlockCommitment, L2BlockId},
 };
 use zkaleido::{Proof, ProofReceipt, PublicValues};
-
-use crate::id::L2BlockId;
 
 /// Consolidates all information required to describe and verify a batch checkpoint.
 /// This includes metadata about the batch, the state transitions, checkpoint base state,
@@ -25,8 +23,9 @@ pub struct BatchCheckpoint {
     /// Transition data for L1 and L2 states, which is verified by the proof.
     transition: BatchTransition,
 
-    /// Reference state against which batch transitions and corresponding proof is verified
-    checkpoint_base_state: CheckpointBaseState,
+    /// Reference state commitment against which batch transition and corresponding proof is
+    /// verified
+    checkpoint_base_state: CheckpointBaseStateCommitment,
 
     /// Proof for the batch obtained from prover manager
     proof: Proof,
@@ -36,7 +35,7 @@ impl BatchCheckpoint {
     pub fn new(
         batch_info: BatchInfo,
         transition: BatchTransition,
-        checkpoint_base_state: CheckpointBaseState,
+        checkpoint_base_state: CheckpointBaseStateCommitment,
         proof: Proof,
     ) -> Self {
         Self {
@@ -55,7 +54,7 @@ impl BatchCheckpoint {
         &self.transition
     }
 
-    pub fn checkpoint_base_state(&self) -> &CheckpointBaseState {
+    pub fn checkpoint_base_state(&self) -> &CheckpointBaseStateCommitment {
         &self.checkpoint_base_state
     }
 
@@ -137,14 +136,52 @@ pub struct BatchInfo {
     /// Checkpoint epoch
     pub epoch: u64,
 
-    /// L1 height range(inclusive) the checkpoint covers
+    /// L1 block range(inclusive) the checkpoint covers
     pub l1_range: (L1BlockCommitment, L1BlockCommitment),
 
-    /// L2 height range(inclusive) the checkpoint covers
+    /// L2 block range(inclusive) the checkpoint covers
     pub l2_range: (L2BlockCommitment, L2BlockCommitment),
+}
 
-    /// The last L2 block upto which this checkpoint covers since the previous checkpoint
-    pub l2_blockid: L2BlockId,
+impl BatchInfo {
+    pub fn new(
+        checkpoint_idx: u64,
+        l1_range: (L1BlockCommitment, L1BlockCommitment),
+        l2_range: (L2BlockCommitment, L2BlockCommitment),
+    ) -> Self {
+        Self {
+            epoch: checkpoint_idx,
+            l1_range,
+            l2_range,
+        }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    /// Returns the final L2 block commitment in the batch's L2 range.
+    pub fn final_l2_blockid(&self) -> &L2BlockId {
+        self.l2_range.1.blkid()
+    }
+
+    /// check for whether the l2 block is covered by the checkpoint
+    pub fn includes_l2_block(&self, l2_block_height: u64) -> bool {
+        let (_, last_l2_commitment) = self.l2_range;
+        if l2_block_height <= last_l2_commitment.slot() {
+            return true;
+        }
+        false
+    }
+
+    /// check for whether the l1 block is covered by the checkpoint
+    pub fn includes_l1_block(&self, l1_block_height: u64) -> bool {
+        let (_, last_l1_commitment) = self.l1_range;
+        if l1_block_height <= last_l1_commitment.height() {
+            return true;
+        }
+        false
+    }
 }
 
 /// Describes state transitions for both L1 and L2, along with a commitment to the
@@ -186,13 +223,13 @@ impl BatchTransition {
     }
 
     /// Creates a [`CheckpointBaseState`] by taking the initial state of the [`BatchTransition`]
-    pub fn get_initial_checkpoint_base_state(&self) -> CheckpointBaseState {
-        CheckpointBaseState::new(self.l1_transition.0, self.l2_transition.0)
+    pub fn get_initial_checkpoint_base_state(&self) -> CheckpointBaseStateCommitment {
+        CheckpointBaseStateCommitment::new(self.l1_transition.0, self.l2_transition.0)
     }
 
     /// Creates a [`CheckpointBaseState`] by taking the final state of the [`BatchTransition`]
-    pub fn get_final_checkpoint_base_state(&self) -> CheckpointBaseState {
-        CheckpointBaseState::new(self.l1_transition.1, self.l2_transition.1)
+    pub fn get_final_checkpoint_base_state(&self) -> CheckpointBaseStateCommitment {
+        CheckpointBaseStateCommitment::new(self.l1_transition.1, self.l2_transition.1)
     }
 
     pub fn rollup_params_commitment(&self) -> Buf32 {
@@ -200,49 +237,8 @@ impl BatchTransition {
     }
 }
 
-impl BatchInfo {
-    pub fn new(
-        checkpoint_idx: u64,
-        l1_range: (L1BlockCommitment, L1BlockCommitment),
-        l2_range: (L2BlockCommitment, L2BlockCommitment),
-        l2_blockid: L2BlockId,
-    ) -> Self {
-        Self {
-            epoch: checkpoint_idx,
-            l1_range,
-            l2_range,
-            l2_blockid,
-        }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
-
-    pub fn l2_blockid(&self) -> &L2BlockId {
-        &self.l2_blockid
-    }
-
-    /// check for whether the l2 block is covered by the checkpoint
-    pub fn includes_l2_block(&self, l2_block_height: u64) -> bool {
-        let (_, last_l2_commitment) = self.l2_range;
-        if l2_block_height <= last_l2_commitment.slot() {
-            return true;
-        }
-        false
-    }
-
-    /// check for whether the l1 block is covered by the checkpoint
-    pub fn includes_l1_block(&self, l1_block_height: u64) -> bool {
-        let (_, last_l1_commitment) = self.l1_range;
-        if l1_block_height <= last_l1_commitment.height() {
-            return true;
-        }
-        false
-    }
-}
-
-/// Represents the reference state against which batch transitions and proofs are verified.
+/// Represents the reference state commitment against which batch transitions and proofs are
+/// verified.
 ///
 /// NOTE/TODO: This state serves as the starting point for verifying a checkpoint proof. If we move
 /// towards a strict mode where we prove each checkpoint recursively, this should be replaced with
@@ -250,12 +246,12 @@ impl BatchInfo {
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
-pub struct CheckpointBaseState {
+pub struct CheckpointBaseStateCommitment {
     pub initial_l1_state: Buf32,
     pub initial_l2_state: Buf32,
 }
 
-impl CheckpointBaseState {
+impl CheckpointBaseStateCommitment {
     pub fn new(initial_l1_state: Buf32, initial_l2_state: Buf32) -> Self {
         Self {
             initial_l1_state,
@@ -267,13 +263,13 @@ impl CheckpointBaseState {
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
 pub struct CheckpointProofOutput {
     pub batch_transition: BatchTransition,
-    pub checkpoint_base_state: CheckpointBaseState,
+    pub checkpoint_base_state: CheckpointBaseStateCommitment,
 }
 
 impl CheckpointProofOutput {
     pub fn new(
         batch_transition: BatchTransition,
-        checkpoint_base_state: CheckpointBaseState,
+        checkpoint_base_state: CheckpointBaseStateCommitment,
     ) -> CheckpointProofOutput {
         Self {
             batch_transition,

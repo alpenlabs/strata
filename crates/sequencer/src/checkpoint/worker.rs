@@ -6,7 +6,7 @@ use strata_consensus_logic::csm::message::ClientUpdateNotif;
 use strata_db::{traits::Database, types::CheckpointEntry, DbError};
 use strata_primitives::{buf::Buf32, l1::L1BlockCommitment, l2::L2BlockCommitment, params::Params};
 use strata_state::{
-    batch::{BatchInfo, BatchTransition, CheckpointBaseState},
+    batch::{BatchInfo, BatchTransition, CheckpointBaseStateCommitment},
     client_state::ClientState,
 };
 use strata_storage::NodeStorage;
@@ -104,7 +104,7 @@ fn get_next_batch(
     state: &ClientState,
     storage: &NodeStorage,
     rollup_params_commitment: Buf32,
-) -> Result<(BatchInfo, BatchTransition, CheckpointBaseState), Error> {
+) -> Result<(BatchInfo, BatchTransition, CheckpointBaseStateCommitment), Error> {
     if !state.is_chain_active() {
         debug!("chain not active, no duties created");
         return Err(Error::ChainInactive);
@@ -184,7 +184,7 @@ fn get_next_batch(
             // Build the batch transition and batch info.
             let new_transition =
                 BatchTransition::new(l1_transition, l2_transition, rollup_params_commitment);
-            let new_batch = BatchInfo::new(first_checkpoint_idx, l1_range, l2_range, tip_id);
+            let new_batch = BatchInfo::new(first_checkpoint_idx, l1_range, l2_range);
             let genesis_state = new_transition.get_initial_checkpoint_base_state();
 
             Ok((new_batch, new_transition, genesis_state))
@@ -216,7 +216,7 @@ fn get_next_batch(
             let current_chain_state_root = current_chain_state.compute_state_root();
             let l2_transition = (batch_transition.l2_transition.1, current_chain_state_root);
 
-            let new_batch_info = BatchInfo::new(batch_info.epoch + 1, l1_range, l2_range, tip_id);
+            let new_batch_info = BatchInfo::new(batch_info.epoch + 1, l1_range, l2_range);
             let new_transition =
                 BatchTransition::new(l1_transition, l2_transition, rollup_params_commitment);
 

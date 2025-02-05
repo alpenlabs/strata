@@ -10,7 +10,7 @@ use strata_primitives::buf::Buf32;
 use tracing::*;
 
 use crate::{
-    batch::{BatchInfo, BatchTransition, CheckpointBaseState},
+    batch::{BatchInfo, BatchTransition, CheckpointBaseStateCommitment},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
     operation::{ClientUpdateOutput, SyncAction},
@@ -306,8 +306,8 @@ pub struct L1Checkpoint {
     /// The inner checkpoint batch transition
     pub batch_transition: BatchTransition,
 
-    /// Reference state against which batch transitions is verified
-    pub checkpoint_base_state: CheckpointBaseState,
+    /// Reference state commitment against which batch transitions is verified
+    pub checkpoint_base_state: CheckpointBaseStateCommitment,
 
     /// If the checkpoint included proof
     pub is_proved: bool,
@@ -320,7 +320,7 @@ impl L1Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
         batch_transition: BatchTransition,
-        checkpoint_base_state: CheckpointBaseState,
+        checkpoint_base_state: CheckpointBaseStateCommitment,
         is_proved: bool,
         height: u64,
     ) -> Self {

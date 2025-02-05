@@ -12,7 +12,7 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadIntent},
 };
 use strata_state::batch::{
-    BatchCheckpoint, BatchInfo, BatchTransition, CheckpointBaseState, CommitmentInfo,
+    BatchCheckpoint, BatchInfo, BatchTransition, CheckpointBaseStateCommitment, CommitmentInfo,
 };
 use zkaleido::Proof;
 
@@ -222,7 +222,7 @@ impl CheckpointEntry {
     pub fn new_pending_proof(
         info: BatchInfo,
         transition: BatchTransition,
-        checkpoint_base_state: CheckpointBaseState,
+        checkpoint_base_state: CheckpointBaseStateCommitment,
     ) -> Self {
         let checkpoint =
             BatchCheckpoint::new(info, transition, checkpoint_base_state, Proof::default());

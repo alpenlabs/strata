@@ -251,7 +251,7 @@ pub fn apply_writes_to_state(
                         panic!("operation: mismatched indices of pending checkpoint");
                     }
 
-                    let fin_blockid = *checkpt.batch_info.l2_blockid();
+                    let fin_blockid = *checkpt.batch_info.final_l2_blockid();
                     l1v.last_finalized_checkpoint = Some(checkpt);
 
                     // Update finalized blockid in StateSync

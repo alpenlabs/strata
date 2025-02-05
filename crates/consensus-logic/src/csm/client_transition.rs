@@ -312,7 +312,7 @@ fn handle_mature_l1_height(
         // If l2 blocks is not in db then finalization will happen when
         // l2Block is fetched from the network and the corresponding
         //checkpoint is already finalized.
-        let blkid = checkpt.batch_info.l2_blockid;
+        let blkid = *checkpt.batch_info.final_l2_blockid();
 
         match context.get_l2_block_data(&blkid) {
             Ok(_) => {
@@ -403,7 +403,12 @@ fn find_l1_height_for_l2_blockid(
     target_l2_blockid: &L2BlockId,
 ) -> Option<u64> {
     checkpoints
-        .binary_search_by(|checkpoint| checkpoint.batch_info.l2_blockid.cmp(target_l2_blockid))
+        .binary_search_by(|checkpoint| {
+            checkpoint
+                .batch_info
+                .final_l2_blockid()
+                .cmp(target_l2_blockid)
+        })
         .ok()
         .map(|index| checkpoints[index].height)
 }
