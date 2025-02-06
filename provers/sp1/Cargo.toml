@@ -12,8 +12,8 @@ zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v
 [build-dependencies]
 bincode.workspace = true
 cargo_metadata = "0.19.1"
-sha2.workspace = true
 cfg-if.workspace = true
+sha2.workspace = true
 sp1-helper = { git = "https://github.com/succinctlabs/sp1.git", rev = "6c5a7f2846cd3610ecd38b1641f0e370fd07ee83" }
 sp1-sdk = "4.0.0"
 
@@ -22,5 +22,4 @@ default = ["prover"]
 docker-build = []
 mock = []
 prover = ["zkaleido-sp1-adapter"]
-docker-build = []
 sp1-dev = []

@@ -21,7 +21,7 @@ pub enum L1Event {
     GenesisVerificationState(u64, HeaderVerificationState),
 }
 
-/// Indexed transaction entry taken from
+/// Indexed transaction entry taken from a block.
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub struct IndexedTxEntry<T> {
     /// Index of the transaction in the block
@@ -54,11 +54,6 @@ impl<T> IndexedTxEntry<T> {
         self.contents
     }
 }
-
-/*
- * Core protocol specific bitcoin transaction reference. A bitcoin transaction can have multiple
- * operations relevant to protocol. This is used in the context of [`BlockData`].
- */
 
 /// Container for the different kinds of messages that we could extract from a L1 tx.
 #[derive(Clone, Debug)]
@@ -110,7 +105,7 @@ impl L1TxMessages {
     }
 }
 
-/// Da data retrieved from L1 transaction.
+/// DA commitment and blob retrieved from L1 transaction.
 #[derive(Clone, Debug)]
 pub struct DaEntry {
     #[allow(unused)]
