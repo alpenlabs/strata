@@ -36,7 +36,10 @@ use revm_primitives::{
     alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
     Account,
 };
-use strata_reth_evm::{constants::BRIDGEOUT_ADDRESS, set_evm_handles};
+use strata_reth_evm::{
+    constants::{BRIDGEOUT_ADDRESS, SCHNORR_ADDRESS},
+    set_evm_handles,
+};
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},
@@ -278,6 +281,11 @@ impl EvmProcessor<InMemoryDB> {
                 continue;
             }
 
+            // Ignore strata statless precompiles
+            if address == &BRIDGEOUT_ADDRESS || address == &SCHNORR_ADDRESS {
+                continue;
+            }
+
             let state_trie_index = keccak(address);
 
             // Remove from state trie if it has been deleted.
@@ -317,12 +325,9 @@ impl EvmProcessor<InMemoryDB> {
                 code_hash: account.info.code_hash,
             };
 
-            // Skip adding BridgeOut precompile (stateless contract) to the state tree.
-            if *address != BRIDGEOUT_ADDRESS {
-                state_trie
-                    .insert_rlp(&state_trie_index, state_account)
-                    .expect("MPT is corrupted");
-            }
+            state_trie
+                .insert_rlp(&state_trie_index, state_account)
+                .expect("MPT is corrupted");
         }
 
         // Update state trie root in header.
