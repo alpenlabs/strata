@@ -32,6 +32,18 @@ x-base-bridge-client: &base-bridge-client
   depends_on:
     - sequencer
 
+x-base-prover: &base-prover
+  build:
+    context: ../
+    dockerfile: ./docker/prover-client/Dockerfile
+    args:
+      PROVER_FEATURES: "sp1"
+  image: "strata_prover_client:v0.1.0"
+  networks:
+    - strata_network
+  depends_on:
+    - sequencer-signer
+
 services:
   reth:
     <<: *base-reth
@@ -106,6 +118,25 @@ services:
     ]
     depends_on:
       - sequencer
+
+  prover-client:
+    <<: *base-prover
+    container_name: strata_prover_client
+    volumes:
+      - ./configs/params.json:/app/params.json
+      - ./.data:/app/.data
+    environment:
+      ELF_BASE_PATH: "elfs"
+    command: [
+      "--rollup-params", "params.json",
+      "--datadir", ".data",
+      "--sequencer-rpc", "http://sequencer:8432",
+      "--reth-rpc", "http://reth:8545",
+      "--bitcoind-url", "http://bitcoind:18443",
+      "--bitcoind-user", "rpcuser",
+      "--bitcoind-password","rpcpassword",
+    ]
+
 
   fullnode:
     <<: *base-client
