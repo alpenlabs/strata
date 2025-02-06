@@ -109,17 +109,87 @@ mod tests {
     use crate::test_utils::get_rocksdb_tmp_instance;
 
     #[test]
+    fn test_insert_summary_single() {
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = RBCheckpointDB::new(db, db_ops);
+
+        let summary: EpochSummary = ArbitraryGenerator::new().generate();
+        let commitment = summary.get_epoch_commitment();
+        seq_db.insert_epoch_summary(summary).expect("test: insert");
+
+        let stored = seq_db
+            .get_epoch_summary(commitment)
+            .expect("test: get")
+            .expect("test: get missing");
+        assert_eq!(stored, summary);
+
+        let commitments = seq_db
+            .get_epoch_commitments_at(commitment.epoch())
+            .expect("test: get at epoch");
+
+        assert_eq!(commitments.as_slice(), &[commitment]);
+    }
+
+    #[test]
+    fn test_insert_summary_overwrite() {
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = RBCheckpointDB::new(db, db_ops);
+
+        let summary: EpochSummary = ArbitraryGenerator::new().generate();
+        seq_db.insert_epoch_summary(summary).expect("test: insert");
+        seq_db
+            .insert_epoch_summary(summary)
+            .expect_err("test: passed unexpectedly");
+    }
+
+    #[test]
+    fn test_insert_summary_multiple() {
+        let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
+        let seq_db = RBCheckpointDB::new(db, db_ops);
+
+        let mut ag = ArbitraryGenerator::new();
+        let summary1: EpochSummary = ag.generate();
+        let epoch = summary1.epoch();
+        let summary2 = EpochSummary::new(epoch, ag.generate(), ag.generate(), ag.generate());
+
+        let commitment1 = summary1.get_epoch_commitment();
+        let commitment2 = summary2.get_epoch_commitment();
+        seq_db.insert_epoch_summary(summary1).expect("test: insert");
+        seq_db.insert_epoch_summary(summary2).expect("test: insert");
+
+        let stored1 = seq_db
+            .get_epoch_summary(commitment1)
+            .expect("test: get")
+            .expect("test: get missing");
+        assert_eq!(stored1, summary1);
+
+        let stored2 = seq_db
+            .get_epoch_summary(commitment2)
+            .expect("test: get")
+            .expect("test: get missing");
+        assert_eq!(stored2, summary2);
+
+        let mut commitments = vec![commitment1, commitment2];
+        commitments.sort();
+
+        let mut stored_commitments = seq_db
+            .get_epoch_commitments_at(epoch)
+            .expect("test: get at epoch");
+        stored_commitments.sort();
+
+        assert_eq!(stored_commitments, commitments);
+    }
+
+    #[test]
     fn test_batch_checkpoint_new_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
         let batchidx = 1;
         let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
-        seq_db
-            .put_batch_checkpoint(batchidx, checkpoint.clone())
-            .unwrap();
+        seq_db.put_checkpoint(batchidx, checkpoint.clone()).unwrap();
 
-        let retrieved_batch = seq_db.get_batch_checkpoint(batchidx).unwrap().unwrap();
+        let retrieved_batch = seq_db.get_checkpoint(batchidx).unwrap().unwrap();
         assert_eq!(checkpoint, retrieved_batch);
     }
 
@@ -130,13 +200,8 @@ mod tests {
 
         let batchidx = 1;
         let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
-        seq_db
-            .put_batch_checkpoint(batchidx, checkpoint.clone())
-            .unwrap();
-
-        seq_db
-            .put_batch_checkpoint(batchidx, checkpoint.clone())
-            .unwrap();
+        seq_db.put_checkpoint(batchidx, checkpoint.clone()).unwrap();
+        seq_db.put_checkpoint(batchidx, checkpoint.clone()).unwrap();
     }
 
     #[test]
@@ -145,11 +210,9 @@ mod tests {
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
         let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
-        seq_db
-            .put_batch_checkpoint(100, checkpoint.clone())
-            .unwrap();
-        seq_db.put_batch_checkpoint(1, checkpoint.clone()).unwrap();
-        seq_db.put_batch_checkpoint(3, checkpoint.clone()).unwrap();
+        seq_db.put_checkpoint(100, checkpoint.clone()).unwrap();
+        seq_db.put_checkpoint(1, checkpoint.clone()).unwrap();
+        seq_db.put_checkpoint(3, checkpoint.clone()).unwrap();
     }
 
     #[test]
@@ -158,17 +221,15 @@ mod tests {
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
         let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
-        seq_db
-            .put_batch_checkpoint(100, checkpoint.clone())
-            .unwrap();
-        seq_db.put_batch_checkpoint(1, checkpoint.clone()).unwrap();
-        seq_db.put_batch_checkpoint(3, checkpoint.clone()).unwrap();
+        seq_db.put_checkpoint(100, checkpoint.clone()).unwrap();
+        seq_db.put_checkpoint(1, checkpoint.clone()).unwrap();
+        seq_db.put_checkpoint(3, checkpoint.clone()).unwrap();
 
-        let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap();
+        let last_idx = seq_db.get_last_checkpoint_idx().unwrap().unwrap();
         assert_eq!(last_idx, 100);
 
-        seq_db.put_batch_checkpoint(50, checkpoint.clone()).unwrap();
-        let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap();
+        seq_db.put_checkpoint(50, checkpoint.clone()).unwrap();
+        let last_idx = seq_db.get_last_checkpoint_idx().unwrap().unwrap();
         assert_eq!(last_idx, 100);
     }
 
@@ -182,12 +243,12 @@ mod tests {
         let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
 
         for expected_idx in 0..=256 {
-            let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap_or(0);
+            let last_idx = seq_db.get_last_checkpoint_idx().unwrap().unwrap_or(0);
             assert_eq!(last_idx, expected_idx);
 
             // Insert one to db
             seq_db
-                .put_batch_checkpoint(last_idx + 1, checkpoint.clone())
+                .put_checkpoint(last_idx + 1, checkpoint.clone())
                 .unwrap();
         }
     }
