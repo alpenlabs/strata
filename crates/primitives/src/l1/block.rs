@@ -46,6 +46,7 @@ impl From<L1BlockId> for BlockHash {
 }
 
 #[derive(
+    Debug,
     Copy,
     Clone,
     Eq,

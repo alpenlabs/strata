@@ -245,13 +245,13 @@ pub fn apply_writes_to_state(
                         .last_finalized_checkpoint
                         .as_ref()
                         .is_none_or(|prev_chp| {
-                            checkpt.batch_info.idx() == prev_chp.batch_info.idx() + 1
+                            checkpt.batch_info.epoch() == prev_chp.batch_info.epoch() + 1
                         })
                     {
                         panic!("operation: mismatched indices of pending checkpoint");
                     }
 
-                    let fin_blockid = *checkpt.batch_info.l2_blockid();
+                    let fin_blockid = *checkpt.batch_info.final_l2_blockid();
                     l1v.last_finalized_checkpoint = Some(checkpt);
 
                     // Update finalized blockid in StateSync

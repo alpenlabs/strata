@@ -41,7 +41,7 @@ impl Duty {
     pub fn expiry(&self) -> Expiry {
         match self {
             Self::SignBlock(_) => Expiry::NextBlock,
-            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.idx()),
+            Self::CommitBatch(duty) => Expiry::CheckpointIdxFinalized(duty.0.batch_info().epoch()),
         }
     }
 
@@ -49,7 +49,7 @@ impl Duty {
     pub fn id(&self) -> Buf32 {
         match self {
             // We want Batch commitment duty to be unique by the checkpoint idx
-            Self::CommitBatch(duty) => compute_borsh_hash(&duty.idx()),
+            Self::CommitBatch(duty) => compute_borsh_hash(&duty.0.batch_info().epoch()),
             _ => compute_borsh_hash(self),
         }
     }
@@ -96,24 +96,22 @@ impl BlockSigningDuty {
 /// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
 /// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
-pub struct BatchCheckpointDuty {
-    checkpoint: BatchCheckpoint,
-}
+pub struct BatchCheckpointDuty(BatchCheckpoint);
 
 impl BatchCheckpointDuty {
-    /// Create new duty from [`BatchCheckpoint`]
-    pub fn new(checkpoint: BatchCheckpoint) -> Self {
-        Self { checkpoint }
+    /// Creates a new `BatchCheckpointDuty` from a `BatchCheckpoint`.
+    pub fn new(batch_checkpoint: BatchCheckpoint) -> Self {
+        Self(batch_checkpoint)
     }
 
-    /// Gen checkpoint index.
-    pub fn idx(&self) -> u64 {
-        self.checkpoint.batch_info().idx()
+    /// Consumes `self`, returning the inner `BatchCheckpoint`.
+    pub fn into_inner(self) -> BatchCheckpoint {
+        self.0
     }
 
-    /// Get reference to checkpoint.
-    pub fn checkpoint(&self) -> &BatchCheckpoint {
-        &self.checkpoint
+    /// Returns a reference to the inner `BatchCheckpoint`.
+    pub fn inner(&self) -> &BatchCheckpoint {
+        &self.0
     }
 }
 

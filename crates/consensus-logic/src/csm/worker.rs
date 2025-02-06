@@ -360,13 +360,11 @@ fn apply_action(
         SyncAction::WriteCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
                 let batch_ckp = &c.batch_checkpoint;
-                let idx = batch_ckp.batch_info().idx();
+                let idx = batch_ckp.batch_info().epoch();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Confirmed;
                 let entry = CheckpointEntry::new(
-                    batch_ckp.batch_info().clone(),
-                    batch_ckp.bootstrap_state().clone(),
-                    batch_ckp.clone().into_proof_receipt(),
+                    batch_ckp.clone(),
                     pstatus,
                     cstatus,
                     Some(c.commitment.clone().into()),
@@ -380,13 +378,11 @@ fn apply_action(
         SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
                 let batch_ckp = &c.batch_checkpoint;
-                let idx = batch_ckp.batch_info().idx();
+                let idx = batch_ckp.batch_info().epoch();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Finalized;
                 let entry = CheckpointEntry::new(
-                    batch_ckp.batch_info().clone(),
-                    batch_ckp.bootstrap_state().clone(),
-                    batch_ckp.clone().into_proof_receipt(),
+                    batch_ckp.clone(),
                     pstatus,
                     cstatus,
                     Some(c.commitment.clone().into()),

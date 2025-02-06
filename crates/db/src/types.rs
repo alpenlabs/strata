@@ -11,8 +11,10 @@ use strata_primitives::{
     buf::Buf32,
     l1::payload::{L1Payload, PayloadIntent},
 };
-use strata_state::batch::{BatchCheckpoint, BatchInfo, BootstrapState, CommitmentInfo};
-use zkaleido::ProofReceipt;
+use strata_state::batch::{
+    BaseStateCommitment, BatchCheckpoint, BatchInfo, BatchTransition, CommitmentInfo,
+};
+use zkaleido::Proof;
 
 /// Represents an intent to publish to some DA, which will be bundled for efficiency.
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
@@ -184,15 +186,8 @@ pub enum L1TxStatus {
 /// Entry corresponding to a BatchCommitment
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CheckpointEntry {
-    /// Info related to the batch
-    pub batch_info: BatchInfo,
-
-    /// Includes the initial and final hashed state of both the `L1StateTransition` and
-    /// `L2StateTransition` that happened in this batch
-    pub bootstrap: BootstrapState,
-
-    /// Proof with public values
-    pub proof: ProofReceipt,
+    /// The batch checkpoint containing metadata, state transitions, and proof data.
+    pub checkpoint: BatchCheckpoint,
 
     /// Proving Status
     pub proving_status: CheckpointProvingStatus,
@@ -206,17 +201,13 @@ pub struct CheckpointEntry {
 
 impl CheckpointEntry {
     pub fn new(
-        batch_info: BatchInfo,
-        bootstrap: BootstrapState,
-        proof: ProofReceipt,
+        checkpoint: BatchCheckpoint,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
         commitment: Option<CheckpointCommitment>,
     ) -> Self {
         Self {
-            batch_info,
-            bootstrap,
-            proof,
+            checkpoint,
             proving_status,
             confirmation_status,
             commitment,
@@ -224,15 +215,19 @@ impl CheckpointEntry {
     }
 
     pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
-        BatchCheckpoint::new(self.batch_info, self.bootstrap, self.proof.proof().clone())
+        self.checkpoint
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
-    pub fn new_pending_proof(info: BatchInfo, bootstrap: BootstrapState) -> Self {
+    pub fn new_pending_proof(
+        info: BatchInfo,
+        transition: BatchTransition,
+        base_state_commitment: BaseStateCommitment,
+    ) -> Self {
+        let checkpoint =
+            BatchCheckpoint::new(info, transition, base_state_commitment, Proof::default());
         Self::new(
-            info,
-            bootstrap,
-            ProofReceipt::default(),
+            checkpoint,
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
             None,
@@ -269,6 +264,7 @@ pub enum CheckpointConfStatus {
     Finalized,
 }
 
+// TODO: why is this needed? can this information be part of `L1Checkpoint`?
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CheckpointCommitment {
     pub blockhash: Buf32,

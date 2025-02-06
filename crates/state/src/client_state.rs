@@ -10,7 +10,7 @@ use strata_primitives::buf::Buf32;
 use tracing::*;
 
 use crate::{
-    batch::{BatchInfo, BootstrapState},
+    batch::{BaseStateCommitment, BatchInfo, BatchTransition},
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
     operation::{ClientUpdateOutput, SyncAction},
@@ -303,9 +303,11 @@ pub struct L1Checkpoint {
     /// The inner checkpoint batch info
     pub batch_info: BatchInfo,
 
-    /// The inner checkpoint batch info
-    // TODO why is this called bootstrap state?
-    pub bootstrap_state: BootstrapState,
+    /// The inner checkpoint batch transition
+    pub batch_transition: BatchTransition,
+
+    /// Reference state commitment against which batch transitions is verified
+    pub base_state_commitment: BaseStateCommitment,
 
     /// If the checkpoint included proof
     pub is_proved: bool,
@@ -317,13 +319,15 @@ pub struct L1Checkpoint {
 impl L1Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
-        bootstrap_state: BootstrapState,
+        batch_transition: BatchTransition,
+        base_state_commitment: BaseStateCommitment,
         is_proved: bool,
         height: u64,
     ) -> Self {
         Self {
             batch_info,
-            bootstrap_state,
+            batch_transition,
+            base_state_commitment,
             is_proved,
             height,
         }
@@ -496,12 +500,14 @@ impl ClientStateMut {
             if l1v
                 .last_finalized_checkpoint
                 .as_ref()
-                .is_some_and(|prev_ckpt| ckpt.batch_info.idx() != prev_ckpt.batch_info.idx() + 1)
+                .is_some_and(|prev_ckpt| {
+                    ckpt.batch_info.epoch() != prev_ckpt.batch_info.epoch() + 1
+                })
             {
                 panic!("clientstate: mismatched indices of pending checkpoint");
             }
 
-            let fin_blockid = *ckpt.batch_info.l2_blockid();
+            let fin_blockid = *ckpt.batch_info.final_l2_blockid();
             l1v.last_finalized_checkpoint = Some(ckpt);
 
             // Update finalized blockid in StateSync

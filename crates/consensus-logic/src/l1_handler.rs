@@ -187,7 +187,7 @@ pub fn verify_proof(
     rollup_params: &RollupParams,
 ) -> ZkVmResult<()> {
     let rollup_vk = rollup_params.rollup_vk;
-    let checkpoint_idx = checkpoint.batch_info().idx();
+    let checkpoint_idx = checkpoint.batch_info().epoch();
     info!(%checkpoint_idx, "verifying proof");
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
@@ -200,7 +200,7 @@ pub fn verify_proof(
         return Ok(());
     }
 
-    let expected_public_output = checkpoint.proof_output();
+    let expected_public_output = checkpoint.get_proof_output();
     let actual_public_output: CheckpointProofOutput =
         borsh::from_slice(proof_receipt.public_values().as_bytes())
             .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;

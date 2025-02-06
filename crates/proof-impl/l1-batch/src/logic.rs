@@ -5,7 +5,7 @@ use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_proofimpl_btc_blockspace::scan::process_blockscan;
 use strata_state::{
     batch::BatchCheckpoint,
-    l1::{get_btc_params, HeaderVerificationState, HeaderVerificationStateSnapshot, L1TxProof},
+    l1::{get_btc_params, HeaderVerificationState, L1TxProof},
     tx::DepositInfo,
 };
 use zkaleido::ZkVmEnv;
@@ -15,8 +15,8 @@ use zkaleido::ZkVmEnv;
 pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
     pub prev_checkpoint: Option<BatchCheckpoint>,
-    pub initial_snapshot: HeaderVerificationStateSnapshot,
-    pub final_snapshot: HeaderVerificationStateSnapshot,
+    pub initial_state_hash: Buf32,
+    pub final_state_hash: Buf32,
     pub rollup_params_commitment: Buf32,
 }
 
@@ -31,12 +31,12 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
 
     let rollup_params: RollupParams = zkvm.read_serde();
     let filter_config =
-        TxFilterConfig::derive_from(&rollup_params).expect("derive tx-filter config");
+        TxFilterConfig::derive_from(&rollup_params).expect("failed to derive tx-filter config");
 
     let num_inputs: u32 = zkvm.read_serde();
     assert!(num_inputs > 0);
 
-    let initial_snapshot = state.compute_initial_snapshot();
+    let initial_state_hash = state.compute_hash().expect("failed to compute state hash");
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
@@ -51,13 +51,13 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
         deposits.extend(blockscan_result.deposits);
         prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);
     }
-    let final_snapshot = state.compute_final_snapshot();
+    let final_state_hash = state.compute_hash().expect("failed to compute state hash");
 
     let output = L1BatchProofOutput {
         deposits,
         prev_checkpoint,
-        initial_snapshot,
-        final_snapshot,
+        initial_state_hash,
+        final_state_hash,
         rollup_params_commitment: rollup_params.compute_hash(),
     };
 

@@ -206,7 +206,8 @@ pub fn process_event(
                                 &batch_checkpoint_with_commitment.batch_checkpoint;
                             L1Checkpoint::new(
                                 batch_checkpoint.batch_info().clone(),
-                                batch_checkpoint.bootstrap_state().clone(),
+                                batch_checkpoint.batch_transition().clone(),
+                                batch_checkpoint.base_state_commitment().clone(),
                                 !batch_checkpoint.proof().is_empty(),
                                 *height,
                             )
@@ -311,7 +312,7 @@ fn handle_mature_l1_height(
         // If l2 blocks is not in db then finalization will happen when
         // l2Block is fetched from the network and the corresponding
         //checkpoint is already finalized.
-        let blkid = checkpt.batch_info.l2_blockid;
+        let blkid = *checkpt.batch_info.final_l2_blockid();
 
         match context.get_l2_block_data(&blkid) {
             Ok(_) => {
@@ -402,7 +403,12 @@ fn find_l1_height_for_l2_blockid(
     target_l2_blockid: &L2BlockId,
 ) -> Option<u64> {
     checkpoints
-        .binary_search_by(|checkpoint| checkpoint.batch_info.l2_blockid.cmp(target_l2_blockid))
+        .binary_search_by(|checkpoint| {
+            checkpoint
+                .batch_info
+                .final_l2_blockid()
+                .cmp(target_l2_blockid)
+        })
         .ok()
         .map(|index| checkpoints[index].height)
 }
@@ -437,14 +443,14 @@ pub fn filter_verified_checkpoints(
     } else {
         last_finalized
     }
-    .map(|x| (x.batch_info.idx() + 1, Some(&x.batch_info)))
+    .map(|x| (x.batch_info.epoch() + 1, Some(&x.batch_transition)))
     .unwrap_or((0, None)); // expect the first checkpoint
 
     let mut result_checkpoints = Vec::new();
 
     for checkpoint in checkpoints {
-        let curr_idx = checkpoint.batch_checkpoint.batch_info().idx;
-        let proof_receipt: ProofReceipt = checkpoint.batch_checkpoint.clone().into_proof_receipt();
+        let curr_idx = checkpoint.batch_checkpoint.batch_info().epoch;
+        let proof_receipt: ProofReceipt = checkpoint.batch_checkpoint.get_proof_receipt();
         if curr_idx != expected_idx {
             warn!(%expected_idx, %curr_idx, "Received invalid checkpoint idx, ignoring.");
             continue;
@@ -453,7 +459,7 @@ pub fn filter_verified_checkpoints(
             && verify_proof(&checkpoint.batch_checkpoint, &proof_receipt, params).is_ok()
         {
             result_checkpoints.push(checkpoint.clone());
-            last_valid_checkpoint = Some(checkpoint.batch_checkpoint.batch_info());
+            last_valid_checkpoint = Some(checkpoint.batch_checkpoint.batch_transition());
         } else if expected_idx == 0 {
             warn!(%expected_idx, "Received invalid checkpoint proof, ignoring.");
         } else {
@@ -463,8 +469,8 @@ pub fn filter_verified_checkpoints(
             let last_l2_tsn = last_valid_checkpoint
                 .expect("There should be a last_valid_checkpoint")
                 .l2_transition;
-            let l1_tsn = checkpoint.batch_checkpoint.batch_info().l1_transition;
-            let l2_tsn = checkpoint.batch_checkpoint.batch_info().l2_transition;
+            let l1_tsn = checkpoint.batch_checkpoint.batch_transition().l1_transition;
+            let l2_tsn = checkpoint.batch_checkpoint.batch_transition().l2_transition;
 
             if l1_tsn.0 != last_l1_tsn.1 {
                 warn!(obtained = ?l1_tsn.0, expected = ?last_l1_tsn.1, "Received invalid checkpoint l1 transition, ignoring.");
@@ -476,7 +482,7 @@ pub fn filter_verified_checkpoints(
             }
             if verify_proof(&checkpoint.batch_checkpoint, &proof_receipt, params).is_ok() {
                 result_checkpoints.push(checkpoint.clone());
-                last_valid_checkpoint = Some(checkpoint.batch_checkpoint.batch_info());
+                last_valid_checkpoint = Some(checkpoint.batch_checkpoint.batch_transition());
             } else {
                 warn!(%expected_idx, "Received invalid checkpoint proof, ignoring.");
                 continue;

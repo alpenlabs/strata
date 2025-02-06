@@ -116,12 +116,12 @@ impl StrataRpcImpl {
         };
 
         // in current implementation, chainstate idx == l2 block idx
-        let (_, end_slot) = last_checkpoint.batch_info.l2_range;
+        let (_, end_commitment) = last_checkpoint.batch_info.l2_range;
 
         Ok(self
             .storage
             .chainstate()
-            .get_toplevel_chainstate_async(end_slot)
+            .get_toplevel_chainstate_async(end_commitment.slot())
             .await?
             .map(Arc::new))
     }
@@ -552,7 +552,7 @@ impl StrataApiServer for StrataRpcImpl {
             Ok(client_state
                 .l1_view()
                 .last_finalized_checkpoint()
-                .map(|checkpoint| checkpoint.batch_info.idx()))
+                .map(|checkpoint| checkpoint.batch_info.epoch()))
         } else {
             // get latest checkpoint index from db
             let idx = self
@@ -741,10 +741,10 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         verify_proof(&checkpoint, &proof_receipt, self.params.rollup())
             .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
 
-        entry.proof = proof_receipt;
+        entry.checkpoint.update_proof(proof_receipt.proof().clone());
         entry.proving_status = CheckpointProvingStatus::ProofReady;
 
-        debug!(%idx, "Proof is pending, setting proof reaedy");
+        debug!(%idx, "Proof is pending, setting proof ready");
 
         self.checkpoint_handle
             .put_checkpoint(idx, entry)
