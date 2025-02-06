@@ -25,7 +25,7 @@ where
             }
         };
 
-        info!("got {} duties", duties.len());
+        info!(count = %duties.len(), "got new duties");
 
         for duty in duties {
             if duty_tx.send(duty).await.is_err() {

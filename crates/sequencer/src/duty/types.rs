@@ -26,6 +26,9 @@ pub enum Expiry {
     CheckpointIdxFinalized(u64),
 }
 
+/// Unique identifier for a duty.
+pub type DutyId = Buf32;
+
 /// Duties the sequencer might carry out.
 #[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
@@ -46,7 +49,7 @@ impl Duty {
     }
 
     /// Returns a unique identifier for the duty.
-    pub fn id(&self) -> Buf32 {
+    pub fn id(&self) -> DutyId {
         match self {
             // We want Batch commitment duty to be unique by the checkpoint idx
             Self::CommitBatch(duty) => compute_borsh_hash(&duty.0.batch_info().epoch()),
