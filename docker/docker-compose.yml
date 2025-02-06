@@ -158,6 +158,8 @@ services:
       - ./.data/bridge-client-1:/app/.data
     ports:
       - 4781:4781
+    profiles:
+      - bridge
 
   bridge-client-2:
     <<: *base-bridge-client
@@ -167,6 +169,8 @@ services:
       - ./.data/bridge-client-2:/app/.data
     ports:
       - 4782:4781
+    profiles:
+      - bridge
 
 networks:
   strata_network:
