@@ -8,11 +8,8 @@ use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
-    filter::{
-        indexer::{BlockIndexer, OpIndexer},
-        TxFilterConfig,
-    },
-    messages::{BlockData, L1Event},
+    filter::{indexer::index_block, TxFilterConfig},
+    messages::{BlockData, L1Event, RelevantTxEntry},
 };
 use strata_primitives::params::Params;
 use strata_state::l1::{
@@ -24,7 +21,7 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    reader::{state::ReaderState, tx_indexer::ClientTxIndexer},
+    reader::{state::ReaderState, tx_indexer::ReaderTxVisitorImpl},
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -33,12 +30,16 @@ use crate::{
 struct ReaderContext<R: ReaderRpc> {
     /// Bitcoin reader client
     client: Arc<R>,
+
     /// L1Event sender
     event_tx: mpsc::Sender<L1Event>,
+
     /// Config
     config: Arc<ReaderConfig>,
+
     /// Params
     params: Arc<Params>,
+
     /// Status transmitter
     status_channel: StatusChannel,
 }
@@ -141,6 +142,7 @@ async fn handle_new_filter_rule<R: ReaderRpc>(
     if ctx.event_tx.send(revert_ev).await.is_err() {
         warn!("unable to submit L1 reorg event, did persistence task exit?");
     }
+
     Ok(())
 }
 
@@ -326,14 +328,13 @@ async fn process_block<R: ReaderRpc>(
     let txs = block.txdata.len();
     let params = ctx.params.clone();
 
-    // Index ops
-    let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), state.filter_config());
-    let (tx_entries, _dep_reqs, _da_entries) =
-        ops_indexer.index_block(&block).finalize().into_parts();
+    // Index all the stuff in the block.
+    let entries: Vec<RelevantTxEntry> =
+        index_block(&block, ReaderTxVisitorImpl::new, state.filter_config());
 
     // TODO: do stuffs with dep_reqs and da_entries
 
-    let block_data = BlockData::new(height, block, tx_entries);
+    let block_data = BlockData::new(height, block, entries);
 
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");

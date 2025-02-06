@@ -1,10 +1,7 @@
-use digest::Digest;
-use sha2::Sha256;
 use strata_l1tx::{
-    filter::indexer::TxIndexer,
-    messages::{DaEntry, L1TxExtract},
+    filter::indexer::TxVisitor,
+    messages::{DaEntry, L1TxMessages},
 };
-use strata_primitives::buf::Buf32;
 use strata_state::{
     batch::SignedBatchCheckpoint,
     tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
@@ -12,13 +9,13 @@ use strata_state::{
 
 /// Ops indexer for rollup client. Collects extra info like da blobs and deposit requests
 #[derive(Clone, Debug)]
-pub struct ClientTxIndexer {
+pub struct ReaderTxVisitorImpl {
     ops: Vec<ProtocolOperation>,
     deposit_requests: Vec<DepositRequestInfo>,
     da_entries: Vec<DaEntry>,
 }
 
-impl ClientTxIndexer {
+impl ReaderTxVisitorImpl {
     pub fn new() -> Self {
         Self {
             ops: Vec::new(),
@@ -32,39 +29,39 @@ impl ClientTxIndexer {
     }
 }
 
-impl TxIndexer for ClientTxIndexer {
+impl TxVisitor for ReaderTxVisitorImpl {
+    type Output = L1TxMessages;
+
     fn visit_da<'a>(&mut self, chunks: impl Iterator<Item = &'a [u8]>) {
-        let mut hasher = Sha256::new();
-        let mut blob = Vec::new();
-
-        for chunk in chunks {
-            hasher.update(chunk);
-            blob.extend_from_slice(chunk);
-        }
-        let hash: [u8; 32] = hasher.finalize().into();
-        let commitment: Buf32 = hash.into();
-
-        self.ops.push(ProtocolOperation::DaCommitment(commitment));
-        // Collect da
-        self.da_entries
-            .push(DaEntry::new_unchecked(commitment, blob));
+        let da_entry = DaEntry::from_chunks(chunks);
+        self.ops
+            .push(ProtocolOperation::DaCommitment(*da_entry.commitment()));
+        self.da_entries.push(da_entry);
     }
 
     fn visit_deposit(&mut self, d: DepositInfo) {
         self.ops.push(ProtocolOperation::Deposit(d));
     }
 
-    fn visit_deposit_request(&mut self, d: DepositRequestInfo) {
-        self.ops.push(ProtocolOperation::DepositRequest(d.clone()));
-        self.deposit_requests.push(d);
+    fn visit_deposit_request(&mut self, dr: DepositRequestInfo) {
+        self.ops.push(ProtocolOperation::DepositRequest(dr.clone()));
+        self.deposit_requests.push(dr);
     }
 
     fn visit_checkpoint(&mut self, chkpt: SignedBatchCheckpoint) {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
-    fn finalize(self) -> L1TxExtract {
-        L1TxExtract::new(self.ops, self.deposit_requests, self.da_entries)
+    fn finalize(self) -> Option<L1TxMessages> {
+        if self.ops.is_empty() && self.deposit_requests.is_empty() && self.da_entries.is_empty() {
+            None
+        } else {
+            Some(L1TxMessages::new(
+                self.ops,
+                self.deposit_requests,
+                self.da_entries,
+            ))
+        }
     }
 }
 
@@ -75,10 +72,7 @@ mod test {
         hashes::Hash,
         Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode,
     };
-    use strata_l1tx::filter::{
-        indexer::{BlockIndexer, OpIndexer},
-        TxFilterConfig,
-    };
+    use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
     use strata_primitives::{
         l1::{payload::L1Payload, BitcoinAmount},
         params::Params,
@@ -93,7 +87,9 @@ mod test {
         ArbitraryGenerator,
     };
 
-    use crate::{reader::tx_indexer::ClientTxIndexer, test_utils::create_checkpoint_envelope_tx};
+    use crate::{
+        reader::tx_indexer::ReaderTxVisitorImpl, test_utils::create_checkpoint_envelope_tx,
+    };
 
     const TEST_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
 
@@ -134,12 +130,11 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
-        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
+        let tx_entries = index_block(&block, ReaderTxVisitorImpl::new, &filter_config);
 
         assert_eq!(tx_entries.len(), 1, "Should find one relevant transaction");
 
-        for op in tx_entries[0].proto_ops() {
+        for op in tx_entries[0].contents().protocol_ops() {
             if let ProtocolOperation::Deposit(deposit_info) = op {
                 assert_eq!(deposit_info.address, ee_addr, "EE address should match");
                 assert_eq!(
@@ -178,8 +173,11 @@ mod test {
 
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
-        let (_, dep_reqs, _) = ops_indexer.index_block(&block).finalize().into_parts();
+        let tx_entries = index_block(&block, ReaderTxVisitorImpl::new, &filter_config);
+        let dep_reqs = tx_entries
+            .iter()
+            .flat_map(|tx| tx.contents().deposit_reqs())
+            .collect::<Vec<_>>();
 
         assert_eq!(dep_reqs.len(), 1, "Should find one deposit request");
 
@@ -205,8 +203,7 @@ mod test {
 
         let block = create_test_block(vec![irrelevant_tx]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
-        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
+        let tx_entries = index_block(&block, ReaderTxVisitorImpl::new, &filter_config);
 
         assert!(
             tx_entries.is_empty(),
@@ -240,14 +237,13 @@ mod test {
 
         let block = create_test_block(vec![tx1, tx2]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
-        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
+        let tx_entries = index_block(&block, ReaderTxVisitorImpl::new, &filter_config);
 
         assert_eq!(tx_entries.len(), 2, "Should find two relevant transactions");
 
         for (i, info) in tx_entries
             .iter()
-            .flat_map(|op_txs| op_txs.proto_ops())
+            .flat_map(|op_txs| op_txs.contents().protocol_ops())
             .enumerate()
         {
             if let ProtocolOperation::Deposit(deposit_info) = info {
@@ -304,8 +300,7 @@ mod test {
         // Create a block with single tx that has multiple ops
         let block = create_test_block(vec![tx]);
 
-        let ops_indexer = OpIndexer::new(ClientTxIndexer::new(), &filter_config);
-        let (tx_entries, _, _) = ops_indexer.index_block(&block).finalize().into_parts();
+        let tx_entries = index_block(&block, ReaderTxVisitorImpl::new, &filter_config);
 
         assert_eq!(
             tx_entries.len(),
@@ -313,14 +308,14 @@ mod test {
             "Should find one matching transaction entry"
         );
         assert_eq!(
-            tx_entries[0].proto_ops().len(),
+            tx_entries[0].contents().protocol_ops().len(),
             2,
             "Should find two protocol ops"
         );
 
         let mut dep_count = 0;
         let mut ckpt_count = 0;
-        for op in tx_entries[0].proto_ops() {
+        for op in tx_entries[0].contents().protocol_ops() {
             match op {
                 ProtocolOperation::Deposit(_) => dep_count += 1,
                 ProtocolOperation::Checkpoint(_) => ckpt_count += 1,

@@ -1,9 +1,8 @@
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, hash};
 use strata_state::{
     l1::HeaderVerificationState,
-    tx::{DepositRequestInfo, ProtocolOperation},
+    tx::{DaCommitment, DepositRequestInfo, ProtocolOperation},
 };
 
 /// L1 events that we observe and want the persistence task to work on.
@@ -22,44 +21,60 @@ pub enum L1Event {
     GenesisVerificationState(u64, HeaderVerificationState),
 }
 
-/// Core protocol specific bitcoin transaction reference. A bitcoin transaction can have multiple
-/// operations relevant to protocol. This is used in the context of [`BlockData`].
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
-pub struct ProtocolTxEntry {
+/// Indexed transaction entry taken from
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+pub struct IndexedTxEntry<T> {
     /// Index of the transaction in the block
     index: u32,
-    /// The operation that is to be applied on data
-    proto_ops: Vec<ProtocolOperation>,
+
+    /// Contents emitted from the visitor that was ran on this tx.
+    ///
+    /// This is probably a list of protocol operations.
+    contents: T,
 }
 
-impl ProtocolTxEntry {
-    /// Creates a new [`ProtocolTxEntry`]
-    pub fn new(index: u32, proto_ops: Vec<ProtocolOperation>) -> Self {
-        Self { index, proto_ops }
+impl<T> IndexedTxEntry<T> {
+    /// Creates a new instance.
+    pub fn new(index: u32, contents: T) -> Self {
+        Self { index, contents }
     }
 
-    /// Returns the index of the transaction
+    /// Returns the position of the transaction within the block.
     pub fn index(&self) -> u32 {
         self.index
     }
 
-    /// Returns a reference to the protocol operation
-    pub fn proto_ops(&self) -> &[ProtocolOperation] {
-        &self.proto_ops
+    /// Returns a reference to the contents.
+    pub fn contents(&self) -> &T {
+        &self.contents
+    }
+
+    /// "Unwraps" the entry into its contents.
+    pub fn into_contents(self) -> T {
+        self.contents
     }
 }
 
-/// Consolidation of items extractable from an L1 Transaction.
-pub struct L1TxExtract {
-    // Protocol operations relevant to STF.
+/*
+ * Core protocol specific bitcoin transaction reference. A bitcoin transaction can have multiple
+ * operations relevant to protocol. This is used in the context of [`BlockData`].
+ */
+
+/// Container for the different kinds of messages that we could extract from a L1 tx.
+#[derive(Clone, Debug)]
+pub struct L1TxMessages {
+    /// Protocol consensus operations relevant to STF.
     protocol_ops: Vec<ProtocolOperation>,
-    // Deposit requests which the node stores for non-stf related bookkeeping.
+
+    /// Deposit requests which the node stores for non-stf related bookkeeping.
     deposit_reqs: Vec<DepositRequestInfo>,
-    // DA entries which the node stores for state reconstruction.
+
+    /// DA entries which the node stores for state reconstruction.  These MUST
+    /// reflect messages found in `ProtocolOperation`.
     da_entries: Vec<DaEntry>,
 }
 
-impl L1TxExtract {
+impl L1TxMessages {
     pub fn new(
         protocol_ops: Vec<ProtocolOperation>,
         deposit_reqs: Vec<DepositRequestInfo>,
@@ -95,99 +110,98 @@ impl L1TxExtract {
     }
 }
 
-/// Consolidation of items extractable from an L1 Block.
-pub struct L1BlockExtract {
-    // Transaction entries that contain protocol operations.
-    tx_entries: Vec<ProtocolTxEntry>,
-    // Deposit requests which the node stores for non-stf related bookkeeping.
-    deposit_reqs: Vec<DepositRequestInfo>,
-    // DA entries which the node stores for state reconstruction.
-    da_entries: Vec<DaEntry>,
-}
-
-impl L1BlockExtract {
-    pub fn new(
-        tx_entries: Vec<ProtocolTxEntry>,
-        deposit_reqs: Vec<DepositRequestInfo>,
-        da_entries: Vec<DaEntry>,
-    ) -> Self {
-        Self {
-            tx_entries,
-            deposit_reqs,
-            da_entries,
-        }
-    }
-
-    pub fn tx_entries(&self) -> &[ProtocolTxEntry] {
-        &self.tx_entries
-    }
-
-    pub fn deposit_reqs(&self) -> &[DepositRequestInfo] {
-        &self.deposit_reqs
-    }
-
-    pub fn da_entries(&self) -> &[DaEntry] {
-        &self.da_entries
-    }
-
-    pub fn into_parts(self) -> (Vec<ProtocolTxEntry>, Vec<DepositRequestInfo>, Vec<DaEntry>) {
-        (self.tx_entries, self.deposit_reqs, self.da_entries)
-    }
-}
-
 /// Da data retrieved from L1 transaction.
 #[derive(Clone, Debug)]
 pub struct DaEntry {
     #[allow(unused)]
-    commitment: Buf32,
+    commitment: DaCommitment,
+
     #[allow(unused)]
-    blob: Vec<u8>,
+    blob_buf: Vec<u8>,
 }
 
 impl DaEntry {
-    /// Creates a new `DaEntry` instance that doesn't check that the commitment actually corresponds
-    /// to the blob.
-    pub fn new_unchecked(commitment: Buf32, blob: Vec<u8>) -> Self {
-        Self { commitment, blob }
+    /// Creates a new `DaEntry` instance without checking that the commitment
+    /// actually corresponds to the blob.
+    pub fn new_unchecked(commitment: DaCommitment, blob_buf: Vec<u8>) -> Self {
+        Self {
+            commitment,
+            blob_buf,
+        }
     }
 
+    /// Creates a new instance for a blob, generating the commitment.
     pub fn new(blob: Vec<u8>) -> Self {
-        let commitment = hash::raw(&blob);
-        Self { commitment, blob }
+        let commitment = DaCommitment::from_buf(&blob);
+        Self::new_unchecked(commitment, blob)
+    }
+
+    /// Creates a new instance from an iterator over contiguous chunks of bytes.
+    ///
+    /// This is intended to be used when extracting data from an in-situ bitcoin
+    /// tx, which has a requirement that data is in 520 byte chunks.
+    pub fn from_chunks<'a>(chunks: impl Iterator<Item = &'a [u8]>) -> Self {
+        // I'm not sure if I can just like `.flatten().copied().collect()` this
+        // efficiently how it looks like you can.
+        let mut buf = Vec::new();
+        chunks.for_each(|chunk| buf.extend_from_slice(chunk));
+
+        Self::new(buf)
+    }
+
+    pub fn commitment(&self) -> &DaCommitment {
+        &self.commitment
+    }
+
+    pub fn blob_buf(&self) -> &[u8] {
+        &self.blob_buf
+    }
+
+    pub fn into_blob_buf(self) -> Vec<u8> {
+        self.blob_buf
     }
 }
 
-/// Store the bitcoin block and references to the relevant transactions within the block
+/// Indexed tx entry with some messages.
+pub type RelevantTxEntry = IndexedTxEntry<L1TxMessages>;
+
+/// Stores the bitcoin block and interpretations of relevant transactions within
+/// the block.
 #[derive(Clone, Debug)]
 pub struct BlockData {
+    /// Block number.
     block_num: u64,
+
+    /// Raw block data.
+    // TODO remove?
     block: Block,
+
     /// Transactions in the block that contain protocol operations
-    protocol_txs: Vec<ProtocolTxEntry>,
+    relevant_txs: Vec<RelevantTxEntry>,
 }
 
 impl BlockData {
-    pub fn new(block_num: u64, block: Block, protocol_txs: Vec<ProtocolTxEntry>) -> Self {
+    pub fn new(block_num: u64, block: Block, relevant_txs: Vec<RelevantTxEntry>) -> Self {
         Self {
             block_num,
             block,
-            protocol_txs,
+            relevant_txs,
         }
+    }
+
+    pub fn block_num(&self) -> u64 {
+        self.block_num
     }
 
     pub fn block(&self) -> &Block {
         &self.block
     }
 
-    pub fn protocol_tx_idxs(&self) -> impl Iterator<Item = u32> + '_ {
-        self.protocol_txs.iter().map(|v| v.index)
+    pub fn relevant_txs(&self) -> &[RelevantTxEntry] {
+        &self.relevant_txs
     }
 
-    pub fn protocol_txs(&self) -> &[ProtocolTxEntry] {
-        &self.protocol_txs
-    }
-
-    pub fn block_num(&self) -> u64 {
-        self.block_num
+    pub fn tx_idxs_iter(&self) -> impl Iterator<Item = u32> + '_ {
+        self.relevant_txs.iter().map(|v| v.index)
     }
 }
