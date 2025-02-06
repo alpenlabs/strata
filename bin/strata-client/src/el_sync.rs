@@ -1,6 +1,21 @@
-use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
+use strata_db::DbError;
+use strata_eectl::{engine::ExecEngineCtl, errors::EngineError, messages::ExecPayloadData};
+use strata_state::id::L2BlockId;
 use strata_storage::NodeStorage;
+use thiserror::Error;
 use tracing::{debug, info};
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("missing chainstate for slot {0}")]
+    MissingChainstate(u64),
+    #[error("missing l2block {0}")]
+    MissingL2Block(L2BlockId),
+    #[error("db: {0}")]
+    Db(#[from] DbError),
+    #[error("engine: {0}")]
+    Engine(#[from] EngineError),
+}
 
 /// Sync missing blocks in EL using payloads stored in L2 block database.
 ///
@@ -8,7 +23,7 @@ use tracing::{debug, info};
 pub fn sync_chainstate_to_el(
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
-) -> anyhow::Result<()> {
+) -> Result<(), Error> {
     let chainstate_manager = storage.chainstate();
     let l2_block_manager = storage.l2();
     let earliest_idx = chainstate_manager.get_earliest_write_idx_blocking()?;
@@ -19,7 +34,7 @@ pub fn sync_chainstate_to_el(
     // last idx of chainstate whose corresponding block is present in el
     let sync_from_idx = find_last_match((earliest_idx, latest_idx), |idx| {
         let Some(chain_state) = chainstate_manager.get_toplevel_chainstate_blocking(idx)? else {
-            anyhow::bail!(format!("Missing chain state idx: {}", idx));
+            return Err(Error::MissingChainstate(idx));
         };
 
         let block_id = chain_state.chain_tip_blkid();
@@ -34,13 +49,13 @@ pub fn sync_chainstate_to_el(
     for idx in sync_from_idx..=latest_idx {
         debug!(?idx, "Syncing chainstate");
         let Some(chain_state) = chainstate_manager.get_toplevel_chainstate_blocking(idx)? else {
-            anyhow::bail!(format!("Missing chain state idx: {}", idx));
+            return Err(Error::MissingChainstate(idx));
         };
 
         let block_id = chain_state.chain_tip_blkid();
 
         let Some(l2block) = l2_block_manager.get_block_data_blocking(block_id)? else {
-            anyhow::bail!(format!("Missing L2 block idx: {}", block_id));
+            return Err(Error::MissingL2Block(*block_id));
         };
 
         let payload = ExecPayloadData::from_l2_block_bundle(&l2block);
@@ -54,8 +69,8 @@ pub fn sync_chainstate_to_el(
 
 fn find_last_match(
     range: (u64, u64),
-    predicate: impl Fn(u64) -> anyhow::Result<bool>,
-) -> anyhow::Result<Option<u64>> {
+    predicate: impl Fn(u64) -> Result<bool, Error>,
+) -> Result<Option<u64>, Error> {
     let (mut left, mut right) = range;
 
     // Check the leftmost value first
@@ -82,7 +97,7 @@ fn find_last_match(
 
 #[cfg(test)]
 mod tests {
-    use crate::el_sync::find_last_match;
+    use super::*;
 
     #[test]
     fn test_find_last_match() {
@@ -96,8 +111,8 @@ mod tests {
         // got error
         let error_message = "intentional error for test";
         assert!(matches!(
-            find_last_match((0, 5), |_| anyhow::bail!(error_message)),
-            Err(err) if err.to_string() == error_message
+            find_last_match((0, 5), |_| Err(EngineError::Other(error_message.into()))?),
+            Err(err) if err.to_string().contains(error_message)
         ));
     }
 }
