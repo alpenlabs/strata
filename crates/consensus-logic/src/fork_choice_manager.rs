@@ -222,35 +222,13 @@ pub fn tracker_task<E: ExecEngineCtl>(
     };
     info!(%finalized_blockid, "forkchoice manager started");
 
-    {
-        info!("check for unprocessed l2blocks");
-        // check if there are unprocessed L2 blocks in db. if there are, we need to process them.
-        let l2_block_manager = storage.l2();
-        let mut slot = fcm.cur_index;
-        loop {
-            let blocksids = l2_block_manager.get_blocks_at_height_blocking(slot)?;
-            if blocksids.is_empty() {
-                break;
-            }
-            warn!(?blocksids, ?slot, "found extra l2blocks");
-            for blockid in blocksids {
-                let status = l2_block_manager.get_block_status_blocking(&blockid)?;
-                if let Some(BlockStatus::Invalid) = status {
-                    continue;
-                }
-                warn!(?blockid, "processing l2block");
-                process_fc_message(
-                    ForkChoiceMessage::NewBlock(blockid),
-                    &mut fcm,
-                    engine.as_ref(),
-                    &csm_ctl,
-                    &status_channel,
-                )?;
-            }
-            slot += 1;
-        }
-        info!("completed check for unprocessed l2blocks");
-    }
+    handle_unprocessed_blocks(
+        &mut fcm,
+        &storage,
+        engine.as_ref(),
+        &csm_ctl,
+        &status_channel,
+    )?;
 
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
@@ -264,6 +242,46 @@ pub fn tracker_task<E: ExecEngineCtl>(
         error!(err = ?e, "tracker aborted");
         return Err(e);
     }
+
+    Ok(())
+}
+
+/// Check if there are unprocessed L2 blocks in db.
+/// If there are, pass them to fcm.
+fn handle_unprocessed_blocks(
+    fcm: &mut ForkChoiceManager,
+    storage: &NodeStorage,
+    engine: &impl ExecEngineCtl,
+    csm_ctl: &CsmController,
+    status_channel: &StatusChannel,
+) -> anyhow::Result<()> {
+    info!("check for unprocessed l2blocks");
+
+    let l2_block_manager = storage.l2();
+    let mut slot = fcm.cur_index;
+    loop {
+        let blocksids = l2_block_manager.get_blocks_at_height_blocking(slot)?;
+        if blocksids.is_empty() {
+            break;
+        }
+        warn!(?blocksids, ?slot, "found extra l2blocks");
+        for blockid in blocksids {
+            let status = l2_block_manager.get_block_status_blocking(&blockid)?;
+            if let Some(BlockStatus::Invalid) = status {
+                continue;
+            }
+            warn!(?blockid, "processing l2block");
+            process_fc_message(
+                ForkChoiceMessage::NewBlock(blockid),
+                fcm,
+                engine,
+                csm_ctl,
+                status_channel,
+            )?;
+        }
+        slot += 1;
+    }
+    info!("completed check for unprocessed l2blocks");
 
     Ok(())
 }
