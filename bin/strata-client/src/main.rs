@@ -286,7 +286,7 @@ fn do_startup_checks(
         }
         Ok(false) => {
             // Current chain tip tip block is not known by the EL.
-            warn!("missing expected evm block, block_id = {}", chain_tip);
+            warn!(%chain_tip, "missing expected EVM block");
             sync_chainstate_to_el(storage, engine)?;
         }
         Err(error) => {

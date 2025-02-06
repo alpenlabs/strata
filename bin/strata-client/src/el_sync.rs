@@ -1,6 +1,6 @@
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_storage::NodeStorage;
-use tracing::debug;
+use tracing::{debug, info};
 
 /// Sync missing blocks in EL using payloads stored in L2 block database.
 ///
@@ -14,7 +14,7 @@ pub fn sync_chainstate_to_el(
     let earliest_idx = chainstate_manager.get_earliest_write_idx_blocking()?;
     let latest_idx = chainstate_manager.get_last_write_idx_blocking()?;
 
-    debug!(?earliest_idx, ?latest_idx, "search for last known idx");
+    info!(%earliest_idx, %latest_idx, "search for last known idx");
 
     // last idx of chainstate whose corresponding block is present in el
     let sync_from_idx = find_last_match((earliest_idx, latest_idx), |idx| {
@@ -29,7 +29,7 @@ pub fn sync_chainstate_to_el(
     .map(|idx| idx + 1) // sync from next index
     .unwrap_or(0); // sync from genesis
 
-    debug!(?sync_from_idx, "last known index in EL");
+    info!(%sync_from_idx, "last known index in EL");
 
     for idx in sync_from_idx..=latest_idx {
         debug!(?idx, "Syncing chainstate");
@@ -52,10 +52,10 @@ pub fn sync_chainstate_to_el(
     Ok(())
 }
 
-fn find_last_match<F>(range: (u64, u64), predicate: F) -> anyhow::Result<Option<u64>>
-where
-    F: Fn(u64) -> anyhow::Result<bool>,
-{
+fn find_last_match(
+    range: (u64, u64),
+    predicate: impl Fn(u64) -> anyhow::Result<bool>,
+) -> anyhow::Result<Option<u64>> {
     let (mut left, mut right) = range;
 
     // Check the leftmost value first
