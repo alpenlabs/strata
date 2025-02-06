@@ -28,7 +28,7 @@ class BridgeDepositReclaimTest(testenv.StrataTester):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(testenv.BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

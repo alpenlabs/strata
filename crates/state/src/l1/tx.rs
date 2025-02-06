@@ -14,15 +14,15 @@ pub struct L1Tx {
     // TODO: verify if we need L1TxProof or L1WtxProof
     proof: L1TxProof,
     tx: RawBitcoinTx,
-    protocol_operation: ProtocolOperation,
+    protocol_ops: Vec<ProtocolOperation>,
 }
 
 impl L1Tx {
-    pub fn new(proof: L1TxProof, tx: RawBitcoinTx, protocol_operation: ProtocolOperation) -> Self {
+    pub fn new(proof: L1TxProof, tx: RawBitcoinTx, protocol_ops: Vec<ProtocolOperation>) -> Self {
         Self {
             proof,
             tx,
-            protocol_operation,
+            protocol_ops,
         }
     }
 
@@ -34,8 +34,8 @@ impl L1Tx {
         &self.tx
     }
 
-    pub fn protocol_operation(&self) -> &ProtocolOperation {
-        &self.protocol_operation
+    pub fn protocol_ops(&self) -> &[ProtocolOperation] {
+        &self.protocol_ops
     }
 }
 

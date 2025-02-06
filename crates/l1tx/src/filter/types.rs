@@ -8,11 +8,17 @@ use strata_primitives::{
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct EnvelopeTags {
+    pub checkpoint_tag: String,
+    pub da_tag: String,
+}
+
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct TxFilterConfig {
-    /// For checkpoint update envelopes.
-    pub rollup_name: String,
+    /// Envelope tag names
+    pub envelope_tags: EnvelopeTags,
 
     /// For addresses that are expected to be spent to.
     pub expected_addrs: SortedVec<BitcoinAddress>,
@@ -39,6 +45,11 @@ impl TxFilterConfig {
         let expected_addrs = SortedVec::from(vec![address.clone()]);
         let expected_outpoints = SortedVec::new();
 
+        let envelope_tags = EnvelopeTags {
+            checkpoint_tag: rollup_params.checkpoint_tag.clone(),
+            da_tag: rollup_params.da_tag.clone(),
+        };
+
         let deposit_config = DepositTxParams {
             magic_bytes: rollup_name.clone().into_bytes(),
             address_length: rollup_params.address_length,
@@ -46,7 +57,7 @@ impl TxFilterConfig {
             address,
         };
         Ok(Self {
-            rollup_name,
+            envelope_tags,
             expected_blobs,
             expected_addrs,
             expected_outpoints,

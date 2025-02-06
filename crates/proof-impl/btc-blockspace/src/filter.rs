@@ -2,13 +2,16 @@
 //! deposits, forced inclusion transactions as well as state updates
 
 use bitcoin::Block;
-use strata_l1tx::filter::{filter_protocol_op_tx_refs, TxFilterConfig};
+use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
 use strata_primitives::{block_credential::CredRule, params::RollupParams};
 use strata_state::{
     batch::BatchCheckpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
 
+use crate::tx_indexer::ProverTxVisitorImpl;
+
+// FIXME: needs better name
 pub fn extract_relevant_info(
     block: &Block,
     rollup_params: &RollupParams,
@@ -17,10 +20,10 @@ pub fn extract_relevant_info(
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
-    let relevant_txs = filter_protocol_op_tx_refs(block, rollup_params, filter_config);
+    let tx_entries = index_block(block, ProverTxVisitorImpl::new, filter_config);
 
-    for tx in relevant_txs {
-        match tx.proto_op() {
+    for op in tx_entries.into_iter().flat_map(|t| t.into_contents()) {
+        match op {
             ProtocolOperation::Deposit(deposit_info) => {
                 deposits.push(deposit_info.clone());
             }
@@ -30,6 +33,7 @@ pub fn extract_relevant_info(
                 }
                 let batch: BatchCheckpoint = signed_batch.clone().into();
                 // Note: This assumes we will have one proper update
+                // FIXME: ^what if we have improper updates or more than one proper update?
                 prev_checkpoint = prev_checkpoint.or(Some(batch));
             }
             _ => {}

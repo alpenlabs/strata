@@ -8,9 +8,8 @@ use anyhow::bail;
 use bitcoin::{Block, BlockHash};
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
-    filter::filter_protocol_op_tx_refs,
-    filter_types::TxFilterConfig,
-    messages::{BlockData, L1Event},
+    filter::{indexer::index_block, TxFilterConfig},
+    messages::{BlockData, L1Event, RelevantTxEntry},
 };
 use strata_primitives::params::Params;
 use strata_state::l1::{
@@ -22,7 +21,7 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use crate::{
-    reader::state::ReaderState,
+    reader::{state::ReaderState, tx_indexer::ReaderTxVisitorImpl},
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -31,12 +30,16 @@ use crate::{
 struct ReaderContext<R: ReaderRpc> {
     /// Bitcoin reader client
     client: Arc<R>,
+
     /// L1Event sender
     event_tx: mpsc::Sender<L1Event>,
+
     /// Config
     config: Arc<ReaderConfig>,
+
     /// Params
     params: Arc<Params>,
+
     /// Status transmitter
     status_channel: StatusChannel,
 }
@@ -139,6 +142,7 @@ async fn handle_new_filter_rule<R: ReaderRpc>(
     if ctx.event_tx.send(revert_ev).await.is_err() {
         warn!("unable to submit L1 reorg event, did persistence task exit?");
     }
+
     Ok(())
 }
 
@@ -157,9 +161,9 @@ async fn update_epoch_and_filter_config<R: ReaderRpc>(
         state.set_epoch(new_epoch);
         // TODO: pass in chainstate to `derive_from`
         let new_config = TxFilterConfig::derive_from(ctx.params.rollup())?;
-        let curr_filter_config = state.filter_config().clone();
+        let curr_filter_config = state.filter_config();
 
-        if new_config != curr_filter_config {
+        if new_config != *curr_filter_config {
             state.set_filter_config(new_config.clone());
             return Ok(Some(new_config));
         }
@@ -322,11 +326,16 @@ async fn process_block<R: ReaderRpc>(
     block: Block,
 ) -> anyhow::Result<(L1Event, BlockHash)> {
     let txs = block.txdata.len();
-
     let params = ctx.params.clone();
-    let filtered_txs =
-        filter_protocol_op_tx_refs(&block, ctx.params.rollup(), state.filter_config());
-    let block_data = BlockData::new(height, block, filtered_txs);
+
+    // Index all the stuff in the block.
+    let entries: Vec<RelevantTxEntry> =
+        index_block(&block, ReaderTxVisitorImpl::new, state.filter_config());
+
+    // TODO: do stuffs with dep_reqs and da_entries
+
+    let block_data = BlockData::new(height, block, entries);
+
     let l1blkid = block_data.block().block_hash();
     trace!(%height, %l1blkid, %txs, "fetched block from client");
 
@@ -413,6 +422,7 @@ pub async fn get_verification_state(
 #[cfg(test)]
 mod test {
     use bitcoin::{hashes::Hash, Network};
+    use strata_l1tx::filter::types::EnvelopeTags;
     use strata_primitives::{
         buf::Buf32,
         l1::{BitcoinAddress, L1Status},
@@ -453,9 +463,12 @@ mod test {
         }
     }
 
-    fn get_filter_config(name: &str) -> TxFilterConfig {
+    fn get_filter_config() -> TxFilterConfig {
         TxFilterConfig {
-            rollup_name: name.to_string(),
+            envelope_tags: EnvelopeTags {
+                checkpoint_tag: "test-checkpt".to_string(),
+                da_tag: "test-da".to_string(),
+            },
             expected_addrs: SortedVec::new(),
             expected_blobs: SortedVec::new(),
             expected_outpoints: SortedVec::new(),
@@ -474,7 +487,7 @@ mod test {
 
     // Get reader state with 10 recent blocks
     fn get_reader_state(ctx: &ReaderContext<TestBitcoinClient>) -> ReaderState {
-        let filter_config = get_filter_config("zkzkzk");
+        let filter_config = get_filter_config();
         let recent_blocks: [Buf32; N_RECENT_BLOCKS] = ArbitraryGenerator::new().generate();
         let recent_blocks: VecDeque<BlockHash> = recent_blocks
             .into_iter()

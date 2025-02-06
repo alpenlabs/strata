@@ -3,13 +3,14 @@ use bitcoin::{
     script::{Instruction, Instructions},
     ScriptBuf,
 };
-use strata_primitives::{
-    l1::payload::{L1Payload, L1PayloadType},
-    params::RollupParams,
-};
+use strata_primitives::l1::payload::{L1Payload, L1PayloadType};
 use thiserror::Error;
+use tracing::*;
 
-use crate::utils::{next_bytes, next_op};
+use crate::{
+    filter::TxFilterConfig,
+    utils::{next_bytes, next_op},
+};
 
 /// Errors that can be generated while parsing envelopes.
 #[derive(Debug, Error)]
@@ -35,14 +36,14 @@ pub enum EnvelopeParseError {
 /// This function errors if it cannot parse the [`L1Payload`]
 pub fn parse_envelope_payloads(
     script: &ScriptBuf,
-    params: &RollupParams,
+    filter_conf: &TxFilterConfig,
 ) -> Result<Vec<L1Payload>, EnvelopeParseError> {
     let mut instructions = script.instructions();
 
     let mut payloads = Vec::new();
     // TODO: make this sophisticated, i.e. even if one payload parsing fails, continue finding other
     // envelopes and extracting payloads. Or is that really necessary?
-    while let Ok(payload) = parse_l1_payload(&mut instructions, params) {
+    while let Ok(payload) = parse_l1_payload(&mut instructions, filter_conf) {
         payloads.push(payload);
     }
     Ok(payloads)
@@ -50,13 +51,13 @@ pub fn parse_envelope_payloads(
 
 fn parse_l1_payload(
     instructions: &mut Instructions,
-    params: &RollupParams,
+    filter_conf: &TxFilterConfig,
 ) -> Result<L1Payload, EnvelopeParseError> {
     enter_envelope(instructions)?;
 
     // Parse type
     let ptype = next_bytes(instructions)
-        .and_then(|bytes| parse_payload_type(bytes, params))
+        .and_then(|bytes| parse_payload_type(bytes, filter_conf))
         .ok_or(EnvelopeParseError::InvalidTypeTag)?;
 
     // Parse payload
@@ -64,10 +65,10 @@ fn parse_l1_payload(
     Ok(L1Payload::new(payload, ptype))
 }
 
-fn parse_payload_type(tag_bytes: &[u8], params: &RollupParams) -> Option<L1PayloadType> {
-    if params.checkpoint_tag.as_bytes() == tag_bytes {
+fn parse_payload_type(tag_bytes: &[u8], filter_conf: &TxFilterConfig) -> Option<L1PayloadType> {
+    if filter_conf.envelope_tags.checkpoint_tag.as_bytes() == tag_bytes {
         Some(L1PayloadType::Checkpoint)
-    } else if params.da_tag.as_bytes() == tag_bytes {
+    } else if filter_conf.envelope_tags.da_tag.as_bytes() == tag_bytes {
         Some(L1PayloadType::Da)
     } else {
         None
@@ -135,13 +136,13 @@ mod tests {
     fn test_parse_envelope_data() {
         let bytes = vec![0, 1, 2, 3];
         let params = gen_params();
+        let filter_config = TxFilterConfig::derive_from(params.rollup()).unwrap();
         let envelope1 = L1Payload::new_checkpoint(bytes.clone());
         let envelope2 = L1Payload::new_checkpoint(bytes.clone());
         let script =
             generate_envelope_script_test(&[envelope1.clone(), envelope2.clone()], &params)
                 .unwrap();
-
-        let result = parse_envelope_payloads(&script, params.rollup()).unwrap();
+        let result = parse_envelope_payloads(&script, &filter_config).unwrap();
 
         assert_eq!(result, vec![envelope1, envelope2]);
 
@@ -151,7 +152,7 @@ mod tests {
         let script = generate_envelope_script_test(&[envelope_data.clone()], &params).unwrap();
 
         // Parse the rollup name
-        let result = parse_envelope_payloads(&script, params.rollup()).unwrap();
+        let result = parse_envelope_payloads(&script, &filter_config).unwrap();
 
         // Assert the rollup name was parsed correctly
         assert_eq!(result, vec![envelope_data]);

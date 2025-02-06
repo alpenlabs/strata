@@ -111,21 +111,23 @@ pub(super) async fn extract_deposit_requests(
             BitcoinAddress::parse(&original_taproot_addr.to_string(), network)
                 .expect("address generated must be valid for the network");
 
-        if let ProtocolOperation::DepositRequest(info) = l1_tx.protocol_operation() {
-            let el_address = info.address.clone();
-            let total_amount = Amount::from_sat(info.amt);
-            let take_back_leaf_hash = TapNodeHash::from_slice(&info.take_back_leaf_hash)
-                .expect("a 32-byte slice must be a valid hash");
+        for op in l1_tx.protocol_ops() {
+            if let ProtocolOperation::DepositRequest(info) = op {
+                let el_address = info.address.clone();
+                let total_amount = Amount::from_sat(info.amt);
+                let take_back_leaf_hash = TapNodeHash::from_slice(&info.take_back_leaf_hash)
+                    .expect("a 32-byte slice must be a valid hash");
 
-            let deposit_info = DepositInfo::new(
-                deposit_request_outpoint,
-                el_address,
-                total_amount,
-                take_back_leaf_hash,
-                original_taproot_addr,
-            );
+                let deposit_info = DepositInfo::new(
+                    deposit_request_outpoint,
+                    el_address,
+                    total_amount,
+                    take_back_leaf_hash,
+                    original_taproot_addr,
+                );
 
-            return Some(deposit_info);
+                return Some(deposit_info);
+            }
         }
 
         None
@@ -405,7 +407,7 @@ mod tests {
                             // need clone here because Rust thinks this will be called twice (and
                             // the needle would already have been moved in the second call).
                             num_valid_duties += 1;
-                            return L1Tx::new(proof, needle.0.clone(), needle.1.clone());
+                            return L1Tx::new(proof, needle.0.clone(), vec![needle.1.clone()]);
                         }
                     }
 
@@ -413,7 +415,7 @@ mod tests {
                     if valid {
                         num_valid_duties += 1;
                     }
-                    L1Tx::new(proof, tx, protocol_op)
+                    L1Tx::new(proof, tx, vec![protocol_op])
                 })
                 .collect();
 

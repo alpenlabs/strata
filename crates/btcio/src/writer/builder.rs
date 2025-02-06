@@ -79,7 +79,6 @@ pub fn create_envelope_transactions<W: WriterRpc>(
 
     // Start creating envelope content
     let reveal_script = build_reveal_script(ctx.params.as_ref(), &public_key, payloads)?;
-
     // Create spend info for tapscript
     let taproot_spend_info = TaprootBuilder::new()
         .add_leaf(0, reveal_script.clone())?
