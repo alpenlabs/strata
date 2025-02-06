@@ -174,5 +174,5 @@ services:
 
 networks:
   strata_network:
-    driver: bridge
+    # driver: bridge
     name: strata_network
