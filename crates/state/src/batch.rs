@@ -25,7 +25,7 @@ pub struct BatchCheckpoint {
 
     /// Reference state commitment against which batch transition and corresponding proof is
     /// verified
-    checkpoint_base_state: CheckpointBaseStateCommitment,
+    base_state_commitment: BaseStateCommitment,
 
     /// Proof for the batch obtained from prover manager
     proof: Proof,
@@ -35,13 +35,13 @@ impl BatchCheckpoint {
     pub fn new(
         batch_info: BatchInfo,
         transition: BatchTransition,
-        checkpoint_base_state: CheckpointBaseStateCommitment,
+        base_state_commitment: BaseStateCommitment,
         proof: Proof,
     ) -> Self {
         Self {
             batch_info,
             transition,
-            checkpoint_base_state,
+            base_state_commitment,
             proof,
         }
     }
@@ -54,8 +54,8 @@ impl BatchCheckpoint {
         &self.transition
     }
 
-    pub fn checkpoint_base_state(&self) -> &CheckpointBaseStateCommitment {
-        &self.checkpoint_base_state
+    pub fn base_state_commitment(&self) -> &BaseStateCommitment {
+        &self.base_state_commitment
     }
 
     pub fn proof(&self) -> &Proof {
@@ -69,7 +69,7 @@ impl BatchCheckpoint {
     pub fn get_proof_output(&self) -> CheckpointProofOutput {
         CheckpointProofOutput::new(
             self.batch_transition().clone(),
-            self.checkpoint_base_state().clone(),
+            self.base_state_commitment().clone(),
         )
     }
 
@@ -222,16 +222,16 @@ impl BatchTransition {
         }
     }
 
-    /// Creates a [`CheckpointBaseStateCommitment`] by taking the initial state of the
+    /// Creates a [`BaseStateCommitment`] by taking the initial state of the
     /// [`BatchTransition`]
-    pub fn get_initial_checkpoint_base_state(&self) -> CheckpointBaseStateCommitment {
-        CheckpointBaseStateCommitment::new(self.l1_transition.0, self.l2_transition.0)
+    pub fn get_initial_base_state_commitment(&self) -> BaseStateCommitment {
+        BaseStateCommitment::new(self.l1_transition.0, self.l2_transition.0)
     }
 
-    /// Creates a [`CheckpointBaseStateCommitment`] by taking the final state of the
+    /// Creates a [`BaseStateCommitment`] by taking the final state of the
     /// [`BatchTransition`]
-    pub fn get_final_checkpoint_base_state(&self) -> CheckpointBaseStateCommitment {
-        CheckpointBaseStateCommitment::new(self.l1_transition.1, self.l2_transition.1)
+    pub fn get_final_base_state_commitment(&self) -> BaseStateCommitment {
+        BaseStateCommitment::new(self.l1_transition.1, self.l2_transition.1)
     }
 
     pub fn rollup_params_commitment(&self) -> Buf32 {
@@ -248,12 +248,12 @@ impl BatchTransition {
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
-pub struct CheckpointBaseStateCommitment {
+pub struct BaseStateCommitment {
     pub initial_l1_state: Buf32,
     pub initial_l2_state: Buf32,
 }
 
-impl CheckpointBaseStateCommitment {
+impl BaseStateCommitment {
     pub fn new(initial_l1_state: Buf32, initial_l2_state: Buf32) -> Self {
         Self {
             initial_l1_state,
@@ -265,17 +265,17 @@ impl CheckpointBaseStateCommitment {
 #[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
 pub struct CheckpointProofOutput {
     pub batch_transition: BatchTransition,
-    pub checkpoint_base_state: CheckpointBaseStateCommitment,
+    pub base_state_commitment: BaseStateCommitment,
 }
 
 impl CheckpointProofOutput {
     pub fn new(
         batch_transition: BatchTransition,
-        checkpoint_base_state: CheckpointBaseStateCommitment,
+        base_state_commitment: BaseStateCommitment,
     ) -> CheckpointProofOutput {
         Self {
             batch_transition,
-            checkpoint_base_state,
+            base_state_commitment,
         }
     }
 }

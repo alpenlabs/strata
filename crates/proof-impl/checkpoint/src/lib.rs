@@ -50,16 +50,16 @@ pub fn process_checkpoint_proof(
         l1_batch_output.rollup_params_commitment,
     );
 
-    let (checkpoint_base_state, opt_prev_output) = match l1_batch_output.prev_checkpoint.as_ref() {
-        // Genesis batch: initialize with initial checkpoint_base_state state
-        None => (batch_transition.get_initial_checkpoint_base_state(), None),
+    let (base_state_commitment, opt_prev_output) = match l1_batch_output.prev_checkpoint.as_ref() {
+        // Genesis batch: initialize with initial base_state_commitment state
+        None => (batch_transition.get_initial_base_state_commitment(), None),
         Some(prev_checkpoint) => {
             // Ensure sequential state transition
             assert_eq!(
                 prev_checkpoint
                     .batch_transition()
-                    .get_final_checkpoint_base_state(),
-                batch_transition.get_initial_checkpoint_base_state()
+                    .get_final_base_state_commitment(),
+                batch_transition.get_initial_base_state_commitment()
             );
 
             assert_eq!(
@@ -69,22 +69,22 @@ pub fn process_checkpoint_proof(
                 batch_transition.rollup_params_commitment()
             );
 
-            // If there exist proof for the prev_batch, use the prev_batch checkpoint_base_state
-            // state, else set the current batch initial info as checkpoint_base_state
+            // If there exist proof for the prev_batch, use the prev_batch base_state_commitment
+            // state, else set the current batch initial info as base_state_commitment
             if prev_checkpoint.proof().is_empty() {
-                // No proof in previous checkpoint: use initial checkpoint_base_state state
-                (batch_transition.get_initial_checkpoint_base_state(), None)
+                // No proof in previous checkpoint: use initial base_state_commitment state
+                (batch_transition.get_initial_base_state_commitment(), None)
             } else {
-                // Use previous checkpoint's checkpoint_base_state state and include previous proof
-                let checkpoint_base_state = prev_checkpoint.checkpoint_base_state().clone();
+                // Use previous checkpoint's base_state_commitment state and include previous proof
+                let base_state_commitment = prev_checkpoint.base_state_commitment().clone();
                 (
-                    checkpoint_base_state,
+                    base_state_commitment,
                     Some(prev_checkpoint.get_proof_receipt()),
                 )
             }
         }
     };
-    let output = CheckpointProofOutput::new(batch_transition, checkpoint_base_state);
+    let output = CheckpointProofOutput::new(batch_transition, base_state_commitment);
     (output, opt_prev_output)
 }
 

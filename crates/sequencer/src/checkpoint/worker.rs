@@ -6,7 +6,7 @@ use strata_consensus_logic::csm::message::ClientUpdateNotif;
 use strata_db::{traits::Database, types::CheckpointEntry, DbError};
 use strata_primitives::{buf::Buf32, l1::L1BlockCommitment, l2::L2BlockCommitment, params::Params};
 use strata_state::{
-    batch::{BatchInfo, BatchTransition, CheckpointBaseStateCommitment},
+    batch::{BaseStateCommitment, BatchInfo, BatchTransition},
     client_state::ClientState,
 };
 use strata_storage::NodeStorage;
@@ -68,7 +68,7 @@ pub fn checkpoint_worker<D: Database>(
             continue;
         }
 
-        let (batch_info, batch_transition, checkpoint_base_state) =
+        let (batch_info, batch_transition, base_state_commitment) =
             match get_next_batch(state, storage.as_ref(), rollup_params_commitment) {
                 Err(error) => {
                     warn!(?error, "Failed to get next batch");
@@ -84,7 +84,7 @@ pub fn checkpoint_worker<D: Database>(
         // else save a pending proof checkpoint entry
         debug!("save checkpoint pending proof: {}", checkpoint_idx);
         let entry =
-            CheckpointEntry::new_pending_proof(batch_info, batch_transition, checkpoint_base_state);
+            CheckpointEntry::new_pending_proof(batch_info, batch_transition, base_state_commitment);
         if let Err(e) = checkpoint_handle.put_checkpoint_and_notify_blocking(checkpoint_idx, entry)
         {
             warn!(?e, "Failed to save checkpoint at idx: {}", checkpoint_idx);
@@ -104,7 +104,7 @@ fn get_next_batch(
     state: &ClientState,
     storage: &NodeStorage,
     rollup_params_commitment: Buf32,
-) -> Result<(BatchInfo, BatchTransition, CheckpointBaseStateCommitment), Error> {
+) -> Result<(BatchInfo, BatchTransition, BaseStateCommitment), Error> {
     if !state.is_chain_active() {
         debug!("chain not active, no duties created");
         return Err(Error::ChainInactive);
@@ -185,7 +185,7 @@ fn get_next_batch(
             let new_transition =
                 BatchTransition::new(l1_transition, l2_transition, rollup_params_commitment);
             let new_batch = BatchInfo::new(first_checkpoint_idx, l1_range, l2_range);
-            let genesis_state = new_transition.get_initial_checkpoint_base_state();
+            let genesis_state = new_transition.get_initial_base_state_commitment();
 
             Ok((new_batch, new_transition, genesis_state))
         }
@@ -220,13 +220,13 @@ fn get_next_batch(
             let new_transition =
                 BatchTransition::new(l1_transition, l2_transition, rollup_params_commitment);
 
-            let checkpoint_base_state = if prev_checkpoint.is_proved {
-                prev_checkpoint.checkpoint_base_state.clone()
+            let base_state_commitment = if prev_checkpoint.is_proved {
+                prev_checkpoint.base_state_commitment.clone()
             } else {
-                new_transition.get_initial_checkpoint_base_state()
+                new_transition.get_initial_base_state_commitment()
             };
 
-            Ok((new_batch_info, new_transition, checkpoint_base_state))
+            Ok((new_batch_info, new_transition, base_state_commitment))
         }
     }
 }
