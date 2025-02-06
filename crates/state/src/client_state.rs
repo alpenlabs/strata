@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, l2::L2BlockCommitment};
 use tracing::*;
 
 use crate::{
@@ -130,18 +130,13 @@ impl ClientState {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct SyncState {
-    /// Height of last L2 block we've chosen as the current tip.
-    pub(super) tip_height: u64,
-
-    /// Last L2 block we've chosen as the current tip.
-    pub(super) tip_blkid: L2BlockId,
-
     /// L2 checkpoint blocks that have been confirmed on L1 and proven along with L1 block height.
     /// These are ordered by height
     pub(super) confirmed_checkpoint_blocks: Vec<(L1BlockHeight, L2BlockId)>,
 
-    /// L2 block that's been finalized on L1 and proven
-    pub(super) finalized_blkid: L2BlockId,
+    /// L2 block that's been finalized on L1 and proven.
+    // TODO convert to epoch commitment?
+    pub(super) finalized_block: L2BlockCommitment,
 }
 
 type L1BlockHeight = u64;
@@ -149,19 +144,17 @@ type L1BlockHeight = u64;
 impl SyncState {
     pub fn from_genesis_blkid(gblkid: L2BlockId) -> Self {
         Self {
-            tip_height: 0,
-            tip_blkid: gblkid,
             confirmed_checkpoint_blocks: Vec::new(),
-            finalized_blkid: gblkid,
+            finalized_block: L2BlockCommitment::new(0, gblkid),
         }
     }
 
-    pub fn chain_tip_blkid(&self) -> &L2BlockId {
-        &self.tip_blkid
+    pub fn finalized_blkid(&self) -> &L2BlockId {
+        self.finalized_block.blkid()
     }
 
-    pub fn finalized_blkid(&self) -> &L2BlockId {
-        &self.finalized_blkid
+    pub fn finalized_slot(&self) -> u64 {
+        self.finalized_block.slot()
     }
 
     pub fn confirmed_checkpoint_blocks(&self) -> &[(u64, L2BlockId)] {
@@ -174,10 +167,6 @@ impl SyncState {
             .iter()
             .find(|(h, _)| *h == l1_height)
             .map(|e| e.1)
-    }
-
-    pub fn chain_tip_height(&self) -> u64 {
-        self.tip_height
     }
 }
 
@@ -431,15 +420,6 @@ impl ClientStateMut {
         l1v.next_expected_block += 1;
     }
 
-    // TODO convert to L2BlockCommitment?
-    pub fn accept_l2_block(&mut self, blkid: L2BlockId, height: u64) {
-        // TODO do any other bookkeeping
-        debug!(%height, %blkid, "received AcceptL2Block");
-        let ss = self.state.expect_sync_mut();
-        ss.tip_blkid = blkid;
-        ss.tip_height = height;
-    }
-
     /// Updates the buried L1 block.
     pub fn update_buried(&mut self, new_idx: u64) {
         let l1v = self.state.l1_view_mut();
@@ -508,13 +488,11 @@ impl ClientStateMut {
                 panic!("clientstate: mismatched indices of pending checkpoint");
             }
 
-            let fin_blockid = *ckpt.batch_info.final_l2_blockid();
+            let fin_block = ckpt.batch_info.l2_range.1;
             l1v.last_finalized_checkpoint = Some(ckpt);
 
-            // Update finalized blockid in StateSync
-            self.state.expect_sync_mut().finalized_blkid = fin_blockid;
+            // Update finalized block in SyncState.
+            self.state.expect_sync_mut().finalized_block = fin_block;
         }
     }
-
-    // TODO add operation stuff
 }

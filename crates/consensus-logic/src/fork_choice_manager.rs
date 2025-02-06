@@ -9,13 +9,8 @@ use strata_db::{errors::DbError, traits::BlockStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
 use strata_state::{
-    block::L2BlockBundle,
-    block_validation::validate_block_segments,
-    chain_state::Chainstate,
-    client_state::ClientState,
-    prelude::*,
-    state_op::StateCache,
-    sync_event::{EventSubmitter, SyncEvent},
+    block::L2BlockBundle, block_validation::validate_block_segments, chain_state::Chainstate,
+    client_state::ClientState, prelude::*, state_op::StateCache,
 };
 use strata_status::StatusChannel;
 use strata_storage::{L2BlockManager, NodeStorage};
@@ -120,23 +115,21 @@ pub fn init_forkchoice_manager(
     // or ensure client state and chain state are in-sync during startup
     let sync_state = init_csm_state.sync().expect("csm state should be init");
     let chain_tip_height = storage.chainstate().get_last_write_idx_blocking()?;
-    let finalized_blockid = *sync_state.finalized_blkid();
+
+    let finalized_blkid = *sync_state.finalized_blkid();
+
     let finalized_block = storage
         .l2()
-        .get_block_data_blocking(&finalized_blockid)?
-        .ok_or(Error::MissingL2Block(finalized_blockid))?;
+        .get_block_data_blocking(&finalized_blkid)?
+        .ok_or(Error::MissingL2Block(finalized_blkid))?;
     let finalized_height = finalized_block.header().blockidx();
 
-    debug!(%finalized_height, %chain_tip_height, "finalized and chain tip height");
+    debug!(%finalized_blkid, %finalized_height, "loaded from finalized block");
 
     // Populate the unfinalized block tracker.
     let mut chain_tracker =
-        unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_blockid);
-    chain_tracker.load_unfinalized_blocks(
-        finalized_height,
-        chain_tip_height,
-        storage.l2().as_ref(),
-    )?;
+        unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_blkid);
+    chain_tracker.load_unfinalized_blocks(finalized_height, storage.l2().as_ref())?;
 
     let (cur_tip_blkid, cur_tip_index) = determine_start_tip(&chain_tracker, storage.l2())?;
 
@@ -195,7 +188,7 @@ pub fn tracker_task<E: ExecEngineCtl>(
     storage: Arc<NodeStorage>,
     engine: Arc<E>,
     fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
-    csm_ctl: Arc<CsmController>,
+    _csm_ctl: Arc<CsmController>,
     params: Arc<Params>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
@@ -227,13 +220,7 @@ pub fn tracker_task<E: ExecEngineCtl>(
     };
     info!(%finalized_blockid, "forkchoice manager started");
 
-    handle_unprocessed_blocks(
-        &mut fcm,
-        &storage,
-        engine.as_ref(),
-        &csm_ctl,
-        &status_channel,
-    )?;
+    handle_unprocessed_blocks(&mut fcm, &storage, engine.as_ref(), &status_channel)?;
 
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
@@ -241,7 +228,6 @@ pub fn tracker_task<E: ExecEngineCtl>(
         fcm,
         engine.as_ref(),
         fcm_rx,
-        &csm_ctl,
         status_channel,
     ) {
         error!(err = ?e, "tracker aborted");
@@ -257,7 +243,6 @@ fn handle_unprocessed_blocks(
     fcm: &mut ForkChoiceManager,
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
-    csm_ctl: &CsmController,
     status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     info!("check for unprocessed l2blocks");
@@ -280,7 +265,6 @@ fn handle_unprocessed_blocks(
                 ForkChoiceMessage::NewBlock(blockid),
                 fcm,
                 engine,
-                csm_ctl,
                 status_channel,
             )?;
         }
@@ -304,7 +288,6 @@ fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
     mut fcm_state: ForkChoiceManager,
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
-    csm_ctl: &CsmController,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
     let mut cl_rx = status_channel.subscribe_client_state();
@@ -318,7 +301,7 @@ fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
 
         match fcm_ev {
             FcmEvent::NewFcmMsg(m) => {
-                process_fc_message(m, &mut fcm_state, engine, csm_ctl, &status_channel)
+                process_fc_message(m, &mut fcm_state, engine, &status_channel)
             }
             FcmEvent::NewStateUpdate(st) => handle_new_state(&mut fcm_state, st),
             FcmEvent::Abort => break,
@@ -364,7 +347,6 @@ fn process_fc_message<E: ExecEngineCtl>(
     msg: ForkChoiceMessage,
     fcm_state: &mut ForkChoiceManager,
     engine: &E,
-    csm_ctl: &CsmController,
     status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match msg {
@@ -465,8 +447,6 @@ fn process_fc_message<E: ExecEngineCtl>(
                     // Insert the sync event and submit it to the executor.
                     let tip_blkid = *reorg.new_tip();
                     info!(?tip_blkid, "new chain tip block");
-                    let ev = SyncEvent::NewTipBlock(tip_blkid);
-                    csm_ctl.submit_event(ev)?;
 
                     // Update status
                     status_channel.update_chainstate(post_state);
@@ -484,15 +464,23 @@ fn handle_new_state(fcm_state: &mut ForkChoiceManager, cs: ClientState) -> anyho
         .expect("fcm: client state missing sync data")
         .clone();
 
-    let csm_tip = sync.chain_tip_blkid();
-    debug!(?csm_tip, "got new CSM state");
+    let cur_fin_blkid = fcm_state.chain_tracker.finalized_tip();
+    let new_fin_blkid = sync.finalized_blkid();
+
+    if new_fin_blkid == cur_fin_blkid {
+        trace!("got new CSM state but finalized block not different, ignoring");
+        return Ok(());
+    }
+
+    debug!(%new_fin_blkid, "got new CSM state, updating finalized block");
 
     // Update the new state.
     fcm_state.cur_csm_state = Arc::new(cs);
 
-    let blkid = sync.finalized_blkid();
-    let fin_report = fcm_state.chain_tracker.update_finalized_tip(blkid)?;
-    info!(?blkid, "updated finalized tip");
+    let fin_report = fcm_state
+        .chain_tracker
+        .update_finalized_tip(new_fin_blkid)?;
+    info!(?new_fin_blkid, "updated finalized tip");
     trace!(?fin_report, "finalization report");
     // TODO do something with the finalization report
 

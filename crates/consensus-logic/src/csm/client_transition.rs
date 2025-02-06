@@ -186,11 +186,6 @@ pub fn process_event(
             debug!(%height, "received L1DABatch");
 
             if let Some(ss) = state.state().sync() {
-                // TODO load it up and figure out what's there, see if we have to
-                // load the state updates from L1 or something
-                // TODO not sure why this was here
-                //let l2_db = database.l2_db();
-
                 let proof_verified_checkpoints =
                     filter_verified_checkpoints(state.state(), checkpoints, params.rollup());
 
@@ -224,45 +219,46 @@ pub fn process_event(
                 return Err(Error::MissingClientSyncState);
             }
         }
-
-        SyncEvent::NewTipBlock(blkid) => {
-            // TODO remove ^this sync event type and all associated fields
-            debug!(?blkid, "Received NewTipBlock");
-            let block = context.get_l2_block_data(blkid)?;
-
-            // TODO: get chainstate idx from blkid OR pass correct idx in sync event
-            let slot = block.header().blockidx();
-            let chainstate = context.get_toplevel_chainstate(slot)?;
-
-            debug!(?chainstate, "Chainstate for new tip block");
-            // height of last matured L1 block in chain state
-            let chs_last_buried = chainstate.l1_view().safe_height().saturating_sub(1);
-            // buried height in client state
-            let cls_last_buried = state.state().l1_view().buried_l1_height();
-
-            if chs_last_buried > cls_last_buried {
-                // can bury till last matured block in chainstate
-                // FIXME: this logic is not necessary for fullnode.
-                // Need to refactor this part for block builder only.
-                let client_state_bury_height = min(
-                    chs_last_buried,
-                    // keep at least 1 item
-                    state.state().l1_view().tip_height().saturating_sub(1),
-                );
-
-                state.update_buried(client_state_bury_height);
-            }
-
-            // TODO better checks here
-            state.accept_l2_block(*blkid, block.block().header().blockidx());
-            state.push_action(SyncAction::UpdateTip(*blkid));
-
-            handle_checkpoint_finalization(state, blkid, params, context)?;
-        }
     }
 
     Ok(())
 }
+
+// TODO remove this old code after we've reconsolidated its responsibilities
+/*SyncEvent::NewTipBlock(blkid) => {
+    // TODO remove ^this sync event type and all associated fields
+    debug!(?blkid, "Received NewTipBlock");
+    let block = context.get_l2_block_data(blkid)?;
+
+    // TODO: get chainstate idx from blkid OR pass correct idx in sync event
+    let slot = block.header().blockidx();
+    let chainstate = context.get_toplevel_chainstate(slot)?;
+
+    debug!(?chainstate, "Chainstate for new tip block");
+    // height of last matured L1 block in chain state
+    let chs_last_buried = chainstate.l1_view().safe_height().saturating_sub(1);
+    // buried height in client state
+    let cls_last_buried = state.state().l1_view().buried_l1_height();
+
+    if chs_last_buried > cls_last_buried {
+        // can bury till last matured block in chainstate
+        // FIXME: this logic is not necessary for fullnode.
+        // Need to refactor this part for block builder only.
+        let client_state_bury_height = min(
+            chs_last_buried,
+            // keep at least 1 item
+            state.state().l1_view().tip_height().saturating_sub(1),
+        );
+
+        state.update_buried(client_state_bury_height);
+    }
+
+    // TODO better checks here
+    state.accept_l2_block(*blkid, block.block().header().blockidx());
+    state.push_action(SyncAction::UpdateTip(*blkid));
+
+    handle_checkpoint_finalization(state, blkid, params, context)?;
+}*/
 
 /// Handles the maturation of L1 height by finalizing checkpoints and emitting
 /// sync actions.

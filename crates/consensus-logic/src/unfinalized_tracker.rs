@@ -6,7 +6,7 @@ use strata_db::traits::BlockStatus;
 use strata_primitives::buf::Buf32;
 use strata_state::prelude::*;
 use strata_storage::L2BlockManager;
-use tracing::warn;
+use tracing::*;
 
 use crate::errors::ChainTipError;
 
@@ -253,37 +253,58 @@ impl UnfinalizedBlockTracker {
     pub fn load_unfinalized_blocks(
         &mut self,
         finalized_height: u64,
-        chain_tip_height: u64,
         l2_block_manager: &L2BlockManager,
     ) -> anyhow::Result<()> {
-        for height in (finalized_height + 1)..=chain_tip_height {
-            let Ok(block_ids) = l2_block_manager.get_blocks_at_height_blocking(height) else {
-                return Err(anyhow::anyhow!("failed to get blocks at height {}", height));
-            };
-            let block_ids = block_ids
-                .into_iter()
-                .filter(|block_id| {
-                    let Ok(Some(block_status)) =
-                        l2_block_manager.get_block_status_blocking(block_id)
-                    else {
-                        // missing block status
-                        warn!(block_id = ?block_id, "missing block status");
-                        return false;
-                    };
-                    block_status == BlockStatus::Valid
-                })
-                .collect::<Vec<_>>();
+        let mut height = finalized_height + 1;
 
-            if block_ids.is_empty() {
-                return Err(anyhow::anyhow!("missing blocks at height {}", height));
+        loop {
+            let blkids = match l2_block_manager.get_blocks_at_height_blocking(height) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    error!(%height, err = %e, "failed to get new blocks");
+                    return Err(e.into());
+                }
+            };
+
+            if blkids.is_empty() {
+                debug!(%height, "found no more blocks, assuming we're past tip");
+                break;
             }
 
-            for block_id in block_ids {
-                if let Some(block) = l2_block_manager.get_block_data_blocking(&block_id)? {
+            for blkid in blkids {
+                // Check the status so we can skip trying to attach blocks we
+                // don't care about.
+                //
+                // TODO if a block doesn't have a concrete status (either
+                // missing or explicit unchecked) should we put it into a queue
+                // to be processed?
+                match l2_block_manager.get_block_status_blocking(&blkid) {
+                    Ok(Some(status)) => {
+                        if status == BlockStatus::Invalid {
+                            debug!(%blkid, "skipping attaching invalid block");
+                            continue;
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!(%blkid, err = %e, "error loading block status, continuing");
+                        continue;
+                    }
+                }
+
+                // Once we've decided if we want to attach a block, we can
+                // continue now.
+                if let Some(block) = l2_block_manager.get_block_data_blocking(&blkid)? {
                     let header = block.header();
-                    let _ = self.attach_block(block_id, header);
+                    if let Err(e) = self.attach_block(blkid, header) {
+                        warn!(%blkid, err = %e, "failed to attach block, continuing");
+                    }
+                } else {
+                    error!(%blkid, "missing expected block from database!  wtf?");
                 }
             }
+
+            height += 1;
         }
 
         Ok(())
