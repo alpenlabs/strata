@@ -292,12 +292,6 @@ impl ReaderRpc for BitcoinClient {
         .await
     }
 
-    async fn submit_package(&self, txs: &[Transaction]) -> ClientResult<SubmitPackage> {
-        let txstrs: Vec<String> = txs.iter().map(serialize_hex).collect();
-        self.call::<SubmitPackage>("submitpackage", &[to_value(txstrs)?])
-            .await
-    }
-
     async fn network(&self) -> ClientResult<Network> {
         Ok(self
             .call::<GetBlockchainInfo>("getblockchaininfo", &[])
@@ -334,6 +328,12 @@ impl BroadcasterRpc for BitcoinClient {
         let txstr = serialize_hex(tx);
         trace!(%txstr, "Testing mempool accept");
         self.call::<Vec<TestMempoolAccept>>("testmempoolaccept", &[to_value([txstr])?])
+            .await
+    }
+
+    async fn submit_package(&self, txs: &[Transaction]) -> ClientResult<SubmitPackage> {
+        let txstrs: Vec<String> = txs.iter().map(serialize_hex).collect();
+        self.call::<SubmitPackage>("submitpackage", &[to_value(txstrs)?])
             .await
     }
 }
