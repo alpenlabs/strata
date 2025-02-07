@@ -51,12 +51,22 @@ impl CheckpointDbManager {
             .await
     }
 
-    pub async fn get_epoch_summary_blocking(
+    pub fn get_epoch_summary_blocking(
         &self,
         epoch: EpochCommitment,
     ) -> DbResult<Option<EpochSummary>> {
         self.summary_cache
             .get_or_fetch_blocking(&epoch, || self.ops.get_epoch_summary_blocking(epoch))
+    }
+
+    pub async fn get_last_summarized_epoch(&self) -> DbResult<Option<u64>> {
+        // TODO cache this?
+        self.ops.get_last_summarized_epoch_async().await
+    }
+
+    pub async fn get_last_summarized_epoch_blocking(&self) -> DbResult<Option<u64>> {
+        // TODO cache this?
+        self.ops.get_last_summarized_epoch_blocking()
     }
 
     /// Gets the epoch commitments for some epoch.

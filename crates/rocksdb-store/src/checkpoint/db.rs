@@ -10,7 +10,6 @@ use crate::DbOpsConfig;
 
 pub struct RBCheckpointDB {
     db: Arc<OptimisticTransactionDB>,
-    #[allow(dead_code)]
     ops: DbOpsConfig,
 }
 
@@ -84,6 +83,10 @@ impl CheckpointDatabase for RBCheckpointDB {
             .into_iter()
             .map(|s| s.get_epoch_commitment())
             .collect::<Vec<_>>())
+    }
+
+    fn get_last_summarized_epoch(&self) -> DbResult<Option<u64>> {
+        Ok(rockbound::utils::get_last::<EpochSummarySchema>(&*self.db)?.map(|(x, _)| x))
     }
 
     fn put_checkpoint(&self, epoch: u64, entry: CheckpointEntry) -> DbResult<()> {
