@@ -8,19 +8,22 @@ class StrataLoadJob(HttpUser):
     A common layer for all the load jobs in the load tests.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Locust's HttpUser has Environment as a first parameter in the constructor.
-        # we hot patched the Environment with the datadir, so the logging is enabled.
-        self._logger = setup_load_job_logger(args[0]._datadir, type(self).__name__)
-
     def on_start(self):
         super().on_start()
+
+        # Setup a separate logger with its own file for each load job.
+        self._logger = setup_load_job_logger(self.environment._datadir, type(self).__name__)
+
         # Technically, before_start and after_start can be merged.
         # It's done to separate initialization logic (aka constructor) from "run-it-once" logic.
         # Also, with that in mind, the "on_start" is a bit misleading.
+        self._logger.info("Before start:")
         self.before_start()
+        self._logger.info("Before start completed.")
+
+        self._logger.info("After start:")
         self.after_start()
+        self._logger.info("After start completed.")
 
     def before_start(self):
         """

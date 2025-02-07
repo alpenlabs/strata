@@ -511,9 +511,9 @@ def setup_load_job_logger(datadir_root: str, job_name: str):
         logging.Logger
     """
     # Common formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
-    )
+    # We intentionally skip filename:line_number because most of the logs are coming
+    # from the same place - logging transactions when sent, logging blocks when received, etc.
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     # Set up individual loggers for each load job.
     filename = os.path.join(datadir_root, f"{job_name}.log")
     logger = logging.getLogger(job_name)
