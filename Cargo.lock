@@ -13090,6 +13090,8 @@ dependencies = [
 name = "strata-datatool"
 version = "0.1.0"
 dependencies = [
+ "alloy-genesis 0.9.2",
+ "alloy-primitives",
  "anyhow",
  "argh",
  "bech32",
@@ -13097,6 +13099,7 @@ dependencies = [
  "bytemuck",
  "hex",
  "rand_core",
+ "reth-chainspec",
  "secp256k1",
  "serde_json",
  "strata-key-derivation",

@@ -188,6 +188,9 @@ pub(crate) struct SubcParams {
 
     #[argh(option, description = "directory to export the generated ELF")]
     pub(crate) elf_dir: Option<PathBuf>,
+
+    #[argh(option, description = "path to evm chain config json")]
+    pub(crate) chain_config: Option<PathBuf>,
 }
 
 pub(crate) struct CmdContext {
