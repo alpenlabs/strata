@@ -105,7 +105,7 @@ impl UnfinalizedBlockTracker {
         header: &SignedL2BlockHeader,
     ) -> Result<bool, ChainTipError> {
         if self.pending_table.contains_key(&blkid) {
-            warn!(blkid = ?blkid, "block already attached");
+            warn!(?blkid, "block already attached");
             return Ok(false);
         }
 

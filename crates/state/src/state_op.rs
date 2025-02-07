@@ -53,6 +53,10 @@ impl WriteBatch {
         Self::new(new_state, Vec::new())
     }
 
+    pub fn new_toplevel_state(&self) -> &Chainstate {
+        &self.new_toplevel_state
+    }
+
     /// Extracts the toplevel state, discarding the write ops.
     pub fn into_toplevel(self) -> Chainstate {
         self.new_toplevel_state
