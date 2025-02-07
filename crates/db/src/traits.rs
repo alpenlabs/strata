@@ -215,6 +215,9 @@ pub trait CheckpointDatabase {
     /// Gets all commitments for an epoch.  This makes no guarantees about ordering.
     fn get_epoch_commitments_at(&self, epoch: u64) -> DbResult<Vec<EpochCommitment>>;
 
+    /// Gets the index of the last epoch that we have a summary for, if any.
+    fn get_last_summarized_epoch(&self) -> DbResult<Option<u64>>;
+
     /// Store a [`CheckpointEntry`]
     ///
     /// `batchidx` for the Checkpoint is expected to increase monotonically and
