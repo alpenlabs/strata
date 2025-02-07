@@ -414,11 +414,10 @@ class LoadGeneratorFactory(flexitest.Factory):
 
         datadir = ctx.make_service_dir(name)
         rpc_port = self.next_port()
-        logfile = os.path.join(datadir, "service.log")
 
         rpc_url = f"ws://localhost:{rpc_port}"
 
-        svc = LoadGeneratorService(logfile, load_cfg)
+        svc = LoadGeneratorService(datadir, load_cfg)
         svc.start()
         _inject_service_create_rpc(svc, rpc_url, name)
         return svc

@@ -6,8 +6,22 @@ from load.job import StrataLoadJob
 
 
 class AbstractAccount:
+    """
+    Abstract Ethereum-like account on RETH in fntests.
+    """
+
     _nonce: int = 0
+    """
+    Nonce of the account w3 is initialized with.
+    """
+
     _nonce_lock = Semaphore()
+    """
+    Gevent syncronization primitive on the nonce.
+    The reason is twofold:
+    - to avoid fetching the current nonce before each transaction.
+    - to avoid races on the nonce when different green threads use the same account.
+    """
 
     @property
     def w3(self) -> web3.Web3:
@@ -34,6 +48,10 @@ class AbstractAccount:
 
 
 class GenesisAccount:
+    """
+    Prefunded account according to the genesis config of RETH in fntests.
+    """
+
     nonce: int = 0
     nonce_lock = Semaphore()
 
@@ -50,8 +68,8 @@ class GenesisAccount:
         self._account = account
 
     def fund_address(self, account_address, amount) -> bool:
-        # Class Descriptor attribute to have the same nonce lock even if
-        # multiple instances of GenesisAccount are used.
+        # We use class attribute here (rather than object attribute) to have
+        # the same nonce lock even if multiple instances of GenesisAccount are used.
         nonce = GenesisAccount._inc_nonce()
         tx_hash = self._w3.eth.send_transaction(
             {
@@ -76,9 +94,13 @@ class GenesisAccount:
 
 
 class FundedAccount(AbstractAccount):
+    """
+    Fresh Ethereum-like account with no funds.
+    """
+
     def __init__(self, job: StrataLoadJob):
         w3 = web3.Web3(web3.Web3.HTTPProvider(job.host, session=job.client))
-        # Init the prefunded account as specified in the chain config.
+        # Init the new account.
         account = w3.eth.account.create()
         # Set the account onto web3 and init the signing middleware.
         w3.address = account.address

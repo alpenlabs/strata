@@ -3,7 +3,6 @@ from load.job import StrataLoadJob
 from .account import FundedAccount, GenesisAccount
 
 
-# TODO(load): configure the structured logging as we do in the tests.
 class BaseRethLoadJob(StrataLoadJob):
     """
     Base class for all load jobs targetting Reth.

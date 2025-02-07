@@ -35,6 +35,11 @@ class _TransactionFaucet:
 
 
 class TransactionBuilder(_TransactionFaucet):
+    """
+    A transaction mixin responsible for basic trancation payload building.
+    Supports Legacy, EIP-2930 and EIP-1559 transaction types.
+    """
+
     def ensure_tx(
         self, tx: Tx, tx_type: TransactionType = TransactionType.LEGACY, from_rpc: bool = False
     ):
@@ -70,6 +75,10 @@ class TransactionBuilder(_TransactionFaucet):
 
 
 class TransactionSender(TransactionBuilder):
+    """
+    A helper that's capable of sending transaction and waiting for the receipt.
+    """
+
     def send_tx(self, tx: Tx) -> HexStr | None:
         try:
             tx_hash = self.w3.eth.send_transaction(tx)
@@ -105,6 +114,10 @@ class TransactionSender(TransactionBuilder):
 
 
 class TransferTransaction(TransactionSender):
+    """
+    A transaction mixin that's capable of transferring funds to another account.
+    """
+
     def transfer(self, to, value, tx_type: TransactionType) -> HexStr | None:
         tx: Tx = TransactionBuilder.new_with_gas(25000)
         tx.update(
@@ -117,6 +130,10 @@ class TransferTransaction(TransactionSender):
 
 
 class SmartContracts(TransactionSender):
+    """
+    Mixin to work with smart contracts.
+    """
+
     CONTRACTS_DIR = "load/reth/contracts/"
     SOL_VERSION = "0.8.0"
 
@@ -182,6 +199,10 @@ class SmartContracts(TransactionSender):
 
 
 class ERC20(SmartContracts):
+    """
+    Allows to call ERC20 contract methods.
+    """
+
     def mint_erc20(self, token_name, amount):
         return self.call_contract(token_name, "mint", self._acc.address, amount)
 
@@ -190,6 +211,10 @@ class ERC20(SmartContracts):
 
 
 class Uniswap(SmartContracts):
+    """
+    Allows to call basic uniswap methods.
+    """
+
     def swap(self, token_in, token_out, amount):
         return self.call_contract("Uniswap", "swap", token_in, token_out, amount)
 
@@ -207,4 +232,8 @@ class Uniswap(SmartContracts):
 class EthTransactions(
     Uniswap, ERC20, SmartContracts, TransferTransaction, TransactionSender, _TransactionFaucet
 ):
+    """
+    Enables all mixins altogether.
+    """
+
     pass

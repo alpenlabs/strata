@@ -11,7 +11,7 @@ class BasicRethBlockJob(BaseRethLoadJob):
 
     @task
     def get_block(self):
-        # print("GET_BLOCK REQUEST")
+        self._logger.info("GET_BLOCK REQUEST")
 
         block_txn_cnt = list()
         for i in range(1, 50):
@@ -21,7 +21,7 @@ class BasicRethBlockJob(BaseRethLoadJob):
                 break
             txn_cnt = len(block["transactions"])
             block_txn_cnt.append(txn_cnt)
-        # print(f"BLOCKS {block_txn_cnt}")
+        self._logger.info(f"BLOCKS {block_txn_cnt}")
 
 
 class BasicRethTxJob(BaseRethLoadJob):
@@ -36,61 +36,65 @@ class BasicRethTxJob(BaseRethLoadJob):
     def after_start(self):
         super().after_start()
 
-        print(
-            "Deploying counter contract: ",
-            self.eth.deploy_contract("Counter.sol", "Counter", "Counter"),
+        self._logger.info(
+            "Deploying counter contract: {}".format(
+                self.eth.deploy_contract("Counter.sol", "Counter", "Counter")
+            )
         )
 
-        print(
-            "Deploying EGM contract: ",
-            self.eth.deploy_contract("ERC20.sol", "ERC20", "EGM", "EndGameMoney", "EGM"),
+        self._logger.info(
+            "Deploying EGM contract: {}".format(
+                self.eth.deploy_contract("ERC20.sol", "ERC20", "EGM", "EndGameMoney", "EGM")
+            )
         )
 
-        print(
-            "Deploying SUSD token: ",
-            self.eth.deploy_contract("ERC20.sol", "ERC20", "SUSD", "StrataUSD", "SUSD"),
+        self._logger.info(
+            "Deploying SUSD token: {}".format(
+                self.eth.deploy_contract("ERC20.sol", "ERC20", "SUSD", "StrataUSD", "SUSD")
+            )
         )
 
-        print(
-            "Deploying Uniswap Factory: ",
-            self.eth.deploy_contract("Uniswap.sol", "UniswapFactory", "UniswapFactory"),
+        self._logger.info(
+            "Deploying Uniswap Factory: {}".format(
+                self.eth.deploy_contract("Uniswap.sol", "UniswapFactory", "UniswapFactory")
+            )
         )
 
-        print(
-            "Deploying Uniswap: ",
-            self.eth.deploy_contract(
-                "Uniswap.sol",
-                "UniswapRouter",
-                "Uniswap",
-                self.eth.get_contract_address("UniswapFactory"),
+        self._logger.info(
+            "Deploying Uniswap: {}".format(
+                self.eth.deploy_contract(
+                    "Uniswap.sol",
+                    "UniswapRouter",
+                    "Uniswap",
+                    self.eth.get_contract_address("UniswapFactory"),
+                )
             ),
         )
 
-        print("Mint EGM: ", self.eth.mint_erc20("EGM", 1_000_000))
-        print("Mint SUSD: ", self.eth.mint_erc20("SUSD", 1_000_000))
+        self._logger.info("Mint EGM: {}".format(self.eth.mint_erc20("EGM", 1_000_000)))
+        self._logger.info("Mint SUSD: {}".format(self.eth.mint_erc20("SUSD", 1_000_000)))
 
         uniswap_addr = self.eth.get_contract_address("Uniswap")
         egm_token_addr = self.eth.get_contract_address("EGM")
         susd_token_addr = self.eth.get_contract_address("SUSD")
 
-        print(
-            "Approve EGM: ",
-            self.eth.approve_spend("EGM", uniswap_addr, 1_000_000),
+        self._logger.info(
+            "Approve EGM: {}".format(self.eth.approve_spend("EGM", uniswap_addr, 1_000_000))
         )
 
-        print(
-            "Approve SUSD: ",
-            self.eth.approve_spend("SUSD", uniswap_addr, 1_000_000),
+        self._logger.info(
+            "Approve SUSD: {}".format(self.eth.approve_spend("SUSD", uniswap_addr, 1_000_000))
         )
 
-        print(
-            "Add liquidity: ",
-            self.eth.add_liquidity(
-                egm_token_addr,
-                100_000,
-                susd_token_addr,
-                100_000,
-            ),
+        self._logger.info(
+            "Add liquidity: {}".format(
+                self.eth.add_liquidity(
+                    egm_token_addr,
+                    100_000,
+                    susd_token_addr,
+                    100_000,
+                )
+            )
         )
 
         return
@@ -110,29 +114,30 @@ class BasicRethTxJob(BaseRethLoadJob):
     def transactions_task(self):
         target_address = self.eth.w3.eth.account.create().address
 
-        print(
-            "Sending Legacy Transaction:",
-            self.transfer.transfer(target_address, 0.1, TransactionType.LEGACY),
+        self._logger.info(
+            "Sending Legacy Transaction: {}".format(
+                self.transfer.transfer(target_address, 0.1, TransactionType.LEGACY)
+            )
         )
 
-        print(
-            "Sending 2930 Transaction:",
-            self.transfer.transfer(target_address, 0.1, TransactionType.EIP2930),
+        self._logger.info(
+            "Sending 2930 Transaction: {}".format(
+                self.transfer.transfer(target_address, 0.1, TransactionType.EIP2930)
+            )
         )
 
-        print(
-            "Sending 1559 Transaction:",
-            self.transfer.transfer(target_address, 0.1, TransactionType.EIP1559),
+        self._logger.info(
+            "Sending 1559 Transaction: {}".format(
+                self.transfer.transfer(target_address, 0.1, TransactionType.EIP1559)
+            )
         )
 
-        print(
-            "Incrementing Counter:",
-            self.eth.call_contract("Counter", "increment"),
+        self._logger.info(
+            "Incrementing Counter: {}".format(self.eth.call_contract("Counter", "increment"))
         )
 
-        print(
-            "Mint: ",
-            self.eth.mint_erc20("SUSD", 100),
+        self._logger.info(
+            "Mint: {}".format(self.eth.mint_erc20("SUSD", 100)),
         )
 
-        print("OK")
+        self._logger.info("OK")
