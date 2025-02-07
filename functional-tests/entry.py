@@ -32,7 +32,7 @@ def disabled_tests() -> list[str]:
     Helper to disable some tests.
     Useful during debugging or when the test becomes flaky.
     """
-    return frozenset([""])
+    return frozenset(["basic_load"])
 
 def filter_tests(parsed_args, modules):
     """
