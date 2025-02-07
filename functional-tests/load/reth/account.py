@@ -17,7 +17,7 @@ class AbstractAccount:
 
     _nonce_lock = Semaphore()
     """
-    Gevent syncronization primitive on the nonce.
+    Gevent synchronization primitive on the nonce.
     The reason is twofold:
     - to avoid fetching the current nonce before each transaction.
     - to avoid races on the nonce when different green threads use the same account.

@@ -5,7 +5,7 @@ from .account import FundedAccount, GenesisAccount
 
 class BaseRethLoadJob(StrataLoadJob):
     """
-    Base class for all load jobs targetting Reth.
+    Base class for all load jobs targeting Reth.
     """
 
     def before_start(self):

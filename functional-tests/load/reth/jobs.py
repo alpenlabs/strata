@@ -6,7 +6,7 @@ from .transaction import EthTransactions, TransactionType, TransferTransaction
 
 class BasicRethBlockJob(BaseRethLoadJob):
     """
-    Basic job thats displays block information - number of transactions.
+    Basic job that displays block information - number of transactions.
     """
 
     def before_start(self):
@@ -28,7 +28,7 @@ class BasicRethBlockJob(BaseRethLoadJob):
 
 class BasicRethTxJob(BaseRethLoadJob):
     """
-    Basic job thats generates the load - transfers, ERC20 mints, smart contract calls.
+    Basic job that generates the load - transfers, ERC20 mints, smart contract calls.
     """
 
     def before_start(self):
