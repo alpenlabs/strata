@@ -106,19 +106,13 @@ async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
 
     loop {
         let mut status_updates: Vec<L1StatusUpdate> = Vec::new();
-        let cur_best_height = state.best_block_idx();
 
         // See if epoch/filter rules have changed
         if let Some(l1ev) = check_epoch_change(&ctx, &mut state)? {
             handle_bitcoin_event(l1ev, &ctx, event_submitter).await?;
         };
 
-        let poll_span = debug_span!("l1poll", %cur_best_height);
-
-        match poll_for_new_blocks(&ctx, &mut state, &mut status_updates)
-            .instrument(poll_span)
-            .await
-        {
+        match poll_for_new_blocks(&ctx, &mut state, &mut status_updates).await {
             Err(err) => {
                 handle_poll_error(&err, &mut status_updates);
             }
@@ -271,7 +265,8 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
             info!(%pivot_height, %pivot_blkid, "found apparent reorg");
             state.rollback_to_height(pivot_height);
             let revert_ev = L1Event::RevertTo(pivot_height);
-            events.push(revert_ev);
+            // Return with the revert event immediately
+            return Ok(vec![revert_ev]);
         }
     } else {
         // TODO make this case a bit more structured
