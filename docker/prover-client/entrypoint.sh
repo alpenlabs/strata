@@ -8,5 +8,4 @@ echo "starting Prover client"
 # Sample Entrypoint
 strata-prover-client \
     --rpc-port 9851 \
-    --enable-dev-rpcs true \
-    --enable-checkpoint-runner false $@
+    --enable-dev-rpcs true $@

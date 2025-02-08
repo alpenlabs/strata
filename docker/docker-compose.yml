@@ -43,6 +43,8 @@ x-base-prover: &base-prover
     - strata_network
   depends_on:
     - sequencer-signer
+    - bitcoind
+    - sequencer
 
 services:
   reth:
@@ -124,17 +126,21 @@ services:
     container_name: strata_prover_client
     volumes:
       - ./configs/params.json:/app/params.json
-      - ./.data:/app/.data
+      - ./.data/prover-client:/app/.data
+      - ../elfs:/app/elfs
     environment:
-      ELF_BASE_PATH: "elfs"
+      ELF_BASE_PATH: "elfs/sp1"
+      RUST_LOG: "info"
+      SP1_PROVER: "mock"
     command: [
       "--rollup-params", "params.json",
       "--datadir", ".data",
       "--sequencer-rpc", "http://sequencer:8432",
       "--reth-rpc", "http://reth:8545",
-      "--bitcoind-url", "http://bitcoind:18443",
+      "--bitcoind-url", "bitcoind:18443",
       "--bitcoind-user", "rpcuser",
       "--bitcoind-password","rpcpassword",
+      "--enable-checkpoint-runner", "true"
     ]
 
 
@@ -181,6 +187,7 @@ services:
     networks:
       - strata_network
 
+
   bridge-client-1:
     <<: *base-bridge-client
     container_name: bridge-client-1
@@ -205,5 +212,5 @@ services:
 
 networks:
   strata_network:
-    # driver: bridge
+    driver: bridge
     name: strata_network
