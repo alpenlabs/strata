@@ -156,6 +156,8 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
         let proof =
             proof.into_eip1186_response(slots.into_iter().map(JsonStorageKey::from).collect());
 
+        println!("Abishek: accessed address was {:?} ", accessed_address);
+
         parent_proofs.insert(*accessed_address, proof);
     }
 
