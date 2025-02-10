@@ -461,13 +461,13 @@ def setup_root_logger():
 
 def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     """
-    Set up loggers for a list of test names, with log files in a logs directory.
-    - Configures both file and stream handlers for each test logger.
+    Set up logger for a given test, with corresponding log file in a logs directory.
+    - Configures both file and stream handlers for the test logger.
     - Logs are stored in `<datadir_root>/logs/<test_name>.log`.
 
     Parameters:
         datadir_root (str): Root directory for logs.
-        tests (list of str): List of test names to create loggers for.
+        test_name (str): A test names to create loggers for.
 
     Returns:
         logging.Logger
@@ -493,6 +493,37 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     # Add handlers to the logger
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
+
+    return logger
+
+
+def setup_load_job_logger(datadir_root: str, job_name: str):
+    """
+    Set up loggers for a given load job.
+    - Configures file handlers for the test logger.
+    - Logs are stored in `<datadir_root>/<env>/<load_service_name>/<job_name>.log`.
+
+    Parameters:
+        datadir_root (str): Root directory for logs.
+        test_name (str): A load job name to create loggers for.
+
+    Returns:
+        logging.Logger
+    """
+    # Common formatter
+    # We intentionally skip filename:line_number because most of the logs are coming
+    # from the same place - logging transactions when sent, logging blocks when received, etc.
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    # Set up individual loggers for each load job.
+    filename = os.path.join(datadir_root, f"{job_name}.log")
+    logger = logging.getLogger(job_name)
+
+    # File handler
+    file_handler = logging.FileHandler(filename)
+    file_handler.setFormatter(formatter)
+
+    # Add file handler to the logger
+    logger.addHandler(file_handler)
 
     return logger
 

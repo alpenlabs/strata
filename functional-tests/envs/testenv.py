@@ -408,7 +408,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
 
 # TODO: Maybe, we need to make it dynamic to enhance any EnvConfig with load testing capabilities.
 class LoadEnvConfig(BasicEnvConfig):
-    _load_cfgs: list[Callable[[dict[str, flexitest.Service]], LoadConfig]] = []
+    _load_cfgs: list[LoadConfigBuilder] = []
 
     def with_load_builder(self, builder: LoadConfigBuilder):
         self._load_cfgs.append(builder)

@@ -10,7 +10,7 @@ from locust.stats import stats_history, stats_printer
 from load.cfg import LoadConfig
 
 
-# TODO(load): enhance it to be able to increase/decrease the load from test runtime.
+# TODO(load): enhance it to be able to increase/decrease the load dynamically from test runtime.
 class LoadGeneratorService(flexitest.Service):
     """
     A separate flexitest service that is able to generate the load as specified by `LoadConfig`.
@@ -28,23 +28,29 @@ class LoadGeneratorService(flexitest.Service):
     _is_started: bool
     """Whether the LoadGenerator (as a flexitest service) is started."""
 
-    def __init__(self, logfile, cfg: LoadConfig):
+    def __init__(self, datadir, cfg: LoadConfig):
         self._is_started = False
-        self.env = Environment(user_classes=cfg.jobs, events=events)
-        self.runner = self.env.create_local_runner()
         self.cfg = cfg
 
-        # TODO(load): maybe adapt it to our usual logging mechanism from the utils.
-        # Right now, the format is different.
+        self.env = Environment(user_classes=cfg.jobs, events=events, host=cfg.host)
+        self.runner = self.env.create_local_runner()
+
+        # Setup service level logging.
+        service_logfile = os.path.join(datadir, "service.log")
         log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
-        setup_logging(log_level, logfile=logfile)
+        setup_logging(log_level, logfile=service_logfile)
+
+        # Dirty hack...
+        # Injecting datadir directly onto env object.
+        # With this, the load jobs are able to set up its logging properly.
+        self.env._datadir = datadir
 
     def start(self):
         self.env.events.init.fire(environment=self.env, runner=self.runner)
 
         gevent.spawn(stats_printer(self.env.stats))
         gevent.spawn(stats_history, self.env.runner)
-        self.runner.start(1, spawn_rate=self.cfg.spawn_rate)
+        self.runner.start(len(self.cfg.jobs), spawn_rate=self.cfg.spawn_rate)
         self._is_started = True
 
     def stop(self):
