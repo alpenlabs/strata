@@ -42,41 +42,38 @@ class BasicRethTxJob(BaseRethLoadJob):
     def after_start(self):
         super().after_start()
 
+        tx = self.tx
+
         # Deploy Counter.
-        self.tx.deploy_contract("Counter.sol", "Counter", "Counter")
+        tx.deploy_contract("Counter.sol", "Counter", "Counter")
 
         # Deploy EGM and SUSD
-        self.tx.deploy_contract("ERC20.sol", "ERC20", "EGM", "EndGameMoney", "EGM")
-        self.tx.deploy_contract("ERC20.sol", "ERC20", "SUSD", "StrataUSD", "SUSD")
+        tx.deploy_contract("ERC20.sol", "ERC20", "EGM", "EndGameMoney", "EGM")
+        tx.deploy_contract("ERC20.sol", "ERC20", "SUSD", "StrataUSD", "SUSD")
 
         # Deploy Uniswap.
-        self.tx.deploy_contract("Uniswap.sol", "UniswapFactory", "UniswapFactory")
-        self.tx.deploy_contract(
+        tx.deploy_contract("Uniswap.sol", "UniswapFactory", "UniswapFactory")
+        tx.deploy_contract(
             "Uniswap.sol",
             "UniswapRouter",
             "Uniswap",
-            self.tx.get_contract_address("UniswapFactory"),
+            tx.get_contract_address("UniswapFactory"),
         )
 
         # Mint some EGM and SUSD tokens.
-        self.tx.mint_erc20("EGM", 1_000_000)
-        self.tx.mint_erc20("SUSD", 1_000_000)
+        tx.mint_erc20("EGM", 1_000_000)
+        tx.mint_erc20("SUSD", 1_000_000)
 
-        uniswap_addr = self.tx.get_contract_address("Uniswap")
-        egm_token_addr = self.tx.get_contract_address("EGM")
-        susd_token_addr = self.tx.get_contract_address("SUSD")
+        uniswap_addr = tx.get_contract_address("Uniswap")
+        egm_token_addr = tx.get_contract_address("EGM")
+        susd_token_addr = tx.get_contract_address("SUSD")
 
         # Approve spending tokens to Uniswap (standard ERC20 approve).
-        self.tx.approve_spend("EGM", uniswap_addr, 1_000_000)
-        self.tx.approve_spend("SUSD", uniswap_addr, 1_000_000)
+        tx.approve_spend("EGM", uniswap_addr, 1_000_000)
+        tx.approve_spend("SUSD", uniswap_addr, 1_000_000)
 
         # Add liquidity to uniswap liquidity pair (since we approved spending).
-        self.tx.add_liquidity(
-            egm_token_addr,
-            100_000,
-            susd_token_addr,
-            100_000,
-        )
+        tx.add_liquidity(egm_token_addr, 100_000, susd_token_addr, 100_000)
 
         # We either have a bug in our reth, or swap itself contains some neat bug.
         # Disabled for now.
@@ -84,7 +81,7 @@ class BasicRethTxJob(BaseRethLoadJob):
         return
 
         # Swap SUSD to EGM (FOMO IS REAL).
-        self.tx.swap(susd_token_addr, egm_token_addr, 500_000)
+        tx.swap(susd_token_addr, egm_token_addr, 500)
 
     @task
     def transactions_task(self):

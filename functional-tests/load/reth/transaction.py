@@ -194,13 +194,7 @@ class SmartContracts(TransactionSender):
         return self._extract_compiled_contract(compiled_sol, contract_name)
 
     @tx_caller("DEPLOYING CONTRACT [3]")
-    def deploy_contract(
-        self,
-        contract_path,
-        contract_name,
-        contract_id,
-        *args,
-    ):
+    def deploy_contract(self, contract_path, contract_name, contract_id, *args):
         abi, bytecode = self._compile_contract(contract_path, contract_name)
         contract = self.w3.eth.contract(abi=abi, bytecode=bytecode)
 
@@ -219,7 +213,9 @@ class SmartContracts(TransactionSender):
         return self._smart_contracts_storage.get(contract_id, (None, None))[0]
 
     @tx_caller("CALLING CONTRACT [1]")
-    def call_contract(self, contract_id, function_name, *args) -> HexBytes | None:
+    def call_contract(
+        self, contract_id, function_name, *args, wait=True
+    ) -> HexBytes | TxReceipt | None:
         try:
             contract = self.w3.eth.contract(
                 address=self._contract_address(contract_id), abi=self._contract_abi(contract_id)
@@ -228,7 +224,10 @@ class SmartContracts(TransactionSender):
             self.fill_tx_fields(tx)
 
             function_tx = contract.functions[function_name](*args).build_transaction(tx)
-            return self.send_tx(function_tx)
+            if wait:
+                return self.send_tx_and_wait(function_tx)
+            else:
+                return self.send_tx(function_tx)
         except Exception as e:
             print(e)
             return None
@@ -243,12 +242,12 @@ class ERC20(SmartContracts):
     """
 
     @tx_caller("MINTING [2] [1] tokens")
-    def mint_erc20(self, token_name, amount):
-        return self.call_contract(token_name, "mint", self._acc.address, amount)
+    def mint_erc20(self, token_name, amount, wait=True):
+        return self.call_contract(token_name, "mint", self._acc.address, amount, wait=wait)
 
     @tx_caller("APPROVING SPEND [3] [1] TOKENS FOR [2]")
-    def approve_spend(self, token_name, spender, amount):
-        return self.call_contract(token_name, "approve", spender, amount)
+    def approve_spend(self, token_name, spender, amount, wait=True):
+        return self.call_contract(token_name, "approve", spender, amount, wait=wait)
 
 
 class Uniswap(SmartContracts):
@@ -256,17 +255,14 @@ class Uniswap(SmartContracts):
     Allows to call basic uniswap methods.
     """
 
-    def swap(self, token_in, token_out, amount):
-        return self.call_contract("Uniswap", "swap", token_in, token_out, amount)
+    @tx_caller("SWAPPING [1] FOR [2], AMOUNT [3]")
+    def swap(self, token_in, token_out, amount, wait=True):
+        return self.call_contract("Uniswap", "swap", token_in, token_out, amount, wait=wait)
 
-    def add_liquidity(self, token_a, amount_a, token_b, amount_b):
+    @tx_caller("ADDING LIQUIDITY FOR [1]/[3] PAIR, AMOUNT [2]/[4]")
+    def add_liquidity(self, token_a, amount_a, token_b, amount_b, wait=True):
         return self.call_contract(
-            "Uniswap",
-            "addLiquidity",
-            token_a,
-            token_b,
-            amount_a,
-            amount_b,
+            "Uniswap", "addLiquidity", token_a, token_b, amount_a, amount_b, wait=wait
         )
 
 
