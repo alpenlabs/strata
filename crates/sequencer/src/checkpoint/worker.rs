@@ -5,7 +5,6 @@ use std::sync::Arc;
 use strata_consensus_logic::csm::message::ClientUpdateNotif;
 use strata_db::{traits::Database, types::CheckpointEntry, DbError};
 use strata_primitives::{
-    buf::Buf32,
     epoch::EpochCommitment,
     l1::{L1BlockCommitment, L1BlockId, L1BlockManifest},
     l2::{L2BlockCommitment, L2BlockId},
@@ -15,11 +14,12 @@ use strata_state::{
     batch::{BaseStateCommitment, BatchInfo, BatchTransition, EpochSummary},
     block::L2BlockBundle,
     chain_state::Chainstate,
-    client_state::ClientState,
     header::*,
     l1::HeaderVerificationState,
 };
-use strata_storage::{ChainstateManager, L1BlockManager, L2BlockManager, NodeStorage};
+use strata_storage::{
+    ChainstateManager, CheckpointDbManager, L1BlockManager, L2BlockManager, NodeStorage,
+};
 use strata_tasks::ShutdownGuard;
 use thiserror::Error;
 use tokio::sync::broadcast;
@@ -65,7 +65,12 @@ pub fn checkpoint_worker<D: Database>(
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
 ) -> anyhow::Result<()> {
-    let rollup_params_commitment = params.rollup().compute_hash();
+    let ckman = storage.checkpoint();
+
+    //let rollup_params_commitment = params.rollup().compute_hash();
+
+    // FIXME this should have special handling for genesis
+    let mut last_saved_epoch = ckman.get_last_checkpoint_blocking()?.unwrap_or_default();
 
     loop {
         if shutdown.should_shutdown() {
@@ -73,6 +78,7 @@ pub fn checkpoint_worker<D: Database>(
             break;
         }
 
+        // TODO rework this to be based on new FCM state
         let update = match cupdate_rx.blocking_recv() {
             Ok(u) => u,
             Err(broadcast::error::RecvError::Closed) => {
@@ -84,48 +90,101 @@ pub fn checkpoint_worker<D: Database>(
             }
         };
 
-        let state = update.new_state();
+        // Fetch the epochs that seem ready to have checkpoints generated.
+        let ready_epochs = find_ready_checkpoints(last_saved_epoch, ckman)?;
 
-        let next_checkpoint_idx = get_next_checkpoint_idx(state);
-        // check if entry is already present
-        if checkpoint_handle
-            .get_checkpoint_blocking(next_checkpoint_idx)?
-            .is_some()
-        {
-            continue;
-        }
-
-        let (batch_info, batch_transition, base_state_commitment) =
-            match get_next_batch(state, storage.as_ref(), rollup_params_commitment) {
-                Err(e) => {
-                    warn!(err = %e, "Failed to get next batch");
-                    continue;
-                }
-                Ok(data) => data,
+        for epoch in ready_epochs {
+            let Some(summary) = ckman.get_epoch_summary_blocking(epoch)? else {
+                warn!(
+                    ?epoch,
+                    "epoch seemed ready but summary was missing, ignoring"
+                );
+                continue;
             };
 
-        let checkpoint_idx = batch_info.epoch();
+            handle_ready_epoch(
+                &summary,
+                storage.as_ref(),
+                checkpoint_handle.as_ref(),
+                params.rollup(),
+            )?;
 
-        // sanity check
-        assert_eq!(checkpoint_idx, next_checkpoint_idx);
-
-        // else save a pending proof checkpoint entry
-        debug!(%checkpoint_idx, "saving checkpoint pending proof");
-        let entry =
-            CheckpointEntry::new_pending_proof(batch_info, batch_transition, base_state_commitment);
-        if let Err(e) = checkpoint_handle.put_checkpoint_and_notify_blocking(checkpoint_idx, entry)
-        {
-            warn!(%checkpoint_idx, err = %e, "failed to save checkpoint");
+            last_saved_epoch = epoch.epoch();
         }
     }
     Ok(())
 }
 
-fn get_next_checkpoint_idx(state: &Chainstate) -> u64 {
-    state.cur_epoch()
+/// Finds any epoch after a given epoch number that have been inserted but we
+/// haven't inserted checkpoint entries for.
+fn find_ready_checkpoints(
+    from_epoch: u64,
+    ckman: &CheckpointDbManager,
+) -> Result<Vec<EpochCommitment>, Error> {
+    let epoch_at = from_epoch; // TODO make this +1 after we fix genesis
+    let Some(last_ready_epoch) = ckman.get_last_summarized_epoch_blocking()? else {
+        return Ok(Vec::new());
+    };
+
+    let mut epochs = Vec::new();
+
+    for i in epoch_at..=last_ready_epoch {
+        let commitments = ckman.get_epoch_commitments_at_blocking(i)?;
+
+        if commitments.is_empty() {
+            warn!(epoch = %i, "thought there was an epoch summary here, moving on");
+            break;
+        }
+
+        if commitments.len() > 1 {
+            let ignored_count = commitments.len() - 1;
+            warn!(epoch = %i, %ignored_count, "ignoring some summaries at epoch");
+        }
+
+        let the_epoch = commitments[0];
+        if ckman.get_checkpoint_blocking(the_epoch.epoch())?.is_none() {
+            epochs.push(the_epoch);
+        }
+    }
+
+    Ok(epochs)
 }
 
-pub struct CheckpointPrepData {
+fn handle_ready_epoch(
+    epoch_summary: &EpochSummary,
+    storage: &NodeStorage,
+    ckhandle: &CheckpointHandle,
+    params: &RollupParams,
+) -> anyhow::Result<()> {
+    let epoch = epoch_summary.epoch();
+
+    // REALLY make sure we don't already have checkpoint for the epoch.
+    if ckhandle.get_checkpoint_blocking(epoch)?.is_some() {
+        warn!(%epoch, "already have checkpoint for epoch, aborting preparation");
+        return Ok(());
+    }
+
+    let cpd = create_checkpoint_prep_data_from_summary(epoch_summary, storage, params)?;
+
+    // sanity check
+    assert_eq!(
+        cpd.info.epoch(),
+        epoch_summary.epoch(),
+        "ckptworker: epoch mismatch in checkpoint preparation"
+    );
+
+    // else save a pending proof checkpoint entry
+    debug!(%epoch, "saving checkpoint pending proof");
+    let entry = CheckpointEntry::new_pending_proof(cpd.info, cpd.tsn, cpd.commitment);
+    if let Err(e) = ckhandle.put_checkpoint_and_notify_blocking(epoch, entry) {
+        warn!(%epoch, err = %e, "failed to save checkpoint");
+    }
+
+    Ok(())
+}
+
+/// Container structure for convenience.
+struct CheckpointPrepData {
     info: BatchInfo,
     tsn: BatchTransition,
     commitment: BaseStateCommitment,
