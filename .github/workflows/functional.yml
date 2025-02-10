@@ -126,12 +126,31 @@ jobs:
 
       # Run again just to be sure as some tests are flaky
       - name: Run functional tests (2)
+        id: funcTestsRun2
         if: steps.funcTestsRun1.outcome == 'failure'
+        continue-on-error: true
         run: |
           NEWPATH="$(realpath target/debug/)"
           export PATH="${NEWPATH}:${PATH}"
           which strata-client
           cd functional-tests && poetry run python entry.py
+
+      - name: Upload logs as build artifact on failure
+        if: steps.funcTestsRun1.outcome == 'failure' || steps.funcTestsRun2.outcome == 'failure'
+        id: upload_logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: fntest_dd
+          path: functional-tests/_dd/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Fail job if functional tests fail
+        if: steps.funcTestsRun2.outcome == 'failure'
+        run: |
+          echo "Functional tests failed"
+          exit 1
+
 
   functional-tests-success:
     name: Check that all checks pass
