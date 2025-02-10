@@ -42,6 +42,13 @@ pub struct EpochSummary {
 
     /// The new L1 block that was submitted in the terminal block.
     new_l1: L1BlockCommitment,
+
+    /// The final state root of the epoch.
+    ///
+    /// Currently this is just copied from the state root of the header of the
+    /// last block of the slot, but it's likely we'll change this to add
+    /// processing outside of the terminal block before "finishing" the epoch.
+    final_state: Buf32,
 }
 
 impl EpochSummary {
@@ -51,12 +58,14 @@ impl EpochSummary {
         terminal: L2BlockCommitment,
         prev_terminal: L2BlockCommitment,
         new_l1: L1BlockCommitment,
+        final_state: Buf32,
     ) -> Self {
         Self {
             epoch,
             terminal,
             prev_terminal,
             new_l1,
+            final_state,
         }
     }
 
@@ -74,6 +83,10 @@ impl EpochSummary {
 
     pub fn new_l1(&self) -> &L1BlockCommitment {
         &self.new_l1
+    }
+
+    pub fn final_state(&self) -> &Buf32 {
+        &self.final_state
     }
 
     /// Generates an epoch commitent for this epoch using the data in the
@@ -101,8 +114,15 @@ impl EpochSummary {
         &self,
         new_terminal: L2BlockCommitment,
         new_l1: L1BlockCommitment,
+        new_state: Buf32,
     ) -> EpochSummary {
-        Self::new(self.epoch() + 1, new_terminal, *self.terminal(), new_l1)
+        Self::new(
+            self.epoch() + 1,
+            new_terminal,
+            *self.terminal(),
+            new_l1,
+            new_state,
+        )
     }
 }
 
