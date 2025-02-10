@@ -134,17 +134,21 @@ jobs:
           export PATH="${NEWPATH}:${PATH}"
           which strata-client
           cd functional-tests && poetry run python entry.py
-
+      - name: Zip log files on failure
+        if: steps.funcTestsRun1.outcome == 'failure' || steps.funcTestsRun2.outcome == 'failure'
+        # Create a zip archive (logs.zip) that includes only service.log files,
+        # preserving the folder structure starting from functional-tests/_dd
+        # NOTE: Entire _dd ends up hundreds of MBs, so keep only logs.
+        run: find functional-tests/_dd -type f -name "service.log" | zip -@ logs.zip
       - name: Upload logs as build artifact on failure
         if: steps.funcTestsRun1.outcome == 'failure' || steps.funcTestsRun2.outcome == 'failure'
-        id: upload_logs
         uses: actions/upload-artifact@v4
         with:
           name: fntest_dd
-          path: functional-tests/_dd/
+          path: logs.zip
           retention-days: 30
           if-no-files-found: error
-
+          compression-level: 0 # already compressed
       - name: Fail job if functional tests fail
         if: steps.funcTestsRun2.outcome == 'failure'
         run: |
