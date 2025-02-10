@@ -2,10 +2,7 @@
 
 use strata_db::types::CheckpointConfStatus;
 use strata_primitives::params::Params;
-use strata_state::{
-    client_state::{ClientState, SyncState},
-    header::L2Header,
-};
+use strata_state::{chain_state::Chainstate, header::L2Header};
 use strata_storage::L2BlockManager;
 
 use super::types::{BlockSigningDuty, Duty};
@@ -14,34 +11,26 @@ use crate::{
     duty::{errors::Error, types::CheckpointDuty},
 };
 
-/// Extracts new duties given a consensus state and a identity.
+/// Extracts new duties given a current chainstate and an identity.
 pub(crate) fn extract_duties(
-    state: &ClientState,
+    state: &Chainstate,
     checkpoint_handle: &CheckpointHandle,
     l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<Vec<Duty>, Error> {
-    // If a sync state isn't present then we probably don't have anything we
-    // want to do.  We might change this later.
-    let Some(ss) = state.sync() else {
-        return Ok(Vec::new());
-    };
-
     let mut duties = vec![];
-
-    duties.extend(extract_block_duties(ss, l2_block_manager, params)?);
+    duties.extend(extract_block_duties(state, l2_block_manager, params)?);
     duties.extend(extract_batch_duties(checkpoint_handle)?);
-
     Ok(duties)
 }
 
 fn extract_block_duties(
-    ss: &SyncState,
+    state: &Chainstate,
     l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<Vec<Duty>, Error> {
-    let tip_height = ss.chain_tip_height();
-    let tip_blkid = *ss.chain_tip_blkid();
+    let tip_slot = state.chain_tip_slot();
+    let tip_blkid = *state.chain_tip_blkid();
 
     let tip_block_ts = l2_block_manager
         .get_block_data_blocking(&tip_blkid)?
@@ -54,13 +43,15 @@ fn extract_block_duties(
     // Since we're not rotating sequencers, for now we just *always* produce a
     // new block.
     Ok(vec![Duty::SignBlock(BlockSigningDuty::new_simple(
-        tip_height + 1,
+        tip_slot + 1,
         tip_blkid,
         target_ts,
     ))])
 }
 
 fn extract_batch_duties(checkpoint_handle: &CheckpointHandle) -> Result<Vec<Duty>, Error> {
+    // TODO do this dependent on chainstates
+
     // get checkpoints ready to be signed
     let last_checkpoint_idx = checkpoint_handle.get_last_checkpoint_idx_blocking()?;
 
