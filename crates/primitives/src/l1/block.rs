@@ -1,5 +1,5 @@
 use arbitrary::Arbitrary;
-use bitcoin::{consensus::serialize, hashes::Hash, Block, BlockHash};
+use bitcoin::{hashes::Hash, BlockHash};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -163,6 +163,9 @@ pub struct L1BlockRecord {
     /// here. This is what we use in the MMR.
     blockid: L1BlockId,
 
+    /// Block height
+    height: u64,
+
     /// Block header and whatever additional data we might want to query.
     header: Vec<u8>,
 
@@ -173,9 +176,10 @@ pub struct L1BlockRecord {
 }
 
 impl L1BlockRecord {
-    pub fn new(blockid: L1BlockId, header: Vec<u8>, txs_root: Buf32) -> Self {
+    pub fn new(blockid: L1BlockId, height: u64, header: Vec<u8>, txs_root: Buf32) -> Self {
         Self {
             blockid,
+            height,
             header,
             txs_root,
         }
@@ -185,6 +189,10 @@ impl L1BlockRecord {
         self.blockid
     }
 
+    pub fn height(&self) -> u64 {
+        self.height
+    }
+
     pub fn header(&self) -> &[u8] {
         &self.header
     }
@@ -192,21 +200,5 @@ impl L1BlockRecord {
     /// Witness transactions root.
     pub fn txs_root(&self) -> Buf32 {
         self.txs_root
-    }
-}
-
-impl From<Block> for L1BlockRecord {
-    fn from(block: Block) -> Self {
-        let blockid = block.block_hash().into();
-        let root = block
-            .witness_root()
-            .map(|x| x.to_byte_array())
-            .unwrap_or_default();
-        let header = serialize(&block.header);
-        Self {
-            blockid,
-            txs_root: Buf32(root),
-            header,
-        }
     }
 }
