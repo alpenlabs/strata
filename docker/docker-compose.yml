@@ -43,8 +43,6 @@ x-base-prover: &base-prover
     - strata_network
   depends_on:
     - sequencer-signer
-    - bitcoind
-    - sequencer
 
 services:
   reth:
