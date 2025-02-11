@@ -143,6 +143,11 @@ impl StatusChannel {
         self.sender.cl.subscribe()
     }
 
+    /// Create a subscription to the chain sync status watcher.
+    pub fn subscribe_chain_sync(&self) -> watch::Receiver<Option<ChainSyncStatusUpdate>> {
+        self.sender.chs.subscribe()
+    }
+
     /// Waits until genesis and returns the client state.
     pub async fn wait_until_genesis(&self) -> Result<ClientState, RecvError> {
         let mut rx = self.receiver.cl.clone();

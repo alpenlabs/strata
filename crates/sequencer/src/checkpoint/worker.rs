@@ -358,7 +358,7 @@ fn create_checkpoint_prep_data_from_summary(
 
     // There's some special handling we have to do if we're the genesis epoch.
     let is_genesis_epoch = summary.epoch() == 0;
-    let prev_summary = if is_genesis_epoch {
+    let prev_summary = if !is_genesis_epoch {
         let ps = storage
             .checkpoint()
             .get_epoch_summary_blocking(summary.get_prev_epoch_commitment().unwrap())?

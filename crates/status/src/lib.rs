@@ -5,3 +5,6 @@ pub use status_manager::*;
 
 mod chain;
 pub use chain::*;
+
+mod sync_receiver;
+pub use sync_receiver::*;

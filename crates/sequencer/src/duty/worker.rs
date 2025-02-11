@@ -1,38 +1,34 @@
 //! Executes duties.
 
-use std::{sync::Arc, time};
+use std::sync::Arc;
 
 use parking_lot::RwLock;
-use strata_consensus_logic::csm::message::ClientUpdateNotif;
 use strata_primitives::params::Params;
-use strata_state::{client_state::ClientState, prelude::*};
+use strata_state::{chain_state::Chainstate, prelude::*};
+use strata_status::{ChainSyncStatusUpdate, StatusChannel, SyncReceiver};
 use strata_storage::{L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
-use tokio::sync::broadcast;
+use tokio::runtime::Handle;
 use tracing::*;
 
-use crate::{
-    checkpoint::CheckpointHandle,
-    duty::{
-        errors::Error,
-        extractor,
-        types::{DutyTracker, StateUpdate},
-    },
-};
+use super::{errors::Error, extractor, tracker::DutyTracker, types::StateUpdate};
+use crate::checkpoint::CheckpointHandle;
 
 /// Watch client state updates and generate sequencer duties.
 pub fn duty_tracker_task(
     shutdown: ShutdownGuard,
     duty_tracker: Arc<RwLock<DutyTracker>>,
-    cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    status_ch: Arc<StatusChannel>,
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
+    rt: Handle,
     params: Arc<Params>,
 ) -> Result<(), Error> {
+    let status_rx = SyncReceiver::new(status_ch.subscribe_chain_sync(), rt);
     duty_tracker_task_inner(
         shutdown,
         duty_tracker,
-        cupdate_rx,
+        status_rx,
         storage.as_ref(),
         checkpoint_handle.as_ref(),
         params.as_ref(),
@@ -42,7 +38,7 @@ pub fn duty_tracker_task(
 fn duty_tracker_task_inner(
     shutdown: ShutdownGuard,
     duty_tracker: Arc<RwLock<DutyTracker>>,
-    mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    mut status_rx: SyncReceiver<Option<ChainSyncStatusUpdate>>,
     storage: &NodeStorage,
     checkpoint_handle: &CheckpointHandle,
     params: &Params,
@@ -74,27 +70,32 @@ fn duty_tracker_task_inner(
             warn!("received shutdown signal");
             break;
         }
-        let update = match cupdate_rx.blocking_recv() {
-            Ok(u) => u,
-            Err(broadcast::error::RecvError::Closed) => {
-                break;
-            }
-            Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                // TODO maybe check the things we missed, but this is fine for now
-                warn!(%skipped, "overloaded, skipping indexing some duties");
-                continue;
-            }
+
+        // Wait for a new update.
+        if let Err(e) = status_rx.changed() {
+            break;
+        }
+
+        // Get it if there is one.
+        let update = status_rx.borrow();
+        let Some(update) = update.as_ref() else {
+            trace!("received new chain sync status but was still unset, ignoring");
+            continue;
         };
 
-        let ev_idx = update.sync_event_idx();
-        let new_state = update.new_state();
-        trace!(%ev_idx, "new consensus state, updating duties");
-        trace!("STATE: {new_state:?}");
+        // Again check if we should shutdown, just in case.
+        if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
+            break;
+        }
+
+        let new_tip = update.new_status().tip;
+        trace!(?new_tip, "new chain tip, updating duties");
 
         if let Err(e) = update_tracker(
-            duty_tracker.clone(),
-            new_state,
-            storage.l2(),
+            &duty_tracker,
+            update.new_tl_chainstate().as_ref(),
+            storage,
             checkpoint_handle,
             params,
         ) {
@@ -108,55 +109,59 @@ fn duty_tracker_task_inner(
 }
 
 fn update_tracker(
-    tracker: Arc<RwLock<DutyTracker>>,
-    state: &ClientState,
-    l2_block_manager: &L2BlockManager,
+    tracker: &Arc<RwLock<DutyTracker>>,
+    state: &Chainstate,
+    storage: &NodeStorage,
     checkpoint_handle: &CheckpointHandle,
     params: &Params,
 ) -> Result<(), Error> {
-    let Some(ss) = state.sync() else {
-        return Ok(());
-    };
+    let l2man = storage.l2();
 
-    let new_duties = extractor::extract_duties(state, checkpoint_handle, l2_block_manager, params)?;
+    let new_duties = extractor::extract_duties(state, checkpoint_handle, l2man, params)?;
 
-    info!(new_duties = ?new_duties, "new duties");
+    info!(?new_duties, "new duties");
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
-    let tip_blkid = *ss.chain_tip_blkid();
-    let block = l2_block_manager
+    let tip_blkid = *state.chain_tip_blkid();
+    let block = l2man
         .get_block_data_blocking(&tip_blkid)?
         .ok_or(Error::MissingL2Block(tip_blkid))?;
-    let block_idx = block.header().blockidx();
-    let ts = time::Instant::now(); // FIXME XXX use .timestamp()!!!
+    let tip_slot = block.header().blockidx();
+    let ts_millis = block.header().timestamp();
 
-    // Figure out which blocks were finalized
-    let new_finalized = state.sync().map(|sync| *sync.finalized_blkid());
+    // Figure out which blocks were finalized.  This is a bit janky and should
+    // be reworked to need less special-casing.  This might be able to be
+    // simplified since we are more directly generating duties from the chain
+    // state.
+    let new_finalized = *state.finalized_epoch().last_blkid();
     let newly_finalized_blocks: Vec<L2BlockId> = get_finalized_blocks(
         tracker.read().get_finalized_block(),
-        l2_block_manager,
-        new_finalized,
+        Some(new_finalized),
+        l2man,
     )?;
 
-    let latest_finalized_batch = state
-        .l1_view()
-        .last_finalized_checkpoint()
-        .map(|x| x.batch_info.epoch());
+    let latest_finalized_batch = if !state.finalized_epoch().is_null() {
+        Some(state.finalized_epoch().epoch())
+    } else {
+        None
+    };
 
+    // Actualy apply the state update.
     let tracker_update = StateUpdate::new(
-        block_idx,
-        ts,
+        tip_slot,
+        ts_millis,
         newly_finalized_blocks,
         latest_finalized_batch,
     );
+
     {
         let mut tracker = tracker.write();
         let n_evicted = tracker.update(&tracker_update);
         trace!(%n_evicted, "evicted old duties from new consensus state");
 
         // Now actually insert the new duties.
-        tracker.add_duties(tip_blkid, block_idx, new_duties.into_iter());
+        tracker.add_duties(tip_blkid, tip_slot, new_duties.into_iter());
     }
 
     Ok(())
@@ -164,8 +169,8 @@ fn update_tracker(
 
 fn get_finalized_blocks(
     last_finalized_block: Option<L2BlockId>,
-    l2_blkman: &L2BlockManager,
     finalized: Option<L2BlockId>,
+    l2man: &L2BlockManager,
 ) -> Result<Vec<L2BlockId>, Error> {
     // Figure out which blocks were finalized
     let mut newly_finalized_blocks: Vec<L2BlockId> = Vec::new();
@@ -180,7 +185,7 @@ fn get_finalized_blocks(
 
         // else loop till we reach to the last finalized block or go all the way
         // as long as we get some block data
-        match l2_blkman.get_block_data_blocking(&finalized)? {
+        match l2man.get_block_data_blocking(&finalized)? {
             Some(block) => new_finalized = Some(*block.header().parent()),
             None => break,
         }
