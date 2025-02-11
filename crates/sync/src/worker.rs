@@ -1,12 +1,16 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
-use strata_consensus_logic::{csm::message::ForkChoiceMessage, sync_manager::SyncManager};
+use strata_consensus_logic::{
+    csm::message::{ClientUpdateNotif, ForkChoiceMessage},
+    sync_manager::SyncManager,
+};
+use strata_primitives::epoch::EpochCommitment;
 use strata_state::{
     block::L2BlockBundle, client_state::SyncState, header::L2Header, id::L2BlockId,
 };
 use strata_storage::L2BlockManager;
-use tracing::{debug, error, warn};
+use tracing::*;
 
 use crate::{
     state::{self, L2SyncState},
@@ -39,9 +43,7 @@ pub fn block_until_csm_ready_and_init_sync_state<T: SyncClient>(
 ) -> Result<L2SyncState, L2SyncError> {
     debug!("waiting for CSM to become ready");
     let sync_state = wait_for_csm_ready(&context.sync_manager);
-
-    debug!(sync_state = ?sync_state, "CSM is ready");
-
+    debug!(?sync_state, "CSM is ready");
     state::initialize_from_db(&sync_state, &context.l2_block_manager)
 }
 
@@ -70,66 +72,116 @@ pub async fn sync_worker<T: SyncClient>(
     loop {
         tokio::select! {
             client_update = client_update_notif.recv() => {
-                // on receiving new client update, update own finalized state
                 let Ok(update) = client_update else {
                     continue;
                 };
-                let Some(sync) = update.new_state().sync() else {
-                    continue;
-                };
 
-                let finalized_blockid = sync.finalized_blkid();
-                let Ok(Some(finalized_block)) = context.l2_block_manager.get_block_data_async(finalized_blockid).await else {
-                    error!(finalized_blockid = ?finalized_blockid, "missing finalized block");
-                    continue;
-                };
-                let finalized_height = finalized_block.header().blockidx();
-                if let Err(err) = handle_block_finalized(state, finalized_blockid, finalized_height).await {
-                    error!(finalized_blockid = ?finalized_blockid, err = ?err, "failed to finalize block");
-                }
+                handle_new_client_update(update.as_ref(), state, context).await?;
             }
+
             _ = interval.tick() => {
-                // every fixed interval, try to sync with latest state of client
-                let Ok(status) = context.client.get_sync_status().await else {
-                    warn!("failed to get client status");
-                    continue;
-                };
-
-                if state.has_block(&status.tip_block_id) {
-                    // in sync with client
-                    continue;
-                }
-
-                debug!(current_height = state.tip_height(), target_height = status.tip_height, "syncing to target height");
-
-                let start_height = state.tip_height() + 1;
-                let end_height = status.tip_height;
-
-                if let Err(err) = sync_blocks_by_range(state, context, start_height, end_height).await {
-                    error!(start_height = start_height, end_height = end_height, err = ?err, "failed to sync blocks");
-                }
+                do_tick(state, context).await?;
             }
             // maybe subscribe to new blocks on client instead of polling?
         }
     }
 }
 
-async fn sync_blocks_by_range<T: SyncClient>(
+async fn handle_new_client_update<T: SyncClient>(
+    update: &ClientUpdateNotif,
+    state: &mut L2SyncState,
+    _context: &L2SyncContext<T>,
+) -> Result<(), L2SyncError> {
+    // on receiving new client update, update own finalized state
+
+    let Some(sync) = update.new_state().sync() else {
+        debug!("new state but chain hasn't started, ignoring");
+        return Ok(());
+    };
+
+    let fin_epoch = *sync.finalized_epoch();
+    let finalized_blkid = sync.finalized_blkid();
+
+    // I think this can just be removed.
+    /*
+
+        let block = match context
+            .l2_block_manager
+            .get_block_data_async(finalized_blkid)
+            .await
+        {
+            Ok(Some(block)) => block,
+
+            Ok(None) => {
+                // FIXME should we really just ignore it here?
+                error!(%finalized_blkid, "missing newly finalized block, ignoring");
+                return Ok(());
+            }
+
+            Err(e) => {
+                // FIXME should we REALLY just ignore it here???
+                error!(%finalized_blkid, err = %e, "error fetching finalized block, ignoring");
+                return Ok(());
+            }
+        };
+    */
+
+    if let Err(e) = handle_block_finalized(state, fin_epoch).await {
+        error!(%finalized_blkid, err = %e, "failed to handle newly finalized block");
+    }
+
+    Ok(())
+}
+
+async fn do_tick<T: SyncClient>(
     state: &mut L2SyncState,
     context: &L2SyncContext<T>,
+) -> Result<(), L2SyncError> {
+    // every fixed interval, try to sync with latest state of client
+    let Ok(status) = context.client.get_sync_status().await else {
+        // This should never *really* happen.
+        warn!("failed to get client status");
+        return Ok(());
+    };
+
+    if state.has_block(&status.tip_block_id) {
+        // in sync with client
+        return Ok(());
+    }
+
+    let start_slot = state.tip_height() + 1;
+    let end_slot = status.tip_height;
+
+    let span = debug_span!("sync", %start_slot, %end_slot);
+
+    /*debug!(
+        current_height = state.tip_height(),
+        target_height = status.tip_height,
+        "syncing to target height"
+    );*/
+
+    if let Err(e) = sync_blocks_by_range(start_slot, end_slot, state, context)
+        .instrument(span)
+        .await
+    {
+        error!(%start_slot, %end_slot, err = ?e, "failed to make sync fetch");
+    }
+
+    Ok(())
+}
+
+async fn sync_blocks_by_range<T: SyncClient>(
     start_height: u64,
     end_height: u64,
+    state: &mut L2SyncState,
+    context: &L2SyncContext<T>,
 ) -> Result<(), L2SyncError> {
-    debug!(
-        start_height = start_height,
-        end_height = end_height,
-        "syncing blocks by range"
-    );
+    debug!("syncing blocks by range");
 
-    let blockstream = context.client.get_blocks_range(start_height, end_height);
-    let mut blockstream = Box::pin(blockstream);
+    let block_stream = context.client.get_blocks_range(start_height, end_height);
+    let mut block_stream = Box::pin(block_stream);
 
-    while let Some(block) = blockstream.next().await {
+    while let Some(block) = block_stream.next().await {
         handle_new_block(state, context, block).await?;
     }
 
@@ -207,18 +259,19 @@ async fn handle_new_block<T: SyncClient>(
 
 async fn handle_block_finalized(
     state: &mut L2SyncState,
-    new_finalized_blockid: &L2BlockId,
-    new_finalized_height: u64,
+    new_finalized_epoch: EpochCommitment,
 ) -> Result<(), L2SyncError> {
-    if state.finalized_blockid() == new_finalized_blockid {
+    if state.finalized_blockid() == new_finalized_epoch.last_blkid() {
         return Ok(());
     }
 
-    if !state.has_block(new_finalized_blockid) {
-        return Err(L2SyncError::MissingFinalized(*new_finalized_blockid));
+    if !state.has_block(new_finalized_epoch.last_blkid()) {
+        return Err(L2SyncError::MissingFinalized(
+            *new_finalized_epoch.last_blkid(),
+        ));
     };
 
-    state.update_finalized_tip(new_finalized_blockid, new_finalized_height)?;
+    state.update_finalized_tip(new_finalized_epoch)?;
 
     Ok(())
 }
