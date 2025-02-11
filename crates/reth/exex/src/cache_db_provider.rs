@@ -114,12 +114,7 @@ impl DatabaseRef for CacheDBProvider {
         let storage_value = self
             .provider
             .storage(address, index.into())?
-            .ok_or_else(|| {
-                ProviderError::Database(DatabaseError::Other(format!(
-                    "Storage for the given address {:?} at slot {:?} not found",
-                    address, index,
-                )))
-            })?;
+            .unwrap_or(U256::default());
 
         // Record the storage value to the state.
         self.storage
