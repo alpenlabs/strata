@@ -7,10 +7,12 @@ use strata_chaintsn::transition::process_block;
 use strata_common::bail_manager::{check_bail_trigger, BAIL_ADVANCE_CONSENSUS_STATE};
 use strata_db::{errors::DbError, traits::BlockStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
-use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment, params::Params};
+use strata_primitives::{
+    epoch::EpochCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment, params::Params,
+};
 use strata_state::{
-    block::L2BlockBundle, block_validation::validate_block_segments, chain_state::Chainstate,
-    client_state::ClientState, prelude::*, state_op::StateCache,
+    batch::EpochSummary, block::L2BlockBundle, block_validation::validate_block_segments,
+    chain_state::Chainstate, client_state::ClientState, prelude::*, state_op::StateCache,
 };
 use strata_status::*;
 use strata_storage::{L2BlockManager, NodeStorage};
@@ -506,19 +508,6 @@ fn handle_new_block(
     }
 }
 
-/// Checks if the block is the terminal block of an epoch.
-///
-/// This is used to decide if we should insert a `EpochSummary` into the
-/// checkpoint database, which will eventually be used to produce a checkpoint.
-fn is_epoch_terminal(
-    blkid: &L2BlockId,
-    bundle: &L2BlockBundle,
-    pre_state: &Chainstate,
-) -> anyhow::Result<bool> {
-    // TODO something
-    Ok(false)
-}
-
 /// Considers if the block is plausibly valid and if we should attach it to the
 /// pending unfinalized blocks tree.  The block is assumed to already be
 /// structurally consistent.
@@ -666,7 +655,7 @@ fn apply_blocks(
     blkids: impl Iterator<Item = L2BlockId>,
     fcm_state: &mut ForkChoiceManager,
 ) -> anyhow::Result<()> {
-    let rparams = fcm_state.params.rollup();
+    let rparams = fcm_state.params.rollup().clone();
 
     let mut cur_state = fcm_state.cur_chainstate.as_ref().clone();
     let mut updates = Vec::new();
@@ -683,16 +672,25 @@ fn apply_blocks(
         let block = L2BlockCommitment::new(slot, blkid);
 
         // Check if this is the last block in an epoch, if so, do something.
-        let is_terminal = is_epoch_terminal(&blkid, &bundle, &cur_state)?;
+        let is_terminal = is_block_epoch_terminal(&blkid, &bundle, &cur_state)?;
         // TODO something
+
+        if is_terminal {}
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
         let mut prestate_cache = StateCache::new(cur_state);
         debug!(%blkid, "processing block");
-        process_block(&mut prestate_cache, header, body, rparams)
+        process_block(&mut prestate_cache, header, body, &rparams)
             .map_err(|e| Error::InvalidStateTsn(blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();
+
+        // If it's the terminal block then we go and insert the epoch summary
+        // before moving on.
+        if is_terminal {
+            handle_finish_epoch(&blkid, &bundle, &post_state, fcm_state)?;
+        }
+
         cur_state = post_state;
 
         // After each application we update the fork choice tip data in case we fail
@@ -715,6 +713,69 @@ fn apply_blocks(
 
     // Update the tip block in the FCM state.
     fcm_state.update_tip_block(last_block, Arc::new(cur_state));
+
+    Ok(())
+}
+
+/// Checks if the block is the terminal block of an epoch.
+///
+/// This is used to decide if we should insert a `EpochSummary` into the
+/// checkpoint database, which will eventually be used to produce a checkpoint.
+fn is_block_epoch_terminal(
+    _blkid: &L2BlockId,
+    bundle: &L2BlockBundle,
+    _pre_state: &Chainstate,
+) -> anyhow::Result<bool> {
+    let l1seg = bundle.l1_segment();
+    Ok(l1seg.new_payloads().len() > 0)
+}
+
+/// Takes the
+fn handle_finish_epoch(
+    blkid: &L2BlockId,
+    bundle: &L2BlockBundle,
+    post_state: &Chainstate,
+    fcm_state: &mut ForkChoiceManager,
+) -> anyhow::Result<()> {
+    // Construct the various parts of the summary
+    let epoch = post_state.cur_epoch();
+
+    let slot = bundle.header().blockidx();
+    let terminal = L2BlockCommitment::new(slot, *blkid);
+
+    let prev_epoch = post_state.prev_epoch(); // FIXME is this right?
+    assert_eq!(prev_epoch.epoch() + 1, epoch, "fcm: epoch sequencing mixup");
+    let prev_terminal = prev_epoch.to_block_commitment();
+
+    let l1seg = bundle.l1_segment();
+    let tip_l1_record = l1seg
+        .new_payloads()
+        .last()
+        .expect("fcm: epoch terminal missing payloads");
+
+    let new_l1_block = L1BlockCommitment::new(tip_l1_record.idx(), *tip_l1_record.record().blkid());
+
+    let epoch_final_state = post_state.compute_state_root();
+
+    // Actually construct and insert the epoch summary.
+    let summary = EpochSummary::new(
+        epoch,
+        terminal,
+        prev_terminal,
+        new_l1_block,
+        epoch_final_state,
+    );
+
+    let epoch = summary.get_epoch_commitment();
+
+    // TODO convert to debug after we figure things out
+    // TODO convert to Display
+    info!(?epoch, "finishing chain epoch");
+
+    fcm_state
+        .storage
+        .checkpoint()
+        .insert_epoch_summary_blocking(summary)?;
 
     Ok(())
 }
