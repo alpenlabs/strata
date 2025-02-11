@@ -1136,6 +1136,7 @@ version = "0.1.0"
 dependencies = [
  "bitcoin",
  "borsh",
+ "digest",
  "serde",
  "sha2",
  "strata-bridge-tx-builder",
