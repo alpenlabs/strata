@@ -21,71 +21,76 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc, E: EventSubmitter>(
     ctx: &ReaderContext<R>,
     event_submitter: &E,
 ) -> anyhow::Result<()> {
+    let sync_evs = match event {
+        L1Event::RevertTo(revert_height) => {
+            // L1 reorgs will be handled in L2 STF, we just have to reflect
+            // what the client is telling us in the database.
+            ctx.l1_manager.revert_to_height_async(revert_height).await?;
+            debug!(%revert_height, "reverted l1db");
+            vec![SyncEvent::L1Revert(revert_height)]
+        }
+
+        L1Event::BlockData(blockdata, epoch) => handle_blockdata(ctx, blockdata, epoch).await?,
+
+        L1Event::GenesisVerificationState(height, header_verification_state) => {
+            vec![SyncEvent::L1BlockGenesis(height, header_verification_state)]
+        }
+    };
+
+    // Write to sync event db.
+    for ev in sync_evs {
+        event_submitter.submit_event_async(ev).await?;
+    }
+    Ok(())
+}
+
+async fn handle_blockdata<R: ReaderRpc>(
+    ctx: &ReaderContext<R>,
+    blockdata: BlockData,
+    epoch: u64,
+) -> anyhow::Result<Vec<SyncEvent>> {
     let ReaderContext {
         seq_pubkey,
         params,
         l1_manager,
         ..
     } = ctx;
-    match event {
-        L1Event::RevertTo(revert_blk_num) => {
-            // L1 reorgs will be handled in L2 STF, we just have to reflect
-            // what the client is telling us in the database.
-            l1_manager.revert_to_height_async(revert_blk_num).await?;
-            debug!(%revert_blk_num, "wrote revert");
+    let height = blockdata.block_num();
+    let mut sync_evs = Vec::new();
 
-            // Write to sync event db.
-            let ev = SyncEvent::L1Revert(revert_blk_num);
-            event_submitter.submit_event_async(ev).await?;
-
-            Ok(())
-        }
-
-        L1Event::BlockData(blockdata, epoch) => {
-            let height = blockdata.block_num();
-
-            // Bail out fast if we don't have to care.
-            let horizon = params.rollup().horizon_l1_height;
-            if height < horizon {
-                warn!(%height, %horizon, "ignoring BlockData for block before horizon");
-                return Ok(());
-            }
-
-            let l1blkid = blockdata.block().block_hash();
-
-            let manifest = generate_block_manifest(blockdata.block(), epoch);
-            let l1txs: Vec<_> = generate_l1txs(&blockdata);
-            let num_txs = l1txs.len();
-            l1_manager
-                .put_block_data_async(blockdata.block_num(), manifest, l1txs.clone())
-                .await?;
-            info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
-
-            // Write to sync event db if it's something we care about.
-            let blkid: Buf32 = blockdata.block().block_hash().into();
-            let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
-            event_submitter.submit_event_async(ev).await?;
-
-            // Check for da batch and send event accordingly
-            debug!(?height, "Checking for da batch");
-            let checkpoints = check_for_commitments(&blockdata, *seq_pubkey);
-            debug!(?checkpoints, "Received checkpoints");
-            if !checkpoints.is_empty() {
-                let ev = SyncEvent::L1DABatch(height, checkpoints);
-                event_submitter.submit_event_async(ev).await?;
-            }
-
-            // TODO: Check for deposits and forced inclusions and emit appropriate events
-
-            Ok(())
-        }
-
-        L1Event::GenesisVerificationState(height, header_verification_state) => {
-            let ev = SyncEvent::L1BlockGenesis(height, header_verification_state);
-            event_submitter.submit_event_async(ev).await?;
-            Ok(())
-        }
+    // Bail out fast if we don't have to care.
+    let horizon = params.rollup().horizon_l1_height;
+    if height < horizon {
+        warn!(%height, %horizon, "ignoring BlockData for block before horizon");
+        return Ok(sync_evs);
     }
+
+    let l1blkid = blockdata.block().block_hash();
+
+    let manifest = generate_block_manifest(blockdata.block(), epoch);
+    let l1txs: Vec<_> = generate_l1txs(&blockdata);
+    let num_txs = l1txs.len();
+    l1_manager
+        .put_block_data_async(blockdata.block_num(), manifest, l1txs.clone())
+        .await?;
+    info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
+
+    // Create a sync event if it's something we care about.
+    let blkid: Buf32 = blockdata.block().block_hash().into();
+
+    sync_evs.push(SyncEvent::L1Block(blockdata.block_num(), blkid.into()));
+
+    // Check for checkpoint and creaet event accordingly
+    debug!(%height, "Checking for checkpoints in l1 block");
+    let checkpoints = check_for_commitments(&blockdata, *seq_pubkey);
+    debug!(?checkpoints, "Received checkpoints");
+
+    // TODO: Check for deposits and forced inclusions and emit appropriate events
+
+    if !checkpoints.is_empty() {
+        sync_evs.push(SyncEvent::L1DABatch(height, checkpoints));
+    }
+    Ok(sync_evs)
 }
 
 /// Parses envelopes and checks for batch data in the transactions
@@ -106,29 +111,31 @@ fn check_for_commitments(
         })
     });
 
-    let sig_verified_checkpoints = signed_checkpts.filter_map(|ckpt_data| {
-        let (signed_checkpoint, tx, position) = ckpt_data?;
-        if let Some(seq_pubkey) = seq_pubkey {
-            if !signed_checkpoint.verify_sig(&seq_pubkey.into()) {
-                error!(
-                    ?tx,
-                    ?signed_checkpoint,
-                    "signature verification failed on checkpoint"
-                );
-                return None;
+    signed_checkpts
+        .filter_map(|ckpt_data| {
+            let (signed_checkpoint, tx, position) = ckpt_data?;
+            if let Some(seq_pubkey) = seq_pubkey {
+                if !signed_checkpoint.verify_sig(&seq_pubkey.into()) {
+                    error!(
+                        ?tx,
+                        ?signed_checkpoint,
+                        "signature verification failed on checkpoint"
+                    );
+                    return None;
+                }
             }
-        }
-        let checkpoint: Checkpoint = signed_checkpoint.clone().into();
+            let checkpoint: Checkpoint = signed_checkpoint.clone().into();
 
-        let blockhash = (*blockdata.block().block_hash().as_byte_array()).into();
-        let txid = (*tx.compute_txid().as_byte_array()).into();
-        let wtxid = (*tx.compute_wtxid().as_byte_array()).into();
-        let block_height = blockdata.block_num();
-        let commitment_info = CommitmentInfo::new(blockhash, txid, wtxid, block_height, position);
+            let blockhash = (*blockdata.block().block_hash().as_byte_array()).into();
+            let txid = (*tx.compute_txid().as_byte_array()).into();
+            let wtxid = (*tx.compute_wtxid().as_byte_array()).into();
+            let block_height = blockdata.block_num();
+            let commitment_info =
+                CommitmentInfo::new(blockhash, txid, wtxid, block_height, position);
 
-        Some(L1CommittedCheckpoint::new(checkpoint, commitment_info))
-    });
-    sig_verified_checkpoints.collect()
+            Some(L1CommittedCheckpoint::new(checkpoint, commitment_info))
+        })
+        .collect()
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can
