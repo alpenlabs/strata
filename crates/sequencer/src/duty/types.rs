@@ -206,22 +206,28 @@ impl StateUpdate {
         Self::new(last_block_slot, cur_timestamp, Vec::new(), None)
     }
 
+    /// Gets the last block slot.
     pub fn last_block_slot(&self) -> u64 {
         self.last_block_slot
     }
 
+    /// Gets the timestamp of this update.
     pub fn timestamp(&self) -> u64 {
         self.timestamp
     }
 
+    /// Gets the newly finalized blocks.
     pub fn newly_finalized_blocks(&self) -> &[L2BlockId] {
         &self.newly_finalized_blocks
     }
 
+    /// Gets the latest finalized block, if there is one.
     pub fn latest_finalized_block(&self) -> Option<&L2BlockId> {
         self.latest_finalized_block.as_ref()
     }
 
+    /// Gets the index of the latest finalized batch, if there is one.  This
+    /// corresponds to the latest finalized epoch.
     pub fn latest_finalized_batch(&self) -> Option<u64> {
         self.latest_finalized_batch
     }
@@ -252,6 +258,7 @@ impl DutyBatch {
         Self { tip, duties }
     }
 
+    /// Returns the chain tip this batch was derived from.
     pub fn tip(&self) -> &L2BlockCommitment {
         &self.tip
     }

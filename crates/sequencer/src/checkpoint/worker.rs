@@ -1,14 +1,16 @@
 //! worker to monitor chainstate and create checkpoint entries.
 
+#![allow(unused)] // TODO clean this up once we're sure we don't need these fns
+
 use std::sync::Arc;
 
-use strata_consensus_logic::csm::message::ClientUpdateNotif;
-use strata_db::{traits::Database, types::CheckpointEntry, DbError};
+use strata_db::{types::CheckpointEntry, DbError};
 use strata_primitives::{
+    self,
     epoch::EpochCommitment,
-    l1::{L1BlockCommitment, L1BlockId, L1BlockManifest},
-    l2::{L2BlockCommitment, L2BlockId},
-    params::{Params, RollupParams},
+    l1::{L1BlockCommitment, L1BlockManifest},
+    l2::L2BlockCommitment,
+    prelude::*,
 };
 use strata_state::{
     batch::{BaseStateCommitment, BatchInfo, BatchTransition, EpochSummary},
@@ -17,55 +19,30 @@ use strata_state::{
     header::*,
     l1::HeaderVerificationState,
 };
+use strata_status::*;
 use strata_storage::{
     ChainstateManager, CheckpointDbManager, L1BlockManager, L2BlockManager, NodeStorage,
 };
 use strata_tasks::ShutdownGuard;
-use thiserror::Error;
-use tokio::sync::broadcast;
+use tokio::runtime::Handle;
 use tracing::*;
 
 use super::CheckpointHandle;
-
-#[derive(Debug, Error)]
-enum Error {
-    #[error("chain is not active yet")]
-    ChainInactive,
-
-    #[error("missing expected chainstate for blockidx {0}")]
-    MissingIdxChainstate(u64),
-
-    #[error("missing checkpoint for epoch {0}")]
-    MissingCheckpoint(u64),
-
-    #[error("missing L1 block from database {0}")]
-    MissingL1Block(L1BlockId),
-
-    #[error("missing L2 block from database {0}")]
-    MissingL2Block(L2BlockId),
-
-    #[error("stored L1 block {0:?} scanned using wrong epoch (got {1}, exp {2})")]
-    L1BlockWithWrongEpoch(L1BlockId, u64, u64),
-
-    /// If we can't find the start block or something.
-    #[error("malformed epoch {0:?}")]
-    MalformedEpoch(EpochCommitment),
-
-    #[error("db: {0}")]
-    Db(#[from] strata_db::errors::DbError),
-}
+use crate::errors::Error;
 
 /// Worker to monitor client state updates and create checkpoint entries
 /// pending proof when previous proven checkpoint is finalized.
-pub fn checkpoint_worker<D: Database>(
+pub fn checkpoint_worker(
     shutdown: ShutdownGuard,
-    mut cupdate_rx: broadcast::Receiver<Arc<ClientUpdateNotif>>,
+    status_ch: Arc<StatusChannel>,
     params: Arc<Params>,
-    _database: Arc<D>,
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
+    rt: Handle,
 ) -> anyhow::Result<()> {
     let ckman = storage.checkpoint();
+
+    let mut chs_rx = SyncReceiver::new(status_ch.subscribe_chain_sync(), rt);
 
     //let rollup_params_commitment = params.rollup().compute_hash();
 
@@ -78,19 +55,27 @@ pub fn checkpoint_worker<D: Database>(
             break;
         }
 
-        // TODO rework this to be based on new FCM state
-        let update = match cupdate_rx.blocking_recv() {
-            Ok(u) => u,
-            Err(broadcast::error::RecvError::Closed) => {
-                break;
-            }
-            Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                warn!(%skipped, "overloaded, skipping dispatching some duties");
-                continue;
-            }
+        // Wait for a new update.
+        if let Err(_) = chs_rx.changed() {
+            break;
+        }
+
+        // Get it if there is one.
+        let update = chs_rx.borrow_and_update();
+        let Some(_update) = update.as_ref() else {
+            trace!("received new chain sync status but was still unset, ignoring");
+            continue;
         };
 
-        // Fetch the epochs that seem ready to have checkpoints generated.
+        // Again check if we should shutdown, just in case.
+        if shutdown.should_shutdown() {
+            warn!("received shutdown signal");
+            break;
+        }
+
+        // Fetch the epochs that seem ready to have checkpoints generated.  We
+        // don't actually use the update for this, it's just a signal to check.
+        // Maybe that could be simplfied?
         let ready_epochs = find_ready_checkpoints(last_saved_epoch, ckman)?;
 
         for epoch in ready_epochs {
@@ -191,7 +176,7 @@ struct CheckpointPrepData {
 }
 
 impl CheckpointPrepData {
-    pub fn new(info: BatchInfo, tsn: BatchTransition, commitment: BaseStateCommitment) -> Self {
+    fn new(info: BatchInfo, tsn: BatchTransition, commitment: BaseStateCommitment) -> Self {
         Self {
             info,
             tsn,

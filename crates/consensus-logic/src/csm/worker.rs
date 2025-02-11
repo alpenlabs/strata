@@ -320,7 +320,7 @@ fn apply_action(
     action: SyncAction,
     state: &mut WorkerState,
     engine: &impl ExecEngineCtl,
-    status_channel: &StatusChannel,
+    _status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match action {
         SyncAction::UpdateTip(blkid) => {
