@@ -355,12 +355,10 @@ where
     TxBuildContext: BuildContext + Sync + Send,
 {
     fn drop(&mut self) {
-        // Securely erase the keypair before the struct is deallocated
+        // Attempts to erase the keypair
         self.keypair.non_secure_erase();
-        println!("ExecHandler is being dropped: Keypair erased.");
 
-        // If SignatureManager also holds sensitive data, erase its keypair if applicable
+        // Attempts to erase the keypair inside SignatureManager
         self.sig_manager.erase_keypair();
-        println!("SignatureManager inside ExecHandler dropped: Keypair erased.");
     }
 }
