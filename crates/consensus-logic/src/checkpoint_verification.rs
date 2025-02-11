@@ -5,6 +5,29 @@ use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
 use zkaleido_risc0_adapter;
 use zkaleido_sp1_adapter;
 
+/// A trait to extend [`RollupVerifyingKey`] with verification logic.
+pub trait VerifyingKeyExt {
+    fn verify_groth16(&self, proof_receipt: &ProofReceipt) -> ZkVmResult<()>;
+}
+
+impl VerifyingKeyExt for RollupVerifyingKey {
+    fn verify_groth16(&self, proof_receipt: &ProofReceipt) -> ZkVmResult<()> {
+        // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
+        // checkpoint
+        match self {
+            RollupVerifyingKey::Risc0VerifyingKey(vk) => {
+                zkaleido_risc0_adapter::verify_groth16(proof_receipt, vk.as_ref())
+            }
+            RollupVerifyingKey::SP1VerifyingKey(vk) => {
+                zkaleido_sp1_adapter::verify_groth16(proof_receipt, vk.as_ref())
+            }
+            // In Native Execution mode, we do not actually generate the proof to verify. Checking
+            // public parameters is sufficient.
+            RollupVerifyingKey::NativeVerifyingKey(_) => Ok(()),
+        }
+    }
+}
+
 /// Verify that the provided checkpoint proof is valid for the verifier key.
 ///
 /// # Caution
@@ -25,7 +48,7 @@ pub fn verify_proof(
         && proof_receipt.proof().is_empty()
         && proof_receipt.public_values().is_empty()
     {
-        warn!(%checkpoint_idx, "verifying empty proof as correct");
+        warn!(%checkpoint_idx, "Allow empty set. Verifying empty proof as correct");
         return Ok(());
     }
 
@@ -33,6 +56,7 @@ pub fn verify_proof(
     let actual_public_output: CheckpointProofOutput =
         borsh::from_slice(proof_receipt.public_values().as_bytes())
             .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
+
     if expected_public_output != actual_public_output {
         dbg!(actual_public_output, expected_public_output);
         return Err(ZkVmError::ProofVerificationError(
@@ -40,17 +64,5 @@ pub fn verify_proof(
         ));
     }
 
-    // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
-    // checkpoint
-    match rollup_vk {
-        RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-            zkaleido_risc0_adapter::verify_groth16(proof_receipt, vk.as_ref())
-        }
-        RollupVerifyingKey::SP1VerifyingKey(vk) => {
-            zkaleido_sp1_adapter::verify_groth16(proof_receipt, vk.as_ref())
-        }
-        // In Native Execution mode, we do not actually generate the proof to verify. Checking
-        // public parameters is sufficient.
-        RollupVerifyingKey::NativeVerifyingKey(_) => Ok(()),
-    }
+    rollup_vk.verify_groth16(proof_receipt)
 }

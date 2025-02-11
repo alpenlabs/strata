@@ -16,10 +16,10 @@ use tracing::*;
 use super::query::ReaderContext;
 use crate::rpc::traits::ReaderRpc;
 
-pub(crate) async fn handle_bitcoin_event<R: ReaderRpc, E: EventSubmitter>(
+pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
     event: L1Event,
     ctx: &ReaderContext<R>,
-    event_submitter: &E,
+    event_submitter: &impl EventSubmitter,
 ) -> anyhow::Result<()> {
     let sync_evs = match event {
         L1Event::RevertTo(revert_height) => {
@@ -80,7 +80,7 @@ async fn handle_blockdata<R: ReaderRpc>(
 
     sync_evs.push(SyncEvent::L1Block(blockdata.block_num(), blkid.into()));
 
-    // Check for checkpoint and creaet event accordingly
+    // Check for checkpoint and create event accordingly
     debug!(%height, "Checking for checkpoints in l1 block");
     let checkpoints = check_for_commitments(&blockdata, *seq_pubkey);
     debug!(?checkpoints, "Received checkpoints");

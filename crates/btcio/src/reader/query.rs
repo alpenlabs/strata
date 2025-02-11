@@ -249,9 +249,6 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
     let client_height = chain_info.blocks;
     let fresh_best_block = chain_info.best_block_hash.parse::<BlockHash>()?;
 
-    status_updates.push(L1StatusUpdate::CurHeight(client_height));
-    status_updates.push(L1StatusUpdate::CurTip(fresh_best_block.to_string()));
-
     if fresh_best_block == *state.best_block() {
         trace!("polled client, nothing to do");
         return Ok(vec![]);
@@ -271,7 +268,7 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
     } else {
         // TODO make this case a bit more structured
         error!("unable to find common block with client chain, something is seriously wrong here!");
-        bail!("things are broken");
+        bail!("things are broken with l1 reader");
     }
 
     debug!(%client_height, "have new blocks");
