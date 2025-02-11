@@ -78,7 +78,7 @@ class BasicRethTxJob(BaseRethLoadJob):
         # We either have a bug in our reth, or swap itself contains some neat bug.
         # Disabled for now.
         # TODO: investigate.
-        return
+        # return
 
         # Swap SUSD to EGM (FOMO IS REAL).
         tx.swap(susd_token_addr, egm_token_addr, 500)

@@ -37,7 +37,7 @@ class LoadGeneratorService(flexitest.Service):
 
         # Setup service level logging.
         service_logfile = os.path.join(datadir, "service.log")
-        log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+        log_level = os.getenv("LOG_LEVEL", "DEBUG").upper()
         setup_logging(log_level, logfile=service_logfile)
 
         # Dirty hack...
