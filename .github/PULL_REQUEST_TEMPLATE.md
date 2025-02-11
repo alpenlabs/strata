@@ -35,7 +35,7 @@ Ensure all the following are checked:
 - [ ] I have commented my code where necessary.
 - [ ] I have updated the documentation if needed.
 - [ ] My changes do not introduce new warnings.
-- [ ] I have added tests that prove my changes are effective or that my feature works.
+- [ ] I have added (where necessary) tests that prove my changes are effective or that my feature works.
 - [ ] New and existing tests pass with my changes.
 
 ## Related Issues
