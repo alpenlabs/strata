@@ -71,6 +71,10 @@ impl ReaderRpc for TestBitcoinClient {
         Ok(block)
     }
 
+    async fn get_block_height(&self, _hash: &BlockHash) -> ClientResult<u64> {
+        Ok(100)
+    }
+
     async fn get_block_at(&self, _height: u64) -> ClientResult<Block> {
         let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
         Ok(block)
