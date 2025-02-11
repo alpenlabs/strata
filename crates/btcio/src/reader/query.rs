@@ -152,7 +152,7 @@ async fn update_epoch_and_filter_config<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
 ) -> anyhow::Result<Option<TxFilterConfig>> {
-    let new_epoch = ctx.status_channel.epoch().unwrap_or(0);
+    let new_epoch = ctx.status_channel.cur_chain_epoch().unwrap_or(0);
     // TODO: check if new_epoch < current epoch. should panic if so?
     let curr_epoch = state.epoch();
 
@@ -208,7 +208,7 @@ async fn init_reader_state<R: ReaderRpc>(
 
     let params = ctx.params.clone();
     let filter_config = TxFilterConfig::derive_from(params.rollup())?;
-    let epoch = ctx.status_channel.epoch().unwrap_or(0);
+    let epoch = ctx.status_channel.cur_chain_epoch().unwrap_or(0);
     let state = ReaderState::new(
         real_cur_height + 1,
         lookback,
@@ -498,7 +498,7 @@ mod test {
             N_RECENT_BLOCKS,
             recent_blocks,
             filter_config,
-            ctx.status_channel.epoch().unwrap(),
+            ctx.status_channel.cur_chain_epoch().unwrap(),
         )
     }
 
@@ -514,7 +514,7 @@ mod test {
 
         // Update new chainstate from status channel
         chstate.set_epoch(curr_epoch + 1);
-        ctx.status_channel.update_chainstate(chstate);
+        ctx.status_channel.update_chain_sync_status(chstate);
 
         // Now If we check for filter rule changes
         let new_config = update_epoch_and_filter_config(&ctx, &mut state)
