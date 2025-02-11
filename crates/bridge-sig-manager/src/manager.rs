@@ -52,6 +52,12 @@ impl std::fmt::Debug for SignatureManager {
     }
 }
 
+impl Drop for SignatureManager {
+    fn drop(&mut self) {
+        self.erase_keypair();
+    }
+}
+
 impl SignatureManager {
     /// Create a new [`SignatureManager`].
     pub fn new(db_ops: Arc<BridgeTxStateOps>, index: OperatorIdx, keypair: Keypair) -> Self {
@@ -124,6 +130,11 @@ impl SignatureManager {
         let entry = self.db_ops.get_tx_state_async(Buf32::from(txid)).await?;
 
         entry.ok_or(BridgeSigError::TransactionNotFound)
+    }
+
+    /// Attempts to erase the secret within the keypair.
+    pub fn erase_keypair(&mut self) {
+        self.keypair.non_secure_erase();
     }
 
     /// Generate a random secret nonce.

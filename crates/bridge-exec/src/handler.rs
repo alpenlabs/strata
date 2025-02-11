@@ -111,6 +111,11 @@ where
         Ok(())
     }
 
+    /// Attempts to erase the secret within the keypair.
+    pub fn erase_keypair(&mut self) {
+        self.keypair.non_secure_erase();
+    }
+
     async fn broadcast_msg<S: BorshSerialize + Debug>(
         &self,
         scope: &Scope,
@@ -342,5 +347,20 @@ where
             self.own_index,
             self.keypair.public_key()
         )
+    }
+}
+
+impl<TxBuildContext> Drop for ExecHandler<TxBuildContext>
+where
+    TxBuildContext: BuildContext + Sync + Send,
+{
+    fn drop(&mut self) {
+        // Securely erase the keypair before the struct is deallocated
+        self.keypair.non_secure_erase();
+        println!("ExecHandler is being dropped: Keypair erased.");
+
+        // If SignatureManager also holds sensitive data, erase its keypair if applicable
+        self.sig_manager.erase_keypair();
+        println!("SignatureManager inside ExecHandler dropped: Keypair erased.");
     }
 }
