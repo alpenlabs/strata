@@ -35,7 +35,7 @@ impl CheckpointDbManager {
         Ok(())
     }
 
-    pub fn insert_epoch_blocking(&self, summary: EpochSummary) -> DbResult<()> {
+    pub fn insert_epoch_summary_blocking(&self, summary: EpochSummary) -> DbResult<()> {
         self.ops.insert_epoch_summary_blocking(summary)?;
         self.summary_cache
             .insert(summary.get_epoch_commitment(), Some(summary));
