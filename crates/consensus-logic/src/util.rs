@@ -1,5 +1,5 @@
 use strata_primitives::{params::RollupParams, proof::RollupVerifyingKey};
-use strata_state::batch::{BatchCheckpoint, CheckpointProofOutput};
+use strata_state::batch::{Checkpoint, CheckpointProofOutput};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
 use zkaleido_risc0_adapter;
@@ -11,7 +11,7 @@ use zkaleido_sp1_adapter;
 ///
 /// If the checkpoint proof is empty, this function returns an `Ok(())`.
 pub fn verify_proof(
-    checkpoint: &BatchCheckpoint,
+    checkpoint: &Checkpoint,
     proof_receipt: &ProofReceipt,
     rollup_params: &RollupParams,
 ) -> ZkVmResult<()> {

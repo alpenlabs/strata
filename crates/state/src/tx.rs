@@ -8,7 +8,7 @@ use strata_primitives::{
     l1::{BitcoinAmount, OutputRef},
 };
 
-use crate::batch::SignedBatchCheckpoint;
+use crate::batch::SignedCheckpoint;
 
 /// Commits to a DA blob.  This is just the hash of the DA blob.
 #[derive(
@@ -68,7 +68,7 @@ pub enum ProtocolOperation {
     Deposit(DepositInfo),
 
     /// Checkpoint data
-    Checkpoint(SignedBatchCheckpoint),
+    Checkpoint(SignedCheckpoint),
 
     /// DA blob
     DaCommitment(DaCommitment),

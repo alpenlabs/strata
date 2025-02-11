@@ -5,7 +5,7 @@ use bitcoin::Block;
 use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
 use strata_primitives::{block_credential::CredRule, params::RollupParams};
 use strata_state::{
-    batch::BatchCheckpoint,
+    batch::Checkpoint,
     tx::{DepositInfo, ProtocolOperation},
 };
 
@@ -16,7 +16,7 @@ pub fn extract_relevant_info(
     block: &Block,
     rollup_params: &RollupParams,
     filter_config: &TxFilterConfig,
-) -> (Vec<DepositInfo>, Option<BatchCheckpoint>) {
+) -> (Vec<DepositInfo>, Option<Checkpoint>) {
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
@@ -31,7 +31,7 @@ pub fn extract_relevant_info(
                 if let CredRule::SchnorrKey(pub_key) = rollup_params.cred_rule {
                     assert!(signed_batch.verify_sig(&pub_key));
                 }
-                let batch: BatchCheckpoint = signed_batch.clone().into();
+                let batch: Checkpoint = signed_batch.clone().into();
                 // Note: This assumes we will have one proper update
                 // FIXME: ^what if we have improper updates or more than one proper update?
                 prev_checkpoint = prev_checkpoint.or(Some(batch));

@@ -42,7 +42,7 @@ use broadcaster::{
 };
 pub use chain_state::db::ChainstateDb;
 pub use checkpoint::db::RBCheckpointDB;
-use checkpoint::schemas::BatchCheckpointSchema;
+use checkpoint::schemas::CheckpointSchema;
 pub use client_state::db::ClientStateDb;
 pub use l1::db::L1Db;
 use l2::{
@@ -103,7 +103,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     BridgeDutyCheckpointSchema::COLUMN_FAMILY_NAME,
 
     // Checkpoint schemas
-    BatchCheckpointSchema::COLUMN_FAMILY_NAME,
+    CheckpointSchema::COLUMN_FAMILY_NAME,
 ];
 
 /// database operations configuration

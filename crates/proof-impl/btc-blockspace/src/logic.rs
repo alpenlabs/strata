@@ -4,7 +4,7 @@ use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::params::RollupParams;
-use strata_state::{batch::BatchCheckpoint, l1::L1TxProof, tx::DepositInfo};
+use strata_state::{batch::Checkpoint, l1::L1TxProof, tx::DepositInfo};
 use zkaleido::ZkVmEnv;
 
 use crate::scan::process_blockscan;
@@ -15,7 +15,7 @@ use crate::scan::process_blockscan;
 pub struct BlockScanResult {
     pub header_raw: Vec<u8>,
     pub deposits: Vec<DepositInfo>,
-    pub prev_checkpoint: Option<BatchCheckpoint>,
+    pub prev_checkpoint: Option<Checkpoint>,
 }
 
 /// Represents the input data required for generating an L1Scan proof.

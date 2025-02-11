@@ -6,7 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    batch::BatchCheckpointWithCommitment,
+    batch::L1CommittedCheckpoint,
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
 };
@@ -24,7 +24,7 @@ pub enum SyncEvent {
 
     /// New checkpoint posted to L1 in a DA batch at given height.
     // FIXME what does this data mean?
-    L1DABatch(u64, Vec<BatchCheckpointWithCommitment>),
+    L1DABatch(u64, Vec<L1CommittedCheckpoint>),
 
     /// We've observed that the `genesis_l1_height` has reached maturity
     L1BlockGenesis(u64, HeaderVerificationState),

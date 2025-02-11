@@ -4,7 +4,7 @@ use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_proofimpl_btc_blockspace::scan::process_blockscan;
 use strata_state::{
-    batch::BatchCheckpoint,
+    batch::Checkpoint,
     l1::{get_btc_params, HeaderVerificationState, L1TxProof},
     tx::DepositInfo,
 };
@@ -14,7 +14,7 @@ use zkaleido::ZkVmEnv;
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofOutput {
     pub deposits: Vec<DepositInfo>,
-    pub prev_checkpoint: Option<BatchCheckpoint>,
+    pub prev_checkpoint: Option<Checkpoint>,
     pub initial_state_hash: Buf32,
     pub final_state_hash: Buf32,
     pub rollup_params_commitment: Buf32,

@@ -1,7 +1,7 @@
 use bitcoin::Transaction;
 use strata_primitives::l1::payload::L1PayloadType;
 use strata_state::{
-    batch::SignedBatchCheckpoint,
+    batch::SignedCheckpoint,
     tx::{DepositInfo, DepositRequestInfo},
 };
 use tracing::warn;
@@ -49,7 +49,7 @@ fn parse_da_blobs<'a>(
 fn parse_checkpoint_envelopes<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
-) -> impl Iterator<Item = SignedBatchCheckpoint> + 'a {
+) -> impl Iterator<Item = SignedCheckpoint> + 'a {
     tx.input.iter().flat_map(|inp| {
         inp.witness
             .tapscript()
@@ -59,7 +59,7 @@ fn parse_checkpoint_envelopes<'a>(
                     .into_iter()
                     .filter_map(|item| match *item.payload_type() {
                         L1PayloadType::Checkpoint => {
-                            borsh::from_slice::<SignedBatchCheckpoint>(item.data()).ok()
+                            borsh::from_slice::<SignedCheckpoint>(item.data()).ok()
                         }
                         L1PayloadType::Da => {
                             warn!("Da parsing is not supported yet");
@@ -80,7 +80,7 @@ mod test {
         l1::{payload::L1Payload, BitcoinAmount},
         params::Params,
     };
-    use strata_state::batch::SignedBatchCheckpoint;
+    use strata_state::batch::SignedCheckpoint;
     use strata_test_utils::{
         bitcoin::{
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
@@ -110,7 +110,7 @@ mod test {
         let num_envelopes = 2;
         let l1_payloads: Vec<_> = (0..num_envelopes)
             .map(|_| {
-                let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
+                let signed_checkpoint: SignedCheckpoint = ArbitraryGenerator::new().generate();
                 L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
             })
             .collect();

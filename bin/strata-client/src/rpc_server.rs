@@ -41,7 +41,7 @@ use strata_sequencer::{
     duty::types::{Duty, DutyEntry, DutyTracker},
 };
 use strata_state::{
-    batch::{BatchCheckpoint, SignedBatchCheckpoint},
+    batch::{Checkpoint, SignedCheckpoint},
     block::{L2Block, L2BlockBundle},
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
@@ -815,8 +815,8 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             Err(Error::CheckpointAlreadyPosted(idx))?;
         }
 
-        let checkpoint = BatchCheckpoint::from(entry);
-        let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, sig.0.into());
+        let checkpoint = Checkpoint::from(entry);
+        let signed_checkpoint = SignedCheckpoint::new(checkpoint, sig.0.into());
 
         if !verify_checkpoint_sig(&signed_checkpoint, &self.params) {
             Err(Error::InvalidCheckpointSignature(idx))?;

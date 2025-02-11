@@ -6,7 +6,7 @@ use strata_primitives::{
     l1::{L1BlockManifest, L1BlockRecord},
 };
 use strata_state::{
-    batch::{BatchCheckpoint, BatchCheckpointWithCommitment, CommitmentInfo},
+    batch::{Checkpoint, CommitmentInfo, L1CommittedCheckpoint},
     l1::{generate_l1_tx, L1Tx},
     sync_event::{EventSubmitter, SyncEvent},
     tx::ProtocolOperation,
@@ -68,7 +68,7 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc, E: EventSubmitter>(
 
             // Check for da batch and send event accordingly
             debug!(?height, "Checking for da batch");
-            let checkpoints = check_for_da_batch(&blockdata, *seq_pubkey);
+            let checkpoints = check_for_commitments(&blockdata, *seq_pubkey);
             debug!(?checkpoints, "Received checkpoints");
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
@@ -89,10 +89,10 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc, E: EventSubmitter>(
 }
 
 /// Parses envelopes and checks for batch data in the transactions
-fn check_for_da_batch(
+fn check_for_commitments(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
-) -> Vec<BatchCheckpointWithCommitment> {
+) -> Vec<L1CommittedCheckpoint> {
     let relevant_txs = blockdata.relevant_txs();
 
     let signed_checkpts = relevant_txs.iter().flat_map(|txref| {
@@ -118,7 +118,7 @@ fn check_for_da_batch(
                 return None;
             }
         }
-        let checkpoint: BatchCheckpoint = signed_checkpoint.clone().into();
+        let checkpoint: Checkpoint = signed_checkpoint.clone().into();
 
         let blockhash = (*blockdata.block().block_hash().as_byte_array()).into();
         let txid = (*tx.compute_txid().as_byte_array()).into();
@@ -126,10 +126,7 @@ fn check_for_da_batch(
         let block_height = blockdata.block_num();
         let commitment_info = CommitmentInfo::new(blockhash, txid, wtxid, block_height, position);
 
-        Some(BatchCheckpointWithCommitment::new(
-            checkpoint,
-            commitment_info,
-        ))
+        Some(L1CommittedCheckpoint::new(checkpoint, commitment_info))
     });
     sig_verified_checkpoints.collect()
 }

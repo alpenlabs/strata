@@ -5,7 +5,7 @@ use std::{collections::HashSet, time};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
-use strata_state::{batch::BatchCheckpoint, id::L2BlockId};
+use strata_state::{batch::Checkpoint, id::L2BlockId};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -36,7 +36,7 @@ pub enum Duty {
     /// Goal to sign a block.
     SignBlock(BlockSigningDuty),
     /// Goal to build and commit a batch.
-    CommitBatch(BatchCheckpointDuty),
+    CommitBatch(CheckpointDuty),
 }
 
 impl Duty {
@@ -99,21 +99,21 @@ impl BlockSigningDuty {
 /// When this duty is created, in order to execute the duty, the sequencer looks for corresponding
 /// batch proof in the proof db.
 #[derive(Clone, Debug, BorshSerialize, Serialize, Deserialize)]
-pub struct BatchCheckpointDuty(BatchCheckpoint);
+pub struct CheckpointDuty(Checkpoint);
 
-impl BatchCheckpointDuty {
-    /// Creates a new `BatchCheckpointDuty` from a `BatchCheckpoint`.
-    pub fn new(batch_checkpoint: BatchCheckpoint) -> Self {
+impl CheckpointDuty {
+    /// Creates a new `CheckpointDuty` from a [`Checkpoint`].
+    pub fn new(batch_checkpoint: Checkpoint) -> Self {
         Self(batch_checkpoint)
     }
 
-    /// Consumes `self`, returning the inner `BatchCheckpoint`.
-    pub fn into_inner(self) -> BatchCheckpoint {
+    /// Consumes `self`, returning the inner [`Checkpoint`].
+    pub fn into_inner(self) -> Checkpoint {
         self.0
     }
 
-    /// Returns a reference to the inner `BatchCheckpoint`.
-    pub fn inner(&self) -> &BatchCheckpoint {
+    /// Returns a reference to the inner [`Checkpoint`].
+    pub fn inner(&self) -> &Checkpoint {
         &self.0
     }
 }
