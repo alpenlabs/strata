@@ -43,6 +43,9 @@ pub trait ReaderRpc {
     /// Gets a [`Block`] with the given hash.
     async fn get_block(&self, hash: &BlockHash) -> ClientResult<Block>;
 
+    /// Gets a block height with the given hash.
+    async fn get_block_height(&self, hash: &BlockHash) -> ClientResult<u64>;
+
     /// Gets a [`Block`] at given height.
     async fn get_block_at(&self, height: u64) -> ClientResult<Block>;
 

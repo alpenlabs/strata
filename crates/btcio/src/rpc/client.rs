@@ -28,10 +28,10 @@ use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
     types::{
-        CreateRawTransaction, CreateWallet, GetBlockVerbosityZero, GetBlockchainInfo,
-        GetNewAddress, GetTransaction, GetTxOut, ImportDescriptor, ImportDescriptorResult,
-        ListDescriptors, ListTransactions, ListUnspent, PreviousTransactionOutput,
-        SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
+        CreateRawTransaction, CreateWallet, GetBlockVerbosityOne, GetBlockVerbosityZero,
+        GetBlockchainInfo, GetNewAddress, GetTransaction, GetTxOut, ImportDescriptor,
+        ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
+        PreviousTransactionOutput, SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
 };
 
@@ -244,6 +244,15 @@ impl ReaderRpc for BitcoinClient {
             .block()
             .map_err(|err| ClientError::Other(format!("block decode: {}", err)))?;
         Ok(block)
+    }
+
+    async fn get_block_height(&self, hash: &BlockHash) -> ClientResult<u64> {
+        let block_verobose = self
+            .call::<GetBlockVerbosityOne>("getblock", &[to_value(hash.to_string())?])
+            .await?;
+
+        let block_height = block_verobose.height as u64;
+        Ok(block_height)
     }
 
     async fn get_block_at(&self, height: u64) -> ClientResult<Block> {
