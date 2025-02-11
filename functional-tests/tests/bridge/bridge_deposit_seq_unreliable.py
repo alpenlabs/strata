@@ -1,8 +1,15 @@
 import flexitest
 
+from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
 from mixins import bridge_mixin
-from utils import check_sequencer_down, get_bridge_pubkey, wait_until, wait_until_with_value
+from utils import (
+    check_initial_eth_balance,
+    check_sequencer_down,
+    get_bridge_pubkey,
+    wait_until,
+    wait_until_with_value,
+)
 from utils.constants import SATS_TO_WEI
 
 
@@ -15,12 +22,12 @@ class BridgeDepositSequencerUnreliableTest(bridge_mixin.BridgeMixin):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(testenv.BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
         address = ctx.env.gen_ext_btc_address()
         withdraw_address = ctx.env.gen_ext_btc_address()
-        el_address = self.eth_account.address
+        el_address = ctx.env.gen_el_address()
         bridge_pk = get_bridge_pubkey(self.seqrpc)
         self.debug(f"Address: {address}")
         self.debug(f"Change Address: {withdraw_address}")
@@ -28,6 +35,9 @@ class BridgeDepositSequencerUnreliableTest(bridge_mixin.BridgeMixin):
         self.debug(f"Bridge pubkey: {bridge_pk}")
 
         cfg: RollupConfig = ctx.env.rollup_cfg()
+
+        # Make sure starting ETH balance is 0
+        check_initial_eth_balance(self.rethrpc, el_address, self.debug)
 
         # deposit
         self.deposit(ctx, el_address, bridge_pk)
