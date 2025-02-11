@@ -18,7 +18,7 @@ use reth_provider::{
     DBProvider, DatabaseProvider, EthStorage, ProviderResult, ReadBodyInput, StorageLocation,
 };
 use reth_transaction_pool::{PoolTransaction, TransactionPool};
-use revm_primitives::alloy_primitives;
+use revm_primitives::{alloy_primitives, Address};
 use strata_reth_rpc::{SequencerClient, StrataEthApi};
 
 use crate::{
@@ -165,6 +165,8 @@ where
     fn add_ons(&self) -> Self::AddOns {
         Self::AddOns::builder()
             .with_sequencer(self.args.sequencer_http.clone())
+            .with_eoa_enabled(self.args.enable_eoa)
+            .with_allowed_eoa_addrs(self.args.allowed_eoa_addrs.clone())
             .build()
     }
 }
@@ -257,12 +259,29 @@ pub struct StrataAddOnsBuilder {
     /// Sequencer client, configured to forward submitted transactions to sequencer of given OP
     /// network.
     sequencer_client: Option<SequencerClient>,
+    /// Flag to reject EOA txs or not with exception of certain allowed eoa txs.
+    enable_eoa: bool,
+    /// Allowed EOA addrs
+    allowed_eoa_addrs: Vec<Address>,
 }
 
 impl StrataAddOnsBuilder {
     /// With a [`SequencerClient`].
     pub fn with_sequencer(mut self, sequencer_client: Option<String>) -> Self {
         self.sequencer_client = sequencer_client.map(SequencerClient::new);
+        self
+    }
+
+    /// With `enable_eoa` set to given value.
+    pub fn with_eoa_enabled(mut self, enabled: bool) -> Self {
+        self.enable_eoa = enabled;
+        self
+    }
+
+    /// With allowed EOA addrs as `Vec<Address>`.
+    pub fn with_allowed_eoa_addrs(mut self, allowed_addrs: Vec<Address>) -> Self {
+        // TODO: perhaps need to allow this only if `enable_eoa` is false.
+        self.allowed_eoa_addrs = allowed_addrs;
         self
     }
 }
@@ -273,13 +292,19 @@ impl StrataAddOnsBuilder {
     where
         N: FullNodeComponents<Types: NodeTypes<Primitives = StrataPrimitives>>,
     {
-        let Self { sequencer_client } = self;
+        let Self {
+            sequencer_client,
+            enable_eoa,
+            allowed_eoa_addrs,
+        } = self;
 
         StrataAddOns {
             rpc_add_ons: RpcAddOns::new(
                 move |ctx| {
                     StrataEthApi::<N>::builder()
                         .with_sequencer(sequencer_client)
+                        .with_eoa_enabled(enable_eoa)
+                        .with_allowed_eoa_addrs(allowed_eoa_addrs)
                         .build(ctx)
                 },
                 Default::default(),

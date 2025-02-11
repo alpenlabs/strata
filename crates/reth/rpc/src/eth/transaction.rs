@@ -5,6 +5,7 @@ use alloy_primitives::{Bytes, PrimitiveSignature as Signature, B256};
 use alloy_rpc_types_eth::{Transaction, TransactionInfo, TransactionRequest};
 use reth_node_api::FullNodeComponents;
 use reth_primitives::{RecoveredTx, TransactionSigned};
+use reth_primitives_traits::SignedTransaction;
 use reth_provider::{
     BlockReader, BlockReaderIdExt, ProviderTx, ReceiptProvider, TransactionsProvider,
 };
@@ -30,8 +31,20 @@ where
     ///
     /// Returns the hash of the transaction.
     async fn send_raw_transaction(&self, tx: Bytes) -> Result<B256, Self::Error> {
-        let recovered = recover_raw_transaction(&tx)?;
+        let recovered: RecoveredTx<
+            <<Self::Pool as TransactionPool>::Transaction as PoolTransaction>::Pooled,
+        > = recover_raw_transaction(&tx)?;
+        let sender = recovered.recover_signer_unchecked();
         let pool_transaction = <Self::Pool as TransactionPool>::Transaction::from_pooled(recovered);
+
+        // Check if EOA disabled and if so the sender is in the allowed list
+        if !self.inner.enable_eoa
+            && sender
+                .map(|x| self.inner.allowed_eoa_addrs.contains(&x))
+                .unwrap_or(false)
+        {
+            return Err(EthApiError::Unsupported("EOA txs are not allowed").into());
+        }
 
         // On Strata, transactions are forwarded directly to the sequencer to be included in
         // blocks that it builds.
