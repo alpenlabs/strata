@@ -135,19 +135,24 @@ jobs:
           RUST_LOG: "trace,hyper=warn,soketto=warn,jsonrpsee-server=warn,mio=warn"
           NO_COLOR: "1"
           RUST_BACKTRACE: "1"
+          LOG_LEVEL: "debug"
         run: |
           NEWPATH="$(realpath target/debug/)"
           export PATH="${NEWPATH}:${PATH}"
           which strata-client
           cd functional-tests && poetry run python entry.py
       - name: Zip log files on failure
-        if: steps.funcTestsRun1.outcome == 'failure' || steps.funcTestsRun2.outcome == 'failure'
+        if: steps.funcTestsRun2.outcome == 'failure'
         # Create a zip archive (logs.zip) that includes only service.log files,
         # preserving the folder structure starting from functional-tests/_dd
-        # NOTE: Entire _dd ends up hundreds of MBs, so keep only logs.
-        run: find functional-tests/_dd -type f -name "service.log" | zip -@ logs.zip
+        # NOTE: Entire _dd ends up hundreds of MBs, so keep only logs (still huge...).
+        run: |
+          # service logs
+          find functional-tests/_dd -type f -name "service.log" | zip -@ logs.zip
+          # functional test logs
+          zip -r logs.zip functional-tests/_dd -i '*/logs/*.log'
       - name: Upload logs as build artifact on failure
-        if: steps.funcTestsRun1.outcome == 'failure' || steps.funcTestsRun2.outcome == 'failure'
+        if: steps.funcTestsRun2.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: fntest_dd
