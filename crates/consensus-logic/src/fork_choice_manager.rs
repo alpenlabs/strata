@@ -110,9 +110,11 @@ pub fn init_forkchoice_manager(
 ) -> anyhow::Result<ForkChoiceManager> {
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
-    let sync_state = init_csm_state.sync().expect("csm state should be init");
-    let chain_tip_height = sync_state.chain_tip_height();
 
+    // TODO: get finalized block id without depending on client state
+    // or ensure client state and chain state are in-sync during startup
+    let sync_state = init_csm_state.sync().expect("csm state should be init");
+    let chain_tip_height = storage.chainstate().get_last_write_idx_blocking()?;
     let finalized_blockid = *sync_state.finalized_blkid();
     let finalized_block = storage
         .l2()
@@ -211,7 +213,7 @@ pub fn tracker_task<E: ExecEngineCtl>(
 
     // Now that we have the database state in order, we can actually init the
     // FCM.
-    let fcm = match init_forkchoice_manager(&storage, &params, init_state) {
+    let mut fcm = match init_forkchoice_manager(&storage, &params, init_state) {
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");
@@ -219,6 +221,14 @@ pub fn tracker_task<E: ExecEngineCtl>(
         }
     };
     info!(%finalized_blockid, "forkchoice manager started");
+
+    handle_unprocessed_blocks(
+        &mut fcm,
+        &storage,
+        engine.as_ref(),
+        &csm_ctl,
+        &status_channel,
+    )?;
 
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
@@ -232,6 +242,46 @@ pub fn tracker_task<E: ExecEngineCtl>(
         error!(err = ?e, "tracker aborted");
         return Err(e);
     }
+
+    Ok(())
+}
+
+/// Check if there are unprocessed L2 blocks in db.
+/// If there are, pass them to fcm.
+fn handle_unprocessed_blocks(
+    fcm: &mut ForkChoiceManager,
+    storage: &NodeStorage,
+    engine: &impl ExecEngineCtl,
+    csm_ctl: &CsmController,
+    status_channel: &StatusChannel,
+) -> anyhow::Result<()> {
+    info!("check for unprocessed l2blocks");
+
+    let l2_block_manager = storage.l2();
+    let mut slot = fcm.cur_index;
+    loop {
+        let blocksids = l2_block_manager.get_blocks_at_height_blocking(slot)?;
+        if blocksids.is_empty() {
+            break;
+        }
+        warn!(?blocksids, ?slot, "found extra l2blocks");
+        for blockid in blocksids {
+            let status = l2_block_manager.get_block_status_blocking(&blockid)?;
+            if let Some(BlockStatus::Invalid) = status {
+                continue;
+            }
+            warn!(?blockid, "processing l2block");
+            process_fc_message(
+                ForkChoiceMessage::NewBlock(blockid),
+                fcm,
+                engine,
+                csm_ctl,
+                status_channel,
+            )?;
+        }
+        slot += 1;
+    }
+    info!("completed check for unprocessed l2blocks");
 
     Ok(())
 }

@@ -5,7 +5,7 @@
 use std::{sync::Arc, thread};
 
 #[cfg(feature = "debug-utils")]
-use strata_common::bail_manager::{check_bail_trigger, BAIL_SYNC_EVENT};
+use strata_common::bail_manager::{check_bail_trigger, BAIL_SYNC_EVENT, BAIL_SYNC_EVENT_NEW_TIP};
 use strata_db::{
     traits::*,
     types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus},
@@ -143,7 +143,12 @@ impl WorkerState {
         debug!(?ev, "processing sync event");
 
         #[cfg(feature = "debug-utils")]
-        check_bail_trigger(BAIL_SYNC_EVENT);
+        {
+            check_bail_trigger(BAIL_SYNC_EVENT);
+            if matches!(ev, strata_state::sync_event::SyncEvent::NewTipBlock(_)) {
+                check_bail_trigger(BAIL_SYNC_EVENT_NEW_TIP);
+            }
+        }
 
         // Compute the state transition.
         let context = client_transition::StorageEventContext::new(&self.storage);

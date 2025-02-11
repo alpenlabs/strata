@@ -11,6 +11,7 @@ fi
 CONFIG_FILE=configs
 
 JWT_FILE=$CONFIG_FILE/jwt.hex
+JWT_FN_FILE=$CONFIG_FILE/jwt.fn.hex
 
 generate_random_hex() {
     if [ -z "$1" ]; then
@@ -27,6 +28,7 @@ generate_random_hex() {
 }
 
 generate_random_hex $JWT_FILE
+generate_random_hex $JWT_FN_FILE
 
 SEQ_SEED_FILE=$CONFIG_FILE/sequencer.bin
 OP1_SEED_FILE=$CONFIG_FILE/operator1.bin

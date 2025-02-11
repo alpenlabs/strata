@@ -11,6 +11,7 @@ class BaseMixin(testenv.StrataTester):
 
         self.btc = ctx.get_service("bitcoin")
         self.seq = ctx.get_service("sequencer")
+        self.seq_signer = ctx.get_service("sequencer_signer")
         self.reth = ctx.get_service("reth")
 
         self.seqrpc = self.seq.create_rpc()

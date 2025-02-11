@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use strata_rpc_api::StrataSequencerApiClient;
 use strata_sequencer::duty::types::Duty;
 use tokio::sync::mpsc;
-use tracing::{debug, error, warn};
+use tracing::{error, info, warn};
 
 pub(crate) async fn duty_fetcher_worker<R>(
     rpc: Arc<R>,
@@ -25,7 +25,7 @@ where
             }
         };
 
-        debug!("got {} duties", duties.len());
+        info!(count = %duties.len(), "got new duties");
 
         for duty in duties {
             if duty_tx.send(duty).await.is_err() {
