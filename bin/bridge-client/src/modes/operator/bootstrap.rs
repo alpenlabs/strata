@@ -162,7 +162,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let exec_handler_clone = shared_exec_handler.clone();
 
     let task_manager = TaskManager {
-        exec_handler: shared_exec_handler,
+        exec_handler: exec_handler_clone,
         broadcaster: l1_rpc_client,
         bridge_duty_db_ops,
         bridge_duty_idx_db_ops,
@@ -201,7 +201,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     tokio::try_join!(rpc_task, duty_task)?;
 
     // Attempt to erase keypair from ExecHandler and ExecHandler.sig_manager
-    if let Ok(mut handler) = Arc::try_unwrap(exec_handler_clone) {
+    if let Ok(mut handler) = Arc::try_unwrap(shared_exec_handler) {
         handler.erase_keypair(); // Ensure keypair is erased before dropping
         handler.sig_manager.erase_keypair();
     }

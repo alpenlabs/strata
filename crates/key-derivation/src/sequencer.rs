@@ -56,14 +56,6 @@ impl SequencerKeys {
     }
 }
 
-// Manual Drop implementation to zeroize keys on drop.
-impl Drop for SequencerKeys {
-    fn drop(&mut self) {
-        #[cfg(feature = "zeroize")]
-        self.zeroize();
-    }
-}
-
 #[cfg(feature = "zeroize")]
 impl Zeroize for SequencerKeys {
     #[inline]
@@ -142,6 +134,8 @@ impl ZeroizeOnDrop for SequencerKeys {}
 #[cfg(test)]
 mod tests {
 
+    use std::sync::Arc;
+
     use bitcoin::Network;
 
     use super::*;
@@ -186,5 +180,36 @@ mod tests {
             ChildNumber::Normal { index } => assert_eq!(index, 0),
             ChildNumber::Hardened { index } => assert_eq!(index, 0),
         }
+    }
+
+    #[test]
+    #[cfg(feature = "zeroize")]
+    fn test_zeroize_idata() {
+        let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
+        let keys = Arc::new(SequencerKeys::new(&master).unwrap());
+
+        // Store original values
+        let master_chaincode = *keys.master_xpriv().chain_code.as_bytes();
+        let derived_chaincode = *keys.derived_xpriv().chain_code.as_bytes();
+
+        // Verify data exists
+        assert_ne!(master_chaincode, [0u8; 32]);
+        assert_ne!(derived_chaincode, [0u8; 32]);
+
+        fn bar(keys_clone: Arc<SequencerKeys>) {
+            println!("got keys {}", keys_clone.master);
+        }
+
+        fn foo(keys: Arc<SequencerKeys>) {
+            println!("got keys {}", keys.master);
+            bar(keys.clone());
+            if let Ok(mut keys) = Arc::try_unwrap(keys) {
+                keys.zeroize();
+                assert_eq!(keys.master_xpriv().private_key.secret_bytes(), [1u8; 32]);
+                assert_eq!(keys.derived_xpriv().private_key.secret_bytes(), [1u8; 32]);
+            }
+        }
+
+        foo(keys);
     }
 }
