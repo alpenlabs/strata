@@ -356,7 +356,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {
         let deps = self
             .status_channel
-            .deposits_table()
+            .cur_tip_deposits_table()
             .ok_or(Error::BeforeGenesis)?;
 
         Ok(deps.get_all_deposits_idxs_iters_iter().collect())
@@ -365,7 +365,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<RpcDepositEntry> {
         let deps = self
             .status_channel
-            .deposits_table()
+            .cur_tip_deposits_table()
             .ok_or(Error::BeforeGenesis)?;
         Ok(deps
             .get_deposit(deposit_id)
@@ -504,7 +504,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
         let operator_table = self
             .status_channel
-            .operator_table()
+            .cur_tip_operator_table()
             .ok_or(Error::BeforeGenesis)?;
         let operator_map: BTreeMap<OperatorIdx, PublicKey> = operator_table
             .operators()

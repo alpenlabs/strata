@@ -7,12 +7,12 @@ use strata_chaintsn::transition::process_block;
 use strata_common::bail_manager::{check_bail_trigger, BAIL_ADVANCE_CONSENSUS_STATE};
 use strata_db::{errors::DbError, traits::BlockStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
-use strata_primitives::{l2::L2BlockCommitment, params::Params};
+use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment, params::Params};
 use strata_state::{
     block::L2BlockBundle, block_validation::validate_block_segments, chain_state::Chainstate,
     client_state::ClientState, prelude::*, state_op::StateCache,
 };
-use strata_status::StatusChannel;
+use strata_status::*;
 use strata_storage::{L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::{
@@ -149,20 +149,13 @@ pub fn init_forkchoice_manager(
     let sync_state = init_csm_state.sync().expect("csm state should be init");
     let chain_tip_height = storage.chainstate().get_last_write_idx_blocking()?;
 
-    let finalized_blkid = *sync_state.finalized_blkid();
-
-    let finalized_block = storage
-        .l2()
-        .get_block_data_blocking(&finalized_blkid)?
-        .ok_or(Error::MissingL2Block(finalized_blkid))?;
-    let finalized_height = finalized_block.header().blockidx();
-
-    debug!(%finalized_blkid, %finalized_height, "loaded from finalized block");
+    let finalized_epoch = *sync_state.finalized_epoch();
+    debug!(?finalized_epoch, "loaded from finalized block");
 
     // Populate the unfinalized block tracker.
     let mut chain_tracker =
-        unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_blkid);
-    chain_tracker.load_unfinalized_blocks(finalized_height, storage.l2().as_ref())?;
+        unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_epoch);
+    chain_tracker.load_unfinalized_blocks(finalized_epoch.last_slot(), storage.l2().as_ref())?;
 
     let cur_tip_block = determine_start_tip(&chain_tracker, storage.l2())?;
 
@@ -401,9 +394,15 @@ fn process_fc_message(
 
             let status = if !ok {
                 // Update status.
-                // FIXME avoid clone
-                let new_state = &fcm_state.cur_chainstate;
-                status_channel.update_chainstate(new_state.as_ref().clone());
+                let status = ChainSyncStatus {
+                    tip: fcm_state.cur_best_block,
+                    // FIXME
+                    prev_epoch: EpochCommitment::null(),
+                    finalized_epoch: *fcm_state.chain_tracker.finalized_epoch(),
+                };
+
+                let update = ChainSyncStatusUpdate::new(status, fcm_state.cur_chainstate.clone());
+                status_channel.update_chain_sync_status(update);
 
                 BlockStatus::Valid
             } else {
@@ -729,23 +728,26 @@ fn handle_new_client_state(
         .expect("fcm: client state missing sync data")
         .clone();
 
-    let cur_fin_blkid = fcm_state.chain_tracker.finalized_tip();
-    let new_fin_blkid = sync.finalized_blkid();
+    let cur_fin_epoch = fcm_state.chain_tracker.finalized_epoch();
+    let new_fin_epoch = sync.finalized_epoch();
 
-    if new_fin_blkid == cur_fin_blkid {
-        trace!("got new CSM state but finalized block not different, ignoring");
+    if new_fin_epoch.last_blkid() == cur_fin_epoch.last_blkid() {
+        trace!("got new CSM state but finalized epoch not different, ignoring");
         return Ok(());
     }
 
-    debug!(%new_fin_blkid, "got new CSM state, updating finalized block");
+    debug!(
+        ?new_fin_epoch,
+        "got new CSM state, updating finalized block"
+    );
 
     // Update the new state.
     fcm_state.cur_csm_state = Arc::new(cs);
 
     let fin_report = fcm_state
         .chain_tracker
-        .update_finalized_tip(new_fin_blkid)?;
-    info!(?new_fin_blkid, "updated finalized tip");
+        .update_finalized_epoch(new_fin_epoch)?;
+    info!(?new_fin_epoch, "updated finalized tip");
     trace!(?fin_report, "finalization report");
     // TODO do something with the finalization report
 

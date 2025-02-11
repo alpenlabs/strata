@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, l2::L2BlockCommitment};
+use strata_primitives::{buf::Buf32, epoch::EpochCommitment};
 use tracing::*;
 
 use crate::{
@@ -135,8 +135,7 @@ pub struct SyncState {
     pub(super) confirmed_checkpoint_blocks: Vec<(L1BlockHeight, L2BlockId)>,
 
     /// L2 block that's been finalized on L1 and proven.
-    // TODO convert to epoch commitment?
-    pub(super) finalized_block: L2BlockCommitment,
+    pub(super) finalized_epoch: EpochCommitment,
 }
 
 type L1BlockHeight = u64;
@@ -145,16 +144,21 @@ impl SyncState {
     pub fn from_genesis_blkid(gblkid: L2BlockId) -> Self {
         Self {
             confirmed_checkpoint_blocks: Vec::new(),
-            finalized_block: L2BlockCommitment::new(0, gblkid),
+            finalized_epoch: EpochCommitment::new(0, 0, gblkid),
         }
     }
 
+    /// Returns the finalized epoch commitment.
+    pub fn finalized_epoch(&self) -> &EpochCommitment {
+        &self.finalized_epoch
+    }
+
     pub fn finalized_blkid(&self) -> &L2BlockId {
-        self.finalized_block.blkid()
+        self.finalized_epoch.last_blkid()
     }
 
     pub fn finalized_slot(&self) -> u64 {
-        self.finalized_block.slot()
+        self.finalized_epoch.last_slot()
     }
 
     pub fn confirmed_checkpoint_blocks(&self) -> &[(u64, L2BlockId)] {
@@ -470,7 +474,7 @@ impl ClientStateMut {
 
         let new_finalized = finalized_checkpts.last().cloned().cloned();
         let total_finalized = finalized_checkpts.len();
-        debug!(?new_finalized, ?total_finalized, "Finalized checkpoints");
+        debug!(?new_finalized, %total_finalized, "Finalized checkpoints");
 
         // Remove the finalized from pending and then mark the last one as last_finalized
         // checkpoint
@@ -488,11 +492,13 @@ impl ClientStateMut {
                 panic!("clientstate: mismatched indices of pending checkpoint");
             }
 
+            let epoch_idx = ckpt.batch_info.epoch;
             let fin_block = ckpt.batch_info.l2_range.1;
             l1v.last_finalized_checkpoint = Some(ckpt);
 
             // Update finalized block in SyncState.
-            self.state.expect_sync_mut().finalized_block = fin_block;
+            let fin_epoch = EpochCommitment::new(epoch_idx, fin_block.slot(), *fin_block.blkid());
+            self.state.expect_sync_mut().finalized_epoch = fin_epoch;
         }
     }
 }
