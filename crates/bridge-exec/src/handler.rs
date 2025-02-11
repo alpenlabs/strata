@@ -349,16 +349,3 @@ where
         )
     }
 }
-
-impl<TxBuildContext> Drop for ExecHandler<TxBuildContext>
-where
-    TxBuildContext: BuildContext + Sync + Send,
-{
-    fn drop(&mut self) {
-        // Attempts to erase the keypair
-        self.keypair.non_secure_erase();
-
-        // Attempts to erase the keypair inside SignatureManager
-        self.sig_manager.erase_keypair();
-    }
-}

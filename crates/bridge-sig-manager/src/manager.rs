@@ -52,12 +52,6 @@ impl std::fmt::Debug for SignatureManager {
     }
 }
 
-impl Drop for SignatureManager {
-    fn drop(&mut self) {
-        self.erase_keypair();
-    }
-}
-
 impl SignatureManager {
     /// Create a new [`SignatureManager`].
     pub fn new(db_ops: Arc<BridgeTxStateOps>, index: OperatorIdx, keypair: Keypair) -> Self {
