@@ -72,12 +72,12 @@ fn duty_tracker_task_inner(
         }
 
         // Wait for a new update.
-        if let Err(e) = status_rx.changed() {
+        if let Err(_) = status_rx.changed() {
             break;
         }
 
         // Get it if there is one.
-        let update = status_rx.borrow();
+        let update = status_rx.borrow_and_update();
         let Some(update) = update.as_ref() else {
             trace!("received new chain sync status but was still unset, ignoring");
             continue;
