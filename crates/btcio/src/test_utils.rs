@@ -140,6 +140,25 @@ impl ReaderRpc for TestBitcoinClient {
         })
     }
 
+    async fn network(&self) -> ClientResult<Network> {
+        Ok(Network::Regtest)
+    }
+}
+
+#[async_trait]
+impl BroadcasterRpc for TestBitcoinClient {
+    // send_raw_transaction sends a raw transaction to the network
+    async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
+        Ok(Txid::from_slice(&[1u8; 32]).unwrap())
+    }
+    async fn test_mempool_accept(&self, _tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>> {
+        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        Ok(vec![TestMempoolAccept {
+            txid: some_tx.compute_txid(),
+            reject_reason: None,
+        }])
+    }
+
     async fn submit_package(&self, _txs: &[Transaction]) -> ClientResult<SubmitPackage> {
         let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
         let wtxid = some_tx.compute_wtxid();
@@ -159,25 +178,6 @@ impl ReaderRpc for TestBitcoinClient {
             tx_results,
             replaced_transactions: vec![],
         })
-    }
-
-    async fn network(&self) -> ClientResult<Network> {
-        Ok(Network::Regtest)
-    }
-}
-
-#[async_trait]
-impl BroadcasterRpc for TestBitcoinClient {
-    // send_raw_transaction sends a raw transaction to the network
-    async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
-        Ok(Txid::from_slice(&[1u8; 32]).unwrap())
-    }
-    async fn test_mempool_accept(&self, _tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>> {
-        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
-        Ok(vec![TestMempoolAccept {
-            txid: some_tx.compute_txid(),
-            reject_reason: None,
-        }])
     }
 }
 

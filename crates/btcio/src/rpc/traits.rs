@@ -80,18 +80,6 @@ pub trait ReaderRpc {
         include_mempool: bool,
     ) -> ClientResult<GetTxOut>;
 
-    /// Submit a package of raw transactions (serialized, hex-encoded) to local node.
-    ///
-    /// The package will be validated according to consensus and mempool policy rules. If any
-    /// transaction passes, it will be accepted to mempool. This RPC is experimental and the
-    /// interface may be unstable. Refer to doc/policy/packages.md for documentation on package
-    /// policies.
-    ///
-    /// # Warning
-    ///
-    /// Successful submission does not mean the transactions will propagate throughout the network.
-    async fn submit_package(&self, txs: &[Transaction]) -> ClientResult<SubmitPackage>;
-
     /// Gets the underlying [`Network`] information.
     async fn network(&self) -> ClientResult<Network>;
 }
@@ -119,6 +107,18 @@ pub trait BroadcasterRpc {
 
     /// Tests if a raw transaction is valid.
     async fn test_mempool_accept(&self, tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>>;
+
+    /// Submit a package of raw transactions (serialized, hex-encoded) to local node.
+    ///
+    /// The package will be validated according to consensus and mempool policy rules. If any
+    /// transaction passes, it will be accepted to mempool. This RPC is experimental and the
+    /// interface may be unstable. Refer to doc/policy/packages.md for documentation on package
+    /// policies.
+    ///
+    /// # Warning
+    ///
+    /// Successful submission does not mean the transactions will propagate throughout the network.
+    async fn submit_package(&self, txs: &[Transaction]) -> ClientResult<SubmitPackage>;
 }
 
 /// Wallet functionality that any Bitcoin client **without private keys** that

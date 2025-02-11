@@ -1,7 +1,10 @@
 use std::{
     env::var,
     fmt,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -54,14 +57,18 @@ where
 }
 
 /// An `async` client for interacting with a `bitcoind` instance.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BitcoinClient {
     /// The URL of the `bitcoind` instance.
     url: String,
     /// The underlying `async` HTTP client.
     client: Client,
     /// The ID of the current request.
-    id: AtomicUsize,
+    ///
+    /// # Implementation Details
+    ///
+    /// Using an [`Arc`] so that [`BitcoinClient`] is [`Clone`].
+    id: Arc<AtomicUsize>,
     /// The maximum number of retries for a request.
     max_retries: u8,
     /// Interval between retries for a request in ms.
@@ -107,7 +114,7 @@ impl BitcoinClient {
             .build()
             .map_err(|e| ClientError::Other(format!("Could not create client: {e}")))?;
 
-        let id = AtomicUsize::new(0);
+        let id = Arc::new(AtomicUsize::new(0));
 
         let max_retries = max_retries.unwrap_or(DEFAULT_MAX_RETRIES);
         let retry_interval = retry_interval.unwrap_or(DEFAULT_RETRY_INTERVAL_MS);
@@ -301,12 +308,6 @@ impl ReaderRpc for BitcoinClient {
         .await
     }
 
-    async fn submit_package(&self, txs: &[Transaction]) -> ClientResult<SubmitPackage> {
-        let txstrs: Vec<String> = txs.iter().map(serialize_hex).collect();
-        self.call::<SubmitPackage>("submitpackage", &[to_value(txstrs)?])
-            .await
-    }
-
     async fn network(&self) -> ClientResult<Network> {
         Ok(self
             .call::<GetBlockchainInfo>("getblockchaininfo", &[])
@@ -343,6 +344,12 @@ impl BroadcasterRpc for BitcoinClient {
         let txstr = serialize_hex(tx);
         trace!(%txstr, "Testing mempool accept");
         self.call::<Vec<TestMempoolAccept>>("testmempoolaccept", &[to_value([txstr])?])
+            .await
+    }
+
+    async fn submit_package(&self, txs: &[Transaction]) -> ClientResult<SubmitPackage> {
+        let txstrs: Vec<String> = txs.iter().map(serialize_hex).collect();
+        self.call::<SubmitPackage>("submitpackage", &[to_value(txstrs)?])
             .await
     }
 }
