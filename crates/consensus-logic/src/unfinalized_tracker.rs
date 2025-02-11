@@ -3,7 +3,7 @@
 use std::collections::*;
 
 use strata_db::traits::BlockStatus;
-use strata_primitives::{buf::Buf32, epoch::EpochCommitment};
+use strata_primitives::{buf::Buf32, epoch::EpochCommitment, l2::L2BlockCommitment};
 use strata_state::prelude::*;
 use strata_storage::L2BlockManager;
 use tracing::*;
@@ -14,6 +14,7 @@ use crate::errors::ChainTipError;
 /// relatives.
 #[derive(Debug)]
 struct BlockEntry {
+    slot: u64,
     parent: L2BlockId,
     children: HashSet<L2BlockId>,
 }
@@ -42,6 +43,7 @@ impl UnfinalizedBlockTracker {
         pending_tbl.insert(
             fin_tip,
             BlockEntry {
+                slot: finalized_epoch.last_slot(),
                 parent: L2BlockId::from(Buf32::zero()),
                 children: HashSet::new(),
             },
@@ -88,6 +90,12 @@ impl UnfinalizedBlockTracker {
         self.unfinalized_tips.iter()
     }
 
+    /// Returns an iterator over the block commitments of the chain tips.
+    pub fn chain_tip_blocks_iter(&self) -> impl Iterator<Item = L2BlockCommitment> + '_ {
+        self.chain_tips_iter()
+            .map(|id| L2BlockCommitment::new(self.pending_table[id].slot, *id))
+    }
+
     /// Checks if the block is traceable all the way back to the finalized tip.
     fn sanity_check_parent_seq(&self, blkid: &L2BlockId) -> bool {
         if blkid == self.finalized_tip() {
@@ -120,12 +128,20 @@ impl UnfinalizedBlockTracker {
         let parent_blkid = header.parent();
 
         if let Some(parent_ent) = self.pending_table.get_mut(parent_blkid) {
+            if header.blockidx() <= parent_ent.slot {
+                return Err(ChainTipError::ChildBeforeParent(
+                    header.blockidx(),
+                    parent_ent.slot,
+                ));
+            }
+
             parent_ent.children.insert(blkid);
         } else {
             return Err(ChainTipError::AttachMissingParent(blkid, *header.parent()));
         }
 
         let ent = BlockEntry {
+            slot: header.blockidx(),
             parent: *header.parent(),
             children: HashSet::new(),
         };

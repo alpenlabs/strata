@@ -103,4 +103,8 @@ pub enum ChainTipError {
 
     #[error("tried to finalize unknown block {0:?}")]
     MissingBlock(L2BlockId),
+
+    /// This should only happen with malformed blocks.
+    #[error("child slot {0} was leq declared parent slot {1}")]
+    ChildBeforeParent(u64, u64),
 }

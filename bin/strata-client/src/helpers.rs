@@ -5,7 +5,7 @@ use bitcoin::{Address, Network};
 use format_serde_error::SerdeError;
 use strata_btcio::rpc::{traits::WalletRpc, BitcoinClient};
 use strata_config::Config;
-use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
+use strata_evmexec::{engine::RpcExecEngineCtl, fetch_init_fork_choice_state, EngineRpcClient};
 use strata_primitives::{
     l1::L1Status,
     params::{Params, RollupParams, SyncParams},
@@ -152,7 +152,7 @@ pub fn init_engine_controller(
         reth_jwtsecret,
     );
 
-    let initial_fcs = fork_choice_state_initial(db, params.rollup())?;
+    let initial_fcs = fetch_init_fork_choice_state(db, params.rollup())?;
     let eng_ctl = strata_evmexec::engine::RpcExecEngineCtl::new(
         client,
         initial_fcs,

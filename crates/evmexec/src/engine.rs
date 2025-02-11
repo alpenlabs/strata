@@ -292,7 +292,7 @@ impl<T: EngineRpc> RpcExecEngineCtl<T> {
     }
 
     fn get_block_info(&self, l2block: L2BlockBundle) -> EngineResult<EVML2Block> {
-        EVML2Block::try_from(l2block).map_err(|err| EngineError::Other(err.to_string()))
+        EVML2Block::try_extract(&l2block).map_err(|err| EngineError::Other(err.to_string()))
     }
 }
 
@@ -306,7 +306,7 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
         let prev_l2block = self
             .get_l2block(env.prev_l2_block_id())
             .map_err(|err| EngineError::Other(err.to_string()))?;
-        let prev_block = EVML2Block::try_from(prev_l2block)
+        let prev_block = EVML2Block::try_extract(&prev_l2block)
             .map_err(|err| EngineError::Other(err.to_string()))?;
         self.tokio_handle
             .block_on(self.inner.build_block_from_mempool(env, prev_block))
@@ -523,7 +523,7 @@ mod tests {
         let accessory = L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap());
         let l2block_bundle = L2BlockBundle::new(l2block, accessory);
 
-        let evm_l2_block = EVML2Block::try_from(l2block_bundle.clone()).unwrap();
+        let evm_l2_block = EVML2Block::try_extract(&l2block_bundle).unwrap();
 
         let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, fcs);
 
