@@ -8,9 +8,6 @@ pub struct CsmStatus {
     /// Index of the last sync event.
     pub last_sync_ev_idx: u64,
 
-    /// Chain tip's block ID.
-    pub chain_tip_blkid: Option<L2BlockId>,
-
     /// Finalized block ID.
     pub finalized_blkid: Option<L2BlockId>,
 }
@@ -21,12 +18,6 @@ impl CsmStatus {
     }
 
     pub fn update_from_client_state(&mut self, state: &ClientState) {
-        if let Some(ss) = state.sync() {
-            self.chain_tip_blkid = Some(*ss.chain_tip_blkid());
-            self.finalized_blkid = Some(*ss.finalized_blkid());
-        } else {
-            self.chain_tip_blkid = None;
-            self.finalized_blkid = None;
-        }
+        self.finalized_blkid = state.sync().map(|ss| *ss.finalized_blkid());
     }
 }

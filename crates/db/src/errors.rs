@@ -1,3 +1,4 @@
+use strata_primitives::epoch::EpochCommitment;
 use thiserror::Error;
 
 use crate::entities::errors::EntityError;
@@ -40,6 +41,9 @@ pub enum DbError {
 
     #[error("unknown state index {0}")]
     UnknownIdx(u64),
+
+    #[error("tried to overwrite epoch {0:?}")]
+    OverwriteEpoch(EpochCommitment),
 
     #[error("tried to revert to index {0} above current tip {1}")]
     RevertAboveCurrent(u64, u64),

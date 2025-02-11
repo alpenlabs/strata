@@ -315,7 +315,7 @@ fn apply_action(
     action: SyncAction,
     state: &mut WorkerState,
     engine: &impl ExecEngineCtl,
-    status_channel: &StatusChannel,
+    _status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match action {
         SyncAction::UpdateTip(blkid) => {
@@ -349,12 +349,13 @@ fn apply_action(
 
             // TODO: use l1blkid during chain state genesis ?
 
-            let chstate =
-                genesis::init_genesis_chainstate(&state.params, &state.storage).map_err(|err| {
+            let _chstate = genesis::init_genesis_chainstate(&state.params, &state.storage)
+                .map_err(|err| {
                     error!(err = %err, "failed to compute chain genesis");
                     Error::GenesisFailed(err.to_string())
                 })?;
-            status_channel.update_chainstate(chstate);
+
+            // TODO do we have to do anything here?
         }
 
         SyncAction::WriteCheckpoints(_height, checkpoints) => {

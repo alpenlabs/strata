@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     batch::BatchCheckpointWithCommitment,
-    id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
 };
 
@@ -27,11 +26,6 @@ pub enum SyncEvent {
 
     /// We've observed that the `genesis_l1_height` has reached maturity
     L1BlockGenesis(u64, HeaderVerificationState),
-
-    /// Fork choice manager found a new valid chain tip block.  At this point
-    /// we've already asked the EL to check if it's valid and know we *could*
-    /// accept it.  This is also how we indicate the genesis block.
-    NewTipBlock(L2BlockId),
 }
 
 impl fmt::Display for SyncEvent {
@@ -42,7 +36,6 @@ impl fmt::Display for SyncEvent {
             // TODO implement this when we determine wwhat useful information we can take from here
             Self::L1DABatch(h, _ckpts) => f.write_fmt(format_args!("l1da:<$data>@{h}")),
             Self::L1BlockGenesis(h, _st) => f.write_fmt(format_args!("l1genesis:{h}")),
-            Self::NewTipBlock(id) => f.write_fmt(format_args!("newtip:{id}")),
         }
     }
 }

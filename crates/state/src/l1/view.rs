@@ -18,7 +18,6 @@ pub struct L1ViewState {
 
     /// L1 blocks that might still be reorged.
     pub(crate) maturation_queue: StateQueue<L1MaturationEntry>,
-    // TODO include L1 MMR state that we mature blocks into
 }
 
 impl L1ViewState {
