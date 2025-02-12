@@ -19,4 +19,4 @@ docker build  --build-arg PROVER_FEATURES=sp1-mock -t prover-client-sp1-mock -f 
 Generate a Prover Image in sp1 proving mode. In sp1 mode, actual proofs and public parameters are generated.
 ```bash
 docker build  --build-arg PROVER_FEATURES=sp1 -t prover-client-sp1 -f ./docker/prover-client/Dockerfile .
-```
+``` 
