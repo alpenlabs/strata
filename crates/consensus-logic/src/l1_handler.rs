@@ -66,14 +66,14 @@ fn handle_bitcoin_event(
     seq_pubkey: Option<XOnlyPublicKey>,
 ) -> anyhow::Result<()> {
     match event {
-        L1Event::RevertTo(revert_blk_num) => {
+        L1Event::RevertTo(block) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
-            l1man.revert_to_height(revert_blk_num)?;
-            debug!(%revert_blk_num, "wrote revert");
+            l1man.revert_to_height(block.height())?;
+            debug!(height = %block.height(), "wrote revert");
 
             // Write to sync event db.
-            let ev = SyncEvent::L1Revert(revert_blk_num);
+            let ev = SyncEvent::L1Revert(block);
             csm_ctl.submit_event(ev)?;
 
             Ok(())

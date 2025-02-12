@@ -11,7 +11,7 @@ use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
     messages::{BlockData, L1Event, RelevantTxEntry},
 };
-use strata_primitives::params::Params;
+use strata_primitives::{l1::L1BlockCommitment, params::Params};
 use strata_state::l1::{
     get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
     L1BlockId, TimestampStore,
@@ -63,7 +63,7 @@ pub async fn bitcoin_data_reader_task(
     do_reader_task(ctx, target_next_block).await
 }
 
-/// Inner function that actually does the reading task.
+//// Inner function that actually does the reading task.
 async fn do_reader_task<R: ReaderRpc>(
     ctx: ReaderContext<R>,
     target_next_block: u64,
@@ -126,23 +126,27 @@ async fn handle_new_filter_rule<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
 ) -> anyhow::Result<()> {
-    // Get the L1 height corresponding to the new epoch
-    let last_checkpt_height = ctx
-        .status_channel
-        .get_last_checkpoint()
-        .expect("got epoch change without checkpoint finalized")
-        .height;
+    // FIXME this is super wrong but it doesn't actually matter, we always use
+    // the same filter rule for now so we never have to reverify stuff, this
+    // will be reworked more later
 
-    // Now, we need to revert to the point before the last checkpoint height.
-    state.rollback_to_height(last_checkpt_height);
+    /*    // Get the L1 height corresponding to the new epoch
+        let last_checkpt_height = ctx
+            .status_channel
+            .get_last_checkpoint()
+            .expect("got epoch change without checkpoint finalized")
+            .height;
 
-    // Send L1 revert so that the recent txs can be appropriately re-filtered
-    info!(%last_checkpt_height, "Reverting back to last checkpoint height");
-    let revert_ev = L1Event::RevertTo(last_checkpt_height);
-    if ctx.event_tx.send(revert_ev).await.is_err() {
-        warn!("unable to submit L1 reorg event, did persistence task exit?");
-    }
+        // Now, we need to revert to the point before the last checkpoint height.
+        state.rollback_to_height(last_checkpt_height);
 
+        // Send L1 revert so that the recent txs can be appropriately re-filtered
+        warn!(%last_checkpt_height, "reverting back to last checkpoint height because of reasons?");
+        let revert_ev = L1Event::RevertTo(last_checkpt_height);
+        if ctx.event_tx.send(revert_ev).await.is_err() {
+            warn!("unable to submit L1 reorg event, did persistence task exit?");
+        }
+    */
     Ok(())
 }
 
@@ -243,8 +247,9 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
     if let Some((pivot_height, pivot_blkid)) = find_pivot_block(ctx.client.as_ref(), state).await? {
         if pivot_height < state.best_block_idx() {
             info!(%pivot_height, %pivot_blkid, "found apparent reorg");
+            let block = L1BlockCommitment::new(pivot_height, L1BlockId::from(pivot_blkid));
             state.rollback_to_height(pivot_height);
-            let revert_ev = L1Event::RevertTo(pivot_height);
+            let revert_ev = L1Event::RevertTo(block);
             if ctx.event_tx.send(revert_ev).await.is_err() {
                 warn!("unable to submit L1 reorg event, did persistence task exit?");
             }

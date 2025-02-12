@@ -208,11 +208,8 @@ impl StrataApiServer for StrataRpcImpl {
         let css = self.status_channel.get_chain_sync_status();
         let l1_view = self.status_channel.get_csm_l1_view();
 
-        let last_l1 = l1_view.tip_blkid().cloned().unwrap_or_else(|| {
-            // TODO figure out a better way to do this
-            warn!("last L1 block not set in client state, returning zero");
-            L1BlockId::from(Buf32::zero())
-        });
+        let last_l1_slot = l1_view.tip_height();
+        let last_l1_blkid = l1_view.tip_blkid().cloned().unwrap_or_default();
 
         // Copy these out of the sync state, if they're there.
         let (chain_tip_slot, chain_tip_blkid, finalized_blkid) = css
@@ -224,8 +221,9 @@ impl StrataApiServer for StrataRpcImpl {
             chain_tip: *chain_tip_blkid.as_ref(),
             chain_tip_slot,
             finalized_blkid: *finalized_blkid.as_ref(),
-            last_l1_block: *last_l1.as_ref(),
-            buried_l1_height: l1_view.buried_l1_height(),
+            last_l1_block: *last_l1_blkid.as_ref(),
+            // FIXME this is a bodge, we don't track this anymore
+            buried_l1_height: last_l1_slot.saturating_sub(3),
         })
     }
 
