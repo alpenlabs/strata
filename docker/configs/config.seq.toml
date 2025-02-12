@@ -22,6 +22,9 @@ fee_policy = "smart"
 reveal_amount = 100
 bundle_interval_ms = 1000
 
+[btcio.broadcaster]
+poll_interval_ms = 1000
+
 [sync]
 l1_follow_distance = 6
 max_reorg_depth = 4
@@ -31,9 +34,6 @@ client_checkpoint_interval = 10
 [exec.reth]
 rpc_url = "reth:8551"
 secret = "configs/jwt.hex"
-
-[btcio.broadcaster]
-poll_interval_ms = 1000
 
 [relayer]
 refresh_interval = 10
