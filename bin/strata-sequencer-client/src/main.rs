@@ -79,7 +79,7 @@ fn main_inner(args: Args) -> Result<()> {
     let result = task_manager.monitor(Some(Duration::from_millis(SHUTDOWN_TIMEOUT_MS)));
 
     // Zeroize idata
-    if let Ok(mut idata) = Arc::try_unwrap(idata) {
+    if let Some(mut idata) = Arc::into_inner(idata) {
         idata.zeroize();
     }
 

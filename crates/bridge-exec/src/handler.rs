@@ -385,7 +385,7 @@ mod tests {
         }
 
         foo(wrapper_clone);
-        if let Ok(mut wrapper) = Arc::try_unwrap(shared_wrapper) {
+        if let Some(mut wrapper) = Arc::into_inner(shared_wrapper) {
             wrapper.erase();
             assert_eq!(wrapper.keypair.secret_key().secret_bytes(), [1u8; 32]);
         }

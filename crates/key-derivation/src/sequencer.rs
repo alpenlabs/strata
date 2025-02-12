@@ -208,7 +208,7 @@ mod tests {
 
         foo(keys_clone);
 
-        if let Ok(mut keys) = Arc::try_unwrap(keys) {
+        if let Some(mut keys) = Arc::into_inner(keys) {
             keys.zeroize();
             assert_eq!(keys.master_xpriv().private_key.secret_bytes(), [1u8; 32]);
             assert_eq!(keys.derived_xpriv().private_key.secret_bytes(), [1u8; 32]);
