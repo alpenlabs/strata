@@ -16,7 +16,7 @@ use reth_rpc_eth_api::{
 use reth_rpc_eth_types::{utils::recover_raw_transaction, EthApiError};
 use reth_transaction_pool::{PoolTransaction, TransactionOrigin, TransactionPool};
 
-use crate::{SequencerClient, StrataEthApi, StrataNodeCore};
+use crate::{EOAMode, SequencerClient, StrataEthApi, StrataNodeCore};
 
 impl<N> EthTransactions for StrataEthApi<N>
 where
@@ -38,12 +38,16 @@ where
         let pool_transaction = <Self::Pool as TransactionPool>::Transaction::from_pooled(recovered);
 
         // Check if EOA disabled and if so the sender is in the allowed list
-        if !self.inner.enable_eoa
-            && sender
-                .map(|x| self.inner.allowed_eoa_addrs.contains(&x))
-                .unwrap_or(false)
-        {
-            return Err(EthApiError::Unsupported("EOA txs are not allowed").into());
+        match &self.inner.eoa_mode {
+            EOAMode::Enabled => {}
+            EOAMode::Disabled { allowed_eoa_addrs } => {
+                if sender
+                    .map(|x| allowed_eoa_addrs.contains(&x))
+                    .unwrap_or(false)
+                {
+                    return Err(EthApiError::Unsupported("EOA txs are not allowed").into());
+                }
+            }
         }
 
         // On Strata, transactions are forwarded directly to the sequencer to be included in

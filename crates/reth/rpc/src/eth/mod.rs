@@ -36,9 +36,8 @@ use reth_tasks::{
     TaskSpawner,
 };
 use reth_transaction_pool::TransactionPool;
-use revm_primitives::Address;
 
-use crate::SequencerClient;
+use crate::{EOAMode, SequencerClient};
 
 /// Adapter for [`EthApiInner`], which holds all the data required to serve core `eth_` API.
 pub type EthApiNodeBackend<N> = EthApiInner<
@@ -269,10 +268,8 @@ struct StrataEthApiInner<N: StrataNodeCore> {
     /// Sequencer client, configured to forward submitted transactions to sequencer of given OP
     /// network.
     sequencer_client: Option<SequencerClient>,
-    /// Flag to reject EOA txs or not. Only bundler related txs will be accepted to mempool
-    enable_eoa: bool,
-    /// Allowed EOA addresses if `enable_eoa` is false.
-    allowed_eoa_addrs: Vec<Address>,
+    /// Whether EOA should be enabled or not.
+    eoa_mode: EOAMode,
 }
 
 #[derive(Default)]
@@ -280,10 +277,8 @@ pub struct StrataEthApiBuilder {
     /// Sequencer client, configured to forward submitted transactions to sequencer of given OP
     /// network.
     sequencer_client: Option<SequencerClient>,
-    /// To enable EOA txs or not. If set to false, only bundler EOA txs will be accepted.
-    enable_eoa: bool,
-    /// Allowed EOA addresses if `enable_eoa` is false.
-    allowed_eoa_addrs: Vec<Address>,
+    /// Whether EOA should be enabled or not.
+    eoa_mode: EOAMode,
 }
 
 impl StrataEthApiBuilder {
@@ -291,8 +286,9 @@ impl StrataEthApiBuilder {
     pub const fn new() -> Self {
         Self {
             sequencer_client: None,
-            enable_eoa: false,
-            allowed_eoa_addrs: Vec::new(),
+            eoa_mode: EOAMode::Disabled {
+                allowed_eoa_addrs: Vec::new(),
+            },
         }
     }
 
@@ -302,16 +298,9 @@ impl StrataEthApiBuilder {
         self
     }
 
-    /// With `enable_eoa` set to given value.
-    pub fn with_eoa_enabled(mut self, enabled: bool) -> Self {
-        self.enable_eoa = enabled;
-        self
-    }
-
-    /// With allowed EOA addrs as `Vec<Address>`.
-    pub fn with_allowed_eoa_addrs(mut self, allowed_addrs: Vec<Address>) -> Self {
-        // TODO: perhaps need to allow this only if `enable_eoa` is false.
-        self.allowed_eoa_addrs = allowed_addrs;
+    /// With [`EOAMode`].
+    pub fn with_eoa_mode(mut self, eoa_mode: EOAMode) -> Self {
+        self.eoa_mode = eoa_mode;
         self
     }
 }
@@ -353,8 +342,7 @@ impl StrataEthApiBuilder {
             inner: Arc::new(StrataEthApiInner {
                 eth_api,
                 sequencer_client: self.sequencer_client,
-                enable_eoa: self.enable_eoa,
-                allowed_eoa_addrs: self.allowed_eoa_addrs,
+                eoa_mode: self.eoa_mode,
             }),
         }
     }
