@@ -22,12 +22,13 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
     event_submitter: &impl EventSubmitter,
 ) -> anyhow::Result<()> {
     let sync_evs = match event {
-        L1Event::RevertTo(revert_height) => {
+        L1Event::RevertTo(block) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
-            ctx.l1_manager.revert_to_height_async(revert_height).await?;
-            debug!(%revert_height, "reverted l1db");
-            vec![SyncEvent::L1Revert(revert_height)]
+            let height = block.height();
+            ctx.l1_manager.revert_to_height_async(height).await?;
+            debug!(%height, "reverted L1 block database");
+            vec![SyncEvent::L1Revert(block)]
         }
 
         L1Event::BlockData(blockdata, epoch) => handle_blockdata(ctx, blockdata, epoch).await?,

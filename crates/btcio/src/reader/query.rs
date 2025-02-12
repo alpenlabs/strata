@@ -12,7 +12,7 @@ use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
     messages::{BlockData, L1Event, RelevantTxEntry},
 };
-use strata_primitives::{block_credential::CredRule, params::Params};
+use strata_primitives::{block_credential::CredRule, l1::L1BlockCommitment, params::Params};
 use strata_state::{
     l1::{
         get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
@@ -92,10 +92,10 @@ fn calculate_target_next_block(
 }
 
 /// Inner function that actually does the reading task.
-async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
+async fn do_reader_task<R: ReaderRpc>(
     ctx: ReaderContext<R>,
     target_next_block: u64,
-    event_submitter: &E,
+    event_submitter: &impl EventSubmitter,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -139,7 +139,7 @@ async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
 
 /// Handles errors encountered during polling.
 fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdate>) {
-    warn!(err = %err, "failed to poll Bitcoin client");
+    warn!(%err, "failed to poll Bitcoin client");
     status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
 
     if let Some(reqwest_err) = err.downcast_ref::<reqwest::Error>() {
@@ -150,6 +150,35 @@ fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdat
             panic!("btcio: couldn't build the L1 client");
         }
     }
+}
+
+/// Reverts the reader state to the height where the last checkpoint is finalized.
+async fn handle_new_filter_rule<R: ReaderRpc>(
+    ctx: &ReaderContext<R>,
+    state: &mut ReaderState,
+) -> anyhow::Result<()> {
+    // FIXME this is super wrong but it doesn't actually matter, we always use
+    // the same filter rule for now so we never have to reverify stuff, this
+    // will be reworked more later
+
+    /*    // Get the L1 height corresponding to the new epoch
+        let last_checkpt_height = ctx
+            .status_channel
+            .get_last_checkpoint()
+            .expect("got epoch change without checkpoint finalized")
+            .height;
+
+        // Now, we need to revert to the point before the last checkpoint height.
+        state.rollback_to_height(last_checkpt_height);
+
+        // Send L1 revert so that the recent txs can be appropriately re-filtered
+        warn!(%last_checkpt_height, "reverting back to last checkpoint height because of reasons?");
+        let revert_ev = L1Event::RevertTo(last_checkpt_height);
+        if ctx.event_tx.send(revert_ev).await.is_err() {
+            warn!("unable to submit L1 reorg event, did persistence task exit?");
+        }
+    */
+    Ok(())
 }
 
 /// Checks for epoch changes and any L1 reverts necessary. Internally updates reader's state.
@@ -175,17 +204,18 @@ fn check_epoch_change<R: ReaderRpc>(
     if new_config != curr_filter_config {
         state.set_filter_config(new_config.clone());
 
-        let last_checkpt_height = ctx
+        let last_ckpt = ctx
             .status_channel
             .get_last_checkpoint()
-            .expect("got epoch change without checkpoint finalized")
-            .height;
+            .expect("got epoch change without checkpoint finalized");
+
+        let last_ckpt_block = last_ckpt.batch_info.l1_range.1;
 
         // Now, we need to revert to the point before the last checkpoint height.
-        state.rollback_to_height(last_checkpt_height);
+        state.rollback_to_height(last_ckpt_block.height());
 
         // Create revert event
-        Ok(Some(L1Event::RevertTo(last_checkpt_height)))
+        Ok(Some(L1Event::RevertTo(last_ckpt_block)))
     } else {
         Ok(None)
     }
@@ -263,9 +293,11 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
     if let Some((pivot_height, pivot_blkid)) = find_pivot_block(ctx.client.as_ref(), state).await? {
         if pivot_height < state.best_block_idx() {
             info!(%pivot_height, %pivot_blkid, "found apparent reorg");
+            let block = L1BlockCommitment::new(pivot_height, L1BlockId::from(pivot_blkid));
             state.rollback_to_height(pivot_height);
-            let revert_ev = L1Event::RevertTo(pivot_height);
+
             // Return with the revert event immediately
+            let revert_ev = L1Event::RevertTo(block);
             return Ok(vec![revert_ev]);
         }
     } else {

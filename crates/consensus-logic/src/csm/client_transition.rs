@@ -5,7 +5,7 @@ use std::cmp::min;
 
 use bitcoin::block::Header;
 use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
-use strata_primitives::prelude::*;
+use strata_primitives::{l1::L1BlockCommitment, prelude::*};
 use strata_state::{
     batch::{BatchInfo, Checkpoint, L1CommittedCheckpoint},
     block::{self, L2BlockBundle},
@@ -74,6 +74,8 @@ pub fn process_event(
 ) -> Result<(), Error> {
     match ev {
         SyncEvent::L1Block(height, l1blkid) => {
+            let block = L1BlockCommitment::new(*height, *l1blkid);
+
             // If the block is before the horizon we don't care about it.
             if *height < params.rollup().horizon_l1_height {
                 #[cfg(test)]
@@ -114,7 +116,7 @@ pub fn process_event(
             }
 
             if *height == next_exp_height {
-                state.accept_l1_block(*l1blkid);
+                state.accept_l1_block(block);
             } else {
                 #[cfg(test)]
                 eprintln!("not sure what to do here h={height} exp={next_exp_height}");
@@ -169,17 +171,18 @@ pub fn process_event(
             }
         }
 
-        SyncEvent::L1Revert(to_height) => {
+        SyncEvent::L1Revert(block) => {
             // TODO not sure why this was here
             //let l1_db = database.l1_db();
 
-            let buried = state.state().l1_view().buried_l1_height();
+            /*let buried = state.state().l1_view().buried_l1_height();
             if *to_height < buried {
                 error!(%to_height, %buried, "got L1 revert below buried height");
                 return Err(Error::ReorgTooDeep(*to_height, buried));
-            }
+            }*/
 
-            state.rollback_l1_blocks(*to_height);
+            // TODO move this logic out into this function
+            state.rollback_l1_blocks(*block);
         }
 
         SyncEvent::L1DABatch(height, checkpoints) => {

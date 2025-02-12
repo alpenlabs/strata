@@ -4,6 +4,7 @@ use arbitrary::Arbitrary;
 use async_trait::async_trait;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use strata_primitives::l1::L1BlockCommitment;
 
 use crate::{
     batch::L1CommittedCheckpoint,
@@ -19,7 +20,7 @@ pub enum SyncEvent {
     L1Block(u64, L1BlockId),
 
     /// Revert to a recent-ish L1 block.
-    L1Revert(u64),
+    L1Revert(L1BlockCommitment),
 
     /// New checkpoint posted to L1 in a DA batch at given height.
     // FIXME what does this data mean?
@@ -33,7 +34,7 @@ impl fmt::Display for SyncEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::L1Block(h, id) => f.write_fmt(format_args!("l1block:{id}@{h}")),
-            Self::L1Revert(h) => f.write_fmt(format_args!("l1revert:{h}")),
+            Self::L1Revert(h) => f.write_fmt(format_args!("l1revert:{h:?}")),
             // TODO implement this when we determine wwhat useful information we can take from here
             Self::L1DABatch(h, _ckpts) => f.write_fmt(format_args!("l1da:<$data>@{h}")),
             Self::L1BlockGenesis(h, _st) => f.write_fmt(format_args!("l1genesis:{h}")),

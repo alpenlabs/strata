@@ -1,5 +1,6 @@
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::l1::L1BlockCommitment;
 use strata_state::{
     l1::HeaderVerificationState,
     tx::{DaCommitment, DepositRequestInfo, ProtocolOperation},
@@ -13,7 +14,7 @@ pub enum L1Event {
     BlockData(BlockData, u64),
 
     /// Revert to the provided block height
-    RevertTo(u64),
+    RevertTo(L1BlockCommitment),
 
     /// HeaderVerificationState for the block after genesis
     ///

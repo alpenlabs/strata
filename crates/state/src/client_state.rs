@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, epoch::EpochCommitment};
+use strata_primitives::{buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment};
 use tracing::*;
 
 use crate::{
@@ -101,7 +101,7 @@ impl ClientState {
     }
 
     pub fn most_recent_l1_block(&self) -> Option<&L1BlockId> {
-        self.local_l1_view.local_unaccepted_blocks.last()
+        self.local_l1_view.tip_blkid()
     }
 
     pub fn next_exp_l1_block(&self) -> u64 {
@@ -178,12 +178,8 @@ impl SyncState {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct LocalL1State {
-    /// Local sequence of blocks that should reorg blocks in the chainstate.
-    ///
-    /// This MUST be ordered by block height, so the first block here is the
-    /// buried height +1.
-    // TODO this needs more tracking to make it remember where we are properly
-    pub(super) local_unaccepted_blocks: Vec<L1BlockId>,
+    /// Our current tip L1 block.
+    pub(super) tip_l1_block: L1BlockCommitment,
 
     /// Next L1 block height we expect to receive
     pub(super) next_expected_block: u64,
@@ -210,7 +206,8 @@ impl LocalL1State {
         }
 
         Self {
-            local_unaccepted_blocks: Vec::new(),
+            // FIXME special casing here
+            tip_l1_block: L1BlockCommitment::new(0, L1BlockId::from(Buf32::zero())),
             next_expected_block,
             verified_checkpoints: Vec::new(),
             last_finalized_checkpoint: None,
@@ -218,39 +215,17 @@ impl LocalL1State {
         }
     }
 
-    /// Returns a slice of the unaccepted blocks.
-    pub fn local_unaccepted_blocks(&self) -> &[L1BlockId] {
-        &self.local_unaccepted_blocks
-    }
-
     /// Returns the height of the next block we expected to receive.
     pub fn next_expected_block(&self) -> u64 {
         self.next_expected_block
     }
 
-    /// Returned the height of the buried L1 block, which we can't reorg to.
-    pub fn buried_l1_height(&self) -> u64 {
-        self.next_expected_block - self.local_unaccepted_blocks.len() as u64
-    }
-
-    /// Returns an iterator over the unaccepted L2 blocks, from the lowest up.
-    pub fn unacc_blocks_iter(&self) -> impl Iterator<Item = (u64, &L1BlockId)> {
-        self.local_unaccepted_blocks()
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (self.buried_l1_height() + i as u64, b))
-    }
-
     pub fn tip_height(&self) -> u64 {
-        if self.next_expected_block == 0 {
-            panic!("clientstate: started without L1 genesis block somehow");
-        }
-
-        self.next_expected_block - 1
+        self.tip_l1_block.height()
     }
 
     pub fn tip_blkid(&self) -> Option<&L1BlockId> {
-        self.local_unaccepted_blocks().last()
+        Some(self.tip_l1_block.blkid())
     }
 
     pub fn last_finalized_checkpoint(&self) -> Option<&L1Checkpoint> {
@@ -386,16 +361,15 @@ impl ClientStateMut {
     /// # Panics
     ///
     /// If the new height is below the buried height.
-    pub fn rollback_l1_blocks(&mut self, height: u64) {
+    pub fn rollback_l1_blocks(&mut self, new_block: L1BlockCommitment) {
         let l1v = self.state.l1_view_mut();
-        let buried_height = l1v.buried_l1_height();
+        let height = new_block.height();
 
-        if height < buried_height {
+        /*if height < buried_height {
             error!(%height, %buried_height, "unable to roll back past buried height");
             panic!("clientstate: rollback below buried height");
-        }
+        }*/
 
-        let new_unacc_len = (height - buried_height) as usize;
         let l1_vs = l1v.tip_verification_state();
         if let Some(l1_vs) = l1_vs {
             if height > l1_vs.last_verified_block_num as u64 {
@@ -404,11 +378,9 @@ impl ClientStateMut {
 
             // TODO: handle other things
             let mut rollbacked_l1_vs = l1_vs.clone();
-            rollbacked_l1_vs.last_verified_block_num = height as u32;
-            rollbacked_l1_vs.last_verified_block_hash = l1v.local_unaccepted_blocks[new_unacc_len];
+            rollbacked_l1_vs.last_verified_block_num = new_block.height() as u32;
+            rollbacked_l1_vs.last_verified_block_hash = (*new_block.blkid()).into();
         }
-        l1v.local_unaccepted_blocks.truncate(new_unacc_len);
-        l1v.next_expected_block = height + 1;
 
         // Keep pending checkpoints whose l1 height is less than or equal to rollback height
         l1v.verified_checkpoints
@@ -416,17 +388,20 @@ impl ClientStateMut {
     }
 
     // TODO convert to L1BlockCommitment?
-    pub fn accept_l1_block(&mut self, l1blkid: L1BlockId) {
-        debug!(?l1blkid, "received AcceptL1Block");
+    pub fn accept_l1_block(&mut self, l1block: L1BlockCommitment) {
+        debug!(?l1block, "received AcceptL1Block");
         // TODO make this also do something
         let l1v = self.state.l1_view_mut();
-        l1v.local_unaccepted_blocks.push(l1blkid);
-        l1v.next_expected_block += 1;
+        l1v.tip_l1_block = l1block;
+        l1v.next_expected_block += 1; // TODO sanity check
     }
 
     /// Updates the buried L1 block.
+    // TODO remove this function
     pub fn update_buried(&mut self, new_idx: u64) {
-        let l1v = self.state.l1_view_mut();
+        debug!("call to update_buried, we don't do anything here anymore");
+
+        /*let l1v = self.state.l1_view_mut();
 
         // Check that it's increasing.
         let old_idx = l1v.buried_l1_height();
@@ -445,7 +420,7 @@ impl ClientStateMut {
         let _blocks = l1v
             .local_unaccepted_blocks
             .drain(..diff)
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>();*/
 
         // TODO merge these blocks into the L1 MMR in the client state if
         // we haven't already

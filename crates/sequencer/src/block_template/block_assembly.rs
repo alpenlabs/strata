@@ -106,64 +106,39 @@ fn prepare_l1_segment(
     max_l1_entries: usize,
     _params: &RollupParams,
 ) -> Result<L1Segment, Error> {
-    let unacc_blocks = local_l1_state.unacc_blocks_iter().collect::<Vec<_>>();
-    trace!(unacc_blocks = %unacc_blocks.len(), "figuring out which blocks to include in L1 segment");
+    // We aren't going to reorg, so we'll include blocks right up to the tip.
+    let target_height = local_l1_state.tip_height();
+    trace!(%target_height, "figuring out which blocks to include in L1 segment");
 
     // Check to see if there's actually no blocks in the queue.  In that case we can just give
     // everything we know about.
     let maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
-    if maturation_queue_size == 0 {
-        let mut payloads = Vec::new();
-        for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
-            let rec = load_header_record(*h, l1man)?;
-            let deposit_update_tx = fetch_deposit_update_txs(*h, l1man)?;
-            payloads.push(
-                L1HeaderPayload::new(*h, rec)
-                    .with_deposit_update_txs(deposit_update_tx)
-                    .build(),
-            );
+    let cur_state_height = prev_chstate.l1_view().tip_height();
+
+    // This is much simpler than it was before because I'm removing the ability
+    // to handle reorgs properly.  This is fine, we'll readd it later when we
+    // make the L1 scan proof stuff more sophisticated.
+    let mut payloads = Vec::new();
+    for off in 0..max_l1_entries {
+        let height = cur_state_height + off as u64 + 1; // the first new block to be added on
+
+        // If we get to the tip then we should break here.
+        if height > target_height {
+            break;
         }
 
-        debug!(n = %payloads.len(), "filling in empty queue with fresh L1 payloads");
-        return Ok(L1Segment::new(payloads));
-    }
+        let Some(rec) = try_fetch_header_record(height, l1man)? else {
+            // If we are missing a record, then something is weird, but it would
+            // still be safe to abort.
+            warn!(%height, "missing expected L1 block during assembly");
+            break;
+        };
 
-    let maturing_blocks = prev_chstate
-        .l1_view()
-        .maturation_queue()
-        .iter_entries()
-        .map(|(h, e)| (h, e.blkid()))
-        .collect::<Vec<_>>();
+        let deposits = fetch_deposit_update_txs(height, l1man)?;
 
-    // FIXME this is not comparing the proof of work, it's just looking at the chain lengths, this
-    // is almost the same thing, but might break in the case of a difficulty adjustment taking place
-    // at a reorg exactly on the transition block
-    trace!("computing pivot");
-
-    let Some((pivot_h, _pivot_id)) = find_pivot_block_height(&unacc_blocks, &maturing_blocks)
-    else {
-        // Then we're really screwed.
-        error!("can't determine shared block to insert new maturing blocks");
-        return Err(Error::BlockAssemblyL1SegmentUndetermined);
-    };
-
-    // Compute the offset in the unaccepted list for the blocks we want to use.
-    let unacc_fresh_offset = (pivot_h - local_l1_state.buried_l1_height()) as usize + 1;
-
-    let fresh_blocks = &unacc_blocks
-        .iter()
-        .skip(unacc_fresh_offset)
-        .take(max_l1_entries)
-        .collect::<Vec<_>>();
-
-    // Load the blocks.
-    let mut payloads = Vec::new();
-    for (h, _b) in fresh_blocks {
-        let rec = load_header_record(*h, l1man)?;
-        let deposit_update_tx = fetch_deposit_update_txs(*h, l1man)?;
         payloads.push(
-            L1HeaderPayload::new(*h, rec)
-                .with_deposit_update_txs(deposit_update_tx)
+            L1HeaderPayload::new(height, rec)
+                .with_deposit_update_txs(deposits)
                 .build(),
         );
     }
@@ -175,15 +150,23 @@ fn prepare_l1_segment(
     Ok(L1Segment::new(payloads))
 }
 
-fn load_header_record(h: u64, l1man: &L1BlockManager) -> Result<L1HeaderRecord, Error> {
-    let mf = l1man
-        .get_block_manifest(h)?
-        .ok_or(Error::MissingL1BlockHeight(h))?;
+fn fetch_header_record(h: u64, l1man: &L1BlockManager) -> Result<L1HeaderRecord, Error> {
+    try_fetch_header_record(h, l1man)?.ok_or(Error::MissingL1BlockHeight(h))
+}
+
+fn try_fetch_header_record(
+    h: u64,
+    l1man: &L1BlockManager,
+) -> Result<Option<L1HeaderRecord>, Error> {
+    let Some(mf) = l1man.get_block_manifest(h)? else {
+        return Ok(None);
+    };
+
     // TODO need to include tx root proof we can verify
-    Ok(L1HeaderRecord::create_from_serialized_header(
+    Ok(Some(L1HeaderRecord::create_from_serialized_header(
         mf.header().to_vec(),
         mf.txs_root(),
-    ))
+    )))
 }
 
 fn fetch_deposit_update_txs(h: u64, l1man: &L1BlockManager) -> Result<Vec<DepositUpdateTx>, Error> {
