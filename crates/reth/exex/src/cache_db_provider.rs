@@ -95,7 +95,7 @@ impl DatabaseRef for CacheDBProvider {
         let bytecode = self
             .provider
             .bytecode_by_hash(&code_hash)?
-            .map(|code| Bytecode::new_raw(code.bytes()))
+            .map(|code| Bytecode::new_raw(code.original_bytes()))
             .ok_or_else(|| {
                 ProviderError::Database(DatabaseError::Other(format!(
                     "Bytecode for the given {:?} not found",
@@ -104,7 +104,9 @@ impl DatabaseRef for CacheDBProvider {
             })?;
 
         // Record the storage value to the state
-        self.bytecodes.borrow_mut().insert(bytecode.bytes().clone());
+        self.bytecodes
+            .borrow_mut()
+            .insert(bytecode.original_bytes().clone());
 
         Ok(bytecode)
     }
