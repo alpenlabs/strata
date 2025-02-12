@@ -158,8 +158,11 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         msg_polling_interval,
     };
 
+    let shared_exec_handler = Arc::new(exec_handler);
+    let exec_handler_clone = shared_exec_handler.clone();
+
     let task_manager = TaskManager {
-        exec_handler: Arc::new(exec_handler),
+        exec_handler: exec_handler_clone,
         broadcaster: l1_rpc_client,
         bridge_duty_db_ops,
         bridge_duty_idx_db_ops,
@@ -195,7 +198,16 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
 
     // Wait for all tasks to run
     // They are supposed to run indefinitely in most cases
-    tokio::try_join!(rpc_task, duty_task)?;
+    let result = tokio::try_join!(rpc_task, duty_task);
 
-    Ok(())
+    // Attempt to erase keypair from ExecHandler and ExecHandler.sig_manager
+    if let Some(mut handler) = Arc::into_inner(shared_exec_handler) {
+        handler.erase_keypair(); // Ensure keypair is erased before dropping
+        handler.sig_manager.erase_keypair();
+    }
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e.into()),
+    }
 }

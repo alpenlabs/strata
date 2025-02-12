@@ -111,6 +111,11 @@ where
         Ok(())
     }
 
+    /// Attempts to erase the secret within the keypair.
+    pub fn erase_keypair(&mut self) {
+        self.keypair.non_secure_erase();
+    }
+
     async fn broadcast_msg<S: BorshSerialize + Debug>(
         &self,
         scope: &Scope,
@@ -342,5 +347,47 @@ where
             self.own_index,
             self.keypair.public_key()
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::sync::Arc;
+
+    use bitcoin::{bip32::Xpriv, key::Keypair, secp256k1::SECP256K1, Network};
+
+    #[test]
+    fn test_erase_keypair() {
+        let keys = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
+        let keypair = keys.to_keypair(SECP256K1);
+
+        // Create a wrapper struct that will set a flag when dropped
+        struct TestWrapper {
+            keypair: Keypair,
+        }
+
+        let shared_wrapper = Arc::new(TestWrapper { keypair });
+        let wrapper_clone = shared_wrapper.clone();
+
+        impl TestWrapper {
+            fn erase(&mut self) {
+                self.keypair.non_secure_erase();
+            }
+        }
+
+        fn bar(wrapper_clone: Arc<TestWrapper>) {
+            println!("got key {}", wrapper_clone.keypair.display_secret());
+        }
+
+        fn foo(wrapper: Arc<TestWrapper>) {
+            bar(wrapper.clone());
+        }
+
+        foo(wrapper_clone);
+        if let Some(mut wrapper) = Arc::into_inner(shared_wrapper) {
+            wrapper.erase();
+            assert_eq!(wrapper.keypair.secret_key().secret_bytes(), [1u8; 32]);
+        }
     }
 }
