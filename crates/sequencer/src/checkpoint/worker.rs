@@ -34,7 +34,7 @@ use crate::errors::Error;
 /// pending proof when previous proven checkpoint is finalized.
 pub fn checkpoint_worker(
     shutdown: ShutdownGuard,
-    status_ch: Arc<StatusChannel>,
+    status_ch: StatusChannel,
     params: Arc<Params>,
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
