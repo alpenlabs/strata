@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment};
+use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment, prelude::*};
 use strata_state::chain_state::Chainstate;
 
 /// Describes FCM state.
@@ -19,6 +19,18 @@ pub struct ChainSyncStatus {
 }
 
 impl ChainSyncStatus {
+    pub fn tip_slot(&self) -> u64 {
+        self.tip.slot()
+    }
+
+    pub fn tip_blkid(&self) -> &L2BlockId {
+        self.tip.blkid()
+    }
+
+    pub fn finalized_blkid(&self) -> &L2BlockId {
+        self.finalized_epoch.last_blkid()
+    }
+
     pub fn cur_epoch(&self) -> u64 {
         self.prev_epoch.epoch() + 1
     }

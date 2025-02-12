@@ -75,7 +75,13 @@ impl StatusChannel {
     // Receiver methods
 
     /// Gets the latest [`LocalL1State`].
+    #[deprecated(note = "use `.get_csm_l1_view()`")]
     pub fn l1_view(&self) -> LocalL1State {
+        self.receiver.cl.borrow().l1_view().clone()
+    }
+
+    /// Gets the latest [`LocalL1State`].
+    pub fn get_csm_l1_view(&self) -> LocalL1State {
         self.receiver.cl.borrow().l1_view().clone()
     }
 
@@ -90,12 +96,18 @@ impl StatusChannel {
     }
 
     /// Gets the latest [`SyncState`].
+    #[deprecated(note = "use `.get_cur_sync_state()`")]
     pub fn sync_state(&self) -> Option<SyncState> {
         self.receiver.cl.borrow().sync().cloned()
     }
 
+    /// Gets the latest [`SyncState`].
+    pub fn get_cur_sync_state(&self) -> Option<SyncState> {
+        self.receiver.cl.borrow().sync().cloned()
+    }
+
     /// Returns a clone of the most recent tip block's chainstate, if present.
-    pub fn cur_tip_chainstate(&self) -> Option<Arc<Chainstate>> {
+    pub fn get_cur_tip_chainstate(&self) -> Option<Arc<Chainstate>> {
         self.receiver
             .chs
             .borrow()
@@ -105,23 +117,29 @@ impl StatusChannel {
 
     /// Gets the latest operator table.
     pub fn cur_tip_operator_table(&self) -> Option<OperatorTable> {
-        self.cur_tip_chainstate()
+        self.get_cur_tip_chainstate()
             .map(|chs| chs.operator_table().clone())
     }
 
     /// Gets the latest deposits table.
     pub fn cur_tip_deposits_table(&self) -> Option<DepositsTable> {
-        self.cur_tip_chainstate()
+        self.get_cur_tip_chainstate()
             .map(|chs| chs.deposits_table().clone())
     }
 
     /// Gets the latest [`L1Status`].
+    #[deprecated(note = "use `.get_l1_status()`")]
     pub fn l1_status(&self) -> L1Status {
         self.receiver.l1.borrow().clone()
     }
 
+    /// Gets the latest [`L1Status`].
+    pub fn get_l1_status(&self) -> L1Status {
+        self.receiver.l1.borrow().clone()
+    }
+
     /// Gets the current chain tip epoch, if present.
-    pub fn cur_chain_epoch(&self) -> Option<u64> {
+    pub fn get_cur_chain_epoch(&self) -> Option<u64> {
         self.receiver
             .chs
             .borrow()
@@ -129,14 +147,32 @@ impl StatusChannel {
             .map(|ch| ch.cur_epoch())
     }
 
-    #[deprecated(note = "use `.cur_tip_chainstate()`")]
+    #[deprecated(note = "use `.get_cur_tip_chainstate()`")]
     pub fn chain_state(&self) -> Option<Chainstate> {
-        self.cur_tip_chainstate().map(|chs| chs.as_ref().clone())
+        self.get_cur_tip_chainstate()
+            .map(|chs| chs.as_ref().clone())
     }
 
+    #[deprecated(note = "use `.cur_client_state()`")]
     pub fn client_state(&self) -> ClientState {
         self.receiver.cl.borrow().clone()
     }
+
+    pub fn get_cur_client_state(&self) -> ClientState {
+        self.receiver.cl.borrow().clone()
+    }
+
+    /// Gets the chain sync status, which is regularly updated by the FCM
+    /// whenever the tip changes, if set.
+    pub fn get_chain_sync_status(&self) -> Option<ChainSyncStatus> {
+        self.receiver
+            .chs
+            .borrow()
+            .as_ref()
+            .map(|chs| chs.new_status().clone())
+    }
+
+    // Subscription functions.
 
     /// Create a subscription to the client state watcher.
     pub fn subscribe_client_state(&self) -> watch::Receiver<ClientState> {

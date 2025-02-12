@@ -38,7 +38,10 @@ use strata_sequencer::{
         BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
     },
     checkpoint::{verify_checkpoint_sig, CheckpointHandle},
-    duty::types::{Duty, DutyEntry, DutyTracker},
+    duty::{
+        tracker::DutyTracker,
+        types::{Duty, DutyEntry},
+    },
 };
 use strata_state::{
     batch::{Checkpoint, SignedCheckpoint},
@@ -96,6 +99,7 @@ impl StrataRpcImpl {
 
     /// Gets a clone of the current client state and fetches the chainstate that
     /// of the L2 block that it considers the tip state.
+    // TODO remove this RPC, we aren't supposed to be exposing this
     async fn get_cur_states(&self) -> Result<(ClientState, Option<Arc<Chainstate>>), Error> {
         let cs = self.get_client_state().await;
 
@@ -103,11 +107,12 @@ impl StrataRpcImpl {
             return Ok((cs, None));
         }
 
-        let chs = self.status_channel.chain_state().map(Arc::new);
+        let chs = self.status_channel.get_cur_tip_chainstate().clone();
 
         Ok((cs, chs))
     }
 
+    // TODO remove this RPC, we aren't supposed to be exposing this
     async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
         let client_state = self.status_channel.client_state();
 
@@ -200,8 +205,8 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_client_status(&self) -> RpcResult<RpcClientStatus> {
-        let sync_state = self.status_channel.sync_state();
-        let l1_view = self.status_channel.l1_view();
+        let css = self.status_channel.get_chain_sync_status();
+        let l1_view = self.status_channel.get_csm_l1_view();
 
         let last_l1 = l1_view.tip_blkid().cloned().unwrap_or_else(|| {
             // TODO figure out a better way to do this
@@ -210,25 +215,14 @@ impl StrataApiServer for StrataRpcImpl {
         });
 
         // Copy these out of the sync state, if they're there.
-        let (chain_tip_blkid, finalized_blkid) = sync_state
-            .map(|ss| (*ss.chain_tip_blkid(), *ss.finalized_blkid()))
+        let (chain_tip_slot, chain_tip_blkid, finalized_blkid) = css
+            .as_ref()
+            .map(|css| (css.tip_slot(), *css.tip_blkid(), *css.finalized_blkid()))
             .unwrap_or_default();
-
-        // FIXME make this load from cache, and put the data we actually want
-        // here in the client state
-        // FIXME error handling
-        let slot: u64 = self
-            .storage
-            .l2()
-            .get_block_data_async(&chain_tip_blkid)
-            .map_err(Error::Db)
-            .await?
-            .map(|b| b.header().blockidx())
-            .unwrap_or(u64::MAX);
 
         Ok(RpcClientStatus {
             chain_tip: *chain_tip_blkid.as_ref(),
-            chain_tip_slot: slot,
+            chain_tip_slot,
             finalized_blkid: *finalized_blkid.as_ref(),
             last_l1_block: *last_l1.as_ref(),
             buried_l1_height: l1_view.buried_l1_height(),
@@ -237,8 +231,11 @@ impl StrataApiServer for StrataRpcImpl {
 
     async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<RpcBlockHeader>> {
         // FIXME: sync state should have a block number
-        let sync_state = self.status_channel.sync_state();
-        let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
+        let css = self
+            .status_channel
+            .get_chain_sync_status()
+            .ok_or(Error::ClientNotStarted)?;
+        let tip_blkid = css.tip_blkid();
 
         let fetch_limit = self.sync_manager.params().run().l2_blocks_fetch_limit;
         if count > fetch_limit {
@@ -246,7 +243,7 @@ impl StrataApiServer for StrataRpcImpl {
         }
 
         let mut output = Vec::new();
-        let mut cur_blkid = tip_blkid;
+        let mut cur_blkid = *tip_blkid;
         while output.len() < count as usize {
             let l2_blk = self.fetch_l2_block_ok(&cur_blkid).await?;
             output.push(conv_blk_header_to_rpc(l2_blk.header()));
@@ -260,8 +257,11 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_headers_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<RpcBlockHeader>>> {
-        let sync_state = self.status_channel.sync_state();
-        let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
+        let css = self
+            .status_channel
+            .get_chain_sync_status()
+            .ok_or(Error::ClientNotStarted)?;
+        let tip_blkid = css.tip_blkid();
 
         // check the tip idx
         let tip_block = self.fetch_l2_block_ok(&tip_blkid).await?;
@@ -333,6 +333,7 @@ impl StrataApiServer for StrataRpcImpl {
         }
     }
 
+    // TODO rework this, at least to use new OL naming?
     async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
         let l2_blk_bundle = self.fetch_l2_block_ok(&blkid).await?;
 
@@ -374,12 +375,12 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn sync_status(&self) -> RpcResult<RpcSyncStatus> {
-        let sync_state = self.status_channel.sync_state();
-        Ok(sync_state
-            .map(|sync| RpcSyncStatus {
-                tip_height: sync.chain_tip_height(),
-                tip_block_id: *sync.chain_tip_blkid(),
-                finalized_block_id: *sync.finalized_blkid(),
+        let css = self.status_channel.get_chain_sync_status();
+        Ok(css
+            .map(|css| RpcSyncStatus {
+                tip_height: css.tip_slot(),
+                tip_block_id: *css.tip_blkid(),
+                finalized_block_id: *css.finalized_blkid(),
             })
             .ok_or(Error::ClientNotStarted)?)
     }
@@ -565,22 +566,28 @@ impl StrataApiServer for StrataRpcImpl {
         }
     }
 
-    async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {
-        let sync_state = self.status_channel.sync_state();
+    // TODO this logic should be moved into `SyncManager` or *something* that
+    // has easier access to the context about block status instead of
+    // implementing protocol-aware deliberation in the RPC method impl
+    async fn get_l2_block_status(&self, block_slot: u64) -> RpcResult<L2BlockStatus> {
+        let css = self
+            .status_channel
+            .get_chain_sync_status()
+            .ok_or(Error::BeforeGenesis)?;
         let l1_view = self.status_channel.l1_view();
+
         if let Some(last_checkpoint) = l1_view.last_finalized_checkpoint() {
-            if last_checkpoint.batch_info.includes_l2_block(block_height) {
+            if last_checkpoint.batch_info.includes_l2_block(block_slot) {
                 return Ok(L2BlockStatus::Finalized(last_checkpoint.height));
             }
         }
-        if let Some(l1_height) = l1_view.get_verified_l1_height(block_height) {
+
+        if let Some(l1_height) = l1_view.get_verified_l1_height(block_slot) {
             return Ok(L2BlockStatus::Verified(l1_height));
         }
 
-        if let Some(sync_status) = sync_state {
-            if block_height < sync_status.chain_tip_height() {
-                return Ok(L2BlockStatus::Confirmed);
-            }
+        if block_slot < css.tip_slot() {
+            return Ok(L2BlockStatus::Confirmed);
         }
 
         Ok(L2BlockStatus::Unknown)

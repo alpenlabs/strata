@@ -35,7 +35,7 @@ use strata_rpc_api::{
 use strata_sequencer::{
     block_template,
     checkpoint::{checkpoint_expiry_worker, checkpoint_worker, CheckpointHandle},
-    duty::{types::DutyTracker, worker as duty_worker},
+    duty::{tracker::DutyTracker, worker as duty_worker},
 };
 use strata_status::StatusChannel;
 use strata_storage::{
@@ -232,6 +232,7 @@ fn init_logging(rt: &Handle) {
 /// Shared low-level services that secondary services depend on.
 #[derive(Clone)]
 pub struct CoreContext {
+    pub runtime: Handle,
     pub database: Arc<CommonDb>,
     pub storage: Arc<NodeStorage>,
     pub pool: threadpool::ThreadPool,
@@ -316,16 +317,13 @@ fn start_core_tasks(
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
+    let runtime = executor.handle().clone();
+
     // init status tasks
     let status_channel = init_status_channel(storage.as_ref())?;
 
-    let engine = init_engine_controller(
-        config,
-        database.clone(),
-        params.as_ref(),
-        storage.l2().clone(),
-        executor.handle(),
-    )?;
+    let engine =
+        init_engine_controller(config, params.as_ref(), storage.as_ref(), executor.handle())?;
 
     // do startup checks
     do_startup_checks(
@@ -369,6 +367,7 @@ fn start_core_tasks(
     );
 
     Ok(CoreContext {
+        runtime,
         database,
         storage,
         pool,
@@ -392,6 +391,7 @@ fn start_sequencer_tasks(
     methods: &mut Methods,
 ) -> anyhow::Result<()> {
     let CoreContext {
+        runtime,
         database,
         storage,
         pool,
@@ -441,14 +441,17 @@ fn start_sequencer_tasks(
     let cupdate_rx = sync_manager.create_cstate_subscription();
     let t_storage = storage.clone();
     let t_checkpoint_handle = checkpoint_handle.clone();
+    let t_status_ch = status_channel.clone();
+    let t_rt = runtime.clone();
     let t_params = params.clone();
     executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
         duty_worker::duty_tracker_task(
             shutdown,
             duty_tracker,
-            cupdate_rx,
+            t_status_ch,
             t_storage,
             t_checkpoint_handle,
+            t_rt,
             t_params,
         )
         .map_err(Into::into)
@@ -466,15 +469,17 @@ fn start_sequencer_tasks(
         }
     }
 
-    let cupdate_rx = sync_manager.create_cstate_subscription();
+    // FIXME this moves values out of the CoreContext, do we want that?
+    let t_status_ch = status_channel.clone();
+    let t_rt = runtime.clone();
     executor.spawn_critical("checkpoint-tracker", |shutdown| {
         checkpoint_worker(
             shutdown,
-            cupdate_rx,
+            t_status_ch,
             params,
-            database,
             storage,
             checkpoint_handle,
+            t_rt,
         )
     });
 

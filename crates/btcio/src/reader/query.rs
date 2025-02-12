@@ -157,11 +157,10 @@ fn check_epoch_change<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
 ) -> anyhow::Result<Option<L1Event>> {
-    let new_epoch = ctx
-        .status_channel
-        .get_last_checkpoint()
-        .map(|ckpt| ckpt.batch_info.epoch())
-        .unwrap_or(0);
+    // FIXME something here might have gotten borked with the bookkeeping here
+    // in a rebase, let me (trey) know if there's something wrong here
+    let new_epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
+
     // TODO: check if new_epoch < current epoch. should panic if so?
     let curr_epoch = state.epoch();
 
@@ -229,7 +228,7 @@ async fn init_reader_state<R: ReaderRpc>(
 
     let params = ctx.params.clone();
     let filter_config = TxFilterConfig::derive_from(params.rollup())?;
-    let epoch = ctx.status_channel.cur_chain_epoch().unwrap_or(0);
+    let epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
     let state = ReaderState::new(
         real_cur_height + 1,
         lookback,
@@ -489,7 +488,7 @@ mod test {
             n_recent_blocks,
             recent_blocks,
             filter_config,
-            ctx.status_channel.cur_chain_epoch().unwrap(),
+            ctx.status_channel.get_cur_chain_epoch().unwrap(),
         )
     }
 

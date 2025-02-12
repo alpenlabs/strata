@@ -18,7 +18,7 @@ use crate::checkpoint::CheckpointHandle;
 pub fn duty_tracker_task(
     shutdown: ShutdownGuard,
     duty_tracker: Arc<RwLock<DutyTracker>>,
-    status_ch: Arc<StatusChannel>,
+    status_ch: StatusChannel,
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
     rt: Handle,
