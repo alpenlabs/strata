@@ -12,7 +12,7 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadIntent},
 };
 use strata_state::batch::{
-    BaseStateCommitment, BatchCheckpoint, BatchInfo, BatchTransition, CommitmentInfo,
+    BaseStateCommitment, BatchInfo, BatchTransition, Checkpoint, CommitmentInfo,
 };
 use zkaleido::Proof;
 
@@ -187,7 +187,7 @@ pub enum L1TxStatus {
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct CheckpointEntry {
     /// The batch checkpoint containing metadata, state transitions, and proof data.
-    pub checkpoint: BatchCheckpoint,
+    pub checkpoint: Checkpoint,
 
     /// Proving Status
     pub proving_status: CheckpointProvingStatus,
@@ -201,7 +201,7 @@ pub struct CheckpointEntry {
 
 impl CheckpointEntry {
     pub fn new(
-        checkpoint: BatchCheckpoint,
+        checkpoint: Checkpoint,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
         commitment: Option<CheckpointCommitment>,
@@ -214,7 +214,7 @@ impl CheckpointEntry {
         }
     }
 
-    pub fn into_batch_checkpoint(self) -> BatchCheckpoint {
+    pub fn into_batch_checkpoint(self) -> Checkpoint {
         self.checkpoint
     }
 
@@ -224,8 +224,7 @@ impl CheckpointEntry {
         transition: BatchTransition,
         base_state_commitment: BaseStateCommitment,
     ) -> Self {
-        let checkpoint =
-            BatchCheckpoint::new(info, transition, base_state_commitment, Proof::default());
+        let checkpoint = Checkpoint::new(info, transition, base_state_commitment, Proof::default());
         Self::new(
             checkpoint,
             CheckpointProvingStatus::PendingProof,
@@ -239,8 +238,8 @@ impl CheckpointEntry {
     }
 }
 
-impl From<CheckpointEntry> for BatchCheckpoint {
-    fn from(entry: CheckpointEntry) -> BatchCheckpoint {
+impl From<CheckpointEntry> for Checkpoint {
+    fn from(entry: CheckpointEntry) -> Checkpoint {
         entry.into_batch_checkpoint()
     }
 }

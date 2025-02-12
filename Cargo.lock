@@ -12917,6 +12917,7 @@ dependencies = [
  "musig2",
  "rand 0.8.5",
  "reqwest 0.12.12",
+ "secp256k1",
  "serde",
  "serde_json",
  "sha2 0.10.8",
@@ -13078,6 +13079,7 @@ name = "strata-consensus-logic"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bitcoin",
  "borsh",
  "futures",
@@ -13845,7 +13847,9 @@ dependencies = [
 name = "strata-state"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
+ "async-trait",
  "bitcoin",
  "borsh",
  "digest 0.10.7",

@@ -9,8 +9,13 @@ use strata_db::{errors::DbError, traits::BlockStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
 use strata_state::{
-    block::L2BlockBundle, block_validation::validate_block_segments, chain_state::Chainstate,
-    client_state::ClientState, prelude::*, state_op::StateCache, sync_event::SyncEvent,
+    block::L2BlockBundle,
+    block_validation::validate_block_segments,
+    chain_state::Chainstate,
+    client_state::ClientState,
+    prelude::*,
+    state_op::StateCache,
+    sync_event::{EventSubmitter, SyncEvent},
 };
 use strata_status::StatusChannel;
 use strata_storage::{L2BlockManager, NodeStorage};

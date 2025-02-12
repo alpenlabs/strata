@@ -3,7 +3,7 @@ use strata_l1tx::{
     messages::{DaEntry, L1TxMessages},
 };
 use strata_state::{
-    batch::SignedBatchCheckpoint,
+    batch::SignedCheckpoint,
     tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
 };
 
@@ -48,7 +48,7 @@ impl TxVisitor for ReaderTxVisitorImpl {
         self.deposit_requests.push(dr);
     }
 
-    fn visit_checkpoint(&mut self, chkpt: SignedBatchCheckpoint) {
+    fn visit_checkpoint(&mut self, chkpt: SignedCheckpoint) {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
@@ -77,7 +77,7 @@ mod test {
         l1::{payload::L1Payload, BitcoinAmount},
         params::Params,
     };
-    use strata_state::{batch::SignedBatchCheckpoint, tx::ProtocolOperation};
+    use strata_state::{batch::SignedCheckpoint, tx::ProtocolOperation};
     use strata_test_utils::{
         bitcoin::{
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
@@ -290,7 +290,7 @@ mod test {
         let num_envelopes = 1;
         let l1_payloads: Vec<_> = (0..num_envelopes)
             .map(|_| {
-                let signed_checkpoint: SignedBatchCheckpoint = ArbitraryGenerator::new().generate();
+                let signed_checkpoint: SignedCheckpoint = ArbitraryGenerator::new().generate();
                 L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
             })
             .collect();

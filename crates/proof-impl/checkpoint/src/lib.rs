@@ -3,7 +3,7 @@
 //! chain and that all L1-L2 transactions were processed.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{params::RollupParams, proof::RollupVerifyingKey};
+use strata_primitives::params::RollupParams;
 use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_proofimpl_l1_batch::L1BatchProofOutput;
 use strata_state::batch::{BatchTransition, CheckpointProofOutput};
@@ -94,11 +94,7 @@ pub fn process_checkpoint_proof_outer(
     l2_batch_vk: &[u32; 8],
 ) {
     let rollup_params: RollupParams = zkvm.read_serde();
-    let rollup_vk = match rollup_params.rollup_vk() {
-        RollupVerifyingKey::SP1VerifyingKey(sp1_vk) => sp1_vk,
-        RollupVerifyingKey::Risc0VerifyingKey(risc0_vk) => risc0_vk,
-        RollupVerifyingKey::NativeVerifyingKey(native_vk) => native_vk,
-    };
+    let vk = *rollup_params.rollup_vk().key();
 
     // verify l1 proof
     let l1_batch_pp = zkvm.read_verified_borsh(l1_batch_vk);
@@ -107,7 +103,7 @@ pub fn process_checkpoint_proof_outer(
     let (output, prev_checkpoint) = process_checkpoint_proof(&l1_batch_pp, &l2_batch_pp);
 
     if let Some(prev_receipt) = prev_checkpoint {
-        zkvm.verify_groth16_receipt(&prev_receipt, &rollup_vk.0);
+        zkvm.verify_groth16_receipt(&prev_receipt, &vk.0);
     }
 
     zkvm.commit_borsh(&output);

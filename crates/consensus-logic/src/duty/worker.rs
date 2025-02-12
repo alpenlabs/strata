@@ -17,7 +17,7 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadDest, PayloadIntent},
     params::Params,
 };
-use strata_state::{batch::SignedBatchCheckpoint, client_state::ClientState, prelude::*};
+use strata_state::{batch::SignedCheckpoint, client_state::ClientState, prelude::*};
 use strata_storage::{L2BlockManager, NodeStorage};
 use strata_tasks::{ShutdownGuard, TaskExecutor};
 use tokio::sync::broadcast;
@@ -416,7 +416,7 @@ fn perform_duty(
 
             let checkpoint_hash = checkpoint.hash();
             let signature = sign_with_identity_key(&checkpoint_hash, identity_key);
-            let signed_checkpoint = SignedBatchCheckpoint::new(checkpoint, signature);
+            let signed_checkpoint = SignedCheckpoint::new(checkpoint, signature);
 
             // serialize and send to l1 writer
             let payload_data =
