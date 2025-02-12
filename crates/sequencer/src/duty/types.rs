@@ -351,7 +351,7 @@ pub enum IdentityKey {
 ///
 /// This is really just a stub that we should replace
 /// with real cryptographic signatures and putting keys in the rollup params.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct IdentityData {
     /// Unique identifying info.
     pub ident: Identity,
@@ -363,18 +363,5 @@ impl IdentityData {
     /// Create new IdentityData from components.
     pub fn new(ident: Identity, key: IdentityKey) -> Self {
         Self { ident, key }
-    }
-}
-
-impl Zeroize for IdentityData {
-    fn zeroize(&mut self) {
-        self.key.zeroize(); // Zeroize the private key
-    }
-}
-
-impl Drop for IdentityData {
-    fn drop(&mut self) {
-        #[cfg(feature = "zeroize")]
-        self.zeroize();
     }
 }
