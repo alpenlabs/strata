@@ -76,14 +76,17 @@ fn main_inner(args: Args) -> Result<()> {
     );
 
     task_manager.start_signal_listeners();
-    task_manager.monitor(Some(Duration::from_millis(SHUTDOWN_TIMEOUT_MS)))?;
+    let result = task_manager.monitor(Some(Duration::from_millis(SHUTDOWN_TIMEOUT_MS)));
 
     // Zeroize idata
     if let Ok(mut idata) = Arc::try_unwrap(idata) {
         idata.zeroize();
     }
 
-    Ok(())
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e.into()),
+    }
 }
 
 fn get_config(args: Args) -> Result<Config> {
