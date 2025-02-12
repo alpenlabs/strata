@@ -4,7 +4,7 @@ use strata_rpc_api::StrataSequencerApiClient;
 use strata_rpc_types::HexBytes64;
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig},
-    duty::types::{BlockSigningDuty, CheckpointDuty, Duty, IdentityData},
+    duty::types::{BlockSigningDuty, CheckpointDuty, Duty, DutyId, IdentityData},
     utils::now_millis,
 };
 use thiserror::Error;
@@ -129,8 +129,8 @@ where
 
 async fn handle_commit_batch_duty<R>(
     rpc: Arc<R>,
-    duty_id: DutyId,
     duty: CheckpointDuty,
+    duty_id: DutyId,
     idata: IdentityData,
 ) -> Result<(), DutyExecError>
 where
