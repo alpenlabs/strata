@@ -415,6 +415,7 @@ impl ClientStateMut {
             rollbacked_l1_vs.last_verified_block_hash = l1v.local_unaccepted_blocks[new_unacc_len];
         }
         l1v.local_unaccepted_blocks.truncate(new_unacc_len);
+        l1v.next_expected_block = height + 1;
 
         // Keep pending checkpoints whose l1 height is less than or equal to rollback height
         l1v.verified_checkpoints
