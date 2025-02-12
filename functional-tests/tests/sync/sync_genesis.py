@@ -11,7 +11,7 @@ MAX_GENESIS_TRIES = 10
 @flexitest.register
 class SyncGenesisTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(testenv.BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
@@ -51,5 +51,5 @@ class SyncGenesisTest(testenv.StrataTester):
             tip_blkid = stat["chain_tip"]
             self.debug(f"cur tip slot {tip_slot} blkid {tip_blkid}")
             assert tip_slot >= last_slot, "cur slot went backwards"
-            assert tip_slot > last_slot, "seem to not be making progress"
+            assert tip_slot > last_slot, "seems not to be making progress"
             last_slot = tip_slot

@@ -21,6 +21,10 @@ client_poll_dur_ms = 200
 write_poll_dur_ms = 200
 fee_policy = "smart"
 reveal_amount = 100
+bundle_interval_ms = 1000
+
+[btcio.broadcaster]
+poll_interval_ms = 1000
 
 [sync]
 l1_follow_distance = 6

@@ -34,7 +34,7 @@ pub fn compute_block_hash(header: &Header) -> Buf32 {
 ///
 /// # Panics
 /// - If the `idx` is out of bounds for the block's transaction data.
-pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation) -> L1Tx {
+pub fn generate_l1_tx(block: &Block, idx: u32, proto_ops: Vec<ProtocolOperation>) -> L1Tx {
     assert!(
         (idx as usize) < block.txdata.len(),
         "utils: tx idx out of range of block txs"
@@ -43,7 +43,7 @@ pub fn generate_l1_tx(block: &Block, idx: u32, proto_op_data: ProtocolOperation)
 
     let proof = L1TxProof::generate(&block.txdata, idx);
 
-    L1Tx::new(proof, tx.clone().into(), proto_op_data)
+    L1Tx::new(proof, tx.clone().into(), proto_ops)
 }
 
 #[cfg(test)]

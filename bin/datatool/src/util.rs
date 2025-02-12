@@ -9,12 +9,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use alloy_genesis::Genesis;
+use alloy_primitives::B256;
 use bitcoin::{
     base58,
     bip32::{Xpriv, Xpub},
     Network,
 };
 use rand_core::CryptoRngCore;
+use reth_chainspec::ChainSpec;
 use strata_key_derivation::{
     operator::{convert_base_xpub_to_message_xpub, convert_base_xpub_to_wallet_xpub, OperatorKeys},
     sequencer::SequencerKeys,
@@ -43,6 +46,9 @@ const OPKEY_ENVVAR: &str = "STRATA_OP_KEY";
 ///
 /// Right now this is [`Network::Signet`].
 const DEFAULT_NETWORK: Network = Network::Signet;
+
+/// The default evm chainspec to use in params.
+const DEFAULT_CHAIN_SPEC: &str = include_str!("../../strata-reth/res/alpen-dev-chain.json");
 
 /// Resolves a [`Network`] from a string.
 pub(super) fn resolve_network(arg: Option<&str>) -> anyhow::Result<Network> {
@@ -76,10 +82,10 @@ pub(super) fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result
 /// # Errors
 ///
 /// Returns an error if the export process fails.
-fn export_elf(elf_path: &PathBuf) -> anyhow::Result<()> {
-    #[cfg(feature = "sp1")]
+fn export_elf(_elf_path: &PathBuf) -> anyhow::Result<()> {
+    #[cfg(feature = "sp1-builder")]
     {
-        strata_sp1_guest_builder::export_elf(elf_path)?
+        strata_sp1_guest_builder::export_elf(_elf_path)?
     }
 
     Ok(())
@@ -100,7 +106,7 @@ fn export_elf(elf_path: &PathBuf) -> anyhow::Result<()> {
 /// only one ZKVM can be supported at a time.
 fn resolve_rollup_vk() -> RollupVerifyingKey {
     // Use SP1 if only `sp1` feature is enabled
-    #[cfg(all(feature = "sp1", not(feature = "risc0")))]
+    #[cfg(all(feature = "sp1-builder", not(feature = "risc0-builder")))]
     {
         use strata_sp1_guest_builder::GUEST_CHECKPOINT_VK_HASH_STR;
         let vk_buf32: Buf32 = GUEST_CHECKPOINT_VK_HASH_STR
@@ -110,7 +116,7 @@ fn resolve_rollup_vk() -> RollupVerifyingKey {
     }
 
     // Use Risc0 if only `risc0` feature is enabled
-    #[cfg(all(feature = "risc0", not(feature = "sp1")))]
+    #[cfg(all(feature = "risc0-builder", not(feature = "sp1-builder")))]
     {
         use strata_risc0_guest_builder::GUEST_RISC0_CHECKPOINT_ID;
         let vk_u8: [u8; 32] = bytemuck::cast(GUEST_RISC0_CHECKPOINT_ID);
@@ -119,7 +125,7 @@ fn resolve_rollup_vk() -> RollupVerifyingKey {
     }
 
     // Panic if both `sp1` and `risc0` feature are enabled
-    #[cfg(all(feature = "risc0", feature = "sp1"))]
+    #[cfg(all(feature = "risc0-builder", feature = "sp1-builder"))]
     {
         panic!(
             "Conflicting ZKVM features: both 'sp1' and 'risc0' are enabled. \
@@ -128,7 +134,7 @@ fn resolve_rollup_vk() -> RollupVerifyingKey {
     }
 
     // If neither `risc0` nor `sp1` is enabled, use the Native verifying key
-    #[cfg(all(not(feature = "risc0"), not(feature = "sp1")))]
+    #[cfg(all(not(feature = "risc0-builder"), not(feature = "sp1-builder")))]
     {
         RollupVerifyingKey::NativeVerifyingKey(Buf32::zero())
     }
@@ -271,6 +277,13 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
     // Parse the checkpoint verification key.
     let rollup_vk = resolve_rollup_vk();
 
+    let chainspec_json = match cmd.chain_config {
+        Some(path) => fs::read_to_string(path)?,
+        None => DEFAULT_CHAIN_SPEC.into(),
+    };
+
+    let evm_genesis_info = get_genesis_block_info(&chainspec_json)?;
+
     let config = ParamsConfig {
         name: cmd.name.unwrap_or_else(|| "strata-testnet".to_string()),
         checkpoint_tag: cmd.checkpoint_tag.unwrap_or("strata-ckpt".to_string()),
@@ -286,6 +299,7 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         // TODO make a const
         deposit_sats,
         proof_timeout: cmd.proof_timeout,
+        evm_genesis_info,
     };
 
     let params = construct_params(config);
@@ -439,6 +453,8 @@ pub struct ParamsConfig {
     deposit_sats: u64,
     /// Timeout for proofs.
     proof_timeout: Option<u32>,
+    /// evm chain config json.
+    evm_genesis_info: BlockInfo,
 }
 
 /// Constructs the parameters for a Strata network.
@@ -472,15 +488,8 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
         horizon_l1_height: config.genesis_trigger / 2,
         genesis_l1_height: config.genesis_trigger,
         operator_config: strata_primitives::params::OperatorConfig::Static(opkeys),
-        // TODO make configurable
-        evm_genesis_block_hash:
-            "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
-                .parse()
-                .unwrap(),
-        evm_genesis_block_state_root:
-            "0x351714af72d74259f45cd7eab0b04527cd40e74836a45abcae50f92d919d988f"
-                .parse()
-                .unwrap(),
+        evm_genesis_block_hash: config.evm_genesis_info.blockhash.0.into(),
+        evm_genesis_block_state_root: config.evm_genesis_info.stateroot.0.into(),
         // TODO make configurable
         l1_reorg_safe_depth: 4,
         target_l2_batch_size: config.epoch_slots as u64,
@@ -546,4 +555,24 @@ fn parse_abbr_amt(s: &str) -> anyhow::Result<u64> {
 
     // Simple value.
     Ok(s.parse::<u64>()?)
+}
+
+struct BlockInfo {
+    blockhash: B256,
+    stateroot: B256,
+}
+
+fn get_genesis_block_info(genesis_json: &str) -> anyhow::Result<BlockInfo> {
+    let genesis: Genesis = serde_json::from_str(genesis_json)?;
+
+    let chain_spec = ChainSpec::from_genesis(genesis);
+
+    let genesis_header = chain_spec.genesis_header();
+    let genesis_stateroot = genesis_header.state_root;
+    let genesis_hash = chain_spec.genesis_hash();
+
+    Ok(BlockInfo {
+        blockhash: genesis_hash,
+        stateroot: genesis_stateroot,
+    })
 }

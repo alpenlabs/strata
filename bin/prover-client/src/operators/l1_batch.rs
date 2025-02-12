@@ -3,10 +3,7 @@ use std::sync::Arc;
 use bitcoin::{params::MAINNET, Block};
 use strata_btcio::{
     reader::query::get_verification_state,
-    rpc::{
-        traits::{ReaderRpc, WalletRpc},
-        BitcoinClient,
-    },
+    rpc::{traits::ReaderRpc, BitcoinClient},
 };
 use strata_primitives::{
     params::RollupParams,
@@ -49,14 +46,11 @@ impl L1BatchOperator {
     }
 
     async fn get_block_height(&self, block_id: L1BlockId) -> Result<u64, ProvingTaskError> {
-        let block = self.get_block(block_id).await?;
-
         let block_height = self
             .btc_client
-            .get_transaction(&block.coinbase().expect("expect coinbase tx").compute_txid())
+            .get_block_height(&block_id.into())
             .await
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
-            .block_height();
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
         Ok(block_height)
     }

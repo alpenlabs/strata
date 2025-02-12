@@ -1,4 +1,5 @@
 import os
+import shutil
 from typing import Optional, TypedDict
 
 import flexitest
@@ -284,8 +285,25 @@ class RethFactory(flexitest.Factory):
             w3.middleware_onion.add(web3.middleware.SignAndSendRawMiddlewareBuilder.build(account))
             return w3
 
+        def snapshot_dir_path(idx: int):
+            return os.path.join(ctx.envdd_path, f"reth.{id}.{idx}")
+
+        def _snapshot_datadir(idx: int):
+            snapshot_dir = snapshot_dir_path(idx)
+            os.makedirs(snapshot_dir, exist_ok=True)
+            shutil.copytree(datadir, snapshot_dir, dirs_exist_ok=True)
+
+        def _restore_snapshot(idx: int):
+            assert not svc.is_started(), "Should call restore only when service is stopped"
+            snapshot_dir = snapshot_dir_path(idx)
+            assert os.path.exists(snapshot_dir)
+            shutil.rmtree(datadir)
+            os.rename(snapshot_dir, datadir)
+
         _inject_service_create_rpc(svc, ethrpc_url, name)
         svc.create_web3 = _create_web3
+        svc.snapshot_datadir = _snapshot_datadir
+        svc.restore_snapshot = _restore_snapshot
 
         return svc
 
@@ -414,11 +432,10 @@ class LoadGeneratorFactory(flexitest.Factory):
 
         datadir = ctx.make_service_dir(name)
         rpc_port = self.next_port()
-        logfile = os.path.join(datadir, "service.log")
 
         rpc_url = f"ws://localhost:{rpc_port}"
 
-        svc = LoadGeneratorService(logfile, load_cfg)
+        svc = LoadGeneratorService(datadir, load_cfg)
         svc.start()
         _inject_service_create_rpc(svc, rpc_url, name)
         return svc

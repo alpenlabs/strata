@@ -25,7 +25,9 @@ pub fn fork_choice_state_initial<D: Database>(
             .and_then(|state| state.sync())
             .map(|sync_state| sync_state.chain_tip_blkid()),
     )?
-    .unwrap_or(rollup_params.evm_genesis_block_hash.into());
+    .unwrap_or(revm_primitives::FixedBytes(
+        *rollup_params.evm_genesis_block_hash.as_ref(),
+    ));
 
     let finalized_block_hash = get_block_hash_by_id(
         db.as_ref(),
@@ -50,7 +52,7 @@ fn get_block_hash(l2_block: L2BlockBundle) -> Result<B256> {
 }
 
 fn get_last_checkpoint_state<D: Database>(db: &D) -> Result<Option<ClientState>> {
-    let last_checkpoint_idx = db.client_state_db().get_last_checkpoint_idx();
+    let last_checkpoint_idx = db.client_state_db().get_last_state_idx();
 
     if let Err(DbError::NotBootstrapped) = last_checkpoint_idx {
         // before genesis block ready; use hardcoded genesis state
@@ -58,7 +60,8 @@ fn get_last_checkpoint_state<D: Database>(db: &D) -> Result<Option<ClientState>>
     }
 
     last_checkpoint_idx
-        .and_then(|ckpt_idx| db.client_state_db().get_state_checkpoint(ckpt_idx))
+        .and_then(|ckpt_idx| db.client_state_db().get_client_update(ckpt_idx))
+        .map(|res| res.map(|update| update.into_state()))
         .context("Failed to get last checkpoint state")
 }
 

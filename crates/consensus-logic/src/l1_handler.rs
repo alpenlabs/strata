@@ -19,6 +19,7 @@ use strata_state::{
     },
     l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
+    tx::ProtocolOperation,
 };
 use strata_storage::L1BlockManager;
 use tokio::sync::mpsc;
@@ -128,17 +129,19 @@ fn check_for_da_batch(
     blockdata: &BlockData,
     seq_pubkey: Option<XOnlyPublicKey>,
 ) -> Vec<BatchCheckpointWithCommitment> {
-    let protocol_ops_txs = blockdata.protocol_ops_txs();
+    let protocol_ops_txs = blockdata.relevant_txs();
 
-    let signed_checkpts = protocol_ops_txs
-        .iter()
-        .filter_map(|ops_txs| match ops_txs.proto_op() {
-            strata_state::tx::ProtocolOperation::Checkpoint(envelope) => Some((
-                envelope,
-                &blockdata.block().txdata[ops_txs.index() as usize],
-            )),
-            _ => None,
-        });
+    let signed_checkpts = protocol_ops_txs.iter().flat_map(|tx| {
+        tx.contents()
+            .protocol_ops()
+            .iter()
+            .filter_map(|op| match op {
+                ProtocolOperation::Checkpoint(envelope) => {
+                    Some((envelope, &blockdata.block().txdata[tx.index() as usize]))
+                }
+                _ => None,
+            })
+    });
 
     let sig_verified_checkpoints = signed_checkpts.filter_map(|(signed_checkpoint, tx)| {
         if let Some(seq_pubkey) = seq_pubkey {
@@ -184,7 +187,7 @@ pub fn verify_proof(
     rollup_params: &RollupParams,
 ) -> ZkVmResult<()> {
     let rollup_vk = rollup_params.rollup_vk;
-    let checkpoint_idx = checkpoint.batch_info().idx();
+    let checkpoint_idx = checkpoint.batch_info().epoch();
     info!(%checkpoint_idx, "verifying proof");
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
@@ -197,7 +200,7 @@ pub fn verify_proof(
         return Ok(());
     }
 
-    let expected_public_output = checkpoint.proof_output();
+    let expected_public_output = checkpoint.get_proof_output();
     let actual_public_output: CheckpointProofOutput =
         borsh::from_slice(proof_receipt.public_values().as_bytes())
             .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
@@ -239,13 +242,13 @@ fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
     blockdata
-        .protocol_ops_txs()
+        .relevant_txs()
         .iter()
         .map(|ops_txs| {
             generate_l1_tx(
                 blockdata.block(),
                 ops_txs.index(),
-                ops_txs.proto_op().clone(),
+                ops_txs.contents().protocol_ops().to_vec(),
             )
         })
         .collect()

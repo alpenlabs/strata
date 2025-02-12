@@ -15,13 +15,8 @@ use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
 use strata_common::bail_manager::BAIL_SENDER;
-use strata_consensus_logic::{
-    csm::state_tracker::reconstruct_state, l1_handler::verify_proof, sync_manager::SyncManager,
-};
-use strata_db::{
-    traits::*,
-    types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus},
-};
+use strata_consensus_logic::{l1_handler::verify_proof, sync_manager::SyncManager};
+use strata_db::types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus};
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
@@ -66,30 +61,18 @@ use zkaleido::ProofReceipt;
 
 use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
-fn fetch_l2blk<D: Database + Sync + Send + 'static>(
-    l2_db: &Arc<<D as Database>::L2DB>,
-    blkid: L2BlockId,
-) -> Result<L2BlockBundle, Error> {
-    l2_db
-        .get_block_data(blkid)
-        .map_err(Error::Db)?
-        .ok_or(Error::MissingL2Block(blkid))
-}
-
-pub struct StrataRpcImpl<D> {
+pub struct StrataRpcImpl {
     status_channel: StatusChannel,
-    database: Arc<D>,
     sync_manager: Arc<SyncManager>,
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
     relayer_handle: Arc<RelayerHandle>,
 }
 
-impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
+impl StrataRpcImpl {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         status_channel: StatusChannel,
-        database: Arc<D>,
         sync_manager: Arc<SyncManager>,
         storage: Arc<NodeStorage>,
         checkpoint_handle: Arc<CheckpointHandle>,
@@ -97,7 +80,6 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
     ) -> Self {
         Self {
             status_channel,
-            database,
             sync_manager,
             storage,
             checkpoint_handle,
@@ -134,14 +116,28 @@ impl<D: Database + Sync + Send + 'static> StrataRpcImpl<D> {
         };
 
         // in current implementation, chainstate idx == l2 block idx
-        let (_, end_slot) = last_checkpoint.batch_info.l2_range;
+        let (_, end_commitment) = last_checkpoint.batch_info.l2_range;
 
         Ok(self
             .storage
             .chainstate()
-            .get_toplevel_chainstate_async(end_slot)
+            .get_toplevel_chainstate_async(end_commitment.slot())
             .await?
             .map(Arc::new))
+    }
+
+    async fn fetch_l2_block_ok(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
+        self.fetch_l2_block(blkid)
+            .await?
+            .ok_or(Error::MissingL2Block(*blkid))
+    }
+
+    async fn fetch_l2_block(&self, blkid: &L2BlockId) -> Result<Option<L2BlockBundle>, Error> {
+        self.storage
+            .l2()
+            .get_block_data_async(blkid)
+            .map_err(Error::Db)
+            .await
     }
 }
 
@@ -158,7 +154,7 @@ fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> RpcBlockHeader {
 }
 
 #[async_trait]
-impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
+impl StrataApiServer for StrataRpcImpl {
     async fn get_blocks_at_idx(&self, idx: u64) -> RpcResult<Vec<HexBytes32>> {
         let l2_blocks = self
             .storage
@@ -243,92 +239,67 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // FIXME: sync state should have a block number
         let sync_state = self.status_channel.sync_state();
         let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
-        let db = self.database.clone();
 
         let fetch_limit = self.sync_manager.params().run().l2_blocks_fetch_limit;
         if count > fetch_limit {
             return Err(Error::FetchLimitReached(fetch_limit, count).into());
         }
 
-        let blk_headers = wait_blocking("block_headers", move || {
-            let l2_db = db.l2_db();
-            let mut output = Vec::new();
-            let mut cur_blkid = tip_blkid;
-
-            while output.len() < count as usize {
-                let l2_blk = fetch_l2blk::<D>(l2_db, cur_blkid)?;
-                output.push(conv_blk_header_to_rpc(l2_blk.header()));
-                cur_blkid = *l2_blk.header().parent();
-                if l2_blk.header().blockidx() == 0 || Buf32::from(cur_blkid).is_zero() {
-                    break;
-                }
+        let mut output = Vec::new();
+        let mut cur_blkid = tip_blkid;
+        while output.len() < count as usize {
+            let l2_blk = self.fetch_l2_block_ok(&cur_blkid).await?;
+            output.push(conv_blk_header_to_rpc(l2_blk.header()));
+            cur_blkid = *l2_blk.header().parent();
+            if l2_blk.header().blockidx() == 0 || Buf32::from(cur_blkid).is_zero() {
+                break;
             }
+        }
 
-            Ok(output)
-        })
-        .await?;
-
-        Ok(blk_headers)
+        Ok(output)
     }
 
     async fn get_headers_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<RpcBlockHeader>>> {
         let sync_state = self.status_channel.sync_state();
         let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
-        let db = self.database.clone();
 
-        let blk_header = wait_blocking("block_at_idx", move || {
-            let l2_db = db.l2_db();
-            // check the tip idx
-            let tip_idx = fetch_l2blk::<D>(l2_db, tip_blkid)?.header().blockidx();
+        // check the tip idx
+        let tip_block = self.fetch_l2_block_ok(&tip_blkid).await?;
+        let tip_idx = tip_block.header().blockidx();
 
-            if idx > tip_idx {
-                return Ok(None);
-            }
+        if idx > tip_idx {
+            return Ok(None);
+        }
 
-            l2_db
-                .get_blocks_at_height(idx)
-                .map_err(Error::Db)?
-                .iter()
-                .map(|blkid| {
-                    let l2_blk = fetch_l2blk::<D>(l2_db, *blkid)?;
+        let blocks = self
+            .storage
+            .l2()
+            .get_blocks_at_height_async(idx)
+            .map_err(Error::Db)
+            .await?;
 
-                    Ok(Some(conv_blk_header_to_rpc(l2_blk.block().header())))
-                })
-                .collect::<Result<Option<Vec<RpcBlockHeader>>, Error>>()
-        })
-        .await?;
+        if blocks.is_empty() {
+            return Ok(None);
+        }
 
-        Ok(blk_header)
+        let mut headers = Vec::new();
+        for blkid in blocks {
+            let bundle = self.fetch_l2_block_ok(&blkid).await?;
+            headers.push(conv_blk_header_to_rpc(bundle.header()));
+        }
+
+        Ok(Some(headers))
     }
 
     async fn get_header_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<RpcBlockHeader>> {
-        let db = self.database.clone();
-        // let blkid = L2BlockId::from(Buf32::from(blkid.0));
-
-        Ok(wait_blocking("fetch_block", move || {
-            let l2_db = db.l2_db();
-
-            fetch_l2blk::<D>(l2_db, blkid)
-        })
-        .await
-        .map(|blk| conv_blk_header_to_rpc(blk.header()))
-        .ok())
+        let block = self.fetch_l2_block(&blkid).await?;
+        Ok(block.map(|block| conv_blk_header_to_rpc(block.header())))
     }
 
     async fn get_exec_update_by_id(&self, blkid: L2BlockId) -> RpcResult<Option<RpcExecUpdate>> {
-        let db = self.database.clone();
-
-        let l2_blk = wait_blocking("fetch_block", move || {
-            let l2_db = db.l2_db();
-
-            fetch_l2blk::<D>(l2_db, blkid)
-        })
-        .await
-        .ok();
-
-        match l2_blk {
-            Some(l2_blk) => {
-                let exec_update = l2_blk.exec_segment().update();
+        match self.fetch_l2_block(&blkid).await? {
+            Some(block) => {
+                let exec_update = block.exec_segment().update();
 
                 let withdrawals = exec_update
                     .output()
@@ -363,12 +334,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
     }
 
     async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
-        let l2_blk_db = self.database.clone();
-        let l2_blk_bundle = wait_blocking("l2_block", move || {
-            let l2_db = l2_blk_db.l2_db();
-            fetch_l2blk::<D>(l2_db, blkid).map_err(|_| Error::MissingL2Block(blkid))
-        })
-        .await?;
+        let l2_blk_bundle = self.fetch_l2_block_ok(&blkid).await?;
 
         let prev_slot = l2_blk_bundle.block().header().header().blockidx() - 1;
 
@@ -505,11 +471,10 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
         // call takes a lot of time (for example, when there are hundreds of thousands of
         // deposits/withdrawals).
 
-        let l1_db = self.database.l1_db();
         let network = self.sync_manager.params().rollup().network;
 
         let (deposit_duties, latest_index) =
-            extract_deposit_requests(l1_db, start_index, network).await?;
+            extract_deposit_requests(self.storage.l1().as_ref(), start_index, network).await?;
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
@@ -587,7 +552,7 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
             Ok(client_state
                 .l1_view()
                 .last_finalized_checkpoint()
-                .map(|checkpoint| checkpoint.batch_info.idx()))
+                .map(|checkpoint| checkpoint.batch_info.epoch()))
         } else {
             // get latest checkpoint index from db
             let idx = self
@@ -623,23 +588,23 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
     // FIXME: possibly create a separate rpc type corresponding to SyncEvent
     async fn get_sync_event(&self, idx: u64) -> RpcResult<Option<SyncEvent>> {
-        let db = self.database.clone();
-
-        let ev: Option<SyncEvent> = wait_blocking("fetch_sync_event", move || {
-            Ok(db.sync_event_db().get_sync_event(idx)?)
-        })
-        .await?;
+        let ev: Option<SyncEvent> = self
+            .storage
+            .sync_event()
+            .get_sync_event_async(idx)
+            .await
+            .map_err(Error::Db)?;
 
         Ok(ev)
     }
 
     async fn get_last_sync_event_idx(&self) -> RpcResult<u64> {
-        let db = self.database.clone();
-
-        let last = wait_blocking("fetch_last_sync_event_idx", move || {
-            Ok(db.sync_event_db().get_last_idx()?)
-        })
-        .await?;
+        let last = self
+            .storage
+            .sync_event()
+            .get_last_idx_async()
+            .await
+            .map_err(Error::Db)?;
 
         // FIXME returning MAX if we haven't produced one yet, should figure
         // something else out
@@ -648,39 +613,12 @@ impl<D: Database + Send + Sync + 'static> StrataApiServer for StrataRpcImpl<D> {
 
     // FIXME: possibly create a separate rpc type corresponding to ClientUpdateOutput
     async fn get_client_update_output(&self, idx: u64) -> RpcResult<Option<ClientUpdateOutput>> {
-        let db = self.database.clone();
-
-        let res = wait_blocking("fetch_client_update_output", move || {
-            let client_state_db = db.client_state_db();
-
-            let writes = client_state_db.get_client_state_writes(idx)?;
-            let actions = client_state_db.get_client_update_actions(idx)?;
-
-            match (writes, actions) {
-                (Some(w), Some(a)) => Ok(Some(ClientUpdateOutput::new(w, a))),
-                // normally this is just that they're both missing
-                _ => Ok(None),
-            }
-        })
-        .await?;
-
-        Ok(res)
-    }
-}
-
-/// Wrapper around [``tokio::task::spawn_blocking``] that handles errors in
-/// external task and merges the errors into the standard RPC error type.
-async fn wait_blocking<F, R>(name: &'static str, f: F) -> Result<R, Error>
-where
-    F: Fn() -> Result<R, Error> + Sync + Send + 'static,
-    R: Sync + Send + 'static,
-{
-    match tokio::task::spawn_blocking(f).await {
-        Ok(v) => v,
-        Err(_) => {
-            error!(%name, "background task aborted for unknown reason");
-            Err(Error::BlockingAbort(name.to_owned()))
-        }
+        Ok(self
+            .storage
+            .client_state()
+            .get_update_async(idx)
+            .map_err(Error::Db)
+            .await?)
     }
 }
 
@@ -803,10 +741,10 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         verify_proof(&checkpoint, &proof_receipt, self.params.rollup())
             .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
 
-        entry.proof = proof_receipt;
+        entry.checkpoint.update_proof(proof_receipt.proof().clone());
         entry.proving_status = CheckpointProvingStatus::ProofReady;
 
-        debug!(%idx, "Proof is pending, setting proof reaedy");
+        debug!(%idx, "Proof is pending, setting proof ready");
 
         self.checkpoint_handle
             .put_checkpoint(idx, entry)
@@ -899,19 +837,18 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 }
 
-pub struct StrataDebugRpcImpl<D> {
+pub struct StrataDebugRpcImpl {
     storage: Arc<NodeStorage>,
-    database: Arc<D>,
 }
 
-impl<D: Database + Sync + Send + 'static> StrataDebugRpcImpl<D> {
-    pub fn new(storage: Arc<NodeStorage>, database: Arc<D>) -> Self {
-        Self { storage, database }
+impl StrataDebugRpcImpl {
+    pub fn new(storage: Arc<NodeStorage>) -> Self {
+        Self { storage }
     }
 }
 
 #[async_trait]
-impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRpcImpl<D> {
+impl StrataDebugApiServer for StrataDebugRpcImpl {
     async fn get_block_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<L2Block>> {
         let l2_block = self
             .storage
@@ -941,19 +878,12 @@ impl<D: Database + Sync + Send + 'static> StrataDebugApiServer for StrataDebugRp
     }
 
     async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>> {
-        let database = self.database.clone();
-        let cs = wait_blocking("clientstate_at_idx", move || {
-            let client_state_db = database.client_state_db();
-            match reconstruct_state(client_state_db.as_ref(), idx) {
-                Ok(client_state) => Ok(Some(client_state)),
-                Err(e) => {
-                    error!(%idx, %e, "failed to reconstruct client state");
-                    Err(Error::Other(e.to_string()))
-                }
-            }
-        })
-        .await?;
-        Ok(cs)
+        Ok(self
+            .storage
+            .client_state()
+            .get_state_async(idx)
+            .map_err(Error::Db)
+            .await?)
     }
 
     async fn set_bail_context(&self, _ctx: String) -> RpcResult<()> {

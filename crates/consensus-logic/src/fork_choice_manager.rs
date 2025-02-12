@@ -5,10 +5,7 @@ use std::sync::Arc;
 use strata_chaintsn::transition::process_block;
 #[cfg(feature = "debug-utils")]
 use strata_common::bail_manager::{check_bail_trigger, BAIL_ADVANCE_CONSENSUS_STATE};
-use strata_db::{
-    errors::DbError,
-    traits::{BlockStatus, Database},
-};
+use strata_db::{errors::DbError, traits::BlockStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::params::Params;
 use strata_state::{
@@ -32,13 +29,9 @@ use crate::{
 };
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
-pub struct ForkChoiceManager<D: Database> {
+pub struct ForkChoiceManager {
     /// Consensus parameters.
     params: Arc<Params>,
-
-    /// Underlying state database.
-    // TODO remove
-    database: Arc<D>,
 
     /// Common node storage interface.
     storage: Arc<NodeStorage>,
@@ -57,11 +50,10 @@ pub struct ForkChoiceManager<D: Database> {
     cur_index: u64,
 }
 
-impl<D: Database> ForkChoiceManager<D> {
+impl ForkChoiceManager {
     /// Constructs a new instance we can run the tracker with.
     pub fn new(
         params: Arc<Params>,
-        database: Arc<D>,
         storage: Arc<NodeStorage>,
         cur_csm_state: Arc<ClientState>,
         chain_tracker: unfinalized_tracker::UnfinalizedBlockTracker,
@@ -70,7 +62,6 @@ impl<D: Database> ForkChoiceManager<D> {
     ) -> Self {
         Self {
             params,
-            database,
             storage,
             cur_csm_state,
             chain_tracker,
@@ -112,17 +103,18 @@ impl<D: Database> ForkChoiceManager<D> {
 }
 
 /// Creates the forkchoice manager state from a database and rollup params.
-pub fn init_forkchoice_manager<D: Database>(
-    database: &Arc<D>,
+pub fn init_forkchoice_manager(
     storage: &Arc<NodeStorage>,
     params: &Arc<Params>,
     init_csm_state: Arc<ClientState>,
-) -> anyhow::Result<ForkChoiceManager<D>> {
+) -> anyhow::Result<ForkChoiceManager> {
     // Load data about the last finalized block so we can use that to initialize
     // the finalized tracker.
-    let sync_state = init_csm_state.sync().expect("csm state should be init");
-    let chain_tip_height = sync_state.chain_tip_height();
 
+    // TODO: get finalized block id without depending on client state
+    // or ensure client state and chain state are in-sync during startup
+    let sync_state = init_csm_state.sync().expect("csm state should be init");
+    let chain_tip_height = storage.chainstate().get_last_write_idx_blocking()?;
     let finalized_blockid = *sync_state.finalized_blkid();
     let finalized_block = storage
         .l2()
@@ -146,7 +138,6 @@ pub fn init_forkchoice_manager<D: Database>(
     // Actually assemble the forkchoice manager state.
     let fcm = ForkChoiceManager::new(
         params.clone(),
-        database.clone(),
         storage.clone(),
         init_csm_state,
         chain_tracker,
@@ -191,12 +182,11 @@ fn determine_start_tip(
     Ok((*best, best_height))
 }
 
-#[allow(clippy::too_many_arguments)]
 /// Main tracker task that takes a ready fork choice manager and some IO stuff.
-pub fn tracker_task<D: Database, E: ExecEngineCtl>(
+#[allow(clippy::too_many_arguments)]
+pub fn tracker_task<E: ExecEngineCtl>(
     shutdown: ShutdownGuard,
     handle: Handle,
-    database: Arc<D>,
     storage: Arc<NodeStorage>,
     engine: Arc<E>,
     fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
@@ -223,7 +213,7 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
 
     // Now that we have the database state in order, we can actually init the
     // FCM.
-    let fcm = match init_forkchoice_manager(&database, &storage, &params, init_state) {
+    let mut fcm = match init_forkchoice_manager(&storage, &params, init_state) {
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");
@@ -231,6 +221,14 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
         }
     };
     info!(%finalized_blockid, "forkchoice manager started");
+
+    handle_unprocessed_blocks(
+        &mut fcm,
+        &storage,
+        engine.as_ref(),
+        &csm_ctl,
+        &status_channel,
+    )?;
 
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
@@ -248,6 +246,46 @@ pub fn tracker_task<D: Database, E: ExecEngineCtl>(
     Ok(())
 }
 
+/// Check if there are unprocessed L2 blocks in db.
+/// If there are, pass them to fcm.
+fn handle_unprocessed_blocks(
+    fcm: &mut ForkChoiceManager,
+    storage: &NodeStorage,
+    engine: &impl ExecEngineCtl,
+    csm_ctl: &CsmController,
+    status_channel: &StatusChannel,
+) -> anyhow::Result<()> {
+    info!("check for unprocessed l2blocks");
+
+    let l2_block_manager = storage.l2();
+    let mut slot = fcm.cur_index;
+    loop {
+        let blocksids = l2_block_manager.get_blocks_at_height_blocking(slot)?;
+        if blocksids.is_empty() {
+            break;
+        }
+        warn!(?blocksids, ?slot, "found extra l2blocks");
+        for blockid in blocksids {
+            let status = l2_block_manager.get_block_status_blocking(&blockid)?;
+            if let Some(BlockStatus::Invalid) = status {
+                continue;
+            }
+            warn!(?blockid, "processing l2block");
+            process_fc_message(
+                ForkChoiceMessage::NewBlock(blockid),
+                fcm,
+                engine,
+                csm_ctl,
+                status_channel,
+            )?;
+        }
+        slot += 1;
+    }
+    info!("completed check for unprocessed l2blocks");
+
+    Ok(())
+}
+
 #[allow(clippy::large_enum_variant)]
 enum FcmEvent {
     NewFcmMsg(ForkChoiceMessage),
@@ -255,10 +293,10 @@ enum FcmEvent {
     Abort,
 }
 
-fn forkchoice_manager_task_inner<D: Database, E: ExecEngineCtl>(
+fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
     shutdown: &ShutdownGuard,
     handle: Handle,
-    mut fcm_state: ForkChoiceManager<D>,
+    mut fcm_state: ForkChoiceManager,
     engine: &E,
     mut fcm_rx: mpsc::Receiver<ForkChoiceMessage>,
     csm_ctl: &CsmController,
@@ -317,9 +355,9 @@ pub async fn wait_for_client_change(
     Ok(state)
 }
 
-fn process_fc_message<D: Database, E: ExecEngineCtl>(
+fn process_fc_message<E: ExecEngineCtl>(
     msg: ForkChoiceMessage,
-    fcm_state: &mut ForkChoiceManager<D>,
+    fcm_state: &mut ForkChoiceManager,
     engine: &E,
     csm_ctl: &CsmController,
     status_channel: &StatusChannel,
@@ -435,10 +473,7 @@ fn process_fc_message<D: Database, E: ExecEngineCtl>(
     Ok(())
 }
 
-fn handle_new_state<D: Database>(
-    fcm_state: &mut ForkChoiceManager<D>,
-    cs: ClientState,
-) -> anyhow::Result<()> {
+fn handle_new_state(fcm_state: &mut ForkChoiceManager, cs: ClientState) -> anyhow::Result<()> {
     let sync = cs
         .sync()
         .expect("fcm: client state missing sync data")
@@ -464,11 +499,11 @@ fn handle_new_state<D: Database>(
 /// Considers if the block is plausibly valid and if we should attach it to the
 /// pending unfinalized blocks tree.  The block is assumed to already be
 /// structurally consistent.
-fn check_new_block<D: Database>(
+fn check_new_block(
     blkid: &L2BlockId,
     block: &L2Block,
     _cstate: &ClientState,
-    state: &mut ForkChoiceManager<D>,
+    state: &mut ForkChoiceManager,
 ) -> anyhow::Result<bool, Error> {
     let params = state.params.as_ref();
 
@@ -532,9 +567,9 @@ fn pick_best_block<'t>(
     Ok(best_tip)
 }
 
-fn apply_tip_update<D: Database>(
+fn apply_tip_update(
     reorg: &reorg::Reorg,
-    fc_manager: &mut ForkChoiceManager<D>,
+    fc_manager: &mut ForkChoiceManager,
 ) -> anyhow::Result<Chainstate> {
     let chsman = fc_manager.storage.as_ref().chainstate();
 

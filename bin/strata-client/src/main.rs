@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, BlockHash};
+use el_sync::sync_chainstate_to_el;
 use jsonrpsee::Methods;
 use parking_lot::lock_api::RwLock;
 use rpc_client::sync_client;
@@ -45,6 +46,7 @@ use tracing::*;
 use crate::{args::Args, helpers::*};
 
 mod args;
+mod el_sync;
 mod errors;
 mod extractor;
 mod helpers;
@@ -98,7 +100,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     // Initialize core databases
     let database = init_core_dbs(rbdb.clone(), ops_config);
-    let storage = Arc::new(create_node_storage(database.clone(), pool.clone()));
+    let storage = Arc::new(create_node_storage(database.clone(), pool.clone())?);
 
     // Set up bridge messaging stuff.
     // TODO move all of this into relayer task init
@@ -110,9 +112,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
     let bitcoin_client = create_bitcoin_rpc_client(&config)?;
 
     // Check if we have to do genesis.
-    if genesis::check_needs_client_init(database.as_ref())? {
+    if genesis::check_needs_client_init(storage.as_ref())? {
         info!("need to init client state!");
-        genesis::init_client_state(&params, database.as_ref())?;
+        genesis::init_client_state(&params, storage.client_state())?;
     }
 
     info!("init finished, starting main tasks");
@@ -284,8 +286,8 @@ fn do_startup_checks(
         }
         Ok(false) => {
             // Current chain tip tip block is not known by the EL.
-            // TODO: Try to sync EL using existing block payloads from DB.
-            anyhow::bail!("missing expected evm block, block_id = {}", chain_tip);
+            warn!(%chain_tip, "missing expected EVM block");
+            sync_chainstate_to_el(storage, engine)?;
         }
         Err(error) => {
             // Likely network issue
@@ -310,7 +312,7 @@ fn start_core_tasks(
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
     // init status tasks
-    let status_channel = init_status_channel(database.as_ref())?;
+    let status_channel = init_status_channel(storage.as_ref())?;
 
     let engine = init_engine_controller(
         config,
@@ -331,10 +333,8 @@ fn start_core_tasks(
     // Start the sync manager.
     let sync_manager: Arc<_> = sync_manager::start_sync_tasks(
         executor,
-        database.clone(),
-        storage.clone(),
+        &storage,
         engine.clone(),
-        pool.clone(),
         params.clone(),
         status_channel.clone(),
     )?
@@ -505,7 +505,6 @@ async fn start_rpc(
     mut methods: Methods,
 ) -> anyhow::Result<()> {
     let CoreContext {
-        database,
         storage,
         sync_manager,
         status_channel,
@@ -518,7 +517,6 @@ async fn start_rpc(
     // Init RPC impls.
     let strata_rpc = rpc_server::StrataRpcImpl::new(
         status_channel.clone(),
-        database.clone(),
         sync_manager.clone(),
         storage.clone(),
         checkpoint_handle,
@@ -529,7 +527,7 @@ async fn start_rpc(
     let admin_rpc = rpc_server::AdminServerImpl::new(stop_tx);
     methods.merge(admin_rpc.into_rpc())?;
 
-    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(storage.clone(), database.clone());
+    let debug_rpc = rpc_server::StrataDebugRpcImpl::new(storage.clone());
     methods.merge(debug_rpc.into_rpc())?;
 
     let rpc_host = config.client.rpc_host;

@@ -12,12 +12,14 @@ use crate::errors::ChainTipError;
 
 /// Entry in block tracker table we use to relate a block with its immediate
 /// relatives.
+#[derive(Debug)]
 struct BlockEntry {
     parent: L2BlockId,
     children: HashSet<L2BlockId>,
 }
 
 /// Tracks the unfinalized block tree on top of the finalized tip.
+#[derive(Debug)]
 pub struct UnfinalizedBlockTracker {
     /// Block that we treat as a base that all of the other blocks that we're
     /// considering uses.

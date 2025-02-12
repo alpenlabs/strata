@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strata_db::{traits::Database, DbResult};
+use strata_db::{traits::L1Database, DbResult};
 use strata_primitives::l1::{L1BlockManifest, L1TxRef};
 use strata_state::l1::{L1BlockId, L1Tx};
 use threadpool::ThreadPool;
@@ -18,8 +18,8 @@ pub struct L1BlockManager {
 }
 
 impl L1BlockManager {
-    pub fn new<D: Database + Sync + Send + 'static>(pool: ThreadPool, db: Arc<D>) -> Self {
-        let ops = ops::l1::Context::new(db.l1_db().clone()).into_ops(pool);
+    pub fn new<D: L1Database + Sync + Send + 'static>(pool: ThreadPool, db: Arc<D>) -> Self {
+        let ops = ops::l1::Context::new(db).into_ops(pool);
         let manifest_cache = cache::CacheTable::new(64.try_into().unwrap());
         let txs_cache = cache::CacheTable::new(64.try_into().unwrap());
         Self {
@@ -123,13 +123,5 @@ impl L1BlockManager {
     pub async fn get_tx_async(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
         // TODO: Might need to use a cache here, but let's keep it for when we use it
         self.ops.get_tx_async(tx_ref).await
-    }
-
-    pub fn get_txs_from(&self, start_idx: u64) -> DbResult<(Vec<L1Tx>, u64)> {
-        self.ops.get_txs_from_blocking(start_idx)
-    }
-
-    pub async fn get_txs_from_async(&self, start_idx: u64) -> DbResult<(Vec<L1Tx>, u64)> {
-        self.ops.get_txs_from_async(start_idx).await
     }
 }

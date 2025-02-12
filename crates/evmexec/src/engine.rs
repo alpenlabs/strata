@@ -325,7 +325,10 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
         self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {
                 head_block_hash: Some(block_hash),
-                ..Default::default()
+                // NOTE: reth accepts safe and finalized block hashes to be zero
+                // and does not update the existing values
+                safe_block_hash: Some(B256::ZERO),
+                finalized_block_hash: Some(B256::ZERO),
             };
             self.inner
                 .update_block_state(fork_choice_state)
@@ -526,7 +529,7 @@ mod tests {
 
         let timestamp = 0;
         let el_ops = vec![];
-        let safe_l1_block = FixedBytes::<32>::random().into();
+        let safe_l1_block = Buf32(FixedBytes::<32>::random().into());
         let prev_l2_block = Buf32(FixedBytes::<32>::random().into()).into();
 
         let payload_env = PayloadEnv::new(timestamp, prev_l2_block, safe_l1_block, el_ops);
@@ -570,7 +573,7 @@ mod tests {
         let fcs = ForkchoiceState::default();
 
         let el_payload = ElPayload {
-            base_fee_per_gas: FixedBytes::<32>::from(U256::from(10)).into(),
+            base_fee_per_gas: Buf32(FixedBytes::<32>::from(U256::from(10)).into()),
             parent_hash: Default::default(),
             fee_recipient: Default::default(),
             state_root: Default::default(),

@@ -7,3 +7,4 @@ pub mod merkle;
 pub mod prover;
 pub mod scan;
 pub mod tx;
+mod tx_indexer;

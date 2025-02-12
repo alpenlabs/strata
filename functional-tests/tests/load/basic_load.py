@@ -16,7 +16,7 @@ class BasicLoadGenerationTest(testenv.StrataTester):
         print("test is running")
         load = ctx.get_service("load_generator.reth")
         _loadrpc = load.create_rpc()
-        time.sleep(5)
+        time.sleep(35)
 
         print("test is running")
 

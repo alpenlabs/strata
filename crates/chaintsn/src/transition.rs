@@ -409,7 +409,7 @@ mod tests {
                             outpoint: ArbitraryGenerator::new().generate(),
                             address: [0; 20].to_vec(),
                         });
-                        L1Tx::new(proof, tx, protocol_op)
+                        L1Tx::new(proof, tx, vec![protocol_op])
                     } else {
                         ArbitraryGenerator::new_with_size(1 << 15).generate()
                     };

@@ -52,10 +52,6 @@ class LoadConfigBuilder:
             raise Exception("LoadConfigBuilder: load jobs list is empty")
 
         host = self.host_url(svcs)
-        # Patch jobs by the host.
-        for job in self.jobs:
-            job.host = host
-
         return LoadConfig(self.jobs, host, self.spawn_rate)
 
     def host_url(self, _svcs: dict[str, flexitest.Service]) -> str:

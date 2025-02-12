@@ -3,10 +3,10 @@
 use std::sync::Arc;
 
 use strata_consensus_logic::csm::message::ClientUpdateNotif;
-use strata_db::{traits::Database, types::CheckpointEntry};
-use strata_primitives::{buf::Buf32, params::Params};
+use strata_db::{traits::Database, types::CheckpointEntry, DbError};
+use strata_primitives::{buf::Buf32, l1::L1BlockCommitment, l2::L2BlockCommitment, params::Params};
 use strata_state::{
-    batch::{BatchInfo, BootstrapState},
+    batch::{BaseStateCommitment, BatchInfo, BatchTransition},
     client_state::ClientState,
 };
 use strata_storage::NodeStorage;
@@ -68,22 +68,23 @@ pub fn checkpoint_worker<D: Database>(
             continue;
         }
 
-        let (batch_info, bootstrap_state) =
+        let (batch_info, batch_transition, base_state_commitment) =
             match get_next_batch(state, storage.as_ref(), rollup_params_commitment) {
                 Err(error) => {
                     warn!(?error, "Failed to get next batch");
                     continue;
                 }
-                Ok((b, bs)) => (b, bs),
+                Ok((b, bt, bs)) => (b, bt, bs),
             };
 
-        let checkpoint_idx = batch_info.idx();
+        let checkpoint_idx = batch_info.epoch();
         // sanity check
         assert!(checkpoint_idx == next_checkpoint_idx);
 
         // else save a pending proof checkpoint entry
         debug!("save checkpoint pending proof: {}", checkpoint_idx);
-        let entry = CheckpointEntry::new_pending_proof(batch_info, bootstrap_state);
+        let entry =
+            CheckpointEntry::new_pending_proof(batch_info, batch_transition, base_state_commitment);
         if let Err(e) = checkpoint_handle.put_checkpoint_and_notify_blocking(checkpoint_idx, entry)
         {
             warn!(?e, "Failed to save checkpoint at idx: {}", checkpoint_idx);
@@ -95,7 +96,7 @@ pub fn checkpoint_worker<D: Database>(
 fn get_next_batch_idx(state: &ClientState) -> u64 {
     match state.l1_view().last_finalized_checkpoint() {
         None => 0,
-        Some(prev_checkpoint) => prev_checkpoint.batch_info.idx + 1,
+        Some(prev_checkpoint) => prev_checkpoint.batch_info.epoch + 1,
     }
 }
 
@@ -103,128 +104,129 @@ fn get_next_batch(
     state: &ClientState,
     storage: &NodeStorage,
     rollup_params_commitment: Buf32,
-) -> Result<(BatchInfo, BootstrapState), Error> {
-    let chsman = storage.chainstate();
-
+) -> Result<(BatchInfo, BatchTransition, BaseStateCommitment), Error> {
     if !state.is_chain_active() {
-        // before genesis
         debug!("chain not active, no duties created");
         return Err(Error::ChainInactive);
-    };
+    }
 
-    let Some(sync_state) = state.sync() else {
-        return Err(Error::ChainInactive);
-    };
-
+    let sync_state = state.sync().ok_or(Error::ChainInactive)?;
     let tip_height = sync_state.chain_tip_height();
     let tip_id = *sync_state.chain_tip_blkid();
 
-    // Still not ready to make a batch?  This should be only if the epoch is
-    // something else.
     if tip_height == 0 {
         return Err(Error::ChainInactive);
     }
 
+    let chsman = storage.chainstate();
+
+    // Fetch the current L1 verification state (required in both branches).
+    let current_l1_state = state
+        .l1_view()
+        .tip_verification_state()
+        .ok_or(Error::ChainInactive)?;
+    let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
+
+    // Helper closures to get L1 and L2 block commitments.
+    let get_l1_commitment = |height: u64| -> Result<L1BlockCommitment, Error> {
+        let manifest = storage
+            .l1()
+            .get_block_manifest(height)?
+            .ok_or(DbError::MissingL1BlockBody(height))?;
+        Ok(L1BlockCommitment::new(height, manifest.block_hash()))
+    };
+
+    let get_l2_commitment = |height: u64| -> Result<L2BlockCommitment, Error> {
+        let blocks = storage.l2().get_blocks_at_height_blocking(height)?;
+        let block_id = blocks.first().ok_or(DbError::MissingL2State(height))?;
+        Ok(L2BlockCommitment::new(height, *block_id))
+    };
+
     match state.l1_view().last_finalized_checkpoint() {
-        // Cool, we are producing first batch!
+        // --- Branch: First batch (no finalized checkpoint exists yet) ---
         None => {
             debug!(
                 ?tip_height,
                 ?tip_id,
-                "No finalized checkpoint, creating new checkpiont"
+                "No finalized checkpoint, creating new checkpoint"
             );
-
             let first_checkpoint_idx = 0;
 
-            let current_l1_state = state
-                .l1_view()
-                .tip_verification_state()
-                .ok_or(Error::ChainInactive)?;
-
-            // Include blocks after genesis l1 height to last verified height
-            let l1_range = (
-                state.genesis_l1_height() + 1,
-                current_l1_state.last_verified_block_num as u64,
-            );
             let genesis_l1_state_hash = state
                 .genesis_verification_hash()
                 .ok_or(Error::ChainInactive)?;
-            let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
+
+            // Determine the L1 range.
+            let initial_l1_height = state.genesis_l1_height() + 1;
+            let initial_l1_commitment = get_l1_commitment(initial_l1_height)?;
+            let final_l1_height = current_l1_state.last_verified_block_num as u64;
+            let final_l1_commitment = get_l1_commitment(final_l1_height)?;
+            let l1_range = (initial_l1_commitment, final_l1_commitment);
             let l1_transition = (genesis_l1_state_hash, current_l1_state_hash);
 
-            // Start from first non-genesis l2 block height
-            let l2_range = (1, tip_height);
+            // Determine the L2 range.
+            let initial_l2_height = 1;
+            let initial_l2_commitment = get_l2_commitment(initial_l2_height)?;
+            let final_l2_commitment = L2BlockCommitment::new(tip_height, tip_id);
+            let l2_range = (initial_l2_commitment, final_l2_commitment);
 
+            // Compute the L2 chainstate transition.
             let initial_chain_state = chsman
                 .get_toplevel_chainstate_blocking(0)?
                 .ok_or(Error::MissingIdxChainstate(0))?;
             let initial_chain_state_root = initial_chain_state.compute_state_root();
-
             let current_chain_state = chsman
                 .get_toplevel_chainstate_blocking(tip_height)?
-                .ok_or(Error::MissingIdxChainstate(0))?;
+                .ok_or(Error::MissingIdxChainstate(tip_height))?;
             let current_chain_state_root = current_chain_state.compute_state_root();
             let l2_transition = (initial_chain_state_root, current_chain_state_root);
 
-            let new_batch = BatchInfo::new(
-                first_checkpoint_idx,
-                l1_range,
-                l2_range,
-                l1_transition,
-                l2_transition,
-                tip_id,
-                (0, current_l1_state.total_accumulated_pow),
-                rollup_params_commitment,
-            );
+            // Build the batch transition and batch info.
+            let new_transition =
+                BatchTransition::new(l1_transition, l2_transition, rollup_params_commitment);
+            let new_batch = BatchInfo::new(first_checkpoint_idx, l1_range, l2_range);
+            let genesis_state = new_transition.get_initial_base_state_commitment();
 
-            let genesis_bootstrap = new_batch.get_initial_bootstrap_state();
-            Ok((new_batch, genesis_bootstrap))
+            Ok((new_batch, new_transition, genesis_state))
         }
+
+        // --- Branch: Subsequent batches (using the last finalized checkpoint) ---
         Some(prev_checkpoint) => {
-            let checkpoint = prev_checkpoint.batch_info.clone();
+            let batch_info = prev_checkpoint.batch_info.clone();
+            let batch_transition = prev_checkpoint.batch_transition.clone();
 
-            let current_l1_state = state
-                .l1_view()
-                .tip_verification_state()
-                .ok_or(Error::ChainInactive)?;
-            let l1_range = (
-                checkpoint.l1_range.1 + 1,
-                current_l1_state.last_verified_block_num as u64,
-            );
-            let current_l1_state_hash = current_l1_state.compute_hash().unwrap();
-            let l1_transition = (checkpoint.l1_transition.1, current_l1_state_hash);
+            // Build the L1 range for the new batch.
+            let initial_l1_height = batch_info.l1_range.1.height() + 1;
+            let initial_l1_commitment = get_l1_commitment(initial_l1_height)?;
+            let final_l1_height = current_l1_state.last_verified_block_num as u64;
+            // Use the block id from the current verification state.
+            let final_l1_commitment =
+                L1BlockCommitment::new(final_l1_height, current_l1_state.last_verified_block_hash);
+            let l1_range = (initial_l1_commitment, final_l1_commitment);
+            let l1_transition = (batch_transition.l1_transition.1, current_l1_state_hash);
 
-            // Also, rather than tip heights, we might need to limit the max range a prover will
-            // be proving
-            let l2_range = (checkpoint.l2_range.1 + 1, tip_height);
+            // Build the L2 range for the new batch.
+            let initial_l2_height = batch_info.l2_range.1.slot() + 1;
+            let initial_l2_commitment = get_l2_commitment(initial_l2_height)?;
+            let final_l2_commitment = L2BlockCommitment::new(tip_height, tip_id);
+            let l2_range = (initial_l2_commitment, final_l2_commitment);
             let current_chain_state = chsman
                 .get_toplevel_chainstate_blocking(tip_height)?
-                .ok_or(Error::MissingIdxChainstate(0))?;
+                .ok_or(Error::MissingIdxChainstate(tip_height))?;
             let current_chain_state_root = current_chain_state.compute_state_root();
-            let l2_transition = (checkpoint.l2_transition.1, current_chain_state_root);
+            let l2_transition = (batch_transition.l2_transition.1, current_chain_state_root);
 
-            let new_batch = BatchInfo::new(
-                checkpoint.idx + 1,
-                l1_range,
-                l2_range,
-                l1_transition,
-                l2_transition,
-                tip_id,
-                (
-                    checkpoint.l1_pow_transition.1,
-                    current_l1_state.total_accumulated_pow,
-                ),
-                rollup_params_commitment,
-            );
+            let new_batch_info = BatchInfo::new(batch_info.epoch + 1, l1_range, l2_range);
+            let new_transition =
+                BatchTransition::new(l1_transition, l2_transition, rollup_params_commitment);
 
-            // If prev checkpoint was proved, use the bootstrap state of the prev checkpoint
-            // else create a bootstrap state based on initial info of this batch
-            let bootstrap_state = if prev_checkpoint.is_proved {
-                prev_checkpoint.bootstrap_state.clone()
+            let base_state_commitment = if prev_checkpoint.is_proved {
+                prev_checkpoint.base_state_commitment.clone()
             } else {
-                new_batch.get_initial_bootstrap_state()
+                new_transition.get_initial_base_state_commitment()
             };
-            Ok((new_batch, bootstrap_state))
+
+            Ok((new_batch_info, new_transition, base_state_commitment))
         }
     }
 }

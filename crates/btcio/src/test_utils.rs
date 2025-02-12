@@ -1,13 +1,19 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use async_trait::async_trait;
 use bitcoin::{
+    absolute::{Height, LockTime},
     bip32::Xpriv,
     consensus::{self, deserialize},
     hashes::Hash,
-    taproot::ControlBlock,
-    Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, Transaction, Txid, Work,
+    key::{Parity, UntweakedKeypair},
+    taproot::{ControlBlock, LeafVersion, TaprootMerkleBranch},
+    transaction::Version,
+    Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, TapNodeHash, Transaction,
+    TxOut, Txid, Work, XOnlyPublicKey,
 };
+use musig2::secp256k1::SECP256K1;
+use rand::{rngs::OsRng, RngCore};
 use strata_l1tx::envelope::builder::build_envelope_script;
 use strata_primitives::{l1::payload::L1Payload, params::Params};
 
@@ -63,6 +69,10 @@ impl ReaderRpc for TestBitcoinClient {
     async fn get_block(&self, _hash: &BlockHash) -> ClientResult<Block> {
         let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
         Ok(block)
+    }
+
+    async fn get_block_height(&self, _hash: &BlockHash) -> ClientResult<u64> {
+        Ok(100)
     }
 
     async fn get_block_at(&self, _height: u64) -> ClientResult<Block> {
@@ -130,6 +140,25 @@ impl ReaderRpc for TestBitcoinClient {
         })
     }
 
+    async fn network(&self) -> ClientResult<Network> {
+        Ok(Network::Regtest)
+    }
+}
+
+#[async_trait]
+impl BroadcasterRpc for TestBitcoinClient {
+    // send_raw_transaction sends a raw transaction to the network
+    async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
+        Ok(Txid::from_slice(&[1u8; 32]).unwrap())
+    }
+    async fn test_mempool_accept(&self, _tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>> {
+        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        Ok(vec![TestMempoolAccept {
+            txid: some_tx.compute_txid(),
+            reject_reason: None,
+        }])
+    }
+
     async fn submit_package(&self, _txs: &[Transaction]) -> ClientResult<SubmitPackage> {
         let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
         let wtxid = some_tx.compute_wtxid();
@@ -149,25 +178,6 @@ impl ReaderRpc for TestBitcoinClient {
             tx_results,
             replaced_transactions: vec![],
         })
-    }
-
-    async fn network(&self) -> ClientResult<Network> {
-        Ok(Network::Regtest)
-    }
-}
-
-#[async_trait]
-impl BroadcasterRpc for TestBitcoinClient {
-    // send_raw_transaction sends a raw transaction to the network
-    async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
-        Ok(Txid::from_slice(&[1u8; 32]).unwrap())
-    }
-    async fn test_mempool_accept(&self, _tx: &Transaction) -> ClientResult<Vec<TestMempoolAccept>> {
-        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
-        Ok(vec![TestMempoolAccept {
-            txid: some_tx.compute_txid(),
-            reject_reason: None,
-        }])
     }
 }
 
@@ -351,6 +361,48 @@ pub mod corepc_node_helpers {
         let client = BitcoinClient::new(url, user, password, None, None).unwrap();
         (bitcoind, client)
     }
+}
+
+// Create an envelope transaction. The focus here is to create a tapscript, rather than a
+// completely valid control block. Includes `n_envelopes` envelopes in the tapscript.
+pub fn create_checkpoint_envelope_tx(
+    params: &Params,
+    address: &str,
+    l1_payloads: Vec<L1Payload>,
+) -> Transaction {
+    let address = Address::from_str(address)
+        .unwrap()
+        .require_network(Network::Regtest)
+        .unwrap();
+    let inp_tx = Transaction {
+        version: Version(1),
+        lock_time: LockTime::Blocks(Height::from_consensus(1).unwrap()),
+        input: vec![],
+        output: vec![TxOut {
+            value: Amount::from_sat(100000000),
+            script_pubkey: address.script_pubkey(),
+        }],
+    };
+    let script = generate_envelope_script_test(&l1_payloads, params).unwrap();
+    // Create controlblock
+    let mut rand_bytes = [0; 32];
+    OsRng.fill_bytes(&mut rand_bytes);
+    let key_pair = UntweakedKeypair::from_seckey_slice(SECP256K1, &rand_bytes).unwrap();
+    let public_key = XOnlyPublicKey::from_keypair(&key_pair).0;
+    let nodehash: [TapNodeHash; 0] = [];
+    let cb = ControlBlock {
+        leaf_version: LeafVersion::TapScript,
+        output_key_parity: Parity::Even,
+        internal_key: public_key,
+        merkle_branch: TaprootMerkleBranch::from(nodehash),
+    };
+
+    // Create transaction using control block
+    let mut tx = build_reveal_transaction_test(inp_tx, address, 100, 10, &script, &cb).unwrap();
+    tx.input[0].witness.push([1; 3]);
+    tx.input[0].witness.push(script);
+    tx.input[0].witness.push(cb.serialize());
+    tx
 }
 
 #[cfg(test)]

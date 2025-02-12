@@ -19,25 +19,33 @@ use crate::{
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct ClientUpdateOutput {
-    writes: Vec<ClientStateWrite>,
+    state: ClientState,
     actions: Vec<SyncAction>,
 }
 
 impl ClientUpdateOutput {
-    pub fn new(writes: Vec<ClientStateWrite>, actions: Vec<SyncAction>) -> Self {
-        Self { writes, actions }
+    pub fn new(state: ClientState, actions: Vec<SyncAction>) -> Self {
+        Self { state, actions }
     }
 
-    pub fn writes(&self) -> &[ClientStateWrite] {
-        &self.writes
+    pub fn new_state(state: ClientState) -> Self {
+        Self::new(state, Vec::new())
+    }
+
+    pub fn state(&self) -> &ClientState {
+        &self.state
     }
 
     pub fn actions(&self) -> &[SyncAction] {
         &self.actions
     }
 
-    pub fn into_parts(self) -> (Vec<ClientStateWrite>, Vec<SyncAction>) {
-        (self.writes, self.actions)
+    pub fn into_state(self) -> ClientState {
+        self.state
+    }
+
+    pub fn into_parts(self) -> (ClientState, Vec<SyncAction>) {
+        (self.state, self.actions)
     }
 }
 
@@ -237,13 +245,13 @@ pub fn apply_writes_to_state(
                         .last_finalized_checkpoint
                         .as_ref()
                         .is_none_or(|prev_chp| {
-                            checkpt.batch_info.idx() == prev_chp.batch_info.idx() + 1
+                            checkpt.batch_info.epoch() == prev_chp.batch_info.epoch() + 1
                         })
                     {
                         panic!("operation: mismatched indices of pending checkpoint");
                     }
 
-                    let fin_blockid = *checkpt.batch_info.l2_blockid();
+                    let fin_blockid = *checkpt.batch_info.final_l2_blockid();
                     l1v.last_finalized_checkpoint = Some(checkpt);
 
                     // Update finalized blockid in StateSync

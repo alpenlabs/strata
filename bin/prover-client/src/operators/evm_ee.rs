@@ -90,11 +90,12 @@ impl ProvingOp for EvmEeOperator {
             if blkid == start_block_hash {
                 break;
             } else {
-                blkid = Buf32::from(
+                blkid = Buf32(
                     self.get_block_header(blkid)
                         .await
                         .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
-                        .parent_hash,
+                        .parent_hash
+                        .into(),
                 );
             }
         }
