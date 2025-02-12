@@ -187,6 +187,7 @@ mod tests {
     fn test_zeroize_idata() {
         let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
         let keys = Arc::new(SequencerKeys::new(&master).unwrap());
+        let keys_clone = Arc::clone(&keys);
 
         // Store original values
         let master_chaincode = *keys.master_xpriv().chain_code.as_bytes();
@@ -203,13 +204,14 @@ mod tests {
         fn foo(keys: Arc<SequencerKeys>) {
             println!("got keys {}", keys.master);
             bar(keys.clone());
-            if let Ok(mut keys) = Arc::try_unwrap(keys) {
-                keys.zeroize();
-                assert_eq!(keys.master_xpriv().private_key.secret_bytes(), [1u8; 32]);
-                assert_eq!(keys.derived_xpriv().private_key.secret_bytes(), [1u8; 32]);
-            }
         }
 
-        foo(keys);
+        foo(keys_clone);
+
+        if let Ok(mut keys) = Arc::try_unwrap(keys) {
+            keys.zeroize();
+            assert_eq!(keys.master_xpriv().private_key.secret_bytes(), [1u8; 32]);
+            assert_eq!(keys.derived_xpriv().private_key.secret_bytes(), [1u8; 32]);
+        }
     }
 }

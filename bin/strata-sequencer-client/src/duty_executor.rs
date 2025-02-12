@@ -11,7 +11,6 @@ use strata_sequencer::{
 use thiserror::Error;
 use tokio::{runtime::Handle, select, sync::mpsc};
 use tracing::{debug, error};
-use zeroize::Zeroize;
 
 use crate::helpers::{sign_checkpoint, sign_header};
 
@@ -53,10 +52,6 @@ where
                     handle.spawn(handle_duty(rpc.clone(), duty, idata.clone(), failed_duties_tx.clone()));
                 } else {
                     // tx is closed, we are done
-                    // Zeroize idata
-                    if let Ok(mut idata) = Arc::try_unwrap(idata) {
-                        idata.zeroize();
-                    }
                     return Ok(());
                 }
             }
