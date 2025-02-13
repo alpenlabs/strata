@@ -37,7 +37,7 @@ use reth_tasks::{
 };
 use reth_transaction_pool::TransactionPool;
 
-use crate::SequencerClient;
+use crate::{EOAMode, SequencerClient};
 
 /// Adapter for [`EthApiInner`], which holds all the data required to serve core `eth_` API.
 pub type EthApiNodeBackend<N> = EthApiInner<
@@ -268,6 +268,8 @@ struct StrataEthApiInner<N: StrataNodeCore> {
     /// Sequencer client, configured to forward submitted transactions to sequencer of given OP
     /// network.
     sequencer_client: Option<SequencerClient>,
+    /// Whether EOA should be enabled or not.
+    eoa_mode: EOAMode,
 }
 
 #[derive(Default)]
@@ -275,6 +277,8 @@ pub struct StrataEthApiBuilder {
     /// Sequencer client, configured to forward submitted transactions to sequencer of given OP
     /// network.
     sequencer_client: Option<SequencerClient>,
+    /// Whether EOA should be enabled or not.
+    eoa_mode: EOAMode,
 }
 
 impl StrataEthApiBuilder {
@@ -282,12 +286,21 @@ impl StrataEthApiBuilder {
     pub const fn new() -> Self {
         Self {
             sequencer_client: None,
+            eoa_mode: EOAMode::Disabled {
+                allowed_eoa_addrs: Vec::new(),
+            },
         }
     }
 
     /// With a [`SequencerClient`].
     pub fn with_sequencer(mut self, sequencer_client: Option<SequencerClient>) -> Self {
         self.sequencer_client = sequencer_client;
+        self
+    }
+
+    /// With [`EOAMode`].
+    pub fn with_eoa_mode(mut self, eoa_mode: EOAMode) -> Self {
+        self.eoa_mode = eoa_mode;
         self
     }
 }
@@ -329,6 +342,7 @@ impl StrataEthApiBuilder {
             inner: Arc::new(StrataEthApiInner {
                 eth_api,
                 sequencer_client: self.sequencer_client,
+                eoa_mode: self.eoa_mode,
             }),
         }
     }

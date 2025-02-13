@@ -19,7 +19,7 @@ use reth_provider::{
 };
 use reth_transaction_pool::{PoolTransaction, TransactionPool};
 use revm_primitives::alloy_primitives;
-use strata_reth_rpc::{SequencerClient, StrataEthApi};
+use strata_reth_rpc::{EOAMode, SequencerClient, StrataEthApi};
 
 use crate::{
     args::StrataNodeArgs,
@@ -165,6 +165,10 @@ where
     fn add_ons(&self) -> Self::AddOns {
         Self::AddOns::builder()
             .with_sequencer(self.args.sequencer_http.clone())
+            .with_eoa_mode(EOAMode::new(
+                self.args.enable_eoa,
+                self.args.allowed_eoa_addrs.clone(),
+            ))
             .build()
     }
 }
@@ -257,12 +261,20 @@ pub struct StrataAddOnsBuilder {
     /// Sequencer client, configured to forward submitted transactions to sequencer of given OP
     /// network.
     sequencer_client: Option<SequencerClient>,
+    /// Whether EOA should be enabled or not.
+    eoa_mode: EOAMode,
 }
 
 impl StrataAddOnsBuilder {
     /// With a [`SequencerClient`].
     pub fn with_sequencer(mut self, sequencer_client: Option<String>) -> Self {
         self.sequencer_client = sequencer_client.map(SequencerClient::new);
+        self
+    }
+
+    /// With [`EOAMode`] set to given value.
+    pub fn with_eoa_mode(mut self, eoa_mode: EOAMode) -> Self {
+        self.eoa_mode = eoa_mode;
         self
     }
 }
@@ -273,13 +285,17 @@ impl StrataAddOnsBuilder {
     where
         N: FullNodeComponents<Types: NodeTypes<Primitives = StrataPrimitives>>,
     {
-        let Self { sequencer_client } = self;
+        let Self {
+            sequencer_client,
+            eoa_mode,
+        } = self;
 
         StrataAddOns {
             rpc_add_ons: RpcAddOns::new(
                 move |ctx| {
                     StrataEthApi::<N>::builder()
                         .with_sequencer(sequencer_client)
+                        .with_eoa_mode(eoa_mode)
                         .build(ctx)
                 },
                 Default::default(),
