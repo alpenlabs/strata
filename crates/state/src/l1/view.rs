@@ -1,8 +1,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::l1::L1BlockId;
+use strata_primitives::l1::{L1BlockId, L1HeaderRecord};
 
-use super::{L1HeaderRecord, L1MaturationEntry};
+use super::L1MaturationEntry;
 use crate::prelude::StateQueue;
 
 /// Describes state relating to the CL's view of L1.  Updated by entries in the
@@ -46,7 +46,7 @@ impl L1ViewState {
     }
 
     pub fn safe_blkid(&self) -> &L1BlockId {
-        &self.safe_block.blkid
+        self.safe_block.blkid()
     }
 
     pub fn safe_height(&self) -> u64 {

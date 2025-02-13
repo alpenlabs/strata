@@ -120,34 +120,52 @@ impl From<(u64, u32)> for L1TxRef {
     }
 }
 
+use super::header_verification::HeaderVerificationState;
+
 /// Includes [`L1BlockManifest`] along with scan rules that it is applied to.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockManifest {
     /// The actual l1 record
     record: L1BlockRecord,
-    /// Epoch, which was used to generate this manifest
+
+    /// Header verification state, with PoW.
+    verif_state: HeaderVerificationState,
+
+    /// Epoch, which was used to generate this manifest.
     epoch: u64,
 }
 
 impl L1BlockManifest {
-    pub fn new(record: L1BlockRecord, epoch: u64) -> Self {
-        Self { record, epoch }
+    pub fn new(record: L1BlockRecord, verif_state: HeaderVerificationState, epoch: u64) -> Self {
+        Self {
+            record,
+            verif_state,
+            epoch,
+        }
     }
 
-    pub fn header(&self) -> &[u8] {
-        self.record.header()
+    pub fn record(&self) -> &L1BlockRecord {
+        &self.record
+    }
+
+    pub fn header_verification_state(&self) -> &HeaderVerificationState {
+        &self.verif_state
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn block_hash(&self) -> L1BlockId {
         self.record.block_hash()
     }
 
-    pub fn txs_root(&self) -> Buf32 {
-        self.record.txs_root()
+    pub fn header(&self) -> &[u8] {
+        self.record.header()
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.epoch
+    pub fn txs_root(&self) -> Buf32 {
+        self.record.txs_root()
     }
 
     pub fn into_record(self) -> L1BlockRecord {

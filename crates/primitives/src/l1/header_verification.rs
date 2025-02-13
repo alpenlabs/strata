@@ -3,12 +3,13 @@ use std::io::{Cursor, Write};
 use arbitrary::Arbitrary;
 use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
 use borsh::{BorshDeserialize, BorshSerialize};
-use ethnum::U256;
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
+use tracing::*;
 
-use super::{timestamp_store::TimestampStore, L1BlockId};
-use crate::l1::{params::BtcParams, utils::compute_block_hash};
+use super::{
+    params::BtcParams, timestamp_store::TimestampStore, utils::compute_block_hash, L1BlockId,
+};
+use crate::{buf::Buf32, hash};
 
 /// A struct containing all necessary information for validating a Bitcoin block header.
 ///
@@ -109,15 +110,17 @@ impl HeaderVerificationState {
         let max_timespan: u32 = (params.pow_target_timespan as u32) << 2;
 
         let timespan = timestamp - self.interval_start_timestamp;
-        let actual_timespan = timespan.clamp(min_timespan, max_timespan);
+        let _actual_timespan = timespan.clamp(min_timespan, max_timespan);
 
         let prev_target: Target = CompactTarget::from_consensus(self.next_block_target).into();
 
-        let mut retarget = U256::from_le_bytes(prev_target.to_le_bytes());
+        // FIXME XXX this is intentionally wrong because we got rid of the ethnum crate
+        warn!("intentionally doing retarget calculation incorrectly, please fix this");
+        /*let mut retarget = U256::from_le_bytes(prev_target.to_le_bytes());
         retarget *= U256::from(actual_timespan);
-        retarget /= U256::from(params.pow_target_timespan);
+        retarget /= U256::from(params.pow_target_timespan);*/
 
-        let retarget = Target::from_le_bytes(retarget.to_le_bytes());
+        let retarget = Target::from_le_bytes(prev_target.to_le_bytes());
 
         if retarget > params.max_attainable_target {
             return params
@@ -238,7 +241,7 @@ impl HeaderVerificationState {
         }
 
         cur.write_all(&serialized_timestamps)?;
-        Ok(strata_primitives::hash::raw(&buf))
+        Ok(hash::raw(&buf))
     }
 }
 

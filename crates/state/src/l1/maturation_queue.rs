@@ -1,7 +1,8 @@
+// TODO eventually remove this module
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-
-use super::{DaTx, DepositUpdateTx, L1BlockId, L1HeaderPayload, L1HeaderRecord};
+use strata_primitives::l1::{DaTx, DepositUpdateTx, L1BlockId, L1HeaderPayload, L1HeaderRecord};
 
 /// Entry representing an L1 block that we've acknowledged.
 ///
@@ -51,9 +52,9 @@ impl L1MaturationEntry {
 impl From<L1HeaderPayload> for L1MaturationEntry {
     fn from(value: L1HeaderPayload) -> Self {
         Self {
-            record: value.record,
-            deposit_update_txs: value.deposit_update_txs,
-            da_txs: value.da_txs,
+            record: value.record().clone(),
+            deposit_update_txs: value.deposit_update_txs().to_vec(),
+            da_txs: value.da_txs().to_vec(),
         }
     }
 }

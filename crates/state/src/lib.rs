@@ -6,7 +6,6 @@
 //! Types relating to the execution-layer state are kept generic, not
 //! reusing any Reth types.
 
-pub mod batch;
 pub mod block;
 pub mod block_validation;
 pub mod bridge_duties;
@@ -26,6 +25,7 @@ pub mod operation;
 pub mod state_op;
 pub mod state_queue;
 pub mod sync_event;
-pub mod tx;
 
 pub mod prelude;
+
+pub use strata_primitives::batch;

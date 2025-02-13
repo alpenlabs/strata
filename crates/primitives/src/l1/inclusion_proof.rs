@@ -4,7 +4,8 @@ use arbitrary::Arbitrary;
 use bitcoin::Transaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{
+
+use crate::{
     buf::Buf32,
     hash::sha256d,
     l1::{TxIdComputable, TxIdMarker, WtxIdMarker},

@@ -14,7 +14,7 @@ use tracing::*;
 use crate::{
     batch::{BaseStateCommitment, BatchInfo, BatchTransition},
     id::L2BlockId,
-    l1::{HeaderVerificationState, L1BlockId},
+    l1::L1BlockId,
     operation::{ClientUpdateOutput, SyncAction},
     state_queue::StateQueue,
 };
@@ -36,10 +36,6 @@ pub struct ClientState {
     /// valid chain.
     pub(super) sync_state: Option<SyncState>,
 
-    /// Local view of the L1 state that we compare against the chain's view of
-    /// L1 state.
-    pub(super) local_l1_view: LocalL1State,
-
     /// L1 block we start watching the chain from.  We can't access anything
     /// before this chain height.
     pub(super) horizon_l1_height: u64,
@@ -49,10 +45,6 @@ pub struct ClientState {
 
     /// The depth at which we accept blocks to be finalized.
     pub(super) finalization_depth: u64,
-
-    /// Hash of verification state at `genesis_l1_height`. The hash is computed via
-    /// [`super::l1::HeaderVerificationState::compute_hash`]
-    pub(super) genesis_l1_verification_state_hash: Option<Buf32>,
 
     /// Internal states according to each block height.
     pub(crate) int_states: StateQueue<InternalState>,
@@ -65,12 +57,10 @@ impl ClientState {
         Self {
             chain_active: false,
             sync_state: None,
-            local_l1_view: LocalL1State::new(),
             horizon_l1_height,
             genesis_l1_height,
             // TODO make configurable
             finalization_depth: 3,
-            genesis_l1_verification_state_hash: None,
             int_states: StateQueue::new_at_index(genesis_l1_height),
         }
     }
@@ -88,15 +78,6 @@ impl ClientState {
 
     pub fn has_genesis_occurred(&self) -> bool {
         self.chain_active && self.sync().is_some()
-    }
-
-    /// Returns a ref to the local L1 view.
-    pub fn l1_view(&self) -> &LocalL1State {
-        &self.local_l1_view
-    }
-
-    pub fn l1_view_mut(&mut self) -> &mut LocalL1State {
-        &mut self.local_l1_view
     }
 
     /// Overwrites the sync state.
@@ -122,10 +103,6 @@ impl ClientState {
 
     pub fn genesis_l1_height(&self) -> u64 {
         self.genesis_l1_height
-    }
-
-    pub fn genesis_verification_hash(&self) -> Option<Buf32> {
-        self.genesis_l1_verification_state_hash
     }
 
     /// Gets the internal state for a height, if present.
@@ -340,31 +317,6 @@ impl InternalState {
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
-pub struct LocalL1State {
-    /// This state is used to verify the `next_expected_block`
-    pub(super) header_verification_state: Option<HeaderVerificationState>,
-}
-
-impl LocalL1State {
-    /// Constructs a new instance of the local L1 state bookkeeping.
-    ///
-    /// # Panics
-    ///
-    /// If we try to construct it in a way that implies we don't have the L1 genesis block.
-    pub fn new() -> Self {
-        Self {
-            header_verification_state: None,
-        }
-    }
-
-    pub fn tip_verification_state(&self) -> Option<&HeaderVerificationState> {
-        self.header_verification_state.as_ref()
-    }
-}
-
-#[derive(
-    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
-)]
 pub struct L1Checkpoint {
     /// The inner checkpoint batch info.
     pub batch_info: BatchInfo,
@@ -444,17 +396,6 @@ impl ClientStateMut {
         self.state.chain_active = true;
     }
 
-    pub fn update_verification_state(&mut self, l1_vs: HeaderVerificationState) {
-        debug!(?l1_vs, "received HeaderVerificationState");
-
-        if self.state.genesis_verification_hash().is_none() {
-            info!(?l1_vs, "Setting genesis L1 verification state");
-            self.state.genesis_l1_verification_state_hash = Some(l1_vs.compute_hash().unwrap());
-        }
-
-        self.state.l1_view_mut().header_verification_state = Some(l1_vs);
-    }
-
     /// Rolls back blocks and stuff to a particular height.
     ///
     /// # Panics
@@ -462,24 +403,7 @@ impl ClientStateMut {
     /// If the new height is below the buried height or it's somehow otherwise
     /// unable to perform the rollback.
     pub fn rollback_l1_blocks(&mut self, new_block: L1BlockCommitment) {
-        let l1v = self.state.l1_view_mut();
         let height = new_block.height();
-
-        // TODO handling verification state
-        let l1_vs = l1v.tip_verification_state();
-        if let Some(l1_vs) = l1_vs {
-            if height > l1_vs.last_verified_block_num as u64 {
-                panic!("clientstate: attempted rollback above current tip");
-            }
-
-            // TODO: handle other things
-            let mut rollbacked_l1_vs = l1_vs.clone();
-            rollbacked_l1_vs.last_verified_block_num = new_block.height() as u32;
-            rollbacked_l1_vs.last_verified_block_hash = (*new_block.blkid()).into();
-        }
-
-        // =====
-        // New bookkeeping.
 
         let deepest_block = self
             .state

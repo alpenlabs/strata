@@ -8,6 +8,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
+    l1::ProtocolOperation,
     l2::L2BlockCommitment,
 };
 use tracing::*;
@@ -18,7 +19,6 @@ use crate::{
     chain_state::Chainstate,
     header::L2Header,
     l1::L1MaturationEntry,
-    tx::ProtocolOperation::Deposit,
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -236,7 +236,7 @@ impl StateCache {
         // TODO add it to the MMR so we can reference it in the future
         let (header_record, deposit_txs, _) = matured_block.into_parts();
         for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
-            if let Deposit(deposit_info) = op {
+            if let ProtocolOperation::Deposit(deposit_info) = op {
                 trace!("we got some deposit_txs");
                 let amt = deposit_info.amt;
                 let deposit_intent = DepositIntent::new(amt, &deposit_info.address);

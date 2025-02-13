@@ -1,9 +1,10 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
 
-use super::{DaTx, DepositUpdateTx, L1BlockId};
+use super::{DaTx, DepositUpdateTx, L1BlockId, L1BlockRecord};
+use crate::{buf::Buf32, hash};
+
 /// Header and the wtxs root.
 ///
 /// This is the core data we need to make proof against a L1 block.  We could
@@ -36,7 +37,7 @@ impl L1HeaderRecord {
     }
 
     pub fn create_from_serialized_header(buf: Vec<u8>, wtxs_root: Buf32) -> Self {
-        let blkid = strata_primitives::hash::sha256d(&buf).into();
+        let blkid = hash::sha256d(&buf).into();
         Self::new(blkid, buf, wtxs_root)
     }
 
@@ -61,8 +62,8 @@ impl L1HeaderRecord {
     }
 }
 
-impl From<&strata_primitives::l1::L1BlockRecord> for L1HeaderRecord {
-    fn from(value: &strata_primitives::l1::L1BlockRecord) -> Self {
+impl From<&L1BlockRecord> for L1HeaderRecord {
+    fn from(value: &L1BlockRecord) -> Self {
         Self {
             blkid: value.block_hash(),
             buf: value.header().to_vec(),
@@ -127,15 +128,6 @@ impl L1HeaderPayload {
         self
     }
 
-    pub fn build(self) -> L1HeaderPayload {
-        L1HeaderPayload {
-            idx: self.idx,
-            record: self.record,
-            deposit_update_txs: self.deposit_update_txs,
-            da_txs: self.da_txs,
-        }
-    }
-
     pub fn idx(&self) -> u64 {
         self.idx
     }
@@ -148,7 +140,25 @@ impl L1HeaderPayload {
         self.record().buf()
     }
 
+    pub fn deposit_update_txs(&self) -> &[DepositUpdateTx] {
+        &self.deposit_update_txs
+    }
+
+    pub fn da_txs(&self) -> &[DaTx] {
+        &self.da_txs
+    }
+
     pub fn wtxs_root(&self) -> &Buf32 {
         self.record().wtxs_root()
+    }
+
+    // FIXME remove this
+    pub fn build(self) -> L1HeaderPayload {
+        L1HeaderPayload {
+            idx: self.idx,
+            record: self.record,
+            deposit_update_txs: self.deposit_update_txs,
+            da_txs: self.da_txs,
+        }
     }
 }

@@ -1,14 +1,16 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_crypto::verify_schnorr_sig;
-use strata_primitives::{
+use zkaleido::{Proof, ProofReceipt, PublicValues};
+
+use crate::{
     buf::{Buf32, Buf64},
+    crypto::verify_schnorr_sig,
     epoch::EpochCommitment,
+    hash,
     l1::L1BlockCommitment,
     l2::{L2BlockCommitment, L2BlockId},
 };
-use zkaleido::{Proof, ProofReceipt, PublicValues};
 
 /// Summary generated when we accept the last block of an epoch.
 ///
@@ -211,7 +213,7 @@ impl Checkpoint {
         buf.extend(&batch_serialized);
         buf.extend(self.proof.as_bytes());
 
-        strata_primitives::hash::raw(&buf)
+        hash::raw(&buf)
     }
 }
 
@@ -339,8 +341,7 @@ pub struct BatchTransition {
     /// The state root is computed via [`super::chain_state::Chainstate::compute_state_root`].
     pub l2_transition: (Buf32, Buf32),
 
-    /// A commitment to the `RollupParams`, as computed by
-    /// [`strata_primitives::params::RollupParams::compute_hash`].
+    /// A commitment to the `RollupParams`, as computed by `RollupParams::compute_hash`.
     ///
     /// This indicates that the transition is valid under these rollup parameters.
     pub rollup_params_commitment: Buf32,

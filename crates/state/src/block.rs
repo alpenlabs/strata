@@ -3,13 +3,12 @@ use std::ops::Deref;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::prelude::*;
+use strata_primitives::{l1::L1HeaderPayload, prelude::*};
 
 use crate::{
     exec_update,
     header::{L2BlockHeader, SignedL2BlockHeader},
     id::L2BlockId,
-    l1,
 };
 
 /// Full contents of the bare L2 block.
@@ -94,11 +93,11 @@ impl L2BlockBody {
 pub struct L1Segment {
     /// New headers that we've seen from L1 that we didn't see in the previous
     /// L2 block.
-    new_payloads: Vec<l1::L1HeaderPayload>,
+    new_payloads: Vec<L1HeaderPayload>,
 }
 
 impl L1Segment {
-    pub fn new(new_payloads: Vec<l1::L1HeaderPayload>) -> Self {
+    pub fn new(new_payloads: Vec<L1HeaderPayload>) -> Self {
         Self { new_payloads }
     }
 
@@ -106,7 +105,7 @@ impl L1Segment {
         Self::new(Vec::new())
     }
 
-    pub fn new_payloads(&self) -> &[l1::L1HeaderPayload] {
+    pub fn new_payloads(&self) -> &[L1HeaderPayload] {
         &self.new_payloads
     }
 }

@@ -3,12 +3,12 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use strata_primitives::{
+
+use crate::{
+    batch::SignedCheckpoint,
     buf::Buf32,
     l1::{BitcoinAmount, OutputRef},
 };
-
-use crate::batch::SignedCheckpoint;
 
 /// Commits to a DA blob.  This is just the hash of the DA blob.
 #[derive(
