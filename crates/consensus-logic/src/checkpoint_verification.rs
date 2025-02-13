@@ -1,11 +1,16 @@
-use strata_primitives::{params::RollupParams, proof::RollupVerifyingKey};
-use strata_state::batch::{Checkpoint, CheckpointProofOutput};
+//! General handling around checkpoint verification.
+
+use strata_primitives::{params::*, proof::RollupVerifyingKey};
+use strata_state::{batch::*, client_state::L1Checkpoint};
+use thiserror::Error;
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
 use zkaleido_risc0_adapter;
 use zkaleido_sp1_adapter;
 
-/// A trait to extend [`RollupVerifyingKey`] with verification logic.
+// FIXME this isn't really an extension trait since it's not being used to
+// blanket impl over another trait
+/// Extends [`RollupVerifyingKey`] with verification logic.
 pub trait VerifyingKeyExt {
     fn verify_groth16(&self, proof_receipt: &ProofReceipt) -> ZkVmResult<()>;
 }
@@ -28,6 +33,53 @@ impl VerifyingKeyExt for RollupVerifyingKey {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum CheckpointError {
+    /// This would happen if the checkpoint isn't directly extending the
+    /// provided previous.
+    #[error("checkpoint does not extend previous")]
+    NonExtension,
+
+    #[error("proof: {0}")]
+    Proof(#[from] ZkVmError),
+
+    #[error("not yet implemented")]
+    Unimplemented,
+}
+
+/// Verifies if a checkpoint if valid, given the context of a previous checkpoint.
+///
+/// If this is the first checkpoint we verify, then there is no checkpoint to
+/// check against.
+// TODO reduce this to actually just passing in the core information we really
+// need, not like the height
+pub fn verify_checkpoint(
+    checkpoint: &Checkpoint,
+    prev_checkpoint: Option<&L1Checkpoint>,
+    params: &RollupParams,
+) -> ZkVmResult<()> {
+    let proof_receipt = construct_receipt(checkpoint);
+    verify_proof(checkpoint, &proof_receipt, params)?;
+
+    if let Some(prev) = prev_checkpoint {
+        // TODO
+    } else {
+        // TODO
+    }
+
+    // TODO
+    error!("CHECKPOINT PROOF VERIFICATION NOT YET IMPLEMENTED");
+    Ok(())
+}
+
+/// Constructs a receipt from a checkpoint.
+///
+/// This is here because we want to move it out of the checkpoint structure
+/// itself soon.
+fn construct_receipt(checkpoint: &Checkpoint) -> ProofReceipt {
+    checkpoint.get_proof_receipt()
+}
+
 /// Verify that the provided checkpoint proof is valid for the verifier key.
 ///
 /// # Caution
@@ -48,7 +100,7 @@ pub fn verify_proof(
         && proof_receipt.proof().is_empty()
         && proof_receipt.public_values().is_empty()
     {
-        warn!(%checkpoint_idx, "Allow empty set. Verifying empty proof as correct");
+        warn!(%checkpoint_idx, "verifying empty proof as correct");
         return Ok(());
     }
 

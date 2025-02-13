@@ -151,8 +151,12 @@ pub fn init_forkchoice_manager(
     let sync_state = init_csm_state.sync().expect("csm state should be init");
     let chain_tip_height = storage.chainstate().get_last_write_idx_blocking()?;
 
-    let finalized_epoch = *sync_state.finalized_epoch();
-    debug!(?finalized_epoch, "loaded from finalized block");
+    // XXX right now we have to do some special casing for if we don't have an
+    // initial checkpoint for the genesis epoch
+    let finalized_epoch = init_csm_state
+        .get_finalized_epoch()
+        .unwrap_or_else(|| EpochCommitment::new(0, 0, *sync_state.genesis_blkid()));
+    debug!(?finalized_epoch, "loading from finalized block...");
 
     // Populate the unfinalized block tracker.
     let mut chain_tracker =
@@ -226,22 +230,17 @@ pub fn tracker_task<E: ExecEngineCtl>(
     params: Arc<Params>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
-    info!("waiting for genesis");
+    // TODO only print this if we *don't* have genesis yet, somehow
+    info!("waiting for genesis before starting forkchoice logic");
     let init_state = handle.block_on(status_channel.wait_until_genesis())?;
     let init_state = Arc::new(init_state);
 
-    // we should have the finalized tips in state at this point
-    let Some(ss) = init_state.sync() else {
+    // By the time we get here we should have enough that we can start the FCM.
+    let Some(_ss) = init_state.sync() else {
         return Err(anyhow::anyhow!("fcm: tried to resume without sync state"));
     };
 
-    // If we have an active sync state we just have the finalized tip there already.
-
-    let finalized_blockid = *ss.finalized_blkid();
-
-    // wait for sync is done
-
-    info!(%finalized_blockid, "starting forkchoice manager");
+    info!("starting forkchoice logic");
 
     // Now that we have the database state in order, we can actually init the
     // FCM.
@@ -252,7 +251,6 @@ pub fn tracker_task<E: ExecEngineCtl>(
             return Err(e);
         }
     };
-    info!(%finalized_blockid, "forkchoice manager started");
 
     handle_unprocessed_blocks(&mut fcm, &storage, engine.as_ref(), &status_channel)?;
 
@@ -784,16 +782,14 @@ fn handle_new_client_state(
     fcm_state: &mut ForkChoiceManager,
     cs: ClientState,
 ) -> anyhow::Result<()> {
-    let sync = cs
-        .sync()
-        .expect("fcm: client state missing sync data")
-        .clone();
-
     let cur_fin_epoch = fcm_state.chain_tracker.finalized_epoch();
-    let new_fin_epoch = sync.finalized_epoch();
+    let Some(new_fin_epoch) = cs.get_finalized_epoch() else {
+        debug!("got new CSM state, but finalized epoch still unset, ignoring");
+        return Ok(());
+    };
 
     if new_fin_epoch.last_blkid() == cur_fin_epoch.last_blkid() {
-        trace!("got new CSM state but finalized epoch not different, ignoring");
+        trace!("got new CSM state, but finalized epoch not different, ignoring");
         return Ok(());
     }
 
@@ -807,7 +803,7 @@ fn handle_new_client_state(
 
     let fin_report = fcm_state
         .chain_tracker
-        .update_finalized_epoch(new_fin_epoch)?;
+        .update_finalized_epoch(&new_fin_epoch)?;
     info!(?new_fin_epoch, "updated finalized tip");
     trace!(?fin_report, "finalization report");
     // TODO do something with the finalization report

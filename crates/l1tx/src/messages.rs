@@ -19,7 +19,7 @@ pub enum L1Event {
     /// HeaderVerificationState for the block after genesis
     ///
     /// Note: This event is expected to emit only once after the genesis_block has reached maturity
-    GenesisVerificationState(u64, HeaderVerificationState),
+    GenesisVerificationState(L1BlockCommitment, HeaderVerificationState),
 }
 
 /// Indexed transaction entry taken from a block.

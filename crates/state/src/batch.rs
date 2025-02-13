@@ -179,10 +179,12 @@ impl Checkpoint {
         &self.proof
     }
 
-    pub fn update_proof(&mut self, proof: Proof) {
+    pub fn set_proof(&mut self, proof: Proof) {
         self.proof = proof
     }
 
+    /// Returns the output that should be expected from the checkpoint proof
+    /// verification.
     pub fn get_proof_output(&self) -> CheckpointProofOutput {
         CheckpointProofOutput::new(
             self.batch_transition().clone(),
@@ -190,16 +192,18 @@ impl Checkpoint {
         )
     }
 
+    #[deprecated(note = "use `checkpoint_verification::construct_receipt`")]
     pub fn get_proof_receipt(&self) -> ProofReceipt {
         let proof = self.proof().clone();
         let output = self.get_proof_output();
-        let public_values = PublicValues::new(
-            borsh::to_vec(&output).expect("could not serialize checkpoint proof output"),
-        );
+        let public_values =
+            PublicValues::new(borsh::to_vec(&output).expect("checkpoint: proof output"));
         ProofReceipt::new(proof, public_values)
     }
 
     pub fn hash(&self) -> Buf32 {
+        // FIXME make this more structured and use incremental hashing
+
         let mut buf = vec![];
         let batch_serialized =
             borsh::to_vec(&self.batch_info).expect("could not serialize checkpoint info");
@@ -273,28 +277,44 @@ impl BatchInfo {
         }
     }
 
+    /// Geets the epoch index.
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
 
-    /// Returns the final L2 block commitment in the batch's L2 range.
+    /// Gets the epoch commitment for this batch.
+    pub fn get_epoch_commitment(&self) -> EpochCommitment {
+        EpochCommitment::from_terminal(self.epoch(), *self.final_l2_block())
+    }
+
+    /// Gets the final L2 block commitment in the batch's L2 range.
+    pub fn final_l2_block(&self) -> &L2BlockCommitment {
+        &self.l2_range.1
+    }
+
+    /// Gets the final L2 blkid in the batch's L2 range.
     pub fn final_l2_blockid(&self) -> &L2BlockId {
         self.l2_range.1.blkid()
     }
 
-    /// check for whether the l2 block is covered by the checkpoint
-    pub fn includes_l2_block(&self, l2_block_height: u64) -> bool {
+    /// Gets the final L1 block commitment in the batch's L1 range.
+    pub fn final_l1_block(&self) -> &L1BlockCommitment {
+        &self.l1_range.1
+    }
+
+    /// Check is whether the L2 slot is covered by the checkpoint
+    pub fn includes_l2_block(&self, slot: u64) -> bool {
         let (_, last_l2_commitment) = self.l2_range;
-        if l2_block_height <= last_l2_commitment.slot() {
+        if slot <= last_l2_commitment.slot() {
             return true;
         }
         false
     }
 
-    /// check for whether the l1 block is covered by the checkpoint
-    pub fn includes_l1_block(&self, l1_block_height: u64) -> bool {
+    /// check for whether the L1 height is covered by the checkpoint
+    pub fn includes_l1_block(&self, height: u64) -> bool {
         let (_, last_l1_commitment) = self.l1_range;
-        if l1_block_height <= last_l1_commitment.height() {
+        if height <= last_l1_commitment.height() {
             return true;
         }
         false

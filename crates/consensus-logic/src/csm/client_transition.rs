@@ -73,11 +73,12 @@ pub fn process_event(
     params: &Params,
 ) -> Result<(), Error> {
     match ev {
-        SyncEvent::L1Block(height, l1blkid) => {
-            let block = L1BlockCommitment::new(*height, *l1blkid);
+        SyncEvent::L1Block(block) => {
+            let height = block.height();
+            let l1blkid = block.blkid();
 
             // If the block is before the horizon we don't care about it.
-            if *height < params.rollup().horizon_l1_height {
+            if height < params.rollup().horizon_l1_height {
                 #[cfg(test)]
                 eprintln!("early L1 block at h={height}, you may have set up the test env wrong");
 
@@ -85,14 +86,15 @@ pub fn process_event(
                 return Ok(());
             }
 
-            // FIXME this doesn't do any SPV checks to make sure we only go to
-            // a longer chain, it just does it unconditionally
-            let block_mf = context.get_l1_block_manifest(*height)?;
+            // This doesn't do any SPV checks to make sure we only go to a
+            // a longer chain, it just does it unconditionally.  This is fine,
+            // since we'll be refactoring this more deeply soonish.
+            let block_mf = context.get_l1_block_manifest(height)?;
 
             let l1v = state.state().l1_view();
             let l1_vs = l1v.tip_verification_state();
-            let cur_seen_tip_height = l1v.tip_height();
-            let next_exp_height = l1v.next_expected_block();
+            let cur_seen_tip_height = state.state().get_tip_l1_block().unwrap().height();
+            let next_exp_height = state.state().next_exp_l1_block();
 
             // Do the consensus checks
             if let Some(l1_vs) = l1_vs {
@@ -115,12 +117,26 @@ pub fn process_event(
                 let cur_tip_block = context.get_l1_block_manifest(cur_seen_tip_height)?;
             }
 
-            if *height == next_exp_height {
-                state.accept_l1_block(block);
+            if height == next_exp_height {
+                let prev_istate = state
+                    .state()
+                    .get_internal_state(height)
+                    .expect("clientstate: missing expected block state");
+
+                let new_istate = process_l1_block(prev_istate, &block_mf, params.rollup())?;
+                state.accept_l1_block_state(*block, new_istate);
+
+                // TODO make max states configurable
+                let max_states = 20;
+                if state.state().internal_state_cnt() as u64 > max_states {
+                    let newest_height = state.state().get_deepest_l1_block().unwrap().height();
+                    let new_oldest = newest_height - max_states + 1;
+                    state.discard_old_l1_states(new_oldest);
+                }
             } else {
                 #[cfg(test)]
                 eprintln!("not sure what to do here h={height} exp={next_exp_height}");
-                return Err(Error::OutOfOrderL1Block(next_exp_height, *height, *l1blkid));
+                return Err(Error::OutOfOrderL1Block(next_exp_height, height, *l1blkid));
             }
 
             // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
@@ -134,13 +150,27 @@ pub fn process_event(
             }
         }
 
-        SyncEvent::L1BlockGenesis(height, l1_verification_state) => {
-            debug!(%height, "Received L1BlockGenesis");
-            let horizon_ht = params.rollup.horizon_l1_height;
-            let genesis_ht = params.rollup.genesis_l1_height;
+        SyncEvent::L1Revert(block) => {
+            /*let buried = state.state().l1_view().buried_l1_height();
+            if *to_height < buried {
+                error!(%to_height, %buried, "got L1 revert below buried height");
+                return Err(Error::ReorgTooDeep(*to_height, buried));
+            }*/
+
+            // TODO move this logic out into this function
+            state.rollback_l1_blocks(*block);
+        }
+
+        SyncEvent::L1BlockGenesis(block, l1_verification_state) => {
+            let height = block.height();
+            debug!(%height, "received L1BlockGenesis");
+
+            let horizon_ht = params.rollup().horizon_l1_height;
+            let genesis_ht = params.rollup().genesis_l1_height;
 
             let state_ht = l1_verification_state.last_verified_block_num as u64;
             if genesis_ht != state_ht {
+                // FIXME bad error form
                 let error_msg = format!(
                     "Expected height: {} Found height: {} in state",
                     genesis_ht, state_ht
@@ -154,8 +184,13 @@ pub fn process_event(
             let active = state.state().is_chain_active();
             debug!(%genesis_threshold, %genesis_ht, %active, "Inside activate chain");
 
+            // Construct the block state for the genesis trigger block and insert it.
+            let genesis_mf = context.get_l1_block_manifest(genesis_ht)?;
+            let genesis_istate = process_genesis_trigger_block(&genesis_mf, params.rollup())?;
+            state.accept_l1_block_state(*block, genesis_istate);
+
             // If necessary, activate the chain!
-            if !active && *height >= genesis_threshold {
+            if !active && height >= genesis_threshold {
                 debug!("emitting chain activation");
                 let genesis_block = make_genesis_block(params);
 
@@ -170,61 +205,68 @@ pub fn process_event(
                 ));
             }
         }
-
-        SyncEvent::L1Revert(block) => {
-            // TODO not sure why this was here
-            //let l1_db = database.l1_db();
-
-            /*let buried = state.state().l1_view().buried_l1_height();
-            if *to_height < buried {
-                error!(%to_height, %buried, "got L1 revert below buried height");
-                return Err(Error::ReorgTooDeep(*to_height, buried));
-            }*/
-
-            // TODO move this logic out into this function
-            state.rollback_l1_blocks(*block);
-        }
-
-        SyncEvent::L1DABatch(height, checkpoints) => {
-            debug!(%height, "received L1DABatch");
-
-            if let Some(ss) = state.state().sync() {
-                let proof_verified_checkpoints =
-                    filter_verified_checkpoints(state.state(), checkpoints, params.rollup());
-
-                // When DABatch appears, it is only confirmed at the moment. These will be finalized
-                // only when the corresponding L1 block is buried enough
-                if !proof_verified_checkpoints.is_empty() {
-                    // Copy out all the basic checkpoint data into dedicated
-                    // structures for it.
-                    let ckpts = proof_verified_checkpoints
-                        .iter()
-                        .map(|batch_checkpoint_with_commitment| {
-                            let batch_checkpoint = &batch_checkpoint_with_commitment.checkpoint;
-                            L1Checkpoint::new(
-                                batch_checkpoint.batch_info().clone(),
-                                batch_checkpoint.batch_transition().clone(),
-                                batch_checkpoint.base_state_commitment().clone(),
-                                !batch_checkpoint.proof().is_empty(),
-                                *height,
-                            )
-                        })
-                        .collect::<Vec<_>>();
-                    state.accept_checkpoints(&ckpts);
-
-                    state.push_action(SyncAction::WriteCheckpoints(
-                        *height,
-                        proof_verified_checkpoints,
-                    ));
-                }
-            } else {
-                // TODO we can expand this later to make more sense
-                return Err(Error::MissingClientSyncState);
-            }
-        }
     }
 
     Ok(())
+}
+
+// TODO figure out what to do with this code
+/*
+       SyncEvent::L1DABatch(height, checkpoints) => {
+           debug!(%height, "received L1DABatch");
+
+           if let Some(ss) = state.state().sync() {
+               let proof_verified_checkpoints =
+                   filter_verified_checkpoints(state.state(), checkpoints, params.rollup());
+
+               // When DABatch appears, it is only confirmed at the moment. These will be finalized
+               // only when the corresponding L1 block is buried enough
+               if !proof_verified_checkpoints.is_empty() {
+                   // Copy out all the basic checkpoint data into dedicated
+                   // structures for it.
+                   let ckpts = proof_verified_checkpoints
+                       .iter()
+                       .map(|batch_checkpoint_with_commitment| {
+                           let batch_checkpoint =
+                               &batch_checkpoint_with_commitment.batch_checkpoint;
+                           L1Checkpoint::new(
+                               batch_checkpoint.batch_info().clone(),
+                               batch_checkpoint.batch_transition().clone(),
+                               batch_checkpoint.base_state_commitment().clone(),
+                               !batch_checkpoint.proof().is_empty(),
+                               *height,
+                           )
+                       })
+                       .collect::<Vec<_>>();
+                   state.accept_checkpoints(&ckpts);
+
+                   state.push_action(SyncAction::WriteCheckpoints(
+                       *height,
+                       proof_verified_checkpoints,
+                   ));
+               }
+           } else {
+               // TODO we can expand this later to make more sense
+               return Err(Error::MissingClientSyncState);
+           }
+       }
+*/
+
+fn process_genesis_trigger_block(
+    block_mf: &L1BlockManifest,
+    params: &RollupParams,
+) -> Result<InternalState, Error> {
+    // TODO maybe more bookkeeping?
+    Ok(InternalState::new(block_mf.block_hash(), None))
+}
+
+fn process_l1_block(
+    state: &InternalState,
+    block_mf: &L1BlockManifest,
+    params: &RollupParams,
+) -> Result<InternalState, Error> {
+    // TODO implement this
+    Ok(state.clone())
 }
 
 // TODO remove this old code after we've reconsolidated its responsibilities
@@ -292,7 +334,6 @@ fn handle_mature_l1_height(
     // If there are no checkpoints then return early.
     if !state
         .state()
-        .l1_view()
         .has_verified_checkpoint_before(maturable_height)
     {
         return Ok(());
@@ -302,7 +343,6 @@ fn handle_mature_l1_height(
     // as finalized
     if let Some(checkpt) = state
         .state()
-        .l1_view()
         .get_last_verified_checkpoint_before(maturable_height)
     {
         // FinalizeBlock Should only be applied when l2_block is actually
@@ -317,7 +357,8 @@ fn handle_mature_l1_height(
                 // Emit sync action for finalizing a l2 block
                 info!(%maturable_height, %blkid, "l2 block found in db, push FinalizeBlock SyncAction");
 
-                state.finalize_checkpoint(maturable_height);
+                // FIXME
+                //state.finalize_checkpoint(maturable_height);
                 state.push_action(SyncAction::FinalizeBlock(blkid));
             }
 
@@ -341,6 +382,8 @@ fn handle_mature_l1_height(
     Ok(())
 }
 
+// TODO most of this is irrelevant now and can just be removed
+/*
 /// Handles the finalization of a checkpoint by processing the corresponding L2
 /// block ID.
 ///
@@ -375,11 +418,7 @@ fn handle_checkpoint_finalization(
 
             // Maturable height is the height at which l1 blocks are sufficiently buried
             // and have negligible chance of reorg.
-            let maturable_height = state
-                .state()
-                .l1_view()
-                .next_expected_block()
-                .saturating_sub(safe_depth);
+            let maturable_height = state.state().next_exp_l1_block().saturating_sub(safe_depth);
 
             // The l1 height should be handled only if it is less than maturable height
             if l1_height < maturable_height {
@@ -393,6 +432,7 @@ fn handle_checkpoint_finalization(
 
     Ok(())
 }
+*/
 
 /// Searches for a given [`L2BlockId`] within a slice of [`L1Checkpoint`] structs
 /// and returns the height of the corresponding L1 block if found.
@@ -411,7 +451,9 @@ fn find_l1_height_for_l2_blockid(
         .map(|index| checkpoints[index].height)
 }
 
-/// Filters a list of [`Checkpoint`]s, returning only those that form a valid sequence
+// TODO this is being incrementally moved over to checkpoint_verification
+/*
+/// Filters a list of [`BatchCheckpoint`]s, returning only those that form a valid sequence
 /// of checkpoints.
 ///
 /// A valid checkpoint is one whose proof passes verification, and its index follows
@@ -489,6 +531,7 @@ pub fn filter_verified_checkpoints(
 
     result_checkpoints
 }
+*/
 
 #[cfg(test)]
 mod tests {

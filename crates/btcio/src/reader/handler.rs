@@ -3,7 +3,7 @@ use secp256k1::XOnlyPublicKey;
 use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
     buf::Buf32,
-    l1::{L1BlockManifest, L1BlockRecord},
+    l1::{L1BlockCommitment, L1BlockManifest, L1BlockRecord},
 };
 use strata_state::{
     batch::{Checkpoint, CommitmentInfo, L1CommittedCheckpoint},
@@ -33,8 +33,8 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
 
         L1Event::BlockData(blockdata, epoch) => handle_blockdata(ctx, blockdata, epoch).await?,
 
-        L1Event::GenesisVerificationState(height, header_verification_state) => {
-            vec![SyncEvent::L1BlockGenesis(height, header_verification_state)]
+        L1Event::GenesisVerificationState(block, header_verification_state) => {
+            vec![SyncEvent::L1BlockGenesis(block, header_verification_state)]
         }
     };
 
@@ -78,8 +78,8 @@ async fn handle_blockdata<R: ReaderRpc>(
 
     // Create a sync event if it's something we care about.
     let blkid: Buf32 = blockdata.block().block_hash().into();
-
-    sync_evs.push(SyncEvent::L1Block(blockdata.block_num(), blkid.into()));
+    let block_commitment = L1BlockCommitment::new(height, blkid.into());
+    sync_evs.push(SyncEvent::L1Block(block_commitment));
 
     // Check for checkpoint and create event accordingly
     debug!(%height, "Checking for checkpoints in l1 block");
@@ -88,9 +88,10 @@ async fn handle_blockdata<R: ReaderRpc>(
 
     // TODO: Check for deposits and forced inclusions and emit appropriate events
 
-    if !checkpoints.is_empty() {
+    /*if !checkpoints.is_empty() {
         sync_evs.push(SyncEvent::L1DABatch(height, checkpoints));
-    }
+    }*/
+
     Ok(sync_evs)
 }
 

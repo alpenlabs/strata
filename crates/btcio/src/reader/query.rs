@@ -384,6 +384,8 @@ async fn process_block<R: ReaderRpc>(
     let block_data = BlockData::new(height, block, entries);
 
     let l1blkid = block_data.block().block_hash();
+    let block_commitment = L1BlockCommitment::new(height, l1blkid.into());
+
     trace!(%height, %l1blkid, %txs, "fetched block from client");
 
     status_updates.push(L1StatusUpdate::CurHeight(height));
@@ -402,7 +404,7 @@ async fn process_block<R: ReaderRpc>(
         info!(%height, %genesis_ht, "time for genesis");
         let l1_verification_state =
             get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
-        let ev = L1Event::GenesisVerificationState(height, l1_verification_state);
+        let ev = L1Event::GenesisVerificationState(block_commitment, l1_verification_state);
         l1_events.push(ev);
     }
 
