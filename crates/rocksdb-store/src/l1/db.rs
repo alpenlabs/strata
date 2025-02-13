@@ -46,11 +46,11 @@ impl L1Database for L1Db {
                     .unwrap_or_default();
                 blocks_at_height.push(blockid);
 
-                let mut batch = SchemaBatch::new();
-                batch.put::<L1BlockSchema>(&blockid, &mf)?;
-                batch.put::<TxnSchema>(&blockid, &txs)?;
-                batch.put::<L1BlocksByHeightSchema>(&height, &blocks_at_height)?;
-                txn.write_schemas(batch)
+                txn.put::<L1BlockSchema>(&blockid, &mf)?;
+                txn.put::<TxnSchema>(&blockid, &txs)?;
+                txn.put::<L1BlocksByHeightSchema>(&height, &blocks_at_height)?;
+
+                Ok::<(), DbError>(())
             })
             .map_err(|e: rockbound::TransactionError<_>| DbError::TransactionError(e.to_string()))
     }
@@ -109,16 +109,16 @@ impl L1Database for L1Db {
             self.db
                 .with_optimistic_txn(self.ops.txn_retry_count(), |txn| {
                     let blocks = txn.get_for_update::<L1BlocksByHeightSchema>(&height)?;
-                    let mut batch = SchemaBatch::new();
-                    batch.delete::<L1BlocksByHeightSchema>(&height)?;
-                    batch.delete::<L1CanonicalBlockSchema>(&height)?;
+
+                    txn.delete::<L1BlocksByHeightSchema>(&height)?;
+                    txn.delete::<L1CanonicalBlockSchema>(&height)?;
                     for blockid in blocks.unwrap_or_default() {
-                        batch.delete::<L1BlockSchema>(&blockid)?;
-                        batch.delete::<TxnSchema>(&blockid)?;
-                        batch.delete::<MmrSchema>(&blockid)?;
+                        txn.delete::<L1BlockSchema>(&blockid)?;
+                        txn.delete::<TxnSchema>(&blockid)?;
+                        txn.delete::<MmrSchema>(&blockid)?;
                     }
 
-                    txn.write_schemas(batch)
+                    Ok::<(), DbError>(())
                 })
                 .map_err(|e: rockbound::TransactionError<_>| {
                     DbError::TransactionError(e.to_string())
