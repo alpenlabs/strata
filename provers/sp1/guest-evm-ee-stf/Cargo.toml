@@ -20,3 +20,4 @@ tiny-keccak = { git = "https://github.com/sp1-patches/tiny-keccak", branch = "pa
 
 [features]
 mock = ["zkaleido-sp1-adapter/mock"]
+zkvm-verify = ["zkaleido-sp1-adapter/zkvm-verify"]
