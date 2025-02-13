@@ -746,7 +746,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         verify_proof(&checkpoint, &proof_receipt, self.params.rollup())
             .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
 
-        entry.checkpoint.update_proof(proof_receipt.proof().clone());
+        entry.checkpoint.set_proof(proof_receipt.proof().clone());
         entry.proving_status = CheckpointProvingStatus::ProofReady;
 
         debug!(%idx, "Proof is pending, setting proof ready");

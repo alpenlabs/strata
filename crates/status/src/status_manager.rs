@@ -87,12 +87,7 @@ impl StatusChannel {
 
     /// Gets the last finalized [`L1Checkpoint`] from the current client state.
     pub fn get_last_checkpoint(&self) -> Option<L1Checkpoint> {
-        self.receiver
-            .cl
-            .borrow()
-            .l1_view()
-            .last_finalized_checkpoint()
-            .cloned()
+        self.receiver.cl.borrow().get_last_checkpoint().cloned()
     }
 
     /// Gets the latest [`SyncState`].

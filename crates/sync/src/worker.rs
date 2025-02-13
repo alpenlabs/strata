@@ -150,7 +150,7 @@ async fn do_tick<T: SyncClient>(
     }
 
     let start_slot = state.tip_height() + 1;
-    let end_slot = status.tip_height;
+    let end_slot = status.tip_slot;
 
     let span = debug_span!("sync", %start_slot, %end_slot);
 

@@ -9,14 +9,11 @@ use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{L1BlockManifest, L1BlockRecord},
-    params::{Params, RollupParams},
-    proof::RollupVerifyingKey,
+    l1::{L1BlockCommitment, L1BlockId, L1BlockManifest, L1BlockRecord},
+    params::Params,
 };
 use strata_state::{
-    batch::{
-        BatchCheckpoint, BatchCheckpointWithCommitment, CheckpointProofOutput, CommitmentInfo,
-    },
+    batch::{BatchCheckpoint, BatchCheckpointWithCommitment, CommitmentInfo},
     l1::{generate_l1_tx, L1Tx},
     sync_event::SyncEvent,
     tx::ProtocolOperation,
@@ -24,9 +21,6 @@ use strata_state::{
 use strata_storage::L1BlockManager;
 use tokio::sync::mpsc;
 use tracing::*;
-use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
-use zkaleido_risc0_adapter;
-use zkaleido_sp1_adapter;
 
 use crate::csm::ctl::CsmController;
 
@@ -98,18 +92,19 @@ fn handle_bitcoin_event(
             info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
             // Write to sync event db if it's something we care about.
-            let blkid: Buf32 = blockdata.block().block_hash().into();
-            let ev = SyncEvent::L1Block(blockdata.block_num(), blkid.into());
+            let block = L1BlockCommitment::new(height, L1BlockId::from(l1blkid));
+            let ev = SyncEvent::L1Block(block);
             csm_ctl.submit_event(ev)?;
 
+            // TODO remove, we don't do this here anymore
             // Check for da batch and send event accordingly
-            debug!(?height, "Checking for da batch");
+            /*debug!(%height, "Checking for da batch");
             let checkpoints = check_for_da_batch(&blockdata, seq_pubkey);
             debug!(?checkpoints, "Received checkpoints");
             if !checkpoints.is_empty() {
                 let ev = SyncEvent::L1DABatch(height, checkpoints);
                 csm_ctl.submit_event(ev)?;
-            }
+            }*/
 
             // TODO: Check for deposits and forced inclusions and emit appropriate events
 
@@ -117,7 +112,9 @@ fn handle_bitcoin_event(
         }
 
         L1Event::GenesisVerificationState(height, header_verification_state) => {
-            let ev = SyncEvent::L1BlockGenesis(height, header_verification_state);
+            let last_blkid = L1BlockId::from(header_verification_state.last_verified_block_hash);
+            let block = L1BlockCommitment::new(height, last_blkid);
+            let ev = SyncEvent::L1BlockGenesis(block, header_verification_state);
             csm_ctl.submit_event(ev)?;
             Ok(())
         }
@@ -174,56 +171,6 @@ fn check_for_da_batch(
         ))
     });
     sig_verified_checkpoints.collect()
-}
-
-/// Verify that the provided checkpoint proof is valid for the verifier key.
-///
-/// # Caution
-///
-/// If the checkpoint proof is empty, this function returns an `Ok(())`.
-pub fn verify_proof(
-    checkpoint: &BatchCheckpoint,
-    proof_receipt: &ProofReceipt,
-    rollup_params: &RollupParams,
-) -> ZkVmResult<()> {
-    let rollup_vk = rollup_params.rollup_vk;
-    let checkpoint_idx = checkpoint.batch_info().epoch();
-    info!(%checkpoint_idx, "verifying proof");
-
-    // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
-    // infra.
-    if rollup_params.proof_publish_mode.allow_empty()
-        && proof_receipt.proof().is_empty()
-        && proof_receipt.public_values().is_empty()
-    {
-        warn!(%checkpoint_idx, "verifying empty proof as correct");
-        return Ok(());
-    }
-
-    let expected_public_output = checkpoint.get_proof_output();
-    let actual_public_output: CheckpointProofOutput =
-        borsh::from_slice(proof_receipt.public_values().as_bytes())
-            .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
-    if expected_public_output != actual_public_output {
-        dbg!(actual_public_output, expected_public_output);
-        return Err(ZkVmError::ProofVerificationError(
-            "Public output mismatch during proof verification".to_string(),
-        ));
-    }
-
-    // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
-    // checkpoint
-    match rollup_vk {
-        RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-            zkaleido_risc0_adapter::verify_groth16(proof_receipt, vk.as_ref())
-        }
-        RollupVerifyingKey::SP1VerifyingKey(vk) => {
-            zkaleido_sp1_adapter::verify_groth16(proof_receipt, vk.as_ref())
-        }
-        // In Native Execution mode, we do not actually generate the proof to verify. Checking
-        // public parameters is sufficient.
-        RollupVerifyingKey::NativeVerifyingKey(_) => Ok(()),
-    }
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can
