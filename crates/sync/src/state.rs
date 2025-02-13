@@ -3,12 +3,12 @@ use std::cmp::max;
 use strata_consensus_logic::unfinalized_tracker::UnfinalizedBlockTracker;
 use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment};
 use strata_state::{
-    client_state::SyncState,
+    client_state::ClientState,
     header::{L2Header, SignedL2BlockHeader},
     id::L2BlockId,
 };
 use strata_storage::L2BlockManager;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::L2SyncError;
 
@@ -16,6 +16,7 @@ pub struct L2SyncState {
     /// Height of highest unfinalized block in tracker
     tip_block: L2BlockCommitment,
 
+    // TODO make this just subscribe to FCM tip updates and go from there?
     tracker: UnfinalizedBlockTracker,
 }
 
@@ -65,11 +66,24 @@ impl L2SyncState {
 }
 
 pub fn initialize_from_db(
-    sync: &SyncState,
-    l2_block_manager: &L2BlockManager,
+    cstate: &ClientState,
+    l2man: &L2BlockManager,
 ) -> Result<L2SyncState, L2SyncError> {
-    let finalized_epoch = sync.finalized_epoch();
-    let finalized_block = l2_block_manager.get_block_data_blocking(finalized_epoch.last_blkid())?;
+    let finalized_epoch = match cstate.get_finalized_epoch() {
+        Some(epoch) => epoch,
+        None => {
+            // TODO handle this in some more structured way
+            warn!("no finalized block yet, sync starting from dummy genesis");
+            let blocks = l2man.get_blocks_at_height_blocking(0)?;
+            let genesis_blkid = blocks[0];
+            EpochCommitment::new(0, 0, genesis_blkid)
+        }
+    };
+
+    let finalized_blkid = *finalized_epoch.last_blkid();
+    let finalized_slot = finalized_epoch.last_slot();
+
+    let finalized_block = l2man.get_block_data_blocking(&finalized_blkid)?;
 
     // Should we remove this since we don't do anything with it anymore?  It
     // does serve as a sanity check so that we don't start on a block we don't
@@ -78,16 +92,11 @@ pub fn initialize_from_db(
         return Err(L2SyncError::MissingBlock(*finalized_epoch.last_blkid()));
     };
 
-    let finalized_blkid = finalized_epoch.last_blkid();
-    let finalized_slot = finalized_epoch.last_slot();
-
     debug!(?finalized_blkid, %finalized_slot, "loading unfinalized blocks");
 
-    let finalized_epoch = sync.finalized_epoch();
-
-    let mut tracker = UnfinalizedBlockTracker::new_empty(*finalized_epoch);
+    let mut tracker = UnfinalizedBlockTracker::new_empty(finalized_epoch);
     tracker
-        .load_unfinalized_blocks(finalized_slot, l2_block_manager)
+        .load_unfinalized_blocks(finalized_slot, l2man)
         .map_err(|err| L2SyncError::LoadUnfinalizedFailed(err.to_string()))?;
 
     let tip_block = tracker

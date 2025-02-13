@@ -1,3 +1,5 @@
+// TODO much of this should be converted over to just listening for FCM state updates
+
 use std::sync::Arc;
 
 use futures::StreamExt;
@@ -7,7 +9,7 @@ use strata_consensus_logic::{
 };
 use strata_primitives::epoch::EpochCommitment;
 use strata_state::{
-    block::L2BlockBundle, client_state::SyncState, header::L2Header, id::L2BlockId,
+    block::L2BlockBundle, client_state::ClientState, header::L2Header, id::L2BlockId,
 };
 use strata_storage::L2BlockManager;
 use tracing::*;
@@ -42,12 +44,12 @@ pub fn block_until_csm_ready_and_init_sync_state<T: SyncClient>(
     context: &L2SyncContext<T>,
 ) -> Result<L2SyncState, L2SyncError> {
     debug!("waiting for CSM to become ready");
-    let sync_state = wait_for_csm_ready(&context.sync_manager);
-    debug!(?sync_state, "CSM is ready");
-    state::initialize_from_db(&sync_state, &context.l2_block_manager)
+    let cstate = wait_for_csm_ready(&context.sync_manager);
+    debug!("CSM is ready");
+    state::initialize_from_db(&cstate, &context.l2_block_manager)
 }
 
-fn wait_for_csm_ready(sync_man: &SyncManager) -> SyncState {
+fn wait_for_csm_ready(sync_man: &SyncManager) -> ClientState {
     let mut client_update_notif = sync_man.create_cstate_subscription();
 
     loop {
@@ -56,7 +58,7 @@ fn wait_for_csm_ready(sync_man: &SyncManager) -> SyncState {
         };
         let state = update.new_state();
         if state.is_chain_active() && state.sync().is_some() {
-            return state.sync().unwrap().clone();
+            return state.clone();
         }
     }
 }
@@ -94,13 +96,12 @@ async fn handle_new_client_update<T: SyncClient>(
 ) -> Result<(), L2SyncError> {
     // on receiving new client update, update own finalized state
 
-    let Some(sync) = update.new_state().sync() else {
-        debug!("new state but chain hasn't started, ignoring");
+    let Some(fin_epoch) = update.new_state().get_finalized_epoch() else {
+        debug!("new state but no finalized block yet, ignoring");
         return Ok(());
     };
 
-    let fin_epoch = *sync.finalized_epoch();
-    let finalized_blkid = sync.finalized_blkid();
+    let finalized_blkid = *fin_epoch.last_blkid();
 
     // I think this can just be removed.
     /*
@@ -150,7 +151,7 @@ async fn do_tick<T: SyncClient>(
     }
 
     let start_slot = state.tip_height() + 1;
-    let end_slot = status.tip_slot;
+    let end_slot = status.tip_height; // remote tip height
 
     let span = debug_span!("sync", %start_slot, %end_slot);
 

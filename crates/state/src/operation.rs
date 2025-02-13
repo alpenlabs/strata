@@ -11,7 +11,9 @@ use crate::{
 
 /// Output of a consensus state transition.  Both the consensus state writes and
 /// sync actions.
-#[derive(Clone, Debug, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub struct ClientUpdateOutput {
     state: ClientState,
     actions: Vec<SyncAction>,

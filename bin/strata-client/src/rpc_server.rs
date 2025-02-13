@@ -114,9 +114,9 @@ impl StrataRpcImpl {
 
     // TODO remove this RPC, we aren't supposed to be exposing this
     async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
-        let client_state = self.status_channel.client_state();
+        let client_state = self.status_channel.get_cur_client_state();
 
-        let Some(last_checkpoint) = client_state.l1_view().last_finalized_checkpoint() else {
+        let Some(last_checkpoint) = client_state.get_last_checkpoint() else {
             return Ok(None);
         };
 
@@ -206,10 +206,14 @@ impl StrataApiServer for StrataRpcImpl {
 
     async fn get_client_status(&self) -> RpcResult<RpcClientStatus> {
         let css = self.status_channel.get_chain_sync_status();
-        let l1_view = self.status_channel.get_csm_l1_view();
+        let cstate = self.status_channel.get_cur_client_state();
 
-        let last_l1_slot = l1_view.tip_height();
-        let last_l1_blkid = l1_view.tip_blkid().cloned().unwrap_or_default();
+        let last_l1_block = cstate.get_tip_l1_block();
+        let (last_l1_height, last_l1_blkid) = match last_l1_block {
+            Some(block) => (block.height(), *block.blkid()),
+            // Dummies
+            None => (0, L1BlockId::from(Buf32::zero())),
+        };
 
         // Copy these out of the sync state, if they're there.
         let (chain_tip_slot, chain_tip_blkid, finalized_blkid) = css
@@ -223,7 +227,7 @@ impl StrataApiServer for StrataRpcImpl {
             finalized_blkid: *finalized_blkid.as_ref(),
             last_l1_block: *last_l1_blkid.as_ref(),
             // FIXME this is a bodge, we don't track this anymore
-            buried_l1_height: last_l1_slot.saturating_sub(3),
+            buried_l1_height: last_l1_height.saturating_sub(3),
         })
     }
 
@@ -546,14 +550,17 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_latest_checkpoint_index(&self, finalized: Option<bool>) -> RpcResult<Option<u64>> {
         let finalized = finalized.unwrap_or(false);
         if finalized {
+            // FIXME when this was written, by "finalized" they really meant
+            // just the confirmed or "last" checkpoint, we'll replicate this
+            // behavior for now
+
             // get last finalized checkpoint index from state
             let (client_state, _) = self.get_cur_states().await?;
             Ok(client_state
-                .l1_view()
-                .last_finalized_checkpoint()
+                .get_last_checkpoint()
                 .map(|checkpoint| checkpoint.batch_info.epoch()))
         } else {
-            // get latest checkpoint index from db
+            // get latest checkpoint index from d
             let idx = self
                 .checkpoint_handle
                 .get_last_checkpoint_idx()
@@ -572,15 +579,18 @@ impl StrataApiServer for StrataRpcImpl {
             .status_channel
             .get_chain_sync_status()
             .ok_or(Error::BeforeGenesis)?;
-        let l1_view = self.status_channel.l1_view();
+        let cstate = self.status_channel.get_cur_client_state();
 
-        if let Some(last_checkpoint) = l1_view.last_finalized_checkpoint() {
+        // FIXME when this was written, "finalized" just meant included in a
+        // checkpoint, not that the checkpoint was buried, so we're replicating
+        // that behavior here
+        if let Some(last_checkpoint) = cstate.get_last_checkpoint() {
             if last_checkpoint.batch_info.includes_l2_block(block_slot) {
                 return Ok(L2BlockStatus::Finalized(last_checkpoint.height));
             }
         }
 
-        if let Some(l1_height) = l1_view.get_verified_l1_height(block_slot) {
+        if let Some(l1_height) = cstate.get_verified_l1_height(block_slot) {
             return Ok(L2BlockStatus::Verified(l1_height));
         }
 
@@ -728,6 +738,9 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         idx: u64,
         proof_receipt: ProofReceipt,
     ) -> RpcResult<()> {
+        // TODO shift all this logic somewhere else that's closer to where it's
+        // relevant and not in the RPC method impls
+
         debug!(%idx, "received checkpoint proof request");
         let mut entry = self
             .checkpoint_handle
