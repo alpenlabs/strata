@@ -246,7 +246,7 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
         }
         #[cfg(not(feature = "mock"))]
         {
-            vec![]
+            vec!["zkvm-verify".to_string()]
         }
     };
 
