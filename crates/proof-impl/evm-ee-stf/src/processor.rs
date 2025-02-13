@@ -17,7 +17,10 @@
 // limitations under the License.
 use std::{mem, mem::take};
 
-use alloy_consensus::constants::{GWEI_TO_WEI, MAXIMUM_EXTRA_DATA_SIZE};
+use alloy_consensus::{
+    constants::{GWEI_TO_WEI, MAXIMUM_EXTRA_DATA_SIZE},
+    TxReceipt,
+};
 use alloy_eips::{eip1559::BaseFeeParams, eip2718::Encodable2718};
 use alloy_primitives::map::DefaultHashBuilder;
 use alloy_rlp::BufMut;
@@ -206,12 +209,12 @@ where
 
             // Validate tx gas.
             let block_available_gas = U256::from(self.input.gas_limit) - cumulative_gas_used;
-            if block_available_gas < U256::from(tx.transaction.gas_limit()) {
+            if block_available_gas < U256::from(tx.transaction().gas_limit()) {
                 panic!("Error at transaction {}: gas exceeds block limit", tx_no);
             }
 
             // Setup EVM from tx.
-            fill_eth_tx_env(&mut evm.context.env_mut().tx, &tx.transaction, tx_from);
+            fill_eth_tx_env(&mut evm.context.env_mut().tx, &tx.transaction(), tx_from);
             // Execute transaction.
             let res = evm
                 .transact()
@@ -227,7 +230,7 @@ where
 
             // Create receipt.
             let receipt = Receipt {
-                tx_type: tx.transaction.tx_type(),
+                tx_type: tx.transaction().tx_type(),
                 success: res.result.is_success(),
                 cumulative_gas_used: cumulative_gas_used.try_into().unwrap(),
                 logs: res.result.logs().to_vec(),
@@ -235,7 +238,7 @@ where
 
             executed_txs.push(tx.clone());
             // Update logs bloom.
-            logs_bloom.accrue_bloom(&receipt.bloom_slow());
+            logs_bloom.accrue_bloom(&receipt.bloom());
             receipts.push(receipt);
 
             // Commit state changes.
@@ -259,7 +262,7 @@ where
             .into_iter()
             .collect::<Vec<TransactionSigned>>();
         h.transactions_root = ordered_trie_root_with_encoder(&txs_signed, |tx, buf| {
-            tx.eip2718_encode(&tx.signature, buf);
+            tx.eip2718_encode(&tx.signature(), buf);
         });
         h.receipts_root = ordered_trie_root_with_encoder(&receipts, |receipt, buf| {
             receipt.with_bloom_ref().encode_2718(buf);
