@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use strata_db::{traits::L1Database, DbResult};
-use strata_primitives::l1::{L1BlockManifest, L1TxRef};
-use strata_state::l1::{L1BlockId, L1Tx};
+use strata_primitives::l1::{L1BlockId, L1BlockManifest, L1Tx, L1TxRef};
 use threadpool::ThreadPool;
 
 use crate::{

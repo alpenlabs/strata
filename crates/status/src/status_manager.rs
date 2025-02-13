@@ -5,7 +5,7 @@ use strata_primitives::l1::L1Status;
 use strata_state::{
     bridge_state::{DepositsTable, OperatorTable},
     chain_state::Chainstate,
-    client_state::{ClientState, L1Checkpoint, LocalL1State, SyncState},
+    client_state::{ClientState, L1Checkpoint, SyncState},
 };
 use thiserror::Error;
 use tokio::sync::watch::{self, error::RecvError};
@@ -73,17 +73,6 @@ impl StatusChannel {
     }
 
     // Receiver methods
-
-    /// Gets the latest [`LocalL1State`].
-    #[deprecated(note = "use `.get_csm_l1_view()`")]
-    pub fn l1_view(&self) -> LocalL1State {
-        self.receiver.cl.borrow().l1_view().clone()
-    }
-
-    /// Gets the latest [`LocalL1State`].
-    pub fn get_csm_l1_view(&self) -> LocalL1State {
-        self.receiver.cl.borrow().l1_view().clone()
-    }
 
     /// Gets the last finalized [`L1Checkpoint`] from the current client state.
     pub fn get_last_checkpoint(&self) -> Option<L1Checkpoint> {

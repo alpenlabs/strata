@@ -7,7 +7,7 @@ use std::{cmp::max, collections::HashMap};
 use bitcoin::{OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
-    l1::{BitcoinAmount, L1TxRef, OutputRef},
+    l1::{BitcoinAmount, L1HeaderPayload, L1TxRef, OutputRef},
     params::RollupParams,
 };
 use strata_state::{
@@ -16,7 +16,7 @@ use strata_state::{
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
     exec_env::ExecEnvState,
     exec_update::{self, construct_ops_from_deposit_intents, ELDepositData, Op},
-    l1::{self, L1MaturationEntry},
+    l1::L1MaturationEntry,
     prelude::*,
     state_op::StateCache,
     state_queue,
@@ -142,7 +142,7 @@ fn process_l1_view_update(
 fn check_chain_integrity(
     pivot_idx: u64,
     pivot_blkid: &L1BlockId,
-    new_blocks: &[l1::L1HeaderPayload],
+    new_blocks: &[L1HeaderPayload],
 ) -> Result<(), TsnError> {
     // Iterate over all the blocks in the new list and make sure they match.
     for (i, e) in new_blocks.iter().enumerate() {

@@ -6,13 +6,14 @@ use std::sync::Arc;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
 use strata_primitives::{
-    l1::*,
+    batch::EpochSummary,
+    l1::{L1Tx, *},
     prelude::*,
     proof::{ProofContext, ProofKey},
 };
 use strata_state::{
-    batch::EpochSummary, block::L2BlockBundle, bridge_duties::BridgeDutyStatus,
-    chain_state::Chainstate, l1::L1Tx, operation::*, state_op::WriteBatch, sync_event::SyncEvent,
+    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate, operation::*,
+    state_op::WriteBatch, sync_event::SyncEvent,
 };
 use zkaleido::ProofReceipt;
 

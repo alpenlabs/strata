@@ -1,9 +1,7 @@
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::l1::L1BlockCommitment;
-use strata_state::{
-    l1::HeaderVerificationState,
-    tx::{DaCommitment, DepositRequestInfo, ProtocolOperation},
+use strata_primitives::l1::{
+    DaCommitment, DepositRequestInfo, HeaderVerificationState, L1BlockCommitment, ProtocolOperation,
 };
 
 /// L1 events that we observe and want the persistence task to work on.

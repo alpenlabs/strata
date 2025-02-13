@@ -136,16 +136,16 @@ impl L1HeaderPayload {
         &self.record
     }
 
-    pub fn header_buf(&self) -> &[u8] {
-        self.record().buf()
-    }
-
     pub fn deposit_update_txs(&self) -> &[DepositUpdateTx] {
         &self.deposit_update_txs
     }
 
     pub fn da_txs(&self) -> &[DaTx] {
         &self.da_txs
+    }
+
+    pub fn header_buf(&self) -> &[u8] {
+        self.record().buf()
     }
 
     pub fn wtxs_root(&self) -> &Buf32 {
