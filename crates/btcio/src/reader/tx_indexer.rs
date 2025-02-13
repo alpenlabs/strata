@@ -2,9 +2,9 @@ use strata_l1tx::{
     filter::indexer::TxVisitor,
     messages::{DaEntry, L1TxMessages},
 };
-use strata_state::{
+use strata_primitives::{
     batch::SignedCheckpoint,
-    tx::{DepositInfo, DepositRequestInfo, ProtocolOperation},
+    l1::{DepositInfo, DepositRequestInfo, ProtocolOperation},
 };
 
 /// Ops indexer for rollup client. Collects extra info like da blobs and deposit requests

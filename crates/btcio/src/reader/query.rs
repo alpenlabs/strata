@@ -12,14 +12,15 @@ use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
     messages::{BlockData, L1Event, RelevantTxEntry},
 };
-use strata_primitives::{block_credential::CredRule, l1::L1BlockCommitment, params::Params};
-use strata_state::{
+use strata_primitives::{
+    block_credential::CredRule,
     l1::{
         get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
-        L1BlockId, TimestampStore,
+        L1BlockCommitment, L1BlockId, TimestampStore,
     },
-    sync_event::EventSubmitter,
+    params::Params,
 };
+use strata_state::sync_event::EventSubmitter;
 use strata_status::StatusChannel;
 use strata_storage::L1BlockManager;
 use tracing::*;

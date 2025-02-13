@@ -2,15 +2,13 @@ use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use secp256k1::XOnlyPublicKey;
 use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
-    buf::Buf32,
-    l1::{L1BlockCommitment, L1BlockManifest, L1BlockRecord},
-};
-use strata_state::{
     batch::{Checkpoint, CommitmentInfo, L1CommittedCheckpoint},
-    l1::{generate_l1_tx, L1Tx},
-    sync_event::{EventSubmitter, SyncEvent},
-    tx::ProtocolOperation,
+    buf::Buf32,
+    l1::{
+        generate_l1_tx, L1BlockCommitment, L1BlockManifest, L1BlockRecord, L1Tx, ProtocolOperation,
+    },
 };
+use strata_state::sync_event::{EventSubmitter, SyncEvent};
 use tracing::*;
 
 use super::query::ReaderContext;
@@ -34,7 +32,9 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
         L1Event::BlockData(blockdata, epoch) => handle_blockdata(ctx, blockdata, epoch).await?,
 
         L1Event::GenesisVerificationState(block, header_verification_state) => {
-            vec![SyncEvent::L1BlockGenesis(block, header_verification_state)]
+            // TODO remove this since we're really getting rid of it
+            //vec![SyncEvent::L1BlockGenesis(block, header_verification_state)]
+            Vec::new()
         }
     };
 
