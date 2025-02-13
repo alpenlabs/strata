@@ -66,11 +66,9 @@ async fn handle_blockdata<R: ReaderRpc>(
 
     let txs: Vec<_> = generate_l1txs(&blockdata);
     let num_txs = txs.len();
-    let manifest = generate_block_manifest(blockdata.block(), hvs, txs.clone(), epoch);
+    let manifest = generate_block_manifest(blockdata.block(), hvs, txs.clone(), epoch, height);
 
-    l1_manager
-        .put_block_data_async(blockdata.block_num(), manifest, txs)
-        .await?;
+    l1_manager.put_block_data_async(manifest, txs).await?;
     info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
     // Create a sync event if it's something we care about.
@@ -128,6 +126,7 @@ fn generate_block_manifest(
     hvs: HeaderVerificationState,
     txs: Vec<L1Tx>,
     epoch: u64,
+    height: u64,
 ) -> L1BlockManifest {
     let blockid = block.block_hash().into();
     let root = block
@@ -137,7 +136,7 @@ fn generate_block_manifest(
     let header = serialize(&block.header);
 
     let rec = L1HeaderRecord::new(blockid, header, Buf32::from(root));
-    L1BlockManifest::new(rec, hvs, txs, epoch)
+    L1BlockManifest::new(rec, hvs, txs, epoch, height)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {

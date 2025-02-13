@@ -92,7 +92,7 @@ fn prepare_l1_segment(
     params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     // We aren't going to reorg, so we'll include blocks right up to the tip.
-    let cur_real_l1_height = l1man
+    let (cur_real_l1_height, _) = l1man
         .get_chain_tip()?
         .expect("blockasm: should have L1 blocks by now");
     let target_height = cur_real_l1_height.saturating_sub(params.l1_reorg_safe_depth as u64); // -1 to give some buffer for very short reorgs
@@ -170,7 +170,7 @@ fn fetch_manifest(h: u64, l1man: &L1BlockManager) -> Result<L1BlockManifest, Err
 }
 
 fn try_fetch_manifest(h: u64, l1man: &L1BlockManager) -> Result<Option<L1BlockManifest>, Error> {
-    Ok(l1man.get_block_manifest(h)?)
+    Ok(l1man.get_block_manifest_at_height(h)?)
 }
 
 /// Prepares the execution segment for the block.

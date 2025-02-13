@@ -192,13 +192,13 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_l1_block_hash(&self, height: u64) -> RpcResult<Option<String>> {
-        let blk_manifest = self
+        Ok(self
             .storage
             .l1()
-            .get_block_manifest_async(height)
-            .map_err(Error::Db)
-            .await?;
-        Ok(blk_manifest.map(|mf| mf.blkid().to_string()))
+            .get_blockid_async(height)
+            .await
+            .map_err(Error::Db)?
+            .map(|blockid| blockid.to_string()))
     }
 
     async fn get_client_status(&self) -> RpcResult<RpcClientStatus> {

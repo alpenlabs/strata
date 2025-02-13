@@ -244,11 +244,11 @@ fn get_next_batch(
 
     // Helper closures to get L1 and L2 block commitments.
     let get_l1_commitment = |height: u64| -> Result<L1BlockCommitment, Error> {
-        let manifest = storage
+        let blockid = storage
             .l1()
-            .get_block_manifest(height)?
-            .ok_or(DbError::MissingL1BlockBody(height))?;
-        Ok(L1BlockCommitment::new(height, manifest.block_hash()))
+            .get_blockid(height)?
+            .ok_or(DbError::MissingL1BlockHeight(height))?;
+        Ok(L1BlockCommitment::new(height, blockid))
     };
 
     let get_l2_commitment = |height: u64| -> Result<L2BlockCommitment, Error> {
@@ -413,12 +413,12 @@ fn create_checkpoint_prep_data_from_summary(
     let l1_transition = {
         let prev_epoch_final_blocknum = l1_start_height - 1;
         let prev_mf = l1man
-            .get_block_manifest(prev_epoch_final_blocknum)?
-            .ok_or(DbError::MissingL1BlockBody(prev_epoch_final_blocknum))?;
+            .get_block_manifest_at_height(prev_epoch_final_blocknum)?
+            .ok_or(DbError::MissingL1Block(prev_epoch_final_blocknum))?;
         let current_epoch_final_blocknum = summary.new_l1().height();
         let mf = l1man
-            .get_block_manifest(current_epoch_final_blocknum)?
-            .ok_or(DbError::MissingL1BlockBody(current_epoch_final_blocknum))?;
+            .get_block_manifest_at_height(current_epoch_final_blocknum)?
+            .ok_or(DbError::MissingL1Block(current_epoch_final_blocknum))?;
 
         warn!(%epoch, %prev_epoch_final_blocknum, %current_epoch_final_blocknum, "Compute the new L1 sync state commitments");
 
@@ -590,8 +590,8 @@ fn fetch_chainstate(slot: u64, chsman: &ChainstateManager) -> anyhow::Result<Cha
 
 fn fetch_l1_block_manifest(height: u64, l1man: &L1BlockManager) -> anyhow::Result<L1BlockManifest> {
     Ok(l1man
-        .get_block_manifest(height)?
-        .ok_or(DbError::MissingL1BlockBody(height))?)
+        .get_block_manifest_at_height(height)?
+        .ok_or(DbError::MissingL1Block(height))?)
 }
 
 /// Fetches and L1 block manifest, checking that the manifest that we found
