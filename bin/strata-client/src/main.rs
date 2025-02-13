@@ -393,11 +393,9 @@ fn start_sequencer_tasks(
 ) -> anyhow::Result<()> {
     let CoreContext {
         runtime,
-        database,
         storage,
         pool,
         params,
-        sync_manager,
         status_channel,
         bitcoin_client,
         ..
@@ -439,7 +437,6 @@ fn start_sequencer_tasks(
     methods.merge(admin_rpc.into_rpc())?;
 
     // Spawn duty tasks.
-    let cupdate_rx = sync_manager.create_cstate_subscription();
     let t_storage = storage.clone();
     let t_checkpoint_handle = checkpoint_handle.clone();
     let t_status_ch = status_channel.clone();

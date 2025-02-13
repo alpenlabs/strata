@@ -93,11 +93,15 @@ pub fn process_event(
 
             let l1v = state.state().l1_view();
             let l1_vs = l1v.tip_verification_state();
-            let cur_seen_tip_height = state.state().get_tip_l1_block().unwrap().height();
+            /*let cur_seen_tip_height = state
+            .state()
+            .get_tip_l1_block()
+            .map(|block| block.height())
+            .unwrap_or(params.rollup().genesis_l1_height - 1);*/
             let next_exp_height = state.state().next_exp_l1_block();
 
             // Do the consensus checks
-            if let Some(l1_vs) = l1_vs {
+            /*if let Some(l1_vs) = l1_vs {
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
                 let mut updated_l1vs = l1_vs.clone();
                 for height in (l1_vs_height + 1..cur_seen_tip_height) {
@@ -108,14 +112,14 @@ pub fn process_event(
                         updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
                 }
                 state.update_verification_state(updated_l1vs);
-            }
+            }*/
 
             // Only accept the block if it's the next block in the chain we expect to accept.
-            if next_exp_height > params.rollup().horizon_l1_height {
+            /*if next_exp_height > params.rollup().horizon_l1_height {
                 // TODO check that the new block we're trying to add has the same parent as the tip
                 // block
                 let cur_tip_block = context.get_l1_block_manifest(cur_seen_tip_height)?;
-            }
+            }*/
 
             if height == next_exp_height {
                 let prev_istate = state
@@ -127,12 +131,12 @@ pub fn process_event(
                 state.accept_l1_block_state(*block, new_istate);
 
                 // TODO make max states configurable
-                let max_states = 20;
+                /*let max_states = 20;
                 if state.state().internal_state_cnt() as u64 > max_states {
                     let newest_height = state.state().get_deepest_l1_block().unwrap().height();
                     let new_oldest = newest_height - max_states + 1;
                     state.discard_old_l1_states(new_oldest);
-                }
+                }*/
             } else {
                 #[cfg(test)]
                 eprintln!("not sure what to do here h={height} exp={next_exp_height}");
