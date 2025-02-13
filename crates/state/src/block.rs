@@ -192,6 +192,8 @@ mod tests {
     use super::*;
     use crate::block_validation::validate_block_segments;
 
+    // This test is flaky because sometimes it generates an L1 segment with no
+    // elements twice.
     #[test]
     fn test_verify_block_hashes() {
         // use arbitrary generator to get the new block

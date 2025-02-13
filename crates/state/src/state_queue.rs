@@ -8,8 +8,11 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
 pub struct StateQueue<T> {
     /// The front of the queue that we take entries out of.
     base_idx: u64,
@@ -43,6 +46,7 @@ impl<T> StateQueue<T> {
 
     /// Returns a slice over the entries in the queue, without their positioning
     /// information.  Consider if `.iter_entries` is more well-suited.
+    // TODO is it bad to expose this?
     pub fn entries(&self) -> &[T] {
         &self.entries
     }
@@ -57,8 +61,18 @@ impl<T> StateQueue<T> {
         self.entries.is_empty()
     }
 
+    /// Returns the offset index in the entries list for an absolute index.
+    /// This does not fail for out of bounds values or overflow.
+    ///
+    /// Not meant for public consumption, the backing entries array is meant to
+    /// be internal.
+    fn get_off_for_abs(&self, idx: u64) -> u64 {
+        idx - self.base_idx
+    }
+
     /// Returns the index of the element at the front of the queue, if there is
-    /// one.
+    /// one.  This is semantically distinct from `.base_idx()`, but if this
+    /// returns `Some` then that will return the same value.
     pub fn front_idx(&self) -> Option<u64> {
         if !self.entries.is_empty() {
             Some(self.base_idx)
@@ -67,10 +81,33 @@ impl<T> StateQueue<T> {
         }
     }
 
+    /// Returns the absolute index of and a reference to the front entry in the
+    /// queue, if it exists.
+    pub fn front_entry(&self) -> Option<(u64, &T)> {
+        self.entries.first().map(|e| (self.base_idx, e))
+    }
+
+    /// Returns a reference to the front entry of the queue, if it exists.
+    pub fn front(&self) -> Option<&T> {
+        self.entries.first()
+    }
+
     /// Returns the index of the element at the back of the queue, if there is
     /// one.
     pub fn back_idx(&self) -> Option<u64> {
         self.front_idx().map(|i| i + self.entries.len() as u64 - 1)
+    }
+
+    /// Returns the absolute index of and a reference to the back entry in the
+    /// queue, if it exists.
+    pub fn back_entry(&self) -> Option<(u64, &T)> {
+        // Is there a better way to do this?
+        self.entries.last().map(|e| (self.back_idx().unwrap(), e))
+    }
+
+    /// Returns a reference to the back entry in the queue, if it exists.
+    pub fn back(&self) -> Option<&T> {
+        self.entries.last()
     }
 
     /// Returns the absolute index of the next element to be written to the queue.
@@ -79,13 +116,24 @@ impl<T> StateQueue<T> {
     }
 
     /// Gets an entry by absolute position.
+    ///
+    /// This does the math to calculate the correct offset.
     pub fn get_absolute(&self, idx: u64) -> Option<&T> {
         if idx < self.base_idx || idx >= self.next_idx() {
             return None;
         }
 
-        let off = idx - self.base_idx;
-        Some(self.entries.get(off as usize).unwrap())
+        Some(
+            self.entries
+                .get(self.get_off_for_abs(idx) as usize)
+                .unwrap(),
+        )
+    }
+
+    /// Checks if the queue contains an element with the provided absolute index.
+    pub fn contains_abs(&self, idx: u64) -> bool {
+        let end = self.base_idx + self.len() as u64;
+        idx >= self.base_idx && idx < end
     }
 
     /// Pushes an entry to the back of the queue, returning the absolute
@@ -141,7 +189,7 @@ impl<T> StateQueue<T> {
     /// This is a batch operation so that we don't have to repeatedly take
     /// single elements out of the vec with `.pop_front()` and move the later
     /// ones over if we want to take out multiple elements, and it provides a
-    /// check to ensure that it can really be done atomically.
+    /// check to ensure that it can really be done as a single operation.
     pub fn pop_front_n_arr<const N: usize>(&mut self) -> Option<[T; N]> {
         if self.entries.len() < N {
             return None;
@@ -166,6 +214,51 @@ impl<T> StateQueue<T> {
         // Now just copy it to the stack.
         self.base_idx += N as u64;
         Some(*arr_box)
+    }
+
+    /// Drops n elements from the front of the queue.  Will not drop more
+    /// elements than there are in the queue.  Returns if successful or not.
+    pub fn drop_n(&mut self, n: u64) -> bool {
+        let nn = n as usize;
+        if nn as usize > self.entries.len() {
+            return false;
+        }
+
+        assert_eq!(
+            self.entries.drain(..nn).count(),
+            nn,
+            "statequeue: inconsistent drain"
+        );
+        self.base_idx += n;
+
+        true
+    }
+
+    /// Drops some number of elements to make the provided index be the new base
+    /// of the queue.  Returns if successful or not.
+    pub fn drop_abs(&mut self, new_base: u64) -> bool {
+        if new_base < self.base_idx {
+            return false;
+        }
+
+        let diff = new_base - self.base_idx;
+        self.drop_n(diff)
+    }
+
+    /// Drops recent elements from the queue, making the specified absolute
+    /// index the new "next element".  Passing in `.next_idx()` successfully
+    /// does no operation.
+    ///
+    /// Returns true if successful.  Returns false if not possible, making no
+    /// changes.
+    pub fn truncate_abs(&mut self, new_next_idx: u64) -> bool {
+        if new_next_idx < self.base_idx || new_next_idx > self.next_idx() {
+            return false;
+        }
+
+        let new_len = new_next_idx - self.base_idx;
+        self.entries.truncate(new_len as usize);
+        true
     }
 
     /// Iterates over the entries in the queue, from front to back.
@@ -240,5 +333,28 @@ mod tests {
         assert!(q.is_empty());
         let b2 = q.base_idx();
         assert_eq!(b2, 12);
+    }
+
+    #[test]
+    fn test_truncate() {
+        let mut q = StateQueue::<u64>::new_at_index(10);
+
+        q.push_back(5); // idx = 10
+        q.push_back(6);
+        q.push_back(7);
+        q.push_back(8); // idx = 13
+
+        assert_eq!(q.back_idx(), Some(13));
+        assert_eq!(q.back(), Some(&8));
+
+        assert!(q.truncate_abs(13));
+        assert_eq!(q.back_idx(), Some(12));
+        assert_eq!(q.back(), Some(&7));
+
+        assert!(q.truncate_abs(11));
+        assert_eq!(q.back_idx(), Some(10));
+        assert_eq!(q.back(), Some(&5));
+
+        // TODO
     }
 }

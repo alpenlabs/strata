@@ -16,6 +16,7 @@ use crate::{
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
     operation::{ClientUpdateOutput, SyncAction},
+    state_queue::StateQueue,
 };
 
 /// High level client's state of the network.  This is local to the client, not
@@ -24,7 +25,9 @@ use crate::{
 /// This is updated when we see a consensus-relevant message.  This is L2 blocks
 /// but also L1 blocks being published with relevant things in them, and
 /// various other events.
-#[derive(Clone, Debug, Arbitrary, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Deserialize, Serialize,
+)]
 pub struct ClientState {
     /// If we are after genesis.
     pub(super) chain_active: bool,
@@ -52,7 +55,7 @@ pub struct ClientState {
     pub(super) genesis_l1_verification_state_hash: Option<Buf32>,
 
     /// Internal states according to each block height.
-    pub(crate) int_states: BTreeMap<u64, InternalState>,
+    pub(crate) int_states: StateQueue<InternalState>,
 }
 
 impl ClientState {
@@ -68,7 +71,7 @@ impl ClientState {
             // TODO make configurable
             finalization_depth: 3,
             genesis_l1_verification_state_hash: None,
-            int_states: BTreeMap::new(),
+            int_states: StateQueue::new_at_index(genesis_l1_height),
         }
     }
 
@@ -110,14 +113,11 @@ impl ClientState {
     }
 
     pub fn most_recent_l1_block(&self) -> Option<&L1BlockId> {
-        self.int_states.last_key_value().map(|(_, is)| is.blkid())
+        self.int_states.back().map(|is| is.blkid())
     }
 
     pub fn next_exp_l1_block(&self) -> u64 {
-        self.int_states
-            .last_key_value()
-            .map(|(h, _)| *h)
-            .unwrap_or(self.horizon_l1_height)
+        self.int_states.back_idx().unwrap_or(self.genesis_l1_height)
     }
 
     pub fn genesis_l1_height(&self) -> u64 {
@@ -130,7 +130,7 @@ impl ClientState {
 
     /// Gets the internal state for a height, if present.
     pub fn get_internal_state(&self, height: u64) -> Option<&InternalState> {
-        self.int_states.get(&height)
+        self.int_states.get_absolute(height)
     }
 
     /// Gets the number of internal states tracked.
@@ -141,15 +141,15 @@ impl ClientState {
     /// Returns the deepest L1 block we have, if there is one.
     pub fn get_deepest_l1_block(&self) -> Option<L1BlockCommitment> {
         self.int_states
-            .first_key_value()
-            .map(|(h, is)| L1BlockCommitment::new(*h, is.blkid))
+            .front_entry()
+            .map(|(h, is)| L1BlockCommitment::new(h, is.blkid))
     }
 
     /// Returns the deepest L1 block we have, if there is one.
     pub fn get_tip_l1_block(&self) -> Option<L1BlockCommitment> {
         self.int_states
-            .last_key_value()
-            .map(|(h, is)| L1BlockCommitment::new(*h, is.blkid))
+            .back_entry()
+            .map(|(h, is)| L1BlockCommitment::new(h, is.blkid))
     }
 
     /// Gets the highest internal state we have.
@@ -157,7 +157,7 @@ impl ClientState {
     /// This isn't durable, as it's possible it might be rolled back in the
     /// future.
     pub fn get_last_internal_state(&self) -> Option<&InternalState> {
-        self.int_states.last_key_value().map(|(_, st)| st)
+        self.int_states.back()
     }
 
     /// Gets the last checkpoint as of the last internal state.
@@ -172,7 +172,7 @@ impl ClientState {
     /// Checks if there is any checkpoint available at or before the given height.
     // TODO handling if we ask for a block outside this range
     pub fn has_verified_checkpoint_before(&self, height: u64) -> bool {
-        match self.int_states.get(&height) {
+        match self.int_states.get_absolute(height) {
             Some(istate) => istate.last_checkpoint().is_some(),
             None => false,
         }
@@ -182,7 +182,7 @@ impl ClientState {
     // TODO handling if we ask for a block outside this range
     pub fn get_last_verified_checkpoint_before(&self, height: u64) -> Option<&L1Checkpoint> {
         self.int_states
-            .get(&height)
+            .get_absolute(height)
             .and_then(|ck| ck.last_checkpoint())
     }
 
@@ -282,7 +282,9 @@ impl SyncState {
 /// Eventually, when we do away with global bookkeeping around client state,
 /// this will become the full client state that we determine on the fly based on
 /// what L1 blocks are available and what we have persisted.
-#[derive(Clone, Debug, Arbitrary, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Deserialize, Serialize,
+)]
 pub struct InternalState {
     /// Corresponding block ID.  This entry is stored keyed by height, so we
     /// always have that.
@@ -457,7 +459,8 @@ impl ClientStateMut {
     ///
     /// # Panics
     ///
-    /// If the new height is below the buried height.
+    /// If the new height is below the buried height or it's somehow otherwise
+    /// unable to perform the rollback.
     pub fn rollback_l1_blocks(&mut self, new_block: L1BlockCommitment) {
         let l1v = self.state.l1_view_mut();
         let height = new_block.height();
@@ -493,12 +496,10 @@ impl ClientStateMut {
         }
 
         let remove_start_height = new_block.height() + 1;
-
-        for i in remove_start_height..cur_tip_block.height() {
-            if self.state.int_states.remove(&i).is_none() {
-                panic!("clientstate: uncontiguous block state");
-            }
-        }
+        assert!(
+            self.state.int_states.truncate_abs(remove_start_height),
+            "clientstate: remove reorged blocks"
+        );
     }
 
     /// Accepts a new L1 block that extends the chain directly.
@@ -509,7 +510,10 @@ impl ClientStateMut {
     /// * If the block already has a corresponding state.
     /// * If there isn't a preceeding block.
     pub fn accept_l1_block_state(&mut self, l1block: L1BlockCommitment, intstate: InternalState) {
-        if !self.state.int_states.is_empty() {
+        let h = l1block.height();
+        let int_states = &mut self.state.int_states;
+
+        if int_states.is_empty() {
             // Sanity checks.
             assert_eq!(
                 l1block.blkid(),
@@ -517,17 +521,20 @@ impl ClientStateMut {
                 "clientstate: inserting invalid block state"
             );
 
-            let h = l1block.height();
-            if self.state.int_states.contains_key(&h) {
-                panic!("clientstate: tried to overwrite block state for {h}");
-            }
-
-            if !self.state.int_states.contains_key(&(h - 1)) {
-                panic!("clientstate: missing prev block state for {h}");
-            }
+            assert_eq!(
+                int_states.next_idx(),
+                h,
+                "clientstate: inserting out of order block state"
+            );
         }
 
-        self.state.int_states.insert(l1block.height(), intstate);
+        let new_h = int_states.push_back(intstate);
+
+        // Extra, probably redundant, sanity check.
+        assert_eq!(
+            new_h, h,
+            "clientstate: inserted block state is for unexpected height"
+        );
     }
 
     /// Discards old block states up to a certain height which becomes the new oldest.
@@ -537,18 +544,14 @@ impl ClientStateMut {
     /// * If trying to discard the newest.
     /// * If there are no states to discard, for any reason.
     pub fn discard_old_l1_states(&mut self, new_oldest: u64) {
-        let oldest = self
-            .state
-            .int_states
-            .first_key_value()
-            .map(|(h, _)| *h)
+        let int_states = &mut self.state.int_states;
+
+        let oldest = int_states
+            .front_idx()
             .expect("clientstate: missing expected block state");
 
-        let newest = self
-            .state
-            .int_states
-            .last_key_value()
-            .map(|(h, _)| *h)
+        let newest = int_states
+            .back_idx()
             .expect("clientstate: missing expected block state");
 
         if new_oldest <= oldest {
@@ -560,7 +563,14 @@ impl ClientStateMut {
         }
 
         // Actually do the operation.
-        self.state.int_states.retain(|k, _| *k >= new_oldest);
+        int_states.drop_abs(new_oldest);
+
+        // Sanity checks.
+        assert_eq!(
+            int_states.front_idx(),
+            Some(new_oldest),
+            "chainstate: new oldest is unexpected"
+        );
     }
 
     /// Updates the buried L1 block.
