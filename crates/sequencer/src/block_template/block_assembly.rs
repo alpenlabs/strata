@@ -107,7 +107,10 @@ fn prepare_l1_segment(
     _params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     // We aren't going to reorg, so we'll include blocks right up to the tip.
-    let target_height = local_l1_state.tip_height();
+    let l1_height = l1man
+        .get_chain_tip()?
+        .expect("blockasm: should have L1 blocks by now");
+    let target_height = l1_height - 1; // -1 to give some buffer
     trace!(%target_height, "figuring out which blocks to include in L1 segment");
 
     // Check to see if there's actually no blocks in the queue.  In that case we can just give
