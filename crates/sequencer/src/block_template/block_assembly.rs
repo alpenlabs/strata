@@ -114,9 +114,9 @@ fn prepare_l1_segment(
     let maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
     if maturation_queue_size == 0 {
         let mut payloads = Vec::new();
-        for (h, _b) in unacc_blocks.iter().take(max_l1_entries) {
-            let rec = load_header_record(*h, l1man)?;
-            let deposit_update_tx = fetch_deposit_update_txs(*h, l1man)?;
+        for (h, blockid) in unacc_blocks.iter().take(max_l1_entries) {
+            let rec = load_header_record(blockid, l1man)?;
+            let deposit_update_tx = fetch_deposit_update_txs(blockid, l1man)?;
             payloads.push(
                 L1HeaderPayload::new(*h, rec)
                     .with_deposit_update_txs(deposit_update_tx)
@@ -158,9 +158,9 @@ fn prepare_l1_segment(
 
     // Load the blocks.
     let mut payloads = Vec::new();
-    for (h, _b) in fresh_blocks {
-        let rec = load_header_record(*h, l1man)?;
-        let deposit_update_tx = fetch_deposit_update_txs(*h, l1man)?;
+    for (h, blockid) in fresh_blocks {
+        let rec = load_header_record(blockid, l1man)?;
+        let deposit_update_tx = fetch_deposit_update_txs(blockid, l1man)?;
         payloads.push(
             L1HeaderPayload::new(*h, rec)
                 .with_deposit_update_txs(deposit_update_tx)
@@ -175,10 +175,13 @@ fn prepare_l1_segment(
     Ok(L1Segment::new(payloads))
 }
 
-fn load_header_record(h: u64, l1man: &L1BlockManager) -> Result<L1HeaderRecord, Error> {
+fn load_header_record(
+    blockid: &L1BlockId,
+    l1man: &L1BlockManager,
+) -> Result<L1HeaderRecord, Error> {
     let mf = l1man
-        .get_block_manifest(h)?
-        .ok_or(Error::MissingL1BlockHeight(h))?;
+        .get_block_manifest(blockid)?
+        .ok_or(Error::MissingL1Block(*blockid))?;
     // TODO need to include tx root proof we can verify
     Ok(L1HeaderRecord::create_from_serialized_header(
         mf.header().to_vec(),
@@ -186,10 +189,13 @@ fn load_header_record(h: u64, l1man: &L1BlockManager) -> Result<L1HeaderRecord, 
     ))
 }
 
-fn fetch_deposit_update_txs(h: u64, l1man: &L1BlockManager) -> Result<Vec<DepositUpdateTx>, Error> {
+fn fetch_deposit_update_txs(
+    blockid: &L1BlockId,
+    l1man: &L1BlockManager,
+) -> Result<Vec<DepositUpdateTx>, Error> {
     let relevant_tx_ref = l1man
-        .get_block_txs(h)?
-        .ok_or(Error::MissingL1BlockHeight(h))?;
+        .get_block_txs(blockid)?
+        .ok_or(Error::MissingL1Block(*blockid))?;
 
     let mut deposit_update_txs = Vec::new();
     for tx_ref in relevant_tx_ref {

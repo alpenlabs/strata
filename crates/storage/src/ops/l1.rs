@@ -10,12 +10,17 @@ use crate::exec::*;
 
 inst_ops_simple! {
     (<D: L1Database> => L1DataOps) {
-        put_block_data(idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) => ();
-        revert_to_height(idx: u64) => ();
-        get_chain_tip() => Option<u64>;
-        get_block_manifest(idx: u64) => Option<L1BlockManifest>;
-        get_blockid_range(start_idx: u64, end_idx: u64) => Vec<L1BlockId>;
-        get_block_txs(idx: u64) => Option<Vec<L1TxRef>>;
+        put_block_data(mf: L1BlockManifest, txs: Vec<L1Tx>) => ();
+        // put_mmr_checkpoint(blockid: L1BlockId, mmr: CompactMmr) => ();
+        add_at_height(height: u64, blockid: L1BlockId) => ();
+        revert_to_height(height: u64) => ();
+        prune_to_height(height: u64) => ();
+        get_chain_tip() => Option<(u64, L1BlockId)>;
+        get_block_manifest(blockid: L1BlockId) => Option<L1BlockManifest>;
+        get_blockid(height: u64) => Option<L1BlockId>;
+        get_blockid_range(start_height: u64, end_height: u64) => Vec<L1BlockId>;
+        get_block_txs(blockid: L1BlockId) => Option<Vec<L1TxRef>>;
         get_tx(tx_ref: L1TxRef) => Option<L1Tx>;
+        // get_mmr(blockid: L1BlockId) => Option<CompactMmr>;
     }
 }

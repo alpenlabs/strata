@@ -71,7 +71,7 @@ async fn handle_blockdata<R: ReaderRpc>(
     let l1txs: Vec<_> = generate_l1txs(&blockdata);
     let num_txs = l1txs.len();
     l1_manager
-        .put_block_data_async(blockdata.block_num(), manifest, l1txs.clone())
+        .put_block_data_async(manifest, l1txs.clone())
         .await?;
     info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
@@ -142,14 +142,15 @@ fn check_for_commitments(
 /// store in the database.
 fn generate_block_manifest(block: &Block, height: u64, epoch: u64) -> L1BlockManifest {
     let blockid = block.block_hash().into();
+    let prev_blockid = block.header.prev_blockhash.into();
     let root = block
         .witness_root()
         .map(|x| x.to_byte_array())
         .unwrap_or_default();
     let header = serialize(&block.header);
 
-    let mf = L1BlockRecord::new(blockid, height, header, Buf32::from(root));
-    L1BlockManifest::new(mf, epoch)
+    let record = L1BlockRecord::new(blockid, header, Buf32::from(root));
+    L1BlockManifest::new(record, prev_blockid, height, epoch)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
