@@ -18,6 +18,8 @@ pub use header::*;
 pub use header_verification::*;
 pub use inclusion_proof::*;
 pub use ops::*;
+pub use params::*;
 pub use proof::*;
 pub use status::*;
+pub use timestamp_store::*;
 pub use tx::*;
