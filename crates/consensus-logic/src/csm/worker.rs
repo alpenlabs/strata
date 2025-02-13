@@ -181,7 +181,7 @@ pub fn client_worker_task<E: ExecEngineCtl>(
     engine: Arc<E>,
     mut msg_rx: mpsc::Receiver<CsmMessage>,
     status_channel: StatusChannel,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     while let Some(msg) = msg_rx.blocking_recv() {
         if let Err(e) = process_msg(
             &mut state,

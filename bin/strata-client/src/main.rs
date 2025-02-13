@@ -91,6 +91,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         .build()
         .expect("init: build rt");
     let task_manager = TaskManager::new(runtime.handle().clone());
+    //strata_tasks::set_panic_hook(); // only if necessary
     let executor = task_manager.executor();
 
     init_logging(executor.handle());
