@@ -16,24 +16,24 @@ use strata_storage::NodeStorage;
 use tokio::runtime::Handle;
 use tracing::*;
 
-use crate::{args::Args, errors::InitError, network};
+use crate::{
+    args::{Args, EnvArgs},
+    errors::InitError,
+    network,
+};
 
 pub fn get_config(args: Args) -> Result<Config, InitError> {
-    match args.config.as_ref() {
-        Some(config_path) => {
-            // Values passed over arguments get the precedence over the configuration files
-            let mut config = load_configuration(config_path)?;
-            args.update_config(&mut config);
-            Ok(config)
-        }
-        None => match args.derive_config() {
-            Err(msg) => {
-                eprintln!("Error: {}", msg);
-                std::process::exit(1);
-            }
-            Ok(cfg) => Ok(cfg),
-        },
-    }
+    // First load from config file.
+    let mut config = load_configuration(args.config.as_ref())?;
+
+    // Override from env
+    let env_args = EnvArgs::from_env();
+    env_args.override_config(&mut config);
+
+    // Finally override from cli args
+    args.override_config(&mut config);
+
+    Ok(config)
 }
 
 fn load_configuration(path: &Path) -> Result<Config, InitError> {
