@@ -26,7 +26,7 @@ use crate::{checkpoint_verification::verify_proof, errors::*, genesis::make_gene
 /// Interface for external context necessary specifically for event validation.
 pub trait EventContext {
     fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error>;
-    fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error>;
+    fn get_l2_block_data(&self, blockid: &L2BlockId) -> Result<L2BlockBundle, Error>;
     fn get_toplevel_chainstate(&self, slot: u64) -> Result<Chainstate, Error>;
 }
 
@@ -43,10 +43,15 @@ impl<'c> StorageEventContext<'c> {
 
 impl EventContext for StorageEventContext<'_> {
     fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
+        let blockid = self
+            .storage
+            .l1()
+            .get_blockid(height)?
+            .ok_or(Error::MissingL1BlockHeight(height))?;
         self.storage
             .l1()
-            .get_block_manifest(height)?
-            .ok_or(Error::MissingL1BlockHeight(height))
+            .get_block_manifest(&blockid)?
+            .ok_or(Error::MissingL1Block(blockid))
     }
 
     fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
@@ -522,7 +527,12 @@ mod tests {
     impl EventContext for DummyEventContext {
         fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
             let rec = self.chainseg.get_block_record(height as u32);
-            Ok(L1BlockManifest::new(rec, height))
+            let prev_blockid = self
+                .chainseg
+                .get_header(height as u32)
+                .prev_blockhash
+                .into();
+            Ok(L1BlockManifest::new(rec, prev_blockid, height, 0))
         }
 
         fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
