@@ -79,7 +79,7 @@ impl L1BlockCommitment {
     }
 }
 
-/// Reference to a transaction in a block.  This is the block index and the
+/// Reference to a transaction in a block.  This is the blockid and the
 /// position of the transaction in the block.
 #[derive(
     Copy,
@@ -96,10 +96,10 @@ impl L1BlockCommitment {
     Serialize,
     Deserialize,
 )]
-pub struct L1TxRef(u64, u32);
+pub struct L1TxRef(L1BlockId, u32);
 
 impl L1TxRef {
-    pub fn blk_idx(&self) -> u64 {
+    pub fn blk_id(&self) -> L1BlockId {
         self.0
     }
 
@@ -108,14 +108,14 @@ impl L1TxRef {
     }
 }
 
-impl From<L1TxRef> for (u64, u32) {
+impl From<L1TxRef> for (L1BlockId, u32) {
     fn from(val: L1TxRef) -> Self {
         (val.0, val.1)
     }
 }
 
-impl From<(u64, u32)> for L1TxRef {
-    fn from(value: (u64, u32)) -> Self {
+impl From<(L1BlockId, u32)> for L1TxRef {
+    fn from(value: (L1BlockId, u32)) -> Self {
         Self(value.0, value.1)
     }
 }
@@ -127,11 +127,24 @@ pub struct L1BlockManifest {
     record: L1BlockRecord,
     /// Epoch, which was used to generate this manifest
     epoch: u64,
+    /// Block height.
+    height: u64,
+    /// Previous block.
+    prev_blockid: L1BlockId,
 }
 
 impl L1BlockManifest {
-    pub fn new(record: L1BlockRecord, epoch: u64) -> Self {
-        Self { record, epoch }
+    pub fn new(record: L1BlockRecord, prev_blockid: L1BlockId, height: u64, epoch: u64) -> Self {
+        Self {
+            record,
+            height,
+            epoch,
+            prev_blockid,
+        }
+    }
+
+    pub fn height(&self) -> u64 {
+        self.height
     }
 
     pub fn header(&self) -> &[u8] {
@@ -140,6 +153,10 @@ impl L1BlockManifest {
 
     pub fn block_hash(&self) -> L1BlockId {
         self.record.block_hash()
+    }
+
+    pub fn get_prev_block_hash(&self) -> L1BlockId {
+        self.record.get_prev_block_hash()
     }
 
     pub fn txs_root(&self) -> Buf32 {
@@ -163,9 +180,6 @@ pub struct L1BlockRecord {
     /// here. This is what we use in the MMR.
     blockid: L1BlockId,
 
-    /// Block height
-    height: u64,
-
     /// Block header and whatever additional data we might want to query.
     header: Vec<u8>,
 
@@ -176,10 +190,9 @@ pub struct L1BlockRecord {
 }
 
 impl L1BlockRecord {
-    pub fn new(blockid: L1BlockId, height: u64, header: Vec<u8>, txs_root: Buf32) -> Self {
+    pub fn new(blockid: L1BlockId, header: Vec<u8>, txs_root: Buf32) -> Self {
         Self {
             blockid,
-            height,
             header,
             txs_root,
         }
@@ -189,8 +202,9 @@ impl L1BlockRecord {
         self.blockid
     }
 
-    pub fn height(&self) -> u64 {
-        self.height
+    pub fn get_prev_block_hash(&self) -> L1BlockId {
+        let prev_blockhash: [u8; 32] = self.header[4..36].try_into().unwrap();
+        L1BlockId(Buf32(prev_blockhash))
     }
 
     pub fn header(&self) -> &[u8] {

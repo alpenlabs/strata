@@ -129,11 +129,11 @@ fn get_next_batch(
 
     // Helper closures to get L1 and L2 block commitments.
     let get_l1_commitment = |height: u64| -> Result<L1BlockCommitment, Error> {
-        let manifest = storage
+        let blockid = storage
             .l1()
-            .get_block_manifest(height)?
-            .ok_or(DbError::MissingL1BlockBody(height))?;
-        Ok(L1BlockCommitment::new(height, manifest.block_hash()))
+            .get_blockid(height)?
+            .ok_or(DbError::MissingL1BlockHeight(height))?;
+        Ok(L1BlockCommitment::new(height, blockid))
     };
 
     let get_l2_commitment = |height: u64| -> Result<L2BlockCommitment, Error> {
