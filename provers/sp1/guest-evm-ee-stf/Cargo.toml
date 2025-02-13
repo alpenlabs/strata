@@ -7,7 +7,7 @@ version = "0.1.0"
 
 [dependencies]
 strata-proofimpl-evm-ee-stf = { path = "../../../crates/proof-impl/evm-ee-stf" }
-zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc1", features = [
+zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc2", features = [
   "zkvm",
 ] }
 
