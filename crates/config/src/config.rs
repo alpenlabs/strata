@@ -5,6 +5,10 @@ use serde::Deserialize;
 
 use crate::{bridge::RelayerConfig, btcio::BtcioConfig};
 
+const DEFAULT_RPC_PORT: u16 = 8542;
+const DEFAULT_P2P_PORT: u16 = 8543;
+const DEFAULT_DATADIR: &str = "strata-data";
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct FullNodeConfig {
     /// host:port of sequencer rpc
@@ -25,12 +29,34 @@ pub enum ClientMode {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ClientConfig {
     pub rpc_host: String,
+
+    #[serde(default = "default_rpc_port")]
     pub rpc_port: u16,
+
+    #[serde(default = "default_p2p_port")]
+    pub p2p_port: u16,
+
     #[serde(flatten)]
     pub client_mode: ClientMode,
+
     pub l2_blocks_fetch_limit: u64,
+
+    #[serde(default = "default_datadir")]
     pub datadir: PathBuf,
+
     pub db_retry_count: u16,
+}
+
+fn default_p2p_port() -> u16 {
+    DEFAULT_P2P_PORT
+}
+
+fn default_rpc_port() -> u16 {
+    DEFAULT_RPC_PORT
+}
+
+fn default_datadir() -> PathBuf {
+    DEFAULT_DATADIR.into()
 }
 
 #[derive(Debug, Clone, Deserialize)]
