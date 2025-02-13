@@ -81,7 +81,7 @@ impl L1BlockCommitment {
     }
 }
 
-/// Reference to a transaction in a block.  This is the block index and the
+/// Reference to a transaction in a block.  This is the blockid and the
 /// position of the transaction in the block.
 #[derive(
     Copy,
@@ -98,10 +98,10 @@ impl L1BlockCommitment {
     Serialize,
     Deserialize,
 )]
-pub struct L1TxRef(u64, u32);
+pub struct L1TxRef(L1BlockId, u32);
 
 impl L1TxRef {
-    pub fn blk_idx(&self) -> u64 {
+    pub fn blk_id(&self) -> L1BlockId {
         self.0
     }
 
@@ -110,15 +110,21 @@ impl L1TxRef {
     }
 }
 
-impl From<L1TxRef> for (u64, u32) {
+impl From<L1TxRef> for (L1BlockId, u32) {
     fn from(val: L1TxRef) -> Self {
         (val.0, val.1)
     }
 }
 
-impl From<(u64, u32)> for L1TxRef {
-    fn from(value: (u64, u32)) -> Self {
+impl From<(L1BlockId, u32)> for L1TxRef {
+    fn from(value: (L1BlockId, u32)) -> Self {
         Self(value.0, value.1)
+    }
+}
+
+impl From<(&L1BlockId, u32)> for L1TxRef {
+    fn from(value: (&L1BlockId, u32)) -> Self {
+        Self(*value.0, value.1)
     }
 }
 
@@ -138,6 +144,9 @@ pub struct L1BlockManifest {
 
     /// Epoch, which was used to generate this manifest.
     epoch: u64,
+
+    /// Block height.
+    height: u64,
 }
 
 impl L1BlockManifest {
@@ -146,12 +155,14 @@ impl L1BlockManifest {
         verif_state: HeaderVerificationState,
         txs: Vec<L1Tx>,
         epoch: u64,
+        height: u64,
     ) -> Self {
         Self {
             record,
             verif_state,
             txs,
             epoch,
+            height,
         }
     }
 
@@ -178,6 +189,10 @@ impl L1BlockManifest {
     #[deprecated(note = "use .blkid()")]
     pub fn block_hash(&self) -> L1BlockId {
         *self.record.blkid()
+    }
+
+    pub fn height(&self) -> u64 {
+        self.height
     }
 
     pub fn header(&self) -> &[u8] {

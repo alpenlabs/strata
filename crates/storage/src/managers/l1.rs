@@ -12,8 +12,9 @@ use crate::{
 /// Caching manager of L1 block data
 pub struct L1BlockManager {
     ops: ops::l1::L1DataOps,
-    manifest_cache: CacheTable<u64, Option<L1BlockManifest>>,
-    txs_cache: CacheTable<u64, Option<Vec<L1TxRef>>>,
+    manifest_cache: CacheTable<L1BlockId, Option<L1BlockManifest>>,
+    txs_cache: CacheTable<L1BlockId, Option<Vec<L1TxRef>>>,
+    blockheight_cache: CacheTable<u64, Option<L1BlockId>>,
 }
 
 impl L1BlockManager {
@@ -21,73 +22,97 @@ impl L1BlockManager {
         let ops = ops::l1::Context::new(db).into_ops(pool);
         let manifest_cache = cache::CacheTable::new(64.try_into().unwrap());
         let txs_cache = cache::CacheTable::new(64.try_into().unwrap());
+        let blockheight_cache = cache::CacheTable::new(64.try_into().unwrap());
         Self {
             ops,
             manifest_cache,
             txs_cache,
+            blockheight_cache,
         }
     }
 
-    pub fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
-        self.ops.put_block_data_blocking(idx, mf, txs)?;
-        self.manifest_cache.purge(&idx);
-        self.txs_cache.purge(&idx);
-        Ok(())
+    pub fn put_block_data(&self, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
+        let blockid = mf.blkid();
+        self.manifest_cache.purge(blockid);
+        self.txs_cache.purge(blockid);
+        self.ops.put_block_data_blocking(mf, txs)
     }
 
-    pub async fn put_block_data_async(
-        &self,
-        idx: u64,
-        mf: L1BlockManifest,
-        txs: Vec<L1Tx>,
-    ) -> DbResult<()> {
-        self.ops.put_block_data_async(idx, mf, txs).await?;
-        self.manifest_cache.purge(&idx);
-        self.txs_cache.purge(&idx);
-        Ok(())
+    pub async fn put_block_data_async(&self, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
+        let blockid = mf.blkid();
+        self.manifest_cache.purge(blockid);
+        self.txs_cache.purge(blockid);
+        self.ops.put_block_data_async(mf, txs).await
     }
 
     pub fn revert_to_height(&self, idx: u64) -> DbResult<()> {
-        let res = self.ops.revert_to_height_blocking(idx);
-
-        // Purge from cache
-        if let Some(tip) = self.ops.get_chain_tip_blocking()? {
-            for i in idx..=tip {
-                self.manifest_cache.purge(&i);
+        if let Some((tip, _)) = self.ops.get_chain_tip_blocking()? {
+            for i in idx + 1..=tip {
+                self.blockheight_cache.purge(&i);
             }
         }
-
-        res
+        self.ops.revert_to_height_blocking(idx)
     }
 
     pub async fn revert_to_height_async(&self, idx: u64) -> DbResult<()> {
-        let res = self.ops.revert_to_height_async(idx).await;
-
-        // Purge from cache
-        if let Some(tip) = self.ops.get_chain_tip_blocking()? {
-            for i in idx..=tip {
-                self.manifest_cache.purge(&i);
+        if let Some((tip, _)) = self.ops.get_chain_tip_async().await? {
+            for i in idx + 1..=tip {
+                self.blockheight_cache.purge(&i);
             }
         }
-        res
+
+        self.ops.revert_to_height_async(idx).await
     }
 
-    pub fn get_chain_tip(&self) -> DbResult<Option<u64>> {
+    pub fn get_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>> {
         self.ops.get_chain_tip_blocking()
     }
 
-    pub async fn get_chain_tip_async(&self) -> DbResult<Option<u64>> {
+    pub async fn get_chain_tip_async(&self) -> DbResult<Option<(u64, L1BlockId)>> {
         self.ops.get_chain_tip_async().await
     }
 
-    pub fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>> {
+    pub fn get_block_manifest(&self, blockid: &L1BlockId) -> DbResult<Option<L1BlockManifest>> {
         self.manifest_cache
-            .get_or_fetch_blocking(&idx, || self.ops.get_block_manifest_blocking(idx))
+            .get_or_fetch_blocking(blockid, || self.ops.get_block_manifest_blocking(*blockid))
     }
 
-    pub async fn get_block_manifest_async(&self, idx: u64) -> DbResult<Option<L1BlockManifest>> {
+    pub async fn get_block_manifest_async(
+        &self,
+        blockid: &L1BlockId,
+    ) -> DbResult<Option<L1BlockManifest>> {
         self.manifest_cache
-            .get_or_fetch(&idx, || self.ops.get_block_manifest_chan(idx))
+            .get_or_fetch(blockid, || self.ops.get_block_manifest_chan(*blockid))
+            .await
+    }
+
+    pub fn get_block_manifest_at_height(&self, height: u64) -> DbResult<Option<L1BlockManifest>> {
+        Ok(self
+            .get_blockid(height)?
+            .map(|blockid| self.get_block_manifest(&blockid))
+            .transpose()?
+            .flatten())
+    }
+
+    pub async fn get_block_manifest_at_height_async(
+        &self,
+        height: u64,
+    ) -> DbResult<Option<L1BlockManifest>> {
+        let Some(blockid) = self.get_blockid_async(height).await? else {
+            return Ok(None);
+        };
+
+        self.get_block_manifest_async(&blockid).await
+    }
+
+    pub fn get_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>> {
+        self.blockheight_cache
+            .get_or_fetch_blocking(&height, || self.ops.get_blockid_blocking(height))
+    }
+
+    pub async fn get_blockid_async(&self, height: u64) -> DbResult<Option<L1BlockId>> {
+        self.blockheight_cache
+            .get_or_fetch(&height, || self.ops.get_blockid_chan(height))
             .await
     }
 
@@ -103,14 +128,14 @@ impl L1BlockManager {
         self.ops.get_blockid_range_async(start_idx, end_idx).await
     }
 
-    pub fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
+    pub fn get_block_txs(&self, blockid: &L1BlockId) -> DbResult<Option<Vec<L1TxRef>>> {
         self.txs_cache
-            .get_or_fetch_blocking(&idx, || self.ops.get_block_txs_blocking(idx))
+            .get_or_fetch_blocking(blockid, || self.ops.get_block_txs_blocking(*blockid))
     }
 
-    pub async fn get_block_txs_async(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>> {
+    pub async fn get_block_txs_async(&self, blockid: &L1BlockId) -> DbResult<Option<Vec<L1TxRef>>> {
         self.txs_cache
-            .get_or_fetch(&idx, || self.ops.get_block_txs_chan(idx))
+            .get_or_fetch(blockid, || self.ops.get_block_txs_chan(*blockid))
             .await
     }
 

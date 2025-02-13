@@ -49,7 +49,7 @@ use l2::{
     db::L2Db,
     schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema},
 };
-use rockbound::{schema::ColumnFamilyName, Schema};
+use rockbound::{schema::ColumnFamilyName, Schema, TransactionRetry};
 pub use sync_event::db::SyncEventDb;
 pub use writer::db::RBL1WriterDb;
 use writer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
@@ -116,6 +116,10 @@ pub struct DbOpsConfig {
 impl DbOpsConfig {
     pub fn new(retry_count: u16) -> Self {
         Self { retry_count }
+    }
+
+    pub fn txn_retry_count(&self) -> TransactionRetry {
+        TransactionRetry::Count(self.retry_count)
     }
 }
 

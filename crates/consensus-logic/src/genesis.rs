@@ -88,7 +88,7 @@ fn load_pre_genesis_l1_manifests(
 ) -> anyhow::Result<Vec<L1BlockManifest>> {
     let mut manifests = Vec::new();
     for height in horizon_height..=genesis_height {
-        let Some(mf) = l1man.get_block_manifest(height)? else {
+        let Some(mf) = l1man.get_block_manifest_at_height(height)? else {
             return Err(Error::MissingL1BlockHeight(height).into());
         };
 
