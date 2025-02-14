@@ -59,7 +59,7 @@ impl L1Database for L1Db {
         Ok(())
     }
 
-    fn add_at_height(&self, height: u64, blockid: L1BlockId) -> DbResult<()> {
+    fn add_to_canonical_chain(&self, height: u64, blockid: L1BlockId) -> DbResult<()> {
         match self.get_latest_block()? {
             // if block exists, new block must extend chain sequentially
             Some((existing_height, _)) if existing_height + 1 != height => {
@@ -73,7 +73,7 @@ impl L1Database for L1Db {
         Ok(())
     }
 
-    fn revert_to_height(&self, height: u64) -> DbResult<()> {
+    fn revert_canonical_chain(&self, height: u64) -> DbResult<()> {
         // Get latest height, iterate backwards upto the idx, get blockhash and delete txns and
         // blockmanifest data at each iteration
         let last_height = self
@@ -172,7 +172,11 @@ impl L1Database for L1Db {
     }
 
     // TODO: This should not exist in database level and should be handled by downstream manager
-    fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<L1BlockId>> {
+    fn get_canonical_blockid_range(
+        &self,
+        start_idx: u64,
+        end_idx: u64,
+    ) -> DbResult<Vec<L1BlockId>> {
         let mut options = ReadOptions::default();
         options.set_iterate_lower_bound(
             KeyEncoder::<L1CanonicalBlockSchema>::encode_key(&start_idx)
@@ -192,7 +196,7 @@ impl L1Database for L1Db {
         Ok(res)
     }
 
-    fn get_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>> {
+    fn get_canonical_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>> {
         Ok(self.db.get::<L1CanonicalBlockSchema>(&height)?)
     }
 
@@ -236,7 +240,7 @@ mod tests {
         // Insert block data
         let res = db.put_block_data(mf.clone(), txs.clone());
         assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
-        let res = db.add_at_height(height, *mf.blkid());
+        let res = db.add_to_canonical_chain(height, *mf.blkid());
         assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
 
         // Insert mmr data
@@ -274,7 +278,7 @@ mod tests {
             let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
             let blockid = *mf.blkid();
             db.put_block_data(mf, txs).unwrap();
-            let res = db.add_at_height(invalid_idx, blockid);
+            let res = db.add_to_canonical_chain(invalid_idx, blockid);
             assert!(res.is_err(), "Should fail to insert to db");
         }
 
@@ -285,7 +289,7 @@ mod tests {
         let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
         let blockid = *mf.blkid();
         db.put_block_data(mf, txs).unwrap();
-        let res = db.add_at_height(valid_idx, blockid);
+        let res = db.add_to_canonical_chain(valid_idx, blockid);
         assert!(res.is_ok(), "Should successfully insert to db");
     }
 
@@ -302,7 +306,7 @@ mod tests {
         // Try reverting to an invalid height, which should fail
         let invalid_heights = [5, 6, 10];
         for inv_h in invalid_heights {
-            let res = db.revert_to_height(inv_h);
+            let res = db.revert_canonical_chain(inv_h);
             assert!(res.is_err(), "Should fail to revert to height {}", inv_h);
         }
     }
@@ -317,7 +321,7 @@ mod tests {
         let _ = insert_block_data(3, &db, num_txs);
         let _ = insert_block_data(4, &db, num_txs);
 
-        let res = db.revert_to_height(0);
+        let res = db.revert_canonical_chain(0);
         assert!(res.is_ok(), "Should succeed to revert to height 0");
     }
 
@@ -331,13 +335,13 @@ mod tests {
         let _ = insert_block_data(3, &db, num_txs);
         let _ = insert_block_data(4, &db, num_txs);
 
-        let res = db.revert_to_height(3);
+        let res = db.revert_canonical_chain(3);
         assert!(res.is_ok(), "Should succeed to revert to non-zero height");
-        let revert_blockid = db.get_blockid(3).unwrap().unwrap();
+        let revert_blockid = db.get_canonical_blockid(3).unwrap().unwrap();
 
         // Check that some txns and mmrs exists upto this height
         for h in 1..=3 {
-            let blockid = db.get_blockid(h).unwrap().unwrap();
+            let blockid = db.get_canonical_blockid(h).unwrap().unwrap();
             let txn_data = db.get_tx((blockid, 0).into()).unwrap();
             assert!(txn_data.is_some());
             let mmr_data = db.get_mmr(blockid).unwrap();
@@ -348,7 +352,7 @@ mod tests {
         let latest = db.get_latest_block().unwrap();
         assert!(matches!(latest, Some((3, blockid)) if blockid == revert_blockid));
         // check that block beyond revert height is not accessible
-        let blockid = db.get_blockid(4).unwrap();
+        let blockid = db.get_canonical_blockid(4).unwrap();
         assert!(blockid.is_none());
     }
 
@@ -373,12 +377,14 @@ mod tests {
 
         // fetch non existent block
         let non_idx = 200;
-        let observed_blockid = db.get_blockid(non_idx).expect("Could not fetch from db");
+        let observed_blockid = db
+            .get_canonical_blockid(non_idx)
+            .expect("Could not fetch from db");
         assert_eq!(observed_blockid, None);
 
         // fetch and check, existent block
         let blockid = db
-            .get_blockid(idx)
+            .get_canonical_blockid(idx)
             .expect("Could not fetch from db")
             .expect("Expected block missing");
         let observed_mf = db
@@ -448,7 +454,7 @@ mod tests {
         insert_block_data(2, &db, num_txs);
         insert_block_data(3, &db, num_txs);
 
-        let blockid = db.get_blockid(2).unwrap().unwrap();
+        let blockid = db.get_canonical_blockid(2).unwrap().unwrap();
         let block_txs = db.get_block_txs(blockid).unwrap().unwrap();
         let expected: Vec<_> = (0..10).map(|i| (blockid, i).into()).collect(); // 10 because insert_block_data inserts 10 txs
         assert_eq!(block_txs, expected);
@@ -463,7 +469,7 @@ mod tests {
         let _ = insert_block_data(2, &db, num_txs);
         let _ = insert_block_data(3, &db, num_txs);
 
-        let range = db.get_blockid_range(3, 1).unwrap();
+        let range = db.get_canonical_blockid_range(3, 1).unwrap();
         assert_eq!(range.len(), 0);
     }
 
@@ -476,7 +482,7 @@ mod tests {
         let (mf2, _, _) = insert_block_data(2, &db, num_txs);
         let (mf3, _, _) = insert_block_data(3, &db, num_txs);
 
-        let range = db.get_blockid_range(1, 4).unwrap();
+        let range = db.get_canonical_blockid_range(1, 4).unwrap();
         assert_eq!(range.len(), 3);
         for (exp, obt) in vec![mf1, mf2, mf3].iter().zip(range) {
             assert_eq!(*exp.blkid(), obt);

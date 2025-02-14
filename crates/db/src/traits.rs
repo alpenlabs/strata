@@ -55,11 +55,11 @@ pub trait L1Database {
     fn put_mmr_checkpoint(&self, blockid: L1BlockId, mmr: CompactMmr) -> DbResult<()>;
 
     /// Set block at specific height.
-    fn add_at_height(&self, height: u64, blockid: L1BlockId) -> DbResult<()>;
+    fn add_to_canonical_chain(&self, height: u64, blockid: L1BlockId) -> DbResult<()>;
 
     /// Resets the L1 chain tip to the specified block index.  The provided
     /// index will be the new chain tip that we store.
-    fn revert_to_height(&self, idx: u64) -> DbResult<()>;
+    fn revert_canonical_chain(&self, idx: u64) -> DbResult<()>;
 
     /// Prune earliest blocks till height
     fn prune_to_height(&self, height: u64) -> DbResult<()>;
@@ -73,12 +73,13 @@ pub trait L1Database {
     fn get_block_manifest(&self, blockid: L1BlockId) -> DbResult<Option<L1BlockManifest>>;
 
     /// Gets the blockid at height for the current chain.
-    fn get_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>>;
+    fn get_canonical_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>>;
 
     // TODO: This should not exist in database level and should be handled by downstream manager.
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.
-    fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<L1BlockId>>;
+    fn get_canonical_blockid_range(&self, start_idx: u64, end_idx: u64)
+        -> DbResult<Vec<L1BlockId>>;
 
     /// Gets the relevant txs we stored in a block.
     fn get_block_txs(&self, blockid: L1BlockId) -> DbResult<Option<Vec<L1TxRef>>>;
