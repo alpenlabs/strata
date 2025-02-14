@@ -395,7 +395,7 @@ async fn process_block<R: ReaderRpc>(
     let genesis_ht = params.rollup().genesis_l1_height;
     let genesis_threshold = genesis_ht + threshold as u64;
 
-    trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
+    //trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
 
     /*if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");

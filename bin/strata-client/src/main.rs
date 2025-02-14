@@ -553,7 +553,7 @@ async fn start_rpc(
     let rpc_handle = rpc_server.start(methods);
 
     // start a Btcio event handler
-    info!("started RPC server");
+    info!(%rpc_host, %rpc_port, "started RPC server");
 
     // Wait for a stop signal.
     let _ = stop_rx.await;

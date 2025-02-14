@@ -19,7 +19,7 @@ class SyncGenesisTest(testenv.StrataTester):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
 
-        time.sleep(3)
+        time.sleep(5)
 
         # Wait until genesis.  This might need to be tweaked if we change how
         # long we wait for genesis in tests.
@@ -29,12 +29,15 @@ class SyncGenesisTest(testenv.StrataTester):
             assert tries <= MAX_GENESIS_TRIES, "did not observe genesis before timeout"
 
             self.info("waiting for genesis")
-            stat = seqrpc.strata_clientStatus()
-            self.info(stat)
-            if stat["finalized_blkid"] != UNSET_ID:
-                last_slot = stat["chain_tip_slot"]
-                self.info(f"observed genesis, now at slot {last_slot}")
-                break
+            try:
+                stat = seqrpc.strata_clientStatus()
+                self.info(stat)
+                if stat["finalized_blkid"] != UNSET_ID:
+                    last_slot = stat["chain_tip_slot"]
+                    self.info(f"observed genesis, now at slot {last_slot}")
+                    break
+            except ConnectionRefusedError:
+                self.warning("RPC server still closed")
 
             time.sleep(0.5)
             self.info(f"waiting for genesis... -- tries {tries}")

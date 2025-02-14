@@ -14,6 +14,7 @@ pub enum L1Event {
     /// Revert to the provided block height
     RevertTo(L1BlockCommitment),
 
+    // TODO remove this
     /// HeaderVerificationState for the block after genesis
     ///
     /// Note: This event is expected to emit only once after the genesis_block has reached maturity
