@@ -43,15 +43,10 @@ impl<'c> StorageEventContext<'c> {
 
 impl EventContext for StorageEventContext<'_> {
     fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
-        let blockid = self
-            .storage
-            .l1()
-            .get_canonical_blockid(height)?
-            .ok_or(Error::MissingL1BlockHeight(height))?;
         self.storage
             .l1()
-            .get_block_manifest(&blockid)?
-            .ok_or(Error::MissingL1Block(blockid))
+            .get_block_manifest_at_height(height)?
+            .ok_or(Error::MissingL1BlockHeight(height))
     }
 
     fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
