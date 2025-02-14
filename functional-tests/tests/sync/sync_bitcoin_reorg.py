@@ -25,6 +25,7 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
                 # TODO: Need to generate at least horizon height blocks, can't
                 # get rollup params from here
                 2,
+                pre_fund_addrs=False,
                 rollup_settings=net_settings.get_fast_batch_settings(),
                 auto_generate_blocks=False,
             )

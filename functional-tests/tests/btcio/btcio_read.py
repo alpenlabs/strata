@@ -1,11 +1,8 @@
-import time
-
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
-from utils import generate_n_blocks, wait_until
-from utils.constants import MAX_HORIZON_POLL_INTERVAL_SECS
+from utils import generate_n_blocks, wait_until_with_value
 
 
 @flexitest.register
@@ -22,14 +19,21 @@ class L1StatusTest(testenv.StrataTester):
         # generate 5 btc blocks
         generate_n_blocks(btcrpc, 5)
 
-        # Wait for seq
-        wait_until(
-            lambda: seqrpc.strata_protocolVersion() is not None,
-            error_with="Sequencer did not start on time",
+        received_block = wait_until_with_value(
+            lambda: btcrpc.getblock(btcrpc.proxy.getbestblockhash()),
+            predicate=lambda block: block["height"] == 5,
+            error_with="btc blocks not generated",
         )
 
-        received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
-        l1stat = seqrpc.strata_l1status()
+        # Wait for seq to catch up
+        l1stat = wait_until_with_value(
+            lambda: seqrpc.strata_l1status(),
+            predicate=lambda stat: stat["cur_height"] == 5,
+            error_with="Sequencer did not catch up",
+        )
+
+        print(received_block)
+        print(l1stat)
 
         # Time is in millis
         cur_time = l1stat["last_update"] // 1000
@@ -37,17 +41,30 @@ class L1StatusTest(testenv.StrataTester):
         # check if height on bitcoin is same as, it is seen in sequencer
         self.debug(f"L1 stat curr height: {l1stat['cur_height']}")
         self.debug(f"Received from bitcoin: {received_block['height']}")
-        assert l1stat["cur_height"] == received_block["height"], (
-            "sequencer height doesn't match the bitcoin node height"
+        assert l1stat["cur_tip_blkid"] == received_block["block_hash"], (
+            "sequencer block doesn't match the bitcoin node block"
         )
 
         # generate 2 more btc blocks
         generate_n_blocks(btcrpc, 2)
-        time.sleep(MAX_HORIZON_POLL_INTERVAL_SECS * 2)
 
-        next_l1stat = seqrpc.strata_l1status()
+        received_block = wait_until_with_value(
+            lambda: btcrpc.getblock(btcrpc.proxy.getbestblockhash()),
+            predicate=lambda block: block["height"] == 7,
+            error_with="btc blocks not generated",
+        )
+
+        # Wait for seq to catch up
+        next_l1stat = wait_until_with_value(
+            lambda: seqrpc.strata_l1status(),
+            predicate=lambda stat: stat["cur_height"] == 7,
+            error_with="Sequencer did not catch up",
+        )
+
         elapsed_time = next_l1stat["last_update"] // 1000
 
         # check if L1 reader is seeing new L1 activity
-        assert next_l1stat["cur_height"] - l1stat["cur_height"] == 2, "new blocks not read"
+        assert next_l1stat["cur_tip_blkid"] == received_block["block_hash"], (
+            "sequencer block doesn't match the bitcoin node block"
+        )
         assert elapsed_time > cur_time, "time not flowing properly"
