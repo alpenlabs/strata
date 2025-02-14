@@ -1,3 +1,4 @@
+#![feature(slice_pattern)]
 use std::{sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, BlockHash};
