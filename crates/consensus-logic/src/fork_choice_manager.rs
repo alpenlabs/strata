@@ -332,12 +332,19 @@ fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
 ) -> anyhow::Result<()> {
     let mut cl_rx = status_channel.subscribe_client_state();
     loop {
+        // Check if we should shut down.
         if shutdown.should_shutdown() {
             warn!("fcm task received shutdown signal");
             break;
         }
 
         let fcm_ev = wait_for_fcm_event(&handle, &mut fcm_rx, &mut cl_rx);
+
+        // Check again in case we got the signal while waiting.
+        if shutdown.should_shutdown() {
+            warn!("fcm task received shutdown signal");
+            break;
+        }
 
         match fcm_ev {
             FcmEvent::NewFcmMsg(m) => {
@@ -347,7 +354,9 @@ fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
             FcmEvent::Abort => break,
         }?;
     }
-    info!("Exiting fork_choice_manager task");
+
+    info!("FCM exiting");
+
     Ok(())
 }
 
@@ -375,11 +384,11 @@ fn wait_for_fcm_event(
 }
 
 /// Waits until there's a new client state and returns the client state.
-pub async fn wait_for_client_change(
+async fn wait_for_client_change(
     cl_rx: &mut watch::Receiver<ClientState>,
 ) -> Result<ClientState, watch::error::RecvError> {
     cl_rx.changed().await?;
-    let state = cl_rx.borrow().clone();
+    let state = cl_rx.borrow_and_update().clone();
     Ok(state)
 }
 
