@@ -139,8 +139,8 @@ async fn get_txs_from_height(
     l1man: &L1BlockManager,
     start_height: u64,
 ) -> RpcResult<(Vec<L1Tx>, u64)> {
-    let (tip_height, _) = l1man
-        .get_chain_tip_async()
+    let tip_height = l1man
+        .get_chain_tip_height_async()
         .await
         .map_err(RpcServerError::Db)?
         .ok_or(RpcServerError::BeforeGenesis)?;
@@ -150,13 +150,8 @@ async fn get_txs_from_height(
         for height in start_height..=tip_height {
             // We don't actually care if we don't have txs at a particular
             // height, we can continue unconditionally.
-            let blockid = l1man
-                .get_canonical_blockid_async(height)
-                .await
-                .map_err(RpcServerError::Db)?
-                .ok_or(RpcServerError::MissingL1BlockManifest(height))?;
             let Some(tx_refs) = l1man
-                .get_block_txs_async(&blockid)
+                .get_block_txs_at_height_async(height)
                 .await
                 .map_err(RpcServerError::Db)?
             else {
