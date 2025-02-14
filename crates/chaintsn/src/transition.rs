@@ -7,6 +7,7 @@ use std::{cmp::max, collections::HashMap};
 use bitcoin::{OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
+    epoch::EpochCommitment,
     l1::{BitcoinAmount, L1HeaderPayload, L1TxRef, OutputRef},
     params::RollupParams,
 };
@@ -57,9 +58,14 @@ pub fn process_block(
     state.set_cur_header(header);
 
     // Go through each stage and play out the operations it has.
-    process_l1_view_update(state, body.l1_segment(), params)?;
+    let new_epoch = process_l1_view_update(state, body.l1_segment(), params)?;
     let ready_withdrawals = process_execution_update(state, body.exec_segment().update())?;
     process_deposit_updates(state, ready_withdrawals, &mut rng, params)?;
+
+    // If we checked in with L1, then advance the epoch.
+    if new_epoch {
+        advance_epoch(state, header)?;
+    }
 
     Ok(())
 }
@@ -76,12 +82,15 @@ fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
 }
 
 /// Update our view of the L1 state, playing out downstream changes from that.
+///
+/// Returns if there was an update processed.
 fn process_l1_view_update(
     state: &mut StateCache,
     l1seg: &L1Segment,
     params: &RollupParams,
-) -> Result<(), TsnError> {
+) -> Result<bool, TsnError> {
     let l1v = state.state().l1_view();
+
     // Accept new blocks, comparing the tip against the current to figure out if
     // we need to do a reorg.
     // FIXME this should actually check PoW, it just does it based on block heights
@@ -132,8 +141,19 @@ fn process_l1_view_update(
         for idx in (cur_safe_height..=new_matured_l1_height) {
             state.mature_l1_block(idx);
         }
-    }
 
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+/// Advances the epoch bookkeeping, using the provided header as the terminal.
+fn advance_epoch(state: &mut StateCache, header: &impl L2Header) -> Result<(), TsnError> {
+    let cur_epoch = state.state().cur_epoch();
+    let this_epoch = EpochCommitment::new(cur_epoch, header.blockidx(), header.get_blockid());
+    state.set_prev_epoch(this_epoch);
+    state.set_cur_epoch(cur_epoch + 1);
     Ok(())
 }
 

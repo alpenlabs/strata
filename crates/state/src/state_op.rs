@@ -8,6 +8,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
+    epoch::EpochCommitment,
     l1::ProtocolOperation,
     l2::L2BlockCommitment,
 };
@@ -164,6 +165,21 @@ impl StateCache {
     pub fn set_last_block(&mut self, block: L2BlockCommitment) {
         let state = self.state_mut();
         state.last_block = block;
+    }
+
+    /// Sets the current epoch index.
+    pub fn set_cur_epoch(&mut self, epoch: u64) {
+        self.state_mut().cur_epoch = epoch;
+    }
+
+    /// Sets the previous epoch.
+    pub fn set_prev_epoch(&mut self, epoch: EpochCommitment) {
+        self.state_mut().prev_epoch = epoch;
+    }
+
+    /// Sets the previous epoch.
+    pub fn set_finalized_epoch(&mut self, epoch: EpochCommitment) {
+        self.state_mut().finalized_epoch = epoch;
     }
 
     /// remove a deposit intent from the pending deposits queue.
