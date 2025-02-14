@@ -452,7 +452,7 @@ def setup_root_logger():
     """
     reads `LOG_LEVEL` from the environment. Defaults to `WARNING` if not provided.
     """
-    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, log_level, logging.NOTSET)
     # Configure the root logger
     root_logger = logging.getLogger()
@@ -480,12 +480,15 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
     )
+
     # Set up individual loggers for each test
     logger = logging.getLogger(test_name)
+
     # File handler
     log_path = os.path.join(log_dir, f"{test_name}.log")
     file_handler = logging.FileHandler(log_path)
     file_handler.setFormatter(formatter)
+
     # Stream handler
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -493,6 +496,10 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     # Add handlers to the logger
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
+
+    # Set level to something sensible.
+    # TODO make this fetch from user input
+    logger.setLevel(logging.INFO)
 
     return logger
 
