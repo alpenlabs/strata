@@ -140,7 +140,7 @@ impl WorkerState {
         // Load the event from the database.
         let ev = self.get_sync_event_ok(ev_idx)?;
 
-        debug!(?ev, "processing sync event");
+        debug!(%ev_idx, ?ev, "processing sync event");
 
         #[cfg(feature = "debug-utils")]
         {
@@ -165,9 +165,9 @@ impl WorkerState {
             .put_update_blocking(ev_idx, outp.clone())?;
 
         // Update bookkeeping.
+        debug!(%ev_idx, ?state, "computed new consensus state");
         self.cur_state = state;
         self.cur_state_idx = ev_idx;
-        debug!(%ev_idx, "computed new consensus state");
 
         Ok((outp, self.cur_state.clone()))
     }
@@ -280,6 +280,8 @@ fn handle_sync_event_with_retry(
         }
     }
 
+    debug!(%ev_idx, %ev, "processed OK");
+
     Ok(())
 }
 
@@ -307,9 +309,11 @@ fn handle_sync_event(
     status.update_from_client_state(new_state.as_ref());
     status_channel.update_client_state(new_state.as_ref().clone());
 
-    trace!(?new_state, "sending client update notif");
+    trace!(%ev_idx, "sending client update notif");
     let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
+        // Is this actually useful?  Does this just error if there's no
+        // listeners?
         warn!("failed to send broadcast for new CSM update");
     }
 

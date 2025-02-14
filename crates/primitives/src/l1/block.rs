@@ -3,6 +3,7 @@ use bitcoin::{consensus::serialize, hashes::Hash, Block, BlockHash};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+use super::L1Tx;
 use crate::{buf::Buf32, hash::sha256d, impl_buf_wrapper};
 
 /// ID of an L1 block, usually the hash of its header.
@@ -131,15 +132,24 @@ pub struct L1BlockManifest {
     /// Header verification state, with PoW.
     verif_state: HeaderVerificationState,
 
+    /// List of interesting transactions we took out.
+    txs: Vec<L1Tx>,
+
     /// Epoch, which was used to generate this manifest.
     epoch: u64,
 }
 
 impl L1BlockManifest {
-    pub fn new(record: L1BlockRecord, verif_state: HeaderVerificationState, epoch: u64) -> Self {
+    pub fn new(
+        record: L1BlockRecord,
+        verif_state: HeaderVerificationState,
+        txs: Vec<L1Tx>,
+        epoch: u64,
+    ) -> Self {
         Self {
             record,
             verif_state,
+            txs,
             epoch,
         }
     }
@@ -150,6 +160,10 @@ impl L1BlockManifest {
 
     pub fn header_verification_state(&self) -> &HeaderVerificationState {
         &self.verif_state
+    }
+
+    pub fn txs(&self) -> &[L1Tx] {
+        &self.txs
     }
 
     pub fn epoch(&self) -> u64 {

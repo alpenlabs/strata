@@ -98,7 +98,7 @@ impl ClientState {
     }
 
     pub fn next_exp_l1_block(&self) -> u64 {
-        self.int_states.back_idx().unwrap_or(self.genesis_l1_height)
+        self.int_states.next_idx()
     }
 
     pub fn genesis_l1_height(&self) -> u64 {
@@ -433,7 +433,7 @@ impl ClientStateMut {
     /// * If the blkids are inconsistent.
     /// * If the block already has a corresponding state.
     /// * If there isn't a preceeding block.
-    pub fn accept_l1_block_state(&mut self, l1block: L1BlockCommitment, intstate: InternalState) {
+    pub fn accept_l1_block_state(&mut self, l1block: &L1BlockCommitment, intstate: InternalState) {
         let h = l1block.height();
         let int_states = &mut self.state.int_states;
 

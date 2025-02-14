@@ -203,25 +203,29 @@ fn handle_block(
     if height == params.rollup().genesis_l1_height {
         // Do genesis here.
         let istate = process_genesis_trigger_block(&block_mf, params.rollup())?;
-        state.accept_l1_block_state(*block, istate);
+        state.accept_l1_block_state(block, istate);
         state.activate_chain();
     } else if height == next_exp_height {
         // Do normal L1 block extension here.
         let prev_istate = state
             .state()
-            .get_internal_state(height)
+            .get_internal_state(height - 1)
             .expect("clientstate: missing expected block state");
 
         let new_istate = process_l1_block(prev_istate, &block_mf, params.rollup())?;
-        state.accept_l1_block_state(*block, new_istate);
+        state.accept_l1_block_state(block, new_istate);
 
         // TODO make max states configurable
-        /*let max_states = 20;
-        if state.state().internal_state_cnt() as u64 > max_states {
-            let newest_height = state.state().get_deepest_l1_block().unwrap().height();
-            let new_oldest = newest_height - max_states + 1;
-            state.discard_old_l1_states(new_oldest);
-        }*/
+        let max_states = 20;
+        let total_states = state.state().internal_state_cnt();
+        if total_states > max_states {
+            let excess = total_states - max_states;
+            let base_block = state
+                .state()
+                .get_deepest_l1_block()
+                .expect("clienttsn: missing oldest state");
+            state.discard_old_l1_states(base_block.height() + excess as u64);
+        }
     } else {
         // If it's below the expected height then it's possible it's
         // just a tracking inconsistentcy, let's make sure we don't
@@ -309,8 +313,12 @@ fn process_l1_block(
     block_mf: &L1BlockManifest,
     params: &RollupParams,
 ) -> Result<InternalState, Error> {
-    // TODO implement this
-    Ok(state.clone())
+    let blkid = block_mf.block_hash();
+    let mut checkpoint = None;
+
+    for txs in block_mf.txs() {}
+
+    Ok(InternalState::new(blkid, checkpoint))
 }
 
 // TODO remove this old code after we've reconsolidated its responsibilities

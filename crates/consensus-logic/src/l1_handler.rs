@@ -85,9 +85,12 @@ fn handle_bitcoin_event(
 
             let l1blkid = blockdata.block().block_hash();
 
-            let manifest = generate_block_manifest(blockdata.block(), epoch, hvs);
+            // Extract all the parts we want.
+            // TODO clean this up, the parts are kinda weird
             let l1txs: Vec<_> = generate_l1txs(&blockdata);
             let num_txs = l1txs.len();
+            let manifest = generate_block_manifest(blockdata.block(), hvs, l1txs.clone(), epoch);
+
             l1man.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
             info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
@@ -177,8 +180,9 @@ fn check_for_da_batch(
 /// store in the database.
 fn generate_block_manifest(
     block: &Block,
-    epoch: u64,
     hvs: HeaderVerificationState,
+    txs: Vec<L1Tx>,
+    epoch: u64,
 ) -> L1BlockManifest {
     let blockid = block.block_hash().into();
     let root = block
@@ -188,7 +192,7 @@ fn generate_block_manifest(
     let header = serialize(&block.header);
 
     let mf = L1BlockRecord::new(blockid, header, Buf32::from(root));
-    L1BlockManifest::new(mf, hvs, epoch)
+    L1BlockManifest::new(mf, hvs, txs, epoch)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
