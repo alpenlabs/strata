@@ -212,7 +212,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
 
     async fn submit_new_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
         let el_payload = borsh::from_slice::<ElPayload>(payload.accessory_data())
-            .map_err(|_| EngineError::Other("Invalid payload".to_string()))?;
+            .map_err(|_| EngineError::PayloadMalformed)?;
 
         // actually bridge-in deposits
         let withdrawals: Vec<Withdrawal> = payload
