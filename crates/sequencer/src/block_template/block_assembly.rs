@@ -9,18 +9,16 @@ use strata_eectl::{
 };
 use strata_primitives::{
     buf::Buf32,
+    l1::{DepositUpdateTx, L1HeaderPayload, L1HeaderRecord, ProtocolOperation},
     params::{Params, RollupParams},
 };
 use strata_state::{
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     chain_state::Chainstate,
-    client_state::LocalL1State,
     exec_update::construct_ops_from_deposit_intents,
     header::L2BlockHeader,
-    l1::{DepositUpdateTx, L1HeaderPayload, L1HeaderRecord},
     prelude::*,
     state_op::*,
-    tx::ProtocolOperation::Deposit,
 };
 use strata_storage::{L1BlockManager, NodeStorage};
 use tracing::*;
@@ -32,10 +30,10 @@ const MAX_L1_ENTRIES_PER_BLOCK: usize = 100;
 
 /// Build contents for a new L2 block with the provided configuration.
 /// Needs to be signed to be a valid L2Block.
+// TODO use parent block chainstate
 pub fn prepare_block(
     slot: u64,
     prev_block: L2BlockBundle,
-    l1_state: &LocalL1State,
     ts: u64,
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
@@ -64,7 +62,6 @@ pub fn prepare_block(
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
     let l1_seg = prepare_l1_segment(
-        l1_state,
         &prev_chstate,
         l1man.as_ref(),
         MAX_L1_ENTRIES_PER_BLOCK,
@@ -100,7 +97,6 @@ pub fn prepare_block(
 }
 
 fn prepare_l1_segment(
-    local_l1_state: &LocalL1State,
     prev_chstate: &Chainstate,
     l1man: &L1BlockManager,
     max_l1_entries: usize,
@@ -182,7 +178,7 @@ fn fetch_deposit_update_txs(h: u64, l1man: &L1BlockManager) -> Result<Vec<Deposi
         let tx = l1man.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
 
         for op in tx.protocol_ops() {
-            if let Deposit(_dep) = op {
+            if let ProtocolOperation::Deposit(_dep) = op {
                 deposit_update_txs.push(DepositUpdateTx::new(tx.clone(), tx_ref.position()))
             }
         }

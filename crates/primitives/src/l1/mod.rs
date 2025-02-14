@@ -23,3 +23,4 @@ pub use proof::*;
 pub use status::*;
 pub use timestamp_store::*;
 pub use tx::*;
+pub use utils::*;

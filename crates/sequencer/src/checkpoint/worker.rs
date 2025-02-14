@@ -17,7 +17,6 @@ use strata_state::{
     block::L2BlockBundle,
     chain_state::Chainstate,
     header::*,
-    l1::HeaderVerificationState,
 };
 use strata_status::*;
 use strata_storage::{

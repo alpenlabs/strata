@@ -62,6 +62,9 @@ pub enum Error {
     #[error("out of order L1 block {2} (exp next height {0}, block {1})")]
     OutOfOrderL1Block(u64, u64, L1BlockId),
 
+    #[error("tried to process competing block for height {0} (have {0}, given {1})")]
+    CompetingBlock(u64, L1BlockId, L1BlockId),
+
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
 

@@ -7,17 +7,17 @@ use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use secp256k1::XOnlyPublicKey;
 use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
+    batch::{BatchCheckpoint, BatchCheckpointWithCommitment, CommitmentInfo},
     block_credential::CredRule,
     buf::Buf32,
-    l1::{L1BlockCommitment, L1BlockId, L1BlockManifest, L1BlockRecord},
+    l1::{
+        generate_l1_tx, L1BlockCommitment, L1BlockId, L1BlockManifest, L1BlockRecord, L1Tx,
+        ProtocolOperation,
+    },
     params::Params,
+    prelude::*,
 };
-use strata_state::{
-    batch::{BatchCheckpoint, BatchCheckpointWithCommitment, CommitmentInfo},
-    l1::{generate_l1_tx, L1Tx},
-    sync_event::SyncEvent,
-    tx::ProtocolOperation,
-};
+use strata_state::sync_event::SyncEvent;
 use strata_storage::L1BlockManager;
 use tokio::sync::mpsc;
 use tracing::*;
@@ -73,7 +73,7 @@ fn handle_bitcoin_event(
             Ok(())
         }
 
-        L1Event::BlockData(blockdata, epoch) => {
+        L1Event::BlockData(blockdata, epoch, hvs) => {
             let height = blockdata.block_num();
 
             // Bail out fast if we don't have to care.
@@ -85,7 +85,7 @@ fn handle_bitcoin_event(
 
             let l1blkid = blockdata.block().block_hash();
 
-            let manifest = generate_block_manifest(blockdata.block(), epoch);
+            let manifest = generate_block_manifest(blockdata.block(), epoch, hvs);
             let l1txs: Vec<_> = generate_l1txs(&blockdata);
             let num_txs = l1txs.len();
             l1man.put_block_data(blockdata.block_num(), manifest, l1txs.clone())?;
@@ -114,8 +114,8 @@ fn handle_bitcoin_event(
         L1Event::GenesisVerificationState(height, header_verification_state) => {
             let last_blkid = L1BlockId::from(header_verification_state.last_verified_block_hash);
             let block = L1BlockCommitment::new(height, last_blkid);
-            let ev = SyncEvent::L1BlockGenesis(block, header_verification_state);
-            csm_ctl.submit_event(ev)?;
+            //let ev = SyncEvent::L1BlockGenesis(block, header_verification_state);
+            //csm_ctl.submit_event(ev)?;
             Ok(())
         }
     }
@@ -175,7 +175,11 @@ fn check_for_da_batch(
 
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
-fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
+fn generate_block_manifest(
+    block: &Block,
+    epoch: u64,
+    hvs: HeaderVerificationState,
+) -> L1BlockManifest {
     let blockid = block.block_hash().into();
     let root = block
         .witness_root()
@@ -184,7 +188,7 @@ fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
     let header = serialize(&block.header);
 
     let mf = L1BlockRecord::new(blockid, header, Buf32::from(root));
-    L1BlockManifest::new(mf, epoch)
+    L1BlockManifest::new(mf, hvs, epoch)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {

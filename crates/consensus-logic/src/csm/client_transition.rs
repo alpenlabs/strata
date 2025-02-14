@@ -5,15 +5,17 @@ use std::cmp::min;
 
 use bitcoin::block::Header;
 use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
-use strata_primitives::{l1::L1BlockCommitment, prelude::*};
-use strata_state::{
+use strata_primitives::{
     batch::{BatchInfo, Checkpoint, L1CommittedCheckpoint},
+    l1::{get_btc_params, HeaderVerificationState, L1BlockCommitment, L1BlockId},
+    prelude::*,
+};
+use strata_state::{
     block::{self, L2BlockBundle},
     chain_state::Chainstate,
     client_state::*,
     header::L2Header,
     id::L2BlockId,
-    l1::{get_btc_params, HeaderVerificationState, L1BlockId},
     operation::*,
     sync_event::SyncEvent,
 };
@@ -75,10 +77,10 @@ pub fn process_event(
     match ev {
         SyncEvent::L1Block(block) => {
             let height = block.height();
-            let l1blkid = block.blkid();
 
-            // If the block is before the horizon we don't care about it.
-            if height < params.rollup().horizon_l1_height {
+            // If the block is before genesis we don't care about it.
+            // TODO maybe put back pre-genesis tracking?
+            if height < params.rollup().genesis_l1_height {
                 #[cfg(test)]
                 eprintln!("early L1 block at h={height}, you may have set up the test env wrong");
 
@@ -90,68 +92,8 @@ pub fn process_event(
             // a longer chain, it just does it unconditionally.  This is fine,
             // since we'll be refactoring this more deeply soonish.
             let block_mf = context.get_l1_block_manifest(height)?;
-
-            let l1v = state.state().l1_view();
-            let l1_vs = l1v.tip_verification_state();
-            /*let cur_seen_tip_height = state
-            .state()
-            .get_tip_l1_block()
-            .map(|block| block.height())
-            .unwrap_or(params.rollup().genesis_l1_height - 1);*/
-            let next_exp_height = state.state().next_exp_l1_block();
-
-            // Do the consensus checks
-            /*if let Some(l1_vs) = l1_vs {
-                let l1_vs_height = l1_vs.last_verified_block_num as u64;
-                let mut updated_l1vs = l1_vs.clone();
-                for height in (l1_vs_height + 1..cur_seen_tip_height) {
-                    let block_mf = context.get_l1_block_manifest(height)?;
-                    let header: Header =
-                        bitcoin::consensus::deserialize(block_mf.header()).unwrap();
-                    updated_l1vs =
-                        updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
-                }
-                state.update_verification_state(updated_l1vs);
-            }*/
-
-            // Only accept the block if it's the next block in the chain we expect to accept.
-            /*if next_exp_height > params.rollup().horizon_l1_height {
-                // TODO check that the new block we're trying to add has the same parent as the tip
-                // block
-                let cur_tip_block = context.get_l1_block_manifest(cur_seen_tip_height)?;
-            }*/
-
-            if height == next_exp_height {
-                let prev_istate = state
-                    .state()
-                    .get_internal_state(height)
-                    .expect("clientstate: missing expected block state");
-
-                let new_istate = process_l1_block(prev_istate, &block_mf, params.rollup())?;
-                state.accept_l1_block_state(*block, new_istate);
-
-                // TODO make max states configurable
-                /*let max_states = 20;
-                if state.state().internal_state_cnt() as u64 > max_states {
-                    let newest_height = state.state().get_deepest_l1_block().unwrap().height();
-                    let new_oldest = newest_height - max_states + 1;
-                    state.discard_old_l1_states(new_oldest);
-                }*/
-            } else {
-                #[cfg(test)]
-                eprintln!("not sure what to do here h={height} exp={next_exp_height}");
-                return Err(Error::OutOfOrderL1Block(next_exp_height, height, *l1blkid));
-            }
-
-            // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
-            let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
-            let maturable_height = next_exp_height.saturating_sub(safe_depth);
-
-            if maturable_height > params.rollup().horizon_l1_height
-                && state.state().is_chain_active()
-            {
-                handle_mature_l1_height(state, maturable_height, context);
-            }
+            handle_block(state, block, &block_mf, context, params)?;
+            Ok(())
         }
 
         SyncEvent::L1Revert(block) => {
@@ -163,8 +105,12 @@ pub fn process_event(
 
             // TODO move this logic out into this function
             state.rollback_l1_blocks(*block);
+            Ok(())
         }
+    }
+}
 
+/*
         SyncEvent::L1BlockGenesis(block, l1_verification_state) => {
             let height = block.height();
             debug!(%height, "received L1BlockGenesis");
@@ -208,7 +154,101 @@ pub fn process_event(
                     l1_verification_state.last_verified_block_hash,
                 ));
             }
+
+            Ok(())
         }
+*/
+
+fn handle_block(
+    state: &mut ClientStateMut,
+    block: &L1BlockCommitment,
+    block_mf: &L1BlockManifest,
+    context: &impl EventContext,
+    params: &Params,
+) -> Result<(), Error> {
+    let height = block.height();
+    let l1blkid = block.blkid();
+
+    /*let cur_seen_tip_height = state
+    .state()
+    .get_tip_l1_block()
+    .map(|block| block.height())
+    .unwrap_or(params.rollup().genesis_l1_height - 1);*/
+
+    // Do the consensus checks
+    /*if let Some(l1_vs) = l1_vs {
+        let l1_vs_height = l1_vs.last_verified_block_num as u64;
+        let mut updated_l1vs = l1_vs.clone();
+        for height in (l1_vs_height + 1..cur_seen_tip_height) {
+            let block_mf = context.get_l1_block_manifest(height)?;
+            let header: Header =
+                bitcoin::consensus::deserialize(block_mf.header()).unwrap();
+            updated_l1vs =
+                updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
+        }
+        state.update_verification_state(updated_l1vs);
+    }*/
+
+    // Only accept the block if it's the next block in the chain we expect to accept.
+    /*if next_exp_height > params.rollup().horizon_l1_height {
+                // TODO check that the new block we're trying to add has the same parent as the tip
+                // block
+                let cur_tip_block = context.get_l1_block_manifest(cur_seen_tip_height)?;
+    }*/
+
+    let next_exp_height = state.state().next_exp_l1_block();
+
+    // We probably should have gotten the L1Genesis message by now but
+    // let's just do this anyways.
+    if height == params.rollup().genesis_l1_height {
+        // Do genesis here.
+        let istate = process_genesis_trigger_block(&block_mf, params.rollup())?;
+        state.accept_l1_block_state(*block, istate);
+        state.activate_chain();
+    } else if height == next_exp_height {
+        // Do normal L1 block extension here.
+        let prev_istate = state
+            .state()
+            .get_internal_state(height)
+            .expect("clientstate: missing expected block state");
+
+        let new_istate = process_l1_block(prev_istate, &block_mf, params.rollup())?;
+        state.accept_l1_block_state(*block, new_istate);
+
+        // TODO make max states configurable
+        /*let max_states = 20;
+        if state.state().internal_state_cnt() as u64 > max_states {
+            let newest_height = state.state().get_deepest_l1_block().unwrap().height();
+            let new_oldest = newest_height - max_states + 1;
+            state.discard_old_l1_states(new_oldest);
+        }*/
+    } else {
+        // If it's below the expected height then it's possible it's
+        // just a tracking inconsistentcy, let's make sure we don't
+        // already have it.
+        if height < next_exp_height {
+            if let Some(istate) = state.state().get_internal_state(height) {
+                let internal_blkid = istate.blkid();
+                if internal_blkid == l1blkid {
+                    warn!(%next_exp_height, %height, "ignoring possible duplicate in-chain block");
+                } else {
+                    error!(%next_exp_height, %height, %internal_blkid, "given competing L1 block without reorg event, possible chain tracking issue");
+                    return Err(Error::CompetingBlock(height, *internal_blkid, *l1blkid));
+                }
+            }
+        }
+
+        #[cfg(test)]
+        eprintln!("not sure what to do here h={height} exp={next_exp_height}");
+        return Err(Error::OutOfOrderL1Block(next_exp_height, height, *l1blkid));
+    }
+
+    // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
+    let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
+    let maturable_height = next_exp_height.saturating_sub(safe_depth);
+
+    if maturable_height > params.rollup().horizon_l1_height && state.state().is_chain_active() {
+        handle_mature_l1_height(state, maturable_height, context);
     }
 
     Ok(())
@@ -216,44 +256,44 @@ pub fn process_event(
 
 // TODO figure out what to do with this code
 /*
-       SyncEvent::L1DABatch(height, checkpoints) => {
-           debug!(%height, "received L1DABatch");
+      SyncEvent::L1DABatch(height, checkpoints) => {
+          debug!(%height, "received L1DABatch");
 
-           if let Some(ss) = state.state().sync() {
-               let proof_verified_checkpoints =
-                   filter_verified_checkpoints(state.state(), checkpoints, params.rollup());
+          if let Some(ss) = state.state().sync() {
+              let proof_verified_checkpoints =
+                  filter_verified_checkpoints(state.state(), checkpoints, params.rollup());
 
-               // When DABatch appears, it is only confirmed at the moment. These will be finalized
-               // only when the corresponding L1 block is buried enough
-               if !proof_verified_checkpoints.is_empty() {
-                   // Copy out all the basic checkpoint data into dedicated
-                   // structures for it.
-                   let ckpts = proof_verified_checkpoints
-                       .iter()
-                       .map(|batch_checkpoint_with_commitment| {
-                           let batch_checkpoint =
-                               &batch_checkpoint_with_commitment.batch_checkpoint;
-                           L1Checkpoint::new(
-                               batch_checkpoint.batch_info().clone(),
-                               batch_checkpoint.batch_transition().clone(),
-                               batch_checkpoint.base_state_commitment().clone(),
-                               !batch_checkpoint.proof().is_empty(),
-                               *height,
-                           )
-                       })
-                       .collect::<Vec<_>>();
-                   state.accept_checkpoints(&ckpts);
+              // When DABatch appears, it is only confirmed at the moment. These will be finalized
+              // only when the corresponding L1 block is buried enough
+              if !proof_verified_checkpoints.is_empty() {
+                  // Copy out all the basic checkpoint data into dedicated
+                  // structures for it.
+                  let ckpts = proof_verified_checkpoints
+                      .iter()
+                      .map(|batch_checkpoint_with_commitment| {
+                          let batch_checkpoint =
+                              &batch_checkpoint_with_commitment.batch_checkpoint;
+                          L1Checkpoint::new(
+                              batch_checkpoint.batch_info().clone(),
+                              batch_checkpoint.batch_transition().clone(),
+                              batch_checkpoint.base_state_commitment().clone(),
+                              !batch_checkpoint.proof().is_empty(),
+                              *height,
+                          )
+                      })
+                      .collect::<Vec<_>>();
+                  state.accept_checkpoints(&ckpts);
 
-                   state.push_action(SyncAction::WriteCheckpoints(
-                       *height,
-                       proof_verified_checkpoints,
-                   ));
-               }
-           } else {
-               // TODO we can expand this later to make more sense
-               return Err(Error::MissingClientSyncState);
-           }
-       }
+                  state.push_action(SyncAction::WriteCheckpoints(
+                      *height,
+                      proof_verified_checkpoints,
+                  ));
+              }
+          } else {
+              // TODO we can expand this later to make more sense
+              return Err(Error::MissingClientSyncState);
+          }
+      }
 */
 
 fn process_genesis_trigger_block(

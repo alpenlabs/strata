@@ -14,13 +14,9 @@ use bitcoin::{
 };
 use jsonrpsee::core::RpcResult;
 use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
-use strata_primitives::l1::BitcoinAddress;
+use strata_primitives::l1::{BitcoinAddress, L1Tx, ProtocolOperation};
 use strata_rpc_types::RpcServerError;
-use strata_state::{
-    bridge_state::{DepositState, DepositsTable},
-    l1::L1Tx,
-    tx::ProtocolOperation,
-};
+use strata_state::bridge_state::{DepositState, DepositsTable};
 use strata_storage::L1BlockManager;
 use tracing::*;
 

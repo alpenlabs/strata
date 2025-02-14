@@ -250,13 +250,11 @@ impl HeaderVerificationState {
 ///
 /// # Arguments
 ///
-/// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
-///   the second, and so on.
-/// * `start` - The starting height from which to calculate.
+/// * `height` - The index of the block we're looking at.
 /// * `params` - [`BtcParams`] of the bitcoin network in use
-pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &BtcParams) -> u32 {
-    let difficulty_adjustment_interval = params.inner().difficulty_adjustment_interval() as u32;
-    ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
+pub fn get_difficulty_adjustment_start_height(height: u32, params: &BtcParams) -> u32 {
+    let adj_interval = params.inner().difficulty_adjustment_interval() as u32;
+    (height / adj_interval) * adj_interval
 }
 
 #[cfg(test)]
@@ -272,7 +270,7 @@ mod tests {
         let chain = get_btc_chain();
         // TODO: figure out why passing btc_params to `check_and_update_full` doesn't work
         let btc_params: BtcParams = MAINNET.clone().into();
-        let h1 = get_difficulty_adjustment_height(1, chain.start, &btc_params);
+        let h1 = get_difficulty_adjustment_start_height(1, chain.start, &btc_params);
         let r1 = OsRng.gen_range(h1..chain.end);
         let mut verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
 
@@ -286,7 +284,7 @@ mod tests {
     fn test_get_difficulty_adjustment_height() {
         let start = 0;
         let idx = OsRng.gen_range(1..1000);
-        let h = get_difficulty_adjustment_height(idx, start, &MAINNET.clone().into());
+        let h = get_difficulty_adjustment_start_height(idx, start, &MAINNET.clone().into());
         assert_eq!(h, MAINNET.difficulty_adjustment_interval() as u32 * idx);
     }
 

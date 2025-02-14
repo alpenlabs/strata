@@ -5,7 +5,8 @@ use strata_primitives::{
     batch::{Checkpoint, CommitmentInfo, L1CommittedCheckpoint},
     buf::Buf32,
     l1::{
-        generate_l1_tx, L1BlockCommitment, L1BlockManifest, L1BlockRecord, L1Tx, ProtocolOperation,
+        generate_l1_tx, HeaderVerificationState, L1BlockCommitment, L1BlockManifest, L1BlockRecord,
+        L1Tx, ProtocolOperation,
     },
 };
 use strata_state::sync_event::{EventSubmitter, SyncEvent};
@@ -29,7 +30,9 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
             vec![SyncEvent::L1Revert(block)]
         }
 
-        L1Event::BlockData(blockdata, epoch) => handle_blockdata(ctx, blockdata, epoch).await?,
+        L1Event::BlockData(blockdata, epoch, hvs) => {
+            handle_blockdata(ctx, blockdata, hvs, epoch).await?
+        }
 
         L1Event::GenesisVerificationState(block, header_verification_state) => {
             // TODO remove this since we're really getting rid of it
@@ -48,6 +51,7 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
 async fn handle_blockdata<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     blockdata: BlockData,
+    hvs: HeaderVerificationState,
     epoch: u64,
 ) -> anyhow::Result<Vec<SyncEvent>> {
     let ReaderContext {
@@ -68,7 +72,7 @@ async fn handle_blockdata<R: ReaderRpc>(
 
     let l1blkid = blockdata.block().block_hash();
 
-    let manifest = generate_block_manifest(blockdata.block(), epoch);
+    let manifest = generate_block_manifest(blockdata.block(), hvs, epoch);
     let l1txs: Vec<_> = generate_l1txs(&blockdata);
     let num_txs = l1txs.len();
     l1_manager
@@ -142,7 +146,11 @@ fn check_for_commitments(
 
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
-fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
+fn generate_block_manifest(
+    block: &Block,
+    hvs: HeaderVerificationState,
+    epoch: u64,
+) -> L1BlockManifest {
     let blockid = block.block_hash().into();
     let root = block
         .witness_root()
@@ -150,8 +158,8 @@ fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
         .unwrap_or_default();
     let header = serialize(&block.header);
 
-    let mf = L1BlockRecord::new(blockid, header, Buf32::from(root));
-    L1BlockManifest::new(mf, epoch)
+    let rec = L1BlockRecord::new(blockid, header, Buf32::from(root));
+    L1BlockManifest::new(rec, hvs, epoch)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {

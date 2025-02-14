@@ -15,7 +15,7 @@ use strata_l1tx::{
 use strata_primitives::{
     block_credential::CredRule,
     l1::{
-        get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
+        get_btc_params, get_difficulty_adjustment_start_height, BtcParams, HeaderVerificationState,
         L1BlockCommitment, L1BlockId, TimestampStore,
     },
     params::Params,
@@ -385,7 +385,6 @@ async fn process_block<R: ReaderRpc>(
     let block_data = BlockData::new(height, block, entries);
 
     let l1blkid = block_data.block().block_hash();
-    let block_commitment = L1BlockCommitment::new(height, l1blkid.into());
 
     trace!(%height, %l1blkid, %txs, "fetched block from client");
 
@@ -398,28 +397,46 @@ async fn process_block<R: ReaderRpc>(
 
     trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
 
-    let block_ev = L1Event::BlockData(block_data, state.epoch());
-    let mut l1_events = vec![block_ev];
-
-    if height == genesis_threshold {
+    /*if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
         let l1_verification_state =
             get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
         let ev = L1Event::GenesisVerificationState(block_commitment, l1_verification_state);
         l1_events.push(ev);
-    }
+    }*/
+
+    let l1_verification_state =
+        fetch_verification_state(ctx.client.as_ref(), height, &get_btc_params()).await?;
+
+    let block_ev = L1Event::BlockData(block_data, state.epoch(), l1_verification_state);
+    let l1_events = vec![block_ev];
+
+    /*if height == genesis_threshold {
+        info!(%height, %genesis_ht, "time for genesis");
+        if let Err(e) = ctx
+            .event_tx
+            .send(L1Event::GenesisVerificationState(
+                height,
+                l1_verification_state,
+            ))
+            .await
+        {
+            error!("failed to submit L1 block event, did the persistence task crash?");
+            return Err(e.into());
+        }
+    }*/
 
     Ok((l1_events, l1blkid))
 }
 
-/// Gets the [`HeaderVerificationState`] for the particular block
-pub async fn get_verification_state(
+/// Fetches the [`HeaderVerificationState`] for the particular block.
+pub async fn fetch_verification_state(
     client: &impl ReaderRpc,
     height: u64,
     params: &BtcParams,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
-    let h1 = get_difficulty_adjustment_height(0, height as u32, params);
+    let h1 = get_difficulty_adjustment_start_height(height as u32, params);
     let b1 = client.get_block_at(h1 as u64).await?;
 
     // Consider the block before `block_height` to be the last verified block
@@ -457,7 +474,8 @@ pub async fn get_verification_state(
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
     };
-    trace!(%height, ?header_vs, "HeaderVerificationState");
+
+    trace!(%height, ?header_vs, "new HeaderVerificationState");
 
     Ok(header_vs)
 }
@@ -624,7 +642,7 @@ mod test {
 
         let len = 15;
         let height = 100;
-        let mut header_vs = get_verification_state(&client, height, &params)
+        let mut header_vs = fetch_verification_state(&client, height, &params)
             .await
             .unwrap();
 
@@ -633,7 +651,7 @@ mod test {
             header_vs.check_and_update_continuity(&block.header, &params);
         }
 
-        let new_header_vs = get_verification_state(&client, height + len, &params)
+        let new_header_vs = fetch_verification_state(&client, height + len, &params)
             .await
             .unwrap();
 
