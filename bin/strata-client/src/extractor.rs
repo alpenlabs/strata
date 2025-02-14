@@ -155,7 +155,7 @@ async fn get_txs_from_height(
             // We don't actually care if we don't have txs at a particular
             // height, we can continue unconditionally.
             let blockid = l1man
-                .get_blockid_async(height)
+                .get_canonical_blockid_async(height)
                 .await
                 .map_err(RpcServerError::Db)?
                 .ok_or(RpcServerError::MissingL1BlockManifest(height))?;
@@ -434,6 +434,9 @@ mod tests {
                 res.is_ok(),
                 "should be able to put block data into the L1Database"
             );
+            l1_db
+                .add_to_canonical_chain(idx as u64, mf.block_hash())
+                .unwrap();
 
             // Insert mmr data
             let mmr: CompactMmr = arb.generate();

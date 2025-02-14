@@ -25,7 +25,9 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
         L1Event::RevertTo(revert_height) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
-            ctx.l1_manager.revert_to_height_async(revert_height).await?;
+            ctx.l1_manager
+                .revert_canonical_chain_async(revert_height)
+                .await?;
             debug!(%revert_height, "reverted l1db");
             vec![SyncEvent::L1Revert(revert_height)]
         }
@@ -65,20 +67,18 @@ async fn handle_blockdata<R: ReaderRpc>(
         return Ok(sync_evs);
     }
 
-    let l1blkid = blockdata.block().block_hash();
-
     let manifest = generate_block_manifest(blockdata.block(), height, epoch);
+    let l1blockid = manifest.block_hash();
     let l1txs: Vec<_> = generate_l1txs(&blockdata);
     let num_txs = l1txs.len();
+
+    l1_manager.put_block_data_async(manifest, l1txs).await?;
     l1_manager
-        .put_block_data_async(manifest, l1txs.clone())
+        .add_to_canonical_chain_async(height, &l1blockid)
         .await?;
-    info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
+    info!(%height, %l1blockid, txs = %num_txs, "wrote L1 block manifest");
 
-    // Create a sync event if it's something we care about.
-    let blkid: Buf32 = blockdata.block().block_hash().into();
-
-    sync_evs.push(SyncEvent::L1Block(blockdata.block_num(), blkid.into()));
+    sync_evs.push(SyncEvent::L1Block(height, l1blockid));
 
     // Check for checkpoint and create event accordingly
     debug!(%height, "Checking for checkpoints in l1 block");

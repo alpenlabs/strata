@@ -131,7 +131,7 @@ fn get_next_batch(
     let get_l1_commitment = |height: u64| -> Result<L1BlockCommitment, Error> {
         let blockid = storage
             .l1()
-            .get_blockid(height)?
+            .get_canonical_blockid(height)?
             .ok_or(DbError::MissingL1BlockHeight(height))?;
         Ok(L1BlockCommitment::new(height, blockid))
     };

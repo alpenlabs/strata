@@ -46,7 +46,7 @@ impl EventContext for StorageEventContext<'_> {
         let blockid = self
             .storage
             .l1()
-            .get_blockid(height)?
+            .get_canonical_blockid(height)?
             .ok_or(Error::MissingL1BlockHeight(height))?;
         self.storage
             .l1()

@@ -46,23 +46,37 @@ impl L1BlockManager {
         self.ops.put_block_data_async(mf, txs).await
     }
 
-    pub fn revert_to_height(&self, idx: u64) -> DbResult<()> {
+    pub fn add_to_canonical_chain(&self, height: u64, blockid: &L1BlockId) -> DbResult<()> {
+        self.ops.add_to_canonical_chain_blocking(height, *blockid)
+    }
+
+    pub async fn add_to_canonical_chain_async(
+        &self,
+        height: u64,
+        blockid: &L1BlockId,
+    ) -> DbResult<()> {
+        self.ops
+            .add_to_canonical_chain_async(height, *blockid)
+            .await
+    }
+
+    pub fn revert_canonical_chain(&self, idx: u64) -> DbResult<()> {
         if let Some((tip, _)) = self.ops.get_chain_tip_blocking()? {
             for i in idx + 1..=tip {
                 self.blockheight_cache.purge(&i);
             }
         }
-        self.ops.revert_to_height_blocking(idx)
+        self.ops.revert_canonical_chain_blocking(idx)
     }
 
-    pub async fn revert_to_height_async(&self, idx: u64) -> DbResult<()> {
+    pub async fn revert_canonical_chain_async(&self, idx: u64) -> DbResult<()> {
         if let Some((tip, _)) = self.ops.get_chain_tip_async().await? {
             for i in idx + 1..=tip {
                 self.blockheight_cache.purge(&i);
             }
         }
 
-        self.ops.revert_to_height_async(idx).await
+        self.ops.revert_canonical_chain_async(idx).await
     }
 
     pub fn get_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>> {
@@ -89,7 +103,7 @@ impl L1BlockManager {
 
     pub fn get_block_manifest_at_height(&self, height: u64) -> DbResult<Option<L1BlockManifest>> {
         Ok(self
-            .get_blockid(height)?
+            .get_canonical_blockid(height)?
             .map(|blockid| self.get_block_manifest(&blockid))
             .transpose()?
             .flatten())
@@ -99,34 +113,41 @@ impl L1BlockManager {
         &self,
         height: u64,
     ) -> DbResult<Option<L1BlockManifest>> {
-        let Some(blockid) = self.get_blockid_async(height).await? else {
+        let Some(blockid) = self.get_canonical_blockid_async(height).await? else {
             return Ok(None);
         };
 
         self.get_block_manifest_async(&blockid).await
     }
 
-    pub fn get_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>> {
+    pub fn get_canonical_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>> {
         self.blockheight_cache
-            .get_or_fetch_blocking(&height, || self.ops.get_blockid_blocking(height))
+            .get_or_fetch_blocking(&height, || self.ops.get_canonical_blockid_blocking(height))
     }
 
-    pub async fn get_blockid_async(&self, height: u64) -> DbResult<Option<L1BlockId>> {
+    pub async fn get_canonical_blockid_async(&self, height: u64) -> DbResult<Option<L1BlockId>> {
         self.blockheight_cache
-            .get_or_fetch(&height, || self.ops.get_blockid_chan(height))
+            .get_or_fetch(&height, || self.ops.get_canonical_blockid_chan(height))
             .await
     }
 
-    pub fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<L1BlockId>> {
-        self.ops.get_blockid_range_blocking(start_idx, end_idx)
-    }
-
-    pub async fn get_blockid_range_async(
+    pub fn get_canonical_blockid_range(
         &self,
         start_idx: u64,
         end_idx: u64,
     ) -> DbResult<Vec<L1BlockId>> {
-        self.ops.get_blockid_range_async(start_idx, end_idx).await
+        self.ops
+            .get_canonical_blockid_range_blocking(start_idx, end_idx)
+    }
+
+    pub async fn get_canonical_blockid_range_async(
+        &self,
+        start_idx: u64,
+        end_idx: u64,
+    ) -> DbResult<Vec<L1BlockId>> {
+        self.ops
+            .get_canonical_blockid_range_async(start_idx, end_idx)
+            .await
     }
 
     pub fn get_block_txs(&self, blockid: &L1BlockId) -> DbResult<Option<Vec<L1TxRef>>> {
