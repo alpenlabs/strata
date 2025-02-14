@@ -87,6 +87,14 @@ impl L1BlockManager {
         self.ops.get_chain_tip_async().await
     }
 
+    pub fn get_chain_tip_height(&self) -> DbResult<Option<u64>> {
+        Ok(self.get_chain_tip()?.map(|(height, _)| height))
+    }
+
+    pub async fn get_chain_tip_height_async(&self) -> DbResult<Option<u64>> {
+        Ok(self.get_chain_tip_async().await?.map(|(height, _)| height))
+    }
+
     pub fn get_block_manifest(&self, blockid: &L1BlockId) -> DbResult<Option<L1BlockManifest>> {
         self.manifest_cache
             .get_or_fetch_blocking(blockid, || self.ops.get_block_manifest_blocking(*blockid))
@@ -102,11 +110,11 @@ impl L1BlockManager {
     }
 
     pub fn get_block_manifest_at_height(&self, height: u64) -> DbResult<Option<L1BlockManifest>> {
-        Ok(self
-            .get_canonical_blockid(height)?
-            .map(|blockid| self.get_block_manifest(&blockid))
-            .transpose()?
-            .flatten())
+        let Some(blockid) = self.get_canonical_blockid(height)? else {
+            return Ok(None);
+        };
+
+        self.get_block_manifest(&blockid)
     }
 
     pub async fn get_block_manifest_at_height_async(
@@ -159,6 +167,23 @@ impl L1BlockManager {
         self.txs_cache
             .get_or_fetch(blockid, || self.ops.get_block_txs_chan(*blockid))
             .await
+    }
+
+    pub fn get_block_txs_at_height(&self, height: u64) -> DbResult<Option<Vec<L1TxRef>>> {
+        let Some(blockid) = self.get_canonical_blockid(height)? else {
+            return Ok(None);
+        };
+        self.get_block_txs(&blockid)
+    }
+
+    pub async fn get_block_txs_at_height_async(
+        &self,
+        height: u64,
+    ) -> DbResult<Option<Vec<L1TxRef>>> {
+        let Some(blockid) = self.get_canonical_blockid_async(height).await? else {
+            return Ok(None);
+        };
+        self.get_block_txs_async(&blockid).await
     }
 
     pub fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>> {
