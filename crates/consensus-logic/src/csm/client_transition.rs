@@ -211,6 +211,8 @@ fn handle_block(
         state.set_sync_state(SyncState::from_genesis_blkid(
             genesis_block.header().get_blockid(),
         ));
+
+        state.push_action(SyncAction::L2Genesis(*block.blkid()));
     } else if height == next_exp_height {
         // Do normal L1 block extension here.
         let prev_istate = state
@@ -408,26 +410,26 @@ fn handle_mature_l1_height(
         // If l2 blocks is not in db then finalization will happen when
         // l2Block is fetched from the network and the corresponding
         //checkpoint is already finalized.
-        let blkid = *checkpt.batch_info.final_l2_blockid();
+        let epoch = checkpt.batch_info.get_epoch_commitment();
+        let blkid = *epoch.last_blkid();
 
         match context.get_l2_block_data(&blkid) {
             Ok(_) => {
-                // Emit sync action for finalizing a l2 block
-                info!(%maturable_height, %blkid, "l2 block found in db, push FinalizeBlock SyncAction");
-
-                // FIXME
-                //state.finalize_checkpoint(maturable_height);
-                state.push_action(SyncAction::FinalizeBlock(blkid));
+                // Emit sync action for finalizing an epoch
+                trace!(%maturable_height, %blkid, "epoch terminal block found in DB, emitting FinalizedEpoch action");
+                state.push_action(SyncAction::FinalizeEpoch(epoch));
             }
 
+            // TODO figure out how to make this not matter
             Err(Error::MissingL2Block(_)) => {
                 warn!(
-                    %maturable_height, %blkid, "l2 block not in db yet, skipping finalize"
+                    %maturable_height, ?epoch, "epoch terminal not in DB yet, skipping finalization"
                 );
             }
 
             Err(e) => {
-                error!(err = %e, "error while fetching block data from l2_db");
+                error!(%blkid, err = %e, "error while checking for block present");
+                return Err(e.into());
             }
         }
     } else {

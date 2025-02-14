@@ -287,13 +287,15 @@ fn handle_sync_event(
     let (outp, new_state) = state.advance_consensus_state(ev_idx)?;
     let outp = Arc::new(outp);
 
-    // Apply the actions produced from the state transition.
+    // Make sure that the new state index is set as expected.
+    assert_eq!(state.cur_event_idx(), ev_idx);
+
+    // Apply the actions produced from the state transition before we publish
+    // the new state, so that any database changes from them are available when
+    // things listening for the new state observe it.
     for action in outp.actions() {
         apply_action(action.clone(), state, engine, status_channel)?;
     }
-
-    // Make sure that the new state index is set as expected.
-    assert_eq!(state.cur_event_idx(), ev_idx);
 
     // FIXME clean this up and make them take Arcs
     let mut status = CsmStatus::default();
@@ -319,37 +321,25 @@ fn apply_action(
     _status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match action {
-        SyncAction::UpdateTip(blkid) => {
-            // Tell the EL that this block does indeed look good.
-            debug!(?blkid, "updating EL safe block");
-            engine.update_safe_block(blkid)?;
-
-            // TODO update the tip we report in RPCs and whatnot
-        }
-
-        SyncAction::MarkInvalid(blkid) => {
-            // TODO not sure what this should entail yet
-            warn!(?blkid, "marking block invalid!");
-            state
-                .storage
-                .l2()
-                .set_block_status_blocking(&blkid, BlockStatus::Invalid)?;
-        }
-
-        SyncAction::FinalizeBlock(blkid) => {
+        SyncAction::FinalizeEpoch(epoch) => {
             // For the fork choice manager this gets picked up later.  We don't have
             // to do anything here *necessarily*.
-            // TODO we should probably emit a state checkpoint here if we
-            // aren't already
-            info!(?blkid, "finalizing block");
-            engine.update_finalized_block(blkid)?;
+            info!(?epoch, "finalizing epoch");
+
+            // TODO error checking here
+            engine.update_finalized_block(*epoch.last_blkid())?;
         }
 
         SyncAction::L2Genesis(l1blkid) => {
-            info!(%l1blkid, "sync action to do genesis");
+            info!(%l1blkid, "locking in genesis!");
 
             // TODO: use l1blkid during chain state genesis ?
 
+            // Save the genesis block.
+            let gblock = genesis::make_genesis_block(&state.params);
+            state.storage.l2().put_block_data_blocking(gblock)?;
+
+            // Save the genesis chainstate.
             let _chstate = genesis::init_genesis_chainstate(&state.params, &state.storage)
                 .map_err(|err| {
                     error!(err = %err, "failed to compute chain genesis");
@@ -358,43 +348,44 @@ fn apply_action(
 
             // TODO do we have to do anything here?
         }
-
-        SyncAction::WriteCheckpoints(_height, checkpoints) => {
-            for c in checkpoints.iter() {
-                let batch_ckp = &c.checkpoint;
-                let idx = batch_ckp.batch_info().epoch();
-                let pstatus = CheckpointProvingStatus::ProofReady;
-                let cstatus = CheckpointConfStatus::Confirmed;
-                let entry = CheckpointEntry::new(
-                    batch_ckp.clone(),
-                    pstatus,
-                    cstatus,
-                    Some(c.commitment.clone().into()),
-                );
-
-                // Store
-                state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
-            }
-        }
-
-        SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
-            for c in checkpoints.iter() {
-                let batch_ckp = &c.checkpoint;
-                let idx = batch_ckp.batch_info().epoch();
-                let pstatus = CheckpointProvingStatus::ProofReady;
-                let cstatus = CheckpointConfStatus::Finalized;
-                let entry = CheckpointEntry::new(
-                    batch_ckp.clone(),
-                    pstatus,
-                    cstatus,
-                    Some(c.commitment.clone().into()),
-                );
-
-                // Update
-                state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
-            }
-        }
     }
 
     Ok(())
 }
+
+/*
+SyncAction::WriteCheckpoints(_height, checkpoints) => {
+    for c in checkpoints.iter() {
+        let batch_ckp = &c.checkpoint;
+        let idx = batch_ckp.batch_info().epoch();
+        let pstatus = CheckpointProvingStatus::ProofReady;
+        let cstatus = CheckpointConfStatus::Confirmed;
+        let entry = CheckpointEntry::new(
+            batch_ckp.clone(),
+            pstatus,
+            cstatus,
+            Some(c.commitment.clone().into()),
+        );
+
+        // Store
+        state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
+    }
+}
+
+SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
+    for c in checkpoints.iter() {
+        let batch_ckp = &c.checkpoint;
+        let idx = batch_ckp.batch_info().epoch();
+        let pstatus = CheckpointProvingStatus::ProofReady;
+        let cstatus = CheckpointConfStatus::Finalized;
+        let entry = CheckpointEntry::new(
+            batch_ckp.clone(),
+            pstatus,
+            cstatus,
+            Some(c.commitment.clone().into()),
+        );
+
+        // Update
+        state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
+    }
+}*/
