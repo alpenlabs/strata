@@ -4,8 +4,6 @@
 
 use std::{sync::Arc, thread};
 
-#[cfg(feature = "debug-utils")]
-use strata_common::bail_manager::{check_bail_trigger, BAIL_SYNC_EVENT, BAIL_SYNC_EVENT_NEW_TIP};
 use strata_db::{
     traits::*,
     types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus},
@@ -142,14 +140,6 @@ impl WorkerState {
 
         debug!(%ev_idx, ?ev, "processing sync event");
 
-        #[cfg(feature = "debug-utils")]
-        {
-            check_bail_trigger(BAIL_SYNC_EVENT);
-            if matches!(ev, strata_state::sync_event::SyncEvent::NewTipBlock(_)) {
-                check_bail_trigger(BAIL_SYNC_EVENT_NEW_TIP);
-            }
-        }
-
         // Compute the state transition.
         let context = client_transition::StorageEventContext::new(&self.storage);
         let mut state_mut = ClientStateMut::new(self.cur_state.as_ref().clone());
@@ -182,6 +172,8 @@ pub fn client_worker_task<E: ExecEngineCtl>(
     mut msg_rx: mpsc::Receiver<CsmMessage>,
     status_channel: StatusChannel,
 ) -> anyhow::Result<()> {
+    info!("started CSM worker");
+
     while let Some(msg) = msg_rx.blocking_recv() {
         if let Err(e) = process_msg(
             &mut state,
