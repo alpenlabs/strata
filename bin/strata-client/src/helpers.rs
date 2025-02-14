@@ -31,7 +31,7 @@ pub fn get_config(args: Args) -> Result<Config, InitError> {
     env_args.override_config(&mut config);
 
     // Finally override from cli args
-    args.override_config(&mut config);
+    args.override_generic(&mut config)?;
 
     Ok(config)
 }

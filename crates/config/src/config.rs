@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use bitcoin::Network;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{bridge::RelayerConfig, btcio::BtcioConfig};
 
@@ -9,24 +9,34 @@ const DEFAULT_RPC_PORT: u16 = 8542;
 const DEFAULT_P2P_PORT: u16 = 8543;
 const DEFAULT_DATADIR: &str = "strata-data";
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(Default))]
 pub struct FullNodeConfig {
     /// host:port of sequencer rpc
     pub sequencer_rpc: String,
 }
 
 // SequencerConfig is empty for now
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(Default))]
 pub struct SequencerConfig {}
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ClientMode {
     FullNode(FullNodeConfig),
     Sequencer(SequencerConfig),
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[cfg(test)]
+impl Default for ClientMode {
+    fn default() -> Self {
+        Self::FullNode(FullNodeConfig::default())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(Default))]
 pub struct ClientConfig {
     pub rpc_host: String,
 
@@ -59,13 +69,13 @@ fn default_datadir() -> PathBuf {
     DEFAULT_DATADIR.into()
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncConfig {
     pub l1_follow_distance: u64,
     pub client_checkpoint_interval: u32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BitcoindConfig {
     pub rpc_url: String,
     pub rpc_user: String,
@@ -77,18 +87,18 @@ pub struct BitcoindConfig {
     pub retry_interval: Option<u64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RethELConfig {
     pub rpc_url: String,
     pub secret: PathBuf,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecConfig {
     pub reth: RethELConfig,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub client: ClientConfig,
     pub bitcoind_rpc: BitcoindConfig,
