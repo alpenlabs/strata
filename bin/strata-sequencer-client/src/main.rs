@@ -76,17 +76,9 @@ fn main_inner(args: Args) -> Result<()> {
     );
 
     task_manager.start_signal_listeners();
-    let result = task_manager.monitor(Some(Duration::from_millis(SHUTDOWN_TIMEOUT_MS)));
+    task_manager.monitor(Some(Duration::from_millis(SHUTDOWN_TIMEOUT_MS)))?;
 
-    // Zeroize idata
-    if let Some(mut idata) = Arc::into_inner(idata) {
-        idata.zeroize();
-    }
-
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(e.into()),
-    }
+    Ok(())
 }
 
 fn get_config(args: Args) -> Result<Config> {

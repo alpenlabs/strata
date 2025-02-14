@@ -126,11 +126,6 @@ impl SignatureManager {
         entry.ok_or(BridgeSigError::TransactionNotFound)
     }
 
-    /// Attempts to erase the secret within the keypair.
-    pub fn erase_keypair(&mut self) {
-        self.keypair.non_secure_erase();
-    }
-
     /// Generate a random secret nonce.
     ///
     /// Please refer to MuSig2 nonce generation section in
@@ -441,6 +436,12 @@ impl SignatureManager {
         let signed_tx = psbt.extract_tx()?;
 
         Ok(signed_tx)
+    }
+}
+
+impl Drop for SignatureManager {
+    fn drop(&mut self) {
+        self.keypair.non_secure_erase();
     }
 }
 

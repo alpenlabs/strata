@@ -22,7 +22,7 @@ serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-zeroize = { workspace = true, optional = true }
+zeroize.workspace = true
 
 [dev-dependencies]
 strata-test-utils.workspace = true
@@ -37,4 +37,3 @@ rustdoc.all = "warn"
 
 [features]
 debug-utils = ["strata-common/debug-utils"]
-default = ["zeroize"]

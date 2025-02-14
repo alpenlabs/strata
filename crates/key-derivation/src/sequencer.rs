@@ -197,12 +197,9 @@ mod tests {
         assert_ne!(master_chaincode, [0u8; 32]);
         assert_ne!(derived_chaincode, [0u8; 32]);
 
-        fn bar(keys_clone: Arc<SequencerKeys>) {
-            println!("got keys {}", keys_clone.master);
-        }
+        fn bar(_keys_clone: Arc<SequencerKeys>) {}
 
         fn foo(keys: Arc<SequencerKeys>) {
-            println!("got keys {}", keys.master);
             bar(keys.clone());
         }
 

@@ -198,16 +198,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
 
     // Wait for all tasks to run
     // They are supposed to run indefinitely in most cases
-    let result = tokio::try_join!(rpc_task, duty_task);
+    tokio::try_join!(rpc_task, duty_task)?;
 
-    // Attempt to erase keypair from ExecHandler and ExecHandler.sig_manager
-    if let Some(mut handler) = Arc::into_inner(shared_exec_handler) {
-        handler.erase_keypair(); // Ensure keypair is erased before dropping
-        handler.sig_manager.erase_keypair();
-    }
-
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(e.into()),
-    }
+    Ok(())
 }

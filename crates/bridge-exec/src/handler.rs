@@ -111,11 +111,6 @@ where
         Ok(())
     }
 
-    /// Attempts to erase the secret within the keypair.
-    pub fn erase_keypair(&mut self) {
-        self.keypair.non_secure_erase();
-    }
-
     async fn broadcast_msg<S: BorshSerialize + Debug>(
         &self,
         scope: &Scope,
@@ -350,6 +345,16 @@ where
     }
 }
 
+impl<TxBuildContext> Drop for ExecHandler<TxBuildContext>
+where
+    TxBuildContext: BuildContext + Sync + Send,
+{
+    fn drop(&mut self) {
+        // TODO erase keypair inside sig_manager, but sig_manager.keypair is not public.
+        self.keypair.non_secure_erase();
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -376,9 +381,7 @@ mod tests {
             }
         }
 
-        fn bar(wrapper_clone: Arc<TestWrapper>) {
-            println!("got key {}", wrapper_clone.keypair.display_secret());
-        }
+        fn bar(_wrapper_clone: Arc<TestWrapper>) {}
 
         fn foo(wrapper: Arc<TestWrapper>) {
             bar(wrapper.clone());
