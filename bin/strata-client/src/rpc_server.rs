@@ -212,7 +212,10 @@ impl StrataApiServer for StrataRpcImpl {
         let (last_l1_height, last_l1_blkid) = match last_l1_block {
             Some(block) => (block.height(), *block.blkid()),
             // Dummies
-            None => (0, L1BlockId::from(Buf32::zero())),
+            None => {
+                warn!("responding with dummy heights and stuff");
+                (0, L1BlockId::from(Buf32::zero()))
+            }
         };
 
         // Copy these out of the sync state, if they're there.

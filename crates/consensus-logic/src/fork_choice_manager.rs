@@ -74,6 +74,7 @@ impl ForkChoiceManager {
         }
     }
 
+    // TODO is this right?
     fn finalized_tip(&self) -> &L2BlockId {
         self.chain_tracker.finalized_tip()
     }
@@ -134,6 +135,18 @@ impl ForkChoiceManager {
         // maybe more logic here?
 
         Ok(new_tip)
+    }
+
+    fn get_chainstate_cur_epoch(&self) -> u64 {
+        self.cur_chainstate.cur_epoch()
+    }
+
+    fn get_chainstate_prev_epoch(&self) -> &EpochCommitment {
+        self.cur_chainstate.prev_epoch()
+    }
+
+    fn get_chainstate_finalized_epoch(&self) -> &EpochCommitment {
+        self.cur_chainstate.finalized_epoch()
     }
 }
 
@@ -387,16 +400,16 @@ fn process_fc_message(
 
             let ok = handle_new_block(fcm_state, &blkid, &block_bundle, engine)?;
 
-            let status = if !ok {
+            let status = if ok {
                 // Update status.
                 let status = ChainSyncStatus {
                     tip: fcm_state.cur_best_block,
-                    // FIXME
-                    prev_epoch: EpochCommitment::null(),
+                    prev_epoch: *fcm_state.get_chainstate_prev_epoch(),
                     finalized_epoch: *fcm_state.chain_tracker.finalized_epoch(),
                 };
 
                 let update = ChainSyncStatusUpdate::new(status, fcm_state.cur_chainstate.clone());
+                trace!(%blkid, "publishing new chainstate");
                 status_channel.update_chain_sync_status(update);
 
                 BlockStatus::Valid
@@ -513,12 +526,14 @@ fn check_new_block(
 ) -> anyhow::Result<bool, Error> {
     let params = state.params.as_ref();
 
-    // Check that the block is correctly signed.
-    let cred_ok =
-        strata_state::block_validation::check_block_credential(block.header(), params.rollup());
-    if !cred_ok {
-        warn!(?blkid, "block has invalid credential");
-        return Ok(false);
+    // If it's not the genesis block, check that the block is correctly signed.
+    if block.header().blockidx() > 0 {
+        let cred_ok =
+            strata_state::block_validation::check_block_credential(block.header(), params.rollup());
+        if !cred_ok {
+            warn!(?blkid, "block has invalid credential");
+            return Ok(false);
+        }
     }
 
     // Check that we haven't already marked the block as invalid.
