@@ -205,6 +205,12 @@ fn handle_block(
         let istate = process_genesis_trigger_block(&block_mf, params.rollup())?;
         state.accept_l1_block_state(block, istate);
         state.activate_chain();
+
+        // Also have to set this.
+        let genesis_block = make_genesis_block(params);
+        state.set_sync_state(SyncState::from_genesis_blkid(
+            genesis_block.header().get_blockid(),
+        ));
     } else if height == next_exp_height {
         // Do normal L1 block extension here.
         let prev_istate = state

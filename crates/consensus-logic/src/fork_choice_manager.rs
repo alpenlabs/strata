@@ -235,11 +235,6 @@ pub fn tracker_task<E: ExecEngineCtl>(
     let init_state = handle.block_on(status_channel.wait_until_genesis())?;
     let init_state = Arc::new(init_state);
 
-    // By the time we get here we should have enough that we can start the FCM.
-    let Some(_ss) = init_state.sync() else {
-        return Err(anyhow::anyhow!("fcm: tried to resume without sync state"));
-    };
-
     info!("starting forkchoice logic");
 
     // Now that we have the database state in order, we can actually init the
