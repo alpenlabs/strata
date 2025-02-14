@@ -25,7 +25,6 @@ use strata_common::logging;
 use strata_tasks::TaskManager;
 use tokio::{runtime::Handle, sync::mpsc};
 use tracing::info;
-use zeroize::Zeroize;
 
 const SHUTDOWN_TIMEOUT_MS: u64 = 5000;
 
