@@ -54,5 +54,5 @@ class SyncGenesisTest(testenv.StrataTester):
             tip_blkid = stat["chain_tip"]
             self.info(f"cur tip slot {tip_slot} blkid {tip_blkid}")
             assert tip_slot >= last_slot, "cur slot went backwards"
-            assert tip_slot > last_slot, "seems not to be making progress"
+            assert tip_slot > last_slot, f"seems not to be making progress (slot={tip_slot})"
             last_slot = tip_slot
