@@ -19,7 +19,7 @@ pub enum Error {
     MissingL2Block(L2BlockId),
 
     #[error("stored L1 block {0:?} scanned using wrong epoch (got {1}, exp {2})")]
-    L1BlockWithWrongEpoch(L1BlockId, u64, u64),
+    L1ManifestEpochMismatch(L1BlockId, u64, u64),
 
     /// If we can't find the start block or something.
     #[error("malformed epoch {0:?}")]

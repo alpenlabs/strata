@@ -116,7 +116,7 @@ pub fn checkpoint_worker(
 fn find_ready_checkpoints(
     from_epoch: u64,
     ckman: &CheckpointDbManager,
-) -> Result<Vec<EpochCommitment>, Error> {
+) -> anyhow::Result<Vec<EpochCommitment>> {
     let epoch_at = from_epoch; // TODO make this +1 after we fix genesis
     let Some(last_ready_epoch) = ckman.get_last_summarized_epoch_blocking()? else {
         warn!("no epoch summaries have been written, skipping");
@@ -344,7 +344,7 @@ fn create_checkpoint_prep_data_from_summary(
     summary: &EpochSummary,
     storage: &NodeStorage,
     params: &RollupParams,
-) -> Result<CheckpointPrepData, Error> {
+) -> anyhow::Result<CheckpointPrepData> {
     let l1man = storage.l1();
     let l2man = storage.l2();
     let rollup_params_hash = params.compute_hash();
@@ -397,7 +397,7 @@ fn create_checkpoint_prep_data_from_summary(
     // There's a slight weirdness here.  The "range" refers to the first block
     // of the epoch, but the "transition" refers to the final state (ie last
     // block, for now) of the previous epoch.
-    let l2_blocks = get_epoch_l2_headers(summary, l2man)?;
+    let l2_blocks = fetch_epoch_l2_headers(summary, l2man)?;
     let first_block = l2_blocks.first().unwrap();
     let initial_l2_commitment =
         L2BlockCommitment::new(first_block.blockidx(), first_block.get_blockid());
@@ -426,10 +426,10 @@ fn create_checkpoint_prep_data_from_summary(
     ))
 }
 
-fn get_epoch_l2_headers(
+fn fetch_epoch_l2_headers(
     summary: &EpochSummary,
     l2man: &L2BlockManager,
-) -> Result<Vec<L2BlockHeader>, Error> {
+) -> anyhow::Result<Vec<L2BlockHeader>> {
     let limit = 5000; // TODO make a const
 
     let mut headers = Vec::new();
@@ -443,7 +443,7 @@ fn get_epoch_l2_headers(
     // The break conditions are a little weird so we use a bare `loop`.
     loop {
         if headers.len() >= limit {
-            return Err(Error::MalformedEpoch(summary.get_epoch_commitment()));
+            return Err(Error::MalformedEpoch(summary.get_epoch_commitment()).into());
         }
 
         let cur = headers.last().unwrap();
@@ -478,11 +478,11 @@ fn get_epoch_l2_headers(
 /// # Panics
 ///
 /// If the prev epochs's L1 block is after the current summary's L1 block.
-fn get_epoch_l1_manifests(
+fn fetch_epoch_l1_manifests(
     summary: &EpochSummary,
     initial_l1_height: u64,
     l1man: &L1BlockManager,
-) -> Result<Vec<L1BlockManifest>, Error> {
+) -> anyhow::Result<Vec<L1BlockManifest>> {
     if initial_l1_height > summary.new_l1().height() {
         panic!("ckptworker: invalid L1 blocks query");
     }
@@ -508,7 +508,7 @@ fn get_epoch_l1_manifests(
     // scan configuration.
     loop {
         if manifests.len() >= limit {
-            return Err(Error::MalformedEpoch(summary.get_epoch_commitment()));
+            return Err(Error::MalformedEpoch(summary.get_epoch_commitment()).into());
         }
 
         // Kinda hacky math but it works.
@@ -529,19 +529,19 @@ fn get_epoch_l1_manifests(
     Ok(manifests)
 }
 
-fn fetch_l2_block(blkid: &L2BlockId, l2man: &L2BlockManager) -> Result<L2BlockBundle, Error> {
+fn fetch_l2_block(blkid: &L2BlockId, l2man: &L2BlockManager) -> anyhow::Result<L2BlockBundle> {
     Ok(l2man
         .get_block_data_blocking(blkid)?
         .ok_or(Error::MissingL2Block(*blkid))?)
 }
 
-fn fetch_chainstate(slot: u64, chsman: &ChainstateManager) -> Result<Chainstate, Error> {
-    chsman
+fn fetch_chainstate(slot: u64, chsman: &ChainstateManager) -> anyhow::Result<Chainstate> {
+    Ok(chsman
         .get_toplevel_chainstate_blocking(slot)?
-        .ok_or(Error::MissingIdxChainstate(slot))
+        .ok_or(Error::MissingIdxChainstate(slot))?)
 }
 
-fn fetch_l1_block_manifest(height: u64, l1man: &L1BlockManager) -> Result<L1BlockManifest, Error> {
+fn fetch_l1_block_manifest(height: u64, l1man: &L1BlockManager) -> anyhow::Result<L1BlockManifest> {
     Ok(l1man
         .get_block_manifest(height)?
         .ok_or(DbError::MissingL1BlockBody(height))?)
@@ -554,15 +554,11 @@ fn fetch_block_manifest_at_epoch(
     height: u64,
     epoch: u64,
     l1man: &L1BlockManager,
-) -> Result<L1BlockManifest, Error> {
+) -> anyhow::Result<L1BlockManifest> {
     let mf = fetch_l1_block_manifest(height, l1man)?;
 
     if mf.epoch() != epoch {
-        return Err(Error::L1BlockWithWrongEpoch(
-            mf.block_hash(),
-            mf.epoch(),
-            epoch,
-        ));
+        return Err(Error::L1ManifestEpochMismatch(mf.block_hash(), mf.epoch(), epoch).into());
     }
 
     Ok(mf)
