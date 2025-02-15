@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
+    epoch::EpochCommitment,
     l1::{BitcoinAmount, L1BlockCommitment, L1TxRef, OutputRef},
     l2::L2BlockCommitment,
     prelude::L1Status,
@@ -222,7 +223,23 @@ pub struct RpcSyncStatus {
     /// Last L2 block we've chosen as the current tip.
     pub tip_block_id: strata_state::id::L2BlockId,
 
-    /// L2 block that's been finalized and proven on L1.
+    /// Current epoch from chainstate.
+    pub cur_epoch: u64,
+
+    /// Previous epoch from chainstate.
+    pub prev_epoch: EpochCommitment,
+
+    /// Observed finalized epoch from chainstate.
+    pub observed_finalized_epoch: EpochCommitment,
+
+    /// Terminal blkid of observed finalized epoch from chainstate.
+    ///
+    /// Note that this is not necessarily the most recently finalized epoch,
+    /// it's the one we've also observed, so it's behind by >~1.
+    ///
+    /// If you want the real one from L1, use another method.
+    // TODO which other method?
+    #[deprecated]
     pub finalized_block_id: L2BlockId,
 }
 

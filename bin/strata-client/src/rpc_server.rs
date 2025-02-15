@@ -413,6 +413,9 @@ impl StrataApiServer for StrataRpcImpl {
             .map(|css| RpcSyncStatus {
                 tip_height: css.tip_slot(),
                 tip_block_id: *css.tip_blkid(),
+                cur_epoch: css.cur_epoch(),
+                prev_epoch: css.prev_epoch,
+                observed_finalized_epoch: css.finalized_epoch,
                 finalized_block_id: *css.finalized_blkid(),
             })
             .ok_or(Error::ClientNotStarted)?)
