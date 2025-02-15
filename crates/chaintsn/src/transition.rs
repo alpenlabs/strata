@@ -350,7 +350,9 @@ fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use rand_core::SeedableRng;
-    use strata_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
+    use strata_primitives::{
+        bridge::DepositData, buf::Buf32, l1::BitcoinAmount, params::OperatorConfig,
+    };
     use strata_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
         bridge_state::OperatorTable,
@@ -404,10 +406,13 @@ mod tests {
                     let tx = ArbitraryGenerator::new_with_size(1 << 12).generate();
 
                     let l1tx = if idx == 1 {
+                        let data = DepositData {
+                            amount: amt,
+                            el_address: [0; 20].to_vec(),
+                        };
                         let protocol_op = ProtocolOperation::Deposit(DepositInfo {
-                            amt,
+                            data,
                             outpoint: ArbitraryGenerator::new().generate(),
-                            address: [0; 20].to_vec(),
                         });
                         L1Tx::new(proof, tx, vec![protocol_op])
                     } else {

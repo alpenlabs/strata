@@ -3,10 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use strata_primitives::{
-    buf::Buf32,
-    l1::{BitcoinAmount, OutputRef},
-};
+use strata_primitives::{bridge::DepositData, buf::Buf32, l1::OutputRef};
 
 use crate::batch::SignedCheckpoint;
 
@@ -83,14 +80,11 @@ pub enum ProtocolOperation {
     Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
 )]
 pub struct DepositInfo {
-    /// Bitcoin amount
-    pub amt: BitcoinAmount,
+    /// data about deposit
+    pub data: DepositData,
 
     /// outpoint
     pub outpoint: OutputRef,
-
-    /// EE address
-    pub address: Vec<u8>,
 }
 
 #[derive(

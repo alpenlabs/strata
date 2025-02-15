@@ -114,9 +114,12 @@ mod test {
 
         for op in tx_entries[0].contents() {
             if let ProtocolOperation::Deposit(deposit_info) = op {
-                assert_eq!(deposit_info.address, ee_addr, "EE address should match");
                 assert_eq!(
-                    deposit_info.amt,
+                    deposit_info.data.el_address, ee_addr,
+                    "EE address should match"
+                );
+                assert_eq!(
+                    deposit_info.data.amount,
                     BitcoinAmount::from_sat(deposit_config.deposit_amount),
                     "Deposit amount should match"
                 );
@@ -184,7 +187,7 @@ mod test {
         {
             if let ProtocolOperation::Deposit(deposit_info) = info {
                 assert_eq!(
-                    deposit_info.address,
+                    deposit_info.data.el_address,
                     if i == 0 {
                         dest_addr1.clone()
                     } else {
@@ -194,7 +197,7 @@ mod test {
                     i
                 );
                 assert_eq!(
-                    deposit_info.amt,
+                    deposit_info.data.amount,
                     BitcoinAmount::from_sat(deposit_config.deposit_amount),
                     "Deposit amount should match for transaction {}",
                     i

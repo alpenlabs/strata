@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     constants::{MUSIG2_PARTIAL_SIG_SIZE, NONCE_SEED_SIZE, PUB_NONCE_SIZE, SEC_NONCE_SIZE},
-    l1::{BitcoinPsbt, TaprootSpendPath},
+    l1::{BitcoinAmount, BitcoinPsbt, TaprootSpendPath},
 };
 
 /// The ID of an operator.
@@ -325,6 +325,19 @@ impl<'a> Arbitrary<'a> for Musig2SecNonce {
 
         Ok(Musig2SecNonce(sec_nonce))
     }
+}
+
+/// TODO: add docstring
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
+pub struct DepositData {
+    /// The amount in bitcoins that the user is depositing into execution layer.
+    pub amount: BitcoinAmount,
+
+    /// The execution layer address to mint the equivalent tokens to.
+    /// As of now, this is just the 20-byte EVM address.
+    pub el_address: Vec<u8>,
 }
 
 #[cfg(test)]

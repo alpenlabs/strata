@@ -234,8 +234,8 @@ impl StateCache {
         for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
             if let Deposit(deposit_info) = op {
                 trace!("we got some deposit_txs");
-                let amt = deposit_info.amt;
-                let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
+                let amt = deposit_info.data.amount;
+                let deposit_intent = DepositIntent::new(amt, &deposit_info.data.el_address);
                 deposits.push_back(deposit_intent);
                 self.new_state
                     .deposits_table
