@@ -18,8 +18,10 @@ use strata_common::bail_manager::BAIL_SENDER;
 use strata_consensus_logic::{checkpoint_verification::verify_proof, sync_manager::SyncManager};
 use strata_db::types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus};
 use strata_primitives::{
+    batch::EpochSummary,
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
+    epoch::EpochCommitment,
     hash,
     l1::payload::{L1Payload, PayloadDest, PayloadIntent},
     params::Params,
@@ -336,6 +338,32 @@ impl StrataApiServer for StrataRpcImpl {
             }
             None => Ok(None),
         }
+    }
+
+    async fn get_epoch_commitments(&self, epoch: u64) -> RpcResult<Vec<EpochCommitment>> {
+        let commitments = self
+            .storage
+            .checkpoint()
+            .get_epoch_commitments_at(epoch)
+            .map_err(Error::Db)
+            .await?;
+        Ok(commitments)
+    }
+
+    async fn get_epoch_summary(
+        &self,
+        epoch: u64,
+        slot: u64,
+        terminal: L2BlockId,
+    ) -> RpcResult<Option<EpochSummary>> {
+        let commitment = EpochCommitment::new(epoch, slot, terminal);
+        let summary = self
+            .storage
+            .checkpoint()
+            .get_epoch_summary(commitment)
+            .map_err(Error::Db)
+            .await?;
+        Ok(summary)
     }
 
     // TODO rework this, at least to use new OL naming?
