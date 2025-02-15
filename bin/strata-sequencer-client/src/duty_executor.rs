@@ -75,10 +75,8 @@ async fn handle_duty<R>(
     let duty_id = duty.id();
     debug!(%duty_id, ?duty, "handle_duty");
     let duty_result = match duty.clone() {
-        Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, duty_id, idata.clone()).await,
-        Duty::CommitBatch(duty) => {
-            handle_commit_batch_duty(rpc, duty, duty_id, idata.clone()).await
-        }
+        Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, duty_id, &idata).await,
+        Duty::CommitBatch(duty) => handle_commit_batch_duty(rpc, duty, duty_id, &idata).await,
     };
 
     if let Err(error) = duty_result {
@@ -91,7 +89,7 @@ async fn handle_sign_block_duty<R>(
     rpc: Arc<R>,
     duty: BlockSigningDuty,
     duty_id: DutyId,
-    idata: Arc<IdentityData>,
+    idata: &Arc<IdentityData>,
 ) -> Result<(), DutyExecError>
 where
     R: StrataSequencerApiClient + Send + Sync,
@@ -133,7 +131,7 @@ async fn handle_commit_batch_duty<R>(
     rpc: Arc<R>,
     duty: BatchCheckpointDuty,
     duty_id: DutyId,
-    idata: Arc<IdentityData>,
+    idata: &Arc<IdentityData>,
 ) -> Result<(), DutyExecError>
 where
     R: StrataSequencerApiClient + Send + Sync,

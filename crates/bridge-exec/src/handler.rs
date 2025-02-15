@@ -350,7 +350,6 @@ where
     TxBuildContext: BuildContext + Sync + Send,
 {
     fn drop(&mut self) {
-        // TODO erase keypair inside sig_manager, but sig_manager.keypair is not public.
         self.keypair.non_secure_erase();
     }
 }
@@ -364,19 +363,30 @@ mod tests {
 
     #[test]
     fn test_erase_keypair() {
+        fn is_all_zero<T>(p: *const T) -> bool {
+            let len = std::mem::size_of::<T>();
+            let buf = unsafe { std::slice::from_raw_parts(p as *const u8, len) };
+            buf.iter().all(|v| *v == 0)
+        }
+
         let keys = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
         let keypair = keys.to_keypair(SECP256K1);
 
-        // Create a wrapper struct that will set a flag when dropped
+        // Create a wrapper struct including keypair
         struct TestWrapper {
             keypair: Keypair,
         }
 
-        let shared_wrapper = Arc::new(TestWrapper { keypair });
-        let wrapper_clone = shared_wrapper.clone();
+        let wrapper = Arc::new(TestWrapper { keypair });
 
-        impl TestWrapper {
-            fn erase(&mut self) {
+        // Get raw pointer before dropping
+        let raw_ptr = Arc::as_ptr(&wrapper);
+
+        // Verify data exists (should NOT be zero yet)
+        assert!(!is_all_zero(raw_ptr));
+
+        impl Drop for TestWrapper {
+            fn drop(&mut self) {
                 self.keypair.non_secure_erase();
             }
         }
@@ -387,10 +397,12 @@ mod tests {
             bar(wrapper.clone());
         }
 
-        foo(wrapper_clone);
-        if let Some(mut wrapper) = Arc::into_inner(shared_wrapper) {
-            wrapper.erase();
-            assert_eq!(wrapper.keypair.secret_key().secret_bytes(), [1u8; 32]);
-        }
+        foo(wrapper.clone());
+
+        // Drop the last reference, triggering `ZeroizeOnDrop`
+        drop(wrapper);
+
+        // Now check if the memory has been zeroized
+        assert!(is_all_zero(raw_ptr));
     }
 }

@@ -149,20 +149,17 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     );
 
     // Spawn poll duties task.
-    let exec_handler = ExecHandler {
+    let exec_handler = Arc::new(ExecHandler {
         tx_build_ctx: tx_context,
         sig_manager,
         l2_rpc_client_pool,
         keypair,
         own_index,
         msg_polling_interval,
-    };
-
-    let shared_exec_handler = Arc::new(exec_handler);
-    let exec_handler_clone = shared_exec_handler.clone();
+    });
 
     let task_manager = TaskManager {
-        exec_handler: exec_handler_clone,
+        exec_handler: exec_handler.clone(),
         broadcaster: l1_rpc_client,
         bridge_duty_db_ops,
         bridge_duty_idx_db_ops,

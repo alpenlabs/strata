@@ -53,7 +53,6 @@ fn main_inner(args: Args) -> Result<()> {
 
     let config = get_config(args.clone())?;
     let idata = Arc::new(load_seqkey(&config.sequencer_key)?);
-    let idata_clone = Arc::clone(&idata);
 
     let task_manager = TaskManager::new(handle.clone());
     let executor = task_manager.executor();
@@ -71,7 +70,7 @@ fn main_inner(args: Args) -> Result<()> {
     );
     executor.spawn_critical_async(
         "duty-runner",
-        duty_executor_worker(rpc, duty_rx, handle.clone(), idata_clone),
+        duty_executor_worker(rpc, duty_rx, handle.clone(), idata.clone()),
     );
 
     task_manager.start_signal_listeners();

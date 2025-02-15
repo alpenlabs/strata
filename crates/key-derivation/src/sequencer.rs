@@ -131,6 +131,14 @@ impl Zeroize for SequencerKeys {
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for SequencerKeys {}
 
+// Manual Drop implementation to zeroize keys on drop.
+impl Drop for SequencerKeys {
+    fn drop(&mut self) {
+        #[cfg(feature = "zeroize")]
+        self.zeroize();
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -185,17 +193,20 @@ mod tests {
     #[test]
     #[cfg(feature = "zeroize")]
     fn test_zeroize_idata() {
+        fn is_all_zero<T>(p: *const T) -> bool {
+            let len = std::mem::size_of::<T>();
+            let buf = unsafe { std::slice::from_raw_parts(p as *const u8, len) };
+            buf.iter().all(|v| *v == 0)
+        }
+
         let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
         let keys = Arc::new(SequencerKeys::new(&master).unwrap());
-        let keys_clone = Arc::clone(&keys);
 
-        // Store original values
-        let master_chaincode = *keys.master_xpriv().chain_code.as_bytes();
-        let derived_chaincode = *keys.derived_xpriv().chain_code.as_bytes();
+        // Get raw pointer before dropping
+        let raw_ptr = Arc::as_ptr(&keys);
 
-        // Verify data exists
-        assert_ne!(master_chaincode, [0u8; 32]);
-        assert_ne!(derived_chaincode, [0u8; 32]);
+        // Verify data exists (should NOT be zero yet)
+        assert!(!is_all_zero(raw_ptr));
 
         fn bar(_keys_clone: Arc<SequencerKeys>) {}
 
@@ -203,12 +214,12 @@ mod tests {
             bar(keys.clone());
         }
 
-        foo(keys_clone);
+        foo(keys.clone());
 
-        if let Some(mut keys) = Arc::into_inner(keys) {
-            keys.zeroize();
-            assert_eq!(keys.master_xpriv().private_key.secret_bytes(), [1u8; 32]);
-            assert_eq!(keys.derived_xpriv().private_key.secret_bytes(), [1u8; 32]);
-        }
+        // Drop the last reference, triggering `ZeroizeOnDrop`
+        drop(keys);
+
+        // Now check if the memory has been zeroized
+        assert!(is_all_zero(raw_ptr));
     }
 }

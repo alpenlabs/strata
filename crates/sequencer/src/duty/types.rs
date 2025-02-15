@@ -342,7 +342,7 @@ impl DutyBatch {
 }
 
 /// Sequencer key used for signing-related duties.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum IdentityKey {
     /// Sequencer private key used for signing.
     Sequencer(Buf32),
@@ -352,7 +352,7 @@ pub enum IdentityKey {
 ///
 /// This is really just a stub that we should replace
 /// with real cryptographic signatures and putting keys in the rollup params.
-#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, Debug)]
 pub struct IdentityData {
     /// Unique identifying info.
     pub ident: Identity,
