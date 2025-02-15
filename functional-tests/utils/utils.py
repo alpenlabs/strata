@@ -98,8 +98,9 @@ def wait_until_with_value(
             if not predicate(r):
                 raise Exception
             return r
-        except Exception as _:
-            pass
+        except Exception as e:
+            logging.warning(f"caught exception, will still wait for timeout: {e}")
+
         time.sleep(step)
     raise AssertionError(error_with)
 
