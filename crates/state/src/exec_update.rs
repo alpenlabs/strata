@@ -5,7 +5,8 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
-    buf::Buf32, evm_exec::create_evm_extra_payload, prelude::payload::BlobSpec,
+    bridge::DepositData, buf::Buf32, evm_exec::create_evm_extra_payload, l1::BitcoinAmount,
+    prelude::payload::BlobSpec,
 };
 
 use crate::{
@@ -194,30 +195,24 @@ pub fn construct_ops_from_deposit_intents(
 pub struct ELDepositData {
     /// base index of applied deposit intent.
     intent_idx: u64,
-
-    /// Amount in L1 native asset.  For Bitcoin this is sats.
-    amt: u64,
-
-    /// Dest addr encoded in a portable format, assumed to be valid but must be
-    /// checked by EL before committing to building block.
-    dest_addr: Vec<u8>,
+    data: DepositData,
 }
 
 impl ELDepositData {
     pub fn new(intent_idx: u64, amt: u64, dest_addr: Vec<u8>) -> Self {
-        Self {
-            intent_idx,
-            amt,
-            dest_addr,
-        }
+        let data = DepositData {
+            amount: BitcoinAmount::from_sat(amt),
+            el_address: dest_addr,
+        };
+        Self { intent_idx, data }
     }
 
     pub fn amt(&self) -> u64 {
-        self.amt
+        self.data.amount.to_sat()
     }
 
     pub fn dest_addr(&self) -> &[u8] {
-        &self.dest_addr
+        &self.data.el_address
     }
 
     pub fn intent_idx(&self) -> u64 {
