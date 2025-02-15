@@ -381,8 +381,8 @@ pub async fn get_verification_state(
     params: &BtcParams,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
-    let h1 = get_difficulty_adjustment_height(0, height as u32, params);
-    let b1 = client.get_block_at(h1 as u64).await?;
+    let h1 = get_difficulty_adjustment_height(0, height, params);
+    let b1 = client.get_block_at(h1).await?;
 
     // Consider the block before `block_height` to be the last verified block
     let vh = height - 1; // verified_height
@@ -412,7 +412,7 @@ pub async fn get_verification_state(
     let l1_blkid: L1BlockId = vb.header.block_hash().into();
 
     let header_vs = HeaderVerificationState {
-        last_verified_block_num: vh as u32,
+        last_verified_block_num: vh,
         last_verified_block_hash: l1_blkid,
         next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
         interval_start_timestamp: b1.header.time,

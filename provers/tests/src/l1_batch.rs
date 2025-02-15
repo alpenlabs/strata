@@ -17,11 +17,11 @@ impl<H: ZkVmHost> L1BatchProofGenerator<H> {
 }
 
 impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
-    type Input = (u32, u32);
+    type Input = (u64, u64);
     type P = L1BatchProver;
     type H = H;
 
-    fn get_input(&self, heights: &(u32, u32)) -> ZkVmResult<L1BatchProofInput> {
+    fn get_input(&self, heights: &(u64, u64)) -> ZkVmResult<L1BatchProofInput> {
         let (start_height, end_height) = *heights;
         let btc_chain = get_btc_chain();
 
@@ -44,7 +44,7 @@ impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
         Ok(input)
     }
 
-    fn get_proof_id(&self, heights: &(u32, u32)) -> String {
+    fn get_proof_id(&self, heights: &(u64, u64)) -> String {
         let (start_height, end_height) = *heights;
         format!("l1_batch_{}_{}", start_height, end_height)
     }
@@ -63,7 +63,7 @@ mod tests {
     fn test_proof<H: ZkVmHost>(l1_batch_proof_generator: &L1BatchProofGenerator<H>) {
         let params = gen_params();
         let rollup_params = params.rollup();
-        let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
+        let l1_start_height = rollup_params.genesis_l1_height + 1;
         let l1_end_height = l1_start_height + 1;
 
         let _ = l1_batch_proof_generator

@@ -405,13 +405,13 @@ impl ClientStateMut {
         let new_unacc_len = (height - buried_height) as usize;
         let l1_vs = l1v.tip_verification_state();
         if let Some(l1_vs) = l1_vs {
-            if height > l1_vs.last_verified_block_num as u64 {
+            if height > l1_vs.last_verified_block_num {
                 panic!("clientstate: attempted rollback above current tip");
             }
 
             // TODO: handle other things
             let mut rollbacked_l1_vs = l1_vs.clone();
-            rollbacked_l1_vs.last_verified_block_num = height as u32;
+            rollbacked_l1_vs.last_verified_block_num = height;
             rollbacked_l1_vs.last_verified_block_hash = l1v.local_unaccepted_blocks[new_unacc_len];
         }
         l1v.local_unaccepted_blocks.truncate(new_unacc_len);

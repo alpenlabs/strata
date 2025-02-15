@@ -52,14 +52,14 @@ pub fn get_btc_mainnet_block() -> Block {
 
 pub struct BtcChainSegment {
     pub headers: Vec<Header>,
-    pub start: u32,
-    pub end: u32,
-    pub custom_blocks: HashMap<u32, Block>,
+    pub start: u64,
+    pub end: u64,
+    pub custom_blocks: HashMap<u64, Block>,
 }
 
 impl BtcChainSegment {
     /// Retrieves the block header at the specified height.
-    pub fn get_header(&self, height: u32) -> Header {
+    pub fn get_header(&self, height: u64) -> Header {
         assert!(
             (self.start..self.end).contains(&height),
             "height must be in the range [{}..{})",
@@ -70,16 +70,16 @@ impl BtcChainSegment {
         self.headers[idx as usize]
     }
 
-    pub fn get_block(&self, height: u32) -> &Block {
+    pub fn get_block(&self, height: u64) -> &Block {
         self.custom_blocks.get(&height).unwrap()
     }
 
     /// Retrieves the timestamps of a specified number of blocks from a given height in a
     /// descending order.
-    pub fn get_last_timestamps(&self, from: u32, count: u32) -> Vec<u32> {
-        let mut timestamps = Vec::with_capacity(count as usize);
+    pub fn get_last_timestamps(&self, from: u64, count: usize) -> Vec<u32> {
+        let mut timestamps = Vec::with_capacity(count);
         for i in (0..count).rev() {
-            let h = self.get_header(from - i);
+            let h = self.get_header(from - i as u64);
             timestamps.push(h.time)
         }
         timestamps
@@ -87,7 +87,7 @@ impl BtcChainSegment {
 
     pub fn get_verification_state(
         &self,
-        block_height: u32,
+        block_height: u64,
         params: &BtcParams,
     ) -> HeaderVerificationState {
         // Get the difficulty adjustment block just before `block_height`
@@ -123,7 +123,7 @@ impl BtcChainSegment {
         }
     }
 
-    pub fn get_block_record(&self, height: u32) -> L1BlockRecord {
+    pub fn get_block_record(&self, height: u64) -> L1BlockRecord {
         let header = self.get_header(height);
         L1BlockRecord::new(
             header.block_hash().into(),
@@ -132,10 +132,10 @@ impl BtcChainSegment {
         )
     }
 
-    pub fn get_block_records(&self, from_height: u32, len: usize) -> Vec<L1BlockRecord> {
+    pub fn get_block_records(&self, from_height: u64, len: usize) -> Vec<L1BlockRecord> {
         let mut blocks = Vec::with_capacity(len);
         for i in 0..len {
-            let block = self.get_block_record(from_height + i as u32);
+            let block = self.get_block_record(from_height + i as u64);
             blocks.push(block);
         }
         blocks
@@ -156,7 +156,7 @@ pub fn get_btc_chain() -> BtcChainSegment {
     }
 
     // This custom blocks are chose because this is where the first difficulty happened
-    let custom_blocks: HashMap<u32, Block> = vec![
+    let custom_blocks: HashMap<u64, Block> = vec![
         (40321, "0100000045720d24eae33ade0d10397a2e02989edef834701b965a9b161e864500000000993239a44a83d5c427fd3d7902789ea1a4d66a37d5848c7477a7cf47c2b071cd7690784b5746651c3af7ca030101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c02db00ffffffff0100f2052a01000000434104c9f513361104db6a84fb6d5b364ba57a27cd19bd051239bf750d8999c6b437220df8fea6b932a248df3cad1fdebb501791e02b7b893a44718d696542ba92a0acac00000000".to_owned()),
         (40322, "01000000fd1133cd53d00919b0bd77dd6ca512c4d552a0777cc716c00d64c60d0000000014cf92c7edbe8a75d1e328b4fec0d6143764ecbd0f5600aba9d22116bf165058e590784b5746651c1623dbe00101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c020509ffffffff0100f2052a010000004341043eb751f57bd4839a8f2922d5bf1ed15ade9b161774658fb39801f0b9da9c881f226fbe4ee0c240915f17ce5255dd499075ab49b199a7b1f898fb20cc735bc45bac00000000".to_owned()),
         (40323, "01000000c579e586b48485b6e263b54949d07dce8660316163d915a35e44eb570000000011d2b66f9794f17393bf90237f402918b61748f41f9b5a2523c482a81a44db1f4f91784b5746651c284557020101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c024502ffffffff0100f2052a01000000434104597b934f2081e7f0d7fae03ec668a9c69a090f05d4ee7c65b804390d94266ffb90442a1889aaf78b460692a43857638520baa8319cf349b0d5f086dc4d36da8eac00000000".to_owned()),

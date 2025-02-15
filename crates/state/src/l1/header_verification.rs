@@ -42,7 +42,7 @@ use crate::l1::{params::BtcParams, utils::compute_block_hash};
 )]
 pub struct HeaderVerificationState {
     /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
-    pub last_verified_block_num: u32,
+    pub last_verified_block_num: u64,
 
     /// [Hash](bitcoin::block::Header::block_hash) of the last verified block
     pub last_verified_block_hash: L1BlockId,
@@ -100,8 +100,7 @@ impl HeaderVerificationState {
     /// This has not been directly used since it is not available on the current release
     fn next_target(&mut self, timestamp: u32, params: &BtcParams) -> u32 {
         let params = params.inner();
-        if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() as u32 != 0
-        {
+        if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() != 0 {
             return self.next_block_target;
         }
 
@@ -134,7 +133,7 @@ impl HeaderVerificationState {
         self.last_11_blocks_timestamps.insert(timestamp);
 
         let new_block_num = self.last_verified_block_num;
-        if new_block_num % params.inner().difficulty_adjustment_interval() as u32 == 0 {
+        if new_block_num % params.inner().difficulty_adjustment_interval() == 0 {
             self.interval_start_timestamp = timestamp;
         }
     }
@@ -251,8 +250,8 @@ impl HeaderVerificationState {
 ///   the second, and so on.
 /// * `start` - The starting height from which to calculate.
 /// * `params` - [`BtcParams`] of the bitcoin network in use
-pub fn get_difficulty_adjustment_height(idx: u32, start: u32, params: &BtcParams) -> u32 {
-    let difficulty_adjustment_interval = params.inner().difficulty_adjustment_interval() as u32;
+pub fn get_difficulty_adjustment_height(idx: u64, start: u64, params: &BtcParams) -> u64 {
+    let difficulty_adjustment_interval = params.inner().difficulty_adjustment_interval();
     ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
 }
 
@@ -284,7 +283,7 @@ mod tests {
         let start = 0;
         let idx = OsRng.gen_range(1..1000);
         let h = get_difficulty_adjustment_height(idx, start, &MAINNET.clone().into());
-        assert_eq!(h, MAINNET.difficulty_adjustment_interval() as u32 * idx);
+        assert_eq!(h, MAINNET.difficulty_adjustment_interval() * idx);
     }
 
     #[test]
