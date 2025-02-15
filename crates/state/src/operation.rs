@@ -111,7 +111,7 @@ pub enum SyncAction {
     /// Indicates to the worker that it's safe to perform the L2 genesis
     /// operations and start the chain sync work, using a particular L1 block
     /// as the genesis lock-in block.
-    L2Genesis(L1BlockId),
+    L2Genesis(HeaderVerificationState),
 
     /// Indicates to the worker to write the checkpoints to checkpoint db
     WriteCheckpoints(u64, Vec<L1CommittedCheckpoint>),
@@ -164,7 +164,7 @@ pub fn apply_writes_to_state(
                 if let Some(l1_vs) = l1_vs {
                     // TODO: handle other things
                     let mut rollbacked_l1_vs = l1_vs.clone();
-                    rollbacked_l1_vs.last_verified_block_num = height as u32;
+                    rollbacked_l1_vs.last_verified_block_num = height;
                     rollbacked_l1_vs.last_verified_block_hash =
                         l1v.local_unaccepted_blocks[new_unacc_len];
                 }

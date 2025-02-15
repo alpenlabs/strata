@@ -349,16 +349,17 @@ fn apply_action(
             engine.update_finalized_block(blkid)?;
         }
 
-        SyncAction::L2Genesis(l1blkid) => {
+        SyncAction::L2Genesis(l1_vs) => {
+            let l1blkid = l1_vs.last_verified_block_hash;
             info!(%l1blkid, "sync action to do genesis");
 
             // TODO: use l1blkid during chain state genesis ?
 
-            let chstate =
-                genesis::init_genesis_chainstate(&state.params, &state.storage).map_err(|err| {
-                    error!(err = %err, "failed to compute chain genesis");
-                    Error::GenesisFailed(err.to_string())
-                })?;
+            let chstate = genesis::init_genesis_chainstate(&state.params, &state.storage, &l1_vs)
+                .map_err(|err| {
+                error!(err = %err, "failed to compute chain genesis");
+                Error::GenesisFailed(err.to_string())
+            })?;
             status_channel.update_chainstate(chstate);
         }
 
