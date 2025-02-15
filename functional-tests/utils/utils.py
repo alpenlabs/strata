@@ -104,6 +104,32 @@ def wait_until_with_value(
     raise AssertionError(error_with)
 
 
+def wait_until_chain_epoch(rpc, epoch: int, **kwargs) -> dict:
+    """
+    Waits until the chain has finished the specified epoch index, determined by
+    checking for epoch summaries.
+
+    Returns the epoch summary.
+    """
+
+    logging.info(f"waiting for epoch {epoch}")
+
+    def _query():
+        status = rpc.strata_syncStatus()
+        logging.debug(f"checked status {status}")
+        commitments = rpc.strata_getEpochCommitments(epoch)
+        if len(commitments) > 0:
+            comm = commitments[0]
+            logging.info(f"now at epoch {epoch}, slot {comm['last_slot']}, blkid {comm['last_blkid']}")
+            return rpc.strata_getEpochSummary(epoch, comm["last_slot"], comm["last_blkid"])
+        return None
+
+    def _check(v):
+        return v is not None
+
+    return wait_until_with_value(_query, _check, **kwargs)
+
+
 @dataclass
 class ManualGenBlocksConfig:
     btcrpc: BitcoindClient
@@ -482,7 +508,7 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     )
 
     # Set up individual loggers for each test
-    logger = logging.getLogger(test_name)
+    logger = logging.getLogger(f"root.{test_name}")
 
     # File handler
     log_path = os.path.join(log_dir, f"{test_name}.log")
