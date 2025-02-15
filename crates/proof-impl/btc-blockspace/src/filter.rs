@@ -3,8 +3,11 @@
 
 use bitcoin::Block;
 use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
-use strata_primitives::{block_credential::CredRule, bridge::DepositData, params::RollupParams};
-use strata_state::{batch::Checkpoint, tx::ProtocolOperation};
+use strata_primitives::{block_credential::CredRule, params::RollupParams};
+use strata_state::{
+    batch::Checkpoint,
+    tx::{DepositInfo, ProtocolOperation},
+};
 
 use crate::tx_indexer::ProverTxVisitorImpl;
 
@@ -13,7 +16,7 @@ pub fn extract_relevant_info(
     block: &Block,
     rollup_params: &RollupParams,
     filter_config: &TxFilterConfig,
-) -> (Vec<DepositData>, Option<Checkpoint>) {
+) -> (Vec<DepositInfo>, Option<Checkpoint>) {
     let mut deposits = Vec::new();
     let mut prev_checkpoint = None;
 
@@ -22,7 +25,7 @@ pub fn extract_relevant_info(
     for op in tx_entries.into_iter().flat_map(|t| t.into_contents()) {
         match op {
             ProtocolOperation::Deposit(deposit_info) => {
-                deposits.push(deposit_info.data.clone());
+                deposits.push(deposit_info);
             }
             ProtocolOperation::Checkpoint(signed_batch) => {
                 if let CredRule::SchnorrKey(pub_key) = rollup_params.cred_rule {

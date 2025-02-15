@@ -3,9 +3,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use strata_primitives::{bridge::DepositData, buf::Buf32, l1::OutputRef};
+use strata_primitives::{buf::Buf32, l1::OutputRef};
 
-use crate::batch::SignedCheckpoint;
+use crate::{batch::SignedCheckpoint, bridge_ops::DepositIntent};
 
 /// Commits to a DA blob.  This is just the hash of the DA blob.
 #[derive(
@@ -84,7 +84,7 @@ pub enum ProtocolOperation {
 pub struct DepositInfo {
     /// Contains the deposit details, such as the bitcoin amount and the execution layer address
     /// where the equivalent tokens will be minted.
-    pub data: DepositData,
+    pub intent: DepositIntent,
 
     /// Represents the outpoint from the Bitcoin transaction corresponding to this deposit.
     pub outpoint: OutputRef,

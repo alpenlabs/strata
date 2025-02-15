@@ -5,8 +5,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
-    bridge::DepositData, buf::Buf32, evm_exec::create_evm_extra_payload, l1::BitcoinAmount,
-    prelude::payload::BlobSpec,
+    buf::Buf32, evm_exec::create_evm_extra_payload, l1::BitcoinAmount, prelude::payload::BlobSpec,
 };
 
 use crate::{
@@ -180,11 +179,8 @@ pub fn construct_ops_from_deposit_intents(
         }
         let pending_deposit = pending_deposits.pop_front().unwrap();
 
-        el_ops.push(Op::Deposit(ELDepositData::new(
-            idx,
-            pending_deposit.amt(),
-            pending_deposit.dest_ident().to_vec(),
-        )));
+        let intent = DepositIntent::new(pending_deposit.amt(), pending_deposit.dest_ident());
+        el_ops.push(Op::Deposit(ELDepositData::new(idx, intent)));
     }
     el_ops
 }
@@ -199,24 +195,20 @@ pub struct ELDepositData {
     /// base index of applied deposit intent.
     intent_idx: u64,
     /// Deposit details including the amount in bitcoins and the execution layer address.
-    data: DepositData,
+    intent: DepositIntent,
 }
 
 impl ELDepositData {
-    pub fn new(intent_idx: u64, amt: u64, dest_addr: Vec<u8>) -> Self {
-        let data = DepositData {
-            amount: BitcoinAmount::from_sat(amt),
-            el_address: dest_addr,
-        };
-        Self { intent_idx, data }
+    pub fn new(intent_idx: u64, intent: DepositIntent) -> Self {
+        Self { intent_idx, intent }
     }
 
-    pub fn amt(&self) -> u64 {
-        self.data.amount.to_sat()
+    pub fn amt(&self) -> BitcoinAmount {
+        self.intent.amt()
     }
 
     pub fn dest_addr(&self) -> &[u8] {
-        &self.data.el_address
+        self.intent.dest_ident()
     }
 
     pub fn intent_idx(&self) -> u64 {

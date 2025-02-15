@@ -1,5 +1,6 @@
 //! Types for managing pending bridging operations in the CL state.
 
+use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{bitcoin_bosd::Descriptor, l1::BitcoinAmount};
@@ -60,7 +61,9 @@ impl WithdrawalBatch {
 }
 
 /// Describes a deposit data to be processed by an EE.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Arbitrary, Serialize, Deserialize,
+)]
 pub struct DepositIntent {
     /// Quantity in the L1 asset, for Bitcoin this is sats.
     amt: BitcoinAmount,
@@ -78,8 +81,8 @@ impl DepositIntent {
         }
     }
 
-    pub fn amt(&self) -> u64 {
-        self.amt.to_sat()
+    pub fn amt(&self) -> BitcoinAmount {
+        self.amt
     }
 
     pub fn dest_ident(&self) -> &[u8] {

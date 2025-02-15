@@ -2,8 +2,8 @@
 
 use bitcoin::{opcodes::all::OP_RETURN, OutPoint, ScriptBuf, Transaction};
 use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
-use strata_primitives::{bridge::DepositData, l1::OutputRef, prelude::DepositTxParams};
-use strata_state::tx::DepositInfo;
+use strata_primitives::{l1::OutputRef, prelude::DepositTxParams};
+use strata_state::{bridge_ops::DepositIntent, tx::DepositInfo};
 
 use crate::{
     deposit::error::DepositParseError,
@@ -37,14 +37,11 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
         vout: 0, // deposit must always exist in the first output
     });
 
-    let data = DepositData {
-        amount: send_addr_out.value.into(),
-        el_address: ee_address.to_vec(),
-    };
+    let intent = DepositIntent::new(send_addr_out.value.into(), ee_address);
 
     // Construct and return the DepositInfo
     Some(DepositInfo {
-        data,
+        intent,
         outpoint: deposit_outpoint,
     })
 }
@@ -116,7 +113,7 @@ mod tests {
         assert!(out.is_some());
         let out = out.unwrap();
 
-        assert_eq!(out.data.amount, amt.into());
-        assert_eq!(out.data.el_address, ee_addr);
+        assert_eq!(out.intent.amt(), amt.into());
+        assert_eq!(out.intent.dest_ident(), ee_addr);
     }
 }

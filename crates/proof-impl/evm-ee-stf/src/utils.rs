@@ -1,7 +1,7 @@
 use strata_primitives::{buf::Buf32, evm_exec::create_evm_extra_payload, l1::BitcoinAmount};
 use strata_state::{
     block::ExecSegment,
-    bridge_ops,
+    bridge_ops::{self, DepositIntent},
     exec_update::{ELDepositData, ExecUpdate, Op, UpdateInput, UpdateOutput},
 };
 
@@ -25,11 +25,9 @@ pub fn generate_exec_update(el_proof_pp: &EvmBlockStfOutput) -> ExecSegment {
         .deposit_requests
         .iter()
         .map(|request| {
-            Op::Deposit(ELDepositData::new(
-                request.index,
-                gwei_to_sats(request.amount),
-                request.address.as_slice().to_vec(),
-            ))
+            let amt = BitcoinAmount::from_sat(gwei_to_sats(request.amount));
+            let intent = DepositIntent::new(amt, request.address.as_slice());
+            Op::Deposit(ELDepositData::new(request.index, intent))
         })
         .collect::<Vec<_>>();
 

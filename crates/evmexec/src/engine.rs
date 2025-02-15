@@ -20,7 +20,7 @@ use strata_reth_node::{
 };
 use strata_state::{
     block::L2BlockBundle,
-    bridge_ops,
+    bridge_ops::{self, DepositIntent},
     exec_update::{ELDepositData, ExecUpdate, Op, UpdateOutput},
     id::L2BlockId,
 };
@@ -114,8 +114,8 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
                     address: address_from_slice(deposit_data.dest_addr()).ok_or_else(|| {
                         EngineError::InvalidAddress(deposit_data.dest_addr().to_vec())
                     })?,
-                    amount: sats_to_gwei(deposit_data.amt())
-                        .ok_or(EngineError::AmountConversion(deposit_data.amt()))?,
+                    amount: sats_to_gwei(deposit_data.amt().to_sat())
+                        .ok_or(EngineError::AmountConversion(deposit_data.amt().to_sat()))?,
                     ..Default::default()
                 }),
             })
@@ -174,11 +174,9 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
                     .withdrawals
                     .iter()
                     .map(|withdrawal| {
-                        Op::Deposit(ELDepositData::new(
-                            withdrawal.index,
-                            gwei_to_sats(withdrawal.amount),
-                            withdrawal.address.as_slice().to_vec(),
-                        ))
+                        let amt = BitcoinAmount::from_sat(gwei_to_sats(withdrawal.amount));
+                        let intent = DepositIntent::new(amt, withdrawal.address.as_slice());
+                        Op::Deposit(ELDepositData::new(withdrawal.index, intent))
                     })
                     .collect();
 
@@ -222,7 +220,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
                 Op::Deposit(deposit_data) => Some(Withdrawal {
                     index: deposit_data.intent_idx(),
                     address: address_from_slice(deposit_data.dest_addr())?,
-                    amount: sats_to_gwei(deposit_data.amt())?,
+                    amount: sats_to_gwei(deposit_data.amt().to_sat())?,
                     validator_index: 0,
                 }),
             })

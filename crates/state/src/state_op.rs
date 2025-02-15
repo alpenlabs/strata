@@ -13,7 +13,6 @@ use strata_primitives::{
 use tracing::*;
 
 use crate::{
-    bridge_ops::DepositIntent,
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::Chainstate,
     header::L2Header,
@@ -233,10 +232,9 @@ impl StateCache {
         let (header_record, deposit_txs, _) = matured_block.into_parts();
         for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
             if let Deposit(deposit_info) = op {
+                let amt = deposit_info.intent.amt();
                 trace!("we got some deposit_txs");
-                let amt = deposit_info.data.amount;
-                let deposit_intent = DepositIntent::new(amt, &deposit_info.data.el_address);
-                deposits.push_back(deposit_intent);
+                deposits.push_back(deposit_info.intent.clone());
                 self.new_state
                     .deposits_table
                     .add_deposits(&deposit_info.outpoint, &operators, amt)

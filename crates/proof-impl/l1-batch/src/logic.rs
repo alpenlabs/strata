@@ -1,18 +1,19 @@
 use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_l1tx::filter::TxFilterConfig;
-use strata_primitives::{bridge::DepositData, buf::Buf32, params::RollupParams};
+use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_proofimpl_btc_blockspace::scan::process_blockscan;
 use strata_state::{
     batch::Checkpoint,
     l1::{get_btc_params, HeaderVerificationState, L1TxProof},
+    tx::DepositInfo,
 };
 use zkaleido::ZkVmEnv;
 
 /// Represents the public parameters of the L1BlockScan batch proof.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct L1BatchProofOutput {
-    pub deposits: Vec<DepositData>,
+    pub deposits: Vec<DepositInfo>,
     pub prev_checkpoint: Option<Checkpoint>,
     pub initial_state_hash: Buf32,
     pub final_state_hash: Buf32,

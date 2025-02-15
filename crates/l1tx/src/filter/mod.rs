@@ -144,11 +144,12 @@ mod test {
         let deposits: Vec<_> = parse_deposits(&tx, &filter_conf).collect();
         assert_eq!(deposits.len(), 1, "Should find one deposit transaction");
         assert_eq!(
-            deposits[0].data.el_address, ee_addr,
+            deposits[0].intent.dest_ident(),
+            ee_addr,
             "EE address should match"
         );
         assert_eq!(
-            deposits[0].data.amount,
+            deposits[0].intent.amt(),
             BitcoinAmount::from_sat(deposit_config.deposit_amount),
             "Deposit amount should match"
         );
