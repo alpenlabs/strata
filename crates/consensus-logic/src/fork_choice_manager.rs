@@ -759,6 +759,15 @@ fn apply_blocks(
 
 /// Takes the block and post-state and inserts database entries to reflect the
 /// epoch being finished on-chain.
+///
+/// There's some bookkeeping here that's slightly weird since in the way it
+/// works now, the last block of an epoch brings the post-state to the new
+/// epoch.  So the epoch's final state actually has cur_epoch be the *next*
+/// epoch.  And the index we assign to the summary here actually uses the "prev
+/// epoch", since that's what the epoch in question is here.
+///
+/// This will be simplified if/when we out the per-block and per-epoch
+/// processing into two separate stages.
 fn handle_finish_epoch(
     blkid: &L2BlockId,
     bundle: &L2BlockBundle,
@@ -767,16 +776,13 @@ fn handle_finish_epoch(
 ) -> anyhow::Result<()> {
     // Construct the various parts of the summary
     let new_epoch = post_state.cur_epoch();
+    let prev_epoch_idx = new_epoch - 1;
 
     let slot = bundle.header().blockidx();
     let terminal = L2BlockCommitment::new(slot, *blkid);
 
     let prev_epoch = post_state.prev_epoch(); // FIXME is this right?
-    assert_eq!(
-        prev_epoch.epoch() + 1,
-        new_epoch,
-        "fcm: epoch sequencing mixup"
-    );
+    assert_eq!(prev_epoch_idx + 1, new_epoch, "fcm: epoch sequencing mixup");
     let prev_terminal = prev_epoch.to_block_commitment();
 
     let l1seg = bundle.l1_segment();
@@ -791,7 +797,7 @@ fn handle_finish_epoch(
 
     // Actually construct and insert the epoch summary.
     let summary = EpochSummary::new(
-        new_epoch,
+        prev_epoch_idx,
         terminal,
         prev_terminal,
         new_l1_block,

@@ -61,10 +61,13 @@ pub fn checkpoint_worker(
 
         // Get it if there is one.
         let update = chs_rx.borrow_and_update();
-        let Some(_update) = update.as_ref() else {
+        let Some(update) = update.as_ref() else {
             trace!("received new chain sync status but was still unset, ignoring");
             continue;
         };
+
+        let cur_epoch = update.new_status().cur_epoch();
+        debug!(%last_saved_epoch, %cur_epoch, "checkpoint got new chainstate update");
 
         // Again check if we should shutdown, just in case.
         if shutdown.should_shutdown() {
@@ -77,15 +80,24 @@ pub fn checkpoint_worker(
         // Maybe that could be simplfied?
         let ready_epochs = find_ready_checkpoints(last_saved_epoch, ckman)?;
 
-        for epoch in ready_epochs {
-            let Some(summary) = ckman.get_epoch_summary_blocking(epoch)? else {
-                warn!(
-                    ?epoch,
-                    "epoch seemed ready but summary was missing, ignoring"
-                );
+        if !ready_epochs.is_empty() {
+            let n_ready = ready_epochs.len();
+            trace!(%last_saved_epoch, %n_ready, "found epochs ready for checkpoint");
+        } else {
+            trace!("no new epochs ready for checkpoint");
+        }
+
+        for ec in ready_epochs {
+            let Some(summary) = ckman.get_epoch_summary_blocking(ec)? else {
+                warn!(?ec, "epoch seemed ready but summary was missing, ignoring");
                 continue;
             };
 
+            let terminal_blkid = ec.last_blkid();
+            let epoch = ec.epoch();
+            info!(%epoch, %terminal_blkid, "generating checkpoint for epoch");
+
+            // If this errors we should crash probably.
             handle_ready_epoch(
                 &summary,
                 storage.as_ref(),
@@ -93,7 +105,7 @@ pub fn checkpoint_worker(
                 params.rollup(),
             )?;
 
-            last_saved_epoch = epoch.epoch();
+            last_saved_epoch = epoch;
         }
     }
     Ok(())
@@ -107,17 +119,19 @@ fn find_ready_checkpoints(
 ) -> Result<Vec<EpochCommitment>, Error> {
     let epoch_at = from_epoch; // TODO make this +1 after we fix genesis
     let Some(last_ready_epoch) = ckman.get_last_summarized_epoch_blocking()? else {
+        warn!("no epoch summaries have been written, skipping");
         return Ok(Vec::new());
     };
 
-    let mut epochs = Vec::new();
+    trace!(%from_epoch, %last_ready_epoch, "fetching epoch commitments");
 
+    let mut epochs = Vec::new();
     for i in epoch_at..=last_ready_epoch {
         let commitments = ckman.get_epoch_commitments_at_blocking(i)?;
 
         if commitments.is_empty() {
             warn!(epoch = %i, "thought there was an epoch summary here, moving on");
-            break;
+            continue;
         }
 
         if commitments.len() > 1 {
@@ -125,9 +139,10 @@ fn find_ready_checkpoints(
             warn!(epoch = %i, %ignored_count, "ignoring some summaries at epoch");
         }
 
-        let the_epoch = commitments[0];
-        if ckman.get_checkpoint_blocking(the_epoch.epoch())?.is_none() {
-            epochs.push(the_epoch);
+        let ec = commitments[0];
+        if ckman.get_checkpoint_blocking(ec.epoch())?.is_none() {
+            trace!(epoch = %i, "found epoch ready to checkpoint");
+            epochs.push(ec);
         }
     }
 
@@ -158,7 +173,7 @@ fn handle_ready_epoch(
     );
 
     // else save a pending proof checkpoint entry
-    debug!(%epoch, "saving checkpoint pending proof");
+    debug!(%epoch, "saving unproven checkpoint");
     let entry = CheckpointEntry::new_pending_proof(cpd.info, cpd.tsn, cpd.commitment);
     if let Err(e) = ckhandle.put_checkpoint_and_notify_blocking(epoch, entry) {
         warn!(%epoch, err = %e, "failed to save checkpoint");
@@ -334,14 +349,20 @@ fn create_checkpoint_prep_data_from_summary(
     let l2man = storage.l2();
     let rollup_params_hash = params.compute_hash();
 
-    let prev_epoch = summary.epoch() - 1;
-    let prev_checkpoint = storage
-        .checkpoint()
-        .get_checkpoint_blocking(prev_epoch)?
-        .ok_or(Error::MissingCheckpoint(prev_epoch))?;
+    let is_genesis_epoch = summary.epoch() == 0;
+
+    let prev_checkpoint = if !is_genesis_epoch {
+        let prev_epoch = summary.epoch() - 1;
+        let prev_checkpoint = storage
+            .checkpoint()
+            .get_checkpoint_blocking(prev_epoch)?
+            .ok_or(Error::MissingCheckpoint(prev_epoch))?;
+        Some(prev_checkpoint)
+    } else {
+        None
+    };
 
     // There's some special handling we have to do if we're the genesis epoch.
-    let is_genesis_epoch = summary.epoch() == 0;
     let prev_summary = if !is_genesis_epoch {
         let ps = storage
             .checkpoint()
@@ -390,14 +411,12 @@ fn create_checkpoint_prep_data_from_summary(
     let new_transition = BatchTransition::new(l1_transition, l2_transition, rollup_params_hash);
     let new_batch_info = BatchInfo::new(summary.epoch(), l1_range, l2_range);
 
-    // TODO make sure this is correct
-    let base_state_commitment = if prev_checkpoint.is_proof_ready() {
-        prev_checkpoint
-            .into_batch_checkpoint()
-            .base_state_commitment()
-            .clone()
-    } else {
-        new_transition.get_initial_base_state_commitment()
+    // TODO make sure this is correct, what even is this "base state commitment"?
+    let base_state_commitment = match prev_checkpoint {
+        Some(ckpt) if ckpt.is_proof_ready() => {
+            ckpt.into_batch_checkpoint().base_state_commitment().clone()
+        }
+        _ => new_transition.get_initial_base_state_commitment(),
     };
 
     Ok(CheckpointPrepData::new(
