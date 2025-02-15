@@ -277,7 +277,7 @@ pub fn tracker_task<E: ExecEngineCtl>(
     Ok(())
 }
 
-/// Check if there are unprocessed L2 blocks in db.
+/// Check if there are unprocessed L2 blocks in the database.
 /// If there are, pass them to fcm.
 fn handle_unprocessed_blocks(
     fcm: &mut ForkChoiceManager,
@@ -300,7 +300,7 @@ fn handle_unprocessed_blocks(
             if let Some(BlockStatus::Invalid) = status {
                 continue;
             }
-            warn!(?blockid, "processing l2block");
+
             process_fc_message(
                 ForkChoiceMessage::NewBlock(blockid),
                 fcm,
@@ -400,6 +400,7 @@ fn process_fc_message(
 ) -> anyhow::Result<()> {
     match msg {
         ForkChoiceMessage::NewBlock(blkid) => {
+            // TODO change this to "processing new block"
             #[cfg(feature = "debug-utils")]
             check_bail_trigger(BAIL_ADVANCE_CONSENSUS_STATE);
 
@@ -407,7 +408,20 @@ fn process_fc_message(
                 .get_block_data(&blkid)?
                 .ok_or(Error::MissingL2Block(blkid))?;
 
-            let ok = handle_new_block(fcm_state, &blkid, &block_bundle, engine)?;
+            let slot = block_bundle.header().blockidx();
+            info!(%slot, %blkid, "processing new block");
+
+            let ok = match handle_new_block(fcm_state, &blkid, &block_bundle, engine) {
+                Ok(v) => v,
+                Err(e) => {
+                    // Really we shouldn't emit this error unless there's a
+                    // problem checking the block in general and it could be
+                    // valid or invalid, but we're kinda sloppy with errors
+                    // here so let's try to avoid crashing the FCM task?
+                    error!(%slot, %blkid, "error processing block, interpreting as invalid\n{e:?}");
+                    false
+                }
+            };
 
             let status = if ok {
                 // Update status.
@@ -441,9 +455,10 @@ fn handle_new_block(
     bundle: &L2BlockBundle,
     engine: &impl ExecEngineCtl,
 ) -> anyhow::Result<bool> {
+    let slot = bundle.header().blockidx();
+
     // First, decide if the block seems correctly signed and we haven't
     // already marked it as invalid.
-
     let chstate = fcm_state.cur_chainstate.as_ref();
     let correctly_signed = check_new_block(&blkid, &bundle, chstate, fcm_state)?;
     if !correctly_signed {
@@ -452,18 +467,22 @@ fn handle_new_block(
     }
 
     // Try to execute the payload, seeing if *that's* valid.
-    // TODO take implicit input produced by the CL STF and include that in the payload data
-    let exec_hash = bundle.header().exec_payload_hash();
-    let eng_payload = ExecPayloadData::from_l2_block_bundle(&bundle);
-    debug!(?blkid, ?exec_hash, "submitting execution payload");
-    let res = engine.submit_payload(eng_payload)?;
+    //
+    // We don't do this for the genesis block because that block doesn't
+    // actually have a well-formed accessory and it gets mad at us.
+    if slot > 0 {
+        let exec_hash = bundle.header().exec_payload_hash();
+        let eng_payload = ExecPayloadData::from_l2_block_bundle(&bundle);
+        debug!(?blkid, ?exec_hash, "submitting execution payload");
+        let res = engine.submit_payload(eng_payload)?;
 
-    // If the payload is invalid then we should write the full block as
-    // being invalid and return too.
-    // TODO verify this is reasonable behavior, especially with regard
-    // to pre-sync
-    if res == strata_eectl::engine::BlockStatus::Invalid {
-        return Ok(false);
+        // If the payload is invalid then we should write the full block as
+        // being invalid and return too.
+        // TODO verify this is reasonable behavior, especially with regard
+        // to pre-sync
+        if res == strata_eectl::engine::BlockStatus::Invalid {
+            return Ok(false);
+        }
     }
 
     // Insert block into pending block tracker and figure out if we

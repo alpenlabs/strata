@@ -26,6 +26,7 @@ use strata_state::{
 };
 use strata_storage::L2BlockManager;
 use tokio::{runtime::Handle, sync::Mutex};
+use tracing::*;
 
 use crate::{
     block::EVML2Block,
@@ -211,8 +212,11 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
     }
 
     async fn submit_new_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
-        let el_payload = borsh::from_slice::<ElPayload>(payload.accessory_data())
-            .map_err(|_| EngineError::PayloadMalformed)?;
+        let Ok(el_payload) = borsh::from_slice::<ElPayload>(payload.accessory_data()) else {
+            // In particular, this happens if we try to call it with for genesis block.
+            warn!("submit_new_payload called with malformed block accessory, this might be a bug");
+            return Ok(BlockStatus::Invalid);
+        };
 
         // actually bridge-in deposits
         let withdrawals: Vec<Withdrawal> = payload
