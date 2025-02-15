@@ -3,8 +3,8 @@
 use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_l1tx::filter::TxFilterConfig;
-use strata_primitives::params::RollupParams;
-use strata_state::{batch::Checkpoint, l1::L1TxProof, tx::DepositInfo};
+use strata_primitives::{bridge::DepositData, params::RollupParams};
+use strata_state::{batch::Checkpoint, l1::L1TxProof};
 use zkaleido::ZkVmEnv;
 
 use crate::scan::process_blockscan;
@@ -14,7 +14,7 @@ use crate::scan::process_blockscan;
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct BlockScanResult {
     pub header_raw: Vec<u8>,
-    pub deposits: Vec<DepositInfo>,
+    pub deposits: Vec<DepositData>,
     pub prev_checkpoint: Option<Checkpoint>,
 }
 
