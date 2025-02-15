@@ -76,14 +76,17 @@ pub enum ProtocolOperation {
     DepositRequest(DepositRequestInfo),
 }
 
+/// `DepositInfo` encapsulates a complete deposit record, combining the deposit data with its
+/// corresponding outpoint.
 #[derive(
     Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
 )]
 pub struct DepositInfo {
-    /// data about deposit
+    /// Contains the deposit details, such as the bitcoin amount and the execution layer address
+    /// where the equivalent tokens will be minted.
     pub data: DepositData,
 
-    /// outpoint
+    /// Represents the outpoint from the Bitcoin transaction corresponding to this deposit.
     pub outpoint: OutputRef,
 }
 

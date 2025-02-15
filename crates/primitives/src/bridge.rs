@@ -327,7 +327,12 @@ impl<'a> Arbitrary<'a> for Musig2SecNonce {
     }
 }
 
-/// TODO: add docstring
+/// DepositData contains the essential details for processing a user's deposit into the execution
+/// layer.
+///
+/// This struct holds:
+/// - The amount in bitcoins that the user is depositing.
+/// - The execution layer address where the equivalent tokens will be minted.
 #[derive(
     Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
 )]

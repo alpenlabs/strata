@@ -189,12 +189,16 @@ pub fn construct_ops_from_deposit_intents(
     el_ops
 }
 
+/// `ELDepositData` represents the deposit information specific to the execution layer.
+///
+/// It contains the base index of the applied deposit intent and the corresponding deposit data.
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
 pub struct ELDepositData {
     /// base index of applied deposit intent.
     intent_idx: u64,
+    /// Deposit details including the amount in bitcoins and the execution layer address.
     data: DepositData,
 }
 
