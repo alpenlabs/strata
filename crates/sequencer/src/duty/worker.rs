@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 use strata_primitives::params::Params;
-use strata_state::{chain_state::Chainstate, prelude::*};
+use strata_state::{chain_state::Chainstate, client_state::InternalState, prelude::*};
 use strata_status::{ChainSyncStatusUpdate, StatusChannel, SyncReceiver};
 use strata_storage::{L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
@@ -29,6 +29,7 @@ pub fn duty_tracker_task(
         shutdown,
         duty_tracker,
         status_rx,
+        &status_ch,
         storage.as_ref(),
         checkpoint_handle.as_ref(),
         params.as_ref(),
@@ -39,6 +40,7 @@ fn duty_tracker_task_inner(
     shutdown: ShutdownGuard,
     duty_tracker: Arc<RwLock<DutyTracker>>,
     mut status_rx: SyncReceiver<Option<ChainSyncStatusUpdate>>,
+    status_ch: &StatusChannel,
     storage: &NodeStorage,
     checkpoint_handle: &CheckpointHandle,
     params: &Params,
@@ -83,6 +85,13 @@ fn duty_tracker_task_inner(
             continue;
         };
 
+        // Need to get most recent internal state.
+        let cur_cstate = status_ch.get_cur_client_state();
+        let Some(cur_istate) = cur_cstate.get_last_internal_state() else {
+            error!("no usable CSM state, continuing anyways, but this doesn't make any sense!");
+            continue;
+        };
+
         // Again check if we should shutdown, just in case.
         if shutdown.should_shutdown() {
             warn!("received shutdown signal");
@@ -90,11 +99,13 @@ fn duty_tracker_task_inner(
         }
 
         let new_tip = update.new_status().tip;
+        let new_chs = update.new_tl_chainstate().as_ref();
         trace!(?new_tip, "new chain tip, updating duties");
 
         if let Err(e) = update_tracker(
             &duty_tracker,
-            update.new_tl_chainstate().as_ref(),
+            cur_istate,
+            new_chs,
             storage,
             checkpoint_handle,
             params,
@@ -110,20 +121,21 @@ fn duty_tracker_task_inner(
 
 fn update_tracker(
     tracker: &Arc<RwLock<DutyTracker>>,
-    state: &Chainstate,
+    cistate: &InternalState,
+    chstate: &Chainstate,
     storage: &NodeStorage,
     checkpoint_handle: &CheckpointHandle,
     params: &Params,
 ) -> Result<(), Error> {
     let l2man = storage.l2();
 
-    let new_duties = extractor::extract_duties(state, checkpoint_handle, l2man, params)?;
+    let new_duties = extractor::extract_duties(chstate, cistate, checkpoint_handle, l2man, params)?;
 
     info!(?new_duties, "new duties");
 
     // Figure out the block slot from the tip blockid.
     // TODO include the block slot in the consensus state
-    let tip_blkid = *state.chain_tip_blkid();
+    let tip_blkid = *chstate.chain_tip_blkid();
     let block = l2man
         .get_block_data_blocking(&tip_blkid)?
         .ok_or(Error::MissingL2Block(tip_blkid))?;
@@ -134,15 +146,15 @@ fn update_tracker(
     // be reworked to need less special-casing.  This might be able to be
     // simplified since we are more directly generating duties from the chain
     // state.
-    let new_finalized = *state.finalized_epoch().last_blkid();
+    let new_finalized = *chstate.finalized_epoch().last_blkid();
     let newly_finalized_blocks: Vec<L2BlockId> = get_finalized_blocks(
         tracker.read().get_finalized_block(),
         Some(new_finalized),
         l2man,
     )?;
 
-    let latest_finalized_batch = if !state.finalized_epoch().is_null() {
-        Some(state.finalized_epoch().epoch())
+    let latest_finalized_batch = if !chstate.finalized_epoch().is_null() {
+        Some(chstate.finalized_epoch().epoch())
     } else {
         None
     };

@@ -310,6 +310,16 @@ impl InternalState {
             .unwrap_or_else(EpochCommitment::null)
     }
 
+    /// Gets the next epoch we expect to be confirmed.
+    pub fn get_next_expected_epoch_conf(&self) -> u64 {
+        let last_epoch = self.get_last_epoch();
+        if last_epoch.is_null() {
+            0
+        } else {
+            last_epoch.epoch() + 1
+        }
+    }
+
     /// Returns the last witnessed L1 block from the last checkpointed state.
     pub fn last_witnessed_l1_block(&self) -> Option<&L1BlockCommitment> {
         self.last_checkpoint
