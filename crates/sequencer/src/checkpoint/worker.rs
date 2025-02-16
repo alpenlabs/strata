@@ -159,7 +159,7 @@ fn get_next_batch(
             // Determine the L1 range.
             let initial_l1_height = state.genesis_l1_height() + 1;
             let initial_l1_commitment = get_l1_commitment(initial_l1_height)?;
-            let final_l1_height = current_l1_state.last_verified_block_num as u64;
+            let final_l1_height = current_l1_state.last_verified_block_num;
             let final_l1_commitment = get_l1_commitment(final_l1_height)?;
             let l1_range = (initial_l1_commitment, final_l1_commitment);
             let l1_transition = (genesis_l1_state_hash, current_l1_state_hash);
@@ -198,7 +198,7 @@ fn get_next_batch(
             // Build the L1 range for the new batch.
             let initial_l1_height = batch_info.l1_range.1.height() + 1;
             let initial_l1_commitment = get_l1_commitment(initial_l1_height)?;
-            let final_l1_height = current_l1_state.last_verified_block_num as u64;
+            let final_l1_height = current_l1_state.last_verified_block_num;
             // Use the block id from the current verification state.
             let final_l1_commitment =
                 L1BlockCommitment::new(final_l1_height, current_l1_state.last_verified_block_hash);

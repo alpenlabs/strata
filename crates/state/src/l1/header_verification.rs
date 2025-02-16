@@ -222,8 +222,8 @@ impl HeaderVerificationState {
 
     /// Calculate the hash of the verification state
     pub fn compute_hash(&self) -> Result<Buf32, std::io::Error> {
-        // 4 + 32 + 4 + 4 + 16 + 11*4 = 104
-        let mut buf = [0u8; 104];
+        // 8 + 32 + 4 + 4 + 16 + 11*4 = 108
+        let mut buf = [0u8; 108];
         let mut cur = Cursor::new(&mut buf[..]);
         cur.write_all(&self.last_verified_block_num.to_be_bytes())?;
         cur.write_all(self.last_verified_block_hash.as_ref())?;
@@ -238,6 +238,29 @@ impl HeaderVerificationState {
 
         cur.write_all(&serialized_timestamps)?;
         Ok(strata_primitives::hash::raw(&buf))
+    }
+
+    pub fn reorg(&mut self, old_headers: &[Header], new_headers: &[Header], params: &BtcParams) {
+        assert!(
+            new_headers.len() >= old_headers.len(),
+            "cannot reorg if there are few new headers"
+        );
+
+        for old_header in old_headers.iter().rev() {
+            assert_eq!(
+                compute_block_hash(old_header),
+                self.last_verified_block_hash.into(),
+                "invalid old header"
+            );
+            self.last_verified_block_hash = old_header.prev_blockhash.into();
+            self.last_verified_block_num -= 1;
+            self.last_11_blocks_timestamps.remove();
+            self.total_accumulated_pow -= old_header.difficulty(params.inner());
+        }
+
+        for new_header in new_headers {
+            self.check_and_update_continuity(new_header, params);
+        }
     }
 }
 
@@ -257,6 +280,7 @@ pub fn get_difficulty_adjustment_height(idx: u64, start: u64, params: &BtcParams
 
 #[cfg(test)]
 mod tests {
+
     use bitcoin::params::MAINNET;
     use rand::{rngs::OsRng, Rng};
     use strata_test_utils::bitcoin::get_btc_chain;
@@ -293,5 +317,48 @@ mod tests {
         let verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
+    }
+
+    fn test_reorg(reorg: (u64, u64)) {
+        let chain = get_btc_chain();
+
+        dbg!(reorg);
+        let reorg = reorg.0..reorg.1;
+        let headers: Vec<Header> = reorg.clone().map(|h| chain.get_header(h)).collect();
+        let mut verification_state =
+            chain.get_verification_state(reorg.start, &MAINNET.clone().into());
+
+        // insert headers to update accumulated PoW
+        for header in &headers {
+            verification_state.check_and_update_full(header, &MAINNET.clone().into());
+        }
+        let before_vs = verification_state.clone();
+
+        verification_state.reorg(&headers, &headers, &MAINNET.clone().into());
+
+        // We use the same headers for reorg to check if they are consistent
+        assert_eq!(before_vs, verification_state);
+    }
+
+    #[test]
+    fn test_reorg_cases() {
+        let btc_params: BtcParams = MAINNET.clone().into();
+        let chain = get_btc_chain();
+        let h2 = get_difficulty_adjustment_height(2, chain.start, &btc_params);
+        let h3 = get_difficulty_adjustment_height(2, chain.start, &btc_params);
+
+        // Reorg of 10 blocks with no difficulty adjustment in between
+        let reorg = (h2 + 100, h2 + 110);
+        test_reorg(reorg);
+
+        let reorg = (h3 + 100, h3 + 110);
+        test_reorg(reorg);
+
+        // Reorg of 10 blocks with difficulty adjustment in between
+        let reorg = (h2 - 5, h2 + 5);
+        test_reorg(reorg);
+
+        let reorg = (h2 - 5, h2 + 5);
+        test_reorg(reorg);
     }
 }
