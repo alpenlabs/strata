@@ -1,4 +1,4 @@
-use strata_state::prelude::*;
+use strata_state::{l1::L1VerificationError, prelude::*};
 use thiserror::Error;
 
 /// Errors for block state transition.
@@ -27,4 +27,11 @@ pub enum TsnError {
 
     #[error("applied el ops and el ops from chain state doesn't match")]
     ElOpsMismatch,
+
+    /// Indicates an error occurred during the verification of an L1 block.
+    ///
+    /// This variant wraps the underlying [`L1VerificationError`] that provides details about the
+    /// failure.
+    #[error("L1 block verification failed: {0}")]
+    L1BlockVerification(#[from] L1VerificationError),
 }
