@@ -4,7 +4,7 @@
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 
-use bitcoin::block::Header;
+use bitcoin::{block::Header, params::Params};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
@@ -17,7 +17,7 @@ use crate::{
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::Chainstate,
     header::L2Header,
-    l1::{BtcParams, L1MaturationEntry, L1VerificationError},
+    l1::{L1MaturationEntry, L1VerificationError},
     tx::ProtocolOperation::Deposit,
 };
 
@@ -191,7 +191,7 @@ impl StateCache {
         &mut self,
         old_headers: &[Header],
         new_headers: &[Header],
-        params: &BtcParams,
+        params: &Params,
     ) -> Result<(), L1VerificationError> {
         self.state_mut()
             .l1_state

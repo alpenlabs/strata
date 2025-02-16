@@ -100,8 +100,8 @@ pub fn process_event(
                     let block_mf = context.get_l1_block_manifest(height)?;
                     let header: Header =
                         bitcoin::consensus::deserialize(block_mf.header()).unwrap();
-                    updated_l1vs =
-                        updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params())?;
+                    updated_l1vs = updated_l1vs
+                        .check_and_update_continuity_new(&header, get_btc_params().inner())?;
                 }
                 state.update_verification_state(updated_l1vs);
             }
@@ -581,8 +581,7 @@ mod tests {
         let genesis = params.rollup().genesis_l1_height;
 
         let chain = get_btc_chain();
-        let l1_verification_state =
-            chain.get_verification_state(genesis + 1, &MAINNET.clone().into());
+        let l1_verification_state = chain.get_verification_state(genesis + 1, &MAINNET);
 
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();

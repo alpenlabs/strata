@@ -6,6 +6,7 @@ use bitcoin::{
     consensus::{deserialize, serialize},
     hashes::Hash,
     opcodes::all::OP_RETURN,
+    params::Params as BtcParams,
     script::{self, PushBytesBuf},
     Address, Amount, Block, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
@@ -15,7 +16,7 @@ use strata_primitives::{
     l1::{BitcoinAddress, L1BlockRecord, OutputRef},
 };
 use strata_state::l1::{
-    get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
+    get_difficulty_adjustment_height, HeaderVerificationState, L1BlockId, TimestampStore,
 };
 
 use crate::{l2::gen_params, ArbitraryGenerator};

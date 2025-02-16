@@ -1,11 +1,11 @@
-use bitcoin::{consensus::deserialize, Block};
+use bitcoin::{consensus::deserialize, params::Params, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_proofimpl_btc_blockspace::scan::process_blockscan;
 use strata_state::{
     batch::Checkpoint,
-    l1::{get_btc_params, HeaderVerificationState, L1TxProof},
+    l1::{HeaderVerificationState, L1TxProof},
     tx::DepositInfo,
 };
 use zkaleido::ZkVmEnv;
@@ -47,8 +47,9 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
         let block: Block = deserialize(&serialized_block).unwrap();
         let blockscan_result =
             process_blockscan(&block, &inclusion_proof, &rollup_params, &filter_config);
+        let btc_params = Params::new(rollup_params.network);
         state
-            .check_and_update_continuity(&block.header, &get_btc_params())
+            .check_and_update_continuity(&block.header, &btc_params)
             .unwrap();
         deposits.extend(blockscan_result.deposits);
         prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);

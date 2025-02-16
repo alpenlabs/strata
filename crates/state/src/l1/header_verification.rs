@@ -1,13 +1,13 @@
 use std::io::{Cursor, Write};
 
 use arbitrary::Arbitrary;
-use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget};
+use bitcoin::{block::Header, hashes::Hash, params::Params, BlockHash, CompactTarget};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
 
 use super::{error::L1VerificationError, timestamp_store::TimestampStore, L1BlockId};
-use crate::l1::{params::BtcParams, utils::compute_block_hash};
+use crate::l1::utils::compute_block_hash;
 
 /// A struct containing all necessary information for validating a Bitcoin block header.
 ///
@@ -70,8 +70,7 @@ pub struct HeaderVerificationState {
 }
 
 impl HeaderVerificationState {
-    fn next_target(&mut self, timestamp: u32, params: &BtcParams) -> u32 {
-        let params = params.inner();
+    fn next_target(&mut self, timestamp: u32, params: &Params) -> u32 {
         if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() != 0 {
             return self.next_block_target;
         }
@@ -87,11 +86,11 @@ impl HeaderVerificationState {
     }
 
     // Note/TODO: Figure out a better way so we don't have to params each time.
-    fn update_timestamps(&mut self, timestamp: u32, params: &BtcParams) {
+    fn update_timestamps(&mut self, timestamp: u32, params: &Params) {
         self.last_11_blocks_timestamps.insert(timestamp);
 
         let new_block_num = self.last_verified_block_num;
-        if new_block_num % params.inner().difficulty_adjustment_interval() == 0 {
+        if new_block_num % params.difficulty_adjustment_interval() == 0 {
             self.interval_start_timestamp = timestamp;
         }
     }
@@ -110,7 +109,7 @@ impl HeaderVerificationState {
     pub fn check_and_update_full(
         &mut self,
         header: &Header,
-        params: &BtcParams,
+        params: &Params,
     ) -> Result<(), L1VerificationError> {
         // Check continuity
         let prev_blockhash: L1BlockId =
@@ -160,7 +159,7 @@ impl HeaderVerificationState {
         self.update_timestamps(header.time, params);
 
         // Update the total accumulated PoW
-        self.total_accumulated_pow += header.difficulty(params.inner());
+        self.total_accumulated_pow += header.difficulty(params);
 
         // Set the target for the next block
         self.next_block_target = self.next_target(header.time, params);
@@ -176,7 +175,7 @@ impl HeaderVerificationState {
     pub fn check_and_update_continuity(
         &mut self,
         header: &Header,
-        params: &BtcParams,
+        params: &Params,
     ) -> Result<(), L1VerificationError> {
         // Check continuity
         let prev_blockhash: L1BlockId =
@@ -200,7 +199,7 @@ impl HeaderVerificationState {
         self.update_timestamps(header.time, params);
 
         // Update the total accumulated PoW
-        self.total_accumulated_pow += header.difficulty(params.inner());
+        self.total_accumulated_pow += header.difficulty(params);
 
         Ok(())
     }
@@ -212,7 +211,7 @@ impl HeaderVerificationState {
     pub fn check_and_update_continuity_new(
         &self,
         header: &Header,
-        params: &BtcParams,
+        params: &Params,
     ) -> Result<HeaderVerificationState, L1VerificationError> {
         let mut vs = self.clone();
         vs.check_and_update_continuity(header, params)?;
@@ -259,7 +258,7 @@ impl HeaderVerificationState {
         &mut self,
         old_headers: &[Header],
         new_headers: &[Header],
-        params: &BtcParams,
+        params: &Params,
     ) -> Result<(), L1VerificationError> {
         if new_headers.len() < old_headers.len() {
             return Err(L1VerificationError::ReorgLengthError {
@@ -278,7 +277,7 @@ impl HeaderVerificationState {
             self.last_verified_block_hash = old_header.prev_blockhash.into();
             self.last_verified_block_num -= 1;
             self.last_11_blocks_timestamps.remove();
-            self.total_accumulated_pow -= old_header.difficulty(params.inner());
+            self.total_accumulated_pow -= old_header.difficulty(params);
         }
 
         for new_header in new_headers {
@@ -298,8 +297,8 @@ impl HeaderVerificationState {
 ///   the second, and so on.
 /// * `start` - The starting height from which to calculate.
 /// * `params` - [`BtcParams`] of the bitcoin network in use
-pub fn get_difficulty_adjustment_height(idx: u64, start: u64, params: &BtcParams) -> u64 {
-    let difficulty_adjustment_interval = params.inner().difficulty_adjustment_interval();
+pub fn get_difficulty_adjustment_height(idx: u64, start: u64, params: &Params) -> u64 {
+    let difficulty_adjustment_interval = params.difficulty_adjustment_interval();
     ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
 }
 
@@ -315,15 +314,13 @@ mod tests {
     #[test]
     fn test_blocks() {
         let chain = get_btc_chain();
-        // TODO: figure out why passing btc_params to `check_and_update_full` doesn't work
-        let btc_params: BtcParams = MAINNET.clone().into();
-        let h1 = get_difficulty_adjustment_height(1, chain.start, &btc_params);
+        let h1 = get_difficulty_adjustment_height(1, chain.start, &MAINNET);
         let r1 = OsRng.gen_range(h1..chain.end);
-        let mut verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
+        let mut verification_state = chain.get_verification_state(r1, &MAINNET);
 
         for header_idx in r1..chain.end {
             verification_state
-                .check_and_update_full(&chain.get_header(header_idx), &MAINNET.clone().into())
+                .check_and_update_full(&chain.get_header(header_idx), &MAINNET)
                 .unwrap()
         }
     }
@@ -332,7 +329,7 @@ mod tests {
     fn test_get_difficulty_adjustment_height() {
         let start = 0;
         let idx = OsRng.gen_range(1..1000);
-        let h = get_difficulty_adjustment_height(idx, start, &MAINNET.clone().into());
+        let h = get_difficulty_adjustment_height(idx, start, &MAINNET);
         assert_eq!(h, MAINNET.difficulty_adjustment_interval() * idx);
     }
 
@@ -340,7 +337,7 @@ mod tests {
     fn test_hash() {
         let chain = get_btc_chain();
         let r1 = 42000;
-        let verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
+        let verification_state = chain.get_verification_state(r1, &MAINNET);
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
     }
@@ -351,18 +348,17 @@ mod tests {
         dbg!(reorg);
         let reorg = reorg.0..reorg.1;
         let headers: Vec<Header> = reorg.clone().map(|h| chain.get_header(h)).collect();
-        let mut verification_state =
-            chain.get_verification_state(reorg.start, &MAINNET.clone().into());
+        let mut verification_state = chain.get_verification_state(reorg.start, &MAINNET);
 
         for header in &headers {
             verification_state
-                .check_and_update_full(header, &MAINNET.clone().into())
+                .check_and_update_full(header, &MAINNET)
                 .unwrap();
         }
         let before_vs = verification_state.clone();
 
         verification_state
-            .reorg(&headers, &headers, &MAINNET.clone().into())
+            .reorg(&headers, &headers, &MAINNET)
             .unwrap();
 
         // We use the same headers for reorg to check if they are consistent
@@ -371,10 +367,9 @@ mod tests {
 
     #[test]
     fn test_reorgs() {
-        let btc_params: BtcParams = MAINNET.clone().into();
         let chain = get_btc_chain();
-        let h2 = get_difficulty_adjustment_height(2, chain.start, &btc_params);
-        let h3 = get_difficulty_adjustment_height(2, chain.start, &btc_params);
+        let h2 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
+        let h3 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
 
         // Reorg of 10 blocks with no difficulty adjustment in between
         let reorg = (h2 + 100, h2 + 110);

@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::bail;
-use bitcoin::{Block, BlockHash};
+use bitcoin::{params::Params as BtcParams, Block, BlockHash};
 use secp256k1::XOnlyPublicKey;
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
@@ -14,10 +14,7 @@ use strata_l1tx::{
 };
 use strata_primitives::{block_credential::CredRule, params::Params};
 use strata_state::{
-    l1::{
-        get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
-        L1BlockId, TimestampStore,
-    },
+    l1::{get_difficulty_adjustment_height, HeaderVerificationState, L1BlockId, TimestampStore},
     sync_event::EventSubmitter,
 };
 use strata_status::StatusChannel;
@@ -365,8 +362,12 @@ async fn process_block<R: ReaderRpc>(
 
     if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
-        let l1_verification_state =
-            get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
+        let l1_verification_state = get_verification_state(
+            ctx.client.as_ref(),
+            genesis_ht + 1,
+            &BtcParams::new(params.rollup().network),
+        )
+        .await?;
         let ev = L1Event::GenesisVerificationState(height, l1_verification_state);
         l1_events.push(ev);
     }
@@ -426,7 +427,7 @@ pub async fn get_verification_state(
 
 #[cfg(test)]
 mod test {
-    use bitcoin::hashes::Hash;
+    use bitcoin::{hashes::Hash, params::REGTEST};
     use strata_primitives::{buf::Buf32, l1::L1Status};
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
@@ -582,22 +583,21 @@ mod test {
         let (bitcoind, client) = get_bitcoind_and_client();
 
         let _ = mine_blocks(&bitcoind, 115, None).unwrap();
-        let params = get_btc_params();
 
         let len = 15;
         let height = 100;
-        let mut header_vs = get_verification_state(&client, height, &params)
+        let mut header_vs = get_verification_state(&client, height, &REGTEST)
             .await
             .unwrap();
 
         for h in height..height + len {
             let block = client.get_block_at(h).await.unwrap();
             header_vs
-                .check_and_update_continuity(&block.header, &params)
+                .check_and_update_continuity(&block.header, &REGTEST)
                 .unwrap();
         }
 
-        let new_header_vs = get_verification_state(&client, height + len, &params)
+        let new_header_vs = get_verification_state(&client, height + len, &REGTEST)
             .await
             .unwrap();
 

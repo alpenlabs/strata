@@ -4,7 +4,7 @@
 
 use std::{cmp::max, collections::HashMap};
 
-use bitcoin::{block::Header, consensus::deserialize, OutPoint, Transaction};
+use bitcoin::{block::Header, consensus::deserialize, params::Params, OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
     l1::{BitcoinAmount, L1TxRef, OutputRef},
@@ -127,7 +127,8 @@ fn process_l1_view_update(
             state.apply_l1_block_entry(ment.clone());
         }
 
-        state.reorg_l1_vs(&old_headers, &new_headers, &get_btc_params())?;
+        let bitcoin_params = Params::new(params.network);
+        state.reorg_l1_vs(&old_headers, &new_headers, &bitcoin_params)?;
 
         let maturation_threshold = params.l1_reorg_safe_depth as u64;
 
