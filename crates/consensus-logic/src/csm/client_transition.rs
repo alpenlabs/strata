@@ -326,12 +326,18 @@ fn process_l1_block(
     let mut checkpoint = state.last_checkpoint().cloned();
 
     // Iterate through all of the protocol operations in all of the txs.
+    // TODO split out each proto op handling into a separate function
     for txs in block_mf.txs() {
         for op in txs.protocol_ops() {
             match op {
                 ProtocolOperation::Checkpoint(signed_ckpt) => {
                     let ckpt = signed_ckpt.checkpoint();
 
+                    // Before we do anything, make sure that the checkpoint
+                    // proof is correct.  There's no point in looking at it more
+                    // if the proof is invalid.
+                    // TODO update this proof checking to use simplified
+                    // interface, see comment in checkpoint_verification
                     let receipt = signed_ckpt.checkpoint().get_proof_receipt();
                     if !verify_proof(ckpt, &receipt, params).is_ok() {
                         // If it's invalid then just print a warning and move on.
@@ -343,6 +349,11 @@ fn process_l1_block(
                     if let Some(prev_ckpt) = &checkpoint {
                         if !check_checkpoint_extends(ckpt, prev_ckpt, params) {
                             warn!(%height, "ignoring noncontinuous checkpoint in L1 block");
+                            continue;
+                        }
+                    } else {
+                        // If not, then it should be for the genesis epoch.
+                        if ckpt.batch_info().epoch != 0 {
                             continue;
                         }
                     }
@@ -374,7 +385,22 @@ fn check_checkpoint_extends(
     prev: &L1Checkpoint,
     params: &RollupParams,
 ) -> bool {
-    // TODO implement this, copy from the commented filter_verified_checkpoints code
+    let last_l1_tsn = prev.batch_transition.l1_transition;
+    let last_l2_tsn = prev.batch_transition.l2_transition;
+    let l1_tsn = checkpoint.batch_transition().l1_transition;
+    let l2_tsn = checkpoint.batch_transition().l2_transition;
+
+    // Check that the L1 blocks match up.
+    if l1_tsn.0 != last_l1_tsn.1 {
+        warn!("checkpoint mismatch on L1 state!");
+        return false;
+    }
+
+    if l2_tsn.0 != last_l2_tsn.1 {
+        warn!("checkpoint mismatch on L2 state!");
+        return false;
+    }
+
     true
 }
 
