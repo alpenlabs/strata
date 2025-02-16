@@ -210,29 +210,57 @@ impl StrataApiServer for StrataRpcImpl {
         let css = self.status_channel.get_chain_sync_status();
         let cstate = self.status_channel.get_cur_client_state();
 
-        let last_l1_block = cstate.get_tip_l1_block();
-        let (last_l1_height, last_l1_blkid) = match last_l1_block {
-            Some(block) => (block.height(), *block.blkid()),
-            // Dummies
-            None => {
-                warn!("responding with dummy heights and stuff");
-                (0, L1BlockId::from(Buf32::zero()))
-            }
-        };
+        // Define default values for all of the fields that we'll fill in later.
+        let mut chain_tip = Buf32::zero();
+        let mut chain_tip_slot = 0;
+        let mut finalized_blkid = Buf32::zero();
+        let mut last_l1_block = Buf32::zero();
+        let mut buried_l1_height = 0;
+        let mut finalized_epoch = None;
+        let mut confirmed_epoch = None;
+        let mut tip_l1_block = None;
+        let mut buried_l1_block = None;
 
-        // Copy these out of the sync state, if they're there.
-        let (chain_tip_slot, chain_tip_blkid, finalized_blkid) = css
-            .as_ref()
-            .map(|css| (css.tip_slot(), *css.tip_blkid(), *css.finalized_blkid()))
-            .unwrap_or_default();
+        // Maybe set the chain tip fields.
+        // TODO remove this after actually removing the fields
+        if let Some(css) = css {
+            chain_tip = (*css.tip_blkid()).into();
+            chain_tip_slot = css.tip_slot();
+        }
+
+        // Maybe set last L1 block.
+        if let Some(block) = cstate.get_tip_l1_block() {
+            tip_l1_block = Some(block);
+            last_l1_block = (*block.blkid()).into(); // TODO remove
+        }
+
+        // Maybe set buried L1 block.
+        if let Some(block) = cstate.get_buried_l1_block() {
+            buried_l1_block = Some(block);
+            buried_l1_height = block.height(); // TODO remove
+        }
+
+        // Maybe set confirmed epoch.
+        if let Some(last_ckpt) = cstate.get_last_checkpoint() {
+            confirmed_epoch = Some(last_ckpt.batch_info.get_epoch_commitment());
+        }
+
+        // Maybe set finalized epoch.
+        if let Some(fin_ckpt) = cstate.get_finalized_checkpoint() {
+            finalized_epoch = Some(fin_ckpt.batch_info.get_epoch_commitment());
+            finalized_blkid = (*fin_ckpt.batch_info.final_l2_block().blkid()).into();
+        }
 
         Ok(RpcClientStatus {
-            chain_tip: *chain_tip_blkid.as_ref(),
+            chain_tip: chain_tip.into(),
             chain_tip_slot,
             finalized_blkid: *finalized_blkid.as_ref(),
-            last_l1_block: *last_l1_blkid.as_ref(),
-            // FIXME this is a bodge, we don't track this anymore
-            buried_l1_height: last_l1_height.saturating_sub(3),
+            last_l1_block: last_l1_block.into(),
+            finalized_epoch,
+            confirmed_epoch,
+            buried_l1_height,
+            tip_l1_block,
+            buried_l1_block,
         })
     }
 

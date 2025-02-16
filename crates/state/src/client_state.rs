@@ -199,6 +199,14 @@ impl ClientState {
         self.get_finalized_checkpoint()
             .map(|ck| ck.batch_info.get_epoch_commitment())
     }
+
+    /// Gets the L1 block we treat as buried, if there is one and we have it.
+    pub fn get_buried_l1_block(&self) -> Option<L1BlockCommitment> {
+        let tip_block = self.get_tip_l1_block()?;
+        let buried_height = tip_block.height().saturating_sub(self.finalization_depth);
+        let istate = self.get_internal_state(buried_height)?;
+        Some(L1BlockCommitment::new(buried_height, *istate.blkid()))
+    }
 }
 
 #[cfg(feature = "test_utils")]
