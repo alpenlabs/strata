@@ -26,3 +26,6 @@ pub use params::*;
 
 mod inclusion_proof;
 pub use inclusion_proof::*;
+
+mod error;
+pub use error::*;

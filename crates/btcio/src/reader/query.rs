@@ -592,7 +592,9 @@ mod test {
 
         for h in height..height + len {
             let block = client.get_block_at(h).await.unwrap();
-            header_vs.check_and_update_continuity(&block.header, &params);
+            header_vs
+                .check_and_update_continuity(&block.header, &params)
+                .unwrap();
         }
 
         let new_header_vs = get_verification_state(&client, height + len, &params)

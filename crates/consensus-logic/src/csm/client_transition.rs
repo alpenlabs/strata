@@ -101,7 +101,7 @@ pub fn process_event(
                     let header: Header =
                         bitcoin::consensus::deserialize(block_mf.header()).unwrap();
                     updated_l1vs =
-                        updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
+                        updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params())?;
                 }
                 state.update_verification_state(updated_l1vs);
             }

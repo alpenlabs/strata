@@ -19,8 +19,14 @@ pub struct L1ViewState {
     /// L1 blocks that might still be reorged.
     pub(crate) maturation_queue: StateQueue<L1MaturationEntry>,
 
-    /// HeaderVerificationState that verifies till the tip of the maturation queue
-    /// todo: better doc
+    /// The header verification state that tracks and verifies L1 block headers up to the tip
+    /// of the maturation queue.
+    ///
+    /// This field maintains the current state of header verification, ensuring that the sequence
+    /// of L1 block headers follows the expected continuity, meets the necessary consensus rules,
+    /// and correctly reflects difficulty adjustments and timestamp validations. It is updated as
+    /// new L1 headers enter the maturation queue, and its state is used as the basis for
+    /// further header verification.
     pub(crate) header_vs: HeaderVerificationState,
     /* TODO include L1 MMR state that we mature
      * blocks into */
