@@ -308,7 +308,7 @@ impl StateUpdate {
 }
 
 /// Describes an identity that might be assigned duties.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub enum Identity {
     /// Sequencer with an identity key.
     Sequencer(Buf32),
