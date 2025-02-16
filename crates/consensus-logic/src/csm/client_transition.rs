@@ -220,7 +220,7 @@ fn handle_block(
             .get_internal_state(height - 1)
             .expect("clientstate: missing expected block state");
 
-        let new_istate = process_l1_block(prev_istate, &block_mf, params.rollup())?;
+        let new_istate = process_l1_block(prev_istate, height, &block_mf, params.rollup())?;
         state.accept_l1_block_state(block, new_istate);
 
         // TODO make max states configurable
@@ -318,15 +318,64 @@ fn process_genesis_trigger_block(
 
 fn process_l1_block(
     state: &InternalState,
+    height: u64,
     block_mf: &L1BlockManifest,
     params: &RollupParams,
 ) -> Result<InternalState, Error> {
     let blkid = block_mf.block_hash();
-    let mut checkpoint = None;
+    let mut checkpoint = state.last_checkpoint().cloned();
 
-    for txs in block_mf.txs() {}
+    // Iterate through all of the protocol operations in all of the txs.
+    for txs in block_mf.txs() {
+        for op in txs.protocol_ops() {
+            match op {
+                ProtocolOperation::Checkpoint(signed_ckpt) => {
+                    let ckpt = signed_ckpt.checkpoint();
+
+                    let receipt = signed_ckpt.checkpoint().get_proof_receipt();
+                    if !verify_proof(ckpt, &receipt, params).is_ok() {
+                        // If it's invalid then just print a warning and move on.
+                        warn!(%height, "ignoring invalid checkpoint in L1 block");
+                        continue;
+                    }
+
+                    // If we had a previous checkpoint, verify it extends from it.
+                    if let Some(prev_ckpt) = &checkpoint {
+                        if !check_checkpoint_extends(ckpt, prev_ckpt, params) {
+                            warn!(%height, "ignoring noncontinuous checkpoint in L1 block");
+                            continue;
+                        }
+                    }
+
+                    let l1ckpt = L1Checkpoint::new(
+                        ckpt.batch_info().clone(),
+                        ckpt.batch_transition().clone(),
+                        ckpt.base_state_commitment().clone(),
+                        !ckpt.proof().is_empty(),
+                        height,
+                    );
+
+                    // If it all looks good then overwrite the saved checkpoint.
+                    checkpoint = Some(l1ckpt);
+                }
+
+                // The rest we don't care about here.  Maybe we will in the
+                // future, like for when we actually do DA, but not for now.
+                _ => {}
+            }
+        }
+    }
 
     Ok(InternalState::new(blkid, checkpoint))
+}
+
+fn check_checkpoint_extends(
+    checkpoint: &Checkpoint,
+    prev: &L1Checkpoint,
+    params: &RollupParams,
+) -> bool {
+    // TODO implement this, copy from the commented filter_verified_checkpoints code
+    true
 }
 
 // TODO remove this old code after we've reconsolidated its responsibilities
