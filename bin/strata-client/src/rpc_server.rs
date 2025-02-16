@@ -876,40 +876,49 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .map_err(to_jsonrpsee_error("failed to complete block template"))
     }
 
-    async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()> {
-        println!("complete_checkpoint_signature: {}; {:?}", idx, sig);
+    async fn complete_checkpoint_signature(
+        &self,
+        checkpoint_idx: u64,
+        sig: HexBytes64,
+    ) -> RpcResult<()> {
+        // TODO shift all this logic somewhere else that's closer to where it's
+        // relevant and not in the RPC method impls
+        trace!(%checkpoint_idx, ?sig, "call to complete_checkpoint_signature");
+
         let entry = self
             .checkpoint_handle
-            .get_checkpoint(idx)
+            .get_checkpoint(checkpoint_idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?
-            .ok_or(Error::MissingCheckpointInDb(idx))?;
+            .ok_or(Error::MissingCheckpointInDb(checkpoint_idx))?;
 
         if entry.proving_status != CheckpointProvingStatus::ProofReady {
-            Err(Error::MissingCheckpointProof(idx))?;
+            Err(Error::MissingCheckpointProof(checkpoint_idx))?;
         }
 
         if entry.confirmation_status == CheckpointConfStatus::Confirmed
             || entry.confirmation_status == CheckpointConfStatus::Finalized
         {
-            Err(Error::CheckpointAlreadyPosted(idx))?;
+            Err(Error::CheckpointAlreadyPosted(checkpoint_idx))?;
         }
 
         let checkpoint = Checkpoint::from(entry);
         let signed_checkpoint = SignedCheckpoint::new(checkpoint, sig.0.into());
 
         if !verify_checkpoint_sig(&signed_checkpoint, &self.params) {
-            Err(Error::InvalidCheckpointSignature(idx))?;
+            Err(Error::InvalidCheckpointSignature(checkpoint_idx))?;
         }
+
+        trace!(%checkpoint_idx, "signature OK");
 
         let payload = L1Payload::new_checkpoint(
             borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?,
         );
         let sighash = signed_checkpoint.checkpoint().hash();
 
-        let blob_intent = PayloadIntent::new(PayloadDest::L1, sighash, payload);
+        let payload_intent = PayloadIntent::new(PayloadDest::L1, sighash, payload);
         self.envelope_handle
-            .submit_intent_async(blob_intent)
+            .submit_intent_async(payload_intent)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
 

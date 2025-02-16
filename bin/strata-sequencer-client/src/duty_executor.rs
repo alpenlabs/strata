@@ -138,9 +138,10 @@ async fn handle_commit_batch_duty<R>(
 where
     R: StrataSequencerApiClient + Send + Sync,
 {
+    let epoch = duty.inner().batch_info().epoch();
     let sig = sign_checkpoint(duty.inner(), &idata.key);
 
-    debug!(%duty_id, %sig, "checkpoint signature");
+    debug!(%epoch, %duty_id, %sig, "signed checkpoint");
 
     rpc.complete_checkpoint_signature(duty.inner().batch_info().epoch(), HexBytes64(sig.0))
         .await
