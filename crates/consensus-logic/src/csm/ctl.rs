@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use strata_state::sync_event::SyncEvent;
+use async_trait::async_trait;
+use strata_state::sync_event::{EventSubmitter, SyncEvent};
 use strata_storage::SyncEventManager;
 use tokio::sync::mpsc;
 use tracing::*;
@@ -21,20 +22,19 @@ impl CsmController {
             csm_tx,
         }
     }
+}
 
+#[async_trait]
+impl EventSubmitter for CsmController {
     /// Writes a sync event to the database and updates the watch channel to
     /// trigger the CSM executor to process the event.
-    pub fn submit_event(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
-        trace!(?sync_event, "Writing sync event");
+    fn submit_event(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
         let ev_idx = self
             .sync_ev_man
             .write_sync_event_blocking(sync_event.clone())?;
         let msg = CsmMessage::EventInput(ev_idx);
-        trace!(?sync_event, ?ev_idx, "sending csm event input");
         if self.csm_tx.blocking_send(msg).is_err() {
             warn!(%ev_idx, "sync event receiver closed when submitting sync event");
-        } else {
-            trace!(%ev_idx, "sent csm event input");
         }
 
         Ok(())
@@ -42,8 +42,11 @@ impl CsmController {
 
     /// Writes a sync event to the database and updates the watch channel to
     /// trigger the CSM executor to process the event.
-    pub async fn submit_event_async(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
-        let ev_idx = self.sync_ev_man.write_sync_event_async(sync_event).await?;
+    async fn submit_event_async(&self, sync_event: SyncEvent) -> anyhow::Result<()> {
+        let ev_idx = self
+            .sync_ev_man
+            .write_sync_event_async(sync_event.clone())
+            .await?;
         let msg = CsmMessage::EventInput(ev_idx);
         if self.csm_tx.send(msg).await.is_err() {
             warn!(%ev_idx, "sync event receiver closed when submitting sync event");

@@ -82,7 +82,7 @@ pub(super) fn exec_subc(cmd: Subcommand, ctx: &mut CmdContext) -> anyhow::Result
 /// # Errors
 ///
 /// Returns an error if the export process fails.
-fn export_elf(_elf_path: &PathBuf) -> anyhow::Result<()> {
+fn export_elf(_elf_path: &Path) -> anyhow::Result<()> {
     #[cfg(feature = "sp1-builder")]
     {
         strata_sp1_guest_builder::export_elf(_elf_path)?

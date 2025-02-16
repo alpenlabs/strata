@@ -1,11 +1,12 @@
 use std::fmt;
 
 use arbitrary::Arbitrary;
+use async_trait::async_trait;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    batch::BatchCheckpointWithCommitment,
+    batch::L1CommittedCheckpoint,
     id::L2BlockId,
     l1::{HeaderVerificationState, L1BlockId},
 };
@@ -23,7 +24,7 @@ pub enum SyncEvent {
 
     /// New checkpoint posted to L1 in a DA batch at given height.
     // FIXME what does this data mean?
-    L1DABatch(u64, Vec<BatchCheckpointWithCommitment>),
+    L1DABatch(u64, Vec<L1CommittedCheckpoint>),
 
     /// We've observed that the `genesis_l1_height` has reached maturity
     L1BlockGenesis(u64, HeaderVerificationState),
@@ -45,4 +46,13 @@ impl fmt::Display for SyncEvent {
             Self::NewTipBlock(id) => f.write_fmt(format_args!("newtip:{id}")),
         }
     }
+}
+
+/// Interface to submit event to CSM in blocking or async fashion.
+#[async_trait]
+pub trait EventSubmitter {
+    /// Submit event blocking
+    fn submit_event(&self, sync_event: SyncEvent) -> anyhow::Result<()>;
+    /// Submit event async
+    async fn submit_event_async(&self, sync_event: SyncEvent) -> anyhow::Result<()>;
 }

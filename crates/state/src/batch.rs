@@ -16,8 +16,8 @@ use zkaleido::{Proof, ProofReceipt, PublicValues};
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
-pub struct BatchCheckpoint {
-    /// Information regarding the current batch checkpoint
+pub struct Checkpoint {
+    /// Information regarding the current batches of l1 and l2 blocks along with epoch.
     batch_info: BatchInfo,
 
     /// Transition data for L1 and L2 states, which is verified by the proof.
@@ -31,7 +31,7 @@ pub struct BatchCheckpoint {
     proof: Proof,
 }
 
-impl BatchCheckpoint {
+impl Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
         transition: BatchTransition,
@@ -97,13 +97,13 @@ impl BatchCheckpoint {
 #[derive(
     Clone, Debug, BorshDeserialize, BorshSerialize, Arbitrary, PartialEq, Eq, Serialize, Deserialize,
 )]
-pub struct SignedBatchCheckpoint {
-    inner: BatchCheckpoint,
+pub struct SignedCheckpoint {
+    inner: Checkpoint,
     signature: Buf64,
 }
 
-impl SignedBatchCheckpoint {
-    pub fn new(inner: BatchCheckpoint, signature: Buf64) -> Self {
+impl SignedCheckpoint {
+    pub fn new(inner: Checkpoint, signature: Buf64) -> Self {
         Self { inner, signature }
     }
 
@@ -111,7 +111,7 @@ impl SignedBatchCheckpoint {
         self.signature
     }
 
-    pub fn checkpoint(&self) -> &BatchCheckpoint {
+    pub fn checkpoint(&self) -> &Checkpoint {
         &self.inner
     }
 
@@ -121,8 +121,8 @@ impl SignedBatchCheckpoint {
     }
 }
 
-impl From<SignedBatchCheckpoint> for BatchCheckpoint {
-    fn from(value: SignedBatchCheckpoint) -> Self {
+impl From<SignedCheckpoint> for Checkpoint {
+    fn from(value: SignedCheckpoint) -> Self {
         value.inner
     }
 }
@@ -309,18 +309,21 @@ impl CommitmentInfo {
     }
 }
 
+/// Contains the checkpoint data along with its commitment to l1.
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
-pub struct BatchCheckpointWithCommitment {
-    pub batch_checkpoint: BatchCheckpoint,
+pub struct L1CommittedCheckpoint {
+    /// The actual `Checkpoint` data.
+    pub checkpoint: Checkpoint,
+    /// Its commitment to L1 used to locate/identify the checkpoint in L1.
     pub commitment: CommitmentInfo,
 }
 
-impl BatchCheckpointWithCommitment {
-    pub fn new(batch_checkpoint: BatchCheckpoint, commitment: CommitmentInfo) -> Self {
+impl L1CommittedCheckpoint {
+    pub fn new(checkpoint: Checkpoint, commitment: CommitmentInfo) -> Self {
         Self {
-            batch_checkpoint,
+            checkpoint,
             commitment,
         }
     }

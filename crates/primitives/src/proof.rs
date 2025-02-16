@@ -32,6 +32,16 @@ pub enum RollupVerifyingKey {
     NativeVerifyingKey(Buf32),
 }
 
+impl RollupVerifyingKey {
+    pub fn key(&self) -> &Buf32 {
+        match self {
+            RollupVerifyingKey::SP1VerifyingKey(sp1_vk) => sp1_vk,
+            RollupVerifyingKey::Risc0VerifyingKey(risc0_vk) => risc0_vk,
+            RollupVerifyingKey::NativeVerifyingKey(native_vk) => native_vk,
+        }
+    }
+}
+
 /// Represents a context for different types of proofs.
 ///
 /// This enum categorizes proofs by their associated context, including the type of proof and its

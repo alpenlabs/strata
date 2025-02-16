@@ -22,6 +22,7 @@ zkaleido-risc0-adapter.workspace = true
 zkaleido-sp1-adapter.workspace = true
 
 anyhow.workspace = true
+async-trait.workspace = true
 bitcoin.workspace = true
 borsh.workspace = true
 futures.workspace = true

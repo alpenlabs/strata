@@ -1,6 +1,6 @@
 use bitcoin::{Block, Transaction};
 use strata_state::{
-    batch::SignedBatchCheckpoint,
+    batch::SignedCheckpoint,
     tx::{DepositInfo, DepositRequestInfo},
 };
 
@@ -15,8 +15,8 @@ pub trait TxVisitor {
     /// Output type collecting what we want to extract from a tx.
     type Output;
 
-    /// Do stuffs with `SignedBatchCheckpoint`.
-    fn visit_checkpoint(&mut self, _chkpt: SignedBatchCheckpoint) {}
+    /// Do stuffs with [`SignedCheckpoint`].
+    fn visit_checkpoint(&mut self, _chkpt: SignedCheckpoint) {}
 
     /// Do stuffs with `DepositInfo`.
     fn visit_deposit(&mut self, _d: DepositInfo) {}

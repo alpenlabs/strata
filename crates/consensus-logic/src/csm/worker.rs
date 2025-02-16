@@ -364,7 +364,7 @@ fn apply_action(
 
         SyncAction::WriteCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
-                let batch_ckp = &c.batch_checkpoint;
+                let batch_ckp = &c.checkpoint;
                 let idx = batch_ckp.batch_info().epoch();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Confirmed;
@@ -382,7 +382,7 @@ fn apply_action(
 
         SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
             for c in checkpoints.iter() {
-                let batch_ckp = &c.batch_checkpoint;
+                let batch_ckp = &c.checkpoint;
                 let idx = batch_ckp.batch_info().epoch();
                 let pstatus = CheckpointProvingStatus::ProofReady;
                 let cstatus = CheckpointConfStatus::Finalized;

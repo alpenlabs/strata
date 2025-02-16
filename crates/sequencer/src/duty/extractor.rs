@@ -11,7 +11,7 @@ use strata_storage::L2BlockManager;
 use super::types::{BlockSigningDuty, Duty};
 use crate::{
     checkpoint::CheckpointHandle,
-    duty::{errors::Error, types::BatchCheckpointDuty},
+    duty::{errors::Error, types::CheckpointDuty},
 };
 
 /// Extracts new duties given a consensus state and a identity.
@@ -74,7 +74,7 @@ fn extract_batch_duties(checkpoint_handle: &CheckpointHandle) -> Result<Vec<Duty
             entry.is_proof_ready() && entry.confirmation_status == CheckpointConfStatus::Pending
         })
         .map(|entry| {
-            let batch_duty = BatchCheckpointDuty::new(entry.into());
+            let batch_duty = CheckpointDuty::new(entry.into());
             Ok(vec![Duty::CommitBatch(batch_duty)])
         })
         .unwrap_or(Ok(vec![]))

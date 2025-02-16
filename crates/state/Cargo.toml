@@ -12,7 +12,9 @@ strata-crypto.workspace = true
 strata-primitives.workspace = true
 zkaleido.workspace = true
 
+anyhow.workspace = true
 arbitrary.workspace = true
+async-trait.workspace = true
 bitcoin.workspace = true
 borsh.workspace = true
 digest.workspace = true
@@ -20,7 +22,7 @@ ethnum = "1.5.0"
 hex.workspace = true
 serde.workspace = true
 sha2.workspace = true
-tracing.workspace = true   # ideally this shouldn't be in this crate
+tracing.workspace = true     # ideally this shouldn't be in this crate
 
 
 [dev-dependencies]

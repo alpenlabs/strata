@@ -270,3 +270,6 @@ provers/sp1/proofs/
 
 # backup files
 *.bak
+
+# Docker env
+docker/prover-client/prover-client.env
