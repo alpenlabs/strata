@@ -1,9 +1,8 @@
 use std::io::{Cursor, Write};
 
 use arbitrary::Arbitrary;
-use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
+use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget};
 use borsh::{BorshDeserialize, BorshSerialize};
-use ethnum::U256;
 use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
 
@@ -71,61 +70,20 @@ pub struct HeaderVerificationState {
 }
 
 impl HeaderVerificationState {
-    /// Computes the [`CompactTarget`] from a difficulty adjustment.
-    ///
-    /// ref: <https://github.com/bitcoin/bitcoin/blob/0503cbea9aab47ec0a87d34611e5453158727169/src/pow.cpp>
-    ///
-    /// Given the previous Target, represented as a [`CompactTarget`], the difficulty is adjusted
-    /// by taking the timespan between them, and multiplying the current [`CompactTarget`] by a
-    /// factor of the net timespan and expected timespan. The [`CompactTarget`] may not adjust
-    /// by more than a factor of 4, or adjust beyond the maximum threshold for the network.
-    ///
-    /// # Note
-    ///
-    /// Under the consensus rules, the difference in the number of blocks between the headers does
-    /// not equate to the `difficulty_adjustment_interval` of [`Params`]. This is due to an
-    /// off-by-one error, and, the expected number of blocks in between headers is
-    /// `difficulty_adjustment_interval - 1` when calculating the difficulty adjustment.
-    ///
-    /// Take the example of the first difficulty adjustment. Block 2016 introduces a new
-    /// [`CompactTarget`], which takes the net timespan between Block 2015 and Block 0, and
-    /// recomputes the difficulty.
-    ///
-    /// # Returns
-    ///
-    /// The expected [`CompactTarget`] recalculation.
-    ///
-    /// # Note
-    /// The comments above and the implementation is based on [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/0d9e8f8c992223869a57162c4afe5a6112d08049/bitcoin/src/pow.rs#L352-L398).
-    /// This has not been directly used since it is not available on the current release
     fn next_target(&mut self, timestamp: u32, params: &BtcParams) -> u32 {
         let params = params.inner();
         if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() != 0 {
             return self.next_block_target;
         }
 
-        let min_timespan: u32 = (params.pow_target_timespan as u32) >> 2;
-        let max_timespan: u32 = (params.pow_target_timespan as u32) << 2;
-
         let timespan = timestamp - self.interval_start_timestamp;
-        let actual_timespan = timespan.clamp(min_timespan, max_timespan);
 
-        let prev_target: Target = CompactTarget::from_consensus(self.next_block_target).into();
-
-        let mut retarget = U256::from_le_bytes(prev_target.to_le_bytes());
-        retarget *= U256::from(actual_timespan);
-        retarget /= U256::from(params.pow_target_timespan);
-
-        let retarget = Target::from_le_bytes(retarget.to_le_bytes());
-
-        if retarget > params.max_attainable_target {
-            return params
-                .max_attainable_target
-                .to_compact_lossy()
-                .to_consensus();
-        }
-
-        retarget.to_compact_lossy().to_consensus()
+        CompactTarget::from_next_work_required(
+            CompactTarget::from_consensus(self.next_block_target),
+            timespan as u64,
+            params,
+        )
+        .to_consensus()
     }
 
     // Note/TODO: Figure out a better way so we don't have to params each time.
@@ -341,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reorg_cases() {
+    fn test_reorgs() {
         let btc_params: BtcParams = MAINNET.clone().into();
         let chain = get_btc_chain();
         let h2 = get_difficulty_adjustment_height(2, chain.start, &btc_params);

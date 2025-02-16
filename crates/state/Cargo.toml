@@ -18,7 +18,6 @@ async-trait.workspace = true
 bitcoin.workspace = true
 borsh.workspace = true
 digest.workspace = true
-ethnum = "1.5.0"
 hex.workspace = true
 serde.workspace = true
 sha2.workspace = true

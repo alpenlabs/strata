@@ -13818,7 +13818,6 @@ dependencies = [
  "bitcoin",
  "borsh",
  "digest 0.10.7",
- "ethnum",
  "hex",
  "rand 0.8.5",
  "serde",
