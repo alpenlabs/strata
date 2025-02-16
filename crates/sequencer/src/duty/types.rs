@@ -342,7 +342,7 @@ impl DutyBatch {
 }
 
 /// Sequencer key used for signing-related duties.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize, Zeroize, ZeroizeOnDrop)]
 pub enum IdentityKey {
     /// Sequencer private key used for signing.
     Sequencer(Buf32),
