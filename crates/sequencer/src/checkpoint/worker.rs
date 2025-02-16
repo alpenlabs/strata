@@ -349,25 +349,27 @@ fn create_checkpoint_prep_data_from_summary(
     let l2man = storage.l2();
     let rollup_params_hash = params.compute_hash();
 
-    let is_genesis_epoch = summary.epoch() == 0;
+    let epoch = summary.epoch();
+    let is_genesis_epoch = epoch == 0;
 
     let prev_checkpoint = if !is_genesis_epoch {
-        let prev_epoch = summary.epoch() - 1;
-        let prev_checkpoint = storage
-            .checkpoint()
-            .get_checkpoint_blocking(prev_epoch)?
-            .ok_or(Error::MissingCheckpoint(prev_epoch))?;
-        Some(prev_checkpoint)
+        let prev_epoch = epoch - 1;
+        let prev = storage.checkpoint().get_checkpoint_blocking(prev_epoch)?;
+        if prev.is_none() {
+            warn!(%epoch, %prev_epoch, "missing expected checkpoint for previous epoch, continuing with none, this might produce an invalid checkpoint proof");
+        }
+        prev
     } else {
         None
     };
 
     // There's some special handling we have to do if we're the genesis epoch.
     let prev_summary = if !is_genesis_epoch {
+        let ec = summary.get_prev_epoch_commitment().unwrap();
         let ps = storage
             .checkpoint()
-            .get_epoch_summary_blocking(summary.get_prev_epoch_commitment().unwrap())?
-            .ok_or(Error::MissingCheckpoint(summary.epoch() - 1))?;
+            .get_epoch_summary_blocking(ec)?
+            .ok_or(Error::MissingEpochSummary(ec))?;
         Some(ps)
     } else {
         None

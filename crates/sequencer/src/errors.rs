@@ -1,4 +1,4 @@
-use strata_primitives::prelude::*;
+use strata_primitives::{epoch::EpochCommitment, prelude::*};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -8,6 +8,9 @@ pub enum Error {
 
     #[error("missing expected chainstate for blockidx {0}")]
     MissingIdxChainstate(u64),
+
+    #[error("missing summary for epoch {0:?}")]
+    MissingEpochSummary(EpochCommitment),
 
     #[error("missing checkpoint for epoch {0}")]
     MissingCheckpoint(u64),

@@ -707,7 +707,10 @@ fn apply_blocks(
         let body = bundle.body();
         let block = L2BlockCommitment::new(slot, blkid);
 
+        // Get the prev epoch to check if the epoch advanced, and the prev
+        // epoch's terminal in case we need it.
         let pre_state_epoch = cur_state.cur_epoch();
+        let prev_epoch_terminal = cur_state.prev_epoch().to_block_commitment();
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
@@ -728,7 +731,7 @@ fn apply_blocks(
         // If we advanced the epoch then we have to finish it.
         let is_terminal = post_state_epoch == pre_state_epoch + 1;
         if is_terminal {
-            handle_finish_epoch(&blkid, &bundle, &post_state, fcm_state)?;
+            handle_finish_epoch(&blkid, &bundle, prev_epoch_terminal, &post_state, fcm_state)?;
         }
 
         cur_state = post_state;
@@ -771,6 +774,7 @@ fn apply_blocks(
 fn handle_finish_epoch(
     blkid: &L2BlockId,
     bundle: &L2BlockBundle,
+    prev_terminal: L2BlockCommitment,
     post_state: &Chainstate,
     fcm_state: &mut ForkChoiceManager,
 ) -> anyhow::Result<()> {
@@ -781,9 +785,14 @@ fn handle_finish_epoch(
     let slot = bundle.header().blockidx();
     let terminal = L2BlockCommitment::new(slot, *blkid);
 
+    // Sanity checks.
     let prev_epoch = post_state.prev_epoch(); // FIXME is this right?
     assert_eq!(prev_epoch_idx + 1, new_epoch, "fcm: epoch sequencing mixup");
-    let prev_terminal = prev_epoch.to_block_commitment();
+    assert_eq!(
+        terminal,
+        prev_epoch.to_block_commitment(),
+        "fcm: fcm: epoch termination mixup"
+    );
 
     let l1seg = bundle.l1_segment();
     let tip_l1_record = l1seg
@@ -808,7 +817,7 @@ fn handle_finish_epoch(
 
     // TODO convert to debug after we figure things out
     // TODO convert to Display
-    info!(%blkid, ?epoch, "finishing chain epoch");
+    info!(?epoch, "finishing chain epoch");
 
     fcm_state
         .storage
