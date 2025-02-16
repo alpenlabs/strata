@@ -95,11 +95,13 @@ def wait_until_with_value(
     for _ in range(math.ceil(timeout / step)):
         try:
             r = fn()
-            if not predicate(r):
-                raise Exception
-            return r
+            # Return if the predicate passes.  The predicate not passing is not
+            # an error.
+            if predicate(r):
+                return r
         except Exception as e:
-            logging.warning(f"caught exception, will still wait for timeout: {e}")
+            ety = type(e)
+            logging.warning(f"caught exception {ety}, will still wait for timeout: {e}")
 
         time.sleep(step)
     raise AssertionError(error_with)
@@ -129,6 +131,36 @@ def wait_until_chain_epoch(rpc, epoch: int, **kwargs) -> dict:
         return v is not None
 
     return wait_until_with_value(_query, _check, **kwargs)
+
+
+def wait_until_next_chain_epoch(rpc, **kwargs) -> int:
+    """
+    Waits until the chain epoch advances by at least 1.
+
+    Returns the new epoch number.
+    """
+    init_epoch = rpc.strata_syncStatus()["cur_epoch"]
+    _query = lambda: rpc.strata_syncStatus()["cur_epoch"]
+    _check = lambda epoch: epoch > init_epoch
+    return wait_until_with_value(_query, _check, **kwargs)
+
+
+def wait_until_epoch_confirmed(rpc, epoch: int, **kwargs) -> int:
+    """
+    Waits until at least the given epoch is confirmed on L1, according to
+    calling `strata_clientStatus`.
+    """
+
+    def _check():
+        cs = rpc.strata_clientStatus()
+        l1_height = cs["tip_l1_block"]["height"]
+        conf_epoch = cs["confirmed_epoch"]
+        logging.info(f"confirmed epoch as of {l1_height}: {conf_epoch}")
+        if conf_epoch is None:
+            return False
+        return conf_epoch["epoch"] >= epoch
+
+    wait_until(_check, **kwargs)
 
 
 @dataclass
@@ -175,7 +207,7 @@ class ProverClientSettings:
 
 
 def check_nth_checkpoint_finalized(
-    idx,
+    idx: int,
     seqrpc,
     prover_rpc,
     manual_gen: ManualGenBlocksConfig | None = None,
@@ -192,19 +224,19 @@ def check_nth_checkpoint_finalized(
     syncstat = seqrpc.strata_syncStatus()
 
     # Wait until we find our expected checkpoint.
-    batch_info = wait_until_with_value(
+    ckpt_info = wait_until_with_value(
         lambda: seqrpc.strata_getCheckpointInfo(idx),
         predicate=lambda v: v is not None,
         error_with=f"Could not find checkpoint info for index {idx}",
         timeout=3,
     )
 
-    assert syncstat["finalized_block_id"] != batch_info["l2_range"][1]["blkid"], (
+    assert syncstat["finalized_block_id"] != ckpt_info["l2_range"][1]["blkid"], (
         "Checkpoint block should not yet finalize"
     )
-    assert batch_info["idx"] == idx
+    assert ckpt_info["idx"] == idx
     checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
-    assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
+    assert checkpoint_info_next is None, f"There should be no checkpoint info for next checkpoint {idx + 1}"
 
     to_finalize_blkid = batch_info["l2_range"][1]["blkid"]
 
@@ -214,6 +246,8 @@ def check_nth_checkpoint_finalized(
 
     if manual_gen:
         # Produce l1 blocks until proof is finalized
+        # TODO encapsulate this somehow do we don't have to do it manually,
+        # maybe just pass the `RunContext` entirely?
         manual_gen.btcrpc.proxy.generatetoaddress(
             manual_gen.finality_depth + 1, manual_gen.gen_addr
         )
