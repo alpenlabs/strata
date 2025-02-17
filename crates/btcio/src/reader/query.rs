@@ -408,7 +408,7 @@ pub async fn get_verification_state(
     // Calculate the 'head' index for the ring buffer based on the current block height.
     // The 'head' represents the position in the buffer where the next timestamp will be inserted.
     let head = height as usize % N;
-    let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head);
+    let last_11_blocks_timestamps = TimestampStore::new_with_head(&timestamps, head);
 
     let l1_blkid: L1BlockId = vb.header.block_hash().into();
 

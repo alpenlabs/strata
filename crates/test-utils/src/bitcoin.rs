@@ -100,7 +100,7 @@ impl BtcChainSegment {
         // Fetch the previous timestamps of block from `vh`
         // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
         let initial_timestamps: [u32; 11] = self.get_last_timestamps(vh, 11).try_into().unwrap();
-        let last_11_blocks_timestamps = TimestampStore::new(initial_timestamps);
+        let last_11_blocks_timestamps = TimestampStore::new(&initial_timestamps);
 
         let last_verified_block_hash: L1BlockId = Buf32::from(
             self.get_header(vh)

@@ -142,7 +142,7 @@ impl HeaderVerificationState {
 
         // Check timestamp against the median of the last 11 timestamps.
         let median = self.last_11_blocks_timestamps.median();
-        if header.time < median {
+        if header.time <= median {
             return Err(L1VerificationError::TimestampError {
                 time: header.time,
                 median,
@@ -345,7 +345,6 @@ mod tests {
     fn test_reorg(reorg: (u64, u64)) {
         let chain = get_btc_chain();
 
-        dbg!(reorg);
         let reorg = reorg.0..reorg.1;
         let headers: Vec<Header> = reorg.clone().map(|h| chain.get_header(h)).collect();
         let mut verification_state = chain.get_verification_state(reorg.start, &MAINNET);
@@ -369,7 +368,8 @@ mod tests {
     fn test_reorgs() {
         let chain = get_btc_chain();
         let h2 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
-        let h3 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
+        let h3 = get_difficulty_adjustment_height(3, chain.start, &MAINNET);
+        let h4 = get_difficulty_adjustment_height(4, chain.start, &MAINNET);
 
         // Reorg of 10 blocks with no difficulty adjustment in between
         let reorg = (h2 + 100, h2 + 110);
@@ -378,11 +378,17 @@ mod tests {
         let reorg = (h3 + 100, h3 + 110);
         test_reorg(reorg);
 
+        let reorg = (h4 + 100, h4 + 110);
+        test_reorg(reorg);
+
         // Reorg of 10 blocks with difficulty adjustment in between
         let reorg = (h2 - 5, h2 + 5);
         test_reorg(reorg);
 
-        let reorg = (h2 - 5, h2 + 5);
+        let reorg = (h3 - 5, h3 + 5);
+        test_reorg(reorg);
+
+        let reorg = (h4 - 5, h4 + 5);
         test_reorg(reorg);
     }
 }
