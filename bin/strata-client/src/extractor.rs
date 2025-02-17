@@ -428,7 +428,7 @@ mod tests {
                 "should be able to put block data into the L1Database"
             );
             l1_db
-                .add_to_canonical_chain(idx as u64, *mf.blkid())
+                .extend_canonical_chain(idx as u64, *mf.blkid())
                 .unwrap();
 
             // Insert mmr data

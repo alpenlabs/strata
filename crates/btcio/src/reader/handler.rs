@@ -68,9 +68,7 @@ async fn handle_blockdata<R: ReaderRpc>(
     let l1blockid = *manifest.blkid();
 
     l1_manager.put_block_data_async(manifest, txs).await?;
-    l1_manager
-        .add_to_canonical_chain_async(height, &l1blockid)
-        .await?;
+    l1_manager.extend_canonical_chain_async(&l1blockid).await?;
     info!(%height, %l1blockid, txs = %num_txs, "wrote L1 block manifest");
 
     // Create a sync event if it's something we care about.
