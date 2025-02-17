@@ -15,6 +15,8 @@ bitcoin = { workspace = true, features = ["rand-std"] }
 secp256k1.workspace = true
 thiserror.workspace = true
 zeroize = { workspace = true, optional = true }
+
+[dev-dependencies]
 strata-sequencer.workspace = true
 
 [features]
