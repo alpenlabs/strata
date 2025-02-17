@@ -46,6 +46,9 @@ pub struct ClientState {
     /// The depth at which we accept blocks to be finalized.
     pub(super) finalization_depth: u64,
 
+    /// The epoch that we've emitted as the final epoch.
+    pub(super) declared_final_epoch: Option<EpochCommitment>,
+
     /// Internal states according to each block height.
     pub(crate) int_states: StateQueue<InternalState>,
 }
@@ -61,6 +64,7 @@ impl ClientState {
             genesis_l1_height,
             // TODO make configurable
             finalization_depth: 3,
+            declared_final_epoch: None,
             int_states: StateQueue::new_at_index(genesis_l1_height),
         }
     }
@@ -186,17 +190,18 @@ impl ClientState {
         self.get_internal_state(target)?.last_checkpoint()
     }
 
-    /// Gets the finalized checkpoint.
+    /// Gets the apparent finalized checkpoint based on our current view of L1
+    /// from the internal states.
     ///
     /// This uses the internal "finalization depth", checking relative to the
     /// current chain tip.
-    pub fn get_finalized_checkpoint(&self) -> Option<&L1Checkpoint> {
+    pub fn get_apparent_finalized_checkpoint(&self) -> Option<&L1Checkpoint> {
         self.get_last_checkpoint_at_depth(self.finalization_depth)
     }
 
     /// Gets the `EpochCommitment` for the finalized epoch, if there is one.
-    pub fn get_finalized_epoch(&self) -> Option<EpochCommitment> {
-        self.get_finalized_checkpoint()
+    pub fn get_apparent_finalized_epoch(&self) -> Option<EpochCommitment> {
+        self.get_apparent_finalized_checkpoint()
             .map(|ck| ck.batch_info.get_epoch_commitment())
     }
 
@@ -206,6 +211,11 @@ impl ClientState {
         let buried_height = tip_block.height().saturating_sub(self.finalization_depth);
         let istate = self.get_internal_state(buried_height)?;
         Some(L1BlockCommitment::new(buried_height, *istate.blkid()))
+    }
+
+    /// Gets the final epoch that we've externally declared.
+    pub fn get_declared_final_epoch(&self) -> Option<&EpochCommitment> {
+        self.declared_final_epoch.as_ref()
     }
 }
 
@@ -514,6 +524,11 @@ impl ClientStateMut {
             Some(new_oldest),
             "chainstate: new oldest is unexpected"
         );
+    }
+
+    /// Sets the declared final epoch.
+    pub fn set_decl_final_epoch(&mut self, epoch: EpochCommitment) {
+        self.state.declared_final_epoch = Some(epoch);
     }
 
     /// Updates the buried L1 block.

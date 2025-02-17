@@ -198,6 +198,8 @@ fn handle_block(
 
     let next_exp_height = state.state().next_exp_l1_block();
 
+    let old_final_epoch = state.state().get_declared_final_epoch();
+
     // We probably should have gotten the L1Genesis message by now but
     // let's just do this anyways.
     if height == params.rollup().genesis_l1_height {
@@ -253,6 +255,24 @@ fn handle_block(
         #[cfg(test)]
         eprintln!("not sure what to do here h={height} exp={next_exp_height}");
         return Err(Error::OutOfOrderL1Block(next_exp_height, height, *l1blkid));
+    }
+
+    // If there's a new epoch finalized that's better than the old one, update
+    // the declared one.
+    let new_final_epoch = state.state().get_apparent_finalized_epoch();
+    match (old_final_epoch, new_final_epoch) {
+        (None, Some(new)) => {
+            state.set_decl_final_epoch(new);
+        }
+        (Some(old), Some(new)) if new.epoch() > old.epoch() => {
+            state.set_decl_final_epoch(new);
+        }
+        _ => {}
+    }
+
+    // Emit the action to submit the finalized block.
+    if let Some(decl_epoch) = state.state().get_declared_final_epoch() {
+        state.push_action(SyncAction::FinalizeEpoch(*decl_epoch));
     }
 
     // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
