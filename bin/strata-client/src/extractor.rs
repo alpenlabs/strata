@@ -248,7 +248,7 @@ mod tests {
         exec_update::UpdateInput,
         genesis::GenesisStateData,
         id::L2BlockId,
-        l1::{L1BlockId, L1HeaderRecord, L1Tx, L1TxProof, L1ViewState},
+        l1::{HeaderVerificationState, L1BlockId, L1HeaderRecord, L1Tx, L1TxProof, L1ViewState},
         tx::DepositRequestInfo,
     };
     use strata_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
@@ -584,7 +584,8 @@ mod tests {
     ) -> (Chainstate, usize, DepositEntry) {
         let l1_block_id = L1BlockId::from(Buf32::zero());
         let safe_block = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
-        let l1_state = L1ViewState::new_at_horizon(0, safe_block);
+        let l1_vs = HeaderVerificationState::default();
+        let l1_state = L1ViewState::new_at_horizon(0, safe_block, l1_vs);
 
         let operator_table = OperatorTable::new_empty();
 

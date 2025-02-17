@@ -14,7 +14,7 @@ use strata_state::{
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
     genesis::GenesisStateData,
     header::L2BlockHeader,
-    l1::{L1HeaderRecord, L1ViewState},
+    l1::{HeaderVerificationState, L1HeaderRecord, L1ViewState},
     operation::ClientUpdateOutput,
     prelude::*,
 };
@@ -49,6 +49,7 @@ pub fn init_client_state(params: &Params, csman: &ClientStateManager) -> anyhow:
 pub fn init_genesis_chainstate(
     params: &Params,
     storage: &NodeStorage,
+    l1_vs: &HeaderVerificationState,
 ) -> anyhow::Result<Chainstate> {
     debug!("preparing database genesis chainstate!");
 
@@ -62,7 +63,7 @@ pub fn init_genesis_chainstate(
 
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(params);
-    let gchstate = make_genesis_chainstate(&gblock, pregenesis_mfs, params);
+    let gchstate = make_genesis_chainstate(&gblock, pregenesis_mfs, params, l1_vs.clone());
 
     // Now insert things into the database.
     storage.chainstate().write_genesis_state(gchstate.clone())?;
@@ -142,6 +143,7 @@ pub fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
     pregenesis_mfs: Vec<L1BlockRecord>,
     params: &Params,
+    genesis_header_vs: HeaderVerificationState,
 ) -> Chainstate {
     let genesis_blkid = gblock.header().get_blockid();
 
@@ -151,7 +153,7 @@ pub fn make_genesis_chainstate(
 
     let horizon_blk_height = params.rollup.horizon_l1_height;
     let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
-    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, genesis_blk_rec);
+    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, genesis_blk_rec, genesis_header_vs);
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
     let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);

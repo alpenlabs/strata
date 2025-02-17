@@ -4,11 +4,12 @@
 
 use std::{cmp::max, collections::HashMap};
 
-use bitcoin::{OutPoint, Transaction};
+use bitcoin::{block::Header, consensus::deserialize, params::Params, OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
     l1::{BitcoinAmount, L1TxRef, OutputRef},
     params::RollupParams,
+    relay::util::verify_sig,
 };
 use strata_state::{
     block::L1Segment,
@@ -16,7 +17,7 @@ use strata_state::{
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
     exec_env::ExecEnvState,
     exec_update::{self, construct_ops_from_deposit_intents, ELDepositData, Op},
-    l1::{self, L1MaturationEntry},
+    l1::{self, get_btc_params, L1MaturationEntry},
     prelude::*,
     state_op::StateCache,
     state_queue,
@@ -98,31 +99,38 @@ fn process_l1_view_update(
         let cur_safe_height = l1v.safe_height();
 
         // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
-        // TODO This probably needs to be adjusted for PoW.
         if new_tip_height < cur_tip_height {
             return Err(TsnError::L1SegNotExtend);
         }
 
         // Now make sure that the block hashes all connect up sensibly.
         let pivot_idx = implied_pivot_height;
-        let pivot_blkid = l1v
-            .maturation_queue()
-            .get_absolute(pivot_idx)
-            .map(|b| b.blkid())
-            .unwrap_or_else(|| l1v.safe_block().blkid());
-        check_chain_integrity(pivot_idx, pivot_blkid, l1seg.new_payloads())?;
-
-        // Okay now that we've figured that out, let's actually how to actually do the reorg.
+        let mut old_headers = vec![];
         if pivot_idx > params.horizon_l1_height && pivot_idx < cur_tip_height {
+            for h in pivot_idx + 1..cur_tip_height {
+                let header_buf = l1v
+                    .maturation_queue()
+                    .get_absolute(h)
+                    .expect("msg")
+                    .header_buf();
+                let header: Header = deserialize(header_buf).expect("invalid header");
+                old_headers.push(header);
+            }
             state.revert_l1_view_to(pivot_idx);
         }
 
-        let maturation_threshold = params.l1_reorg_safe_depth as u64;
-
+        let mut new_headers = vec![];
         for e in l1seg.new_payloads() {
+            let header: Header = deserialize(e.record().buf()).expect("invalid header");
+            new_headers.push(header);
             let ment = L1MaturationEntry::from(e.clone());
             state.apply_l1_block_entry(ment.clone());
         }
+
+        let bitcoin_params = Params::new(params.network);
+        state.reorg_l1_vs(&old_headers, &new_headers, &bitcoin_params)?;
+
+        let maturation_threshold = params.l1_reorg_safe_depth as u64;
 
         let new_matured_l1_height = max(
             new_tip_height.saturating_sub(maturation_threshold),
@@ -132,44 +140,6 @@ fn process_l1_view_update(
         for idx in (cur_safe_height..=new_matured_l1_height) {
             state.mature_l1_block(idx);
         }
-    }
-
-    Ok(())
-}
-
-/// Checks the attested block IDs and parent blkid connections in new blocks.
-// TODO unit tests
-fn check_chain_integrity(
-    pivot_idx: u64,
-    pivot_blkid: &L1BlockId,
-    new_blocks: &[l1::L1HeaderPayload],
-) -> Result<(), TsnError> {
-    // Iterate over all the blocks in the new list and make sure they match.
-    for (i, e) in new_blocks.iter().enumerate() {
-        let h = e.idx();
-        assert_eq!(pivot_idx + 1 + i as u64, h);
-
-        // Make sure the hash matches.
-        let computed_id = L1BlockId::compute_from_header_buf(e.header_buf());
-        let attested_id = e.record().blkid();
-        if computed_id != *attested_id {
-            return Err(TsnError::L1BlockIdMismatch(h, *attested_id, computed_id));
-        }
-
-        // Make sure matches parent.
-        // TODO FIXME I think my impl for parent_blkid is incorrect, fix this later
-        /*let blk_parent = e.record().parent_blkid();
-        if i == 0 {
-            if blk_parent != *pivot_blkid {
-                return Err(TsnError::L1BlockParentMismatch(h, blk_parent, *pivot_blkid));
-            }
-        } else {
-            let parent_payload = &new_blocks[i - 1];
-            let parent_id = parent_payload.record().blkid();
-            if blk_parent != *parent_id {
-                return Err(TsnError::L1BlockParentMismatch(h, blk_parent, *parent_id));
-            }
-        }*/
     }
 
     Ok(())
@@ -196,16 +166,12 @@ fn process_execution_update<'u>(
     // for all the ops, corresponding to DepositIntent, remove those DepositIntent the ExecEnvState
     let applied_ops = update.input().applied_ops();
 
-    let applied_deposit_intent_idx = applied_ops
-        .iter()
-        .filter_map(|op| match op {
-            Op::Deposit(deposit) => Some(deposit.intent_idx()),
-            _ => None,
-        })
-        .max();
-
-    if let Some(intent_idx) = applied_deposit_intent_idx {
-        state.consume_deposit_intent(intent_idx);
+    for op in applied_ops {
+        match op {
+            Op::Deposit(deposit) => {
+                state.check_and_consume_deposit_intent(deposit.intent_idx(), deposit.intent());
+            }
+        }
     }
 
     Ok(update.output().withdrawals())
@@ -353,6 +319,7 @@ mod tests {
     use strata_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
     use strata_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
+        bridge_ops::DepositIntent,
         bridge_state::OperatorTable,
         chain_state::Chainstate,
         exec_env::ExecEnvState,
@@ -404,10 +371,10 @@ mod tests {
                     let tx = ArbitraryGenerator::new_with_size(1 << 12).generate();
 
                     let l1tx = if idx == 1 {
+                        let intent = DepositIntent::new(amt, &[0; 20]);
                         let protocol_op = ProtocolOperation::Deposit(DepositInfo {
-                            amt,
+                            intent,
                             outpoint: ArbitraryGenerator::new().generate(),
-                            address: [0; 20].to_vec(),
                         });
                         L1Tx::new(proof, tx, vec![protocol_op])
                     } else {

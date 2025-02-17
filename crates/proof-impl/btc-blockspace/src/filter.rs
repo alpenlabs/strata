@@ -25,7 +25,7 @@ pub fn extract_relevant_info(
     for op in tx_entries.into_iter().flat_map(|t| t.into_contents()) {
         match op {
             ProtocolOperation::Deposit(deposit_info) => {
-                deposits.push(deposit_info.clone());
+                deposits.push(deposit_info);
             }
             ProtocolOperation::Checkpoint(signed_batch) => {
                 if let CredRule::SchnorrKey(pub_key) = rollup_params.cred_rule {

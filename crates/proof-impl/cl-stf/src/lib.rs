@@ -8,14 +8,14 @@ use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
-    tx::DepositInfo,
+    bridge_ops::DepositIntent,
 };
 pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateCache};
 use zkaleido::ZkVmEnv;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct L2BatchProofOutput {
-    pub deposits: Vec<DepositInfo>,
+    pub deposits: Vec<DepositIntent>,
     pub initial_state_hash: Buf32,
     pub final_state_hash: Buf32,
     pub rollup_params_commitment: Buf32,

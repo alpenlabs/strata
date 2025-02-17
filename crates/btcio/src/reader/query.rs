@@ -5,18 +5,18 @@ use std::{
 };
 
 use anyhow::bail;
-use bitcoin::{Block, BlockHash};
+use bitcoin::{params::Params as BtcParams, Block, BlockHash};
 use secp256k1::XOnlyPublicKey;
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
     messages::{BlockData, L1Event, RelevantTxEntry},
 };
-use strata_primitives::{block_credential::CredRule, params::Params};
+use strata_primitives::{block_credential::CredRule, l1::L1BlockCommitment, params::Params};
 use strata_state::{
     l1::{
-        get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
-        L1BlockId, TimestampStore,
+        get_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState, L1BlockId,
+        TimestampStore,
     },
     sync_event::EventSubmitter,
 };
@@ -365,8 +365,12 @@ async fn process_block<R: ReaderRpc>(
 
     if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
-        let l1_verification_state =
-            get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
+        let l1_verification_state = get_verification_state(
+            ctx.client.as_ref(),
+            genesis_ht + 1,
+            &BtcParams::new(params.rollup().network),
+        )
+        .await?;
         let ev = L1Event::GenesisVerificationState(height, l1_verification_state);
         l1_events.push(ev);
     }
@@ -381,8 +385,16 @@ pub async fn get_verification_state(
     params: &BtcParams,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
-    let h1 = get_difficulty_adjustment_height(0, height as u32, params);
-    let b1 = client.get_block_at(h1 as u64).await?;
+    let h1 = get_difficulty_adjustment_height(0, height, params);
+    let b1 = client.get_block_at(h1).await?;
+
+    // Get the difficulty adjustment block just before `h0`
+    let h0 = if h1 > params.difficulty_adjustment_interval() {
+        h1 - params.difficulty_adjustment_interval()
+    } else {
+        h1
+    };
+    let b0 = client.get_block_at(h0).await?;
 
     // Consider the block before `block_height` to be the last verified block
     let vh = height - 1; // verified_height
@@ -407,15 +419,17 @@ pub async fn get_verification_state(
     // Calculate the 'head' index for the ring buffer based on the current block height.
     // The 'head' represents the position in the buffer where the next timestamp will be inserted.
     let head = height as usize % N;
-    let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head);
+    let last_11_blocks_timestamps = TimestampStore::new_with_head(&timestamps, head);
 
     let l1_blkid: L1BlockId = vb.header.block_hash().into();
 
     let header_vs = HeaderVerificationState {
-        last_verified_block_num: vh as u32,
-        last_verified_block_hash: l1_blkid,
+        last_verified_block: L1BlockCommitment::new(vh, l1_blkid),
         next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
-        interval_start_timestamp: b1.header.time,
+        epoch_timestamps: EpochTimestamps {
+            current: b1.header.time,
+            previous: b0.header.time,
+        },
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
     };
@@ -426,7 +440,7 @@ pub async fn get_verification_state(
 
 #[cfg(test)]
 mod test {
-    use bitcoin::hashes::Hash;
+    use bitcoin::{hashes::Hash, params::REGTEST};
     use strata_primitives::{buf::Buf32, l1::L1Status};
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
@@ -582,20 +596,21 @@ mod test {
         let (bitcoind, client) = get_bitcoind_and_client();
 
         let _ = mine_blocks(&bitcoind, 115, None).unwrap();
-        let params = get_btc_params();
 
         let len = 15;
         let height = 100;
-        let mut header_vs = get_verification_state(&client, height, &params)
+        let mut header_vs = get_verification_state(&client, height, &REGTEST)
             .await
             .unwrap();
 
         for h in height..height + len {
             let block = client.get_block_at(h).await.unwrap();
-            header_vs.check_and_update_continuity(&block.header, &params);
+            header_vs
+                .check_and_update_continuity(&block.header, &REGTEST)
+                .unwrap();
         }
 
-        let new_header_vs = get_verification_state(&client, height + len, &params)
+        let new_header_vs = get_verification_state(&client, height + len, &REGTEST)
             .await
             .unwrap();
 

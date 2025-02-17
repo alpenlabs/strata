@@ -1,6 +1,9 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use bitcoin::secp256k1::{SecretKey, SECP256K1};
+use bitcoin::{
+    params::Params as BtcParams,
+    secp256k1::{SecretKey, SECP256K1},
+};
 use rand::{rngs::StdRng, SeedableRng};
 use strata_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
 use strata_primitives::{
@@ -139,7 +142,11 @@ pub fn get_genesis_chainstate() -> Chainstate {
     let params = gen_params();
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(&params);
-    let pregenesis_mfs =
-        vec![get_btc_chain().get_block_record(params.rollup().horizon_l1_height as u32)];
-    make_genesis_chainstate(&gblock, pregenesis_mfs, &params)
+    let l1_vs = get_btc_chain().get_verification_state(
+        params.rollup().genesis_l1_height,
+        &BtcParams::new(params.rollup().network),
+        params.rollup().l1_reorg_safe_depth,
+    );
+    let pregenesis_mfs = vec![get_btc_chain().get_block_record(params.rollup().horizon_l1_height)];
+    make_genesis_chainstate(&gblock, pregenesis_mfs, &params, l1_vs)
 }

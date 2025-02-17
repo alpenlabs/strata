@@ -88,7 +88,7 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     let params = gen_params();
     let rollup_params = params.rollup();
 
-    let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
+    let l1_start_height = rollup_params.genesis_l1_height + 1;
     let l1_end_height = l1_start_height + 1;
 
     let l2_start_height = 1;
@@ -149,7 +149,7 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     println!("Generating a report for CHECKPOINT");
     let checkpoint = generator.checkpoint();
     let checkpoint_test_input = CheckpointBatchInfo {
-        l1_range: (l1_start_height.into(), l1_end_height.into()),
+        l1_range: (l1_start_height, l1_end_height),
         l2_range: (l2_start_height, l2_end_height),
     };
     let checkpoint_report = checkpoint

@@ -54,6 +54,7 @@ impl From<L1BlockId> for BlockHash {
     Ord,
     PartialOrd,
     Hash,
+    Default,
     Arbitrary,
     BorshDeserialize,
     BorshSerialize,

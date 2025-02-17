@@ -94,14 +94,14 @@ pub fn process_event(
 
             // Do the consensus checks
             if let Some(l1_vs) = l1_vs {
-                let l1_vs_height = l1_vs.last_verified_block_num as u64;
+                let l1_vs_height = l1_vs.last_verified_block.height();
                 let mut updated_l1vs = l1_vs.clone();
                 for height in (l1_vs_height + 1..cur_seen_tip_height) {
                     let block_mf = context.get_l1_block_manifest(height)?;
                     let header: Header =
                         bitcoin::consensus::deserialize(block_mf.header()).unwrap();
-                    updated_l1vs =
-                        updated_l1vs.check_and_update_continuity_new(&header, &get_btc_params());
+                    updated_l1vs = updated_l1vs
+                        .check_and_update_continuity_new(&header, get_btc_params().inner())?;
                 }
                 state.update_verification_state(updated_l1vs);
             }
@@ -137,7 +137,7 @@ pub fn process_event(
             let horizon_ht = params.rollup.horizon_l1_height;
             let genesis_ht = params.rollup.genesis_l1_height;
 
-            let state_ht = l1_verification_state.last_verified_block_num as u64;
+            let state_ht = l1_verification_state.last_verified_block.height();
             if genesis_ht != state_ht {
                 let error_msg = format!(
                     "Expected height: {} Found height: {} in state",
@@ -163,9 +163,7 @@ pub fn process_event(
                     genesis_block.header().get_blockid(),
                 ));
 
-                state.push_action(SyncAction::L2Genesis(
-                    l1_verification_state.last_verified_block_hash,
-                ));
+                state.push_action(SyncAction::L2Genesis(l1_verification_state.clone()));
             }
         }
 
@@ -521,7 +519,7 @@ mod tests {
 
     impl EventContext for DummyEventContext {
         fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
-            let rec = self.chainseg.get_block_record(height as u32);
+            let rec = self.chainseg.get_block_record(height);
             Ok(L1BlockManifest::new(rec, height))
         }
 
@@ -583,12 +581,15 @@ mod tests {
         let genesis = params.rollup().genesis_l1_height;
 
         let chain = get_btc_chain();
-        let l1_verification_state =
-            chain.get_verification_state(genesis as u32 + 1, &MAINNET.clone().into());
+        let l1_verification_state = chain.get_verification_state(
+            genesis + 1,
+            &MAINNET,
+            params.rollup().l1_reorg_safe_depth,
+        );
 
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();
-        let l1_chain = chain.get_block_records(horizon as u32, 10);
+        let l1_chain = chain.get_block_records(horizon, 10);
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash()).collect();
 
         let test_cases = [
@@ -703,9 +704,7 @@ mod tests {
                             genesis + 3,
                             l1_verification_state.clone(),
                         ),
-                        expected_actions: &[SyncAction::L2Genesis(
-                            l1_chain[(genesis - horizon) as usize].block_hash(),
-                        )],
+                        expected_actions: &[SyncAction::L2Genesis(l1_verification_state)],
                     },
                     TestEvent {
                         event: SyncEvent::L1Block(
