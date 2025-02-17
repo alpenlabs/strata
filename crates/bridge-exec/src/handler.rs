@@ -344,3 +344,65 @@ where
         )
     }
 }
+
+impl<TxBuildContext> Drop for ExecHandler<TxBuildContext>
+where
+    TxBuildContext: BuildContext + Sync + Send,
+{
+    fn drop(&mut self) {
+        self.keypair.non_secure_erase();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::sync::Arc;
+
+    use bitcoin::{bip32::Xpriv, key::Keypair, secp256k1::SECP256K1, Network};
+
+    #[test]
+    fn test_erase_keypair() {
+        fn is_all_zero<T>(p: *const T) -> bool {
+            let len = std::mem::size_of::<T>();
+            let buf = unsafe { std::slice::from_raw_parts(p as *const u8, len) };
+            buf.iter().all(|v| *v == 0)
+        }
+
+        let keys = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
+        let keypair = keys.to_keypair(SECP256K1);
+
+        // Create a wrapper struct including keypair
+        struct TestWrapper {
+            keypair: Keypair,
+        }
+
+        let wrapper = Arc::new(TestWrapper { keypair });
+
+        // Get raw pointer before dropping
+        let raw_ptr = Arc::as_ptr(&wrapper);
+
+        // Verify data exists (should NOT be zero yet)
+        assert!(!is_all_zero(raw_ptr));
+
+        impl Drop for TestWrapper {
+            fn drop(&mut self) {
+                self.keypair.non_secure_erase();
+            }
+        }
+
+        fn bar(_wrapper_clone: Arc<TestWrapper>) {}
+
+        fn foo(wrapper: Arc<TestWrapper>) {
+            bar(wrapper.clone());
+        }
+
+        foo(wrapper.clone());
+
+        // Drop the last reference, triggering `ZeroizeOnDrop`
+        drop(wrapper);
+
+        // Now check if the memory has been zeroized
+        assert!(is_all_zero(raw_ptr));
+    }
+}

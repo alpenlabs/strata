@@ -439,6 +439,12 @@ impl SignatureManager {
     }
 }
 
+impl Drop for SignatureManager {
+    fn drop(&mut self) {
+        self.keypair.non_secure_erase();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{ops::Not, str::FromStr};
