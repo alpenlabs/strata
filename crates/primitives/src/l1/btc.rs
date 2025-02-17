@@ -1327,7 +1327,7 @@ mod tests {
 
     #[test]
     fn test_bitcoin_tx_arbitrary_generation() {
-        let mut generator = ArbitraryGenerator::new();
+        let mut generator = ArbitraryGenerator::new_with_size(4_096 * 4);
         let raw_tx: RawBitcoinTx = generator.generate();
         let _: Transaction = raw_tx.try_into().expect("should generate valid tx");
 

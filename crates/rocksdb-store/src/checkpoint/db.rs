@@ -57,7 +57,7 @@ mod tests {
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
         let batchidx = 1;
-        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new_with_size(4_096 * 4).generate();
         seq_db
             .put_batch_checkpoint(batchidx, checkpoint.clone())
             .unwrap();
@@ -72,7 +72,7 @@ mod tests {
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
         let batchidx = 1;
-        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new_with_size(4_096 * 4).generate();
         seq_db
             .put_batch_checkpoint(batchidx, checkpoint.clone())
             .unwrap();
@@ -87,7 +87,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
-        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new_with_size(4_096 * 4).generate();
         seq_db
             .put_batch_checkpoint(100, checkpoint.clone())
             .unwrap();
@@ -100,7 +100,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
-        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new_with_size(4_096 * 4).generate();
         seq_db
             .put_batch_checkpoint(100, checkpoint.clone())
             .unwrap();
@@ -122,7 +122,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBCheckpointDB::new(db, db_ops);
 
-        let checkpoint: CheckpointEntry = ArbitraryGenerator::new().generate();
+        let checkpoint: CheckpointEntry = ArbitraryGenerator::new_with_size(4_096 * 4).generate();
 
         for expected_idx in 0..=256 {
             let last_idx = seq_db.get_last_batch_idx().unwrap().unwrap_or(0);

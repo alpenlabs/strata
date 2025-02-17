@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_find_pivot_noop() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 12);
+        let mut ag = ArbitraryGenerator::new_with_size(4_096);
 
         let blkids: [L1BlockId; 10] = ag.generate();
         eprintln!("{blkids:#?}");
@@ -394,7 +394,7 @@ mod tests {
 
     #[test]
     fn test_find_pivot_noop_offset() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 12);
+        let mut ag = ArbitraryGenerator::new_with_size(4_096);
 
         let blkids: [L1BlockId; 10] = ag.generate();
         eprintln!("{blkids:#?}");
@@ -417,7 +417,7 @@ mod tests {
 
     #[test]
     fn test_find_pivot_simple_extend() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 12);
+        let mut ag = ArbitraryGenerator::new_with_size(4_096);
 
         let blkids1: [L1BlockId; 10] = ag.generate();
         let mut blkids2 = Vec::from(blkids1);
@@ -449,7 +449,7 @@ mod tests {
 
     #[test]
     fn test_find_pivot_typical_reorg() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 16);
+        let mut ag = ArbitraryGenerator::new_with_size(65_536);
 
         let mut blkids1: Vec<L1BlockId> = Vec::new();
         for _ in 0..10 {
@@ -486,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_find_pivot_cur_shorter_reorg() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 16);
+        let mut ag = ArbitraryGenerator::new_with_size(65_536);
 
         let mut blkids1: Vec<L1BlockId> = Vec::new();
         for _ in 0..10 {
@@ -527,7 +527,7 @@ mod tests {
 
     #[test]
     fn test_find_pivot_disjoint() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 16);
+        let mut ag = ArbitraryGenerator::new_with_size(65_536);
 
         let mut blkids1: Vec<L1BlockId> = Vec::new();
         for _ in 0..10 {

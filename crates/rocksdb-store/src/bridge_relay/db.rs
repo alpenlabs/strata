@@ -118,7 +118,7 @@ mod tests {
     }
 
     fn make_bridge_msg() -> (u128, BridgeMessage) {
-        let mut arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new_with_size(4_096 * 2);
 
         let msg: BridgeMessage = arb.generate();
 

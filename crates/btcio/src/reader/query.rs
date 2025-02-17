@@ -493,8 +493,8 @@ mod test {
     /// remain unchanged
     #[tokio::test]
     async fn test_epoch_change() {
-        let mut chstate: Chainstate = ArbitraryGenerator::new().generate();
-        let clstate: ClientState = ArbitraryGenerator::new().generate();
+        let mut chstate: Chainstate = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
+        let clstate: ClientState = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
         let curr_epoch = chstate.cur_epoch();
         println!("curr epoch {:?}", curr_epoch);
 
@@ -520,12 +520,12 @@ mod test {
     /// to the height of last finalized checkpoint.
     #[tokio::test]
     async fn test_new_filter_rule() {
-        let mut chstate: Chainstate = ArbitraryGenerator::new().generate();
+        let mut chstate: Chainstate = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
         let curr_epoch = chstate.cur_epoch();
 
         // Create client state with a finalized checkpoint
-        let mut clstate: ClientState = ArbitraryGenerator::new().generate();
-        let mut checkpt: L1Checkpoint = ArbitraryGenerator::new().generate();
+        let mut clstate: ClientState = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
+        let mut checkpt: L1Checkpoint = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
 
         let chkpt_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
         checkpt.height = chkpt_height;
