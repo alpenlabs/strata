@@ -14,6 +14,7 @@ use strata_primitives::{
 use tracing::*;
 
 use crate::{
+    bridge_ops::DepositIntent,
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::Chainstate,
     header::L2Header,
@@ -178,6 +179,42 @@ impl StateCache {
 
         deposits
             .pop_front_n_vec(to_drop_count as usize) // ensures to_drop_idx < front_idx + len
+            .expect("stateop: unable to consume deposit intent");
+    }
+
+    /// Checks and consumes a deposit intent from the pending deposits queue.
+    /// # Panics
+    ///
+    /// This function will panic if:
+    /// - The deposit intents queue is empty.
+    /// - The front deposit intent is not at the provided index (`idx`).
+    /// - The deposit intent at the provided index does not exist.
+    /// - The expected deposit intent does not match the provided `intent`.
+    /// - The deposit intent cannot be consumed from the queue.
+    pub fn check_and_consume_deposit_intent(&mut self, idx: u64, intent: &DepositIntent) {
+        let deposits = self.state_mut().exec_env_state.pending_deposits_mut();
+
+        // Ensure the deposit intents queue is not empty and get the index of the front deposit.
+        let front_idx = deposits
+            .front_idx()
+            .expect("stateop: empty deposit intent queue");
+
+        // Validate that the front deposit intent's index matches the provided index.
+        assert_eq!(front_idx, idx, "stateop: deposit out of sequence");
+
+        // Retrieve the expected deposit intent at the given index.
+        let expected_deposit = deposits
+            .get_absolute(idx)
+            .expect("stateop: deposit intent not found");
+
+        assert_eq!(
+            expected_deposit, intent,
+            "stateop: expected deposit doesn't match"
+        );
+
+        // Consume the deposit intent by removing it from the front of the queue.
+        deposits
+            .pop_front()
             .expect("stateop: unable to consume deposit intent");
     }
 

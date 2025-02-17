@@ -214,6 +214,10 @@ impl ELDepositData {
     pub fn intent_idx(&self) -> u64 {
         self.intent_idx
     }
+
+    pub fn intent(&self) -> &DepositIntent {
+        &self.intent
+    }
 }
 
 impl<'a> Arbitrary<'a> for UpdateOutput {

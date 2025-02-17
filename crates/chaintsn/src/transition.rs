@@ -166,16 +166,12 @@ fn process_execution_update<'u>(
     // for all the ops, corresponding to DepositIntent, remove those DepositIntent the ExecEnvState
     let applied_ops = update.input().applied_ops();
 
-    let applied_deposit_intent_idx = applied_ops
-        .iter()
-        .filter_map(|op| match op {
-            Op::Deposit(deposit) => Some(deposit.intent_idx()),
-            _ => None,
-        })
-        .max();
-
-    if let Some(intent_idx) = applied_deposit_intent_idx {
-        state.consume_deposit_intent(intent_idx);
+    for op in applied_ops {
+        match op {
+            Op::Deposit(deposit) => {
+                state.check_and_consume_deposit_intent(deposit.intent_idx(), deposit.intent());
+            }
+        }
     }
 
     Ok(update.output().withdrawals())
