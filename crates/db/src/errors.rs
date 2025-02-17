@@ -1,3 +1,4 @@
+use strata_state::l1::L1BlockId;
 use thiserror::Error;
 
 use crate::entities::errors::EntityError;
@@ -17,8 +18,11 @@ pub enum DbError {
     #[error("missing {0} block {1} in range {2}..{3}")]
     MissingBlockInRange(&'static str, u64, u64, u64),
 
-    #[error("missing L1 block body (idx {0})")]
-    MissingL1BlockBody(u64),
+    #[error("missing L1 block body (id {0})")]
+    MissingL1BlockBody(L1BlockId),
+
+    #[error("missing L1 block (height {0})")]
+    MissingL1BlockHeight(u64),
 
     #[error("missing L2 state (idx {0})")]
     MissingL2State(u64),

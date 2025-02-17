@@ -8,9 +8,19 @@ use crate::{
 };
 
 // L1 Block Schema and corresponding codecs implementation
+define_table_with_default_codec!(
+    /// A table to store L1 Block data. Maps block id to header
+    (L1BlockSchema) L1BlockId => L1BlockManifest
+);
+
 define_table_with_seek_key_codec!(
-    /// A table to store L1 Block data. Maps block index to header
-    (L1BlockSchema) u64 => L1BlockManifest
+    /// A table to store canonical view of L1 chain
+    (L1CanonicalBlockSchema) u64 => L1BlockId
+);
+
+define_table_with_seek_key_codec!(
+    /// A table to keep track of all added blocks
+    (L1BlocksByHeightSchema) u64 => Vec<L1BlockId>
 );
 
 // L1 Txns Schema and corresponding codecs implementation
@@ -20,7 +30,7 @@ define_table_with_default_codec!(
 );
 
 // Mmr Schema and corresponding codecs implementation
-define_table_with_seek_key_codec!(
+define_table_with_default_codec!(
     /// A table to store L1 Headers mmr
-    (MmrSchema) u64 => CompactMmr
+    (MmrSchema) L1BlockId => CompactMmr
 );
