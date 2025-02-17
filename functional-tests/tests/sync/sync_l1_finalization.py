@@ -45,12 +45,24 @@ class BlockFinalizationTest(testenv.StrataTester):
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
         # Wait until we get the checkpoint confirmed.
-        wait_until_epoch_confirmed(seqrpc, 1, timeout=30)
+        wait_epoch_conf = 1
+        wait_until_epoch_confirmed(seqrpc, wait_epoch_conf, timeout=30, step=2)
+        logging.info(f"Epoch {wait_epoch_conf} was confirmed!")
 
+        # Wait until we get the expected number of epochs finalized.
+        wait_until_epoch_finalized(seqrpc, num_epochs, timeout=30, step=2)
+        logging.info(f"Epoch {num_epochs} was finalized!")
+
+        # FIXME what does this even check?
         # Check for first 4 checkpoints
-        for n in range(num_epochs):
-            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
-            logging.info(f"Pass checkpoint finalization for checkpoint {n}")
+        #for n in range(num_epochs):
+        #    check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
+        #    logging.info(f"Pass checkpoint finalization for checkpoint {n}")
+
+        cstat = seqrpc.strata_clientStatus()
+        cstatdump = json.dumps(cstat, indent=2)
+        logging.info(f"client status: {cstatdump}")
 
         # Proof for checkpoint 0 is already sent above
+        # FIXME do we still need this if we have the other checks?
         check_already_sent_proof(seqrpc, 0)

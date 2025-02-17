@@ -163,6 +163,24 @@ def wait_until_epoch_confirmed(rpc, epoch: int, **kwargs) -> int:
     wait_until(_check, **kwargs)
 
 
+def wait_until_epoch_finalized(rpc, epoch: int, **kwargs) -> int:
+    """
+    Waits until at least the given epoch is finalized on L1, according to
+    calling `strata_clientStatus`.
+    """
+
+    def _check():
+        cs = rpc.strata_clientStatus()
+        l1_height = cs["tip_l1_block"]["height"]
+        fin_epoch = cs["finalized_epoch"]
+        logging.info(f"finalized epoch as of {l1_height}: {fin_epoch}")
+        if fin_epoch is None:
+            return False
+        return fin_epoch["epoch"] >= epoch
+
+    wait_until(_check, **kwargs)
+
+
 @dataclass
 class ManualGenBlocksConfig:
     btcrpc: BitcoindClient
