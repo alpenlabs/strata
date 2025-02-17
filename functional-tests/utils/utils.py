@@ -280,7 +280,7 @@ def check_nth_checkpoint_finalized(
     checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
     assert checkpoint_info_next is None, f"There should be no checkpoint info for next checkpoint {idx + 1}"
 
-    to_finalize_blkid = batch_info["l2_range"][1]["blkid"]
+    to_finalize_blkid = ckpt_info["l2_range"][1]["blkid"]
 
     # Submit checkpoint if proof_timeout is not set
     if proof_timeout is None:
