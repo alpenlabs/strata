@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_write_genesis_state() {
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
         let db = setup_db();
 
         let res = db.get_earliest_write_idx();
@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn test_write_state_update() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
         let batch = WriteBatch::new_replace(genesis_state.clone());
 
         let res = db.put_write_batch(1, batch.clone());
@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn test_get_earliest_and_last_state_idx() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
         let batch = WriteBatch::new_replace(genesis_state.clone());
 
         db.write_genesis_state(genesis_state).unwrap();
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_purge() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
         let batch = WriteBatch::new_replace(genesis_state.clone());
 
         db.write_genesis_state(genesis_state).unwrap();
@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn test_rollback() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
         let batch = WriteBatch::new_replace(genesis_state.clone());
 
         db.write_genesis_state(genesis_state).unwrap();
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn test_purge_and_rollback() {
         let db = setup_db();
-        let genesis_state: Chainstate = ArbitraryGenerator::new().generate();
+        let genesis_state: Chainstate = ArbitraryGenerator::new_with_size(4_096 * 2).generate();
         let batch = WriteBatch::new_replace(genesis_state.clone());
 
         db.write_genesis_state(genesis_state).unwrap();

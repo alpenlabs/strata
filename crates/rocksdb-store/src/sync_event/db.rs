@@ -127,7 +127,7 @@ mod tests {
     }
 
     fn insert_event(db: &SyncEventDb) -> SyncEvent {
-        let ev: SyncEvent = ArbitraryGenerator::new().generate();
+        let ev: SyncEvent = ArbitraryGenerator::new_with_size(4_096).generate();
         let res = db.write_sync_event(ev.clone());
         assert!(res.is_ok());
         ev

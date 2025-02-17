@@ -114,7 +114,7 @@ mod tests {
     use crate::test_utils::get_rocksdb_tmp_instance;
 
     fn get_mock_data() -> L2BlockBundle {
-        let mut arb = ArbitraryGenerator::new_with_size(1 << 14);
+        let mut arb = ArbitraryGenerator::new_with_size(16_384);
         let l2_block: L2BlockBundle = arb.generate();
 
         l2_block

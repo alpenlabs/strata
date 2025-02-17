@@ -599,7 +599,7 @@ mod tests {
         let empty_deposits = empty_chain_state.deposits_table_mut();
         let mut deposits_table = DepositsTable::new_empty();
 
-        let mut arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new_with_size(4_096);
 
         let mut operators: Vec<OperatorIdx> = arb.generate();
         loop {

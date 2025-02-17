@@ -290,7 +290,8 @@ mod test {
         let num_envelopes = 1;
         let l1_payloads: Vec<_> = (0..num_envelopes)
             .map(|_| {
-                let signed_checkpoint: SignedCheckpoint = ArbitraryGenerator::new().generate();
+                let signed_checkpoint: SignedCheckpoint =
+                    ArbitraryGenerator::new_with_size(4_096 * 4).generate();
                 L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
             })
             .collect();

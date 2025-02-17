@@ -221,7 +221,7 @@ mod tests {
     fn gen_task_with_deps(n: u64) -> (ProofKey, Vec<ProofKey>) {
         let mut deps = Vec::with_capacity(n as usize);
         let host = ProofZkVm::Native;
-        let mut gen = ArbitraryGenerator::new();
+        let mut gen = ArbitraryGenerator::new_with_size(2_048);
 
         let start: L1BlockId = gen.generate();
         let end: L1BlockId = gen.generate();

@@ -233,7 +233,7 @@ mod tests {
     fn test_bridge_duty_status_db() {
         let db = setup_duty_db();
 
-        let mut arb = ArbitraryGenerator::new();
+        let mut arb = ArbitraryGenerator::new_with_size(4_096 * 4);
 
         let duty_status: BridgeDutyStatus = arb.generate();
         let txid: BitcoinTxid = arb.generate();
