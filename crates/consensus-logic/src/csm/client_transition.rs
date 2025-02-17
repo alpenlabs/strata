@@ -23,7 +23,7 @@ use strata_storage::NodeStorage;
 use tracing::*;
 use zkaleido::ProofReceipt;
 
-use crate::{checkpoint_verification::verify_proof, errors::*, genesis::make_genesis_block};
+use crate::{checkpoint_verification::verify_checkpoint, errors::*, genesis::make_genesis_block};
 
 /// Interface for external context necessary specifically for event validation.
 pub trait EventContext {
@@ -198,7 +198,7 @@ fn handle_block(
 
     let next_exp_height = state.state().next_exp_l1_block();
 
-    let old_final_epoch = state.state().get_declared_final_epoch();
+    let old_final_epoch = state.state().get_declared_final_epoch().copied();
 
     // We probably should have gotten the L1Genesis message by now but
     // let's just do this anyways.
@@ -358,24 +358,10 @@ fn process_l1_block(
                     // if the proof is invalid.
                     // TODO update this proof checking to use simplified
                     // interface, see comment in checkpoint_verification
-                    let receipt = signed_ckpt.checkpoint().get_proof_receipt();
-                    if !verify_proof(ckpt, &receipt, params).is_ok() {
+                    if !verify_checkpoint(ckpt, checkpoint.as_ref(), params).is_ok() {
                         // If it's invalid then just print a warning and move on.
                         warn!(%height, "ignoring invalid checkpoint in L1 block");
                         continue;
-                    }
-
-                    // If we had a previous checkpoint, verify it extends from it.
-                    if let Some(prev_ckpt) = &checkpoint {
-                        if !check_checkpoint_extends(ckpt, prev_ckpt, params) {
-                            warn!(%height, "ignoring noncontinuous checkpoint in L1 block");
-                            continue;
-                        }
-                    } else {
-                        // If not, then it should be for the genesis epoch.
-                        if ckpt.batch_info().epoch != 0 {
-                            continue;
-                        }
                     }
 
                     let l1ckpt = L1Checkpoint::new(
@@ -398,30 +384,6 @@ fn process_l1_block(
     }
 
     Ok(InternalState::new(blkid, checkpoint))
-}
-
-fn check_checkpoint_extends(
-    checkpoint: &Checkpoint,
-    prev: &L1Checkpoint,
-    params: &RollupParams,
-) -> bool {
-    let last_l1_tsn = prev.batch_transition.l1_transition;
-    let last_l2_tsn = prev.batch_transition.l2_transition;
-    let l1_tsn = checkpoint.batch_transition().l1_transition;
-    let l2_tsn = checkpoint.batch_transition().l2_transition;
-
-    // Check that the L1 blocks match up.
-    if l1_tsn.0 != last_l1_tsn.1 {
-        warn!("checkpoint mismatch on L1 state!");
-        return false;
-    }
-
-    if l2_tsn.0 != last_l2_tsn.1 {
-        warn!("checkpoint mismatch on L2 state!");
-        return false;
-    }
-
-    true
 }
 
 // TODO remove this old code after we've reconsolidated its responsibilities

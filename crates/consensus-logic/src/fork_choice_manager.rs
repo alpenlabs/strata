@@ -167,7 +167,8 @@ pub fn init_forkchoice_manager(
     // XXX right now we have to do some special casing for if we don't have an
     // initial checkpoint for the genesis epoch
     let finalized_epoch = init_csm_state
-        .get_finalized_epoch()
+        .get_declared_final_epoch()
+        .cloned()
         .unwrap_or_else(|| EpochCommitment::new(0, 0, *sync_state.genesis_blkid()));
     debug!(?finalized_epoch, "loading from finalized block...");
 
@@ -832,7 +833,7 @@ fn handle_new_client_state(
     cs: ClientState,
 ) -> anyhow::Result<()> {
     let cur_fin_epoch = fcm_state.chain_tracker.finalized_epoch();
-    let Some(new_fin_epoch) = cs.get_finalized_epoch() else {
+    let Some(new_fin_epoch) = cs.get_declared_final_epoch().copied() else {
         debug!("got new CSM state, but finalized epoch still unset, ignoring");
         return Ok(());
     };
