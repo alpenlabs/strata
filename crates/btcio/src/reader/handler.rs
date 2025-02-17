@@ -73,9 +73,7 @@ async fn handle_blockdata<R: ReaderRpc>(
     let num_txs = l1txs.len();
 
     l1_manager.put_block_data_async(manifest, l1txs).await?;
-    l1_manager
-        .add_to_canonical_chain_async(height, &l1blockid)
-        .await?;
+    l1_manager.extend_canonical_chain_async(&l1blockid).await?;
     info!(%height, %l1blockid, txs = %num_txs, "wrote L1 block manifest");
 
     sync_evs.push(SyncEvent::L1Block(height, l1blockid));

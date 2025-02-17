@@ -60,16 +60,7 @@ impl L1Database for L1Db {
         Ok(())
     }
 
-    fn add_to_canonical_chain(&self, height: u64, blockid: L1BlockId) -> DbResult<()> {
-        match self.get_latest_block()? {
-            // if block exists, new block must extend chain sequentially
-            Some((existing_height, _)) if existing_height + 1 != height => {
-                return Err(DbError::OooInsert("l1_store", height));
-            }
-            // if no blocks in db, allow block insert at any height
-            _ => {}
-        }
-
+    fn extend_canonical_chain(&self, height: u64, blockid: L1BlockId) -> DbResult<()> {
         self.db.put::<L1CanonicalBlockSchema>(&height, &blockid)?;
         Ok(())
     }
@@ -241,7 +232,7 @@ mod tests {
         // Insert block data
         let res = db.put_block_data(mf.clone(), txs.clone());
         assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
-        let res = db.add_to_canonical_chain(height, mf.block_hash());
+        let res = db.extend_canonical_chain(height, mf.block_hash());
         assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
 
         // Insert mmr data
@@ -279,7 +270,7 @@ mod tests {
             let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
             let blockid = mf.block_hash();
             db.put_block_data(mf, txs).unwrap();
-            let res = db.add_to_canonical_chain(invalid_idx, blockid);
+            let res = db.extend_canonical_chain(invalid_idx, blockid);
             assert!(res.is_err(), "Should fail to insert to db");
         }
 
@@ -290,7 +281,7 @@ mod tests {
         let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
         let blockid = mf.block_hash();
         db.put_block_data(mf, txs).unwrap();
-        let res = db.add_to_canonical_chain(valid_idx, blockid);
+        let res = db.extend_canonical_chain(valid_idx, blockid);
         assert!(res.is_ok(), "Should successfully insert to db");
     }
 

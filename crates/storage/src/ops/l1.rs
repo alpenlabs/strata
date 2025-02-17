@@ -12,7 +12,7 @@ inst_ops_simple! {
     (<D: L1Database> => L1DataOps) {
         put_block_data(mf: L1BlockManifest, txs: Vec<L1Tx>) => ();
         // put_mmr_checkpoint(blockid: L1BlockId, mmr: CompactMmr) => ();
-        add_to_canonical_chain(height: u64, blockid: L1BlockId) => ();
+        extend_canonical_chain(height: u64, blockid: L1BlockId) => ();
         revert_canonical_chain(height: u64) => ();
         prune_to_height(height: u64) => ();
         get_chain_tip() => Option<(u64, L1BlockId)>;

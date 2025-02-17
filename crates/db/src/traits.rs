@@ -54,7 +54,7 @@ pub trait L1Database {
     fn put_mmr_checkpoint(&self, blockid: L1BlockId, mmr: CompactMmr) -> DbResult<()>;
 
     /// Set block at specific height.
-    fn add_to_canonical_chain(&self, height: u64, blockid: L1BlockId) -> DbResult<()>;
+    fn extend_canonical_chain(&self, height: u64, blockid: L1BlockId) -> DbResult<()>;
 
     /// Resets the L1 chain tip to the specified block index.  The provided
     /// index will be the new chain tip that we store.
