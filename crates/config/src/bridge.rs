@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Bridge relayer config
-#[derive(Copy, Debug, Clone, Serialize, Deserialize)]
+#[derive(Copy, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RelayerConfig {
     /// Time we check for purgeable messages.
     pub refresh_interval: u64,

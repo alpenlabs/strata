@@ -2,10 +2,11 @@ use std::path::PathBuf;
 
 use anyhow::anyhow;
 use argh::FromArgs;
+use bitcoin::Network;
 use serde_json::{from_str, from_value, to_value, Value};
-use strata_config::{ClientMode, Config, FullNodeConfig, SequencerConfig};
+use strata_config::Config;
 
-/// Configs overriddable by environment. Mostly for sensitive data.
+/// Configs overridable by environment. Mostly for sensitive data.
 #[derive(Debug, Clone)]
 pub struct EnvArgs {
     // TODO: relevant items that will be populated from env vars
@@ -42,54 +43,41 @@ pub struct Args {
     #[argh(option, description = "is sequencer", default = "false")]
     pub sequencer: bool,
 
-    #[argh(option, description = "sequencer rpc")]
-    pub sequencer_rpc: Option<String>,
-
-    #[argh(option, short = 'r', description = "JSON-RPC port")]
-    pub rpc_port: Option<u16>,
-
-    #[argh(option, short = 'p', description = "P2P port")]
-    pub p2p_port: Option<u16>,
-
     #[argh(option, description = "rollup params")]
     pub rollup_params: Option<PathBuf>,
+
+    #[argh(option, description = "rpc host")]
+    pub rpc_host: Option<String>,
+
+    #[argh(option, description = "rpc port")]
+    pub rpc_port: Option<u16>,
 
     #[argh(option, short = 'o', description = "generic config overrides")]
     pub overrides: Vec<String>,
 }
 
 impl Args {
-    /// Override common config params from arg.
-    pub fn override_config(&self, config: &mut Config) -> bool {
-        let args = self.clone();
-        let mut overridden = false;
+    pub fn override_config(&self, config: &mut Config) -> anyhow::Result<bool> {
+        let mut overridden = self.override_generic(config)?;
 
-        if let Some(rpc_port) = args.rpc_port {
-            overridden = true;
-            config.client.rpc_port = rpc_port;
+        if let Some(datadir) = &self.datadir {
+            config.client.datadir = datadir.into();
+            overridden = true
         }
-
-        if let Some(p2p_port) = args.p2p_port {
-            overridden = true;
-            config.client.p2p_port = p2p_port;
+        if let Some(rpc_host) = &self.rpc_host {
+            config.client.rpc_host = rpc_host.to_string();
+            overridden = true
         }
-
-        if let Some(datadir) = args.datadir {
-            overridden = true;
-            config.client.datadir = datadir;
+        if let Some(rpc_port) = &self.rpc_port {
+            config.client.rpc_port = *rpc_port;
+            overridden = true
         }
-
-        if args.sequencer {
-            config.client.client_mode = ClientMode::Sequencer(SequencerConfig {});
-        } else if let Some(sequencer_rpc) = args.sequencer_rpc {
-            overridden = true;
-            config.client.client_mode = ClientMode::FullNode(FullNodeConfig { sequencer_rpc });
-        }
-        overridden
+        Ok(overridden)
     }
 
     /// Override config using the generic overrides.
-    pub fn override_generic(&self, config: &mut Config) -> anyhow::Result<bool> {
+    fn override_generic(&self, config: &mut Config) -> anyhow::Result<bool> {
+        let original = config.clone();
         // Convert config as json
         let mut json_config = to_value(&mut *config).expect("Config json serialization failed");
 
@@ -98,7 +86,7 @@ impl Args {
         }
         *config =
             from_value(json_config).expect("Should be able to create Config from serde json Value");
-        Ok(true)
+        Ok(original == *config)
     }
 }
 
@@ -144,7 +132,7 @@ mod test {
                 rpc_host: "".to_string(),
                 rpc_port: 300,
                 p2p_port: 300,
-                client_mode: ClientMode::Sequencer(SequencerConfig {}),
+                sync_endpoint: None,
                 l2_blocks_fetch_limit: 20,
                 datadir: "".into(),
                 db_retry_count: 3,
@@ -187,9 +175,6 @@ mod test {
             config: "config_path".into(),
             datadir: None,
             sequencer: false,
-            sequencer_rpc: Some("rpc".to_string()),
-            rpc_port: None,
-            p2p_port: None,
             rollup_params: None,
             overrides: vec![
                 "btcio.reader.client_poll_dur_ms=50".to_string(),
@@ -200,7 +185,7 @@ mod test {
         assert!(config.btcio.reader.client_poll_dur_ms != 50);
         assert!(config.sync.l1_follow_distance != 30);
 
-        args.override_generic(&mut config).unwrap();
+        args.override_config(&mut config).unwrap();
 
         assert!(config.btcio.reader.client_poll_dur_ms == 50);
         assert!(config.sync.l1_follow_distance == 30);

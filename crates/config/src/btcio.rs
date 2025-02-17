@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Configuration for btcio tasks.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct BtcioConfig {
     pub reader: ReaderConfig,
     pub writer: WriterConfig,
@@ -9,14 +9,14 @@ pub struct BtcioConfig {
 }
 
 /// Configuration for btcio reader.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReaderConfig {
     /// How often to poll btc client
     pub client_poll_dur_ms: u32,
 }
 
 /// Configuration for btcio writer/signer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WriterConfig {
     /// How often to invoke the writer.
     pub write_poll_dur_ms: u64,
@@ -30,7 +30,7 @@ pub struct WriterConfig {
 }
 
 /// Definition of how fees are determined while creating l1 transactions.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum FeePolicy {
     /// Use estimatesmartfee.
@@ -41,7 +41,7 @@ pub enum FeePolicy {
 }
 
 /// Configuration for btcio broadcaster.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BroadcasterConfig {
     /// How often to invoke the broadcaster, in ms.
     pub poll_interval_ms: u64,
