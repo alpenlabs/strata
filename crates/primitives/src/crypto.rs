@@ -40,6 +40,7 @@ mod tests {
     use secp256k1::{SecretKey, SECP256K1};
 
     use super::{sign_schnorr_sig, verify_schnorr_sig};
+    use crate::buf::Buf32;
 
     #[test]
     fn test_schnorr_signature_pass() {
@@ -47,17 +48,18 @@ mod tests {
 
         let mut mod_msg = msg;
         mod_msg.swap(1, 2);
+        let msg = Buf32::from(msg);
+        let mod_msg = Buf32::from(mod_msg);
 
         let sk = SecretKey::new(&mut OsRng);
         let (pk, _) = sk.x_only_public_key(SECP256K1);
 
-        let sk = *sk.as_ref();
-        let pk = pk.serialize();
+        let sk = Buf32::from(*sk.as_ref());
+        let pk = Buf32::from(pk.serialize());
 
         let sig = sign_schnorr_sig(&msg, &sk);
         assert!(verify_schnorr_sig(&sig, &msg, &pk));
 
-        let mod_msg = Buf32::from(mod_msg);
         assert!(!verify_schnorr_sig(&sig, &mod_msg, &pk));
 
         let sig = sign_schnorr_sig(&mod_msg, &sk);

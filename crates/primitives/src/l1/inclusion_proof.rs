@@ -105,10 +105,10 @@ pub type L1WtxProof = L1TxInclusionProof<WtxIdMarker>;
 mod tests {
     use bitcoin::hashes::Hash;
     use rand::{thread_rng, Rng};
-    use strata_primitives::buf::Buf32;
     use strata_test_utils::bitcoin::{get_btc_chain, get_btc_mainnet_block};
 
     use super::*;
+    use crate::buf::Buf32;
 
     #[test]
     fn test_l1_tx_proof() {
