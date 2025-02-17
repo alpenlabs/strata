@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strata_db::{traits::L1Database, DbResult};
+use strata_db::{traits::L1Database, DbError, DbResult};
 use strata_primitives::l1::{L1BlockId, L1BlockManifest, L1Tx, L1TxRef};
 use threadpool::ThreadPool;
 
@@ -15,6 +15,7 @@ pub struct L1BlockManager {
     manifest_cache: CacheTable<L1BlockId, Option<L1BlockManifest>>,
     txs_cache: CacheTable<L1BlockId, Option<Vec<L1TxRef>>>,
     blockheight_cache: CacheTable<u64, Option<L1BlockId>>,
+    chaintip_cache: CacheTable<(), Option<(u64, L1BlockId)>>,
 }
 
 impl L1BlockManager {
@@ -23,11 +24,13 @@ impl L1BlockManager {
         let manifest_cache = cache::CacheTable::new(64.try_into().unwrap());
         let txs_cache = cache::CacheTable::new(64.try_into().unwrap());
         let blockheight_cache = cache::CacheTable::new(64.try_into().unwrap());
+        let chaintip_cache = cache::CacheTable::new(1.try_into().unwrap());
         Self {
             ops,
             manifest_cache,
             txs_cache,
             blockheight_cache,
+            chaintip_cache,
         }
     }
 
@@ -45,17 +48,50 @@ impl L1BlockManager {
         self.ops.put_block_data_async(mf, txs).await
     }
 
-    pub fn add_to_canonical_chain(&self, height: u64, blockid: &L1BlockId) -> DbResult<()> {
-        self.ops.add_to_canonical_chain_blocking(height, *blockid)
+    pub fn extend_canonical_chain(&self, blockid: &L1BlockId) -> DbResult<()> {
+        let new_block = self
+            .get_block_manifest(blockid)?
+            .ok_or(DbError::MissingL1BlockBody(*blockid))?;
+        let height = new_block.height();
+
+        if let Some((tip_height, tip_blockid)) = self.get_chain_tip()? {
+            if height != tip_height + 1 {
+                return Err(DbError::OooInsert("l1block", height));
+            }
+
+            if new_block.get_prev_blockid() != tip_blockid {
+                return Err(DbError::Other(format!(
+                    "l1block does not extend chain {blockid}"
+                )));
+            }
+        };
+
+        self.chaintip_cache.purge(&());
+        self.ops.extend_canonical_chain_blocking(height, *blockid)
     }
 
-    pub async fn add_to_canonical_chain_async(
-        &self,
-        height: u64,
-        blockid: &L1BlockId,
-    ) -> DbResult<()> {
+    pub async fn extend_canonical_chain_async(&self, blockid: &L1BlockId) -> DbResult<()> {
+        let new_block = self
+            .get_block_manifest_async(blockid)
+            .await?
+            .ok_or(DbError::MissingL1BlockBody(*blockid))?;
+        let height = new_block.height();
+
+        if let Some((tip_height, tip_blockid)) = self.get_chain_tip_async().await? {
+            if height != tip_height + 1 {
+                return Err(DbError::OooInsert("l1block", height));
+            }
+
+            if new_block.get_prev_blockid() != tip_blockid {
+                return Err(DbError::Other(format!(
+                    "l1block does not extend chain {blockid}"
+                )));
+            }
+        };
+
+        self.chaintip_cache.purge(&());
         self.ops
-            .add_to_canonical_chain_async(height, *blockid)
+            .extend_canonical_chain_async(height, *blockid)
             .await
     }
 
@@ -65,6 +101,8 @@ impl L1BlockManager {
                 self.blockheight_cache.purge(&i);
             }
         }
+
+        self.chaintip_cache.purge(&());
         self.ops.revert_canonical_chain_blocking(idx)
     }
 
@@ -75,15 +113,19 @@ impl L1BlockManager {
             }
         }
 
+        self.chaintip_cache.purge(&());
         self.ops.revert_canonical_chain_async(idx).await
     }
 
     pub fn get_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>> {
-        self.ops.get_chain_tip_blocking()
+        self.chaintip_cache
+            .get_or_fetch_blocking(&(), || self.ops.get_chain_tip_blocking())
     }
 
     pub async fn get_chain_tip_async(&self) -> DbResult<Option<(u64, L1BlockId)>> {
-        self.ops.get_chain_tip_async().await
+        self.chaintip_cache
+            .get_or_fetch(&(), || self.ops.get_chain_tip_chan())
+            .await
     }
 
     pub fn get_chain_tip_height(&self) -> DbResult<Option<u64>> {

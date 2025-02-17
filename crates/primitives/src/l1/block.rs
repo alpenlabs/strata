@@ -203,6 +203,10 @@ impl L1BlockManifest {
         *self.record.wtxs_root()
     }
 
+    pub fn get_prev_blockid(&self) -> L1BlockId {
+        self.record().parent_blkid()
+    }
+
     pub fn into_record(self) -> L1HeaderRecord {
         self.record
     }
