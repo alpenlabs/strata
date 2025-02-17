@@ -92,13 +92,19 @@ class StrataFactory(flexitest.Factory):
         rpc_host = "127.0.0.1"
         logfile = os.path.join(datadir, "service.log")
 
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        with open(rollup_params_file, "w") as f:
+            f.write(rollup_params)
+
         # fmt: off
         cmd = [
             "strata-client",
             "--datadir", datadir,
+            "--rollup-params", rollup_params_file,
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
-            "--bitcoind-host", bitcoind_config["bitcoind_sock"],
+
+            "-o", "--bitcoind-host", bitcoind_config["bitcoind_sock"],
             "--bitcoind-user", bitcoind_config["bitcoind_user"],
             "--bitcoind-password", bitcoind_config["bitcoind_pass"],
             "--reth-authrpc", reth_config["reth_socket"],
@@ -107,12 +113,6 @@ class StrataFactory(flexitest.Factory):
             "--sequencer"
         ]
         # fmt: on
-
-        rollup_params_file = os.path.join(datadir, "rollup_params.json")
-        with open(rollup_params_file, "w") as f:
-            f.write(rollup_params)
-
-        cmd.extend(["--rollup-params", rollup_params_file])
 
         rpc_url = f"ws://{rpc_host}:{rpc_port}"
         props = {
