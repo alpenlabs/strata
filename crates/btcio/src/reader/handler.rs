@@ -2,12 +2,17 @@ use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use secp256k1::XOnlyPublicKey;
 use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
-    batch::{Checkpoint, CommitmentInfo, L1CommittedCheckpoint},
+    batch::{
+        verify_signed_checkpoint_sig, Checkpoint, CommitmentInfo, L1CommittedCheckpoint,
+        SignedCheckpoint,
+    },
+    block_credential::CredRule,
     buf::Buf32,
     l1::{
         generate_l1_tx, HeaderVerificationState, L1BlockCommitment, L1BlockManifest, L1BlockRecord,
         L1Tx, ProtocolOperation,
     },
+    params::RollupParams,
 };
 use strata_state::sync_event::{EventSubmitter, SyncEvent};
 use tracing::*;
@@ -32,12 +37,6 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
 
         L1Event::BlockData(blockdata, epoch, hvs) => {
             handle_blockdata(ctx, blockdata, hvs, epoch).await?
-        }
-
-        L1Event::GenesisVerificationState(block, header_verification_state) => {
-            // TODO remove this since we're really getting rid of it
-            //vec![SyncEvent::L1BlockGenesis(block, header_verification_state)]
-            Vec::new()
         }
     };
 
@@ -103,37 +102,32 @@ async fn handle_blockdata<R: ReaderRpc>(
     Ok(sync_evs)
 }
 
-/// Parses envelopes and checks for batch data in the transactions
-fn check_for_commitments(
-    blockdata: &BlockData,
-    seq_pubkey: Option<XOnlyPublicKey>,
-) -> Vec<L1CommittedCheckpoint> {
-    let relevant_txs = blockdata.relevant_txs();
-
-    let signed_checkpts = relevant_txs.iter().flat_map(|txref| {
-        txref.contents().protocol_ops().iter().map(|x| match x {
-            ProtocolOperation::Checkpoint(envelope) => Some((
-                envelope,
-                &blockdata.block().txdata[txref.index() as usize],
-                txref.index(),
-            )),
-            _ => None,
+/// Extracts checkpoints from the block.
+fn find_checkpoints(blockdata: &BlockData, params: &RollupParams) -> Vec<L1CommittedCheckpoint> {
+    blockdata
+        .relevant_txs()
+        .iter()
+        .flat_map(|txref| {
+            txref.contents().protocol_ops().iter().map(|x| match x {
+                ProtocolOperation::Checkpoint(envelope) => Some((
+                    envelope,
+                    &blockdata.block().txdata[txref.index() as usize],
+                    txref.index(),
+                )),
+                _ => None,
+            })
         })
-    });
-
-    signed_checkpts
         .filter_map(|ckpt_data| {
             let (signed_checkpoint, tx, position) = ckpt_data?;
-            if let Some(seq_pubkey) = seq_pubkey {
-                if !signed_checkpoint.verify_sig(&seq_pubkey.into()) {
-                    error!(
-                        ?tx,
-                        ?signed_checkpoint,
-                        "signature verification failed on checkpoint"
-                    );
-                    return None;
-                }
+            if !verify_signed_checkpoint_sig(signed_checkpoint, params) {
+                error!(
+                    ?tx,
+                    ?signed_checkpoint,
+                    "signature verification failed on checkpoint"
+                );
+                return None;
             }
+
             let checkpoint: Checkpoint = signed_checkpoint.clone().into();
 
             let blockhash = (*blockdata.block().block_hash().as_byte_array()).into();

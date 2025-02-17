@@ -4,12 +4,14 @@ use serde::{Deserialize, Serialize};
 use zkaleido::{Proof, ProofReceipt, PublicValues};
 
 use crate::{
+    block_credential::CredRule,
     buf::{Buf32, Buf64},
     crypto::verify_schnorr_sig,
     epoch::EpochCommitment,
     hash,
     l1::L1BlockCommitment,
     l2::{L2BlockCommitment, L2BlockId},
+    params::RollupParams,
 };
 
 /// Summary generated when we accept the last block of an epoch.
@@ -230,17 +232,12 @@ impl SignedCheckpoint {
         Self { inner, signature }
     }
 
-    pub fn signature(&self) -> Buf64 {
-        self.signature
-    }
-
     pub fn checkpoint(&self) -> &Checkpoint {
         &self.inner
     }
 
-    pub fn verify_sig(&self, pub_key: &Buf32) -> bool {
-        let msg = self.checkpoint().hash();
-        verify_schnorr_sig(&self.signature, &msg, pub_key)
+    pub fn signature(&self) -> &Buf64 {
+        &self.signature
     }
 }
 
@@ -465,4 +462,28 @@ impl L1CommittedCheckpoint {
             commitment,
         }
     }
+}
+
+/// Verifies that a signed checkpoint has a proper signature according to rollup
+/// params.
+// TODO this might want to take a chainstate in the future, but we don't have
+// the ability to get that where we call this yet
+pub fn verify_signed_checkpoint_sig(
+    signed_checkpoint: &SignedCheckpoint,
+    params: &RollupParams,
+) -> bool {
+    let seq_pubkey = match params.cred_rule {
+        CredRule::SchnorrKey(key) => key,
+
+        // In this case we always just assume true.
+        CredRule::Unchecked => return true,
+    };
+
+    let checkpoint_sighash = signed_checkpoint.checkpoint().hash();
+
+    verify_schnorr_sig(
+        &signed_checkpoint.signature(),
+        &checkpoint_sighash,
+        &seq_pubkey,
+    )
 }
