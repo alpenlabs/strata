@@ -109,6 +109,29 @@ def wait_until_with_value(
     raise AssertionError(error_with)
 
 
+def wait_for_genesis(rpc, **kwargs):
+    """
+    Waits until we see genesis.  That is to say, that `strata_syncStatus`
+    returns a sensible result.
+    """
+
+    def _check_genesis():
+        try:
+            # This should raise if we're before genesis.
+            ss = seqrpc.strata_syncStatus()
+            logging.debug(f"after genesis, tip is slot {ss['tip_height']} blkid {ss['tip_block_id']}")
+            return True
+        except seqrpc.RpcError as e:
+            # This is the "before genesis" error code, meaning we're still
+            # before genesis
+            if e.code == -32607:
+                return False
+            else:
+                raise e
+
+    wait_until(_check_genesis, timeout=20, step=2)
+
+
 def wait_until_chain_epoch(rpc, epoch: int, **kwargs) -> dict:
     """
     Waits until the chain has finished the specified epoch index, determined by

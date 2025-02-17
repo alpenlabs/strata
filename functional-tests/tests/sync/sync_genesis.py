@@ -19,26 +19,10 @@ class SyncGenesisTest(testenv.StrataTester):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
 
-        time.sleep(1)
-
-        def _check_genesis():
-            try:
-                # This should raise if we're before genesis.
-                ss = seqrpc.strata_syncStatus()
-                logging.debug(f"after genesis, tip is slot {ss['tip_height']} blkid {ss['tip_block_id']}")
-                return True
-            except seqrpc.RpcError as e:
-                # This is the "before genesis" error code, meaning we're still
-                # before genesis
-                if e.code == -32607:
-                    return False
-                else:
-                    raise e
-
-        wait_until(_check_genesis, timeout=20, step=2)
-        logging.info("checking that we're still making progress...")
+        wait_until_genesis(seqrpc, timeout=20, step=2)
 
         # Make sure we're making progress.
+        logging.info("observed genesis, checking that we're still making progress...")
         stat = None
         last_slot = 0
         for _ in range(5):
