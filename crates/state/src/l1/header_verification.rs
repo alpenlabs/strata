@@ -1,10 +1,8 @@
-use std::io::{Cursor, Write};
-
 use arbitrary::Arbitrary;
 use bitcoin::{block::Header, hashes::Hash, params::Params, BlockHash, CompactTarget};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 
 use super::{error::L1VerificationError, timestamp_store::TimestampStore, L1BlockId};
 use crate::l1::utils::compute_block_hash;
@@ -49,16 +47,19 @@ pub struct HeaderVerificationState {
     /// [Target](bitcoin::pow::CompactTarget) for the next block to verify
     pub next_block_target: u32,
 
-    /// Timestamp of the block at the start of a [difficulty adjustment
-    /// interval](bitcoin::consensus::params::Params::difficulty_adjustment_interval).
+    /// Timestamps marking the boundaries of the difficulty adjustment epochs.
     ///
-    /// On [MAINNET](bitcoin::consensus::params::MAINNET), a difficulty adjustment interval lasts
-    /// for 2016 blocks. The interval starts at blocks with heights 0, 2016, 4032, 6048, 8064,
-    /// etc.
+    /// These timestamps are used in the computation of the new difficulty target. They correspond
+    /// to:
+    /// - `current`: The timestamp at the start of the current difficulty adjustment epoch (end
+    ///   boundary).
+    /// - `previous`: The timestamp at the start of the previous difficulty adjustment epoch (start
+    ///   boundary).
     ///
-    /// This field represents the timestamp of the starting block of the interval
-    /// (e.g., block 0, 2016, 4032, etc.).
-    pub interval_start_timestamp: u32,
+    /// For example, to successfully compute the first difficulty adjustment on the Bitcoin
+    /// network, one would pass the header for Block 2015 as `current` and the header for Block
+    /// 0 as `previous`.
+    pub epoch_timestamps: EpochTimestamps,
 
     /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)
     pub total_accumulated_pow: u128,
@@ -69,20 +70,44 @@ pub struct HeaderVerificationState {
     pub last_11_blocks_timestamps: TimestampStore,
 }
 
+/// `EpochTimestamps` stores the timestamps corresponding to the boundaries of difficulty adjustment
+/// epochs.
+///
+/// This structure holds two values for handling reorg scenarios where the epoch boundary
+/// information might be lost:
+///
+/// On [MAINNET](bitcoin::consensus::params::MAINNET), a difficulty adjustment interval lasts
+/// for 2016 blocks. The interval starts at blocks with heights 0, 2016, 4032, 6048, 8064,
+/// etc.
+#[derive(
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Arbitrary,
+    BorshSerialize,
+    BorshDeserialize,
+    Deserialize,
+    Serialize,
+)]
+pub struct EpochTimestamps {
+    /// Timestamp of the block at the start of the current difficulty adjustment epoch.
+    pub current: u32,
+
+    /// Timestamp of the block at the start of the previous difficulty adjustment epoch.
+    pub previous: u32,
+}
+
 impl HeaderVerificationState {
-    fn next_target(&mut self, timestamp: u32, params: &Params) -> u32 {
+    fn next_target(&mut self, header: &Header, params: &Params) -> u32 {
         if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() != 0 {
             return self.next_block_target;
         }
 
-        let timespan = timestamp - self.interval_start_timestamp;
+        let timespan = header.time - self.epoch_timestamps.current;
 
-        CompactTarget::from_next_work_required(
-            CompactTarget::from_consensus(self.next_block_target),
-            timespan as u64,
-            params,
-        )
-        .to_consensus()
+        CompactTarget::from_next_work_required(header.bits, timespan as u64, params).to_consensus()
     }
 
     // Note/TODO: Figure out a better way so we don't have to params each time.
@@ -91,7 +116,8 @@ impl HeaderVerificationState {
 
         let new_block_num = self.last_verified_block_num;
         if new_block_num % params.difficulty_adjustment_interval() == 0 {
-            self.interval_start_timestamp = timestamp;
+            self.epoch_timestamps.previous = self.epoch_timestamps.current;
+            self.epoch_timestamps.current = timestamp;
         }
     }
 
@@ -162,7 +188,7 @@ impl HeaderVerificationState {
         self.total_accumulated_pow += header.difficulty(params);
 
         // Set the target for the next block
-        self.next_block_target = self.next_target(header.time, params);
+        self.next_block_target = self.next_target(header, params);
 
         Ok(())
     }
@@ -220,22 +246,7 @@ impl HeaderVerificationState {
 
     /// Calculate the hash of the verification state
     pub fn compute_hash(&self) -> Result<Buf32, L1VerificationError> {
-        // 8 + 32 + 4 + 4 + 16 + 11*4 = 108
-        let mut buf = [0u8; 108];
-        let mut cur = Cursor::new(&mut buf[..]);
-        cur.write_all(&self.last_verified_block_num.to_be_bytes())?;
-        cur.write_all(self.last_verified_block_hash.as_ref())?;
-        cur.write_all(&self.next_block_target.to_be_bytes())?;
-        cur.write_all(&self.interval_start_timestamp.to_be_bytes())?;
-        cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
-
-        let mut serialized_timestamps = [0u8; 11 * 4];
-        for (i, &timestamp) in self.last_11_blocks_timestamps.buffer.iter().enumerate() {
-            serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
-        }
-
-        cur.write_all(&serialized_timestamps)?;
-        Ok(strata_primitives::hash::raw(&buf))
+        Ok(compute_borsh_hash(&self))
     }
 
     /// Reorganizes the verification state by removing headers from the old chain and applying
@@ -275,8 +286,12 @@ impl HeaderVerificationState {
                 });
             }
             self.last_verified_block_hash = old_header.prev_blockhash.into();
+            if self.last_verified_block_num % params.difficulty_adjustment_interval() == 0 {
+                self.epoch_timestamps.current = self.epoch_timestamps.previous;
+            }
             self.last_verified_block_num -= 1;
             self.last_11_blocks_timestamps.remove();
+            self.next_block_target = old_header.bits.to_consensus();
             self.total_accumulated_pow -= old_header.difficulty(params);
         }
 
@@ -314,9 +329,9 @@ mod tests {
     #[test]
     fn test_blocks() {
         let chain = get_btc_chain();
-        let h1 = get_difficulty_adjustment_height(1, chain.start, &MAINNET);
-        let r1 = OsRng.gen_range(h1..chain.end);
-        let mut verification_state = chain.get_verification_state(r1, &MAINNET);
+        let h2 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
+        let r1 = OsRng.gen_range(h2..chain.end);
+        let mut verification_state = chain.get_verification_state(r1, &MAINNET, 0);
 
         for header_idx in r1..chain.end {
             verification_state
@@ -336,8 +351,8 @@ mod tests {
     #[test]
     fn test_hash() {
         let chain = get_btc_chain();
-        let r1 = 42000;
-        let verification_state = chain.get_verification_state(r1, &MAINNET);
+        let r1 = 45000;
+        let verification_state = chain.get_verification_state(r1, &MAINNET, 0);
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
     }
@@ -345,9 +360,10 @@ mod tests {
     fn test_reorg(reorg: (u64, u64)) {
         let chain = get_btc_chain();
 
+        let reorg_len = (reorg.1 - reorg.0) as u32;
         let reorg = reorg.0..reorg.1;
         let headers: Vec<Header> = reorg.clone().map(|h| chain.get_header(h)).collect();
-        let mut verification_state = chain.get_verification_state(reorg.start, &MAINNET);
+        let mut verification_state = chain.get_verification_state(reorg.start, &MAINNET, reorg_len);
 
         for header in &headers {
             verification_state
@@ -367,28 +383,28 @@ mod tests {
     #[test]
     fn test_reorgs() {
         let chain = get_btc_chain();
-        let h2 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
         let h3 = get_difficulty_adjustment_height(3, chain.start, &MAINNET);
         let h4 = get_difficulty_adjustment_height(4, chain.start, &MAINNET);
+        let h5 = get_difficulty_adjustment_height(5, chain.start, &MAINNET);
 
         // Reorg of 10 blocks with no difficulty adjustment in between
-        let reorg = (h2 + 100, h2 + 110);
-        test_reorg(reorg);
-
         let reorg = (h3 + 100, h3 + 110);
         test_reorg(reorg);
 
         let reorg = (h4 + 100, h4 + 110);
         test_reorg(reorg);
 
-        // Reorg of 10 blocks with difficulty adjustment in between
-        let reorg = (h2 - 5, h2 + 5);
+        let reorg = (h5 + 100, h5 + 110);
         test_reorg(reorg);
 
+        // Reorg of 10 blocks with difficulty adjustment in between
         let reorg = (h3 - 5, h3 + 5);
         test_reorg(reorg);
 
         let reorg = (h4 - 5, h4 + 5);
+        test_reorg(reorg);
+
+        let reorg = (h5 - 5, h5 + 5);
         test_reorg(reorg);
     }
 }

@@ -114,7 +114,7 @@ impl TimestampStore {
         let len = self.buffer.len();
         let mut last_n_timestamps = Vec::with_capacity(N);
         for i in 0..N {
-            let pos = (self.head + i) % len;
+            let pos = (self.head + len - 1 - i) % len;
             last_n_timestamps.push(self.buffer[pos]);
         }
         last_n_timestamps.sort_unstable();
@@ -126,7 +126,7 @@ impl TimestampStore {
 mod tests {
     use std::array;
 
-    use super::TimestampStore;
+    use super::*;
 
     #[test]
     fn test_timestamp_buffer() {
@@ -218,42 +218,37 @@ mod tests {
         let initial_timestamps: [u32; 15] = array::from_fn(|i| (i + 1) as u32);
         let mut timestamps = TimestampStore::new(&initial_timestamps);
         assert_eq!(timestamps.head, 0);
-        assert_eq!(timestamps.median(), 6);
+        assert_eq!(timestamps.median(), 10);
 
         // Insert a new timestamp and test buffer state.
         timestamps.insert(16);
         let expected_timestamps = [16, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         assert_eq!(timestamps.buffer, expected_timestamps);
         assert_eq!(timestamps.head, 1);
-        assert_eq!(timestamps.median(), 7);
+        assert_eq!(timestamps.median(), 11);
+
+        // remove and insert same value
+        timestamps.remove();
+        assert_eq!(timestamps.head, 0);
+        assert_eq!(timestamps.median(), 10);
+        timestamps.insert(16);
+        assert_eq!(timestamps.buffer, expected_timestamps);
 
         // Insert another timestamp.
         timestamps.insert(17);
         let expected_timestamps = [16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         assert_eq!(timestamps.buffer, expected_timestamps);
         assert_eq!(timestamps.head, 2);
-        assert_eq!(timestamps.median(), 8);
+        assert_eq!(timestamps.median(), 12);
 
         // Insert multiple timestamps.
-        let new_timestamps = [18, 19, 20, 21, 22, 23, 24, 25, 26];
-        for &ts in &new_timestamps {
-            timestamps.insert(ts);
-        }
-        assert_eq!(timestamps.head, 11);
-        assert_eq!(timestamps.median(), 17);
-
-        let new_timestamps = [27, 28, 29, 30];
-        for &ts in &new_timestamps {
-            timestamps.insert(ts);
-        }
-        assert_eq!(timestamps.head, 0);
-        assert_eq!(timestamps.median(), 21);
-
         let median = timestamps.median();
-        let new_timestamps = [27, 28, 29, 30];
+        let head = timestamps.head;
+        let new_timestamps = [18, 19, 20, 21, 22, 23, 24, 25, 26];
+        let len = timestamps.buffer.len();
         for (idx, ts) in new_timestamps.iter().enumerate() {
             timestamps.insert(*ts);
-            assert_eq!(timestamps.head, idx + 1);
+            assert_eq!(timestamps.head, (head + idx + 1) % len);
             assert_eq!(timestamps.median(), median + idx as u32 + 1);
         }
     }

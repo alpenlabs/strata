@@ -16,7 +16,8 @@ use strata_primitives::{
     l1::{BitcoinAddress, L1BlockRecord, OutputRef},
 };
 use strata_state::l1::{
-    get_difficulty_adjustment_height, HeaderVerificationState, L1BlockId, TimestampStore,
+    get_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState, L1BlockId,
+    TimestampStore,
 };
 
 use crate::{l2::gen_params, ArbitraryGenerator};
@@ -77,8 +78,8 @@ impl BtcChainSegment {
 
     /// Retrieves the timestamps of a specified number of blocks from a given height in a
     /// descending order.
-    pub fn get_last_timestamps(&self, from: u64, count: usize) -> Vec<u32> {
-        let mut timestamps = Vec::with_capacity(count);
+    pub fn get_last_timestamps(&self, from: u64, count: u32) -> Vec<u32> {
+        let mut timestamps = Vec::with_capacity(count as usize);
         for i in (0..count).rev() {
             let h = self.get_header(from - i as u64);
             timestamps.push(h.time)
@@ -90,16 +91,18 @@ impl BtcChainSegment {
         &self,
         block_height: u64,
         params: &BtcParams,
+        l1_reorg_safe_depth: u32,
     ) -> HeaderVerificationState {
         // Get the difficulty adjustment block just before `block_height`
         let h1 = get_difficulty_adjustment_height(0, block_height, params);
+        let h0 = h1 - params.difficulty_adjustment_interval();
 
         // Consider the block before `block_height` to be the last verified block
         let vh = block_height - 1; // verified_height
 
         // Fetch the previous timestamps of block from `vh`
         // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let initial_timestamps: [u32; 11] = self.get_last_timestamps(vh, 11).try_into().unwrap();
+        let initial_timestamps = self.get_last_timestamps(vh, 11 + l1_reorg_safe_depth);
         let last_11_blocks_timestamps = TimestampStore::new(&initial_timestamps);
 
         let last_verified_block_hash: L1BlockId = Buf32::from(
@@ -110,6 +113,11 @@ impl BtcChainSegment {
         )
         .into();
 
+        let epoch_timestamps = EpochTimestamps {
+            current: self.get_header(h1).time,
+            previous: self.get_header(h0).time,
+        };
+
         HeaderVerificationState {
             last_verified_block_num: vh,
             last_verified_block_hash,
@@ -118,7 +126,7 @@ impl BtcChainSegment {
                 .target()
                 .to_compact_lossy()
                 .to_consensus(),
-            interval_start_timestamp: self.get_header(h1).time,
+            epoch_timestamps,
             total_accumulated_pow: 0u128,
             last_11_blocks_timestamps,
         }

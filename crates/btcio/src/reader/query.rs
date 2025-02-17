@@ -14,7 +14,10 @@ use strata_l1tx::{
 };
 use strata_primitives::{block_credential::CredRule, params::Params};
 use strata_state::{
-    l1::{get_difficulty_adjustment_height, HeaderVerificationState, L1BlockId, TimestampStore},
+    l1::{
+        get_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState, L1BlockId,
+        TimestampStore,
+    },
     sync_event::EventSubmitter,
 };
 use strata_status::StatusChannel;
@@ -385,6 +388,14 @@ pub async fn get_verification_state(
     let h1 = get_difficulty_adjustment_height(0, height, params);
     let b1 = client.get_block_at(h1).await?;
 
+    // Get the difficulty adjustment block just before `h0`
+    let h0 = if h1 > params.difficulty_adjustment_interval() {
+        h1 - params.difficulty_adjustment_interval()
+    } else {
+        h1
+    };
+    let b0 = client.get_block_at(h0).await?;
+
     // Consider the block before `block_height` to be the last verified block
     let vh = height - 1; // verified_height
     let vb = client.get_block_at(vh).await?; // verified_block
@@ -416,7 +427,10 @@ pub async fn get_verification_state(
         last_verified_block_num: vh,
         last_verified_block_hash: l1_blkid,
         next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
-        interval_start_timestamp: b1.header.time,
+        epoch_timestamps: EpochTimestamps {
+            current: b1.header.time,
+            previous: b0.header.time,
+        },
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
     };

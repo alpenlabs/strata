@@ -145,6 +145,7 @@ pub fn get_genesis_chainstate() -> Chainstate {
     let l1_vs = get_btc_chain().get_verification_state(
         params.rollup().genesis_l1_height,
         &BtcParams::new(params.rollup().network),
+        params.rollup().l1_reorg_safe_depth,
     );
     let pregenesis_mfs = vec![get_btc_chain().get_block_record(params.rollup().horizon_l1_height)];
     make_genesis_chainstate(&gblock, pregenesis_mfs, &params, l1_vs)

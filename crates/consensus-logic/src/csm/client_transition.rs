@@ -581,7 +581,11 @@ mod tests {
         let genesis = params.rollup().genesis_l1_height;
 
         let chain = get_btc_chain();
-        let l1_verification_state = chain.get_verification_state(genesis + 1, &MAINNET);
+        let l1_verification_state = chain.get_verification_state(
+            genesis + 1,
+            &MAINNET,
+            params.rollup().l1_reorg_safe_depth,
+        );
 
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();
