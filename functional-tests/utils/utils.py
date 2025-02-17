@@ -10,9 +10,8 @@ from typing import Any, Callable, Optional, TypeVar
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, get_balance, musig_aggregate_pks
 
-from factory.seqrpc import JsonrpcClient
+from factory.seqrpc import JsonrpcClient, RpcError
 from utils.constants import *
-
 
 def generate_jwt_secret() -> str:
     return os.urandom(32).hex()
@@ -118,10 +117,10 @@ def wait_for_genesis(rpc, **kwargs):
     def _check_genesis():
         try:
             # This should raise if we're before genesis.
-            ss = seqrpc.strata_syncStatus()
+            ss = rpc.strata_syncStatus()
             logging.debug(f"after genesis, tip is slot {ss['tip_height']} blkid {ss['tip_block_id']}")
             return True
-        except seqrpc.RpcError as e:
+        except RpcError as e:
             # This is the "before genesis" error code, meaning we're still
             # before genesis
             if e.code == -32607:
