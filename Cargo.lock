@@ -13193,6 +13193,7 @@ dependencies = [
  "bitcoin",
  "secp256k1",
  "strata-primitives",
+ "strata-sequencer",
  "thiserror 2.0.11",
  "zeroize",
 ]
