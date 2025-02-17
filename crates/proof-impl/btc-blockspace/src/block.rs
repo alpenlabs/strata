@@ -9,8 +9,11 @@ use bitcoin::{
     block::Header, consensus::Encodable, hashes::Hash, Block, BlockHash, Transaction, TxMerkleNode,
     WitnessCommitment, WitnessMerkleNode,
 };
-use strata_primitives::{buf::Buf32, hash::sha256d};
-use strata_state::l1::{compute_block_hash, L1TxProof};
+use strata_primitives::{
+    buf::Buf32,
+    hash::sha256d,
+    l1::{compute_block_hash, L1TxProof},
+};
 
 use crate::{
     merkle::calculate_root,

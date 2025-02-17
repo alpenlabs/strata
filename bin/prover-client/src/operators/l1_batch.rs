@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bitcoin::{params::MAINNET, Block};
 use strata_btcio::{
-    reader::query::get_verification_state,
+    reader::query::fetch_verification_state,
     rpc::{traits::ReaderRpc, BitcoinClient},
 };
 use strata_primitives::{
@@ -117,7 +117,7 @@ impl ProvingOp for L1BatchOperator {
         let mut blocks = self.get_block_ancestors(end_block_id, num_blocks).await?;
         blocks.reverse();
 
-        let state = get_verification_state(
+        let state = fetch_verification_state(
             self.btc_client.as_ref(),
             start_height,
             &MAINNET.clone().into(),

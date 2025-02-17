@@ -8,6 +8,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
+    epoch::EpochCommitment,
+    l1::ProtocolOperation,
     l2::L2BlockCommitment,
 };
 use tracing::*;
@@ -18,7 +20,6 @@ use crate::{
     chain_state::Chainstate,
     header::L2Header,
     l1::L1MaturationEntry,
-    tx::ProtocolOperation::Deposit,
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -51,6 +52,10 @@ impl WriteBatch {
     /// changes to the bulk state.
     pub fn new_replace(new_state: Chainstate) -> Self {
         Self::new(new_state, Vec::new())
+    }
+
+    pub fn new_toplevel_state(&self) -> &Chainstate {
+        &self.new_toplevel_state
     }
 
     /// Extracts the toplevel state, discarding the write ops.
@@ -162,6 +167,21 @@ impl StateCache {
         state.last_block = block;
     }
 
+    /// Sets the current epoch index.
+    pub fn set_cur_epoch(&mut self, epoch: u64) {
+        self.state_mut().cur_epoch = epoch;
+    }
+
+    /// Sets the previous epoch.
+    pub fn set_prev_epoch(&mut self, epoch: EpochCommitment) {
+        self.state_mut().prev_epoch = epoch;
+    }
+
+    /// Sets the previous epoch.
+    pub fn set_finalized_epoch(&mut self, epoch: EpochCommitment) {
+        self.state_mut().finalized_epoch = epoch;
+    }
+
     /// remove a deposit intent from the pending deposits queue.
     pub fn consume_deposit_intent(&mut self, idx: u64) {
         let deposits = self.state_mut().exec_env_state.pending_deposits_mut();
@@ -232,7 +252,7 @@ impl StateCache {
         // TODO add it to the MMR so we can reference it in the future
         let (header_record, deposit_txs, _) = matured_block.into_parts();
         for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
-            if let Deposit(deposit_info) = op {
+            if let ProtocolOperation::Deposit(deposit_info) = op {
                 trace!("we got some deposit_txs");
                 let amt = deposit_info.amt;
                 let deposit_intent = DepositIntent::new(amt, &deposit_info.address);

@@ -2,15 +2,14 @@ use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use secp256k1::XOnlyPublicKey;
 use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
-    buf::Buf32,
-    l1::{L1BlockManifest, L1BlockRecord},
-};
-use strata_state::{
     batch::{Checkpoint, CommitmentInfo, L1CommittedCheckpoint},
-    l1::{generate_l1_tx, L1Tx},
-    sync_event::{EventSubmitter, SyncEvent},
-    tx::ProtocolOperation,
+    buf::Buf32,
+    l1::{
+        generate_l1_tx, HeaderVerificationState, L1BlockCommitment, L1BlockManifest, L1BlockRecord,
+        L1Tx, ProtocolOperation,
+    },
 };
+use strata_state::sync_event::{EventSubmitter, SyncEvent};
 use tracing::*;
 
 use super::query::ReaderContext;
@@ -22,18 +21,23 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
     event_submitter: &impl EventSubmitter,
 ) -> anyhow::Result<()> {
     let sync_evs = match event {
-        L1Event::RevertTo(revert_height) => {
+        L1Event::RevertTo(block) => {
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
-            ctx.l1_manager.revert_to_height_async(revert_height).await?;
-            debug!(%revert_height, "reverted l1db");
-            vec![SyncEvent::L1Revert(revert_height)]
+            let height = block.height();
+            ctx.l1_manager.revert_to_height_async(height).await?;
+            debug!(%height, "reverted L1 block database");
+            vec![SyncEvent::L1Revert(block)]
         }
 
-        L1Event::BlockData(blockdata, epoch) => handle_blockdata(ctx, blockdata, epoch).await?,
+        L1Event::BlockData(blockdata, epoch, hvs) => {
+            handle_blockdata(ctx, blockdata, hvs, epoch).await?
+        }
 
-        L1Event::GenesisVerificationState(height, header_verification_state) => {
-            vec![SyncEvent::L1BlockGenesis(height, header_verification_state)]
+        L1Event::GenesisVerificationState(block, header_verification_state) => {
+            // TODO remove this since we're really getting rid of it
+            //vec![SyncEvent::L1BlockGenesis(block, header_verification_state)]
+            Vec::new()
         }
     };
 
@@ -47,6 +51,7 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
 async fn handle_blockdata<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     blockdata: BlockData,
+    hvs: HeaderVerificationState,
     epoch: u64,
 ) -> anyhow::Result<Vec<SyncEvent>> {
     let ReaderContext {
@@ -55,6 +60,7 @@ async fn handle_blockdata<R: ReaderRpc>(
         l1_manager,
         ..
     } = ctx;
+
     let height = blockdata.block_num();
     let mut sync_evs = Vec::new();
 
@@ -67,29 +73,33 @@ async fn handle_blockdata<R: ReaderRpc>(
 
     let l1blkid = blockdata.block().block_hash();
 
-    let manifest = generate_block_manifest(blockdata.block(), epoch);
-    let l1txs: Vec<_> = generate_l1txs(&blockdata);
-    let num_txs = l1txs.len();
+    let txs: Vec<_> = generate_l1txs(&blockdata);
+    let num_txs = txs.len();
+    let manifest = generate_block_manifest(blockdata.block(), hvs, txs.clone(), epoch);
+
     l1_manager
-        .put_block_data_async(blockdata.block_num(), manifest, l1txs.clone())
+        .put_block_data_async(blockdata.block_num(), manifest, txs)
         .await?;
     info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
 
     // Create a sync event if it's something we care about.
     let blkid: Buf32 = blockdata.block().block_hash().into();
+    let block_commitment = L1BlockCommitment::new(height, blkid.into());
+    sync_evs.push(SyncEvent::L1Block(block_commitment));
 
-    sync_evs.push(SyncEvent::L1Block(blockdata.block_num(), blkid.into()));
-
-    // Check for checkpoint and create event accordingly
+    // TODO remove all this outdated stuff
+    /*
+        // Check for checkpoint and create event accordingly
     debug!(%height, "Checking for checkpoints in l1 block");
-    let checkpoints = check_for_commitments(&blockdata, *seq_pubkey);
-    debug!(?checkpoints, "Received checkpoints");
+        let checkpoints = check_for_commitments(&blockdata, *seq_pubkey);
+        debug!(?checkpoints, "Received checkpoints");
 
-    // TODO: Check for deposits and forced inclusions and emit appropriate events
+        // TODO: Check for deposits and forced inclusions and emit appropriate events
 
-    if !checkpoints.is_empty() {
-        sync_evs.push(SyncEvent::L1DABatch(height, checkpoints));
-    }
+        if !checkpoints.is_empty() {
+            sync_evs.push(SyncEvent::L1DABatch(height, checkpoints));
+        }*/
+
     Ok(sync_evs)
 }
 
@@ -140,7 +150,12 @@ fn check_for_commitments(
 
 /// Given a block, generates a manifest of the parts we care about that we can
 /// store in the database.
-fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
+fn generate_block_manifest(
+    block: &Block,
+    hvs: HeaderVerificationState,
+    txs: Vec<L1Tx>,
+    epoch: u64,
+) -> L1BlockManifest {
     let blockid = block.block_hash().into();
     let root = block
         .witness_root()
@@ -148,8 +163,8 @@ fn generate_block_manifest(block: &Block, epoch: u64) -> L1BlockManifest {
         .unwrap_or_default();
     let header = serialize(&block.header);
 
-    let mf = L1BlockRecord::new(blockid, header, Buf32::from(root));
-    L1BlockManifest::new(mf, epoch)
+    let rec = L1BlockRecord::new(blockid, header, Buf32::from(root));
+    L1BlockManifest::new(rec, hvs, txs, epoch)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {

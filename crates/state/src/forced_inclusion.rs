@@ -4,8 +4,7 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-
-use crate::l1;
+use strata_primitives::l1::L1Tx;
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct ForcedInclusion {
@@ -20,5 +19,5 @@ impl ForcedInclusion {
 
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize)]
 pub struct ForcedInclusionTx {
-    tx: l1::L1Tx,
+    tx: L1Tx,
 }

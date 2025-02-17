@@ -3,10 +3,11 @@
 
 use bitcoin::Block;
 use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
-use strata_primitives::{block_credential::CredRule, params::RollupParams};
-use strata_state::{
+use strata_primitives::{
     batch::Checkpoint,
-    tx::{DepositInfo, ProtocolOperation},
+    block_credential::CredRule,
+    l1::{DepositInfo, ProtocolOperation},
+    params::RollupParams,
 };
 
 use crate::tx_indexer::ProverTxVisitorImpl;

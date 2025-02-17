@@ -1,8 +1,58 @@
-//! Reorg planning types.
+//! Types relating to updating the tip and planning reorgs.
 
-use strata_state::id::L2BlockId;
+use strata_primitives::l2::L2BlockId;
+use tracing::*;
 
-use crate::unfinalized_tracker;
+use crate::{errors::Error, unfinalized_tracker};
+
+/// Describes how we're updating the chain's tip.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TipUpdate {
+    /// Simply extending the chain tip from a block (left) to the next (right).
+    ///
+    /// The slot of the first block MUST be lower than the slot of the second
+    /// one.
+    ExtendTip(L2BlockId, L2BlockId),
+
+    /// A reorg that has to undo some blocks first before extending back up to
+    /// the next block.
+    Reorg(Reorg),
+
+    /// Just rolling back to an earlier block without playing out new ones.
+    ///
+    /// This might only happen when we have manual intervention.
+    // maybe it'll also happen if we have async subchain updates?
+    Revert(L2BlockId, L2BlockId),
+}
+
+impl TipUpdate {
+    /// Returns the new tip, regardless of the type of change.
+    pub fn new_tip(&self) -> &L2BlockId {
+        match self {
+            Self::ExtendTip(_, new) => new,
+            Self::Reorg(reorg) => reorg.new_tip(),
+            Self::Revert(_, new) => new,
+        }
+    }
+
+    /// Returns the old tip, regardless of the type of change.
+    pub fn old_tip(&self) -> &L2BlockId {
+        match self {
+            Self::ExtendTip(old, _) => old,
+            Self::Reorg(reorg) => reorg.old_tip(),
+            Self::Revert(old, _) => old,
+        }
+    }
+
+    /// Returns if the tip update is expected to revert blocks.
+    pub fn is_reverting(&self) -> bool {
+        match self {
+            Self::Reorg(reorg) => reorg.revert_iter().next().is_some(),
+            Self::Revert(_, _) => true,
+            _ => false,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Reorg {
@@ -57,22 +107,26 @@ impl Reorg {
     }
 }
 
-/// Computes the reorg path from one block to a new tip, aborting at some reorg
-/// depth.  This behaves sensibly when one block is an ancestor of another or
-/// are the same, although that might not be useful.
-pub fn compute_reorg(
+/// Computes the update path from a block to a new tip, aborting at some reorg
+/// search depth if necessary.  This behaves sensibly when one block is an
+/// ancestor of another or are the same, although that might not be useful.
+pub fn compute_tip_update(
     start: &L2BlockId,
     dest: &L2BlockId,
     limit_depth: usize,
     tracker: &unfinalized_tracker::UnfinalizedBlockTracker,
-) -> Option<Reorg> {
-    // Handle an "identity" reorg.
+) -> Result<Option<TipUpdate>, Error> {
+    // Fast path for when there's no change.
     if start == dest {
-        return Some(Reorg {
-            down: Vec::new(),
-            pivot: *start,
-            up: Vec::new(),
-        });
+        return Ok(None);
+    }
+
+    // Fast path for simply extending the tip.
+    let dest_parent = tracker
+        .get_parent(dest)
+        .expect("fcm: chain tracker missing new block");
+    if dest_parent == start {
+        return Ok(Some(TipUpdate::ExtendTip(*start, *dest)));
     }
 
     // Create a vec of parents from tip to the beginning(before limit depth) and then move forwards
@@ -84,8 +138,10 @@ pub fn compute_reorg(
         .take(limit_depth)
         .collect();
 
+    // This shouldn't happen because we probably would have found it on the
+    // initial check.  But if the search depth is 0 then maybe.
     if down_blocks.is_empty() || up_blocks.is_empty() {
-        return None;
+        return Ok(None);
     }
 
     // Now trim the vectors such that they start from the same ancestor
@@ -100,8 +156,10 @@ pub fn compute_reorg(
     {
         down_blocks.drain(pos + 1..);
     } else {
-        return None;
+        return Ok(None);
     }
+
+    // TODO figure out if this is actually just a revert
 
     // Now reverse so that common ancestor is at the beginning
     down_blocks.reverse();
@@ -115,12 +173,19 @@ pub fn compute_reorg(
         }
         pivot_idx = Some(i);
     }
-    pivot_idx.map(|idx| {
+
+    // At this point we're sure we can't have anything *but* a reorg.
+    if let Some(idx) = pivot_idx {
         let pivot = *up_blocks[idx];
         let down = down_blocks.drain(idx + 1..).copied().rev().collect();
         let up = up_blocks.drain(idx + 1..).copied().collect();
-        Reorg { pivot, down, up }
-    })
+        let reorg = Reorg { pivot, down, up };
+        return Ok(Some(TipUpdate::Reorg(reorg)));
+    }
+
+    // At this point, we haven't been able to figure it out, abort.
+    warn!(%start, %dest, "unable to find tip update path through any normal means");
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -128,7 +193,7 @@ mod tests {
     use rand::{rngs::OsRng, RngCore};
     use strata_state::id::L2BlockId;
 
-    use super::{compute_reorg, Reorg};
+    use super::{compute_tip_update, Reorg};
     use crate::unfinalized_tracker;
 
     fn rand_blkid() -> L2BlockId {
@@ -161,7 +226,8 @@ mod tests {
             .windows(2)
             .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
 
-        let reorg = compute_reorg(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
+        let reorg =
+            compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
 
         let reorg = reorg.expect("test: reorg not found");
         eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
@@ -192,7 +258,8 @@ mod tests {
             .windows(2)
             .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
 
-        let reorg = compute_reorg(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
+        let reorg =
+            compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
 
         let reorg = reorg.expect("test: reorg not found");
         eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
@@ -229,7 +296,8 @@ mod tests {
             .windows(2)
             .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
 
-        let reorg = compute_reorg(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
+        let reorg =
+            compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
 
         let reorg = reorg.expect("test: reorg not found");
         eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
@@ -270,7 +338,7 @@ mod tests {
             .windows(2)
             .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
 
-        let reorg = compute_reorg(side_1.last().unwrap(), side_2.last().unwrap(), 3, &tracker);
+        let reorg = compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 3, &tracker);
 
         if let Some(reorg) = reorg {
             eprintln!("reorg found wrongly {reorg:#?}");
@@ -302,7 +370,7 @@ mod tests {
 
         let src = &chain[3];
         let dest = chain.last().unwrap();
-        let reorg = compute_reorg(src, dest, 10, &tracker);
+        let reorg = compute_tip_update(src, dest, 10, &tracker);
 
         let exp_reorg = Reorg {
             down: Vec::new(),
@@ -340,7 +408,7 @@ mod tests {
 
         let src = chain.last().unwrap();
         let dest = &chain[3];
-        let reorg = compute_reorg(src, dest, 10, &tracker);
+        let reorg = compute_tip_update(src, dest, 10, &tracker);
 
         let exp_reorg = Reorg {
             down: vec![chain[6], chain[5], chain[4]],
@@ -378,7 +446,7 @@ mod tests {
 
         let src = chain.last().unwrap();
         let dest = src;
-        let reorg = compute_reorg(src, dest, 10, &tracker);
+        let reorg = compute_tip_update(src, dest, 10, &tracker);
         eprintln!("reorg found wrongly {reorg:#?}");
 
         let exp_reorg = Reorg {
@@ -418,7 +486,7 @@ mod tests {
             .windows(2)
             .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
 
-        let reorg = compute_reorg(
+        let reorg = compute_tip_update(
             side_1.last().unwrap(),
             side_2.last().unwrap(),
             limit_depth,
@@ -461,7 +529,7 @@ mod tests {
             .windows(2)
             .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
 
-        let reorg = compute_reorg(
+        let reorg = compute_tip_update(
             side_1.last().unwrap(),
             side_2.last().unwrap(),
             limit_depth,

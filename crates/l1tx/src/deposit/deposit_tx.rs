@@ -2,8 +2,10 @@
 
 use bitcoin::{opcodes::all::OP_RETURN, OutPoint, ScriptBuf, Transaction};
 use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
-use strata_primitives::{l1::OutputRef, prelude::DepositTxParams};
-use strata_state::tx::DepositInfo;
+use strata_primitives::{
+    l1::{DepositInfo, OutputRef},
+    prelude::DepositTxParams,
+};
 
 use crate::{
     deposit::error::DepositParseError,

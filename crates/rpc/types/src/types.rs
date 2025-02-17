@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
+    epoch::EpochCommitment,
     l1::{BitcoinAmount, L1BlockCommitment, L1TxRef, OutputRef},
     l2::L2BlockCommitment,
     prelude::L1Status,
@@ -126,25 +127,46 @@ impl Default for RpcL1Status {
     }
 }
 
+/// In reference to checkpointed client state tracked by the CSM.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcClientStatus {
     /// Blockchain tip.
+    // TODO remove this since the CSM doesn't track this anymore, we're pulling it in indirectly
     #[serde(with = "hex::serde")]
+    #[deprecated(note = "no longer tracked by client state")]
     pub chain_tip: [u8; 32],
 
     /// L1 chain tip slot.
+    // TODO remove this since the CSM doesn't track this anymore, we're pulling it in indirectly
+    #[deprecated(note = "no longer tracked by client state")]
     pub chain_tip_slot: u64,
 
     /// L2 block that's been finalized and proven on L1.
     #[serde(with = "hex::serde")]
+    #[deprecated(note = "implied by finalized_epoch, use that instead")]
     pub finalized_blkid: [u8; 32],
+
+    /// Epoch that's been confirmed and buried on L1 and we can assume won't
+    /// roll back.
+    pub finalized_epoch: Option<EpochCommitment>,
+
+    /// Epoch that's been confirmed on L1 but might still roll back.
+    pub confirmed_epoch: Option<EpochCommitment>,
 
     /// Recent L1 block that we might still reorg.
     #[serde(with = "hex::serde")]
+    #[deprecated(note = "use `tip_l1_block`")]
     pub last_l1_block: [u8; 32],
 
     /// L1 block index we treat as being "buried" and won't reorg.
+    #[deprecated(note = "use `buried_l1_block`")]
     pub buried_l1_height: u64,
+
+    /// Tip L1 block that we're following.
+    pub tip_l1_block: Option<L1BlockCommitment>,
+
+    /// Buried L1 block that we use to determine the finalized epoch.
+    pub buried_l1_block: Option<L1BlockCommitment>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -222,7 +244,23 @@ pub struct RpcSyncStatus {
     /// Last L2 block we've chosen as the current tip.
     pub tip_block_id: strata_state::id::L2BlockId,
 
-    /// L2 block that's been finalized and proven on L1.
+    /// Current epoch from chainstate.
+    pub cur_epoch: u64,
+
+    /// Previous epoch from chainstate.
+    pub prev_epoch: EpochCommitment,
+
+    /// Observed finalized epoch from chainstate.
+    pub observed_finalized_epoch: EpochCommitment,
+
+    /// Terminal blkid of observed finalized epoch from chainstate.
+    ///
+    /// Note that this is not necessarily the most recently finalized epoch,
+    /// it's the one we've also observed, so it's behind by >~1.
+    ///
+    /// If you want the real one from L1, use another method.
+    // TODO which other method?
+    #[deprecated]
     pub finalized_block_id: L2BlockId,
 }
 

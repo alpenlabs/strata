@@ -11,28 +11,27 @@ pub(crate) struct EVML2Block {
 }
 
 impl EVML2Block {
+    /// Attempts to construct an instance from an L2 block bundle.
+    pub fn try_extract(bundle: &L2BlockBundle) -> Result<Self, ConversionError> {
+        let extra_payload_slice = bundle.exec_segment().update().input().extra_payload();
+        let extra_payload = EVMExtraPayload::try_from_slice(extra_payload_slice)
+            .or(Err(ConversionError::InvalidExecPayload))?;
+
+        Ok(Self {
+            l2_block: bundle.block().to_owned(),
+            extra_payload,
+        })
+    }
+
+    /// Compute the hash of the extra payload, which would be the EVM exec
+    /// payload.
     pub fn block_hash(&self) -> B256 {
         FixedBytes(*self.extra_payload.block_hash().as_ref())
     }
 }
 
-impl TryFrom<L2BlockBundle> for EVML2Block {
-    type Error = ConversionError;
-
-    fn try_from(value: L2BlockBundle) -> Result<Self, Self::Error> {
-        let extra_payload_slice = value.exec_segment().update().input().extra_payload();
-        let extra_payload = EVMExtraPayload::try_from_slice(extra_payload_slice)
-            .or(Err(ConversionError::Invalid))?;
-
-        Ok(Self {
-            l2_block: value.block().to_owned(),
-            extra_payload,
-        })
-    }
-}
-
 #[derive(Debug, Error)]
-pub(crate) enum ConversionError {
-    #[error("Invalid EVM L2 Block")]
-    Invalid,
+pub enum ConversionError {
+    #[error("invalid EVM exec payload")]
+    InvalidExecPayload,
 }

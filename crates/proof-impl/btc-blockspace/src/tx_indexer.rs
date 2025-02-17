@@ -1,7 +1,7 @@
 use strata_l1tx::filter::indexer::TxVisitor;
-use strata_state::{
+use strata_primitives::{
     batch::SignedCheckpoint,
-    tx::{DaCommitment, DepositInfo, ProtocolOperation},
+    l1::{DaCommitment, DepositInfo, ProtocolOperation},
 };
 
 /// Ops indexer for use with the prover.

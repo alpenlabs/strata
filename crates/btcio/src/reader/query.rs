@@ -12,14 +12,15 @@ use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
     messages::{BlockData, L1Event, RelevantTxEntry},
 };
-use strata_primitives::{block_credential::CredRule, params::Params};
-use strata_state::{
+use strata_primitives::{
+    block_credential::CredRule,
     l1::{
-        get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
-        L1BlockId, TimestampStore,
+        get_btc_params, get_difficulty_adjustment_start_height, BtcParams, HeaderVerificationState,
+        L1BlockCommitment, L1BlockId, TimestampStore,
     },
-    sync_event::EventSubmitter,
+    params::Params,
 };
+use strata_state::sync_event::EventSubmitter;
 use strata_status::StatusChannel;
 use strata_storage::L1BlockManager;
 use tracing::*;
@@ -92,10 +93,10 @@ fn calculate_target_next_block(
 }
 
 /// Inner function that actually does the reading task.
-async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
+async fn do_reader_task<R: ReaderRpc>(
     ctx: ReaderContext<R>,
     target_next_block: u64,
-    event_submitter: &E,
+    event_submitter: &impl EventSubmitter,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -139,7 +140,7 @@ async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
 
 /// Handles errors encountered during polling.
 fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdate>) {
-    warn!(err = %err, "failed to poll Bitcoin client");
+    warn!(%err, "failed to poll Bitcoin client");
     status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
 
     if let Some(reqwest_err) = err.downcast_ref::<reqwest::Error>() {
@@ -152,12 +153,44 @@ fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdat
     }
 }
 
+/// Reverts the reader state to the height where the last checkpoint is finalized.
+async fn handle_new_filter_rule<R: ReaderRpc>(
+    ctx: &ReaderContext<R>,
+    state: &mut ReaderState,
+) -> anyhow::Result<()> {
+    // FIXME this is super wrong but it doesn't actually matter, we always use
+    // the same filter rule for now so we never have to reverify stuff, this
+    // will be reworked more later
+
+    /*    // Get the L1 height corresponding to the new epoch
+        let last_checkpt_height = ctx
+            .status_channel
+            .get_last_checkpoint()
+            .expect("got epoch change without checkpoint finalized")
+            .height;
+
+        // Now, we need to revert to the point before the last checkpoint height.
+        state.rollback_to_height(last_checkpt_height);
+
+        // Send L1 revert so that the recent txs can be appropriately re-filtered
+        warn!(%last_checkpt_height, "reverting back to last checkpoint height because of reasons?");
+        let revert_ev = L1Event::RevertTo(last_checkpt_height);
+        if ctx.event_tx.send(revert_ev).await.is_err() {
+            warn!("unable to submit L1 reorg event, did persistence task exit?");
+        }
+    */
+    Ok(())
+}
+
 /// Checks for epoch changes and any L1 reverts necessary. Internally updates reader's state.
 fn check_epoch_change<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
 ) -> anyhow::Result<Option<L1Event>> {
-    let new_epoch = ctx.status_channel.epoch().unwrap_or(0);
+    // FIXME something here might have gotten borked with the bookkeeping here
+    // in a rebase, let me (trey) know if there's something wrong here
+    let new_epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
+
     // TODO: check if new_epoch < current epoch. should panic if so?
     let curr_epoch = state.epoch();
 
@@ -172,17 +205,18 @@ fn check_epoch_change<R: ReaderRpc>(
     if new_config != curr_filter_config {
         state.set_filter_config(new_config.clone());
 
-        let last_checkpt_height = ctx
+        let last_ckpt = ctx
             .status_channel
             .get_last_checkpoint()
-            .expect("got epoch change without checkpoint finalized")
-            .height;
+            .expect("got epoch change without checkpoint finalized");
+
+        let last_ckpt_block = last_ckpt.batch_info.l1_range.1;
 
         // Now, we need to revert to the point before the last checkpoint height.
-        state.rollback_to_height(last_checkpt_height);
+        state.rollback_to_height(last_ckpt_block.height());
 
         // Create revert event
-        Ok(Some(L1Event::RevertTo(last_checkpt_height)))
+        Ok(Some(L1Event::RevertTo(last_ckpt_block)))
     } else {
         Ok(None)
     }
@@ -225,7 +259,7 @@ async fn init_reader_state<R: ReaderRpc>(
 
     let params = ctx.params.clone();
     let filter_config = TxFilterConfig::derive_from(params.rollup())?;
-    let epoch = ctx.status_channel.epoch().unwrap_or(0);
+    let epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
     let state = ReaderState::new(
         real_cur_height + 1,
         lookback,
@@ -260,9 +294,11 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
     if let Some((pivot_height, pivot_blkid)) = find_pivot_block(ctx.client.as_ref(), state).await? {
         if pivot_height < state.best_block_idx() {
             info!(%pivot_height, %pivot_blkid, "found apparent reorg");
+            let block = L1BlockCommitment::new(pivot_height, L1BlockId::from(pivot_blkid));
             state.rollback_to_height(pivot_height);
-            let revert_ev = L1Event::RevertTo(pivot_height);
+
             // Return with the revert event immediately
+            let revert_ev = L1Event::RevertTo(block);
             return Ok(vec![revert_ev]);
         }
     } else {
@@ -349,6 +385,7 @@ async fn process_block<R: ReaderRpc>(
     let block_data = BlockData::new(height, block, entries);
 
     let l1blkid = block_data.block().block_hash();
+
     trace!(%height, %l1blkid, %txs, "fetched block from client");
 
     status_updates.push(L1StatusUpdate::CurHeight(height));
@@ -358,30 +395,48 @@ async fn process_block<R: ReaderRpc>(
     let genesis_ht = params.rollup().genesis_l1_height;
     let genesis_threshold = genesis_ht + threshold as u64;
 
-    trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
+    //trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
 
-    let block_ev = L1Event::BlockData(block_data, state.epoch());
-    let mut l1_events = vec![block_ev];
-
-    if height == genesis_threshold {
+    /*if height == genesis_threshold {
         info!(%height, %genesis_ht, "time for genesis");
         let l1_verification_state =
             get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
-        let ev = L1Event::GenesisVerificationState(height, l1_verification_state);
+        let ev = L1Event::GenesisVerificationState(block_commitment, l1_verification_state);
         l1_events.push(ev);
-    }
+    }*/
+
+    let l1_verification_state =
+        fetch_verification_state(ctx.client.as_ref(), height, &get_btc_params()).await?;
+
+    let block_ev = L1Event::BlockData(block_data, state.epoch(), l1_verification_state);
+    let l1_events = vec![block_ev];
+
+    /*if height == genesis_threshold {
+        info!(%height, %genesis_ht, "time for genesis");
+        if let Err(e) = ctx
+            .event_tx
+            .send(L1Event::GenesisVerificationState(
+                height,
+                l1_verification_state,
+            ))
+            .await
+        {
+            error!("failed to submit L1 block event, did the persistence task crash?");
+            return Err(e.into());
+        }
+    }*/
 
     Ok((l1_events, l1blkid))
 }
 
-/// Gets the [`HeaderVerificationState`] for the particular block
-pub async fn get_verification_state(
+/// Fetches the [`HeaderVerificationState`] for the particular block.
+pub async fn fetch_verification_state(
     client: &impl ReaderRpc,
     height: u64,
     params: &BtcParams,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
-    let h1 = get_difficulty_adjustment_height(0, height as u32, params);
+    let h1 = get_difficulty_adjustment_start_height(height as u32, params);
     let b1 = client.get_block_at(h1 as u64).await?;
 
     // Consider the block before `block_height` to be the last verified block
@@ -419,7 +474,8 @@ pub async fn get_verification_state(
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
     };
-    trace!(%height, ?header_vs, "HeaderVerificationState");
+
+    trace!(%height, ?header_vs, "new HeaderVerificationState");
 
     Ok(header_vs)
 }
@@ -485,7 +541,7 @@ mod test {
             n_recent_blocks,
             recent_blocks,
             filter_config,
-            ctx.status_channel.epoch().unwrap(),
+            ctx.status_channel.get_cur_chain_epoch().unwrap(),
         )
     }
 
@@ -503,7 +559,7 @@ mod test {
 
         // Update new chainstate from status channel
         chstate.set_epoch(curr_epoch + 1);
-        ctx.status_channel.update_chainstate(chstate);
+        ctx.status_channel.update_chain_sync_status(chstate);
 
         let ev = check_epoch_change(&ctx, &mut state).unwrap();
 
@@ -586,7 +642,7 @@ mod test {
 
         let len = 15;
         let height = 100;
-        let mut header_vs = get_verification_state(&client, height, &params)
+        let mut header_vs = fetch_verification_state(&client, height, &params)
             .await
             .unwrap();
 
@@ -595,7 +651,7 @@ mod test {
             header_vs.check_and_update_continuity(&block.header, &params);
         }
 
-        let new_header_vs = get_verification_state(&client, height + len, &params)
+        let new_header_vs = fetch_verification_state(&client, height + len, &params)
             .await
             .unwrap();
 

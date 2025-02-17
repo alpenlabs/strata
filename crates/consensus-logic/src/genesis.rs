@@ -2,7 +2,7 @@ use strata_db::errors::DbError;
 use strata_primitives::{
     buf::{Buf32, Buf64},
     evm_exec::create_evm_extra_payload,
-    l1::L1BlockRecord,
+    l1::{L1BlockRecord, L1HeaderRecord},
     params::{OperatorConfig, Params},
 };
 use strata_state::{
@@ -14,7 +14,7 @@ use strata_state::{
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
     genesis::GenesisStateData,
     header::L2BlockHeader,
-    l1::{L1HeaderRecord, L1ViewState},
+    l1::L1ViewState,
     operation::ClientUpdateOutput,
     prelude::*,
 };

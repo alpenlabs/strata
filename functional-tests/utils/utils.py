@@ -10,9 +10,8 @@ from typing import Any, Callable, Optional, TypeVar
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, get_balance, musig_aggregate_pks
 
-from factory.seqrpc import JsonrpcClient
+from factory.seqrpc import JsonrpcClient, RpcError
 from utils.constants import *
-
 
 def generate_jwt_secret() -> str:
     return os.urandom(32).hex()
@@ -69,11 +68,13 @@ def wait_until(
     """
     for _ in range(math.ceil(timeout / step)):
         try:
-            if not fn():
-                raise Exception
-            return
-        except Exception as _:
-            pass
+            # Return if the predicate passes.  The predicate not passing is not
+            # an error.
+            if fn():
+                return
+        except Exception as e:
+            ety = type(e)
+            logging.warning(f"caught exception {ety}, will still wait for timeout: {e}")
         time.sleep(step)
     raise AssertionError(error_with)
 
@@ -95,13 +96,113 @@ def wait_until_with_value(
     for _ in range(math.ceil(timeout / step)):
         try:
             r = fn()
-            if not predicate(r):
-                raise Exception
-            return r
-        except Exception as _:
-            pass
+            # Return if the predicate passes.  The predicate not passing is not
+            # an error.
+            if predicate(r):
+                return r
+        except Exception as e:
+            ety = type(e)
+            logging.warning(f"caught exception {ety}, will still wait for timeout: {e}")
+
         time.sleep(step)
     raise AssertionError(error_with)
+
+
+def wait_for_genesis(rpc, **kwargs):
+    """
+    Waits until we see genesis.  That is to say, that `strata_syncStatus`
+    returns a sensible result.
+    """
+
+    def _check_genesis():
+        try:
+            # This should raise if we're before genesis.
+            ss = rpc.strata_syncStatus()
+            logging.debug(f"after genesis, tip is slot {ss['tip_height']} blkid {ss['tip_block_id']}")
+            return True
+        except RpcError as e:
+            # This is the "before genesis" error code, meaning we're still
+            # before genesis
+            if e.code == -32607:
+                return False
+            else:
+                raise e
+
+    wait_until(_check_genesis, timeout=20, step=2)
+
+
+def wait_until_chain_epoch(rpc, epoch: int, **kwargs) -> dict:
+    """
+    Waits until the chain has finished the specified epoch index, determined by
+    checking for epoch summaries.
+
+    Returns the epoch summary.
+    """
+
+    logging.info(f"waiting for epoch {epoch}")
+
+    def _query():
+        status = rpc.strata_syncStatus()
+        logging.debug(f"checked status {status}")
+        commitments = rpc.strata_getEpochCommitments(epoch)
+        if len(commitments) > 0:
+            comm = commitments[0]
+            logging.info(f"now at epoch {epoch}, slot {comm['last_slot']}, blkid {comm['last_blkid']}")
+            return rpc.strata_getEpochSummary(epoch, comm["last_slot"], comm["last_blkid"])
+        return None
+
+    def _check(v):
+        return v is not None
+
+    return wait_until_with_value(_query, _check, **kwargs)
+
+
+def wait_until_next_chain_epoch(rpc, **kwargs) -> int:
+    """
+    Waits until the chain epoch advances by at least 1.
+
+    Returns the new epoch number.
+    """
+    init_epoch = rpc.strata_syncStatus()["cur_epoch"]
+    _query = lambda: rpc.strata_syncStatus()["cur_epoch"]
+    _check = lambda epoch: epoch > init_epoch
+    return wait_until_with_value(_query, _check, **kwargs)
+
+
+def wait_until_epoch_confirmed(rpc, epoch: int, **kwargs) -> int:
+    """
+    Waits until at least the given epoch is confirmed on L1, according to
+    calling `strata_clientStatus`.
+    """
+
+    def _check():
+        cs = rpc.strata_clientStatus()
+        l1_height = cs["tip_l1_block"]["height"]
+        conf_epoch = cs["confirmed_epoch"]
+        logging.info(f"confirmed epoch as of {l1_height}: {conf_epoch}")
+        if conf_epoch is None:
+            return False
+        return conf_epoch["epoch"] >= epoch
+
+    wait_until(_check, **kwargs)
+
+
+def wait_until_epoch_finalized(rpc, epoch: int, **kwargs) -> int:
+    """
+    Waits until at least the given epoch is finalized on L1, according to
+    calling `strata_clientStatus`.
+    """
+
+    def _check():
+        cs = rpc.strata_clientStatus()
+        l1_height = cs["tip_l1_block"]["height"]
+        fin_epoch = cs["finalized_epoch"]
+        logging.info(f"finalized epoch as of {l1_height}: {fin_epoch}")
+        if fin_epoch is None:
+            return False
+        return fin_epoch["epoch"] >= epoch
+
+    wait_until(_check, **kwargs)
 
 
 @dataclass
@@ -148,7 +249,7 @@ class ProverClientSettings:
 
 
 def check_nth_checkpoint_finalized(
-    idx,
+    idx: int,
     seqrpc,
     prover_rpc,
     manual_gen: ManualGenBlocksConfig | None = None,
@@ -165,21 +266,21 @@ def check_nth_checkpoint_finalized(
     syncstat = seqrpc.strata_syncStatus()
 
     # Wait until we find our expected checkpoint.
-    batch_info = wait_until_with_value(
+    ckpt_info = wait_until_with_value(
         lambda: seqrpc.strata_getCheckpointInfo(idx),
         predicate=lambda v: v is not None,
         error_with=f"Could not find checkpoint info for index {idx}",
         timeout=3,
     )
 
-    assert syncstat["finalized_block_id"] != batch_info["l2_range"][1]["blkid"], (
+    assert syncstat["finalized_block_id"] != ckpt_info["l2_range"][1]["blkid"], (
         "Checkpoint block should not yet finalize"
     )
-    assert batch_info["idx"] == idx
+    assert ckpt_info["idx"] == idx
     checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
-    assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
+    assert checkpoint_info_next is None, f"There should be no checkpoint info for next checkpoint {idx + 1}"
 
-    to_finalize_blkid = batch_info["l2_range"][1]["blkid"]
+    to_finalize_blkid = ckpt_info["l2_range"][1]["blkid"]
 
     # Submit checkpoint if proof_timeout is not set
     if proof_timeout is None:
@@ -187,6 +288,8 @@ def check_nth_checkpoint_finalized(
 
     if manual_gen:
         # Produce l1 blocks until proof is finalized
+        # TODO encapsulate this somehow do we don't have to do it manually,
+        # maybe just pass the `RunContext` entirely?
         manual_gen.btcrpc.proxy.generatetoaddress(
             manual_gen.finality_depth + 1, manual_gen.gen_addr
         )
@@ -452,7 +555,7 @@ def setup_root_logger():
     """
     reads `LOG_LEVEL` from the environment. Defaults to `WARNING` if not provided.
     """
-    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, log_level, logging.NOTSET)
     # Configure the root logger
     root_logger = logging.getLogger()
@@ -480,12 +583,15 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
     )
+
     # Set up individual loggers for each test
-    logger = logging.getLogger(test_name)
+    logger = logging.getLogger(f"root.{test_name}")
+
     # File handler
     log_path = os.path.join(log_dir, f"{test_name}.log")
     file_handler = logging.FileHandler(log_path)
     file_handler.setFormatter(formatter)
+
     # Stream handler
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -493,6 +599,10 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     # Add handlers to the logger
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
+
+    # Set level to something sensible.
+    # TODO make this fetch from user input
+    logger.setLevel(logging.INFO)
 
     return logger
 

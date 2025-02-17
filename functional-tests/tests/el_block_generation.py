@@ -1,3 +1,5 @@
+import logging
+import time
 from functools import partial
 
 import flexitest
@@ -17,10 +19,12 @@ class ElBlockGenerationTest(testenv.StrataTester):
         rethrpc = reth.create_rpc()
 
         last_blocknum = int(rethrpc.eth_blockNumber(), 16)
+        logging.info(f"initial EL blocknum is {last_blocknum}")
+
         for _ in range(5):
-            cur_block_num = wait_until_with_value(
-                lambda: int(rethrpc.eth_blockNumber(), 16),
-                partial(lambda x, i: x < i, last_blocknum),
-                error_with="seem not to be making progress",
-            )
-            last_blocknum = cur_block_num
+            time.sleep(3)
+            cur_blocknum = int(rethrpc.eth_blockNumber(), 16)
+            logging.info(f"current EL blocknum is {cur_blocknum}")
+            assert cur_blocknum >= last_blocknum, "cur block went backwards"
+            assert cur_blocknum > last_blocknum, "seem to not be making progress"
+            last_blocknum = cur_blocknum

@@ -5,15 +5,14 @@ use bitcoin::{Address, Network};
 use format_serde_error::SerdeError;
 use strata_btcio::rpc::{traits::WalletRpc, BitcoinClient};
 use strata_config::Config;
-use strata_evmexec::{engine::RpcExecEngineCtl, fork_choice_state_initial, EngineRpcClient};
+use strata_evmexec::{engine::RpcExecEngineCtl, fetch_init_fork_choice_state, EngineRpcClient};
 use strata_primitives::{
     l1::L1Status,
     params::{Params, RollupParams, SyncParams},
 };
-use strata_rocksdb::CommonDb;
 use strata_state::csm_status::CsmStatus;
 use strata_status::StatusChannel;
-use strata_storage::{L2BlockManager, NodeStorage};
+use strata_storage::NodeStorage;
 use tokio::runtime::Handle;
 use tracing::*;
 
@@ -141,9 +140,8 @@ pub fn init_status_channel(storage: &NodeStorage) -> anyhow::Result<StatusChanne
 
 pub fn init_engine_controller(
     config: &Config,
-    db: Arc<CommonDb>,
     params: &Params,
-    l2_block_manager: Arc<L2BlockManager>,
+    storage: &NodeStorage,
     handle: &Handle,
 ) -> anyhow::Result<Arc<RpcExecEngineCtl<EngineRpcClient>>> {
     let reth_jwtsecret = load_jwtsecret(&config.exec.reth.secret)?;
@@ -152,12 +150,12 @@ pub fn init_engine_controller(
         reth_jwtsecret,
     );
 
-    let initial_fcs = fork_choice_state_initial(db, params.rollup())?;
+    let initial_fcs = fetch_init_fork_choice_state(storage, params.rollup())?;
     let eng_ctl = strata_evmexec::engine::RpcExecEngineCtl::new(
         client,
         initial_fcs,
         handle.clone(),
-        l2_block_manager,
+        storage.l2().clone(),
     );
     let eng_ctl = Arc::new(eng_ctl);
     Ok(eng_ctl)

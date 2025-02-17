@@ -18,6 +18,7 @@ pub enum ClientError {
 
 #[async_trait::async_trait]
 pub trait SyncClient {
+    // FIXME this should not be using RPC types
     async fn get_sync_status(&self) -> Result<RpcSyncStatus, ClientError>;
 
     fn get_blocks_range(

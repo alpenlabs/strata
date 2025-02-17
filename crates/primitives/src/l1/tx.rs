@@ -1,10 +1,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::l1::RawBitcoinTx;
 
-use super::L1TxProof;
-use crate::tx::ProtocolOperation;
+use super::{inclusion_proof::L1TxProof, ops::ProtocolOperation, RawBitcoinTx};
 
 /// Tx body with a proof.
 #[derive(

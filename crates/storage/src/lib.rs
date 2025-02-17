@@ -26,6 +26,7 @@ pub struct NodeStorage {
     client_state_manager: Arc<ClientStateManager>,
 
     // TODO maybe move this into a different one?
+    // update: probably not, would require moving data around
     checkpoint_manager: Arc<CheckpointDbManager>,
 }
 
@@ -76,7 +77,10 @@ where
         Arc::new(ClientStateManager::new(pool.clone(), db.clone()).context("open client state")?);
 
     // (see above)
-    let checkpoint_manager = Arc::new(CheckpointDbManager::new(pool.clone(), db.clone()));
+    let checkpoint_manager = Arc::new(CheckpointDbManager::new(
+        pool.clone(),
+        db.checkpoint_db().clone(),
+    ));
 
     Ok(NodeStorage {
         l1_block_manager,

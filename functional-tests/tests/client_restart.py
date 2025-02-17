@@ -1,12 +1,7 @@
 import flexitest
 
 from envs import net_settings, testenv
-from utils import (
-    check_already_sent_proof,
-    check_nth_checkpoint_finalized,
-    check_submit_proof_fails_for_nonexistent_batch,
-    wait_until,
-)
+from utils import *
 
 
 @flexitest.register
@@ -24,6 +19,8 @@ class BlockFinalizationSeqRestartTest(testenv.StrataTester):
 
         prover = ctx.get_service("prover_client")
         prover_rpc = prover.create_rpc()
+
+        wait_for_genesis(seqrpc, timeout=10, step=2)
 
         # Wait for prover
         wait_until(
