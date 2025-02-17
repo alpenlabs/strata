@@ -246,7 +246,7 @@ impl StrataApiServer for StrataRpcImpl {
         }
 
         // Maybe set finalized epoch.
-        if let Some(fin_ckpt) = cstate.get_finalized_checkpoint() {
+        if let Some(fin_ckpt) = cstate.get_apparent_finalized_checkpoint() {
             finalized_epoch = Some(fin_ckpt.batch_info.get_epoch_commitment());
             finalized_blkid = (*fin_ckpt.batch_info.final_l2_block().blkid()).into();
         }

@@ -96,7 +96,7 @@ async fn handle_new_client_update<T: SyncClient>(
 ) -> Result<(), L2SyncError> {
     // on receiving new client update, update own finalized state
 
-    let Some(fin_epoch) = update.new_state().get_finalized_epoch() else {
+    let Some(fin_epoch) = update.new_state().get_apparent_finalized_epoch() else {
         debug!("new state but no finalized block yet, ignoring");
         return Ok(());
     };

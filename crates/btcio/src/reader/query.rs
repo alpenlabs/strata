@@ -153,35 +153,6 @@ fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdat
     }
 }
 
-/// Reverts the reader state to the height where the last checkpoint is finalized.
-async fn handle_new_filter_rule<R: ReaderRpc>(
-    ctx: &ReaderContext<R>,
-    state: &mut ReaderState,
-) -> anyhow::Result<()> {
-    // FIXME this is super wrong but it doesn't actually matter, we always use
-    // the same filter rule for now so we never have to reverify stuff, this
-    // will be reworked more later
-
-    /*    // Get the L1 height corresponding to the new epoch
-        let last_checkpt_height = ctx
-            .status_channel
-            .get_last_checkpoint()
-            .expect("got epoch change without checkpoint finalized")
-            .height;
-
-        // Now, we need to revert to the point before the last checkpoint height.
-        state.rollback_to_height(last_checkpt_height);
-
-        // Send L1 revert so that the recent txs can be appropriately re-filtered
-        warn!(%last_checkpt_height, "reverting back to last checkpoint height because of reasons?");
-        let revert_ev = L1Event::RevertTo(last_checkpt_height);
-        if ctx.event_tx.send(revert_ev).await.is_err() {
-            warn!("unable to submit L1 reorg event, did persistence task exit?");
-        }
-    */
-    Ok(())
-}
-
 /// Checks for epoch changes and any L1 reverts necessary. Internally updates reader's state.
 fn check_epoch_change<R: ReaderRpc>(
     ctx: &ReaderContext<R>,

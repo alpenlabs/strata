@@ -23,7 +23,7 @@ impl CsmStatus {
 
     pub fn update_from_client_state(&mut self, state: &ClientState) {
         self.finalized_blkid = state
-            .get_finalized_checkpoint()
+            .get_apparent_finalized_checkpoint()
             .map(|ck| ck.batch_info.final_l2_block().blkid())
             .copied()
     }

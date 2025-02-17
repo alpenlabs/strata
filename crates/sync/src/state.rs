@@ -69,7 +69,7 @@ pub fn initialize_from_db(
     cstate: &ClientState,
     l2man: &L2BlockManager,
 ) -> Result<L2SyncState, L2SyncError> {
-    let finalized_epoch = match cstate.get_finalized_epoch() {
+    let finalized_epoch = match cstate.get_apparent_finalized_epoch() {
         Some(epoch) => epoch,
         None => {
             // TODO handle this in some more structured way
