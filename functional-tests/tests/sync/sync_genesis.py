@@ -1,11 +1,11 @@
 import time
+import logging
 
 import flexitest
 
 from envs import testenv
-
-UNSET_ID = "0000000000000000000000000000000000000000000000000000000000000000"
-MAX_GENESIS_TRIES = 10
+from factory import seqrpc
+from utils import *
 
 
 @flexitest.register
@@ -19,40 +19,35 @@ class SyncGenesisTest(testenv.StrataTester):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
 
-        time.sleep(5)
+        time.sleep(1)
 
-        # Wait until genesis.  This might need to be tweaked if we change how
-        # long we wait for genesis in tests.
-        tries = 0
-        last_slot = None
-        while True:
-            assert tries <= MAX_GENESIS_TRIES, "did not observe genesis before timeout"
-
-            self.info("waiting for genesis")
+        def _check_genesis():
             try:
-                stat = seqrpc.strata_clientStatus()
-                self.info(stat)
-                if stat["finalized_blkid"] != UNSET_ID:
-                    last_slot = stat["chain_tip_slot"]
-                    self.info(f"observed genesis, now at slot {last_slot}")
-                    break
-            except ConnectionRefusedError:
-                self.warning("RPC server still closed")
+                # This should raise if we're before genesis.
+                ss = seqrpc.strata_syncStatus()
+                logging.debug(f"after genesis, tip is slot {ss['tip_height']} blkid {ss['tip_block_id']}")
+                return True
+            except seqrpc.RpcError as e:
+                # This is the "before genesis" error code, meaning we're still
+                # before genesis
+                if e.code == -32607:
+                    return False
+                else:
+                    raise e
 
-            time.sleep(0.5)
-            self.info(f"waiting for genesis... -- tries {tries}")
-            tries += 1
-
-        assert last_slot is not None, "last slot never set"
+        wait_until(_check_genesis, timeout=20, step=2)
+        logging.info("checking that we're still making progress...")
 
         # Make sure we're making progress.
         stat = None
+        last_slot = 0
         for _ in range(5):
             time.sleep(3)
-            stat = seqrpc.strata_clientStatus()
-            tip_slot = stat["chain_tip_slot"]
-            tip_blkid = stat["chain_tip"]
-            self.info(f"cur tip slot {tip_slot} blkid {tip_blkid}")
+            stat = seqrpc.strata_syncStatus()
+            tip_slot = stat["tip_height"]
+            tip_blkid = stat["tip_block_id"]
+            cur_epoch = stat["cur_epoch"]
+            logging.info(f"cur tip slot {tip_slot}, blkid {tip_blkid}, epoch {cur_epoch}")
             assert tip_slot >= last_slot, "cur slot went backwards"
-            assert tip_slot > last_slot, f"seems not to be making progress (slot={tip_slot})"
+            assert tip_slot > last_slot, "seem to not be making progress"
             last_slot = tip_slot

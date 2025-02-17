@@ -69,11 +69,13 @@ def wait_until(
     """
     for _ in range(math.ceil(timeout / step)):
         try:
-            if not fn():
-                raise Exception
-            return
-        except Exception as _:
-            pass
+            # Return if the predicate passes.  The predicate not passing is not
+            # an error.
+            if fn():
+                return
+        except Exception as e:
+            ety = type(e)
+            logging.warning(f"caught exception {ety}, will still wait for timeout: {e}")
         time.sleep(step)
     raise AssertionError(error_with)
 
