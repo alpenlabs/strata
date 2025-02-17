@@ -74,7 +74,7 @@ pub struct ExecConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Config {
     pub client: ClientConfig,
-    pub bitcoind_rpc: BitcoindConfig,
+    pub bitcoind: BitcoindConfig,
     pub btcio: BtcioConfig,
     pub sync: SyncConfig,
     pub exec: ExecConfig,
@@ -88,7 +88,7 @@ mod test {
     #[test]
     fn test_config_load() {
         let config_string_sequencer = r#"
-            [bitcoind_rpc]
+            [bitcoind]
             rpc_url = "http://localhost:18332"
             rpc_user = "alpen"
             rpc_password = "alpen"
