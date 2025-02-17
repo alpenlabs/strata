@@ -46,12 +46,12 @@ pub const STRATA_OPERATOR_IDX: u32 = 20;
 
 /// Strata message index for the operator message key.
 ///
-/// These should be _normal_ [`ChildNumber`].
+/// These should be _hardened_ [`ChildNumber`].
 pub const STRATA_OPERATOR_MESSAGE_IDX: u32 = 100;
 
 /// Strata Wallet index for the operator wallet key.
 ///
-/// NOTE: These should be _normal_.
+/// NOTE: These should be _hardened_ [`ChildNumber`].
 pub const STRATA_OPERATOR_WALLET_IDX: u32 = 101;
 
 /// Strata [`DerivationPath`] for sequencer's key.
@@ -81,7 +81,7 @@ pub static STRATA_OP_MESSAGE_DERIVATION_PATH: LazyLock<DerivationPath> = LazyLoc
     DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(STRATA_BASE_IDX).expect("valid hardened child number"),
         ChildNumber::from_hardened_idx(STRATA_OPERATOR_IDX).expect("valid hardened child number"),
-        ChildNumber::from_normal_idx(STRATA_OPERATOR_MESSAGE_IDX)
+        ChildNumber::from_hardened_idx(STRATA_OPERATOR_MESSAGE_IDX)
             .expect("valid hardened child number"),
     ])
 });
@@ -92,7 +92,7 @@ pub static STRATA_OP_WALLET_DERIVATION_PATH: LazyLock<DerivationPath> = LazyLock
     DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(STRATA_BASE_IDX).expect("valid hardened child number"),
         ChildNumber::from_hardened_idx(STRATA_OPERATOR_IDX).expect("valid hardened child number"),
-        ChildNumber::from_normal_idx(STRATA_OPERATOR_WALLET_IDX)
+        ChildNumber::from_hardened_idx(STRATA_OPERATOR_WALLET_IDX)
             .expect("valid hardened child number"),
     ])
 });
