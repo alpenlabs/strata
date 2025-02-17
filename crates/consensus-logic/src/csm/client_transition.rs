@@ -94,7 +94,7 @@ pub fn process_event(
 
             // Do the consensus checks
             if let Some(l1_vs) = l1_vs {
-                let l1_vs_height = l1_vs.last_verified_block_num;
+                let l1_vs_height = l1_vs.last_verified_block.height();
                 let mut updated_l1vs = l1_vs.clone();
                 for height in (l1_vs_height + 1..cur_seen_tip_height) {
                     let block_mf = context.get_l1_block_manifest(height)?;
@@ -137,7 +137,7 @@ pub fn process_event(
             let horizon_ht = params.rollup.horizon_l1_height;
             let genesis_ht = params.rollup.genesis_l1_height;
 
-            let state_ht = l1_verification_state.last_verified_block_num;
+            let state_ht = l1_verification_state.last_verified_block.height();
             if genesis_ht != state_ht {
                 let error_msg = format!(
                     "Expected height: {} Found height: {} in state",

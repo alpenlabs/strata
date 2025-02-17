@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, l1::L1BlockCommitment};
 use tracing::*;
 
 use crate::{
@@ -405,14 +405,14 @@ impl ClientStateMut {
         let new_unacc_len = (height - buried_height) as usize;
         let l1_vs = l1v.tip_verification_state();
         if let Some(l1_vs) = l1_vs {
-            if height > l1_vs.last_verified_block_num {
+            if height > l1_vs.last_verified_block.height() {
                 panic!("clientstate: attempted rollback above current tip");
             }
 
             // TODO: handle other things
             let mut rollbacked_l1_vs = l1_vs.clone();
-            rollbacked_l1_vs.last_verified_block_num = height;
-            rollbacked_l1_vs.last_verified_block_hash = l1v.local_unaccepted_blocks[new_unacc_len];
+            rollbacked_l1_vs.last_verified_block =
+                L1BlockCommitment::new(height, l1v.local_unaccepted_blocks[new_unacc_len]);
         }
         l1v.local_unaccepted_blocks.truncate(new_unacc_len);
         l1v.next_expected_block = height + 1;

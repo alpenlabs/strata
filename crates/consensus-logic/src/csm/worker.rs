@@ -350,7 +350,7 @@ fn apply_action(
         }
 
         SyncAction::L2Genesis(l1_vs) => {
-            let l1blkid = l1_vs.last_verified_block_hash;
+            let l1blkid = l1_vs.last_verified_block.blkid();
             info!(%l1blkid, "sync action to do genesis");
 
             // TODO: use l1blkid during chain state genesis ?

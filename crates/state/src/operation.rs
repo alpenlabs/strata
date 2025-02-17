@@ -4,6 +4,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use strata_primitives::l1::L1BlockCommitment;
 use tracing::*;
 
 use crate::{
@@ -164,9 +165,8 @@ pub fn apply_writes_to_state(
                 if let Some(l1_vs) = l1_vs {
                     // TODO: handle other things
                     let mut rollbacked_l1_vs = l1_vs.clone();
-                    rollbacked_l1_vs.last_verified_block_num = height;
-                    rollbacked_l1_vs.last_verified_block_hash =
-                        l1v.local_unaccepted_blocks[new_unacc_len];
+                    rollbacked_l1_vs.last_verified_block =
+                        L1BlockCommitment::new(height, l1v.local_unaccepted_blocks[new_unacc_len]);
                 }
                 l1v.local_unaccepted_blocks.truncate(new_unacc_len);
 

@@ -13,7 +13,7 @@ use bitcoin::{
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{
     buf::Buf32,
-    l1::{BitcoinAddress, L1BlockRecord, OutputRef},
+    l1::{BitcoinAddress, L1BlockCommitment, L1BlockRecord, OutputRef},
 };
 use strata_state::l1::{
     get_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState, L1BlockId,
@@ -119,8 +119,7 @@ impl BtcChainSegment {
         };
 
         HeaderVerificationState {
-            last_verified_block_num: vh,
-            last_verified_block_hash,
+            last_verified_block: L1BlockCommitment::new(vh, last_verified_block_hash),
             next_block_target: self
                 .get_header(vh)
                 .target()

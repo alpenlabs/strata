@@ -2,7 +2,7 @@ use arbitrary::Arbitrary;
 use bitcoin::{block::Header, hashes::Hash, params::Params, BlockHash, CompactTarget};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
+use strata_primitives::{buf::Buf32, hash::compute_borsh_hash, l1::L1BlockCommitment};
 
 use super::{error::L1VerificationError, timestamp_store::TimestampStore, L1BlockId};
 use crate::l1::utils::compute_block_hash;
@@ -28,9 +28,9 @@ use crate::l1::utils::compute_block_hash;
 #[derive(
     Clone,
     Debug,
-    Default,
     PartialEq,
     Eq,
+    Default,
     Arbitrary,
     BorshSerialize,
     BorshDeserialize,
@@ -38,11 +38,7 @@ use crate::l1::utils::compute_block_hash;
     Serialize,
 )]
 pub struct HeaderVerificationState {
-    /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
-    pub last_verified_block_num: u64,
-
-    /// [Hash](bitcoin::block::Header::block_hash) of the last verified block
-    pub last_verified_block_hash: L1BlockId,
+    pub last_verified_block: L1BlockCommitment,
 
     /// [Target](bitcoin::pow::CompactTarget) for the next block to verify
     pub next_block_target: u32,
@@ -101,7 +97,7 @@ pub struct EpochTimestamps {
 
 impl HeaderVerificationState {
     fn next_target(&mut self, header: &Header, params: &Params) -> u32 {
-        if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() != 0 {
+        if (self.last_verified_block.height() + 1) % params.difficulty_adjustment_interval() != 0 {
             return self.next_block_target;
         }
 
@@ -114,7 +110,7 @@ impl HeaderVerificationState {
     fn update_timestamps(&mut self, timestamp: u32, params: &Params) {
         self.last_11_blocks_timestamps.insert(timestamp);
 
-        let new_block_num = self.last_verified_block_num;
+        let new_block_num = self.last_verified_block.height();
         if new_block_num % params.difficulty_adjustment_interval() == 0 {
             self.epoch_timestamps.previous = self.epoch_timestamps.current;
             self.epoch_timestamps.current = timestamp;
@@ -140,9 +136,9 @@ impl HeaderVerificationState {
         // Check continuity
         let prev_blockhash: L1BlockId =
             Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()).into();
-        if prev_blockhash != self.last_verified_block_hash {
+        if prev_blockhash != *self.last_verified_block.blkid() {
             return Err(L1VerificationError::ContinuityError {
-                expected: self.last_verified_block_hash,
+                expected: *self.last_verified_block.blkid(),
                 found: prev_blockhash,
             });
         }
@@ -175,11 +171,9 @@ impl HeaderVerificationState {
             });
         }
 
-        // Increase the last verified block number by 1
-        self.last_verified_block_num += 1;
-
-        // Set the header block hash as the last verified block hash
-        self.last_verified_block_hash = block_hash_raw.into();
+        // Increase the last verified block number by 1 and set the new block hash
+        self.last_verified_block =
+            L1BlockCommitment::new(self.last_verified_block.height() + 1, block_hash_raw.into());
 
         // Update the timestamps
         self.update_timestamps(header.time, params);
@@ -206,20 +200,18 @@ impl HeaderVerificationState {
         // Check continuity
         let prev_blockhash: L1BlockId =
             Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()).into();
-        if prev_blockhash != self.last_verified_block_hash {
+        if prev_blockhash != *self.last_verified_block.blkid() {
             return Err(L1VerificationError::ContinuityError {
-                expected: self.last_verified_block_hash,
+                expected: *self.last_verified_block.blkid(),
                 found: prev_blockhash,
             });
         }
 
         let block_hash_raw = compute_block_hash(header);
 
-        // Increase the last verified block number by 1
-        self.last_verified_block_num += 1;
-
-        // Set the header block hash as the last verified block hash
-        self.last_verified_block_hash = block_hash_raw.into();
+        // Increase the last verified block number by 1 and set the new block hash
+        self.last_verified_block =
+            L1BlockCommitment::new(self.last_verified_block.height() + 1, block_hash_raw.into());
 
         // Update the timestamps
         self.update_timestamps(header.time, params);
@@ -279,17 +271,19 @@ impl HeaderVerificationState {
         }
 
         for old_header in old_headers.iter().rev() {
-            if compute_block_hash(old_header) != self.last_verified_block_hash.into() {
+            if compute_block_hash(old_header) != (*self.last_verified_block.blkid()).into() {
                 return Err(L1VerificationError::ContinuityError {
-                    expected: self.last_verified_block_hash,
+                    expected: *self.last_verified_block.blkid(),
                     found: old_header.prev_blockhash.into(),
                 });
             }
-            self.last_verified_block_hash = old_header.prev_blockhash.into();
-            if self.last_verified_block_num % params.difficulty_adjustment_interval() == 0 {
+            if self.last_verified_block.height() % params.difficulty_adjustment_interval() == 0 {
                 self.epoch_timestamps.current = self.epoch_timestamps.previous;
             }
-            self.last_verified_block_num -= 1;
+            self.last_verified_block = L1BlockCommitment::new(
+                self.last_verified_block.height() - 1,
+                old_header.prev_blockhash.into(),
+            );
             self.last_11_blocks_timestamps.remove();
             self.next_block_target = old_header.bits.to_consensus();
             self.total_accumulated_pow -= old_header.difficulty(params);

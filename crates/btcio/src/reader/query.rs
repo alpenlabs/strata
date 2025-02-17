@@ -12,7 +12,7 @@ use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
     messages::{BlockData, L1Event, RelevantTxEntry},
 };
-use strata_primitives::{block_credential::CredRule, params::Params};
+use strata_primitives::{block_credential::CredRule, l1::L1BlockCommitment, params::Params};
 use strata_state::{
     l1::{
         get_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState, L1BlockId,
@@ -424,8 +424,7 @@ pub async fn get_verification_state(
     let l1_blkid: L1BlockId = vb.header.block_hash().into();
 
     let header_vs = HeaderVerificationState {
-        last_verified_block_num: vh,
-        last_verified_block_hash: l1_blkid,
+        last_verified_block: L1BlockCommitment::new(vh, l1_blkid),
         next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
         epoch_timestamps: EpochTimestamps {
             current: b1.header.time,
