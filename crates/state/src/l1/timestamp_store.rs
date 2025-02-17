@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 /// The number of timestamps used for calculating the median.
 /// According to Bitcoin consensus rules, we need to check that a block's timestamp
 /// is not lower than the median of the last eleven blocks' timestamps.
-const N: usize = 11;
+pub const N: usize = 11;
 
 /// The middle index for selecting the median timestamp.
 /// Since N is odd, the median is the element at index 5 (the 6th element)
 /// after the timestamps are sorted.
-const MID: usize = 5;
+pub const MID: usize = 5;
 
 /// A ring buffer that stores timestamps. The internal buffer is stored as a
 /// [`Vec<u32>`] so that its length can be greater than [`N`]. The buffer always

@@ -16,7 +16,7 @@ mod header_verification;
 pub use header_verification::*;
 
 mod timestamp_store;
-pub use timestamp_store::*;
+pub use timestamp_store::TimestampStore;
 
 mod utils;
 pub use utils::*;
