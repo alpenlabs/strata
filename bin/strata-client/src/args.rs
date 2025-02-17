@@ -1,9 +1,8 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use anyhow::anyhow;
 use argh::FromArgs;
-use bitcoin::Network;
-use serde_json::{from_str, from_value, to_value, Value};
+use serde_json::{from_value, to_value, Value};
 use strata_config::Config;
 
 /// Configs overridable by environment. Mostly for sensitive data.
@@ -40,7 +39,7 @@ pub struct Args {
     )]
     pub datadir: Option<PathBuf>,
 
-    #[argh(option, description = "is sequencer", default = "false")]
+    #[argh(switch, description = "is sequencer")]
     pub sequencer: bool,
 
     #[argh(option, description = "rollup params")]
@@ -109,7 +108,9 @@ fn parse_overrides(overrides: &[String]) -> anyhow::Result<Vec<Override>> {
 fn apply_override(path: &[String], str_value: &str, config: &mut Value) -> anyhow::Result<()> {
     match path {
         [key] => {
-            config[key] = from_str(str_value)?;
+            let mut val = config.get_mut(key);
+            let parsed_value = &mut serde_json::from_str(str_value)?;
+            let _ = val.insert(parsed_value);
         }
         [key, other @ ..] => {
             apply_override(other, str_value, &mut config[key])?;
@@ -137,7 +138,7 @@ mod test {
                 datadir: "".into(),
                 db_retry_count: 3,
             },
-            bitcoind_rpc: strata_config::BitcoindConfig {
+            bitcoind: strata_config::BitcoindConfig {
                 rpc_url: "".to_string(),
                 rpc_user: "".to_string(),
                 rpc_password: "".to_string(),
