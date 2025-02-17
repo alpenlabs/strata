@@ -446,7 +446,7 @@ impl StrataApiServer for StrataRpcImpl {
                 observed_finalized_epoch: css.finalized_epoch,
                 finalized_block_id: *css.finalized_blkid(),
             })
-            .ok_or(Error::ClientNotStarted)?)
+            .ok_or(Error::BeforeGenesis)?)
     }
 
     async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes> {
