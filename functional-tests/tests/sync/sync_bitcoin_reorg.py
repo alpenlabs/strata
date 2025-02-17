@@ -88,17 +88,16 @@ def check_nth_checkpoint_finalized_on_reorg(
     # gen some blocks
     btcrpc.proxy.generatetoaddress(3, seq_addr)
 
-    submit_checkpoint(checkpt_idx, seqrpc, prover_rpc, manual_gen)
-    published_txid = seqrpc.strata_l1status()["last_published_txid"]
+    published_txid = submit_checkpoint(checkpt_idx, seqrpc, prover_rpc, manual_gen)
 
     # wait until it gets confirmed
     btcrpc.proxy.generatetoaddress(1, seq_addr)
+    time.sleep(1)
 
     txinfo = btcrpc.proxy.gettransaction(published_txid)
     assert txinfo["confirmations"] > 0, "Tx should have some confirmations"
 
     # Get block height corresponding to the tx
-    txinfo = btcrpc.proxy.gettransaction(published_txid)
     blockheight = txinfo["blockheight"]
     blockhash = btcrpc.proxy.getblockhash(blockheight)
 
