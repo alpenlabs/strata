@@ -12,10 +12,10 @@ use bitcoin::{
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{
     buf::Buf32,
-    l1::{BitcoinAddress, L1BlockRecord, OutputRef},
-};
-use strata_state::l1::{
-    get_difficulty_adjustment_height, BtcParams, HeaderVerificationState, L1BlockId, TimestampStore,
+    l1::{
+        get_difficulty_adjustment_start_height, BitcoinAddress, BtcParams, HeaderVerificationState,
+        L1BlockId, L1BlockRecord, OutputRef, TimestampStore,
+    },
 };
 
 use crate::{l2::gen_params, ArbitraryGenerator};
@@ -91,7 +91,7 @@ impl BtcChainSegment {
         params: &BtcParams,
     ) -> HeaderVerificationState {
         // Get the difficulty adjustment block just before `block_height`
-        let h1 = get_difficulty_adjustment_height(0, block_height, params);
+        let h1 = get_difficulty_adjustment_start_height(block_height, params);
 
         // Consider the block before `block_height` to be the last verified block
         let vh = block_height - 1; // verified_height
