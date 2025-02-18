@@ -10,8 +10,8 @@ use super::{DaTx, DepositUpdateTx, L1BlockId};
 /// omit the wtxs root, but we'd need to re-prove it every time, and that would
 /// waste space.  So we treat this like you would an "extended header" or
 /// something.
-///
-/// REVIEW: is this different from `L1BlockRecord`?
+//
+// REVIEW: is this different from `L1BlockRecord`?
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct L1HeaderRecord {
     /// L1 block ID here so that we don't have to recompute it too much, which
