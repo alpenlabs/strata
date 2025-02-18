@@ -105,14 +105,14 @@ mod tests {
     use bitcoin::hashes::Hash;
     use rand::{thread_rng, Rng};
     use strata_primitives::buf::Buf32;
-    use strata_test_utils::bitcoin::{get_btc_chain, get_btc_mainnet_block};
+    use strata_test_utils::bitcoin_mainnet_segment::BtcChainSegment;
 
     use super::*;
 
     #[test]
     fn test_l1_tx_proof() {
-        let btc_chain = get_btc_chain();
-        let block = btc_chain.get_block(40_321);
+        let btc_chain = BtcChainSegment::load();
+        let block = btc_chain.get_block_at(40_321).unwrap();
         let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
         let txs = &block.txdata;
 
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_l1_tx_proof_2() {
-        let block = get_btc_mainnet_block();
+        let block = BtcChainSegment::load_full_block();
         let merkle_root: Buf32 = block.header.merkle_root.to_byte_array().into();
         let txs = &block.txdata;
 
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn test_l1_wtx_proof() {
-        let block = get_btc_mainnet_block();
+        let block = BtcChainSegment::load_full_block();
         let txs = &block.txdata;
         let wtx_root = block.witness_root().unwrap().to_byte_array().into();
 

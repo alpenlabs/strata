@@ -382,12 +382,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
-name = "ethnum"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
-
-[[package]]
 name = "ff"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1178,13 +1172,13 @@ dependencies = [
  "bitcoin",
  "borsh",
  "digest",
- "ethnum",
  "hex",
  "serde",
  "sha2",
  "strata-bridge-tx-builder",
  "strata-crypto",
  "strata-primitives",
+ "thiserror 2.0.11",
  "tracing",
  "zkaleido",
 ]

@@ -1,6 +1,5 @@
-use bitcoin::params::MAINNET;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
-use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params};
+use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
 use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
@@ -17,21 +16,23 @@ impl<H: ZkVmHost> L1BatchProofGenerator<H> {
 }
 
 impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
-    type Input = (u32, u32);
+    type Input = (u64, u64);
     type P = L1BatchProver;
     type H = H;
 
-    fn get_input(&self, heights: &(u32, u32)) -> ZkVmResult<L1BatchProofInput> {
+    fn get_input(&self, heights: &(u64, u64)) -> ZkVmResult<L1BatchProofInput> {
         let (start_height, end_height) = *heights;
-        let btc_chain = get_btc_chain();
+        let btc_chain = BtcChainSegment::load();
 
         let params = gen_params();
         let rollup_params = params.rollup().clone();
-        let state = btc_chain.get_verification_state(start_height, &MAINNET.clone().into());
+        let state = btc_chain
+            .get_verification_state(start_height, rollup_params.l1_reorg_safe_depth)
+            .unwrap();
 
         let mut blocks = Vec::new();
         for height in start_height..=end_height {
-            let block = btc_chain.get_block(height).clone();
+            let block = btc_chain.get_block_at(height).unwrap().clone();
             blocks.push(block);
         }
 
@@ -44,7 +45,7 @@ impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
         Ok(input)
     }
 
-    fn get_proof_id(&self, heights: &(u32, u32)) -> String {
+    fn get_proof_id(&self, heights: &(u64, u64)) -> String {
         let (start_height, end_height) = *heights;
         format!("l1_batch_{}_{}", start_height, end_height)
     }
@@ -63,7 +64,7 @@ mod tests {
     fn test_proof<H: ZkVmHost>(l1_batch_proof_generator: &L1BatchProofGenerator<H>) {
         let params = gen_params();
         let rollup_params = params.rollup();
-        let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
+        let l1_start_height = rollup_params.genesis_l1_height + 1;
         let l1_end_height = l1_start_height + 1;
 
         let _ = l1_batch_proof_generator
