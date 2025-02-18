@@ -15,8 +15,8 @@ use strata_l1tx::{
 use strata_primitives::{block_credential::CredRule, l1::L1BlockCommitment, params::Params};
 use strata_state::{
     l1::{
-        get_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState, L1BlockId,
-        TimestampStore,
+        get_relative_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState,
+        L1BlockId, TimestampStore,
     },
     sync_event::EventSubmitter,
 };
@@ -407,55 +407,96 @@ async fn fetch_block_timestamps_ascending(
     Ok(timestamps)
 }
 
-/// Gets the [`HeaderVerificationState`] for the particular block
+/// Returns the [`HeaderVerificationState`] needed to verify the given block height.
+///
+/// This function assumes that `block_height - 1` is valid and gathers all necessary
+/// blockchain data, such as difficulty adjustment headers, block timestamps, and target
+/// values, to compute the verification state.
+///
+/// It calculates the current and previous epoch adjustment headers, fetches the required
+/// timestamps (including a safe margin for potential reorg depth), and determines the next
+/// block's target.
 pub async fn get_verification_state(
     client: &impl ReaderRpc,
-    height: u64,
+    block_height: u64,
     l1_reorg_safe_depth: u32,
 ) -> anyhow::Result<HeaderVerificationState> {
-    let params = BtcParams::new(client.network().await?);
-    // Get the difficulty adjustment block just before `block_height`
-    let h1 = get_difficulty_adjustment_height(0, height, &params);
-    let b1 = client.get_block_header_at(h1).await?;
+    // Create BTC parameters based on the current network.
+    let btc_params = BtcParams::new(client.network().await?);
 
-    // Get the difficulty adjustment block just before `h0`
-    let h0 = if h1 > params.difficulty_adjustment_interval() {
-        h1 - params.difficulty_adjustment_interval()
+    // Get the difficulty adjustment block just before the given block height,
+    // representing the start of the current epoch.
+    let current_epoch_start_height =
+        get_relative_difficulty_adjustment_height(0, block_height, &btc_params);
+    let current_epoch_start_header = client
+        .get_block_header_at(current_epoch_start_height)
+        .await?;
+
+    // Determine the previous difficulty adjustment header.
+    // If the current adjustment height is high enough, subtract the adjustment interval;
+    // otherwise, reuse the current adjustment header.
+    let previous_epoch_start_height =
+        if current_epoch_start_height > btc_params.difficulty_adjustment_interval() {
+            current_epoch_start_height - btc_params.difficulty_adjustment_interval()
+        } else {
+            current_epoch_start_height
+        };
+    let previous_epoch_start_header = client
+        .get_block_header_at(previous_epoch_start_height)
+        .await
+        .unwrap_or(current_epoch_start_header);
+
+    // The block immediately before `block_height` is considered the last verified block.
+    let verified_block_height = block_height - 1;
+    let verified_block_header = client.get_block_header_at(verified_block_height).await?;
+
+    // Bitcoin consensus requires the last 11 timestamps.
+    // Increase the count to include additional timestamps to safely cover potential reorg depths.
+    const BASE_TIMESTAMP_COUNT: usize = 11;
+    let total_timestamp_count = BASE_TIMESTAMP_COUNT + l1_reorg_safe_depth as usize;
+    let timestamps =
+        fetch_block_timestamps_ascending(client, verified_block_height, total_timestamp_count)
+            .await?;
+
+    // Calculate the ring buffer 'head' index.
+    // This index indicates where the next timestamp would be inserted.
+    let ring_buffer_head = (block_height as usize) % total_timestamp_count;
+    let timestamp_history = TimestampStore::new_with_head(&timestamps, ring_buffer_head);
+
+    // Compute the block ID for the verified block.
+    let verified_block_id: L1BlockId = verified_block_header.block_hash().into();
+
+    // Determine the target for the next block.
+    // If the block height is not at a difficulty adjustment boundary, use the verified block's
+    // target. Otherwise, retrieve the target from the block at the adjustment height.
+    let next_block_target = if block_height % btc_params.difficulty_adjustment_interval() != 0 {
+        verified_block_header
+            .target()
+            .to_compact_lossy()
+            .to_consensus()
     } else {
-        h1
+        let adjustment_block_header = client.get_block_header_at(block_height).await?;
+        adjustment_block_header
+            .target()
+            .to_compact_lossy()
+            .to_consensus()
     };
-    let b0 = client.get_block_header_at(h0).await.unwrap_or(b1);
 
-    // Consider the block before `block_height` to be the last verified block
-    let vh = height - 1; // verified_height
-    let vb = client.get_block_header_at(vh).await?; // verified_block header
-
-    // Bitcoin consensus rule requires last 11 timestamps. We set the count to accommodate for the
-    // reorg depth
-    const N: usize = 11;
-    let count = N + l1_reorg_safe_depth as usize;
-    let timestamps = fetch_block_timestamps_ascending(client, vh, count).await?;
-
-    // Calculate the 'head' index for the ring buffer based on the current block height.
-    // The 'head' represents the position in the buffer where the next timestamp will be inserted.
-    let head = height as usize % count;
-    let block_timestamp_history = TimestampStore::new_with_head(&timestamps, head);
-
-    let l1_blkid: L1BlockId = vb.block_hash().into();
-
-    let header_vs = HeaderVerificationState {
-        last_verified_block: L1BlockCommitment::new(vh, l1_blkid),
-        next_block_target: vb.target().to_compact_lossy().to_consensus(),
+    // Build the header verification state structure.
+    let header_verification_state = HeaderVerificationState {
+        last_verified_block: L1BlockCommitment::new(verified_block_height, verified_block_id),
+        next_block_target,
         epoch_timestamps: EpochTimestamps {
-            current: b1.time,
-            previous: b0.time,
+            current: current_epoch_start_header.time,
+            previous: previous_epoch_start_header.time,
         },
         total_accumulated_pow: 0u128,
-        block_timestamp_history,
+        block_timestamp_history: timestamp_history,
     };
-    trace!(%height, ?header_vs, "HeaderVerificationState");
 
-    Ok(header_vs)
+    trace!(%block_height, ?header_verification_state, "HeaderVerificationState");
+
+    Ok(header_verification_state)
 }
 
 #[cfg(test)]

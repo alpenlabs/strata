@@ -309,7 +309,7 @@ impl HeaderVerificationState {
 ///   the second, and so on.
 /// * `start` - The starting height from which to calculate.
 /// * `params` - [`Params`] of the bitcoin network in use
-pub fn get_difficulty_adjustment_height(idx: u64, start: u64, params: &Params) -> u64 {
+pub fn get_relative_difficulty_adjustment_height(idx: u64, start: u64, params: &Params) -> u64 {
     let difficulty_adjustment_interval = params.difficulty_adjustment_interval();
     ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
 }
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn test_blocks() {
         let chain = BtcChainSegment::load();
-        let h2 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
+        let h2 = get_relative_difficulty_adjustment_height(2, chain.start, &MAINNET);
         let r1 = OsRng.gen_range(h2..chain.end);
         let mut verification_state = chain.get_verification_state(r1, 0).unwrap();
 
@@ -341,7 +341,7 @@ mod tests {
     fn test_get_difficulty_adjustment_height() {
         let start = 0;
         let idx = OsRng.gen_range(1..1000);
-        let h = get_difficulty_adjustment_height(idx, start, &MAINNET);
+        let h = get_relative_difficulty_adjustment_height(idx, start, &MAINNET);
         assert_eq!(h, MAINNET.difficulty_adjustment_interval() * idx);
     }
 
@@ -385,9 +385,9 @@ mod tests {
     #[test]
     fn test_reorgs() {
         let chain = BtcChainSegment::load();
-        let h3 = get_difficulty_adjustment_height(3, chain.start, &MAINNET);
-        let h4 = get_difficulty_adjustment_height(4, chain.start, &MAINNET);
-        let h5 = get_difficulty_adjustment_height(5, chain.start, &MAINNET);
+        let h3 = get_relative_difficulty_adjustment_height(3, chain.start, &MAINNET);
+        let h4 = get_relative_difficulty_adjustment_height(4, chain.start, &MAINNET);
+        let h5 = get_relative_difficulty_adjustment_height(5, chain.start, &MAINNET);
 
         // Reorg of 10 blocks with no difficulty adjustment in between
         let reorg = (h3 + 100, h3 + 110);
@@ -407,6 +407,16 @@ mod tests {
         test_reorg(reorg);
 
         let reorg = (h5 - 5, h5 + 5);
+        test_reorg(reorg);
+
+        // Reorg of 10 blocks from difficulty adjusted block
+        let reorg = (h3, h3 + 10);
+        test_reorg(reorg);
+
+        let reorg = (h4, h4 + 10);
+        test_reorg(reorg);
+
+        let reorg = (h5, h5 + 10);
         test_reorg(reorg);
     }
 }
