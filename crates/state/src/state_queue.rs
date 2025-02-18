@@ -92,6 +92,11 @@ impl<T> StateQueue<T> {
         self.entries.first()
     }
 
+    /// Returns a mut ref to the front entry in the queue, if it exists.
+    pub fn front_mut(&mut self) -> Option<&mut T> {
+        self.entries.last_mut()
+    }
+
     /// Returns the index of the element at the back of the queue, if there is
     /// one.
     pub fn back_idx(&self) -> Option<u64> {
@@ -108,6 +113,11 @@ impl<T> StateQueue<T> {
     /// Returns a reference to the back entry in the queue, if it exists.
     pub fn back(&self) -> Option<&T> {
         self.entries.last()
+    }
+
+    /// Returns a mut ref to the back entry in the queue, if it exists.
+    pub fn back_mut(&mut self) -> Option<&mut T> {
+        self.entries.last_mut()
     }
 
     /// Returns the absolute index of the next element to be written to the queue.

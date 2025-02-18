@@ -559,6 +559,7 @@ mod test {
 
         let chkpt_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
         checkpt.height = chkpt_height;
+        #[allow(deprecated)]
         clstate.set_last_finalized_checkpoint(checkpt);
 
         // Create reader context and state
