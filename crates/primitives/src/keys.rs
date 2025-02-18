@@ -4,7 +4,7 @@
 
 use std::ops::Deref;
 
-use bitcoin::bip32::Xpriv;
+use bitcoin::{bip32::Xpriv, key::Keypair};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// A zeroizable on [`Drop`] wrapper around [`Xpriv`].
@@ -53,6 +53,53 @@ impl Zeroize for ZeroizableXpriv {
 
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for ZeroizableXpriv {}
+
+/// A zeroizable on [`Drop`] wrapper around [`Keypair`].
+#[cfg(feature = "zeroize")]
+#[derive(Clone, PartialEq, Eq)]
+pub struct ZeroizableKeypair(Keypair);
+
+impl ZeroizableKeypair {
+    /// Create a new [`ZeroizableKeypair`] from an [`Keypair`].
+    ///
+    /// This should take ownership of the `Keypair` since it is zeroized on drop.
+    pub fn new(keypair: Keypair) -> Self {
+        Self(keypair)
+    }
+}
+
+impl From<Keypair> for ZeroizableKeypair {
+    fn from(keypair: Keypair) -> Self {
+        Self::new(keypair)
+    }
+}
+
+impl Deref for ZeroizableKeypair {
+    type Target = Keypair;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+// Manual Drop implementation to zeroize keypair on drop.
+impl Drop for ZeroizableKeypair {
+    fn drop(&mut self) {
+        #[cfg(feature = "zeroize")]
+        self.zeroize();
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl Zeroize for ZeroizableKeypair {
+    #[inline]
+    fn zeroize(&mut self) {
+        self.0.non_secure_erase();
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl ZeroizeOnDrop for ZeroizableKeypair {}
 
 #[cfg(test)]
 mod tests {

@@ -194,12 +194,6 @@ mod tests {
     #[test]
     #[cfg(feature = "zeroize")]
     fn test_zeroize_idata() {
-        fn is_all_zero<T>(p: *const T) -> bool {
-            let len = std::mem::size_of::<T>();
-            let buf = unsafe { std::slice::from_raw_parts(p as *const u8, len) };
-            buf.iter().all(|v| *v == 0)
-        }
-
         fn load_seqkeys() -> IdentityData {
             let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
             let keys = SequencerKeys::new(&master).unwrap();
@@ -211,12 +205,16 @@ mod tests {
             IdentityData::new(ident, ik)
         }
 
-        let idata = Arc::new(load_seqkeys());
+        fn is_all_zero<T>(p: *const T) -> bool {
+            let len = std::mem::size_of::<T>();
+            let buf = unsafe { std::slice::from_raw_parts(p as *const u8, len) };
+            buf.iter().all(|v| *v == 0)
+        }
 
-        // Get raw pointer before dropping
+        let idata = Arc::new(load_seqkeys());
         let raw_ptr = Arc::as_ptr(&idata);
 
-        // Verify data exists (should NOT be zero yet)
+        // In the beginning should not be zeros
         assert!(!is_all_zero(raw_ptr));
 
         fn bar(_idata_clone: Arc<IdentityData>) {}
@@ -231,6 +229,6 @@ mod tests {
         drop(idata);
 
         // Now check if the memory has been zeroized
-        assert!(is_all_zero(raw_ptr));
+        assert!(is_all_zero(raw_ptr), "contents {:?}", raw_ptr);
     }
 }
