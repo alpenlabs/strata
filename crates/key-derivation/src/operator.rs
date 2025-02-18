@@ -19,8 +19,8 @@
 use bitcoin::bip32::{ChildNumber, Xpriv, Xpub};
 use secp256k1::SECP256K1;
 use strata_primitives::constants::{
-    STRATA_OPERATOR_BASE_DERIVATION_PATH, STRATA_OPERATOR_MESSAGE_IDX, STRATA_OPERATOR_WALLET_IDX,
-    STRATA_OP_MESSAGE_DERIVATION_PATH, STRATA_OP_WALLET_DERIVATION_PATH,
+    STRATA_OPERATOR_BASE_DERIVATION_PATH, STRATA_OP_MESSAGE_DERIVATION_PATH,
+    STRATA_OP_WALLET_DERIVATION_PATH,
 };
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -259,24 +259,6 @@ impl Zeroize for OperatorKeys {
 
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for OperatorKeys {}
-
-/// Converts the base [`Xpub`] to the message [`Xpub`].
-pub fn convert_base_xpub_to_message_xpub(base_xpub: &Xpub) -> Xpub {
-    let message_partial_path = ChildNumber::from_normal_idx(STRATA_OPERATOR_MESSAGE_IDX)
-        .expect("unfallible as long MESSAGE_IDX is not changed");
-    base_xpub
-        .derive_pub(SECP256K1, &message_partial_path)
-        .expect("unfallible")
-}
-
-/// Converts the base [`Xpub`] to the wallet [`Xpub`].
-pub fn convert_base_xpub_to_wallet_xpub(base_xpub: &Xpub) -> Xpub {
-    let wallet_partial_path = ChildNumber::from_normal_idx(STRATA_OPERATOR_WALLET_IDX)
-        .expect("unfallible as long WALLET_IDX is not changed");
-    base_xpub
-        .derive_pub(SECP256K1, &wallet_partial_path)
-        .expect("unfallible")
-}
 
 #[cfg(test)]
 mod tests {
