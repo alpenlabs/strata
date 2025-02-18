@@ -80,9 +80,12 @@ pub fn process_event(
 
             // If the block is before genesis we don't care about it.
             // TODO maybe put back pre-genesis tracking?
-            if height < params.rollup().genesis_l1_height {
+            let genesis_trigger = params.rollup().genesis_l1_height;
+            if height < genesis_trigger {
                 #[cfg(test)]
-                eprintln!("early L1 block at h={height}, you may have set up the test env wrong");
+                eprintln!(
+                    "early L1 block at h={height} (gt={genesis_trigger}) you may have set up the test env wrong"
+                );
 
                 warn!(%height, "ignoring unexpected L1Block event before horizon");
                 return Ok(());
@@ -718,7 +721,9 @@ mod tests {
             let mut outputs = Vec::new();
             for (i, test_event) in case.events.iter().enumerate() {
                 let mut state_mut = ClientStateMut::new(state.clone());
-                process_event(&mut state_mut, &test_event.event, &context, params).unwrap();
+                let event = &test_event.event;
+                eprintln!("giving sync event {event}");
+                process_event(&mut state_mut, event, &context, params).unwrap();
                 let output = state_mut.into_update();
                 outputs.push(output.clone());
 
@@ -757,12 +762,15 @@ mod tests {
         let l1_blocks = l1_chain
             .iter()
             .enumerate()
-            .map(|(i, block)| L1BlockCommitment::new(i as u64, block.block_hash()))
+            .map(|(i, block)| L1BlockCommitment::new(horizon + i as u64, block.block_hash()))
             .collect::<Vec<_>>();
 
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash()).collect();
 
         let test_cases = [
+            // These are kinda weird out because we got rid of pre-genesis
+            // tracking and just discard these L1 blocks that are before
+            // genesis.  We might re-add this later if the project demands it.
             TestCase {
                 description: "At horizon block",
                 events: &[TestEvent {
@@ -773,11 +781,11 @@ mod tests {
                     let l1_chain = l1_chain.clone();
                     move |state| {
                         assert!(!state.is_chain_active());
-                        assert_eq!(
+                        /*assert_eq!(
                             state.most_recent_l1_block(),
                             Some(&l1_chain[0].block_hash())
-                        );
-                        assert_eq!(state.next_exp_l1_block(), horizon + 1);
+                        );*/
+                        //assert_eq!(state.next_exp_l1_block(), horizon + 1);
                     }
                 }),
             },
@@ -791,23 +799,24 @@ mod tests {
                     let l1_chain = l1_chain.clone();
                     move |state| {
                         assert!(!state.is_chain_active());
-                        assert_eq!(
+                        /*assert_eq!(
                             state.most_recent_l1_block(),
                             Some(&l1_chain[1].block_hash())
-                        );
+                        );*/
                         // Because values for horizon is 40318, genesis is 40320
                         assert_eq!(state.next_exp_l1_block(), genesis);
                     }
                 }),
             },
             TestCase {
-                description: "As the genesis of L2 is reached but not locked in yet",
+                // We're assuming no rollback here.
+                description: "At L2 genesis trigger L1 block reached we lock in",
                 events: &[TestEvent {
                     event: SyncEvent::L1Block(l1_blocks[2]),
-                    expected_actions: &[],
+                    expected_actions: &[SyncAction::L2Genesis(*l1_blocks[2].blkid())],
                 }],
                 state_assertions: Box::new(move |state| {
-                    assert!(!state.is_chain_active());
+                    assert!(state.is_chain_active());
                     assert_eq!(state.next_exp_l1_block(), genesis + 1);
                 }),
             },
@@ -821,7 +830,7 @@ mod tests {
                     let l1_chain = l1_chain.clone();
                     let blkids = blkids.clone();
                     move |state| {
-                        assert!(!state.is_chain_active());
+                        assert!(state.is_chain_active());
                         assert_eq!(
                             state.most_recent_l1_block(),
                             Some(&l1_chain[(genesis + 1 - horizon) as usize].block_hash(),)
@@ -840,7 +849,7 @@ mod tests {
                     let l1_chain = l1_chain.clone();
                     let blkids = blkids.clone();
                     move |state| {
-                        assert!(!state.is_chain_active());
+                        assert!(state.is_chain_active());
                         assert_eq!(
                             state.most_recent_l1_block(),
                             Some(&l1_chain[(genesis + 2 - horizon) as usize].block_hash())
