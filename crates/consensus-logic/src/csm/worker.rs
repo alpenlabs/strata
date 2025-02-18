@@ -335,11 +335,7 @@ fn apply_action(
 
             // TODO: use l1blkid during chain state genesis ?
 
-            // Save the genesis block.
-            let gblock = genesis::make_genesis_block(&state.params);
-            state.storage.l2().put_block_data_blocking(gblock)?;
-
-            // Save the genesis chainstate.
+            // Save the genesis chainstate and block.
             let _chstate = genesis::init_genesis_chainstate(&state.params, &state.storage)
                 .map_err(|err| {
                     error!(err = %err, "failed to compute chain genesis");

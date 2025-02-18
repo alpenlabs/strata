@@ -103,23 +103,28 @@ fn prepare_l1_segment(
     _params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     // We aren't going to reorg, so we'll include blocks right up to the tip.
-    let l1_height = l1man
+    let cur_real_l1_height = l1man
         .get_chain_tip()?
         .expect("blockasm: should have L1 blocks by now");
-    let target_height = l1_height - 1; // -1 to give some buffer
+    let target_height = cur_real_l1_height - 1; // -1 to give some buffer
     trace!(%target_height, "figuring out which blocks to include in L1 segment");
 
     // Check to see if there's actually no blocks in the queue.  In that case we can just give
     // everything we know about.
-    let maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
-    let cur_state_height = prev_chstate.l1_view().tip_height();
+    let _maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
+    let cur_state_l1_height = prev_chstate.l1_view().tip_height();
+
+    // If there isn't any new blocks to pull then we just give nothing.
+    if target_height <= cur_state_l1_height {
+        return Ok(L1Segment::new_empty());
+    }
 
     // This is much simpler than it was before because I'm removing the ability
     // to handle reorgs properly.  This is fine, we'll readd it later when we
     // make the L1 scan proof stuff more sophisticated.
     let mut payloads = Vec::new();
-    for off in 0..max_l1_entries {
-        let height = cur_state_height + off as u64 + 1; // the first new block to be added on
+    for off in 1..max_l1_entries {
+        let height = cur_state_l1_height + off as u64;
 
         // If we get to the tip then we should break here.
         if height > target_height {

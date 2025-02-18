@@ -29,6 +29,7 @@ impl L1ViewState {
         }
     }
 
+    /// Creates a new instance with the genesis trigger L1 block already ingested.
     pub fn new_at_genesis(
         horizon_height: u64,
         genesis_height: u64,
@@ -37,7 +38,7 @@ impl L1ViewState {
         Self {
             horizon_height,
             safe_block: genesis_trigger_block,
-            maturation_queue: StateQueue::new_at_index(genesis_height),
+            maturation_queue: StateQueue::new_at_index(genesis_height + 1),
         }
     }
 
@@ -50,7 +51,7 @@ impl L1ViewState {
     }
 
     pub fn safe_height(&self) -> u64 {
-        self.maturation_queue.base_idx()
+        self.maturation_queue.base_idx() - 1
     }
 
     pub fn tip_height(&self) -> u64 {

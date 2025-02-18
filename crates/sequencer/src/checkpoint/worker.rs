@@ -156,6 +156,9 @@ fn handle_ready_epoch(
     params: &RollupParams,
 ) -> anyhow::Result<()> {
     let epoch = epoch_summary.epoch();
+    let new_l1 = epoch_summary.new_l1();
+
+    info!(?epoch, ?new_l1, "preparing checkpoint data");
 
     // REALLY make sure we don't already have checkpoint for the epoch.
     if ckhandle.get_checkpoint_blocking(epoch)?.is_some() {
@@ -164,6 +167,19 @@ fn handle_ready_epoch(
     }
 
     let cpd = create_checkpoint_prep_data_from_summary(epoch_summary, storage, params)?;
+
+    // Commented out version of this that avoids a crash if it fails.  Was used
+    // in troubleshooting.  But do we really need it?
+    /*let cpd = match create_checkpoint_prep_data_from_summary(epoch_summary, storage, params) {
+        Ok(cpd) => cpd,
+        Err(e) => {
+            error!("failed to generate checkpoint prep data, this shouldn't be possible if we generated the epoch authentically");
+            error!("backtrace:\n{e}");
+
+            // We don't want to crash.
+            return Ok(());
+        }
+    };*/
 
     // sanity check
     assert_eq!(
