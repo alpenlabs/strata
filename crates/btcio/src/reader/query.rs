@@ -460,6 +460,7 @@ mod test {
         chain_state::Chainstate,
         client_state::{ClientState, L1Checkpoint},
     };
+    use strata_status::ChainSyncStatusUpdate;
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
     use threadpool::ThreadPool;
 
@@ -475,7 +476,8 @@ mod test {
     fn get_reader_ctx(chs: Chainstate, cls: ClientState) -> ReaderContext<TestBitcoinClient> {
         let mut gen = ArbitraryGenerator::new();
         let l1status: L1Status = gen.generate();
-        let status_channel = StatusChannel::new(cls, l1status, Some(chs));
+        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chs.clone()));
+        let status_channel = StatusChannel::new(cls, l1status, Some(css));
         let params = Arc::new(gen_params());
         let config = Arc::new(ReaderConfig::default());
         let client = Arc::new(TestBitcoinClient::new(1));
@@ -530,7 +532,8 @@ mod test {
 
         // Update new chainstate from status channel
         chstate.set_epoch(curr_epoch + 1);
-        ctx.status_channel.update_chain_sync_status(chstate);
+        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chstate));
+        ctx.status_channel.update_chain_sync_status(css);
 
         let ev = check_epoch_change(&ctx, &mut state).unwrap();
 
@@ -578,7 +581,8 @@ mod test {
 
         // Update new chainstate from status channel
         chstate.set_epoch(curr_epoch + 1);
-        ctx.status_channel.update_chainstate(chstate);
+        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chstate));
+        ctx.status_channel.update_chain_sync_status(css);
 
         // Check for epoch change, this should not trigger L1 revert because filter config has not
         // changed

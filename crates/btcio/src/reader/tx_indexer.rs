@@ -74,10 +74,10 @@ mod test {
     };
     use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
     use strata_primitives::{
-        l1::{payload::L1Payload, BitcoinAmount},
+        batch::SignedCheckpoint,
+        l1::{payload::L1Payload, BitcoinAmount, ProtocolOperation},
         params::Params,
     };
-    use strata_state::{batch::SignedCheckpoint, tx::ProtocolOperation};
     use strata_test_utils::{
         bitcoin::{
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,

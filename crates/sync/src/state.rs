@@ -96,7 +96,7 @@ pub fn initialize_from_db(
 
     let mut tracker = UnfinalizedBlockTracker::new_empty(finalized_epoch);
     tracker
-        .load_unfinalized_blocks(finalized_slot, l2man)
+        .load_unfinalized_blocks(l2man)
         .map_err(|err| L2SyncError::LoadUnfinalizedFailed(err.to_string()))?;
 
     let tip_block = tracker

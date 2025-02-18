@@ -370,7 +370,15 @@ fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use rand_core::SeedableRng;
-    use strata_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
+    use strata_primitives::{
+        buf::Buf32,
+        l1::{
+            BitcoinAmount, DepositInfo, DepositUpdateTx, L1HeaderPayload, L1HeaderRecord, L1Tx,
+            ProtocolOperation,
+        },
+        l2::L2BlockId,
+        params::OperatorConfig,
+    };
     use strata_state::{
         block::{ExecSegment, L1Segment, L2BlockBody},
         bridge_state::OperatorTable,
@@ -379,10 +387,8 @@ mod tests {
         exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
         genesis::GenesisStateData,
         header::{L2BlockHeader, L2Header},
-        id::L2BlockId,
-        l1::{DepositUpdateTx, L1HeaderPayload, L1HeaderRecord, L1Tx, L1ViewState},
+        l1::L1ViewState,
         state_op::StateCache,
-        tx::{DepositInfo, ProtocolOperation},
     };
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 

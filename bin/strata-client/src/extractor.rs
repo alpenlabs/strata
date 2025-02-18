@@ -231,7 +231,11 @@ mod tests {
     use strata_primitives::{
         bridge::OperatorIdx,
         buf::Buf32,
-        l1::{BitcoinAmount, L1BlockManifest, OutputRef, RawBitcoinTx, XOnlyPk},
+        l1::{
+            BitcoinAmount, DepositRequestInfo, L1BlockId, L1BlockManifest, L1HeaderRecord, L1Tx,
+            L1TxProof, OutputRef, RawBitcoinTx, XOnlyPk,
+        },
+        l2::L2BlockId,
     };
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
@@ -243,9 +247,7 @@ mod tests {
         exec_env::ExecEnvState,
         exec_update::UpdateInput,
         genesis::GenesisStateData,
-        id::L2BlockId,
-        l1::{L1BlockId, L1HeaderRecord, L1Tx, L1TxProof, L1ViewState},
-        tx::DepositRequestInfo,
+        l1::L1ViewState,
     };
     use strata_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
     use threadpool::ThreadPool;
