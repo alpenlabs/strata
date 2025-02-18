@@ -23,6 +23,13 @@ pub enum TipUpdate {
     /// This might only happen when we have manual intervention.
     // maybe it'll also happen if we have async subchain updates?
     Revert(L2BlockId, L2BlockId),
+
+    /// Extending the tip forward by several blocks.
+    ///
+    /// This is a weird case that shouldn't normally happen.
+    ///
+    /// (old tip, intermediates, new tip)
+    LongExtend(L2BlockId, Vec<L2BlockId>, L2BlockId),
 }
 
 impl TipUpdate {
@@ -32,6 +39,7 @@ impl TipUpdate {
             Self::ExtendTip(_, new) => new,
             Self::Reorg(reorg) => reorg.new_tip(),
             Self::Revert(_, new) => new,
+            Self::LongExtend(_, _, new) => new,
         }
     }
 
@@ -41,6 +49,7 @@ impl TipUpdate {
             Self::ExtendTip(old, _) => old,
             Self::Reorg(reorg) => reorg.old_tip(),
             Self::Revert(old, _) => old,
+            Self::LongExtend(old, _, _) => old,
         }
     }
 
@@ -174,18 +183,40 @@ pub fn compute_tip_update(
         pivot_idx = Some(i);
     }
 
-    // At this point we're sure we can't have anything *but* a reorg.
-    if let Some(idx) = pivot_idx {
-        let pivot = *up_blocks[idx];
-        let down = down_blocks.drain(idx + 1..).copied().rev().collect();
-        let up = up_blocks.drain(idx + 1..).copied().collect();
-        let reorg = Reorg { pivot, down, up };
-        return Ok(Some(TipUpdate::Reorg(reorg)));
+    let Some(pivot_idx) = pivot_idx else {
+        // At this point, we haven't been able to figure it out, abort.
+        warn!(%start, %dest, "unable to find tip update path through any normal means");
+        return Ok(None);
+    };
+
+    let pivot = *up_blocks[pivot_idx];
+    let down: Vec<_> = down_blocks.drain(pivot_idx + 1..).copied().rev().collect();
+    let mut up: Vec<_> = up_blocks.drain(pivot_idx + 1..).copied().collect();
+
+    // Check if it's a revert.  This seems like kinda a lot of work to do in
+    // this case if we're just going to be returning the args, maybe we can move
+    // some check here to happen earlier.
+    if up.is_empty() {
+        return Ok(Some(TipUpdate::Revert(*start, *dest)));
     }
 
-    // At this point, we haven't been able to figure it out, abort.
-    warn!(%start, %dest, "unable to find tip update path through any normal means");
-    Ok(None)
+    // Check if we're just rolling forwards.  But at this point we should know we have at least one
+    // block to go up.
+    if down.is_empty() {
+        let last = up.pop().expect("tipupate: missing up block");
+
+        // This should never have this be true, we'd have caught this case
+        // earlier, but we can still handle it just in case.
+        if up.is_empty() {
+            return Ok(Some(TipUpdate::ExtendTip(pivot, last)));
+        } else {
+            return Ok(Some(TipUpdate::LongExtend(pivot, up, last)));
+        }
+    }
+
+    // Otherwise that looks like a revert.
+    let reorg = Reorg { pivot, down, up };
+    Ok(Some(TipUpdate::Reorg(reorg)))
 }
 
 #[cfg(test)]
@@ -365,7 +396,38 @@ mod tests {
     }
 
     #[test]
-    fn test_start_ancestor() {
+    fn test_start_ancestor_short() {
+        let base = rand_epoch_commitment(10, 2);
+        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
+
+        // Set up the two branches.
+        let chain = [
+            *base.last_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+        ];
+        eprintln!("base {base:?}\nchain {chain:#?}");
+
+        // Insert them.
+        insert_branch(&mut tracker, &chain);
+
+        let src = &chain[5];
+        let dest = chain.last().unwrap();
+        let update = compute_tip_update(src, dest, 10, &tracker);
+
+        let exp_update = TipUpdate::ExtendTip(*src, *dest);
+
+        let update = update.expect("test: update not found");
+        eprintln!("expected {exp_update:#?}\nfound {update:#?}");
+        assert_eq!(update, Some(exp_update));
+    }
+
+    #[test]
+    fn test_start_ancestor_long() {
         let base = rand_epoch_commitment(10, 2);
         let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
 
@@ -385,10 +447,11 @@ mod tests {
         insert_branch(&mut tracker, &chain);
 
         let src = &chain[3];
+        let intermediate = vec![chain[4], chain[5]];
         let dest = chain.last().unwrap();
         let update = compute_tip_update(src, dest, 10, &tracker);
 
-        let exp_update = TipUpdate::ExtendTip(*src, *dest);
+        let exp_update = TipUpdate::LongExtend(*src, intermediate, *dest);
 
         let update = update.expect("test: update not found");
         eprintln!("expected {exp_update:#?}\nfound {update:#?}");

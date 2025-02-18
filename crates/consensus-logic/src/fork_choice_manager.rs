@@ -622,6 +622,19 @@ fn apply_tip_update(update: TipUpdate, fcm_state: &mut ForkChoiceManager) -> any
         // Easy case.
         TipUpdate::ExtendTip(_cur, new) => apply_blocks([new].into_iter(), fcm_state),
 
+        // Weird case that shouldn't normally happen.
+        TipUpdate::LongExtend(_cur, mut intermediate, new) => {
+            if intermediate.is_empty() {
+                warn!("tip update is a LongExtend that should have been a ExtendTip");
+            }
+
+            // Push the new block onto the end and then use that list as the
+            // blocks we're applying.
+            intermediate.push(new);
+
+            apply_blocks(intermediate.into_iter(), fcm_state)
+        }
+
         TipUpdate::Reorg(reorg) => {
             // See if we need to roll back recent changes.
             let pivot_blkid = reorg.pivot();
