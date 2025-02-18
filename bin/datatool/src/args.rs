@@ -53,18 +53,11 @@ pub(crate) struct SubcXpriv {
 #[argh(
     subcommand,
     name = "genseqpubkey",
-    description = "generates a sequencer pubkey from a master xpriv"
+    description = "generates a sequencer pubkey from an xpriv"
 )]
 pub(crate) struct SubcSeqPubkey {
     #[argh(option, description = "reads key from specified file", short = 'f')]
-    pub(crate) key_file: Option<PathBuf>,
-
-    #[argh(
-        switch,
-        description = "reads key from envvar STRATA_SEQ_KEY",
-        short = 'E'
-    )]
-    pub(crate) key_from_env: bool,
+    pub(crate) key_file: PathBuf,
 }
 
 /// Generate the sequencer pubkey to pass around.
@@ -76,7 +69,7 @@ pub(crate) struct SubcSeqPubkey {
 )]
 pub(crate) struct SubcSeqPrivkey {
     #[argh(option, description = "reads key from specified file", short = 'f')]
-    pub(crate) key_file: Option<PathBuf>,
+    pub(crate) key_file: PathBuf,
 
     #[argh(
         switch,
@@ -91,18 +84,11 @@ pub(crate) struct SubcSeqPrivkey {
 #[argh(
     subcommand,
     name = "genopxpub",
-    description = "generates an operator xpub from a master xpriv"
+    description = "generates an operator xpub from an xpriv"
 )]
 pub(crate) struct SubcOpXpub {
     #[argh(option, description = "reads key from specified file", short = 'f')]
-    pub(crate) key_file: Option<PathBuf>,
-
-    #[argh(
-        switch,
-        description = "reads key from envvar STRATA_OP_KEY",
-        short = 'E'
-    )]
-    pub(crate) key_from_env: bool,
+    pub(crate) key_file: PathBuf,
 }
 
 /// Generate a network's param file from inputs.

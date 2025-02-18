@@ -4,10 +4,7 @@
 //! network parameters.
 //! These functions are called from the CLI's subcommands.
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use alloy_genesis::Genesis;
 use alloy_primitives::B256;
@@ -32,12 +29,6 @@ use zeroize::Zeroize;
 use crate::args::{
     CmdContext, SubcOpXpub, SubcParams, SubcSeqPrivkey, SubcSeqPubkey, SubcXpriv, Subcommand,
 };
-
-/// Sequencer key environment variable.
-const SEQKEY_ENVVAR: &str = "STRATA_SEQ_KEY";
-
-/// Operator key environment variable.
-const OPKEY_ENVVAR: &str = "STRATA_OP_KEY";
 
 /// The default network to use.
 ///
@@ -165,7 +156,7 @@ fn exec_genxpriv(cmd: SubcXpriv, ctx: &mut CmdContext) -> anyhow::Result<()> {
 /// Generates the sequencer [`Xpub`] from the provided [`Xpriv`]
 /// and prints it to stdout.
 fn exec_genseqpubkey(cmd: SubcSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
-    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, SEQKEY_ENVVAR)? else {
+    let Some(xpriv) = parse_xpriv_from_path(&cmd.key_file)? else {
         anyhow::bail!("privkey unset");
     };
 
@@ -184,7 +175,7 @@ fn exec_genseqpubkey(cmd: SubcSeqPubkey, _ctx: &mut CmdContext) -> anyhow::Resul
 /// Generates the sequencer [`Xpriv`] that will [`Zeroize`](zeroize) on [`Drop`] and prints it to
 /// stdout.
 fn exec_genseqprivkey(cmd: SubcSeqPrivkey, _ctx: &mut CmdContext) -> anyhow::Result<()> {
-    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, SEQKEY_ENVVAR)? else {
+    let Some(xpriv) = parse_xpriv_from_path(&cmd.key_file)? else {
         anyhow::bail!("privkey unset");
     };
 
@@ -206,7 +197,7 @@ fn exec_genseqprivkey(cmd: SubcSeqPrivkey, _ctx: &mut CmdContext) -> anyhow::Res
 ///
 /// Generates the root xpub for an operator.
 fn exec_genopxpub(cmd: SubcOpXpub, _ctx: &mut CmdContext) -> anyhow::Result<()> {
-    let Some(xpriv) = resolve_xpriv(&cmd.key_file, cmd.key_from_env, OPKEY_ENVVAR)? else {
+    let Some(xpriv) = parse_xpriv_from_path(&cmd.key_file)? else {
         anyhow::bail!("privkey unset");
     };
 
@@ -382,33 +373,6 @@ fn read_xpriv(path: &Path) -> anyhow::Result<ZeroizableXpriv> {
     Ok(zeroizable_xpriv)
 }
 
-/// Parses an [`Xpriv`] from environment variable.
-///
-/// # Notes
-///
-/// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
-fn parse_xpriv_from_env(env: &'static str) -> anyhow::Result<Option<ZeroizableXpriv>> {
-    let mut env_val = match std::env::var(env) {
-        Ok(v) => v,
-        Err(_) => anyhow::bail!("got --key-from-env but {env} not set or invalid"),
-    };
-
-    let mut buf = base58::decode_check(&env_val)?;
-
-    // Parse into a ZeroizableXpriv.
-    let mut xpriv = Xpriv::decode(&buf)?;
-    let zeroizable_xpriv: ZeroizableXpriv = xpriv.into();
-
-    // Zeroize the buffers after parsing.
-    //
-    // NOTE: `zeroizable_xpriv` is zeroized on drop.
-    env_val.zeroize();
-    buf.zeroize();
-    xpriv.private_key.non_secure_erase();
-
-    Ok(Some(zeroizable_xpriv))
-}
-
 /// Parses an [`Xpriv`] from file path.
 ///
 /// # Notes
@@ -416,30 +380,6 @@ fn parse_xpriv_from_env(env: &'static str) -> anyhow::Result<Option<ZeroizableXp
 /// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
 fn parse_xpriv_from_path(path: &Path) -> anyhow::Result<Option<ZeroizableXpriv>> {
     Ok(Some(read_xpriv(path)?))
-}
-
-/// Resolves an [`Xpriv`] from the file path (if provided) or environment variable (if
-/// `--key-from-env` set). Only one source should be specified.
-///
-/// Priority:
-///
-/// 1. File path (if provided with path argument)
-/// 2. Environment variable (if --key-from-env flag is set)
-///
-/// # Notes
-///
-/// This [`Xpriv`] will [`Zeroize`](zeroize) on [`Drop`].
-fn resolve_xpriv(
-    path: &Option<PathBuf>,
-    from_env: bool,
-    env: &'static str,
-) -> anyhow::Result<Option<ZeroizableXpriv>> {
-    match (path, from_env) {
-        (Some(_), true) => anyhow::bail!("got key path and --key-from-env, pick a lane"),
-        (Some(path), false) => parse_xpriv_from_path(path),
-        (None, true) => parse_xpriv_from_env(env),
-        _ => Ok(None),
-    }
 }
 
 /// Inputs for constructing the network parameters.
