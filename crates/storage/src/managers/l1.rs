@@ -65,6 +65,10 @@ impl L1BlockManager {
                     "l1block does not extend chain {blockid}"
                 )));
             }
+
+            for i in height + 1..=tip_height {
+                self.blockheight_cache.purge(&i);
+            }
         };
 
         self.chaintip_cache.purge(&());
@@ -89,6 +93,10 @@ impl L1BlockManager {
                     "l1block does not extend chain {blockid}"
                 )));
             }
+
+            for i in height + 1..=tip_height {
+                self.blockheight_cache.purge(&i);
+            }
         };
 
         self.chaintip_cache.purge(&());
@@ -98,33 +106,37 @@ impl L1BlockManager {
     }
 
     pub fn revert_canonical_chain(&self, height: u64) -> DbResult<()> {
-        let Some((tip, _)) = self.ops.get_chain_tip_blocking()? else {
+        let Some((tip_height, _)) = self.ops.get_chain_tip_blocking()? else {
             // no chain to revert
+            // but clear cache anyway
+            self.blockheight_cache.clear();
+            self.chaintip_cache.clear();
             return Ok(());
         };
 
-        for i in height + 1..=tip {
+        for i in height + 1..=tip_height {
             self.blockheight_cache.purge(&i);
         }
-
         self.chaintip_cache.purge(&());
         self.ops
-            .remove_canonical_chain_range_blocking(height + 1, tip)
+            .remove_canonical_chain_range_blocking(height + 1, tip_height)
     }
 
     pub async fn revert_canonical_chain_async(&self, height: u64) -> DbResult<()> {
-        let Some((tip, _)) = self.ops.get_chain_tip_async().await? else {
+        let Some((tip_height, _)) = self.ops.get_chain_tip_async().await? else {
             // no chain to revert
+            // but clear cache anyway
+            self.blockheight_cache.clear();
+            self.chaintip_cache.clear();
             return Ok(());
         };
 
-        for i in height + 1..=tip {
+        for i in height + 1..=tip_height {
             self.blockheight_cache.purge(&i);
         }
-
         self.chaintip_cache.purge(&());
         self.ops
-            .remove_canonical_chain_range_async(height + 1, tip)
+            .remove_canonical_chain_range_async(height + 1, tip_height)
             .await
     }
 
