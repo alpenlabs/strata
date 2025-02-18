@@ -42,14 +42,15 @@ impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
 
 #[cfg(test)]
 mod tests {
-    use strata_test_utils::bitcoin::get_btc_chain;
+
+    use strata_test_utils::bitcoin_mainnet_segment::BtcChainSegment;
 
     use super::*;
 
     fn test_proof<H: ZkVmHost>(generator: &BtcBlockProofGenerator<H>) {
-        let btc_chain = get_btc_chain();
-        let block = btc_chain.get_block(40321);
-        let _ = generator.get_proof(block).unwrap();
+        let btc_chain = BtcChainSegment::load();
+        let block = btc_chain.get_block_at(40321).unwrap();
+        let _ = generator.get_proof(&block).unwrap();
     }
 
     #[test]

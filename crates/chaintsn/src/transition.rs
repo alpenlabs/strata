@@ -333,7 +333,7 @@ mod tests {
         tx::{DepositInfo, ProtocolOperation},
     };
     use strata_test_utils::{
-        bitcoin::get_btc_chain,
+        bitcoin_mainnet_segment::BtcChainSegment,
         l2::{gen_params, get_genesis_chainstate},
         ArbitraryGenerator,
     };
@@ -358,11 +358,10 @@ mod tests {
     #[test]
     fn test_process_l1_view_update_with_deposit_update_tx() {
         let mut chs = get_genesis_chainstate();
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
         // get the l1 view state of the chain state
         let params = gen_params();
-        let header_vs =
-            chain.get_verification_state(params.rollup().genesis_l1_height, &MAINNET, 0);
+        let header_vs = chain.get_verification_state(params.rollup().genesis_l1_height, 0);
         let l1v = chs.l1_view();
 
         let tip_height = l1v.tip_height();
@@ -371,36 +370,37 @@ mod tests {
         let mut state_cache = StateCache::new(chs);
         let amt: BitcoinAmount = ArbitraryGenerator::new().generate();
 
-        let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> =
-            (1..=params.rollup().l1_reorg_safe_depth)
-                .map(|idx| {
-                    let header: Header = chain.get_header(tip_height + idx as u64).unwrap();
-                    let wtxs_root: Buf32 = ArbitraryGenerator::new().generate();
-                    let record = L1HeaderRecord::new(
-                        header.block_hash().into(),
-                        consensus::serialize(&header),
-                        wtxs_root,
-                    );
-                    let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
-                    let tx = ArbitraryGenerator::new_with_size(1 << 12).generate();
+        let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> = (1..=params
+            .rollup()
+            .l1_reorg_safe_depth)
+            .map(|idx| {
+                let header: Header = chain.get_block_header_at(tip_height + idx as u64).unwrap();
+                let wtxs_root: Buf32 = ArbitraryGenerator::new().generate();
+                let record = L1HeaderRecord::new(
+                    header.block_hash().into(),
+                    consensus::serialize(&header),
+                    wtxs_root,
+                );
+                let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
+                let tx = ArbitraryGenerator::new_with_size(1 << 12).generate();
 
-                    let l1tx = if idx == 1 {
-                        let intent = DepositIntent::new(amt, &[0; 20]);
-                        let protocol_op = ProtocolOperation::Deposit(DepositInfo {
-                            intent,
-                            outpoint: ArbitraryGenerator::new().generate(),
-                        });
-                        L1Tx::new(proof, tx, vec![protocol_op])
-                    } else {
-                        ArbitraryGenerator::new_with_size(1 << 15).generate()
-                    };
+                let l1tx = if idx == 1 {
+                    let intent = DepositIntent::new(amt, &[0; 20]);
+                    let protocol_op = ProtocolOperation::Deposit(DepositInfo {
+                        intent,
+                        outpoint: ArbitraryGenerator::new().generate(),
+                    });
+                    L1Tx::new(proof, tx, vec![protocol_op])
+                } else {
+                    ArbitraryGenerator::new_with_size(1 << 15).generate()
+                };
 
-                    let deposit_update_tx = DepositUpdateTx::new(l1tx, idx);
-                    L1HeaderPayload::new(tip_height + idx as u64, record)
-                        .with_deposit_update_txs(vec![deposit_update_tx])
-                        .build()
-                })
-                .collect();
+                let deposit_update_tx = DepositUpdateTx::new(l1tx, idx);
+                L1HeaderPayload::new(tip_height + idx as u64, record)
+                    .with_deposit_update_txs(vec![deposit_update_tx])
+                    .build()
+            })
+            .collect();
 
         let mut l1_segment = L1Segment::new(new_payloads_with_deposit_update_tx);
 
@@ -438,7 +438,7 @@ mod tests {
     #[test]
     fn test_process_l1_view_update_maturation_check() {
         let mut chs = get_genesis_chainstate();
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
         let params = gen_params();
 
         let header_record = chs.l1_view();

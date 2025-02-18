@@ -319,20 +319,20 @@ mod tests {
 
     use bitcoin::params::MAINNET;
     use rand::{rngs::OsRng, Rng};
-    use strata_test_utils::bitcoin::get_btc_chain;
+    use strata_test_utils::bitcoin_mainnet_segment::BtcChainSegment;
 
     use super::*;
 
     #[test]
     fn test_blocks() {
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
         let h2 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
         let r1 = OsRng.gen_range(h2..chain.end);
-        let mut verification_state = chain.get_verification_state(r1, &MAINNET, 0).unwrap();
+        let mut verification_state = chain.get_verification_state(r1, 0).unwrap();
 
         for header_idx in r1..chain.end {
             verification_state
-                .check_and_update_full(&chain.get_header(header_idx).unwrap(), &MAINNET)
+                .check_and_update_full(&chain.get_block_header_at(header_idx).unwrap(), &MAINNET)
                 .unwrap()
         }
     }
@@ -347,24 +347,24 @@ mod tests {
 
     #[test]
     fn test_hash() {
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
         let r1 = 45000;
-        let verification_state = chain.get_verification_state(r1, &MAINNET, 0).unwrap();
+        let verification_state = chain.get_verification_state(r1, 0).unwrap();
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
     }
 
     fn test_reorg(reorg: (u64, u64)) {
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
 
         let reorg_len = (reorg.1 - reorg.0) as u32;
         let reorg = reorg.0..reorg.1;
         let headers: Vec<Header> = reorg
             .clone()
-            .map(|h| chain.get_header(h).unwrap())
+            .map(|h| chain.get_block_header_at(h).unwrap())
             .collect();
         let mut verification_state = chain
-            .get_verification_state(reorg.start, &MAINNET, reorg_len)
+            .get_verification_state(reorg.start, reorg_len)
             .unwrap();
 
         for header in &headers {
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_reorgs() {
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
         let h3 = get_difficulty_adjustment_height(3, chain.start, &MAINNET);
         let h4 = get_difficulty_adjustment_height(4, chain.start, &MAINNET);
         let h5 = get_difficulty_adjustment_height(5, chain.start, &MAINNET);

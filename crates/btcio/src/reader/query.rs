@@ -368,7 +368,6 @@ async fn process_block<R: ReaderRpc>(
         let l1_verification_state = get_verification_state(
             ctx.client.as_ref(),
             genesis_ht + 1,
-            &BtcParams::new(params.rollup().network),
             params.rollup().l1_reorg_safe_depth,
         )
         .await?;
@@ -412,11 +411,11 @@ async fn fetch_block_timestamps_ascending(
 pub async fn get_verification_state(
     client: &impl ReaderRpc,
     height: u64,
-    params: &BtcParams,
     l1_reorg_safe_depth: u32,
 ) -> anyhow::Result<HeaderVerificationState> {
+    let params = BtcParams::new(client.network().await?);
     // Get the difficulty adjustment block just before `block_height`
-    let h1 = get_difficulty_adjustment_height(0, height, params);
+    let h1 = get_difficulty_adjustment_height(0, height, &params);
     let b1 = client.get_block_header_at(h1).await?;
 
     // Get the difficulty adjustment block just before `h0`
@@ -429,7 +428,7 @@ pub async fn get_verification_state(
 
     // Consider the block before `block_height` to be the last verified block
     let vh = height - 1; // verified_height
-    let vb = client.get_block_at(vh).await?; // verified_block
+    let vb = client.get_block_header_at(vh).await?; // verified_block header
 
     // Bitcoin consensus rule requires last 11 timestamps. We set the count to accommodate for the
     // reorg depth
@@ -442,11 +441,11 @@ pub async fn get_verification_state(
     let head = height as usize % count;
     let block_timestamp_history = TimestampStore::new_with_head(&timestamps, head);
 
-    let l1_blkid: L1BlockId = vb.header.block_hash().into();
+    let l1_blkid: L1BlockId = vb.block_hash().into();
 
     let header_vs = HeaderVerificationState {
         last_verified_block: L1BlockCommitment::new(vh, l1_blkid),
-        next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
+        next_block_target: vb.target().to_compact_lossy().to_consensus(),
         epoch_timestamps: EpochTimestamps {
             current: b1.time,
             previous: b0.time,
@@ -642,7 +641,7 @@ mod test {
 
         let len = 2;
         let height = 100;
-        let mut header_vs = get_verification_state(&client, height, &REGTEST, reorg_safe_depth)
+        let mut header_vs = get_verification_state(&client, height, reorg_safe_depth)
             .await
             .unwrap();
 
@@ -653,10 +652,9 @@ mod test {
                 .unwrap();
         }
 
-        let new_header_vs =
-            get_verification_state(&client, height + len, &REGTEST, reorg_safe_depth)
-                .await
-                .unwrap();
+        let new_header_vs = get_verification_state(&client, height + len, reorg_safe_depth)
+            .await
+            .unwrap();
 
         assert_eq!(
             header_vs.last_verified_block,

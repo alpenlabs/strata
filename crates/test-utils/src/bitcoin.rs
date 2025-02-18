@@ -1,25 +1,14 @@
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
-use anyhow::Error;
 use bitcoin::{
     absolute::LockTime,
-    block::Header,
-    consensus::{deserialize, serialize},
-    hashes::Hash,
+    consensus::deserialize,
     opcodes::all::OP_RETURN,
-    params::Params as BtcParams,
     script::{self, PushBytesBuf},
-    Address, Amount, Block, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
+    Address, Amount, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use strata_l1tx::filter::TxFilterConfig;
-use strata_primitives::{
-    buf::Buf32,
-    l1::{BitcoinAddress, L1BlockCommitment, L1BlockRecord, OutputRef},
-};
-use strata_state::l1::{
-    get_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState, L1BlockId,
-    L1HeaderRecord, TimestampStore,
-};
+use strata_primitives::l1::{BitcoinAddress, L1BlockRecord, OutputRef};
 
 use crate::{l2::gen_params, ArbitraryGenerator};
 
@@ -43,169 +32,6 @@ pub fn gen_l1_chain(len: usize) -> Vec<L1BlockRecord> {
         blocks.push(block);
     }
     blocks
-}
-
-pub fn get_btc_mainnet_block() -> Block {
-    let raw_block = include_bytes!(
-        "../data/mainnet_block_000000000000000000000c835b2adcaedc20fdf6ee440009c249452c726dafae.raw"
-    );
-    let block: Block = deserialize(&raw_block[..]).unwrap();
-    block
-}
-
-pub struct BtcChainSegment {
-    pub headers: Vec<Header>,
-    pub start: u64,
-    pub end: u64,
-    pub custom_blocks: HashMap<u64, Block>,
-}
-
-impl BtcChainSegment {
-    /// Retrieves the block header at the specified height.
-    pub fn get_header(&self, height: u64) -> Result<Header, Error> {
-        if !(self.start..self.end).contains(&height) {
-            return Err(anyhow::anyhow!(
-                "height must be in the range [{}..{}]",
-                self.start,
-                self.end
-            ));
-        }
-        let idx = height - self.start;
-        Ok(self.headers[idx as usize])
-    }
-
-    pub fn get_block(&self, height: u64) -> &Block {
-        self.custom_blocks.get(&height).unwrap()
-    }
-
-    /// Retrieves the timestamps of a specified number of blocks from a given height
-    pub fn get_last_timestamps(&self, from: u64, count: u32) -> Result<Vec<u32>, Error> {
-        let mut timestamps = Vec::with_capacity(count as usize);
-        for i in (0..count).rev() {
-            let h = self.get_header(from - i as u64)?;
-            timestamps.push(h.time)
-        }
-        Ok(timestamps)
-    }
-
-    pub fn get_verification_state(
-        &self,
-        block_height: u64,
-        params: &BtcParams,
-        l1_reorg_safe_depth: u32,
-    ) -> Result<HeaderVerificationState, Error> {
-        // TODO: handle the case where block_height is where new difficulty is enforced i.e.
-        // multiple of 2016
-
-        // Get the difficulty adjustment block just before `block_height`
-        let h1 = get_difficulty_adjustment_height(0, block_height, params);
-        let h0 = h1 - params.difficulty_adjustment_interval();
-
-        // Consider the block before `block_height` to be the last verified block
-        let vh = block_height - 1; // verified_height
-
-        // Fetch the previous timestamps of block from `vh`
-        // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let initial_timestamps = self.get_last_timestamps(vh, 11 + l1_reorg_safe_depth)?;
-        let last_11_blocks_timestamps = TimestampStore::new(&initial_timestamps);
-
-        let last_verified_block_hash: L1BlockId = Buf32::from(
-            self.get_header(vh)?
-                .block_hash()
-                .as_raw_hash()
-                .to_byte_array(),
-        )
-        .into();
-
-        let current_epoch_start_header = self.get_header(h1)?;
-        let epoch_timestamps = EpochTimestamps {
-            current: current_epoch_start_header.time,
-            previous: self
-                .get_header(h0)
-                .unwrap_or(current_epoch_start_header)
-                .time,
-        };
-
-        Ok(HeaderVerificationState {
-            last_verified_block: L1BlockCommitment::new(vh, last_verified_block_hash),
-            next_block_target: self
-                .get_header(vh)?
-                .target()
-                .to_compact_lossy()
-                .to_consensus(),
-            epoch_timestamps,
-            total_accumulated_pow: 0u128,
-            block_timestamp_history: last_11_blocks_timestamps,
-        })
-    }
-
-    pub fn get_block_record(&self, height: u64) -> Result<L1BlockRecord, Error> {
-        let header = self.get_header(height)?;
-        Ok(L1BlockRecord::new(
-            header.block_hash().into(),
-            serialize(&header),
-            Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
-        ))
-    }
-
-    // REVIEW: how is this different from L1BlockRecord?
-    pub fn get_header_record(&self, height: u64) -> Result<L1HeaderRecord, Error> {
-        let header = self.get_header(height)?;
-        Ok(L1HeaderRecord::new(
-            header.block_hash().into(),
-            serialize(&header),
-            Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
-        ))
-    }
-
-    pub fn get_block_records(
-        &self,
-        from_height: u64,
-        len: usize,
-    ) -> Result<Vec<L1BlockRecord>, Error> {
-        let mut blocks = Vec::with_capacity(len);
-        for i in 0..len {
-            let block = self.get_block_record(from_height + i as u64)?;
-            blocks.push(block);
-        }
-        Ok(blocks)
-    }
-}
-
-pub fn get_btc_chain() -> BtcChainSegment {
-    let buffer = include_bytes!("../data/mainnet_blocks_40000-50000.raw");
-
-    let chunk_size = Header::SIZE;
-    let capacity = buffer.len() / chunk_size;
-    let mut headers = Vec::with_capacity(capacity);
-
-    for chunk in buffer.chunks(chunk_size) {
-        let raw_header = chunk.to_vec();
-        let header: Header = deserialize(&raw_header).unwrap();
-        headers.push(header);
-    }
-
-    // This custom blocks are chose because this is where the first difficulty happened
-    let custom_blocks: HashMap<u64, Block> = vec![
-        (40321, "0100000045720d24eae33ade0d10397a2e02989edef834701b965a9b161e864500000000993239a44a83d5c427fd3d7902789ea1a4d66a37d5848c7477a7cf47c2b071cd7690784b5746651c3af7ca030101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c02db00ffffffff0100f2052a01000000434104c9f513361104db6a84fb6d5b364ba57a27cd19bd051239bf750d8999c6b437220df8fea6b932a248df3cad1fdebb501791e02b7b893a44718d696542ba92a0acac00000000".to_owned()),
-        (40322, "01000000fd1133cd53d00919b0bd77dd6ca512c4d552a0777cc716c00d64c60d0000000014cf92c7edbe8a75d1e328b4fec0d6143764ecbd0f5600aba9d22116bf165058e590784b5746651c1623dbe00101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c020509ffffffff0100f2052a010000004341043eb751f57bd4839a8f2922d5bf1ed15ade9b161774658fb39801f0b9da9c881f226fbe4ee0c240915f17ce5255dd499075ab49b199a7b1f898fb20cc735bc45bac00000000".to_owned()),
-        (40323, "01000000c579e586b48485b6e263b54949d07dce8660316163d915a35e44eb570000000011d2b66f9794f17393bf90237f402918b61748f41f9b5a2523c482a81a44db1f4f91784b5746651c284557020101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c024502ffffffff0100f2052a01000000434104597b934f2081e7f0d7fae03ec668a9c69a090f05d4ee7c65b804390d94266ffb90442a1889aaf78b460692a43857638520baa8319cf349b0d5f086dc4d36da8eac00000000".to_owned()),
-        (40324, "010000001f35c6ea4a54eb0ea718a9e2e9badc3383d6598ff9b6f8acfd80e52500000000a7a6fbce300cbb5c0920164d34c36d2a8bb94586e9889749962b1be9a02bbf3b9194784b5746651c0558e1140101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c029001ffffffff0100f2052a01000000434104e5d390c21b7d221e6ba15c518444c1aae43d6fb6f721c4a5f71e590288637ca2961be07ee845a795da3fd1204f52d4faa819c167062782590f08cf717475e488ac00000000".to_owned()),
-        ]
-        .into_iter()
-        .map(|(h, raw_block)| {
-            let block_bytes = hex::decode(&raw_block).unwrap();
-            let block: Block = bitcoin::consensus::deserialize(&block_bytes).unwrap();
-            (h, block)
-        })
-        .collect();
-
-    BtcChainSegment {
-        headers,
-        start: 40_000,
-        end: 50_000,
-        custom_blocks,
-    }
 }
 
 pub fn get_test_tx_filter_config() -> TxFilterConfig {

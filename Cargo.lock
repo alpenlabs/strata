@@ -13901,6 +13901,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "async-trait",
  "bitcoin",
  "hex",
  "musig2",
@@ -13920,6 +13921,7 @@ dependencies = [
  "strata-state",
  "strata-storage",
  "threadpool",
+ "tokio",
 ]
 
 [[package]]

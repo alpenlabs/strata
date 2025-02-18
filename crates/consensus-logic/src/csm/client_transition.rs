@@ -497,7 +497,8 @@ mod tests {
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{l1::L1BlockId, operation};
     use strata_test_utils::{
-        bitcoin::{gen_l1_chain, get_btc_chain, BtcChainSegment},
+        bitcoin::gen_l1_chain,
+        bitcoin_mainnet_segment::BtcChainSegment,
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,
     };
@@ -512,7 +513,7 @@ mod tests {
     impl DummyEventContext {
         pub fn new() -> Self {
             Self {
-                chainseg: get_btc_chain(),
+                chainseg: BtcChainSegment::load(),
             }
         }
     }
@@ -583,9 +584,9 @@ mod tests {
         let horizon = params.rollup().horizon_l1_height;
         let genesis = params.rollup().genesis_l1_height;
 
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
         let l1_verification_state = chain
-            .get_verification_state(genesis + 1, &MAINNET, params.rollup().l1_reorg_safe_depth)
+            .get_verification_state(genesis + 1, params.rollup().l1_reorg_safe_depth)
             .unwrap();
 
         let genesis_block = genesis::make_genesis_block(&params);
