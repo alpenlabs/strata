@@ -59,26 +59,14 @@ impl L1Database for L1Db {
         Ok(())
     }
 
-    fn extend_canonical_chain(&self, height: u64, blockid: L1BlockId) -> DbResult<()> {
+    fn set_canonical_chain_entry(&self, height: u64, blockid: L1BlockId) -> DbResult<()> {
         self.db.put::<L1CanonicalBlockSchema>(&height, &blockid)?;
         Ok(())
     }
 
-    fn revert_canonical_chain(&self, height: u64) -> DbResult<()> {
-        // Get latest height, iterate backwards upto the idx, get blockhash and delete txns and
-        // blockmanifest data at each iteration
-        let last_height = self
-            .get_latest_block()?
-            .map(|(height, _)| height)
-            .unwrap_or(0);
-        if height > last_height {
-            return Err(DbError::Other(
-                "Invalid block number to revert to".to_string(),
-            ));
-        }
-
+    fn remove_canonical_chain_range(&self, start_height: u64, end_height: u64) -> DbResult<()> {
         let mut batch = SchemaBatch::new();
-        for height in ((height + 1)..=last_height).rev() {
+        for height in (start_height..=end_height).rev() {
             batch.delete::<L1CanonicalBlockSchema>(&height)?;
         }
 
@@ -231,7 +219,7 @@ mod tests {
         // Insert block data
         let res = db.put_block_data(mf.clone(), txs.clone());
         assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
-        let res = db.extend_canonical_chain(height, *mf.blkid());
+        let res = db.set_canonical_chain_entry(height, *mf.blkid());
         assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
 
         // Insert mmr data
@@ -256,95 +244,55 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_into_non_empty_db() {
+    fn test_insert_into_canonical_chain() {
         let db = setup_db();
-        let idx = 1_000;
-        insert_block_data(idx, &db, 10); // first insertion
 
-        let invalid_idxs = vec![1, 2, 5000, 1000, 1002, 999]; // basically any id beside idx + 1
-        for invalid_idx in invalid_idxs {
+        let heights = vec![1, 2, 5000, 1000, 1002, 999];
+        let mut blockids = Vec::new();
+        for height in &heights {
             let txs: Vec<L1Tx> = (0..10)
                 .map(|_| ArbitraryGenerator::new().generate())
                 .collect();
             let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
             let blockid = *mf.blkid();
             db.put_block_data(mf, txs).unwrap();
-            let res = db.extend_canonical_chain(invalid_idx, blockid);
-            assert!(res.is_err(), "Should fail to insert to db");
+            assert!(db.set_canonical_chain_entry(*height, blockid).is_ok());
+            blockids.push(blockid);
         }
 
-        let valid_idx = idx + 1;
-        let txs: Vec<L1Tx> = (0..10)
-            .map(|_| ArbitraryGenerator::new().generate())
-            .collect();
-        let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
-        let blockid = *mf.blkid();
-        db.put_block_data(mf, txs).unwrap();
-        let res = db.extend_canonical_chain(valid_idx, blockid);
-        assert!(res.is_ok(), "Should successfully insert to db");
-    }
-
-    #[test]
-    fn test_revert_to_invalid_height() {
-        let db = setup_db();
-        // First insert a couple of manifests
-        let num_txs = 10;
-        let _ = insert_block_data(1, &db, num_txs);
-        let _ = insert_block_data(2, &db, num_txs);
-        let _ = insert_block_data(3, &db, num_txs);
-        let _ = insert_block_data(4, &db, num_txs);
-
-        // Try reverting to an invalid height, which should fail
-        let invalid_heights = [5, 6, 10];
-        for inv_h in invalid_heights {
-            let res = db.revert_canonical_chain(inv_h);
-            assert!(res.is_err(), "Should fail to revert to height {}", inv_h);
+        for (height, expected_blockid) in heights.into_iter().zip(blockids) {
+            assert!(matches!(
+                db.get_canonical_blockid(height),
+                Ok(Some(blockid)) if blockid == expected_blockid
+            ));
         }
     }
 
     #[test]
-    fn test_revert_to_zero_height() {
+    fn test_remove_canonical_chain_range() {
         let db = setup_db();
         // First insert a couple of manifests
         let num_txs = 10;
-        let _ = insert_block_data(1, &db, num_txs);
-        let _ = insert_block_data(2, &db, num_txs);
-        let _ = insert_block_data(3, &db, num_txs);
-        let _ = insert_block_data(4, &db, num_txs);
-
-        let res = db.revert_canonical_chain(0);
-        assert!(res.is_ok(), "Should succeed to revert to height 0");
-    }
-
-    #[test]
-    fn test_revert_to_non_zero_height() {
-        let db = setup_db();
-        // First insert a couple of manifests
-        let num_txs = 10;
-        let _ = insert_block_data(1, &db, num_txs);
-        let _ = insert_block_data(2, &db, num_txs);
-        let _ = insert_block_data(3, &db, num_txs);
-        let _ = insert_block_data(4, &db, num_txs);
-
-        let res = db.revert_canonical_chain(3);
-        assert!(res.is_ok(), "Should succeed to revert to non-zero height");
-        let revert_blockid = db.get_canonical_blockid(3).unwrap().unwrap();
-
-        // Check that some txns and mmrs exists upto this height
-        for h in 1..=3 {
-            let blockid = db.get_canonical_blockid(h).unwrap().unwrap();
-            let txn_data = db.get_tx((blockid, 0).into()).unwrap();
-            assert!(txn_data.is_some());
-            let mmr_data = db.get_mmr(blockid).unwrap();
-            assert!(mmr_data.is_some());
+        let start_height = 1;
+        let end_height = 10;
+        for h in start_height..=end_height {
+            insert_block_data(h, &db, num_txs);
         }
 
-        // Check that latest block is at revert height
-        let latest = db.get_latest_block().unwrap();
-        assert!(matches!(latest, Some((3, blockid)) if blockid == revert_blockid));
-        // check that block beyond revert height is not accessible
-        let blockid = db.get_canonical_blockid(4).unwrap();
-        assert!(blockid.is_none());
+        let remove_start_height = 5;
+        let remove_end_height = 15;
+        assert!(db
+            .remove_canonical_chain_range(remove_start_height, remove_end_height)
+            .is_ok());
+
+        // all removed items are gone from canonical chain
+        for h in remove_start_height..=remove_end_height {
+            assert!(matches!(db.get_canonical_blockid(h), Ok(None)));
+        }
+        // everything else is retained
+        for h in start_height..remove_start_height {
+            assert!(matches!(db.get_canonical_blockid(h), Ok(Some(_))));
+        }
     }
 
     #[test]
