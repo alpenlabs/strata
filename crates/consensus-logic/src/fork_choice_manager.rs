@@ -175,7 +175,7 @@ pub fn init_forkchoice_manager(
     // Populate the unfinalized block tracker.
     let mut chain_tracker =
         unfinalized_tracker::UnfinalizedBlockTracker::new_empty(finalized_epoch);
-    chain_tracker.load_unfinalized_blocks(finalized_epoch.last_slot(), storage.l2().as_ref())?;
+    chain_tracker.load_unfinalized_blocks(storage.l2().as_ref())?;
 
     let cur_tip_block = determine_start_tip(&chain_tracker, storage.l2())?;
 

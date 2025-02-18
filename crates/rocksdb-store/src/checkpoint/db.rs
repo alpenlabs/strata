@@ -153,7 +153,13 @@ mod tests {
         let mut ag = ArbitraryGenerator::new();
         let summary1: EpochSummary = ag.generate();
         let epoch = summary1.epoch();
-        let summary2 = EpochSummary::new(epoch, ag.generate(), ag.generate(), ag.generate());
+        let summary2 = EpochSummary::new(
+            epoch,
+            ag.generate(),
+            ag.generate(),
+            ag.generate(),
+            ag.generate(),
+        );
 
         let commitment1 = summary1.get_epoch_commitment();
         let commitment2 = summary2.get_epoch_commitment();

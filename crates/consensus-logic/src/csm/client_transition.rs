@@ -681,7 +681,12 @@ mod tests {
     impl EventContext for DummyEventContext {
         fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
             let rec = self.chainseg.get_block_record(height as u32);
-            Ok(L1BlockManifest::new(rec, height))
+            Ok(L1BlockManifest::new(
+                rec,
+                HeaderVerificationState::default(),
+                Vec::new(),
+                height,
+            ))
         }
 
         fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
@@ -748,13 +753,20 @@ mod tests {
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();
         let l1_chain = chain.get_block_records(horizon as u32, 10);
+
+        let l1_blocks = l1_chain
+            .iter()
+            .enumerate()
+            .map(|(i, block)| L1BlockCommitment::new(i as u64, block.block_hash()))
+            .collect::<Vec<_>>();
+
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash()).collect();
 
         let test_cases = [
             TestCase {
                 description: "At horizon block",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Block(horizon, l1_chain[0].block_hash()),
+                    event: SyncEvent::L1Block(l1_blocks[0]),
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -772,7 +784,7 @@ mod tests {
             TestCase {
                 description: "At horizon block + 1",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Block(horizon + 1, l1_chain[1].block_hash()),
+                    event: SyncEvent::L1Block(l1_blocks[1]),
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -791,10 +803,7 @@ mod tests {
             TestCase {
                 description: "As the genesis of L2 is reached but not locked in yet",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Block(
-                        genesis,
-                        l1_chain[(genesis - horizon) as usize].block_hash(),
-                    ),
+                    event: SyncEvent::L1Block(l1_blocks[2]),
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new(move |state| {
@@ -805,10 +814,7 @@ mod tests {
             TestCase {
                 description: "At genesis + 1",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Block(
-                        genesis + 1,
-                        l1_chain[(genesis + 1 - horizon) as usize].block_hash(),
-                    ),
+                    event: SyncEvent::L1Block(l1_blocks[3]),
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -821,20 +827,13 @@ mod tests {
                             Some(&l1_chain[(genesis + 1 - horizon) as usize].block_hash(),)
                         );
                         assert_eq!(state.next_exp_l1_block(), genesis + 2);
-                        assert_eq!(
-                            state.l1_view().local_unaccepted_blocks(),
-                            &blkids[0..(genesis + 1 - horizon + 1) as usize]
-                        );
                     }
                 }),
             },
             TestCase {
                 description: "At genesis + 2",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Block(
-                        genesis + 2,
-                        l1_chain[(genesis + 2 - horizon) as usize].block_hash(),
-                    ),
+                    event: SyncEvent::L1Block(l1_blocks[4]),
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
@@ -847,33 +846,15 @@ mod tests {
                             Some(&l1_chain[(genesis + 2 - horizon) as usize].block_hash())
                         );
                         assert_eq!(state.next_exp_l1_block(), genesis + 3);
-                        assert_eq!(
-                            state.l1_view().local_unaccepted_blocks(),
-                            &blkids[0..(genesis + 2 - horizon + 1) as usize]
-                        );
                     }
                 }),
             },
             TestCase {
                 description: "At genesis + 3, lock in genesis",
-                events: &[
-                    TestEvent {
-                        event: SyncEvent::L1BlockGenesis(
-                            genesis + 3,
-                            l1_verification_state.clone(),
-                        ),
-                        expected_actions: &[SyncAction::L2Genesis(
-                            l1_chain[(genesis - horizon) as usize].block_hash(),
-                        )],
-                    },
-                    TestEvent {
-                        event: SyncEvent::L1Block(
-                            genesis + 3,
-                            l1_chain[(genesis + 3 - horizon) as usize].block_hash(),
-                        ),
-                        expected_actions: &[],
-                    },
-                ],
+                events: &[TestEvent {
+                    event: SyncEvent::L1Block(l1_blocks[5]),
+                    expected_actions: &[],
+                }],
                 state_assertions: Box::new({
                     let l1_chain = &l1_chain;
                     move |state| {
@@ -885,7 +866,7 @@ mod tests {
             TestCase {
                 description: "Rollback to genesis height",
                 events: &[TestEvent {
-                    event: SyncEvent::L1Revert(genesis),
+                    event: SyncEvent::L1Revert(l1_blocks[4]),
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({ move |state| {} }),

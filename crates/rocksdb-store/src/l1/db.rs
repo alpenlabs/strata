@@ -184,7 +184,7 @@ impl L1Database for L1Db {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_state::{l1::L1TxProof, tx::ProtocolOperation};
+    use strata_primitives::l1::{L1TxProof, ProtocolOperation};
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;

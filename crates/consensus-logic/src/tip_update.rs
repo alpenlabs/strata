@@ -191,9 +191,12 @@ pub fn compute_tip_update(
 #[cfg(test)]
 mod tests {
     use rand::{rngs::OsRng, RngCore};
-    use strata_state::id::L2BlockId;
+    use strata_primitives::{
+        epoch::EpochCommitment,
+        l2::{L2BlockCommitment, L2BlockId},
+    };
 
-    use super::{compute_tip_update, Reorg};
+    use super::{compute_tip_update, Reorg, TipUpdate};
     use crate::unfinalized_tracker;
 
     fn rand_blkid() -> L2BlockId {
@@ -202,116 +205,133 @@ mod tests {
         L2BlockId::from(strata_primitives::buf::Buf32::from(buf))
     }
 
+    fn rand_block_commitment(s: u64) -> L2BlockCommitment {
+        L2BlockCommitment::new(s, rand_blkid())
+    }
+
+    fn rand_epoch_commitment(e: u64, s: u64) -> EpochCommitment {
+        EpochCommitment::from_terminal(e, rand_block_commitment(s))
+    }
+
+    /// Inserts a branch into the tracker, using the first block in the sequence
+    /// as the starting point which is assumed to exist in the tracker.
+    fn insert_branch(
+        tracker: &mut unfinalized_tracker::UnfinalizedBlockTracker,
+        block_seq: &[L2BlockId],
+    ) {
+        let base_slot = tracker
+            .get_slot(&block_seq[0])
+            .expect("tipupdate: missing block slot");
+        block_seq.windows(2).enumerate().for_each(|(i, pair)| {
+            let slot = base_slot + (i as u64) + 1;
+            tracker.insert_fake_block(slot, pair[1], pair[0])
+        });
+    }
+
     #[test]
     fn test_eq_len() {
-        let base = rand_blkid();
+        let base = rand_epoch_commitment(10, 2);
         let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
 
         // Set up the two branches.
-        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid()];
+        let side_1 = [*base.last_blkid(), rand_blkid(), rand_blkid(), rand_blkid()];
         let side_2 = [side_1[1], rand_blkid(), rand_blkid()];
         eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
 
-        let exp_reorg = Reorg {
+        let exp_reorg = TipUpdate::Reorg(Reorg {
             down: vec![side_1[3], side_1[2]],
             pivot: side_1[1],
             up: vec![side_2[1], side_2[2]],
-        };
+        });
 
         // Insert them.
-        side_1
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
-        side_2
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        insert_branch(&mut tracker, &side_1);
+        insert_branch(&mut tracker, &side_2);
 
         let reorg =
             compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
 
         let reorg = reorg.expect("test: reorg not found");
         eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
-        assert_eq!(reorg, exp_reorg);
+        assert_eq!(reorg, Some(exp_reorg));
     }
 
     #[test]
     fn test_longer_down() {
-        let base = rand_blkid();
-        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
-
-        // Set up the two branches.
-        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid(), rand_blkid()];
-        let side_2 = [side_1[1], rand_blkid(), rand_blkid()];
-        eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
-
-        let exp_reorg = Reorg {
-            down: vec![side_1[4], side_1[3], side_1[2]],
-            pivot: side_1[1],
-            up: vec![side_2[1], side_2[2]],
-        };
-
-        // Insert them.
-        side_1
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
-        side_2
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
-
-        let reorg =
-            compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
-
-        let reorg = reorg.expect("test: reorg not found");
-        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
-        assert_eq!(reorg, exp_reorg);
-    }
-
-    #[test]
-    fn test_longer_up() {
-        let base = rand_blkid();
-        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
-
-        // Set up the two branches.
-        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid()];
-        let side_2 = [
-            side_1[1],
-            rand_blkid(),
-            rand_blkid(),
-            rand_blkid(),
-            rand_blkid(),
-        ];
-        eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
-
-        let exp_reorg = Reorg {
-            down: vec![side_1[3], side_1[2]],
-            pivot: side_1[1],
-            up: vec![side_2[1], side_2[2], side_2[3], side_2[4]],
-        };
-
-        // Insert them.
-        side_1
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
-        side_2
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
-
-        let reorg =
-            compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
-
-        let reorg = reorg.expect("test: reorg not found");
-        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
-        assert_eq!(reorg, exp_reorg);
-    }
-
-    #[test]
-    fn test_too_deep() {
-        let base = rand_blkid();
+        let base = rand_epoch_commitment(10, 2);
         let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
 
         // Set up the two branches.
         let side_1 = [
-            base,
+            *base.last_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+        ];
+        let side_2 = [side_1[1], rand_blkid(), rand_blkid()];
+        eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
+
+        let exp_reorg = TipUpdate::Reorg(Reorg {
+            down: vec![side_1[4], side_1[3], side_1[2]],
+            pivot: side_1[1],
+            up: vec![side_2[1], side_2[2]],
+        });
+
+        // Insert them.
+        insert_branch(&mut tracker, &side_1);
+        insert_branch(&mut tracker, &side_2);
+
+        let reorg =
+            compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
+
+        let reorg = reorg.expect("test: reorg not found");
+        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
+        assert_eq!(reorg, Some(exp_reorg));
+    }
+
+    #[test]
+    fn test_longer_up() {
+        let base = rand_epoch_commitment(10, 2);
+        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
+
+        // Set up the two branches.
+        let side_1 = [*base.last_blkid(), rand_blkid(), rand_blkid(), rand_blkid()];
+        let side_2 = [
+            side_1[1],
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+        ];
+        eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
+
+        let exp_reorg = TipUpdate::Reorg(Reorg {
+            down: vec![side_1[3], side_1[2]],
+            pivot: side_1[1],
+            up: vec![side_2[1], side_2[2], side_2[3], side_2[4]],
+        });
+
+        // Insert them.
+        insert_branch(&mut tracker, &side_1);
+        insert_branch(&mut tracker, &side_2);
+
+        let update =
+            compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 10, &tracker);
+
+        let update = update.expect("test: reorg not found");
+        eprintln!("expected {exp_reorg:#?}\nfound {update:#?}");
+        assert_eq!(update, Some(exp_reorg));
+    }
+
+    #[test]
+    fn test_too_deep() {
+        let base = rand_epoch_commitment(10, 2);
+        let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
+
+        // Set up the two branches.
+        let side_1 = [
+            *base.last_blkid(),
             rand_blkid(),
             rand_blkid(),
             rand_blkid(),
@@ -331,29 +351,27 @@ mod tests {
         eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
 
         // Insert them.
-        side_1
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
-        side_2
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        insert_branch(&mut tracker, &side_1);
+        insert_branch(&mut tracker, &side_2);
 
-        let reorg = compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 3, &tracker);
+        let update =
+            compute_tip_update(side_1.last().unwrap(), side_2.last().unwrap(), 3, &tracker)
+                .expect("tipupdate: compute update");
 
-        if let Some(reorg) = reorg {
-            eprintln!("reorg found wrongly {reorg:#?}");
-            panic!("reorg found wrongly");
+        if let Some(update) = update {
+            eprintln!("update found wrongly {update:#?}");
+            panic!("update found wrongly");
         }
     }
 
     #[test]
     fn test_start_ancestor() {
-        let base = rand_blkid();
+        let base = rand_epoch_commitment(10, 2);
         let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
 
         // Set up the two branches.
         let chain = [
-            base,
+            *base.last_blkid(),
             rand_blkid(),
             rand_blkid(),
             rand_blkid(),
@@ -364,34 +382,27 @@ mod tests {
         eprintln!("base {base:?}\nchain {chain:#?}");
 
         // Insert them.
-        chain
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        insert_branch(&mut tracker, &chain);
 
         let src = &chain[3];
         let dest = chain.last().unwrap();
-        let reorg = compute_tip_update(src, dest, 10, &tracker);
+        let update = compute_tip_update(src, dest, 10, &tracker);
 
-        let exp_reorg = Reorg {
-            down: Vec::new(),
-            pivot: *src,
-            up: vec![chain[4], chain[5], chain[6]],
-        };
+        let exp_update = TipUpdate::ExtendTip(*src, *dest);
 
-        let reorg = reorg.expect("test: reorg not found");
-        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
-        assert_eq!(reorg, exp_reorg);
-        assert!(reorg.is_weird());
+        let update = update.expect("test: update not found");
+        eprintln!("expected {exp_update:#?}\nfound {update:#?}");
+        assert_eq!(update, Some(exp_update));
     }
 
     #[test]
     fn test_end_ancestor() {
-        let base = rand_blkid();
+        let base = rand_epoch_commitment(10, 2);
         let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
 
         // Set up the two branches.
         let chain = [
-            base,
+            *base.last_blkid(),
             rand_blkid(),
             rand_blkid(),
             rand_blkid(),
@@ -402,34 +413,27 @@ mod tests {
         eprintln!("base {base:?}\nchain {chain:#?}");
 
         // Insert them.
-        chain
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        insert_branch(&mut tracker, &chain);
 
         let src = chain.last().unwrap();
         let dest = &chain[3];
-        let reorg = compute_tip_update(src, dest, 10, &tracker);
+        let update = compute_tip_update(src, dest, 10, &tracker);
 
-        let exp_reorg = Reorg {
-            down: vec![chain[6], chain[5], chain[4]],
-            pivot: *dest,
-            up: Vec::new(),
-        };
+        let exp_reorg = TipUpdate::Revert(*src, *dest);
 
-        let reorg = reorg.expect("test: reorg not found");
-        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
-        assert_eq!(reorg, exp_reorg);
-        assert!(reorg.is_weird());
+        let update = update.expect("test: update not found");
+        eprintln!("expected {exp_reorg:#?}\nfound {update:#?}");
+        assert_eq!(update, Some(exp_reorg));
     }
 
     #[test]
     fn test_identity() {
-        let base = rand_blkid();
+        let base = rand_epoch_commitment(10, 2);
         let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
 
         // Set up the two branches.
         let chain = [
-            base,
+            *base.last_blkid(),
             rand_blkid(),
             rand_blkid(),
             rand_blkid(),
@@ -440,71 +444,64 @@ mod tests {
         eprintln!("base {base:?}\nchain {chain:#?}");
 
         // Insert them.
-        chain
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        insert_branch(&mut tracker, &chain);
 
         let src = chain.last().unwrap();
         let dest = src;
-        let reorg = compute_tip_update(src, dest, 10, &tracker);
-        eprintln!("reorg found wrongly {reorg:#?}");
-
-        let exp_reorg = Reorg {
-            down: Vec::new(),
-            pivot: *dest,
-            up: Vec::new(),
-        };
-
-        let reorg = reorg.expect("test: reorg not found");
-        eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
-        assert_eq!(reorg, exp_reorg);
-        assert!(reorg.is_identity());
+        let update = compute_tip_update(src, dest, 10, &tracker);
+        eprintln!("update {update:#?}");
+        match update {
+            Ok(None) => {}
+            u => panic!("bad update {u:?}"),
+        }
     }
 
     #[test]
     fn test_longer_down_depth_less_than_chain_length() {
-        let base = rand_blkid();
+        let base = rand_epoch_commitment(10, 2);
         let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
 
         // Set up the two branches.
-        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid(), rand_blkid()];
+        let side_1 = [
+            *base.last_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+            rand_blkid(),
+        ];
         let side_2 = [side_1[1], rand_blkid(), rand_blkid()];
         let limit_depth = 4; // This is not larger than the longest chain length
         eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
 
-        let exp_reorg = Reorg {
+        let exp_reorg = TipUpdate::Reorg(Reorg {
             down: vec![side_1[4], side_1[3], side_1[2]],
             pivot: side_1[1],
             up: vec![side_2[1], side_2[2]],
-        };
+        });
 
         // Insert them.
-        side_1
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
-        side_2
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        insert_branch(&mut tracker, &side_1);
+        insert_branch(&mut tracker, &side_2);
 
-        let reorg = compute_tip_update(
+        let update = compute_tip_update(
             side_1.last().unwrap(),
             side_2.last().unwrap(),
             limit_depth,
             &tracker,
         );
 
-        let reorg = reorg.expect("test: reorg not found");
+        let reorg = update.expect("test: reorg not found");
         eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
-        assert_eq!(reorg, exp_reorg);
+        assert_eq!(reorg, Some(exp_reorg));
     }
 
     #[test]
     fn test_longer_up_depth_less_than_chain_length() {
-        let base = rand_blkid();
+        let base = rand_epoch_commitment(10, 2);
         let mut tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(base);
 
         // Set up the two branches.
-        let side_1 = [base, rand_blkid(), rand_blkid(), rand_blkid()];
+        let side_1 = [*base.last_blkid(), rand_blkid(), rand_blkid(), rand_blkid()];
         let side_2 = [
             side_1[1],
             rand_blkid(),
@@ -515,19 +512,15 @@ mod tests {
         let limit_depth = 5; // This is not larger than the longest chain length
         eprintln!("base {base:?}\nside1 {side_1:#?}\nside2 {side_2:#?}");
 
-        let exp_reorg = Reorg {
+        let exp_reorg = TipUpdate::Reorg(Reorg {
             down: vec![side_1[3], side_1[2]],
             pivot: side_1[1],
             up: vec![side_2[1], side_2[2], side_2[3], side_2[4]],
-        };
+        });
 
         // Insert them.
-        side_1
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
-        side_2
-            .windows(2)
-            .for_each(|pair| tracker.insert_fake_block(pair[1], pair[0]));
+        insert_branch(&mut tracker, &side_1);
+        insert_branch(&mut tracker, &side_2);
 
         let reorg = compute_tip_update(
             side_1.last().unwrap(),
@@ -538,6 +531,6 @@ mod tests {
 
         let reorg = reorg.expect("test: reorg not found");
         eprintln!("expected {exp_reorg:#?}\nfound {reorg:#?}");
-        assert_eq!(reorg, exp_reorg);
+        assert_eq!(reorg, Some(exp_reorg));
     }
 }

@@ -75,6 +75,11 @@ impl UnfinalizedBlockTracker {
         self.finalized_tip() == id || self.pending_table.contains_key(id)
     }
 
+    /// Returns the slot of some block, if present in the tracker.
+    pub fn get_slot(&self, id: &L2BlockId) -> Option<u64> {
+        self.pending_table.get(id).map(|ent| ent.slot)
+    }
+
     /// Gets the parent of a block from within the tree.  Returns `None` if the
     /// block or its parent isn't in the tree.  Returns `None` for the finalized
     /// tip block, since its parent isn't in the tree.
@@ -278,10 +283,9 @@ impl UnfinalizedBlockTracker {
     /// Loads the unfinalized blocks into the tracker which are already in the DB
     pub fn load_unfinalized_blocks(
         &mut self,
-        finalized_height: u64,
         l2_block_manager: &L2BlockManager,
     ) -> anyhow::Result<()> {
-        let mut height = finalized_height + 1;
+        let mut height = self.finalized_epoch.last_slot() + 1;
 
         loop {
             let blkids = match l2_block_manager.get_blocks_at_height_blocking(height) {
@@ -337,13 +341,14 @@ impl UnfinalizedBlockTracker {
     }
 
     #[cfg(test)]
-    pub fn unchecked_set_finalized_tip(&mut self, id: L2BlockId) {
-        self.finalized_tip = id;
+    pub fn unchecked_set_finalized_tip(&mut self, epoch: EpochCommitment) {
+        self.finalized_epoch = epoch;
     }
 
     #[cfg(test)]
-    pub fn insert_fake_block(&mut self, id: L2BlockId, parent: L2BlockId) {
+    pub fn insert_fake_block(&mut self, slot: u64, id: L2BlockId, parent: L2BlockId) {
         let ent = BlockEntry {
+            slot,
             parent,
             children: HashSet::new(),
         };
@@ -400,8 +405,12 @@ mod tests {
     use std::collections::HashSet;
 
     use strata_db::traits::{BlockStatus, Database, L2BlockDatabase};
+    use strata_primitives::{
+        epoch::EpochCommitment,
+        l2::{L2BlockCommitment, L2BlockId},
+    };
     use strata_rocksdb::test_utils::get_common_db;
-    use strata_state::{header::L2Header, id::L2BlockId};
+    use strata_state::header::L2Header;
     use strata_storage::L2BlockManager;
     use strata_test_utils::l2::gen_l2_chain;
 
@@ -458,21 +467,21 @@ mod tests {
         l2_blkman: &L2BlockManager,
     ) {
         // Init the chain tracker from the state we figured out.
-        let mut chain_tracker =
-            unfinalized_tracker::UnfinalizedBlockTracker::new_empty(prev_finalized_tip);
+        let epoch = EpochCommitment::new(0, 10, prev_finalized_tip);
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
 
-        chain_tracker
-            .load_unfinalized_blocks(0, 3, l2_blkman)
-            .unwrap();
+        chain_tracker.load_unfinalized_blocks(l2_blkman).unwrap();
 
-        let report = chain_tracker
-            .update_finalized_tip(&new_finalized_tip)
-            .unwrap();
+        let new_epoch = EpochCommitment::new(1, 20, new_finalized_tip);
+        let report = chain_tracker.update_finalized_epoch(&new_epoch).unwrap();
 
         assert_eq!(report.prev_tip(), &prev_finalized_tip);
         assert_eq!(report.finalized, finalized_blocks);
         assert_eq!(report.rejected(), rejected_blocks);
-        assert_eq!(chain_tracker.finalized_tip, new_finalized_tip);
+        assert_eq!(
+            *chain_tracker.finalized_epoch().last_blkid(),
+            new_finalized_tip
+        );
         assert_eq!(chain_tracker.unfinalized_tips, unfinalized_tips);
     }
 
@@ -484,14 +493,13 @@ mod tests {
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         // Init the chain tracker from the state we figured out.
-        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
+        let epoch = EpochCommitment::new(0, 10, g);
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
 
         let pool = threadpool::ThreadPool::new(1);
         let blkman = L2BlockManager::new(pool, db);
 
-        chain_tracker
-            .load_unfinalized_blocks(0, 3, &blkman)
-            .unwrap();
+        chain_tracker.load_unfinalized_blocks(&blkman).unwrap();
 
         assert_eq!(chain_tracker.get_parent(&g), None);
         assert_eq!(chain_tracker.get_parent(&a1), Some(&g));
@@ -531,14 +539,13 @@ mod tests {
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         // Init the chain tracker from the state we figured out.
-        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
+        let epoch = EpochCommitment::new(0, 10, g);
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
 
         let pool = threadpool::ThreadPool::new(1);
         let blkman = L2BlockManager::new(pool, db);
 
-        chain_tracker
-            .load_unfinalized_blocks(0, 3, &blkman)
-            .unwrap();
+        chain_tracker.load_unfinalized_blocks(&blkman).unwrap();
 
         assert_eq!(
             chain_tracker.get_all_descendants(&g),
