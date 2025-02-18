@@ -555,12 +555,17 @@ mod test {
 
         // Create client state with a finalized checkpoint
         let mut clstate: ClientState = ArbitraryGenerator::new().generate();
-        let mut checkpt: L1Checkpoint = ArbitraryGenerator::new().generate();
+        let mut ckpt: L1Checkpoint = ArbitraryGenerator::new().generate();
 
-        let chkpt_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
-        checkpt.height = chkpt_height;
+        let ckpt_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
+        ckpt.height = ckpt_height;
+
+        // This is a horrible hack to update the height.
+        ckpt.batch_info.l1_range.1 =
+            L1BlockCommitment::new(ckpt_height, *ckpt.batch_info.l1_range.1.blkid());
+
         #[allow(deprecated)]
-        clstate.set_last_finalized_checkpoint(checkpt);
+        clstate.set_last_finalized_checkpoint(ckpt);
 
         // Create reader context and state
         let mut ctx = get_reader_ctx(chstate.clone(), clstate.clone());
@@ -596,7 +601,7 @@ mod test {
         // Check the reader state's next_height
         assert_eq!(
             state.next_height(),
-            chkpt_height + 1,
+            ckpt_height + 1,
             "Reader's next sheight should be updated"
         );
 
