@@ -55,6 +55,14 @@ impl L1ViewState {
     }
 
     pub fn tip_height(&self) -> u64 {
+        // I don't know if this makes sense to do like this, whatever.
+        self.maturation_queue
+            .back_idx()
+            .unwrap_or(self.maturation_queue.base_idx())
+    }
+
+    /// The height of the next block we expect to be added.
+    pub fn next_expected_height(&self) -> u64 {
         self.maturation_queue.next_idx()
     }
 

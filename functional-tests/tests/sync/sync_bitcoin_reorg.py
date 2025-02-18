@@ -1,4 +1,5 @@
 import time
+import logging
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -54,7 +55,7 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         # Sanity Check for first checkpoint
         idx = 0
         check_nth_checkpoint_finalized(idx, seqrpc, prover_rpc, manual_gen)
-        self.debug(f"Pass checkpoint finalization for checkpoint {idx}")
+        logging.info(f"Pass checkpoint finalization for checkpoint {idx}")
 
         # TODO remove this after adding a proper config file
         # We need to wait for the tx to be published to L1

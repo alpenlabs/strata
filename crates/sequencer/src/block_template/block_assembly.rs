@@ -112,10 +112,10 @@ fn prepare_l1_segment(
     // Check to see if there's actually no blocks in the queue.  In that case we can just give
     // everything we know about.
     let _maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
-    let cur_state_l1_height = prev_chstate.l1_view().tip_height();
+    let cur_next_exp_height = prev_chstate.l1_view().next_expected_height();
 
     // If there isn't any new blocks to pull then we just give nothing.
-    if target_height <= cur_state_l1_height {
+    if target_height <= cur_next_exp_height {
         return Ok(L1Segment::new_empty());
     }
 
@@ -123,11 +123,9 @@ fn prepare_l1_segment(
     // to handle reorgs properly.  This is fine, we'll readd it later when we
     // make the L1 scan proof stuff more sophisticated.
     let mut payloads = Vec::new();
-    for off in 1..max_l1_entries {
-        let height = cur_state_l1_height + off as u64;
-
-        // If we get to the tip then we should break here.
-        if height > target_height {
+    for height in cur_next_exp_height..=target_height {
+        // If we've reached the max we want then move on.
+        if payloads.len() >= max_l1_entries {
             break;
         }
 

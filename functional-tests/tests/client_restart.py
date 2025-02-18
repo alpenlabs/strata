@@ -33,7 +33,7 @@ class BlockFinalizationSeqRestartTest(testenv.StrataTester):
         # Check for first 2 checkpoints
         for n in range(2):
             check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
-            self.debug(f"Pass checkpoint finalization for checkpoint {n}")
+            logging.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         # Stop sequencer
         seq.stop()
@@ -47,6 +47,6 @@ class BlockFinalizationSeqRestartTest(testenv.StrataTester):
         # Check for next 2 checkpoints
         for n in range(2, 4):
             check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
-            self.debug(f"Pass checkpoint finalization for checkpoint {n}")
+            logging.debug(f"Pass checkpoint finalization for checkpoint {n}")
 
         check_already_sent_proof(seqrpc, 0)

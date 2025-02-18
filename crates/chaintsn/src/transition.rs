@@ -103,12 +103,12 @@ fn process_l1_view_update(
         let new_tip_height = new_tip_block.idx();
         let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
         let implied_pivot_height = first_new_block_height - 1;
-        let cur_tip_height = l1v.tip_height();
+        let next_exp_height = l1v.next_expected_height();
         let cur_safe_height = l1v.safe_height();
 
         // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
         // TODO This probably needs to be adjusted for PoW.
-        if new_tip_height < cur_tip_height {
+        if new_tip_height <= next_exp_height {
             return Err(TsnError::L1SegNotExtend);
         }
 
@@ -122,7 +122,7 @@ fn process_l1_view_update(
         check_chain_integrity(pivot_idx, pivot_blkid, l1seg.new_payloads())?;
 
         // Okay now that we've figured that out, let's actually how to actually do the reorg.
-        if pivot_idx > params.horizon_l1_height && pivot_idx < cur_tip_height {
+        if pivot_idx > params.horizon_l1_height && pivot_idx < next_exp_height {
             state.revert_l1_view_to(pivot_idx);
         }
 
@@ -133,12 +133,12 @@ fn process_l1_view_update(
             state.apply_l1_block_entry(ment.clone());
         }
 
-        let new_matured_l1_height = max(
+        let new_safe_height = max(
             new_tip_height.saturating_sub(maturation_threshold),
             cur_safe_height,
         );
 
-        for idx in (cur_safe_height..=new_matured_l1_height) {
+        for idx in (cur_safe_height + 1..=new_safe_height) {
             state.mature_l1_block(idx);
         }
 

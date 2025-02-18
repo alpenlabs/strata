@@ -218,8 +218,8 @@ impl StateCache {
         }
 
         let n_drop = back_idx - to_height;
-        if n_drop > mqueue.len() as u64 {
-            panic!("stateop: revert matured block");
+        if n_drop >= mqueue.len() as u64 {
+            panic!("stateop: would revert all mqueue blocks");
         }
 
         // Now that it's safe to do the revert, we can just do it.
