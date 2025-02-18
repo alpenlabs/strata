@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{bridge::RelayerConfig, btcio::BtcioConfig};
 
+/// Default values for some of the [`ClientConfig`] attributes.
 const DEFAULT_RPC_PORT: u16 = 8542;
 const DEFAULT_P2P_PORT: u16 = 8543;
 const DEFAULT_DATADIR: &str = "strata-data";
@@ -12,21 +13,30 @@ const DEFAULT_DATADIR: &str = "strata-data";
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(test, derive(Default))]
 pub struct ClientConfig {
+    /// Addr that the client rpc will listen to.
     pub rpc_host: String,
 
+    /// Port that the client rpc will listen to.
     #[serde(default = "default_rpc_port")]
     pub rpc_port: u16,
 
+    /// P2P port that the client will listen to.
+    /// NOTE: This is not used at the moment since we don't actually have p2p.
     #[serde(default = "default_p2p_port")]
     pub p2p_port: u16,
 
+    /// Endpoint that the client will use for syncing blocks. In this case sequencer's rpc
+    /// endpoint.
     pub sync_endpoint: Option<String>,
 
+    /// How many l2 blocks to fetch at once while syncing.
     pub l2_blocks_fetch_limit: u64,
 
+    /// The data directory where database contents reside.
     #[serde(default = "default_datadir")]
     pub datadir: PathBuf,
 
+    /// This is for optimistic transaction, how many times to retry if a write fails.
     pub db_retry_count: u16,
 }
 

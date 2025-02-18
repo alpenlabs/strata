@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use argh::FromArgs;
 use serde::de::DeserializeOwned;
 use serde_json::{from_value, to_value, Value};
@@ -33,6 +33,7 @@ pub struct Args {
     pub config: PathBuf,
 
     // Config overriding args
+    /// Data directory path that will override the path in the [`Config`].
     #[argh(
         option,
         short = 'd',
@@ -40,25 +41,31 @@ pub struct Args {
     )]
     pub datadir: Option<PathBuf>,
 
+    /// Switch that indicates if the client is running as a sequencer.
     #[argh(switch, description = "is sequencer")]
     pub sequencer: bool,
 
+    /// Rollup params path that will override the params in the [`Config`].
     #[argh(option, description = "rollup params")]
     pub rollup_params: Option<PathBuf>,
 
+    /// Rpc host that the client will listen to.
     #[argh(option, description = "rpc host")]
     pub rpc_host: Option<String>,
 
+    /// Rpc port that the client will listen to.
     #[argh(option, description = "rpc port")]
     pub rpc_port: Option<u16>,
 
+    /// Other generic overrides to the [`Config`].
+    /// Will be used, for example, as `-o btcio.reader.client_poll_dur_ms=1000 -o exec.reth.rpc_url=http://reth`
     #[argh(option, short = 'o', description = "generic config overrides")]
     pub overrides: Vec<String>,
 }
 
 impl Args {
-    /// Overrides config. First overrides with the generic overrides passed via -o and then
-    /// overrides the result with a couple of commonly passed args. Returns if config was overridden
+    /// Overrides config. First overrides with the generic overrides passed via `-o` and then
+    /// overrides the result with some of the commonly passed args. Returns if config was overridden
     /// or not.
     pub fn override_config(&self, config: &mut Config) -> anyhow::Result<bool> {
         // Override using -o params.
@@ -85,14 +92,14 @@ impl Args {
     fn override_generic(&self, config: &mut Config) -> anyhow::Result<bool> {
         let original = config.clone();
         // Convert config as json
-        let mut json_config = to_value(&mut *config).expect("Config json serialization failed");
+        let mut json_config = to_value(&mut *config).context("Config json serialization failed")?;
 
         for (path, val) in parse_overrides(&self.overrides)?.iter() {
             apply_override(path, val, &mut json_config)?;
         }
         // Convert back to json.
-        *config =
-            from_value(json_config).expect("Should be able to create Config from serde json Value");
+        *config = from_value(json_config)
+            .context("Should be able to create Config from serde json Value")?;
         Ok(original != *config)
     }
 }
@@ -127,8 +134,8 @@ fn apply_override(path: &[String], str_value: &str, config: &mut Value) -> anyho
     Ok(())
 }
 
-/// Parses a string `T`. If parsing fails, attempts to parse it again by converting it to JSON
-/// string i.e. surrounds the string with double quotes.
+/// Parses a string into a `T`. If parsing fails, attempts to parse it again by converting it to
+/// JSON string i.e. surrounds the string with double quotes.
 /// If the second deserialization attempt also fails, it returns the error from the first attempt.
 fn parse_value<T: DeserializeOwned>(str_value: &str) -> Result<T, serde_json::Error> {
     match serde_json::from_str(str_value) {
