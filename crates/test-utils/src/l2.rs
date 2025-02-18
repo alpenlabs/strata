@@ -142,11 +142,29 @@ pub fn get_genesis_chainstate() -> Chainstate {
     let params = gen_params();
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(&params);
-    let l1_vs = get_btc_chain().get_verification_state(
-        params.rollup().genesis_l1_height,
-        &BtcParams::new(params.rollup().network),
-        params.rollup().l1_reorg_safe_depth,
-    );
-    let pregenesis_mfs = vec![get_btc_chain().get_block_record(params.rollup().horizon_l1_height)];
-    make_genesis_chainstate(&gblock, pregenesis_mfs, &params, l1_vs)
+    let l1_vs = get_btc_chain()
+        .get_verification_state(
+            params.rollup().genesis_l1_height,
+            &BtcParams::new(params.rollup().network),
+            params.rollup().l1_reorg_safe_depth,
+        )
+        .unwrap();
+    let pregenesis_mfs = vec![get_btc_chain()
+        .get_block_record(params.rollup().horizon_l1_height)
+        .unwrap()];
+    make_genesis_chainstate(&gblock, pregenesis_mfs, &params, l1_vs.clone())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_genesis_chainstate() {
+        let chs = get_genesis_chainstate();
+        let l1_vs_height = chs.l1_view().header_vs().last_verified_block.height();
+        let l1_tip_height = chs.l1_view().tip_height();
+        assert_eq!(l1_vs_height + 1, l1_tip_height);
+    }
 }

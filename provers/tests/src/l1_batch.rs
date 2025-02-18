@@ -27,11 +27,9 @@ impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
 
         let params = gen_params();
         let rollup_params = params.rollup().clone();
-        let state = btc_chain.get_verification_state(
-            start_height,
-            &MAINNET,
-            rollup_params.l1_reorg_safe_depth,
-        );
+        let state = btc_chain
+            .get_verification_state(start_height, &MAINNET, rollup_params.l1_reorg_safe_depth)
+            .unwrap();
 
         let mut blocks = Vec::new();
         for height in start_height..=end_height {

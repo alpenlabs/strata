@@ -76,6 +76,10 @@ impl L1ViewState {
         self.maturation_queue.next_idx()
     }
 
+    pub fn header_vs(&self) -> &HeaderVerificationState {
+        &self.header_vs
+    }
+
     pub fn maturation_queue(&self) -> &StateQueue<L1MaturationEntry> {
         &self.maturation_queue
     }

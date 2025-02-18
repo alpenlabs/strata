@@ -519,7 +519,10 @@ mod tests {
 
     impl EventContext for DummyEventContext {
         fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
-            let rec = self.chainseg.get_block_record(height);
+            let rec = self
+                .chainseg
+                .get_block_record(height)
+                .map_err(|_| Error::MissingL1BlockHeight(height))?;
             Ok(L1BlockManifest::new(rec, height))
         }
 
@@ -581,15 +584,13 @@ mod tests {
         let genesis = params.rollup().genesis_l1_height;
 
         let chain = get_btc_chain();
-        let l1_verification_state = chain.get_verification_state(
-            genesis + 1,
-            &MAINNET,
-            params.rollup().l1_reorg_safe_depth,
-        );
+        let l1_verification_state = chain
+            .get_verification_state(genesis + 1, &MAINNET, params.rollup().l1_reorg_safe_depth)
+            .unwrap();
 
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();
-        let l1_chain = chain.get_block_records(horizon, 10);
+        let l1_chain = chain.get_block_records(horizon, 10).unwrap();
         let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash()).collect();
 
         let test_cases = [

@@ -57,13 +57,15 @@ pub struct HeaderVerificationState {
     /// 0 as `previous`.
     pub epoch_timestamps: EpochTimestamps,
 
+    /// A ring buffer that maintains a history of block timestamps.
+    ///
+    /// This buffer is used to compute the median block time for consensus rules by considering the
+    /// most recent 11 timestamps. However, it retains additional timestamps to support chain reorg
+    /// scenarios.
+    pub block_timestamp_history: TimestampStore,
+
     /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)
     pub total_accumulated_pow: u128,
-
-    /// Timestamps of the last 11 blocks in descending order.
-    /// The timestamp of the most recent block is at index 0, while the timestamp of the oldest
-    /// block is at index 10.
-    pub last_11_blocks_timestamps: TimestampStore,
 }
 
 /// `EpochTimestamps` stores the timestamps corresponding to the boundaries of difficulty adjustment
@@ -108,7 +110,7 @@ impl HeaderVerificationState {
 
     // Note/TODO: Figure out a better way so we don't have to params each time.
     fn update_timestamps(&mut self, timestamp: u32, params: &Params) {
-        self.last_11_blocks_timestamps.insert(timestamp);
+        self.block_timestamp_history.insert(timestamp);
 
         let new_block_num = self.last_verified_block.height();
         if new_block_num % params.difficulty_adjustment_interval() == 0 {
@@ -163,7 +165,7 @@ impl HeaderVerificationState {
         }
 
         // Check timestamp against the median of the last 11 timestamps.
-        let median = self.last_11_blocks_timestamps.median();
+        let median = self.block_timestamp_history.median();
         if header.time <= median {
             return Err(L1VerificationError::TimestampError {
                 time: header.time,
@@ -284,7 +286,7 @@ impl HeaderVerificationState {
                 self.last_verified_block.height() - 1,
                 old_header.prev_blockhash.into(),
             );
-            self.last_11_blocks_timestamps.remove();
+            self.block_timestamp_history.remove();
             self.next_block_target = old_header.bits.to_consensus();
             self.total_accumulated_pow -= old_header.difficulty(params);
         }
@@ -325,11 +327,11 @@ mod tests {
         let chain = get_btc_chain();
         let h2 = get_difficulty_adjustment_height(2, chain.start, &MAINNET);
         let r1 = OsRng.gen_range(h2..chain.end);
-        let mut verification_state = chain.get_verification_state(r1, &MAINNET, 0);
+        let mut verification_state = chain.get_verification_state(r1, &MAINNET, 0).unwrap();
 
         for header_idx in r1..chain.end {
             verification_state
-                .check_and_update_full(&chain.get_header(header_idx), &MAINNET)
+                .check_and_update_full(&chain.get_header(header_idx).unwrap(), &MAINNET)
                 .unwrap()
         }
     }
@@ -346,7 +348,7 @@ mod tests {
     fn test_hash() {
         let chain = get_btc_chain();
         let r1 = 45000;
-        let verification_state = chain.get_verification_state(r1, &MAINNET, 0);
+        let verification_state = chain.get_verification_state(r1, &MAINNET, 0).unwrap();
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
     }
@@ -356,8 +358,13 @@ mod tests {
 
         let reorg_len = (reorg.1 - reorg.0) as u32;
         let reorg = reorg.0..reorg.1;
-        let headers: Vec<Header> = reorg.clone().map(|h| chain.get_header(h)).collect();
-        let mut verification_state = chain.get_verification_state(reorg.start, &MAINNET, reorg_len);
+        let headers: Vec<Header> = reorg
+            .clone()
+            .map(|h| chain.get_header(h).unwrap())
+            .collect();
+        let mut verification_state = chain
+            .get_verification_state(reorg.start, &MAINNET, reorg_len)
+            .unwrap();
 
         for header in &headers {
             verification_state

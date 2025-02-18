@@ -315,6 +315,7 @@ fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use bitcoin::params::MAINNET;
     use rand_core::SeedableRng;
     use strata_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
     use strata_state::{
@@ -331,7 +332,7 @@ mod tests {
         state_op::StateCache,
         tx::{DepositInfo, ProtocolOperation},
     };
-    use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
+    use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params, ArbitraryGenerator};
 
     use super::{next_rand_op_pos, process_block};
     use crate::{slot_rng::SlotRng, transition::process_l1_view_update};
@@ -353,12 +354,17 @@ mod tests {
     #[test]
     fn test_process_l1_view_update_with_deposit_update_tx() {
         let mut chs: Chainstate = ArbitraryGenerator::new().generate();
+        let chain = get_btc_chain();
         // get the l1 view state of the chain state
         let params = gen_params();
-        let header_record = chs.l1_view();
+        let header_vs =
+            chain.get_verification_state(params.rollup().genesis_l1_height, &MAINNET, 0);
+        let l1v = chs.l1_view();
 
-        let tip_height = header_record.tip_height();
-        let maturation_queue = header_record.maturation_queue();
+        let tip_height = l1v.tip_height();
+        let maturation_queue = l1v.maturation_queue();
+        dbg!(&tip_height);
+        dbg!(maturation_queue);
 
         let mut state_cache = StateCache::new(chs);
         let amt: BitcoinAmount = ArbitraryGenerator::new().generate();
@@ -390,7 +396,9 @@ mod tests {
 
         let mut l1_segment = L1Segment::new(new_payloads_with_deposit_update_tx);
 
-        let view_update = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
+        process_l1_view_update(&mut state_cache, &l1_segment, params.rollup())
+            .expect("failed to process l1 view update");
+
         assert_eq!(
             state_cache
                 .state()

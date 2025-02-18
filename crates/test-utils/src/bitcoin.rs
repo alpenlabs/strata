@@ -1,5 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
+use anyhow::Error;
 use bitcoin::{
     absolute::LockTime,
     block::Header,
@@ -61,15 +62,16 @@ pub struct BtcChainSegment {
 
 impl BtcChainSegment {
     /// Retrieves the block header at the specified height.
-    pub fn get_header(&self, height: u64) -> Header {
-        assert!(
-            (self.start..self.end).contains(&height),
-            "height must be in the range [{}..{})",
-            self.start,
-            self.end
-        );
+    pub fn get_header(&self, height: u64) -> Result<Header, Error> {
+        if !(self.start..self.end).contains(&height) {
+            return Err(anyhow::anyhow!(
+                "height must be in the range [{}..{}]",
+                self.start,
+                self.end
+            ));
+        }
         let idx = height - self.start;
-        self.headers[idx as usize]
+        Ok(self.headers[idx as usize])
     }
 
     pub fn get_block(&self, height: u64) -> &Block {
@@ -78,13 +80,13 @@ impl BtcChainSegment {
 
     /// Retrieves the timestamps of a specified number of blocks from a given height in a
     /// descending order.
-    pub fn get_last_timestamps(&self, from: u64, count: u32) -> Vec<u32> {
+    pub fn get_last_timestamps(&self, from: u64, count: u32) -> Result<Vec<u32>, Error> {
         let mut timestamps = Vec::with_capacity(count as usize);
         for i in (0..count).rev() {
-            let h = self.get_header(from - i as u64);
+            let h = self.get_header(from - i as u64)?;
             timestamps.push(h.time)
         }
-        timestamps
+        Ok(timestamps)
     }
 
     pub fn get_verification_state(
@@ -92,7 +94,7 @@ impl BtcChainSegment {
         block_height: u64,
         params: &BtcParams,
         l1_reorg_safe_depth: u32,
-    ) -> HeaderVerificationState {
+    ) -> Result<HeaderVerificationState, Error> {
         // Get the difficulty adjustment block just before `block_height`
         let h1 = get_difficulty_adjustment_height(0, block_height, params);
         let h0 = h1 - params.difficulty_adjustment_interval();
@@ -102,51 +104,59 @@ impl BtcChainSegment {
 
         // Fetch the previous timestamps of block from `vh`
         // This fetches timestamps of `vh`, `vh-1`, `vh-2`, ...
-        let initial_timestamps = self.get_last_timestamps(vh, 11 + l1_reorg_safe_depth);
+        let initial_timestamps = self.get_last_timestamps(vh, 11 + l1_reorg_safe_depth)?;
         let last_11_blocks_timestamps = TimestampStore::new(&initial_timestamps);
 
         let last_verified_block_hash: L1BlockId = Buf32::from(
-            self.get_header(vh)
+            self.get_header(vh)?
                 .block_hash()
                 .as_raw_hash()
                 .to_byte_array(),
         )
         .into();
 
+        let current_epoch_start_header = self.get_header(h1)?;
         let epoch_timestamps = EpochTimestamps {
-            current: self.get_header(h1).time,
-            previous: self.get_header(h0).time,
+            current: current_epoch_start_header.time,
+            previous: self
+                .get_header(h0)
+                .unwrap_or(current_epoch_start_header)
+                .time,
         };
 
-        HeaderVerificationState {
+        Ok(HeaderVerificationState {
             last_verified_block: L1BlockCommitment::new(vh, last_verified_block_hash),
             next_block_target: self
-                .get_header(vh)
+                .get_header(vh)?
                 .target()
                 .to_compact_lossy()
                 .to_consensus(),
             epoch_timestamps,
             total_accumulated_pow: 0u128,
-            last_11_blocks_timestamps,
-        }
+            block_timestamp_history: last_11_blocks_timestamps,
+        })
     }
 
-    pub fn get_block_record(&self, height: u64) -> L1BlockRecord {
-        let header = self.get_header(height);
-        L1BlockRecord::new(
+    pub fn get_block_record(&self, height: u64) -> Result<L1BlockRecord, Error> {
+        let header = self.get_header(height)?;
+        Ok(L1BlockRecord::new(
             header.block_hash().into(),
             serialize(&header),
             Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
-        )
+        ))
     }
 
-    pub fn get_block_records(&self, from_height: u64, len: usize) -> Vec<L1BlockRecord> {
+    pub fn get_block_records(
+        &self,
+        from_height: u64,
+        len: usize,
+    ) -> Result<Vec<L1BlockRecord>, Error> {
         let mut blocks = Vec::with_capacity(len);
         for i in 0..len {
-            let block = self.get_block_record(from_height + i as u64);
+            let block = self.get_block_record(from_height + i as u64)?;
             blocks.push(block);
         }
-        blocks
+        Ok(blocks)
     }
 }
 

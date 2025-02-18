@@ -431,7 +431,7 @@ pub async fn get_verification_state(
             previous: b0.header.time,
         },
         total_accumulated_pow: 0u128,
-        last_11_blocks_timestamps,
+        block_timestamp_history: last_11_blocks_timestamps,
     };
     trace!(%height, ?header_vs, "HeaderVerificationState");
 
@@ -614,6 +614,19 @@ mod test {
             .await
             .unwrap();
 
-        assert_eq!(header_vs, new_header_vs);
+        assert_eq!(
+            header_vs.last_verified_block,
+            new_header_vs.last_verified_block
+        );
+        assert_eq!(header_vs.next_block_target, new_header_vs.next_block_target);
+        assert_eq!(header_vs.epoch_timestamps, new_header_vs.epoch_timestamps);
+        assert_eq!(
+            header_vs.block_timestamp_history,
+            new_header_vs.block_timestamp_history
+        );
+        assert_eq!(
+            header_vs.last_verified_block,
+            new_header_vs.last_verified_block
+        );
     }
 }
