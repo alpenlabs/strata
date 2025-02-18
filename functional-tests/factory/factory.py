@@ -9,6 +9,7 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from factory import seqrpc
+from factory.config import default_config
 from load.cfg import LoadConfig
 from load.service import LoadGeneratorService
 from utils import *
@@ -92,24 +93,37 @@ class StrataFactory(flexitest.Factory):
         rpc_host = "127.0.0.1"
         logfile = os.path.join(datadir, "service.log")
 
+        # Write rollup params to file
         rollup_params_file = os.path.join(datadir, "rollup_params.json")
         with open(rollup_params_file, "w") as f:
             f.write(rollup_params)
+
+        # Get default config
+        config = default_config()
+
+        # Also write config as toml
+        config_file = os.path.join(datadir, "config.toml")
+        with open(config_file, "w") as f:
+            f.write(config.as_toml_string())
 
         # fmt: off
         cmd = [
             "strata-client",
             "--datadir", datadir,
+            "--config", config_file,
             "--rollup-params", rollup_params_file,
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
 
-            "-o", "--bitcoind-host", bitcoind_config["bitcoind_sock"],
-            "--bitcoind-user", bitcoind_config["bitcoind_user"],
-            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
-            "--reth-authrpc", reth_config["reth_socket"],
-            "--reth-jwtsecret", reth_config["reth_secret_path"],
-            "--network", "regtest",
+            # bitcoind
+            "-o", f"bitcoind.rpc_url={bitcoind_config["bitcoind_sock"]}",
+            "-o", f"bitcoind.rpc_user={bitcoind_config["bitcoind_user"]}",
+            "-o", f"bitcoind.rpc_password={bitcoind_config["bitcoind_pass"]}",
+            "-o", "bitcoind.network=regtest",
+
+            # reth
+            "-o", f"exec.reth.rpc_url={reth_config["reth_socket"]}",
+            "-o", f"exec.reth.secret={reth_config["reth_secret_path"]}",
             "--sequencer"
         ]
         # fmt: on
@@ -189,25 +203,42 @@ class FullNodeFactory(flexitest.Factory):
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        with open(rollup_params_file, "w") as f:
+            f.write(rollup_params)
+
+        # Get default config
+        config = default_config()
+
+        # Also write config as toml
+        config_file = os.path.join(datadir, "config.toml")
+        with open(config_file, "w") as f:
+            f.write(config.as_toml_string())
+
         # fmt: off
         cmd = [
             "strata-client",
             "--datadir", datadir,
+            "--config", config_file,
+            "--rollup-params", rollup_params_file,
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
-            "--bitcoind-host", bitcoind_config["bitcoind_sock"],
-            "--bitcoind-user", bitcoind_config["bitcoind_user"],
-            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
-            "--reth-authrpc", reth_config["reth_socket"],
-            "--reth-jwtsecret", reth_config["reth_secret_path"],
-            "--network", "regtest",
-            "--sequencer-rpc", sequencer_rpc,
+
+            # bitcoind
+            "-o", f"bitcoind.rpc_url={bitcoind_config["bitcoind_sock"]}",
+            "-o", f"bitcoind.rpc_user={bitcoind_config["bitcoind_user"]}",
+            "-o", f"bitcoind.rpc_password={bitcoind_config["bitcoind_pass"]}",
+            "-o", "bitcoind.network=regtest",
+
+            # reth
+            "-o", f"exec.reth.rpc_url={reth_config["reth_socket"]}",
+            "-o", f"exec.reth.secret={reth_config["reth_secret_path"]}",
+            "--sequencer"
+
+            # client
+            "-o", f"client.sync_endpoint={sequencer_rpc}",
         ]
         # fmt: on
-
-        rollup_params_file = os.path.join(datadir, "rollup_params.json")
-        with open(rollup_params_file, "w") as f:
-            f.write(rollup_params)
 
         cmd.extend(["--rollup-params", rollup_params_file])
 

@@ -140,7 +140,7 @@ mod test {
         );
 
         let config_string_fullnode = r#"
-            [bitcoind_rpc]
+            [bitcoind]
             rpc_url = "http://localhost:18332"
             rpc_user = "alpen"
             rpc_password = "alpen"

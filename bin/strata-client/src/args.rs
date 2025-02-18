@@ -18,7 +18,7 @@ impl EnvArgs {
         Self {}
     }
 
-    /// Override some of the config params from env.
+    /// Override some of the config params from env. Returns if config was overridden or not.
     pub fn override_config(&self, _config: &mut Config) -> bool {
         // Override attributes
         true
@@ -58,7 +58,8 @@ pub struct Args {
 
 impl Args {
     /// Overrides config. First overrides with the generic overrides passed via -o and then
-    /// overrides the result with a couple of commonly passed args.
+    /// overrides the result with a couple of commonly passed args. Returns if config was overridden
+    /// or not.
     pub fn override_config(&self, config: &mut Config) -> anyhow::Result<bool> {
         // Override using -o params.
         let mut overridden = self.override_generic(config)?;

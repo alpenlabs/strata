@@ -23,7 +23,8 @@ pub struct WriterConfig {
     /// How the fees for are determined.
     // FIXME: This should actually be a part of signer.
     pub fee_policy: FeePolicy,
-    /// How much amount(in sats) to send to reveal address.
+    /// How much amount(in sats) to send to reveal address. Must be above dust amount or else
+    /// reveal transaction won't be accepted.
     pub reveal_amount: u64,
     /// How often to bundle write intents.
     pub bundle_interval_ms: u64,
