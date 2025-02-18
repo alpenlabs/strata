@@ -19,7 +19,7 @@ class SyncGenesisTest(testenv.StrataTester):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
 
-        wait_until_genesis(seqrpc, timeout=20, step=2)
+        wait_for_genesis(seqrpc, timeout=20, step=2)
 
         # Make sure we're making progress.
         logging.info("observed genesis, checking that we're still making progress...")
