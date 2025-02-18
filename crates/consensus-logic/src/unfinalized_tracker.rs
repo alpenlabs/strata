@@ -467,12 +467,25 @@ mod tests {
         l2_blkman: &L2BlockManager,
     ) {
         // Init the chain tracker from the state we figured out.
-        let epoch = EpochCommitment::new(0, 10, prev_finalized_tip);
+
+        let prev_tip = l2_blkman
+            .get_block_data_blocking(&prev_finalized_tip)
+            .expect("test: load block")
+            .expect("test: missing block");
+        let prev_tip_slot = prev_tip.header().blockidx();
+
+        let epoch = EpochCommitment::new(0, prev_tip_slot, prev_finalized_tip);
         let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
 
         chain_tracker.load_unfinalized_blocks(l2_blkman).unwrap();
 
-        let new_epoch = EpochCommitment::new(1, 20, new_finalized_tip);
+        let new_tip = l2_blkman
+            .get_block_data_blocking(&new_finalized_tip)
+            .expect("test: load block")
+            .expect("test: missing block");
+        let new_tip_slot = new_tip.header().blockidx();
+
+        let new_epoch = EpochCommitment::new(1, new_tip_slot, new_finalized_tip);
         let report = chain_tracker.update_finalized_epoch(&new_epoch).unwrap();
 
         assert_eq!(report.prev_tip(), &prev_finalized_tip);
@@ -493,7 +506,7 @@ mod tests {
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         // Init the chain tracker from the state we figured out.
-        let epoch = EpochCommitment::new(0, 10, g);
+        let epoch = EpochCommitment::new(0, 0, g);
         let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
 
         let pool = threadpool::ThreadPool::new(1);
@@ -539,7 +552,7 @@ mod tests {
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         // Init the chain tracker from the state we figured out.
-        let epoch = EpochCommitment::new(0, 10, g);
+        let epoch = EpochCommitment::new(0, 0, g);
         let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
 
         let pool = threadpool::ThreadPool::new(1);
