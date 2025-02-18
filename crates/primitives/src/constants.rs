@@ -76,7 +76,7 @@ pub static STRATA_OPERATOR_BASE_DERIVATION_PATH: LazyLock<DerivationPath> = Lazy
 
 /// Strata [`DerivationPath`] for operator's key.
 ///
-/// This corresponds to the path: `m/20000'/20'/101'`.
+/// This corresponds to the path: `m/20000'/20'/100'`.
 pub static STRATA_OP_MESSAGE_DERIVATION_PATH: LazyLock<DerivationPath> = LazyLock::new(|| {
     DerivationPath::master().extend([
         ChildNumber::from_hardened_idx(STRATA_BASE_IDX).expect("valid hardened child number"),
