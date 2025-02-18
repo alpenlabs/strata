@@ -6,7 +6,7 @@ pub mod sequencer;
 
 pub use eth::{StrataEthApi, StrataNodeCore};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use revm_primitives::alloy_primitives::B256;
+use revm_primitives::{alloy_primitives::B256, Address};
 pub use rpc::StrataRPC;
 pub use sequencer::SequencerClient;
 use serde::{Deserialize, Serialize};
@@ -30,4 +30,32 @@ pub trait StrataRpcApi {
 pub enum BlockWitness {
     Raw(#[serde(with = "hex::serde")] Vec<u8>),
     Json(EvmBlockStfInput),
+}
+
+#[derive(Debug, Clone)]
+pub enum EOAMode {
+    Disabled { allowed_eoa_addrs: Vec<Address> }, // TODO: Maybe use NonEmptyVec like struct
+    // one element
+    Enabled,
+}
+
+impl EOAMode {
+    pub fn new(enable: bool, allowed_eoa_addrs: Vec<Address>) -> Self {
+        if enable {
+            if !allowed_eoa_addrs.is_empty() {
+                // TODO: possibly warn, but would be better if this happened around the boundary
+            }
+            Self::Enabled
+        } else {
+            Self::Disabled { allowed_eoa_addrs }
+        }
+    }
+}
+
+impl Default for EOAMode {
+    fn default() -> Self {
+        Self::Disabled {
+            allowed_eoa_addrs: Vec::new(),
+        }
+    }
 }
