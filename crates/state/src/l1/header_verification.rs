@@ -38,6 +38,7 @@ use crate::l1::utils::compute_block_hash;
     Serialize,
 )]
 pub struct HeaderVerificationState {
+    /// Commitment to the last verified block, containing both its height and block hash.
     pub last_verified_block: L1BlockCommitment,
 
     /// [Target](bitcoin::pow::CompactTarget) for the next block to verify
@@ -257,8 +258,8 @@ impl HeaderVerificationState {
     ///
     /// # Errors
     ///
-    /// Returns a [`VerificationError::ReorgLengthError`] if the new headers are fewer than the old
-    /// headers, or any error from header verification.
+    /// Returns a [`L1VerificationError::ReorgLengthError`] if the new headers are fewer than the
+    /// old headers, or any error from header verification.
     pub fn reorg(
         &mut self,
         old_headers: &[Header],
@@ -307,7 +308,7 @@ impl HeaderVerificationState {
 /// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
 ///   the second, and so on.
 /// * `start` - The starting height from which to calculate.
-/// * `params` - [`BtcParams`] of the bitcoin network in use
+/// * `params` - [`Params`] of the bitcoin network in use
 pub fn get_difficulty_adjustment_height(idx: u64, start: u64, params: &Params) -> u64 {
     let difficulty_adjustment_interval = params.difficulty_adjustment_interval();
     ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval

@@ -117,9 +117,14 @@ impl ProvingOp for L1BatchOperator {
         let mut blocks = self.get_block_ancestors(end_block_id, num_blocks).await?;
         blocks.reverse();
 
-        let state = get_verification_state(self.btc_client.as_ref(), start_height, &MAINNET)
-            .await
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+        let state = get_verification_state(
+            self.btc_client.as_ref(),
+            start_height,
+            &MAINNET,
+            self.rollup_params.l1_reorg_safe_depth,
+        )
+        .await
+        .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
         Ok(L1BatchProofInput {
             blocks,

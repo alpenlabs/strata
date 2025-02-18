@@ -152,8 +152,16 @@ pub fn make_genesis_chainstate(
         ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
 
     let horizon_blk_height = params.rollup.horizon_l1_height;
+    let genesis_blk_height = params.rollup.genesis_l1_height;
     let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
-    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, genesis_blk_rec, genesis_header_vs);
+
+    // REVIEW: this was new_at_horizon before
+    let l1vs = L1ViewState::new_at_genesis(
+        horizon_blk_height,
+        genesis_blk_height,
+        genesis_blk_rec,
+        genesis_header_vs,
+    );
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
     let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);

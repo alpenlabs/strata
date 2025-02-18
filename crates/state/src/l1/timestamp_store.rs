@@ -13,11 +13,11 @@ pub const N: usize = 11;
 pub const MID: usize = 5;
 
 /// A ring buffer that stores timestamps. The internal buffer is stored as a
-/// [`Vec<u32>`] so that its length can be greater than [`N`]. The buffer always
-/// holds at least [`N`] timestamps. When inserting a new timestamp, the oldest
+/// [`Vec<u32>`] so that its length can be greater than `N`. The buffer always
+/// holds at least `N` timestamps. When inserting a new timestamp, the oldest
 /// timestamp is overwritten and the head pointer is advanced in a circular manner.
 ///
-/// The median is computed using the last [`N`] inserted timestamps.
+/// The median is computed using the last `N` inserted timestamps.
 #[derive(
     Debug,
     Clone,
@@ -32,7 +32,7 @@ pub const MID: usize = 5;
 )]
 pub struct TimestampStore {
     /// The vector that holds the timestamps.
-    /// Its length may be greater than [`N`], but only the last [`N`] timestamps are
+    /// Its length may be greater than `N`, but only the last `N` timestamps are
     /// used for computing the median.
     pub buffer: Vec<u32>,
     /// The index in the buffer where the next timestamp will be inserted.
@@ -106,10 +106,10 @@ impl TimestampStore {
         self.head = (self.head + len - 1) % len;
     }
 
-    /// Computes and returns the median timestamp from the last [`N`] inserted timestamps.
+    /// Computes and returns the median timestamp from the last `N` inserted timestamps.
     ///
-    /// The median is calculated by taking a copy of the last [`N`] timestamps, sorting them,
-    /// and selecting the element at the middle index [`MID`].
+    /// The median is calculated by taking a copy of the last `N` timestamps, sorting them,
+    /// and selecting the element at the middle index `MID`.
     pub fn median(&self) -> u32 {
         let len = self.buffer.len();
         let mut last_n_timestamps = Vec::with_capacity(N);

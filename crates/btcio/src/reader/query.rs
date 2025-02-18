@@ -431,7 +431,7 @@ pub async fn get_verification_state(
     let vh = height - 1; // verified_height
     let vb = client.get_block_at(vh).await?; // verified_block
 
-    // Bitcoin consensus rule requires last 11 timestamps. We set the count to accomodate for the
+    // Bitcoin consensus rule requires last 11 timestamps. We set the count to accommodate for the
     // reorg depth
     const N: usize = 11;
     let count = N + l1_reorg_safe_depth as usize;

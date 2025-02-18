@@ -315,7 +315,7 @@ fn next_rand_op_pos(rng: &mut SlotRng, num: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use bitcoin::params::MAINNET;
+    use bitcoin::{block::Header, consensus, params::MAINNET};
     use rand_core::SeedableRng;
     use strata_primitives::{buf::Buf32, l1::BitcoinAmount, params::OperatorConfig};
     use strata_state::{
@@ -332,7 +332,11 @@ mod tests {
         state_op::StateCache,
         tx::{DepositInfo, ProtocolOperation},
     };
-    use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params, ArbitraryGenerator};
+    use strata_test_utils::{
+        bitcoin::get_btc_chain,
+        l2::{gen_params, get_genesis_chainstate},
+        ArbitraryGenerator,
+    };
 
     use super::{next_rand_op_pos, process_block};
     use crate::{slot_rng::SlotRng, transition::process_l1_view_update};
@@ -353,7 +357,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_with_deposit_update_tx() {
-        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
+        let mut chs = get_genesis_chainstate();
         let chain = get_btc_chain();
         // get the l1 view state of the chain state
         let params = gen_params();
@@ -363,16 +367,20 @@ mod tests {
 
         let tip_height = l1v.tip_height();
         let maturation_queue = l1v.maturation_queue();
-        dbg!(&tip_height);
-        dbg!(maturation_queue);
 
         let mut state_cache = StateCache::new(chs);
         let amt: BitcoinAmount = ArbitraryGenerator::new().generate();
 
         let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> =
-            (1..=params.rollup().l1_reorg_safe_depth + 1)
+            (1..=params.rollup().l1_reorg_safe_depth)
                 .map(|idx| {
-                    let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
+                    let header: Header = chain.get_header(tip_height + idx as u64).unwrap();
+                    let wtxs_root: Buf32 = ArbitraryGenerator::new().generate();
+                    let record = L1HeaderRecord::new(
+                        header.block_hash().into(),
+                        consensus::serialize(&header),
+                        wtxs_root,
+                    );
                     let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
                     let tx = ArbitraryGenerator::new_with_size(1 << 12).generate();
 
@@ -429,8 +437,10 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_maturation_check() {
-        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
+        let mut chs = get_genesis_chainstate();
+        let chain = get_btc_chain();
         let params = gen_params();
+
         let header_record = chs.l1_view();
         let old_safe_height = header_record.safe_height();
         let to_mature_blk_num = 10;
@@ -439,17 +449,19 @@ mod tests {
         let maturation_queue_len = state_cache.state().l1_view().maturation_queue().len() as u64;
 
         // Simulate L1 payloads that have matured
-        let new_payloads_matured: Vec<L1HeaderPayload> = (1..params.rollup().l1_reorg_safe_depth
+        let new_payloads: Vec<L1HeaderPayload> = (1..params.rollup().l1_reorg_safe_depth
             + to_mature_blk_num)
             .map(|idx| {
-                let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
+                let record = chain
+                    .get_header_record(old_safe_height + idx as u64)
+                    .unwrap();
                 L1HeaderPayload::new(old_safe_height + idx as u64, record)
                     .with_deposit_update_txs(vec![])
                     .build()
             })
             .collect();
 
-        let mut l1_segment = L1Segment::new(new_payloads_matured.clone());
+        let mut l1_segment = L1Segment::new(new_payloads.clone());
 
         // Process the L1 view update for matured blocks
         let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());

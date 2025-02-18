@@ -626,7 +626,7 @@ mod tests {
                             state.most_recent_l1_block(),
                             Some(&l1_chain[1].block_hash())
                         );
-                        // Because values for horizon is 40318, genesis is 40320
+                        // Because values for horizon is 40319, genesis is 40321
                         assert_eq!(state.next_exp_l1_block(), genesis);
                     }
                 }),

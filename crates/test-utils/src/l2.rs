@@ -81,8 +81,8 @@ pub fn gen_params_with_seed(seed: u64) -> Params {
             da_tag: "strata-da".to_string(),
             block_time: 1000,
             cred_rule: block_credential::CredRule::Unchecked,
-            horizon_l1_height: 40318,
-            genesis_l1_height: 40320, // we have mainnet blocks from this height test-utils
+            horizon_l1_height: 40319,
+            genesis_l1_height: 40321, // we have mainnet blocks from this height test-utils
             operator_config: OperatorConfig::Static(vec![opkeys]),
             evm_genesis_block_hash:
                 "0x37ad61cff1367467a98cf7c54c4ac99e989f1fbb1bc1e646235e90c065c565ba"
@@ -140,18 +140,22 @@ pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
 
 pub fn get_genesis_chainstate() -> Chainstate {
     let params = gen_params();
+    let genesis_height = params.rollup().genesis_l1_height;
+    let horizon_height = params.rollup().horizon_l1_height;
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(&params);
     let l1_vs = get_btc_chain()
         .get_verification_state(
-            params.rollup().genesis_l1_height,
+            genesis_height + 1,
             &BtcParams::new(params.rollup().network),
             params.rollup().l1_reorg_safe_depth,
         )
         .unwrap();
-    let pregenesis_mfs = vec![get_btc_chain()
-        .get_block_record(params.rollup().horizon_l1_height)
-        .unwrap()];
+
+    let pregenesis_mfs: Vec<_> = (horizon_height..genesis_height)
+        .map(|h| get_btc_chain().get_block_record(h).unwrap())
+        .collect();
+
     make_genesis_chainstate(&gblock, pregenesis_mfs, &params, l1_vs.clone())
 }
 
@@ -164,7 +168,8 @@ mod tests {
     fn test_genesis_chainstate() {
         let chs = get_genesis_chainstate();
         let l1_vs_height = chs.l1_view().header_vs().last_verified_block.height();
+        dbg!(l1_vs_height);
         let l1_tip_height = chs.l1_view().tip_height();
-        assert_eq!(l1_vs_height + 1, l1_tip_height);
+        assert_eq!(l1_vs_height, l1_tip_height);
     }
 }

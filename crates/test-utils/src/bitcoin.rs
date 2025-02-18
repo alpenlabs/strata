@@ -18,7 +18,7 @@ use strata_primitives::{
 };
 use strata_state::l1::{
     get_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState, L1BlockId,
-    TimestampStore,
+    L1HeaderRecord, TimestampStore,
 };
 
 use crate::{l2::gen_params, ArbitraryGenerator};
@@ -78,8 +78,7 @@ impl BtcChainSegment {
         self.custom_blocks.get(&height).unwrap()
     }
 
-    /// Retrieves the timestamps of a specified number of blocks from a given height in a
-    /// descending order.
+    /// Retrieves the timestamps of a specified number of blocks from a given height
     pub fn get_last_timestamps(&self, from: u64, count: u32) -> Result<Vec<u32>, Error> {
         let mut timestamps = Vec::with_capacity(count as usize);
         for i in (0..count).rev() {
@@ -95,6 +94,9 @@ impl BtcChainSegment {
         params: &BtcParams,
         l1_reorg_safe_depth: u32,
     ) -> Result<HeaderVerificationState, Error> {
+        // TODO: handle the case where block_height is where new difficulty is enforced i.e.
+        // multiple of 2016
+
         // Get the difficulty adjustment block just before `block_height`
         let h1 = get_difficulty_adjustment_height(0, block_height, params);
         let h0 = h1 - params.difficulty_adjustment_interval();
@@ -140,6 +142,16 @@ impl BtcChainSegment {
     pub fn get_block_record(&self, height: u64) -> Result<L1BlockRecord, Error> {
         let header = self.get_header(height)?;
         Ok(L1BlockRecord::new(
+            header.block_hash().into(),
+            serialize(&header),
+            Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
+        ))
+    }
+
+    // REVIEW: how is this different from L1BlockRecord?
+    pub fn get_header_record(&self, height: u64) -> Result<L1HeaderRecord, Error> {
+        let header = self.get_header(height)?;
+        Ok(L1HeaderRecord::new(
             header.block_hash().into(),
             serialize(&header),
             Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
