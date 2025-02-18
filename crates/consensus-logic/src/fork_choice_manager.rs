@@ -518,6 +518,13 @@ fn handle_new_block(
     match apply_tip_update(tip_update, fcm_state) {
         Ok(()) => {
             info!(%tip_blkid, "new chain tip");
+
+            // Also this is the point at which we update the engine head and
+            // safe blocks.  These are technically different, but in practice
+            // they mean the same thing and we have to update them both anyways.
+            engine.update_head_block(tip_blkid)?;
+            engine.update_safe_block(tip_blkid)?;
+
             Ok(true)
         }
 
