@@ -1,7 +1,8 @@
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use anyhow::anyhow;
 use argh::FromArgs;
+use serde::de::DeserializeOwned;
 use serde_json::{from_value, to_value, Value};
 use strata_config::Config;
 
@@ -56,9 +57,13 @@ pub struct Args {
 }
 
 impl Args {
+    /// Overrides config. First overrides with the generic overrides passed via -o and then
+    /// overrides the result with a couple of commonly passed args.
     pub fn override_config(&self, config: &mut Config) -> anyhow::Result<bool> {
+        // Override using -o params.
         let mut overridden = self.override_generic(config)?;
 
+        // Override by explicitly parsed args like datadir, rpc_host and rpc_port.
         if let Some(datadir) = &self.datadir {
             config.client.datadir = datadir.into();
             overridden = true
@@ -74,7 +79,8 @@ impl Args {
         Ok(overridden)
     }
 
-    /// Override config using the generic overrides.
+    /// Override config using the generic overrides. The idea here is to first convert the
+    /// [`Config`] to json and then apply the overrides by splitting the key by a dot.
     fn override_generic(&self, config: &mut Config) -> anyhow::Result<bool> {
         let original = config.clone();
         // Convert config as json
@@ -83,15 +89,17 @@ impl Args {
         for (path, val) in parse_overrides(&self.overrides)?.iter() {
             apply_override(path, val, &mut json_config)?;
         }
+        // Convert back to json.
         *config =
             from_value(json_config).expect("Should be able to create Config from serde json Value");
-        Ok(original == *config)
+        Ok(original != *config)
     }
 }
 
 type Override = (Vec<String>, String);
 
-/// Parse valid overrides.
+/// Parse valid overrides. This first splits the entries by '=' to get key and value and then splits
+/// the key by '.' which is the update path.
 fn parse_overrides(overrides: &[String]) -> anyhow::Result<Vec<Override>> {
     let mut result = Vec::new();
     for item in overrides {
@@ -108,9 +116,7 @@ fn parse_overrides(overrides: &[String]) -> anyhow::Result<Vec<Override>> {
 fn apply_override(path: &[String], str_value: &str, config: &mut Value) -> anyhow::Result<()> {
     match path {
         [key] => {
-            let mut val = config.get_mut(key);
-            let parsed_value = &mut serde_json::from_str(str_value)?;
-            let _ = val.insert(parsed_value);
+            config[key] = parse_value(str_value)?;
         }
         [key, other @ ..] => {
             apply_override(other, str_value, &mut config[key])?;
@@ -120,9 +126,23 @@ fn apply_override(path: &[String], str_value: &str, config: &mut Value) -> anyho
     Ok(())
 }
 
+/// Parses a string `T`. If parsing fails, attempts to parse it again by converting it to JSON
+/// string i.e. surrounds the string with double quotes.
+/// If the second deserialization attempt also fails, it returns the error from the first attempt.
+fn parse_value<T: DeserializeOwned>(str_value: &str) -> Result<T, serde_json::Error> {
+    match serde_json::from_str(str_value) {
+        Ok(v) => Ok(v),
+        Err(e) => match serde_json::from_str::<T>(&format!("\"{str_value}\"")) {
+            Ok(v) => Ok(v),
+            Err(_) => Err(e),
+        },
+    }
+}
+
 #[cfg(test)]
 mod test {
 
+    use bitcoin::Network;
     use strata_config::ClientConfig;
 
     use super::*;
@@ -177,18 +197,26 @@ mod test {
             datadir: None,
             sequencer: false,
             rollup_params: None,
+            rpc_host: None,
+            rpc_port: None,
             overrides: vec![
                 "btcio.reader.client_poll_dur_ms=50".to_string(),
                 "sync.l1_follow_distance=30".to_string(),
+                "client.rpc_host=rpchost".to_string(),
+                "bitcoind.network=signet".to_string(),
             ],
         };
         // First assert config doesn't already have the expected values after overriding
         assert!(config.btcio.reader.client_poll_dur_ms != 50);
         assert!(config.sync.l1_follow_distance != 30);
 
-        args.override_config(&mut config).unwrap();
+        let res = args.override_config(&mut config);
+        println!("override result: {:?}", res);
+        assert!(res.is_ok());
 
         assert!(config.btcio.reader.client_poll_dur_ms == 50);
         assert!(config.sync.l1_follow_distance == 30);
+        assert!(&config.client.rpc_host == "rpchost");
+        assert!(config.bitcoind.network == Network::Signet);
     }
 }

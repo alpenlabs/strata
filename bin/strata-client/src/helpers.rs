@@ -27,8 +27,8 @@ pub fn get_config(args: Args) -> Result<Config, InitError> {
     let mut config = load_configuration(args.config.as_ref())?;
 
     // Override from env
-    //let env_args = EnvArgs::from_env();
-    //env_args.override_config(&mut config);
+    let env_args = EnvArgs::from_env();
+    env_args.override_config(&mut config);
 
     // Finally override from cli args
     args.override_config(&mut config)?;
