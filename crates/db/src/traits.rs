@@ -42,6 +42,8 @@ pub trait Database {
 }
 
 /// Database interface to control our view of L1 data.
+/// Operations are NOT VALIDATED at this level.
+/// Ensure all operations are done through `L1BlockManager`
 pub trait L1Database {
     /// Atomically extends the chain with a new block, providing the manifest
     /// and a list of transactions we find relevant.  Returns error if
@@ -53,12 +55,11 @@ pub trait L1Database {
     /// error.
     fn put_mmr_checkpoint(&self, blockid: L1BlockId, mmr: CompactMmr) -> DbResult<()>;
 
-    /// Set block at specific height.
-    fn extend_canonical_chain(&self, height: u64, blockid: L1BlockId) -> DbResult<()>;
+    /// Set block at specific height as part of canonical chain.
+    fn set_canonical_chain_entry(&self, height: u64, blockid: L1BlockId) -> DbResult<()>;
 
-    /// Resets the L1 chain tip to the specified block index.  The provided
-    /// index will be the new chain tip that we store.
-    fn revert_canonical_chain(&self, idx: u64) -> DbResult<()>;
+    /// remove entries from canonical chain in given range (inclusive)
+    fn remove_canonical_chain_range(&self, start_height: u64, end_height: u64) -> DbResult<()>;
 
     /// Prune earliest blocks till height
     fn prune_to_height(&self, height: u64) -> DbResult<()>;
