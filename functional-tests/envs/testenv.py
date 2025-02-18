@@ -236,7 +236,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         operator_message_interval = self.message_interval or settings.message_interval
         # Create all the bridge clients.
         for i in range(self.n_operators):
-            xpriv_path = params_gen_data["opseedpaths"][i]
+            xpriv_path = params_gen_data["op_msg_seedpaths"][i]
             xpriv = None
             with open(xpriv_path) as f:
                 xpriv = f.read().strip()
@@ -388,7 +388,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
 
         # Create all the bridge clients.
         for i in range(self.n_operators):
-            xpriv_path = params_gen_data["opseedpaths"][i]
+            xpriv_path = params_gen_data["op_msg_seedpaths"][i]
             xpriv = None
             with open(xpriv_path) as f:
                 xpriv = f.read().strip()

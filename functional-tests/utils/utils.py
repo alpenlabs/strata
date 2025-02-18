@@ -294,8 +294,23 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
             raise TimeoutError(f"Operation timed out after {time_out} seconds.")
 
 
-def generate_seed_at(path: str):
-    """Generates a seed file at specified path."""
+def generate_message_seed_at(path: str):
+    """Generates an operator message seed file at specified path."""
+    # fmt: off
+    cmd = [
+        "strata-datatool",
+        "-b", "regtest",
+        "genxpriv",
+        "-f", path
+    ]
+    # fmt: on
+
+    res = subprocess.run(cmd, stdout=subprocess.PIPE)
+    res.check_returncode()
+
+
+def generate_sign_seed_at(path: str):
+    """Generates an operator signing seed file at specified path."""
     # fmt: off
     cmd = [
         "strata-datatool",
@@ -332,7 +347,7 @@ def generate_seqpubkey_from_seed(path: str) -> str:
 
 
 def generate_opxpub_from_seed(path: str) -> str:
-    """Generates operate pubkey from seed at file path."""
+    """Generates operator pubkey from seed at file path."""
     # fmt: off
     cmd = [
         "strata-datatool",
@@ -349,7 +364,12 @@ def generate_opxpub_from_seed(path: str) -> str:
     return res
 
 
-def generate_params(settings: RollupParamsSettings, seqpubkey: str, oppubkeys: list[str]) -> str:
+def generate_params(
+    settings: RollupParamsSettings,
+    seqpubkey: str,
+    op_msg_pubkeys: list[str],
+    op_sign_pubkeys: list[str],
+) -> str:
     """Generates a params file from config values."""
     # fmt: off
     cmd = [
@@ -366,8 +386,11 @@ def generate_params(settings: RollupParamsSettings, seqpubkey: str, oppubkeys: l
         cmd.extend(["--proof-timeout", str(settings.proof_timeout)])
     # fmt: on
 
-    for k in oppubkeys:
-        cmd.extend(["--opkey", k])
+    for k in op_msg_pubkeys:
+        cmd.extend(["--op-msg-key", k])
+
+    for k in op_sign_pubkeys:
+        cmd.extend(["--op-sign-key", k])
 
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
     res.check_returncode()
@@ -384,19 +407,31 @@ def generate_simple_params(
     """
     Creates a network with params data and a list of operator seed paths.
 
-    Result options are `params` and `opseedpaths`.
+    Result options are `params`, `op_msg_seedpaths`, and `op_sign_seedpaths`.
     """
     seqseedpath = os.path.join(base_path, "seqkey.bin")
-    opseedpaths = [os.path.join(base_path, "opkey%s.bin") % i for i in range(operator_cnt)]
-    for p in [seqseedpath] + opseedpaths:
-        generate_seed_at(p)
+    op_msg_seedpaths = [
+        os.path.join(base_path, "op_msg_key%s.bin") % i for i in range(operator_cnt)
+    ]
+    op_sign_seedpaths = [
+        os.path.join(base_path, "op_sign_key%s.bin") % i for i in range(operator_cnt)
+    ]
+    for p in [seqseedpath] + op_sign_seedpaths:
+        generate_sign_seed_at(p)
+    for p in op_msg_seedpaths:
+        generate_message_seed_at(p)
 
     seqkey = generate_seqpubkey_from_seed(seqseedpath)
-    opxpubs = [generate_opxpub_from_seed(p) for p in opseedpaths]
+    op_msg_xpubs = [generate_opxpub_from_seed(p) for p in op_msg_seedpaths]
+    op_sign_xpubs = [generate_opxpub_from_seed(p) for p in op_sign_seedpaths]
 
-    params = generate_params(settings, seqkey, opxpubs)
+    params = generate_params(settings, seqkey, op_msg_xpubs, op_sign_xpubs)
     print(f"Params {params}")
-    return {"params": params, "opseedpaths": opseedpaths}
+    return {
+        "params": params,
+        "op_msg_seedpaths": op_msg_seedpaths,
+        "op_sign_seedpaths": op_sign_seedpaths,
+    }
 
 
 def broadcast_tx(btcrpc: BitcoindClient, outputs: list[dict], options: dict) -> str:
