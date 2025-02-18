@@ -369,6 +369,7 @@ async fn process_block<R: ReaderRpc>(
             ctx.client.as_ref(),
             genesis_ht + 1,
             &BtcParams::new(params.rollup().network),
+            params.rollup().l1_reorg_safe_depth,
         )
         .await?;
         let ev = L1Event::GenesisVerificationState(height, l1_verification_state);
@@ -378,11 +379,41 @@ async fn process_block<R: ReaderRpc>(
     Ok((l1_events, l1blkid))
 }
 
+/// Retrieves the timestamps of a specified number of blocks from a given height in descending
+/// order.
+///
+/// This fetches timestamps of `height`, `height-1`, `height-2`, …, down to `height - count + 1` but
+/// returns them in ascending order so that the oldest timestamp is first and the newest is last.
+///
+/// If the provided `height` is less than 1, returns a vector containing a single timestamp of 0.
+async fn fetch_block_timestamps_ascending(
+    client: &impl ReaderRpc,
+    height: u64,
+    count: usize,
+) -> anyhow::Result<Vec<u32>> {
+    let mut timestamps = Vec::with_capacity(count);
+
+    for i in 0..count {
+        let current_height = height.saturating_sub(i as u64);
+        // If we've gone past block 1, push 0 as a placeholder.
+        if current_height < 1 {
+            timestamps.push(0);
+        } else {
+            let header = client.get_block_header_at(current_height).await?;
+            timestamps.push(header.time);
+        }
+    }
+
+    timestamps.reverse();
+    Ok(timestamps)
+}
+
 /// Gets the [`HeaderVerificationState`] for the particular block
 pub async fn get_verification_state(
     client: &impl ReaderRpc,
     height: u64,
     params: &BtcParams,
+    l1_reorg_safe_depth: u32,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
     let h1 = get_difficulty_adjustment_height(0, height, params);
@@ -394,32 +425,22 @@ pub async fn get_verification_state(
     } else {
         h1
     };
-    let b0 = client.get_block_header_at(h0).await?;
+    let b0 = client.get_block_header_at(h0).await.unwrap_or(b1);
 
     // Consider the block before `block_height` to be the last verified block
     let vh = height - 1; // verified_height
     let vb = client.get_block_at(vh).await?; // verified_block
 
+    // Bitcoin consensus rule requires last 11 timestamps. We set the count to accomodate for the
+    // reorg depth
     const N: usize = 11;
-    let mut timestamps: [u32; N] = [0u32; N];
-
-    // Fetch the previous timestamps of block from `vh`
-    // This fetches timestamps of `vh-10`,`vh-9`, ... `vh-1`, `vh`
-    for i in 0..N {
-        if vh >= i as u64 {
-            let height_to_fetch = vh - i as u64;
-            let h = client.get_block_header_at(height_to_fetch).await?;
-            timestamps[N - 1 - i] = h.time;
-        } else {
-            // No more blocks to fetch; the rest remain zero
-            timestamps[N - 1 - i] = 0;
-        }
-    }
+    let count = N + l1_reorg_safe_depth as usize;
+    let timestamps = fetch_block_timestamps_ascending(client, vh, count).await?;
 
     // Calculate the 'head' index for the ring buffer based on the current block height.
     // The 'head' represents the position in the buffer where the next timestamp will be inserted.
-    let head = height as usize % N;
-    let last_11_blocks_timestamps = TimestampStore::new_with_head(&timestamps, head);
+    let head = height as usize % count;
+    let block_timestamp_history = TimestampStore::new_with_head(&timestamps, head);
 
     let l1_blkid: L1BlockId = vb.header.block_hash().into();
 
@@ -431,7 +452,7 @@ pub async fn get_verification_state(
             previous: b0.time,
         },
         total_accumulated_pow: 0u128,
-        block_timestamp_history: last_11_blocks_timestamps,
+        block_timestamp_history,
     };
     trace!(%height, ?header_vs, "HeaderVerificationState");
 
@@ -592,14 +613,36 @@ mod test {
     }
 
     #[tokio::test()]
+    async fn test_fetch_timestamps() {
+        let (bitcoind, client) = get_bitcoind_and_client();
+        let _ = mine_blocks(&bitcoind, 115, None).unwrap();
+
+        let ts = fetch_block_timestamps_ascending(&client, 15, 10)
+            .await
+            .unwrap();
+        assert!(ts.is_sorted());
+
+        let ts = fetch_block_timestamps_ascending(&client, 10, 10)
+            .await
+            .unwrap();
+        assert!(ts.is_sorted());
+
+        let ts = fetch_block_timestamps_ascending(&client, 5, 10)
+            .await
+            .unwrap();
+        assert!(ts.is_sorted());
+    }
+
+    #[tokio::test()]
     async fn test_header_verification_state() {
         let (bitcoind, client) = get_bitcoind_and_client();
+        let reorg_safe_depth = 5;
 
         let _ = mine_blocks(&bitcoind, 115, None).unwrap();
 
-        let len = 15;
+        let len = 2;
         let height = 100;
-        let mut header_vs = get_verification_state(&client, height, &REGTEST)
+        let mut header_vs = get_verification_state(&client, height, &REGTEST, reorg_safe_depth)
             .await
             .unwrap();
 
@@ -610,9 +653,10 @@ mod test {
                 .unwrap();
         }
 
-        let new_header_vs = get_verification_state(&client, height + len, &REGTEST)
-            .await
-            .unwrap();
+        let new_header_vs =
+            get_verification_state(&client, height + len, &REGTEST, reorg_safe_depth)
+                .await
+                .unwrap();
 
         assert_eq!(
             header_vs.last_verified_block,

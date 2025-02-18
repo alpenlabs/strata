@@ -81,7 +81,7 @@ impl TimestampStore {
         // Rearrange the timestamps into the internal buffer representation.
         // The internal buffer expects the oldest timestamp at position `head`,
         // and the newest timestamp at position `(head + N - 1) % N`.
-        for (i, &timestamp) in timestamps.iter().enumerate().take(N) {
+        for (i, &timestamp) in timestamps.iter().enumerate() {
             // Calculate the position in the internal buffer.
             let pos = (head + i) % len;
             buffer[pos] = timestamp;
@@ -250,6 +250,22 @@ mod tests {
             timestamps.insert(*ts);
             assert_eq!(timestamps.head, (head + idx + 1) % len);
             assert_eq!(timestamps.median(), median + idx as u32 + 1);
+        }
+    }
+
+    #[test]
+    fn test_new_with_head_larger_buffer() {
+        // Initialize the buffer with timestamps from 1 to 15
+        let initial_timestamps: [u32; 15] = std::array::from_fn(|i| (i + 1) as u32);
+        let mut expected_ts_store = TimestampStore::new(&initial_timestamps);
+
+        let new_timestamps: [u32; 5] = std::array::from_fn(|i| (i + 16) as u32);
+        for &ts in &new_timestamps {
+            expected_ts_store.insert(ts);
+            let mut timestamps = expected_ts_store.buffer.clone();
+            timestamps.sort_unstable();
+            let ts_store = TimestampStore::new_with_head(&timestamps, expected_ts_store.head);
+            assert_eq!(expected_ts_store, ts_store);
         }
     }
 }
