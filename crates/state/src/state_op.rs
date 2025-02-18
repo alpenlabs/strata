@@ -9,17 +9,14 @@ use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
     epoch::EpochCommitment,
-    l1::ProtocolOperation,
+    l1::{BitcoinAmount, L1HeaderRecord, OutputRef},
     l2::L2BlockCommitment,
 };
-use tracing::*;
 
 use crate::{
-    bridge_ops::DepositIntent,
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::Chainstate,
     header::L2Header,
-    l1::L1MaturationEntry,
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -145,6 +142,9 @@ impl StateCache {
     /// Pushes a new state op onto the write ops list.
     ///
     /// This currently is meaningless since we don't have write ops that do anything anymore.
+    #[deprecated(
+        note = "there is no way to make use of this anymore, but we're leaving it in case we do have something to do with it"
+    )]
     pub fn push_op(&mut self, op: StateOp) {
         self.write_ops.push(op);
     }
@@ -182,7 +182,16 @@ impl StateCache {
         self.state_mut().finalized_epoch = epoch;
     }
 
-    /// remove a deposit intent from the pending deposits queue.
+    /// Updates the safe L1 block.
+    pub fn update_safe_block(&mut self, height: u64, record: L1HeaderRecord) {
+        let state = self.state_mut();
+        state.l1_state.safe_block_height = height;
+        state.l1_state.safe_block_header = record;
+    }
+
+    /// Remove a deposit intent from the pending deposits queue.
+    ///
+    /// This actually removes possibly multiple deposit intents.
     pub fn consume_deposit_intent(&mut self, idx: u64) {
         let deposits = self.state_mut().exec_env_state.pending_deposits_mut();
 
@@ -207,65 +216,18 @@ impl StateCache {
         state.operator_table.insert(signing_pk, wallet_pk);
     }
 
-    /// L1 revert
-    pub fn revert_l1_view_to(&mut self, to_height: u64) {
-        let mqueue = &mut self.state_mut().l1_state.maturation_queue;
-        let back_idx = mqueue.back_idx().expect("stateop: maturation queue empty");
-
-        // Do some bookkeeping to make sure it's safe to do this.
-        if to_height > back_idx {
-            panic!("stateop: revert to above tip block");
-        }
-
-        let n_drop = back_idx - to_height;
-        if n_drop >= mqueue.len() as u64 {
-            panic!("stateop: would revert all mqueue blocks");
-        }
-
-        // Now that it's safe to do the revert, we can just do it.
-        for _ in 0..n_drop {
-            // This expect should never trigger.
-            mqueue.pop_back().expect("stateop: unable to revert more");
-        }
+    /// Inserts a new deposit with some settings.
+    pub fn insert_deposit(
+        &mut self,
+        tx_ref: OutputRef,
+        amt: BitcoinAmount,
+        operators: Vec<OperatorIdx>,
+    ) -> u32 {
+        let dt = self.state_mut().deposits_table_mut();
+        dt.add_deposit(tx_ref, operators, amt)
     }
 
-    /// add l1 block to maturation entry
-    pub fn apply_l1_block_entry(&mut self, ent: L1MaturationEntry) {
-        let mqueue = &mut self.state_mut().l1_state.maturation_queue;
-        mqueue.push_back(ent);
-    }
-
-    /// remove matured block from maturation entry
-    pub fn mature_l1_block(&mut self, idx: u64) {
-        let operators: Vec<_> = self.state().operator_table().indices().collect();
-        let deposits = self.new_state.exec_env_state.pending_deposits_mut();
-        let mqueue = &mut self.new_state.l1_state.maturation_queue;
-
-        // Checks.
-        assert!(mqueue.len() > 1); // make sure we'll still have blocks in the queue
-        let front_idx = mqueue.front_idx().unwrap();
-        assert_eq!(front_idx, idx);
-
-        // Actually take the block out so we can do something with it.
-        let matured_block = mqueue.pop_front().unwrap();
-
-        // TODO add it to the MMR so we can reference it in the future
-        let (header_record, deposit_txs, _) = matured_block.into_parts();
-        for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
-            if let ProtocolOperation::Deposit(deposit_info) = op {
-                trace!("we got some deposit_txs");
-                let amt = deposit_info.amt;
-                let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
-                deposits.push_back(deposit_intent);
-                self.new_state
-                    .deposits_table
-                    .add_deposits(&deposit_info.outpoint, &operators, amt)
-            }
-        }
-
-        self.state_mut().l1_state.safe_block = header_record;
-    }
-
+    /// Assigns a withdrawal command to a deposit, with an expiration.
     pub fn assign_withdrawal_command(
         &mut self,
         deposit_idx: u32,
@@ -284,6 +246,7 @@ impl StateCache {
         deposit_ent.set_state(state);
     }
 
+    /// Updates the deposit assignee and expiration date.
     pub fn reset_deposit_assignee(
         &mut self,
         deposit_idx: u32,
@@ -303,6 +266,46 @@ impl StateCache {
             panic!("stateop: unexpected deposit state");
         };
     }
+
+    // These are all irrelevant now.
+    /*
+            /// add l1 block to maturation entry
+            pub fn apply_l1_block_entry(&mut self, ent: L1MaturationEntry) {
+                let mqueue = &mut self.state_mut().l1_state.maturation_queue;
+                mqueue.push_back(ent);
+            }
+
+            /// remove matured block from maturation entry
+            pub fn mature_l1_block(&mut self, idx: u64) {
+                let operators: Vec<_> = self.state().operator_table().indices().collect();
+                let deposits = self.new_state.exec_env_state.pending_deposits_mut();
+                let mqueue = &mut self.new_state.l1_state.maturation_queue;
+
+                // Checks.
+                assert!(mqueue.len() > 1); // make sure we'll still have blocks in the queue
+                let front_idx = mqueue.front_idx().unwrap();
+                assert_eq!(front_idx, idx);
+
+                // Actually take the block out so we can do something with it.
+                let matured_block = mqueue.pop_front().unwrap();
+
+                // TODO add it to the MMR so we can reference it in the future
+                let (header_record, deposit_txs, _) = matured_block.into_parts();
+                for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
+                    if let ProtocolOperation::Deposit(deposit_info) = op {
+                        trace!("we got some deposit_txs");
+                        let amt = deposit_info.amt;
+                        let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
+                        deposits.push_back(deposit_intent);
+                        self.new_state
+                            .deposits_table
+                            .add_deposits(&deposit_info.outpoint, &operators, amt)
+                    }
+                }
+
+                self.state_mut().l1_state.safe_block = header_record;
+            }
+    */
 
     // TODO add more manipulator functions
 }
