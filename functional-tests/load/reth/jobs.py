@@ -75,11 +75,6 @@ class BasicRethTxJob(BaseRethLoadJob):
         # Add liquidity to uniswap liquidity pair (since we approved spending).
         tx.add_liquidity(egm_token_addr, 100_000, susd_token_addr, 100_000)
 
-        # We either have a bug in our reth, or swap itself contains some neat bug.
-        # Disabled for now.
-        # TODO: investigate.
-        return
-
         # Swap SUSD to EGM (FOMO IS REAL).
         tx.swap(susd_token_addr, egm_token_addr, 500)
 

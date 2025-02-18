@@ -102,7 +102,7 @@ def main(argv):
         "load_generator": load_gen_fac,
     }
 
-    reth_load_env = testenv.LoadEnvConfig()
+    reth_load_env = testenv.LoadEnvConfig(101)
     reth_load_env.with_load_builder(
         RethLoadConfigBuilder().with_jobs([BasicRethBlockJob, BasicRethTxJob]).with_rate(30)
     )

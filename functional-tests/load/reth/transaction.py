@@ -12,8 +12,6 @@ from load.reth.log_helper import log_metadata_var, tx_caller
 
 from .account import AbstractAccount
 
-solcx.install_solc("0.8.0")
-
 
 class TransactionType(Enum):
     LEGACY = 1
@@ -172,7 +170,7 @@ class SmartContracts(TransactionSender):
     """
 
     CONTRACTS_DIR = "load/reth/contracts/"
-    SOL_VERSION = "0.8.0"
+    SOL_VERSION = "0.8.7"
 
     _smart_contracts_storage = dict()
 
@@ -185,6 +183,8 @@ class SmartContracts(TransactionSender):
     def _compile_contract(self, filename, contract_name=None):
         if contract_name is None:
             contract_name = filename.split(".")[0]
+
+        solcx.install_solc(SmartContracts.SOL_VERSION)
 
         compiled_sol = solcx.compile_files(
             [f"{SmartContracts.CONTRACTS_DIR}{filename}"],
