@@ -386,7 +386,7 @@ pub async fn get_verification_state(
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
     let h1 = get_difficulty_adjustment_height(0, height, params);
-    let b1 = client.get_block_at(h1).await?;
+    let b1 = client.get_block_header_at(h1).await?;
 
     // Get the difficulty adjustment block just before `h0`
     let h0 = if h1 > params.difficulty_adjustment_interval() {
@@ -394,7 +394,7 @@ pub async fn get_verification_state(
     } else {
         h1
     };
-    let b0 = client.get_block_at(h0).await?;
+    let b0 = client.get_block_header_at(h0).await?;
 
     // Consider the block before `block_height` to be the last verified block
     let vh = height - 1; // verified_height
@@ -408,8 +408,8 @@ pub async fn get_verification_state(
     for i in 0..N {
         if vh >= i as u64 {
             let height_to_fetch = vh - i as u64;
-            let h = client.get_block_at(height_to_fetch).await?;
-            timestamps[N - 1 - i] = h.header.time;
+            let h = client.get_block_header_at(height_to_fetch).await?;
+            timestamps[N - 1 - i] = h.time;
         } else {
             // No more blocks to fetch; the rest remain zero
             timestamps[N - 1 - i] = 0;
@@ -427,8 +427,8 @@ pub async fn get_verification_state(
         last_verified_block: L1BlockCommitment::new(vh, l1_blkid),
         next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
         epoch_timestamps: EpochTimestamps {
-            current: b1.header.time,
-            previous: b0.header.time,
+            current: b1.time,
+            previous: b0.time,
         },
         total_accumulated_pow: 0u128,
         block_timestamp_history: last_11_blocks_timestamps,

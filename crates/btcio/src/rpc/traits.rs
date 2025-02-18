@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use bitcoin::{bip32::Xpriv, Address, Block, BlockHash, Network, Transaction, Txid};
+use bitcoin::{bip32::Xpriv, block::Header, Address, Block, BlockHash, Network, Transaction, Txid};
 
 use crate::rpc::{
     client::ClientResult,
@@ -43,11 +43,17 @@ pub trait ReaderRpc {
     /// Gets a [`Block`] with the given hash.
     async fn get_block(&self, hash: &BlockHash) -> ClientResult<Block>;
 
+    /// Gets a [`Header`] with the given hash.
+    async fn get_block_header(&self, hash: &BlockHash) -> ClientResult<Header>;
+
     /// Gets a block height with the given hash.
     async fn get_block_height(&self, hash: &BlockHash) -> ClientResult<u64>;
 
     /// Gets a [`Block`] at given height.
     async fn get_block_at(&self, height: u64) -> ClientResult<Block>;
+
+    /// Gets a [`Header`] at given height.
+    async fn get_block_header_at(&self, height: u64) -> ClientResult<Header>;
 
     /// Gets the height of the most-work fully-validated chain.
     ///

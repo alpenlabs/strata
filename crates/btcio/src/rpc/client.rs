@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
 use bitcoin::{
     bip32::Xpriv,
+    block::Header,
     consensus::{self, encode::serialize_hex},
     Address, Block, BlockHash, Network, Transaction, Txid,
 };
@@ -31,9 +32,9 @@ use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
     types::{
-        CreateRawTransaction, CreateWallet, GetBlockVerbosityOne, GetBlockVerbosityZero,
-        GetBlockchainInfo, GetNewAddress, GetTransaction, GetTxOut, ImportDescriptor,
-        ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
+        CreateRawTransaction, CreateWallet, GetBlockHeaderVerbosityZero, GetBlockVerbosityOne,
+        GetBlockVerbosityZero, GetBlockchainInfo, GetNewAddress, GetTransaction, GetTxOut,
+        ImportDescriptor, ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
         PreviousTransactionOutput, SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
 };
@@ -253,6 +254,19 @@ impl ReaderRpc for BitcoinClient {
         Ok(block)
     }
 
+    async fn get_block_header(&self, hash: &BlockHash) -> ClientResult<Header> {
+        let get_block_header = self
+            .call::<GetBlockHeaderVerbosityZero>(
+                "getblockheader",
+                &[to_value(hash.to_string())?, to_value(false)?],
+            )
+            .await?;
+        let header = get_block_header
+            .header()
+            .map_err(|err| ClientError::Other(format!("header decode: {}", err)))?;
+        Ok(header)
+    }
+
     async fn get_block_height(&self, hash: &BlockHash) -> ClientResult<u64> {
         let block_verobose = self
             .call::<GetBlockVerbosityOne>("getblock", &[to_value(hash.to_string())?])
@@ -265,6 +279,11 @@ impl ReaderRpc for BitcoinClient {
     async fn get_block_at(&self, height: u64) -> ClientResult<Block> {
         let hash = self.get_block_hash(height).await?;
         self.get_block(&hash).await
+    }
+
+    async fn get_block_header_at(&self, height: u64) -> ClientResult<Header> {
+        let hash = self.get_block_hash(height).await?;
+        self.get_block_header(&hash).await
     }
 
     async fn get_block_count(&self) -> ClientResult<u64> {
