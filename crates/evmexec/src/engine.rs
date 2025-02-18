@@ -518,7 +518,7 @@ mod tests {
 
         let el_payload = random_el_payload();
 
-        let mut arb = strata_test_utils::ArbitraryGenerator::new();
+        let mut arb = strata_test_utils::ArbitraryGenerator::new_with_size(32_768);
         let l2block: L2Block = arb.generate();
         let accessory = L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap());
         let l2block_bundle = L2BlockBundle::new(l2block, accessory);

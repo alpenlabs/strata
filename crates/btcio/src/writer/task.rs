@@ -343,20 +343,20 @@ mod test {
     fn test_initialize_writer_state_with_existing_payloads() {
         let iops = get_envelope_ops();
 
-        let mut e1: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let mut e1: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
         e1.status = L1BundleStatus::Finalized;
         iops.put_payload_entry_blocking(0, e1).unwrap();
 
-        let mut e2: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let mut e2: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
         e2.status = L1BundleStatus::Published;
         iops.put_payload_entry_blocking(1, e2).unwrap();
         let expected_idx = 1; // All entries before this do not need to be watched.
 
-        let mut e3: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let mut e3: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
         e3.status = L1BundleStatus::Unsigned;
         iops.put_payload_entry_blocking(2, e3).unwrap();
 
-        let mut e4: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let mut e4: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
         e4.status = L1BundleStatus::Unsigned;
         iops.put_payload_entry_blocking(3, e4).unwrap();
 

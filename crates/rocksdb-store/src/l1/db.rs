@@ -201,7 +201,7 @@ mod tests {
         db: &L1Db,
         num_txs: usize,
     ) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
-        let mut arb = ArbitraryGenerator::new_with_size(1 << 12);
+        let mut arb = ArbitraryGenerator::new_with_size(4_096);
 
         // TODO maybe tweak this to make it a bit more realistic?
         let mf: L1BlockManifest = arb.generate();
@@ -248,11 +248,11 @@ mod tests {
         let invalid_idxs = vec![1, 2, 5000, 1000, 1002, 999]; // basically any id beside idx + 1
         for invalid_idx in invalid_idxs {
             let txs: Vec<L1Tx> = (0..10)
-                .map(|_| ArbitraryGenerator::new().generate())
+                .map(|_| ArbitraryGenerator::new_with_size(2_048).generate())
                 .collect();
             let res = db.put_block_data(
                 invalid_idx,
-                ArbitraryGenerator::new().generate::<L1BlockManifest>(),
+                ArbitraryGenerator::new_with_size(1_024).generate::<L1BlockManifest>(),
                 txs,
             );
             assert!(res.is_err(), "Should fail to insert to db");
@@ -260,9 +260,13 @@ mod tests {
 
         let valid_idx = idx + 1;
         let txs: Vec<L1Tx> = (0..10)
-            .map(|_| ArbitraryGenerator::new().generate())
+            .map(|_| ArbitraryGenerator::new_with_size(1_024).generate())
             .collect();
-        let res = db.put_block_data(valid_idx, ArbitraryGenerator::new().generate(), txs);
+        let res = db.put_block_data(
+            valid_idx,
+            ArbitraryGenerator::new_with_size(1_024).generate(),
+            txs,
+        );
         assert!(res.is_ok(), "Should successfully insert to db");
     }
 
@@ -330,7 +334,7 @@ mod tests {
     fn test_put_mmr_checkpoint_invalid() {
         let db = setup_db();
         let _ = insert_block_data(1, &db, 10);
-        let mmr: CompactMmr = ArbitraryGenerator::new().generate();
+        let mmr: CompactMmr = ArbitraryGenerator::new_with_size(2_048).generate();
         let invalid_idxs = vec![0, 2, 4, 5, 6, 100, 1000]; // any idx except 1
         for idx in invalid_idxs {
             let res = db.put_mmr_checkpoint(idx, mmr.clone());
@@ -342,7 +346,7 @@ mod tests {
     fn test_put_mmr_checkpoint_valid() {
         let db = setup_db();
         let _ = insert_block_data(1, &db, 10);
-        let mmr: CompactMmr = ArbitraryGenerator::new().generate();
+        let mmr: CompactMmr = ArbitraryGenerator::new_with_size(2_048).generate();
         let res = db.put_mmr_checkpoint(1, mmr);
         assert!(res.is_ok());
     }

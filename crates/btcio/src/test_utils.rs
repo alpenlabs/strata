@@ -425,8 +425,8 @@ pub(crate) mod test_context {
             .unwrap();
         let cfg = Arc::new(WriterConfig::default());
         let status_channel = StatusChannel::new(
-            ArbitraryGenerator::new().generate(),
-            ArbitraryGenerator::new().generate(),
+            ArbitraryGenerator::new_with_size(4_096 * 2).generate(),
+            ArbitraryGenerator::new_with_size(4_096 * 2).generate(),
             None,
         );
         let params = Arc::new(gen_params());
