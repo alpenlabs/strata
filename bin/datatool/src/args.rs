@@ -148,17 +148,31 @@ pub(crate) struct SubcParams {
 
     #[argh(
         option,
-        description = "add a bridge operator key (must be at least one, appended after file keys)",
-        short = 'b'
+        description = "add a bridge operator message key (must be at least one, appended after file keys)",
+        short = 'm'
     )]
-    pub(crate) opkey: Vec<String>,
+    pub(crate) op_msg_key: Vec<String>,
 
     #[argh(
         option,
-        description = "read bridge operator keys by line from file",
-        short = 'B'
+        description = "read bridge operator message keys by line from file",
+        short = 'M'
     )]
-    pub(crate) opkeys: Option<PathBuf>,
+    pub(crate) op_msg_keys: Option<PathBuf>,
+
+    #[argh(
+        option,
+        description = "add a bridge operator signing key (must be at least one, appended after file keys)",
+        short = 'k'
+    )]
+    pub(crate) op_sign_key: Vec<String>,
+
+    #[argh(
+        option,
+        description = "read bridge operator signing keys by line from file",
+        short = 'K'
+    )]
+    pub(crate) op_sign_keys: Option<PathBuf>,
 
     #[argh(option, description = "deposit amount in sats (default \"10 BTC\")")]
     pub(crate) deposit_sats: Option<String>,

@@ -18,10 +18,7 @@ use bitcoin::{
 };
 use rand_core::CryptoRngCore;
 use reth_chainspec::ChainSpec;
-use strata_key_derivation::{
-    operator::{convert_base_xpub_to_message_xpub, convert_base_xpub_to_wallet_xpub, OperatorKeys},
-    sequencer::SequencerKeys,
-};
+use strata_key_derivation::{operator::OperatorKeys, sequencer::SequencerKeys};
 use strata_primitives::{
     block_credential,
     buf::Buf32,
@@ -247,24 +244,42 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         None => None,
     };
 
-    // Parse each of the operator keys.
-    let mut opkeys = Vec::new();
+    // Parse each of the operator message and signing keys.
+    let mut operator_message_keys = Vec::new();
+    let mut operator_sign_keys = Vec::new();
 
-    if let Some(opkeys_path) = cmd.opkeys {
-        let opkeys_str = fs::read_to_string(opkeys_path)?;
+    if let Some(op_msg_keys_path) = cmd.op_msg_keys {
+        let op_msg_keys_str = fs::read_to_string(op_msg_keys_path)?;
 
-        for l in opkeys_str.lines() {
+        for l in op_msg_keys_str.lines() {
             // skip lines that are empty or look like comments
             if l.trim().is_empty() || l.starts_with("#") {
                 continue;
             }
 
-            opkeys.push(parse_xpub(l)?);
+            operator_message_keys.push(parse_xpub(l)?);
         }
     }
 
-    for k in cmd.opkey {
-        opkeys.push(parse_xpub(&k)?);
+    for k in cmd.op_msg_key {
+        operator_message_keys.push(parse_xpub(&k)?);
+    }
+
+    if let Some(op_sign_keys_path) = cmd.op_sign_keys {
+        let op_sign_keys_str = fs::read_to_string(op_sign_keys_path)?;
+
+        for l in op_sign_keys_str.lines() {
+            // skip lines that are empty or look like comments
+            if l.trim().is_empty() || l.starts_with("#") {
+                continue;
+            }
+
+            operator_sign_keys.push(parse_xpub(l)?);
+        }
+    }
+
+    for k in cmd.op_sign_key {
+        operator_sign_keys.push(parse_xpub(&k)?);
     }
 
     // Parse the deposit size str.
@@ -294,7 +309,8 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         epoch_slots: cmd.epoch_slots.unwrap_or(64),
         genesis_trigger: cmd.genesis_trigger_height.unwrap_or(100),
         seqkey,
-        opkeys,
+        operator_message_keys,
+        operator_sign_keys,
         rollup_vk,
         // TODO make a const
         deposit_sats,
@@ -430,29 +446,46 @@ fn resolve_xpriv(
 pub struct ParamsConfig {
     /// Name of the network.
     name: String,
+
     /// Tagname used to identify DA envelopes
     da_tag: String,
+
     /// Tagname used to identify Checkpoint envelopes
     checkpoint_tag: String,
+
     /// Network to use.
     #[allow(unused)]
     bitcoin_network: Network,
+
     /// Block time in seconds.
     block_time_sec: u64,
+
     /// Number of slots in an epoch.
     epoch_slots: u32,
+
     /// Height at which the genesis block is triggered.
     genesis_trigger: u64,
+
     /// Sequencer's key.
     seqkey: Option<Buf32>,
-    /// Operators' keys.
-    opkeys: Vec<Xpub>,
+
+    /// Operators' message keys.
+    // TODO: maybe this should be a map of index to key somehow
+    operator_message_keys: Vec<Xpub>,
+
+    /// Operators' signing keys.
+    // TODO: maybe this should be a map of index to key somehow
+    operator_sign_keys: Vec<Xpub>,
+
     /// Verifier's key.
     rollup_vk: RollupVerifyingKey,
+
     /// Amount of sats to deposit.
     deposit_sats: u64,
+
     /// Timeout for proofs.
     proof_timeout: Option<u32>,
+
     /// evm chain config json.
     evm_genesis_info: BlockInfo,
 }
@@ -466,13 +499,12 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
         .unwrap_or(block_credential::CredRule::Unchecked);
 
     let opkeys = config
-        .opkeys
+        .operator_message_keys
         .into_iter()
-        .map(|xpk| {
-            let message_xpub = convert_base_xpub_to_message_xpub(&xpk);
-            let wallet_xpub = convert_base_xpub_to_wallet_xpub(&xpk);
-            let message_key_buf = message_xpub.to_x_only_pub().serialize().into();
-            let wallet_key_buf = wallet_xpub.to_x_only_pub().serialize().into();
+        .zip(config.operator_sign_keys)
+        .map(|(msg_pk, sign_pk)| {
+            let message_key_buf = msg_pk.to_x_only_pub().serialize().into();
+            let wallet_key_buf = sign_pk.to_x_only_pub().serialize().into();
             OperatorPubkeys::new(message_key_buf, wallet_key_buf)
         })
         .collect::<Vec<_>>();
