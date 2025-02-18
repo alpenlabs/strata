@@ -67,7 +67,8 @@ impl L1BlockManager {
         };
 
         self.chaintip_cache.purge(&());
-        self.ops.extend_canonical_chain_blocking(height, *blockid)
+        self.ops
+            .set_canonical_chain_entry_blocking(height, *blockid)
     }
 
     pub async fn extend_canonical_chain_async(&self, blockid: &L1BlockId) -> DbResult<()> {
@@ -91,30 +92,39 @@ impl L1BlockManager {
 
         self.chaintip_cache.purge(&());
         self.ops
-            .extend_canonical_chain_async(height, *blockid)
+            .set_canonical_chain_entry_async(height, *blockid)
             .await
     }
 
-    pub fn revert_canonical_chain(&self, idx: u64) -> DbResult<()> {
-        if let Some((tip, _)) = self.ops.get_chain_tip_blocking()? {
-            for i in idx + 1..=tip {
-                self.blockheight_cache.purge(&i);
-            }
+    pub fn revert_canonical_chain(&self, height: u64) -> DbResult<()> {
+        let Some((tip, _)) = self.ops.get_chain_tip_blocking()? else {
+            // no chain to revert
+            return Ok(());
+        };
+
+        for i in height + 1..=tip {
+            self.blockheight_cache.purge(&i);
         }
 
         self.chaintip_cache.purge(&());
-        self.ops.revert_canonical_chain_blocking(idx)
+        self.ops
+            .remove_canonical_chain_range_blocking(height + 1, tip)
     }
 
-    pub async fn revert_canonical_chain_async(&self, idx: u64) -> DbResult<()> {
-        if let Some((tip, _)) = self.ops.get_chain_tip_async().await? {
-            for i in idx + 1..=tip {
-                self.blockheight_cache.purge(&i);
-            }
+    pub async fn revert_canonical_chain_async(&self, height: u64) -> DbResult<()> {
+        let Some((tip, _)) = self.ops.get_chain_tip_async().await? else {
+            // no chain to revert
+            return Ok(());
+        };
+
+        for i in height + 1..=tip {
+            self.blockheight_cache.purge(&i);
         }
 
         self.chaintip_cache.purge(&());
-        self.ops.revert_canonical_chain_async(idx).await
+        self.ops
+            .remove_canonical_chain_range_async(height + 1, tip)
+            .await
     }
 
     pub fn get_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>> {
