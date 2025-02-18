@@ -615,7 +615,7 @@ mod test {
 
         // importdescriptors
         // taken from https://github.com/rust-bitcoin/rust-bitcoin/blob/bb38aeb786f408247d5bbc88b9fa13616c74c009/bitcoin/examples/taproot-psbt.rs#L18C38-L18C149
-        let descriptor_string = "tr([e61b318f/56'/20']tprv8ZgxMBicQKsPd4arFr7sKjSnKFDVMR2JHw9Y8L9nXN4kiok4u28LpHijEudH3mMYoL4pM5UL9Bgdz2M4Cy8EzfErmU9m86ZTw6hCzvFeTg7/101/*)#zz430whl".to_owned();
+        let descriptor_string = "tr([e61b318f/20000'/20']tprv8ZgxMBicQKsPd4arFr7sKjSnKFDVMR2JHw9Y8L9nXN4kiok4u28LpHijEudH3mMYoL4pM5UL9Bgdz2M4Cy8EzfErmU9m86ZTw6hCzvFeTg7/101/*)#2plamwqs".to_owned();
         let timestamp = "now".to_owned();
         let list_descriptors = vec![ImportDescriptor {
             desc: descriptor_string,
