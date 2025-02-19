@@ -7,6 +7,7 @@ version = "0.1.0"
 strata-chaintsn.workspace = true
 strata-crypto.workspace = true
 strata-primitives.workspace = true
+strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-state.workspace = true
 zkaleido.workspace = true

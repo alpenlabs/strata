@@ -44,18 +44,18 @@ pub struct BlockScanProofInput {
 }
 
 pub fn process_blockscan_proof(zkvm: &impl ZkVmEnv) {
-    // 1. Read the count and transaction filters used to scan the block
+    // 1a. Read the count and transaction filters used to scan the block
     let count: usize = zkvm.read_serde();
     let tx_filters: TxFilterConfig = zkvm.read_borsh();
 
     let mut blockscan_results = Vec::with_capacity(count);
 
     for _ in 0..count {
-        // 1a. Read the full serialized block and deserialize it
+        // 1b. Read the full serialized block and deserialize it
         let serialized_block = zkvm.read_buf();
         let block: Block = deserialize(&serialized_block).expect("invalid block serialization");
 
-        // 1b. Read inclusion proof and tx_filters
+        // 1c. Read inclusion proof
         let inclusion_proof: Option<L1TxProof> = zkvm.read_borsh();
 
         // 2. Check that the content of the block is valid
@@ -64,7 +64,7 @@ pub fn process_blockscan_proof(zkvm: &impl ZkVmEnv) {
         // 3. Index the block for protocol ops
         let protocol_ops = index_block(&block, ProverTxVisitorImpl::new, &tx_filters);
 
-        // 4. Collect deposits and DA commitments
+        // 4. Collect deposits and DA commitments of a block
         let mut deposits = Vec::new();
         let mut da_commitments = Vec::new();
         for tx_entry in protocol_ops.into_iter() {
@@ -77,23 +77,23 @@ pub fn process_blockscan_proof(zkvm: &impl ZkVmEnv) {
             }
         }
 
-        // 5. Commit to the output
+        // 5. Create the blockscan result and append to blockscan results
         let raw_header = serialize(&block.header)
             .try_into()
             .expect("bitcoin block header is 80 bytes");
-        let output = BlockScanResult {
+        let result = BlockScanResult {
             raw_header,
             deposits,
             da_commitments,
         };
-        blockscan_results.push(output);
+        blockscan_results.push(result);
     }
 
+    // 6. Create the final output to be committed and commit the output
     let output = BlockscanProofOutput {
         blockscan_results,
         tx_filters,
     };
-
     zkvm.commit_borsh(&output);
 }
 

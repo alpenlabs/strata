@@ -13311,6 +13311,7 @@ dependencies = [
  "strata-chaintsn",
  "strata-crypto",
  "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "strata-test-utils",
