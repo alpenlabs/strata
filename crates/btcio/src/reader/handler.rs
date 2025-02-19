@@ -1,16 +1,11 @@
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
-use secp256k1::XOnlyPublicKey;
 use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
-    batch::{
-        verify_signed_checkpoint_sig, Checkpoint, CommitmentInfo, L1CommittedCheckpoint,
-        SignedCheckpoint,
-    },
-    block_credential::CredRule,
+    batch::{verify_signed_checkpoint_sig, Checkpoint, CommitmentInfo, L1CommittedCheckpoint},
     buf::Buf32,
     l1::{
-        generate_l1_tx, HeaderVerificationState, L1BlockCommitment, L1BlockManifest, L1BlockRecord,
-        L1Tx, ProtocolOperation,
+        generate_l1_tx, HeaderVerificationState, L1BlockCommitment, L1BlockManifest,
+        L1HeaderRecord, L1Tx, ProtocolOperation,
     },
     params::RollupParams,
 };
@@ -157,7 +152,7 @@ fn generate_block_manifest(
         .unwrap_or_default();
     let header = serialize(&block.header);
 
-    let rec = L1BlockRecord::new(blockid, header, Buf32::from(root));
+    let rec = L1HeaderRecord::new(blockid, header, Buf32::from(root));
     L1BlockManifest::new(rec, hvs, txs, epoch)
 }
 

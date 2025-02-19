@@ -816,12 +816,13 @@ fn handle_finish_epoch(
     );
 
     let l1seg = bundle.l1_segment();
-    let tip_l1_record = l1seg
-        .new_payloads()
-        .last()
-        .expect("fcm: epoch terminal missing payloads");
-
-    let new_l1_block = L1BlockCommitment::new(tip_l1_record.idx(), *tip_l1_record.record().blkid());
+    assert!(
+        !l1seg.new_manifests().is_empty(),
+        "fcm: epoch finished without L1 records"
+    );
+    let new_tip_height = l1seg.new_height();
+    let new_tip_blkid = l1seg.new_tip_blkid().expect("fcm: missing l1seg final L1");
+    let new_l1_block = L1BlockCommitment::new(new_tip_height, new_tip_blkid);
 
     let epoch_final_state = post_state.compute_state_root();
 

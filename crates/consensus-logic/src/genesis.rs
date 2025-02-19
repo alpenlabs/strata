@@ -2,7 +2,7 @@ use strata_db::errors::DbError;
 use strata_primitives::{
     buf::{Buf32, Buf64},
     evm_exec::create_evm_extra_payload,
-    l1::{L1BlockRecord, L1HeaderRecord},
+    l1::{L1BlockManifest, L1HeaderRecord},
     params::{OperatorConfig, Params},
 };
 use strata_state::{
@@ -86,14 +86,14 @@ fn load_pre_genesis_l1_manifests(
     l1man: &L1BlockManager,
     horizon_height: u64,
     genesis_height: u64,
-) -> anyhow::Result<Vec<L1BlockRecord>> {
+) -> anyhow::Result<Vec<L1BlockManifest>> {
     let mut manifests = Vec::new();
     for height in horizon_height..=genesis_height {
         let Some(mf) = l1man.get_block_manifest(height)? else {
             return Err(Error::MissingL1BlockHeight(height).into());
         };
 
-        manifests.push(mf.into_record());
+        manifests.push(mf);
     }
 
     Ok(manifests)
@@ -114,7 +114,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     );
 
     // This has to be empty since everyone should have an unambiguous view of the genesis block.
-    let l1_seg = L1Segment::new_empty();
+    let l1_seg = L1Segment::new_empty(params.rollup().genesis_l1_height);
 
     // TODO this is a total stub, we have to fill it in with something
     let exec_seg = ExecSegment::new(genesis_update);
@@ -140,7 +140,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
 
 pub fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
-    pregenesis_mfs: Vec<L1BlockRecord>,
+    pregenesis_mfs: Vec<L1BlockManifest>,
     params: &Params,
 ) -> Chainstate {
     let genesis_blkid = gblock.header().get_blockid();
@@ -151,7 +151,7 @@ pub fn make_genesis_chainstate(
 
     let horizon_blk_height = params.rollup.horizon_l1_height;
     let genesis_blk_height = params.rollup.genesis_l1_height;
-    let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
+    let genesis_blk_rec = pregenesis_mfs.last().unwrap().record().clone();
     let l1vs = L1ViewState::new_at_genesis(horizon_blk_height, genesis_blk_height, genesis_blk_rec);
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
