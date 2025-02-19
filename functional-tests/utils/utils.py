@@ -13,6 +13,7 @@ from strata_utils import convert_to_xonly_pk, get_balance, musig_aggregate_pks
 from factory.seqrpc import JsonrpcClient, RpcError
 from utils.constants import *
 
+
 def generate_jwt_secret() -> str:
     return os.urandom(32).hex()
 
@@ -118,7 +119,9 @@ def wait_for_genesis(rpc, **kwargs):
         try:
             # This should raise if we're before genesis.
             ss = rpc.strata_syncStatus()
-            logging.debug(f"after genesis, tip is slot {ss['tip_height']} blkid {ss['tip_block_id']}")
+            logging.info(
+                f"after genesis, tip is slot {ss['tip_height']} blkid {ss['tip_block_id']}"
+            )
             return True
         except RpcError as e:
             # This is the "before genesis" error code, meaning we're still
@@ -147,7 +150,9 @@ def wait_until_chain_epoch(rpc, epoch: int, **kwargs) -> dict:
         commitments = rpc.strata_getEpochCommitments(epoch)
         if len(commitments) > 0:
             comm = commitments[0]
-            logging.info(f"now at epoch {epoch}, slot {comm['last_slot']}, blkid {comm['last_blkid']}")
+            logging.info(
+                f"now at epoch {epoch}, slot {comm['last_slot']}, blkid {comm['last_blkid']}"
+            )
             return rpc.strata_getEpochSummary(epoch, comm["last_slot"], comm["last_blkid"])
         return None
 
@@ -198,7 +203,8 @@ def wait_until_epoch_finalized(rpc, epoch: int, **kwargs):
         l1_height = cs["tip_l1_block"]["height"]
         fin_epoch = cs["finalized_epoch"]
         logging.info(f"finalized epoch as of {l1_height}: {fin_epoch}")
-        if fin_epoch is None: return False
+        if fin_epoch is None:
+            return False
         return fin_epoch["epoch"] >= epoch
 
     wait_until(_check, **kwargs)
@@ -212,10 +218,11 @@ def wait_until_epoch_observed_final(rpc, epoch: int, **kwargs):
 
     def _check():
         ss = rpc.strata_syncStatus()
-        slot = ss["tip_height"] # TODO rename to tip_slot
+        slot = ss["tip_height"]  # TODO rename to tip_slot
         of_epoch = ss["observed_finalized_epoch"]
         logging.info(f"observed final epoch as of L2 slot {slot}: {of_epoch}")
-        if not of_epoch: return False
+        if not of_epoch:
+            return False
         return of_epoch["epoch"] >= epoch
 
     wait_until(_check, **kwargs)
@@ -228,7 +235,7 @@ def wait_until_l1_observed(rpc, height: int, **kwargs):
 
     def _check():
         ss = rpc.strata_syncStatus()
-        slot = ss["tip_height"] # TODO rename to slot
+        slot = ss["tip_height"]  # TODO rename to slot
         epoch = ss["cur_epoch"]
         view_l1 = ss["safe_l1_block"]["height"]
         logging.info(f"chain now at slot {slot}, epoch {epoch}, observed L1 height is {view_l1}")
@@ -303,6 +310,14 @@ class ProverClientSettings:
             enable_checkpoint_proving=DEFAULT_PROVER_ENABLE_CHECKPOINT_PROVING,
         )
 
+    @staticmethod
+    def new_with_proving():
+        return ProverClientSettings(
+            native_workers=DEFAULT_PROVER_NATIVE_WORKERS,
+            polling_interval=DEFAULT_PROVER_POLLING_INTERVAL,
+            enable_checkpoint_proving=True,
+        )
+
 
 def check_nth_checkpoint_finalized(
     idx: int,
@@ -310,7 +325,7 @@ def check_nth_checkpoint_finalized(
     prover_rpc,
     manual_gen: ManualGenBlocksConfig | None = None,
     proof_timeout: int | None = None,
-    **kwargs
+    **kwargs,
 ):
     """
     This check expects nth checkpoint to be finalized.
@@ -337,7 +352,9 @@ def check_nth_checkpoint_finalized(
         ss = seqrpc.strata_syncStatus()
         cur_epoch = ss["cur_epoch"]
         chain_l1_height = ss["safe_l1_block"]["height"]
-        logging.info(f"finalized epoch as of {l1_height}: {fin_epoch} (cur chain epoch {cur_epoch}, last L1 {chain_l1_height})")
+        logging.info(
+            f"finalized epoch as of {l1_height}: {fin_epoch} (cur chain epoch {cur_epoch}, last L1 {chain_l1_height})"
+        )
         if fin_epoch is not None and fin_epoch["epoch"] >= idx:
             return True
         _maybe_do_gen()
