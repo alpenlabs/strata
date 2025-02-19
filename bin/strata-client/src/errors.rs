@@ -13,8 +13,11 @@ pub enum InitError {
     #[error("io: {0}")]
     Io(#[from] io::Error),
 
-    #[error("config: {0}")]
-    MalformedConfig(#[from] SerdeError),
+    #[error("unparseable params file: {0}")]
+    UnparseableParamsFile(#[from] SerdeError),
+
+    #[error("config: {0:?}")]
+    MalformedConfig(#[from] ConfigError),
 
     #[error("jwt: {0}")]
     MalformedSecret(#[from] JwtError),
@@ -24,4 +27,29 @@ pub enum InitError {
 
     #[error("{0}")]
     Anyhow(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum ConfigError {
+    /// Config is not a toml table.
+    #[error("Config is not a toml table")]
+    ConfigNotTomlTable,
+
+    /// Missing key in table.
+    #[error("missing key: {0}")]
+    MissingKey(String),
+
+    /// Tried to traverse into a primitive.
+    #[error("can't traverse into primitive: {0}")]
+    TraversePrimitiveAt(String),
+
+    /// Bad override string.
+    #[error("malformed override string")]
+    MalformedOverrideStr,
+
+    #[error("Config is not parseable")]
+    ConfigNotParseable,
+
+    #[error("Invalid override: '{0}'")]
+    InvalidOverride(String),
 }
