@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context};
 use argh::FromArgs;
-use serde::de::DeserializeOwned;
-use serde_json::{from_value, to_value, Value};
 use strata_config::Config;
+use toml::value::Table;
+
+use crate::errors::ConfigError;
 
 /// Configs overridable by environment. Mostly for sensitive data.
 #[derive(Debug, Clone)]
@@ -19,9 +19,9 @@ impl EnvArgs {
     }
 
     /// Override some of the config params from env. Returns if config was overridden or not.
-    pub fn override_config(&self, _config: &mut Config) -> bool {
-        // Override attributes
-        true
+    pub fn get_overrides(&self) -> Vec<String> {
+        // TODO: add stuffs as necessary
+        Vec::new()
     }
 }
 
@@ -67,91 +67,92 @@ impl Args {
     /// Overrides config. First overrides with the generic overrides passed via `-o` and then
     /// overrides the result with some of the commonly passed args. Returns if config was overridden
     /// or not.
-    pub fn override_config(&self, config: &mut Config) -> anyhow::Result<bool> {
-        // Override using -o params.
-        let mut overridden = self.override_generic(config)?;
-
-        // Override by explicitly parsed args like datadir, rpc_host and rpc_port.
-        if let Some(datadir) = &self.datadir {
-            config.client.datadir = datadir.into();
-            overridden = true
-        }
-        if let Some(rpc_host) = &self.rpc_host {
-            config.client.rpc_host = rpc_host.to_string();
-            overridden = true
-        }
-        if let Some(rpc_port) = &self.rpc_port {
-            config.client.rpc_port = *rpc_port;
-            overridden = true
-        }
-        Ok(overridden)
+    pub fn get_overrides(&self) -> Vec<String> {
+        let mut overrides = self.overrides.clone();
+        overrides.extend_from_slice(&self.get_direct_overrides());
+        overrides
     }
 
-    /// Override config using the generic overrides. The idea here is to first convert the
-    /// [`Config`] to json and then apply the overrides by splitting the key by a dot.
-    fn override_generic(&self, config: &mut Config) -> anyhow::Result<bool> {
-        let original = config.clone();
-        // Convert config as json
-        let mut json_config = to_value(&mut *config).context("Config json serialization failed")?;
-
-        for (path, val) in parse_overrides(&self.overrides)?.iter() {
-            apply_override(path, val, &mut json_config)?;
+    fn get_direct_overrides(&self) -> Vec<String> {
+        let mut overrides = Vec::new();
+        // Override by explicitly parsed args like datadir, rpc_host and rpc_port.
+        if let Some(datadir) = &self.datadir {
+            overrides.push(format!("client.datadir={}", datadir.to_string_lossy()));
         }
-        // Convert back to json.
-        *config = from_value(json_config)
-            .context("Should be able to create Config from serde json Value")?;
-        Ok(original != *config)
+        if let Some(rpc_host) = &self.rpc_host {
+            overrides.push(format!("client.rpc_host={}", rpc_host));
+        }
+        if let Some(rpc_port) = &self.rpc_port {
+            overrides.push(format!("client.rpc_port={}", rpc_port));
+        }
+
+        overrides
     }
 }
 
 type Override = (Vec<String>, String);
 
-/// Parse valid overrides. This first splits the entries by '=' to get key and value and then splits
+/// Parses an overrides This first splits the string by '=' to get key and value and then splits
 /// the key by '.' which is the update path.
-fn parse_overrides(overrides: &[String]) -> anyhow::Result<Vec<Override>> {
-    let mut result = Vec::new();
-    for item in overrides {
-        let (key, value) = item
-            .split_once("=")
-            .ok_or(anyhow!("Invalid override: must be in 'key=value' format"))?;
-        let path: Vec<_> = key.split(".").map(|x| x.to_string()).collect();
-        result.push((path, value.to_string()));
+pub fn parse_override(override_str: &str) -> Result<Override, ConfigError> {
+    let (key, value) = override_str
+        .split_once("=")
+        .ok_or(ConfigError::InvalidOverride(override_str.to_string()))?;
+    let path: Vec<_> = key.split(".").map(|x| x.to_string()).collect();
+    Ok((path, value.to_string()))
+}
+
+pub fn apply_overrides(overrides: Vec<String>, table: &mut Table) -> Result<Config, ConfigError> {
+    for res in overrides.iter().map(String::as_str).map(parse_override) {
+        let (path, val) = res?;
+        apply_override(&path, &val, table)?;
     }
-    Ok(result)
+
+    toml::Value::Table(table.clone())
+        .try_into()
+        .map_err(|_| ConfigError::ConfigNotParseable)
 }
 
 /// Apply override to config.
-fn apply_override(path: &[String], str_value: &str, config: &mut Value) -> anyhow::Result<()> {
+pub fn apply_override(
+    path: &[String],
+    str_value: &str,
+    table: &mut Table,
+) -> Result<(), ConfigError> {
     match path {
         [key] => {
-            config[key] = parse_value(str_value)?;
+            let value = parse_value(str_value);
+            table.insert(key.to_string(), value);
+            Ok(())
         }
         [key, other @ ..] => {
-            apply_override(other, str_value, &mut config[key])?;
+            if let Some(t) = table.get_mut(key).and_then(|v| v.as_table_mut()) {
+                apply_override(other, str_value, t)
+            } else if table.contains_key(key) {
+                Err(ConfigError::TraversePrimitiveAt(key.to_string()))
+            } else {
+                Err(ConfigError::MissingKey(key.to_string()))
+            }
         }
-        [] => return Err(anyhow!("Invalid override path")),
-    };
-    Ok(())
+        [] => Err(ConfigError::MalformedOverrideStr), // TODO: this might be a better variant
+    }
 }
 
-/// Parses a string into a `T`. If parsing fails, attempts to parse it again by converting it to
-/// JSON string i.e. surrounds the string with double quotes.
-/// If the second deserialization attempt also fails, it returns the error from the first attempt.
-fn parse_value<T: DeserializeOwned>(str_value: &str) -> Result<T, serde_json::Error> {
-    match serde_json::from_str(str_value) {
-        Ok(v) => Ok(v),
-        Err(e) => match serde_json::from_str::<T>(&format!("\"{str_value}\"")) {
-            Ok(v) => Ok(v),
-            Err(_) => Err(e),
-        },
-    }
+/// Parses a string into a toml value. First tries as `i64`, then as `bool` and then defaults to
+/// `String`.
+fn parse_value(str_value: &str) -> toml::Value {
+    str_value
+        .parse::<i64>()
+        .map(toml::Value::Integer)
+        .or_else(|_| str_value.parse::<bool>().map(toml::Value::Boolean))
+        .unwrap_or(toml::Value::String(str_value.to_string()))
 }
 
 #[cfg(test)]
 mod test {
 
     use bitcoin::Network;
-    use strata_config::ClientConfig;
+    use strata_config::{ClientConfig, Config};
 
     use super::*;
 
@@ -198,11 +199,14 @@ mod test {
     }
 
     #[test]
-    fn test_generic_override() {
-        let mut config = get_config();
+    fn test_apply_override() {
+        let config = get_config();
+        let mut toml = toml::Value::try_from(config).unwrap();
+        let table = toml.as_table_mut().unwrap();
+        let datadir: PathBuf = "new/data/dir/".into();
         let args = Args {
             config: "config_path".into(),
-            datadir: None,
+            datadir: Some(datadir.clone()),
             sequencer: false,
             rollup_params: None,
             rpc_host: None,
@@ -214,17 +218,14 @@ mod test {
                 "bitcoind.network=signet".to_string(),
             ],
         };
-        // First assert config doesn't already have the expected values after overriding
-        assert!(config.btcio.reader.client_poll_dur_ms != 50);
-        assert!(config.sync.l1_follow_distance != 30);
 
-        let res = args.override_config(&mut config);
-        println!("override result: {:?}", res);
-        assert!(res.is_ok());
+        let overrides = args.get_overrides();
+        let config = apply_overrides(overrides, table).unwrap();
 
         assert!(config.btcio.reader.client_poll_dur_ms == 50);
         assert!(config.sync.l1_follow_distance == 30);
         assert!(&config.client.rpc_host == "rpchost");
         assert!(config.bitcoind.network == Network::Signet);
+        assert!(config.client.datadir == datadir);
     }
 }
