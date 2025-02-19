@@ -7,7 +7,7 @@ use bitcoin::{
     hashes::Hash,
     key::{
         rand::{rngs::OsRng, RngCore},
-        Keypair, TapTweak,
+        TapTweak,
     },
     secp256k1::{schnorr::Signature, PublicKey, SecretKey, XOnlyPublicKey},
     sighash::SighashCache,
@@ -24,10 +24,12 @@ use strata_primitives::{
         TxSigningData,
     },
     buf::Buf32,
+    keys::ZeroizableKeypair,
     l1::TaprootSpendPath,
 };
 use strata_storage::ops::bridge::BridgeTxStateOps;
 use tracing::info;
+use zeroize::Zeroize;
 
 use super::errors::{BridgeSigError, BridgeSigResult};
 use crate::operations::{create_message_hash, sign_state_partial, verify_partial_sig};
@@ -40,7 +42,7 @@ pub struct SignatureManager {
     db_ops: Arc<BridgeTxStateOps>,
 
     /// This bridge client's keypair
-    keypair: Keypair,
+    keypair: ZeroizableKeypair,
 
     /// This bridge client's Operator index.
     index: OperatorIdx,
@@ -54,7 +56,11 @@ impl std::fmt::Debug for SignatureManager {
 
 impl SignatureManager {
     /// Create a new [`SignatureManager`].
-    pub fn new(db_ops: Arc<BridgeTxStateOps>, index: OperatorIdx, keypair: Keypair) -> Self {
+    pub fn new(
+        db_ops: Arc<BridgeTxStateOps>,
+        index: OperatorIdx,
+        keypair: ZeroizableKeypair,
+    ) -> Self {
         Self {
             db_ops,
             keypair,
@@ -439,6 +445,12 @@ impl SignatureManager {
     }
 }
 
+impl Drop for SignatureManager {
+    fn drop(&mut self) {
+        self.keypair.zeroize();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{ops::Not, str::FromStr};
@@ -446,6 +458,7 @@ mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     use bitcoin::{
         hashes::sha256,
+        key::Keypair,
         secp256k1::{Message, PublicKey, SECP256K1},
     };
     use musig2::PubNonce;
@@ -863,7 +876,7 @@ mod tests {
         let external_signature = sign_state_partial(
             tx_state.pubkeys(),
             tx_state.secnonce(),
-            &external_keypair,
+            &external_keypair.into(),
             &agg_nonce,
             message.as_ref(),
             keypath_spend_only,
@@ -885,7 +898,7 @@ mod tests {
         let external_signature = sign_state_partial(
             &pubkey_table,
             &sec_nonces[external_index].clone().into(),
-            &external_keypair,
+            &external_keypair.into(),
             &agg_nonce,
             message.as_ref(),
             keypath_spend_only,
@@ -939,7 +952,7 @@ mod tests {
         let invalid_external_signature = sign_state_partial(
             tx_state.pubkeys(),
             tx_state.secnonce(),
-            &external_keypair,
+            &external_keypair.into(),
             &agg_nonce,
             random_message.as_ref(),
             keypath_spend_only,
@@ -1040,11 +1053,12 @@ mod tests {
 
             let message = create_message_hash(&mut sighash_cache, prevouts, tx_state.spend_path());
             let message = message.expect("should be able to create message");
+            let keypair = Keypair::from_secret_key(SECP256K1, &secret_keys[signer_index]);
 
             let external_signature = sign_state_partial(
                 &pubkey_table,
                 &sec_nonces[signer_index].clone().into(),
-                &Keypair::from_secret_key(SECP256K1, &secret_keys[signer_index]),
+                &keypair.into(),
                 &aggregated_nonce,
                 message.as_ref(),
                 keypath_spend_only,
@@ -1097,8 +1111,7 @@ mod tests {
 
     fn generate_mock_manager(self_index: u32, keypair: Keypair) -> SignatureManager {
         let db_ops = generate_mock_tx_state_ops(1);
-
-        SignatureManager::new(db_ops.into(), self_index, keypair)
+        SignatureManager::new(db_ops.into(), self_index, keypair.into())
     }
 
     async fn collect_nonces(

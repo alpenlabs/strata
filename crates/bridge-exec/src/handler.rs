@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug, time::Duration};
 
-use bitcoin::{key::Keypair, Transaction, Txid};
+use bitcoin::{Transaction, Txid};
 use borsh::{BorshDeserialize, BorshSerialize};
 use deadpool::managed::{Object, Pool};
 use jsonrpsee::tokio::time::sleep;
@@ -10,6 +10,7 @@ use strata_bridge_sig_manager::manager::SignatureManager;
 use strata_bridge_tx_builder::{context::BuildContext, TxKind};
 use strata_primitives::{
     bridge::{Musig2PartialSig, Musig2PubNonce, OperatorIdx, OperatorPartialSig},
+    keys::ZeroizableKeypair,
     l1::BitcoinTxid,
     relay::{
         types::{BridgeMessage, Scope},
@@ -19,6 +20,7 @@ use strata_primitives::{
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::HexBytes;
 use tracing::{debug, info, warn};
+use zeroize::Zeroize;
 
 use crate::{
     errors::{ExecError, ExecResult},
@@ -41,7 +43,7 @@ pub struct ExecHandler<TxBuildContext: BuildContext + Sync + Send> {
     pub l2_rpc_client_pool: WsClientPool,
 
     /// The keypair for this client used to sign bridge-related messages.
-    pub keypair: Keypair,
+    pub keypair: ZeroizableKeypair,
 
     /// This client's position in the MuSig2 signing ceremony.
     pub own_index: OperatorIdx,
@@ -342,5 +344,14 @@ where
             self.own_index,
             self.keypair.public_key()
         )
+    }
+}
+
+impl<TxBuildContext> Drop for ExecHandler<TxBuildContext>
+where
+    TxBuildContext: BuildContext + Sync + Send,
+{
+    fn drop(&mut self) {
+        self.keypair.zeroize();
     }
 }
