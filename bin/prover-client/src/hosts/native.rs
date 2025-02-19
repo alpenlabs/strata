@@ -3,10 +3,8 @@ use std::sync::Arc;
 use strata_primitives::proof::ProofContext;
 use strata_proofimpl_btc_blockspace::logic::process_blockscan_proof;
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
-use strata_proofimpl_cl_agg::process_cl_agg;
-use strata_proofimpl_cl_stf::batch_process_cl_stf;
+use strata_proofimpl_cl_stf::process_cl_stf;
 use strata_proofimpl_evm_ee_stf::process_block_transaction_outer;
-use strata_proofimpl_l1_batch::process_l1_batch_proof;
 use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
 /// A mock verification key used in native mode when proof verification is not performed.
@@ -28,12 +26,6 @@ pub fn get_host(id: &ProofContext) -> NativeHost {
                 Ok(())
             })),
         },
-        ProofContext::L1Batch(..) => NativeHost {
-            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_l1_batch_proof(zkvm);
-                Ok(())
-            })),
-        },
         ProofContext::EvmEeStf(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
                 process_block_transaction_outer(zkvm);
@@ -42,21 +34,16 @@ pub fn get_host(id: &ProofContext) -> NativeHost {
         },
         ProofContext::ClStf(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                batch_process_cl_stf(zkvm, &MOCK_VK);
-                Ok(())
-            })),
-        },
-        ProofContext::ClAgg(..) => NativeHost {
-            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_cl_agg(zkvm, &MOCK_VK);
+                process_cl_stf(zkvm, &MOCK_VK, &MOCK_VK);
                 Ok(())
             })),
         },
         ProofContext::Checkpoint(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_checkpoint_proof_outer(zkvm, &MOCK_VK, &MOCK_VK);
+                process_checkpoint_proof_outer(zkvm, &MOCK_VK);
                 Ok(())
             })),
         },
+        _ => panic!("not found"),
     }
 }

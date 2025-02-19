@@ -20,10 +20,10 @@ use zkaleido::ZkVmEnv;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ClStfOutput {
-    initial_epoch: u64,
-    initial_chainstate_root: Buf32,
-    final_epoch: u64,
-    final_chainstate_root: Buf32,
+    pub initial_epoch: u64,
+    pub initial_chainstate_root: Buf32,
+    pub final_epoch: u64,
+    pub final_chainstate_root: Buf32,
 }
 
 pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vkey: &[u32; 8]) {

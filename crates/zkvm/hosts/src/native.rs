@@ -2,8 +2,7 @@ use std::sync::{Arc, LazyLock};
 
 use strata_proofimpl_btc_blockspace::logic::process_blockscan_proof;
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
-use strata_proofimpl_cl_agg::process_cl_agg;
-use strata_proofimpl_cl_stf::batch_process_cl_stf;
+use strata_proofimpl_cl_stf::process_cl_stf;
 use strata_proofimpl_evm_ee_stf::process_block_transaction_outer;
 use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
@@ -34,15 +33,7 @@ static EVM_EE_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| Nativ
 /// A native host for [`ProofVm::CLProving`] prover.
 static CL_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        batch_process_cl_stf(zkvm, &MOCK_VK);
-        Ok(())
-    })),
-});
-
-/// A native host for [`ProofVm::CLAggregation`] prover.
-static CL_AGG_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
-    process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_cl_agg(zkvm, &MOCK_VK);
+        process_cl_stf(zkvm, &MOCK_VK, &MOCK_VK);
         Ok(())
     })),
 });
@@ -50,7 +41,7 @@ static CL_AGG_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHos
 /// A native host for [`ProofVm::Checkpoint`] prover.
 static CHECKPOINT_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_checkpoint_proof_outer(zkvm, &MOCK_VK, &MOCK_VK);
+        process_checkpoint_proof_outer(zkvm, &MOCK_VK);
         Ok(())
     })),
 });
@@ -61,7 +52,6 @@ pub fn get_host(vm: ProofVm) -> &'static NativeHost {
         ProofVm::BtcProving => &BTC_BLOCKSPACE_HOST,
         ProofVm::ELProving => &EVM_EE_STF_HOST,
         ProofVm::CLProving => &CL_STF_HOST,
-        ProofVm::CLAggregation => &CL_AGG_HOST,
         ProofVm::Checkpoint => &CHECKPOINT_HOST,
     }
 }

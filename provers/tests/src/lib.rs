@@ -8,13 +8,11 @@ mod checkpoint;
 mod cl;
 mod el;
 mod generators;
-mod l1_batch;
-mod l2_batch;
 
 pub mod proof_generators {
     pub use crate::{
         btc::BtcBlockProofGenerator, checkpoint::CheckpointProofGenerator, cl::ClProofGenerator,
-        el::ElProofGenerator, l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator,
+        el::ElProofGenerator,
     };
 }
 pub use checkpoint::CheckpointBatchInfo;

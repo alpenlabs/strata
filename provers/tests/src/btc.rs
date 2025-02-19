@@ -1,4 +1,5 @@
 use bitcoin::Block;
+use strata_l1tx::filter::TxFilterConfig;
 use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
 use strata_test_utils::l2::gen_params;
 use zkaleido::{ZkVmHost, ZkVmResult};
@@ -24,9 +25,11 @@ impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
     fn get_input(&self, block: &Block) -> ZkVmResult<BlockScanProofInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
+        let btc_blocks = vec![block.clone()];
+        let tx_filters = TxFilterConfig::derive_from(rollup_params).unwrap();
         let input = BlockScanProofInput {
-            btc_blocks: block.clone(),
-            rollup_params: rollup_params.clone(),
+            btc_blocks,
+            tx_filters,
         };
         Ok(input)
     }

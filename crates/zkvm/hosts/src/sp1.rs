@@ -14,9 +14,6 @@ pub static EVM_EE_STF_HOST: LazyLock<SP1Host> =
 pub static CL_STF_HOST: LazyLock<SP1Host> =
     std::sync::LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_CL_STF_PK));
 
-pub static CL_AGG_HOST: LazyLock<SP1Host> =
-    std::sync::LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_CL_AGG_PK));
-
 pub static CHECKPOINT_HOST: LazyLock<SP1Host> =
     std::sync::LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_CHECKPOINT_PK));
 
@@ -25,7 +22,6 @@ pub fn get_host(vm: ProofVm) -> &'static SP1Host {
         ProofVm::BtcProving => &BTC_BLOCKSPACE_HOST,
         ProofVm::ELProving => &EVM_EE_STF_HOST,
         ProofVm::CLProving => &CL_STF_HOST,
-        ProofVm::CLAggregation => &CL_AGG_HOST,
         ProofVm::Checkpoint => &CHECKPOINT_HOST,
     }
 }

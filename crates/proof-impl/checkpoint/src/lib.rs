@@ -2,25 +2,41 @@
 //! Proof. It ensures that the previous batch proof was correctly settled on the L1
 //! chain and that all L1-L2 transactions were processed.
 
-use borsh::{BorshDeserialize, BorshSerialize};
+use strata_proofimpl_cl_stf::ClStfOutput;
 use strata_state::batch::CheckpointProofOutput;
 use zkaleido::ZkVmEnv;
 
 pub mod prover;
 
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
-pub struct CheckpointProofInput {
-    pub l2_state: L2BatchProofOutput,
-    /// The verifying key of this checkpoint program.
-    /// Required for verifying the Groth16 proof of this program.
-    /// Cannot be hardcoded as any change to the program or proof implementation
-    /// will change verifying_key.
-    pub vk: Vec<u8>,
-}
+pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
+    let batches_count: usize = zkvm.read_serde();
+    assert!(batches_count > 0);
 
-pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, l2_batch_vk: &[u32; 8]) {
-    // verify l1 proof
-    let l2_batch_pp: L2BatchProofOutput = zkvm.read_verified_borsh(l2_batch_vk);
+    let ClStfOutput {
+        initial_chainstate_root,
+        initial_epoch,
+        mut final_chainstate_root,
+        mut final_epoch,
+    } = zkvm.read_verified_borsh(cl_stf_vk);
 
-    zkvm.commit_borsh(&l2_batch_pp);
+    // Starting with 1 since we have already read the first CL STF output
+    for _ in 1..batches_count {
+        let cl_stf_output: ClStfOutput = zkvm.read_verified_borsh(cl_stf_vk);
+
+        assert_eq!(
+            cl_stf_output.initial_chainstate_root, final_chainstate_root,
+            "continuity error"
+        );
+
+        final_chainstate_root = cl_stf_output.final_chainstate_root;
+        final_epoch = cl_stf_output.final_epoch;
+    }
+
+    assert_eq!(
+        final_epoch,
+        initial_epoch + 1,
+        "checkpoint must increase the epoch"
+    );
+
+    // TODO: Construct checkpoint proof output
 }

@@ -9,10 +9,10 @@ use crate::ClStfOutput;
 
 pub struct ClStfInput {
     pub rollup_params: RollupParams,
-    pub evm_ee_proof_with_vk: (ProofReceipt, VerificationKey),
-    pub btc_blockspace_proof_with_vk: (ProofReceipt, VerificationKey),
     pub chainstate: Chainstate,
     pub l2_blocks: Vec<L2Block>,
+    pub evm_ee_proof_with_vk: (ProofReceipt, VerificationKey),
+    pub btc_blockspace_proof_with_vk: (ProofReceipt, VerificationKey),
 }
 
 pub struct ClStfProver;
