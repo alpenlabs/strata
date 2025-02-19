@@ -21,7 +21,6 @@ members = [
   "crates/proof-impl/cl-agg",
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
-  "crates/proof-impl/l1-batch",
   "crates/zkvm/hosts",
   "crates/reth/db",
   "crates/reth/evm",
@@ -97,7 +96,6 @@ strata-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }
 strata-proofimpl-cl-agg = { path = "crates/proof-impl/cl-agg" }
 strata-proofimpl-cl-stf = { path = "crates/proof-impl/cl-stf" }
 strata-proofimpl-evm-ee-stf = { path = "crates/proof-impl/evm-ee-stf" }
-strata-proofimpl-l1-batch = { path = "crates/proof-impl/l1-batch" }
 strata-prover-client-rpc-api = { path = "crates/rpc/prover-client-api" }
 strata-reth-db = { path = "crates/reth/db" }
 strata-reth-evm = { path = "crates/reth/evm" }
