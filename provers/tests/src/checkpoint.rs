@@ -1,6 +1,6 @@
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_test_utils::l2::gen_params;
-use zkaleido::{AggregationInput, ZkVmHost, ZkVmResult};
+use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
 use crate::cl::ClProofGenerator;
@@ -20,52 +20,30 @@ impl<H: ZkVmHost> CheckpointProofGenerator<H> {
     }
 }
 
-#[derive(Debug)]
-pub struct CheckpointBatchInfo {
-    pub l1_range: (u64, u64),
-    pub l2_range: (u64, u64),
-}
-
 impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
-    type Input = CheckpointBatchInfo;
+    type Input = (u64, u64); // L2 Range
     type P = CheckpointProver;
     type H = H;
 
-    fn get_input(&self, batch_info: &CheckpointBatchInfo) -> ZkVmResult<CheckpointProverInput> {
+    fn get_input(&self, l2_range: &(u64, u64)) -> ZkVmResult<CheckpointProverInput> {
         let params = gen_params();
         let rollup_params = params.rollup();
 
-        let (l1_start_height, l1_end_height) = batch_info.l1_range;
-        let (l2_start_height, l2_end_height) = batch_info.l2_range;
-        let cl_batches = vec![(l2_start_height, l2_end_height)];
-
-        let l1_batch_proof = self
-            .l1_batch_prover
-            .get_proof(&(l1_start_height, l1_end_height))
-            .unwrap();
-        let l1_batch_vk = self.l1_batch_prover.get_host().get_verification_key();
-        let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);
-
-        let l2_batch_proof = self.l2_batch_prover.get_proof(&cl_batches).unwrap();
-        let l2_batch_vk = self.l2_batch_prover.get_host().get_verification_key();
-        let l2_batch = AggregationInput::new(l2_batch_proof, l2_batch_vk);
+        let cl_stf_proofs = vec![self.cl_stf_prover.get_proof(l2_range).unwrap()];
+        let cl_stf_vk = self.cl_stf_prover.get_host().get_verification_key();
 
         let input = CheckpointProverInput {
             rollup_params: rollup_params.clone(),
-            l1_batch,
-            l2_batch,
+            cl_stf_proofs,
+            cl_stf_vk,
         };
 
         Ok(input)
     }
 
-    fn get_proof_id(&self, info: &CheckpointBatchInfo) -> String {
-        let (l1_start_height, l1_end_height) = info.l1_range;
-        let (l2_start_height, l2_end_height) = info.l2_range;
-        format!(
-            "checkpoint_l1_{}_{}_l2_{}_{}",
-            l1_start_height, l1_end_height, l2_start_height, l2_end_height
-        )
+    fn get_proof_id(&self, l2_range: &(u64, u64)) -> String {
+        let (l2_start_height, l2_end_height) = l2_range;
+        format!("checkpoint_l2_{}_{}", l2_start_height, l2_end_height)
     }
 
     fn get_host(&self) -> H {
@@ -75,21 +53,11 @@ impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
 
 #[allow(dead_code)]
 fn test_proof<H: ZkVmHost>(checkpoint_prover: &CheckpointProofGenerator<H>) {
-    let params = gen_params();
-    let rollup_params = params.rollup();
-    let l1_start_height = (rollup_params.genesis_l1_height + 1) as u32;
-    let l1_end_height = l1_start_height + 2;
-
     let l2_start_height = 1;
     let l2_end_height = 3;
 
-    let prover_input = CheckpointBatchInfo {
-        l1_range: (l1_start_height.into(), l1_end_height.into()),
-        l2_range: (l2_start_height, l2_end_height),
-    };
-
     let _ = checkpoint_prover
-        .get_proof(&prover_input)
+        .get_proof(&(l2_start_height, l2_end_height))
         .expect("Failed to generate proof");
 }
 

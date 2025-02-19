@@ -5,8 +5,8 @@ use reqwest::Client;
 use serde::Serialize;
 use serde_json::json;
 use strata_provers_perf::{ProofGeneratorPerf, ProofReport, ZkVmHostPerf};
-use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
-use strata_zkvm_tests::{CheckpointBatchInfo, TestProverGenerators, TEST_SP1_GENERATORS};
+use strata_test_utils::bitcoin_mainnet_segment::BtcChainSegment;
+use strata_zkvm_tests::{TestProverGenerators, TEST_SP1_GENERATORS};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -84,16 +84,6 @@ fn run_generator_programs<H: ZkVmHostPerf>(
 ) -> Vec<PerformanceReport> {
     let mut reports = vec![];
 
-    // Init test params.
-    let params = gen_params();
-    let rollup_params = params.rollup();
-
-    let l1_start_height = rollup_params.genesis_l1_height + 1;
-    let l1_end_height = l1_start_height + 1;
-
-    let l2_start_height = 1;
-    let l2_end_height = 3;
-
     let btc_block_id = 40321;
     let btc_chain = BtcChainSegment::load();
     let btc_block = btc_chain.get_block_at(btc_block_id).unwrap();
@@ -126,34 +116,11 @@ fn run_generator_programs<H: ZkVmHostPerf>(
 
     reports.push(cl_block_report.into());
 
-    // l1_batch
-    println!("Generating a report for L1_BATCH");
-    let l1_batch = generator.l1_batch();
-    let l1_batch_report = l1_batch
-        .gen_proof_report(&(l1_start_height, l1_end_height), "L1_BATCH".to_owned())
-        .unwrap();
-
-    reports.push(l1_batch_report.into());
-
-    // l2_block
-    println!("Generating a report for L2_BATCH");
-    let l2_block = generator.l2_batch();
-    let l2_mini_batches = vec![(l2_start_height, l2_end_height)];
-    let l2_block_report = l2_block
-        .gen_proof_report(&l2_mini_batches, "L2_BATCH".to_owned())
-        .unwrap();
-
-    reports.push(l2_block_report.into());
-
     // checkpoint
     println!("Generating a report for CHECKPOINT");
     let checkpoint = generator.checkpoint();
-    let checkpoint_test_input = CheckpointBatchInfo {
-        l1_range: (l1_start_height, l1_end_height),
-        l2_range: (l2_start_height, l2_end_height),
-    };
     let checkpoint_report = checkpoint
-        .gen_proof_report(&checkpoint_test_input, "CHECKPOINT".to_owned())
+        .gen_proof_report(&evmee_block_range, "CHECKPOINT".to_owned())
         .unwrap();
     reports.push(checkpoint_report.into());
 

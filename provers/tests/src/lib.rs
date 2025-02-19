@@ -15,7 +15,6 @@ pub mod proof_generators {
         el::ElProofGenerator,
     };
 }
-pub use checkpoint::CheckpointBatchInfo;
 pub use generators::TestProverGenerators;
 
 cfg_if! {

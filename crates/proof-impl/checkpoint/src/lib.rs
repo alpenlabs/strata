@@ -13,7 +13,7 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
     assert!(batches_count > 0);
 
     let ClStfOutput {
-        initial_chainstate_root,
+        initial_chainstate_root: _,
         initial_epoch,
         mut final_chainstate_root,
         mut final_epoch,

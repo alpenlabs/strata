@@ -51,7 +51,7 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
                 el_proof.clone(),
                 self.el_proof_generator.get_host().get_verification_key(),
             ),
-            // TODO: FIX this: this should be BTC
+            // FIXME: this: this should be BTC
             btc_blockspace_proof_with_vk: (
                 el_proof,
                 self.el_proof_generator.get_host().get_verification_key(),
