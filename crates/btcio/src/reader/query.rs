@@ -411,7 +411,7 @@ pub async fn fetch_verification_state(
     let b1 = client.get_block_at(h1 as u64).await?;
 
     // Consider the block before `block_height` to be the last verified block
-    let vh = height - 1; // verified_height
+    let vh = height; // verified_height
     let vb = client.get_block_at(vh).await?; // verified_block
 
     const N: usize = 11;
@@ -432,7 +432,7 @@ pub async fn fetch_verification_state(
 
     // Calculate the 'head' index for the ring buffer based on the current block height.
     // The 'head' represents the position in the buffer where the next timestamp will be inserted.
-    let head = height as usize % N;
+    let head = (height + 1) as usize % N;
     let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head);
 
     let l1_blkid: L1BlockId = vb.header.block_hash().into();

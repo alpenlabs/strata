@@ -119,7 +119,7 @@ impl ProvingOp for L1BatchOperator {
 
         let state = fetch_verification_state(
             self.btc_client.as_ref(),
-            start_height,
+            start_height - 1,
             &MAINNET.clone().into(),
         )
         .await
