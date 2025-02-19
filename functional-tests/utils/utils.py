@@ -109,7 +109,7 @@ def wait_until_with_value(
     raise AssertionError(error_with)
 
 
-def wait_for_genesis(rpc, **kwargs):
+def wait_for_genesis(rpc, timeout=20, step=2, **kwargs):
     """
     Waits until we see genesis.  That is to say, that `strata_syncStatus`
     returns a sensible result.
@@ -131,7 +131,7 @@ def wait_for_genesis(rpc, **kwargs):
             else:
                 raise e
 
-    wait_until(_check_genesis, timeout=20, step=2)
+    wait_until(_check_genesis, timeout=timeout, step=step, **kwargs)
 
 
 def wait_until_chain_epoch(rpc, epoch: int, **kwargs) -> dict:
