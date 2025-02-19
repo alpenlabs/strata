@@ -123,6 +123,8 @@ def main(argv):
         ),  # TODO: Need to generate at least horizon blocks, based on params
         "prover": testenv.BasicEnvConfig(101),
         "load_reth": reth_load_env,
+        # seperate env for running crash_* tests
+        "crash": testenv.BasicEnvConfig(101),
     }
 
     setup_root_logger()
