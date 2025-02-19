@@ -876,7 +876,7 @@ mod tests {
         let external_signature = sign_state_partial(
             tx_state.pubkeys(),
             tx_state.secnonce(),
-            &external_keypair,
+            &external_keypair.into(),
             &agg_nonce,
             message.as_ref(),
             keypath_spend_only,
@@ -898,7 +898,7 @@ mod tests {
         let external_signature = sign_state_partial(
             &pubkey_table,
             &sec_nonces[external_index].clone().into(),
-            &external_keypair,
+            &external_keypair.into(),
             &agg_nonce,
             message.as_ref(),
             keypath_spend_only,
@@ -952,7 +952,7 @@ mod tests {
         let invalid_external_signature = sign_state_partial(
             tx_state.pubkeys(),
             tx_state.secnonce(),
-            &external_keypair,
+            &external_keypair.into(),
             &agg_nonce,
             random_message.as_ref(),
             keypath_spend_only,
@@ -1053,11 +1053,12 @@ mod tests {
 
             let message = create_message_hash(&mut sighash_cache, prevouts, tx_state.spend_path());
             let message = message.expect("should be able to create message");
+            let keypair = Keypair::from_secret_key(SECP256K1, &secret_keys[signer_index]);
 
             let external_signature = sign_state_partial(
                 &pubkey_table,
                 &sec_nonces[signer_index].clone().into(),
-                &Keypair::from_secret_key(SECP256K1, &secret_keys[signer_index]),
+                &keypair.into(),
                 &aggregated_nonce,
                 message.as_ref(),
                 keypath_spend_only,
