@@ -1,7 +1,7 @@
 import logging
 import os
 import shutil
-from typing import Optional, TypedDict
+from typing import Optional
 
 import flexitest
 import web3
@@ -9,22 +9,11 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from factory import seqrpc
-from factory.config import default_config
+from factory.config import BitcoindConfig, ClientConfig, Config, ExecConfig, RethELConfig
 from load.cfg import LoadConfig
 from load.service import LoadGeneratorService
 from utils import *
 from utils.constants import *
-
-
-class BitcoinRpcConfig(TypedDict):
-    bitcoind_sock: str
-    bitcoind_user: str
-    bitcoind_pass: str
-
-
-class RethConfig(TypedDict):
-    reth_socket: str
-    reth_secret_path: str
 
 
 class BitcoinFactory(flexitest.Factory):
@@ -82,8 +71,8 @@ class StrataFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_sequencer_node(
         self,
-        bitcoind_config: BitcoinRpcConfig,
-        reth_config: RethConfig,
+        bitcoind_config: BitcoindConfig,
+        reth_config: RethELConfig,
         sequencer_address: str,  # TODO: remove this
         rollup_params: str,
         ctx: flexitest.EnvContext,
@@ -98,8 +87,11 @@ class StrataFactory(flexitest.Factory):
         with open(rollup_params_file, "w") as f:
             f.write(rollup_params)
 
-        # Get default config
-        config = default_config()
+        # Create config
+        config = Config(
+            bitcoind=bitcoind_config,
+            exec=ExecConfig(reth=reth_config),
+        )
 
         # Also write config as toml
         config_file = os.path.join(datadir, "config.toml")
@@ -115,15 +107,6 @@ class StrataFactory(flexitest.Factory):
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
 
-            # bitcoind
-            "-o", f"bitcoind.rpc_url={bitcoind_config["bitcoind_sock"]}",
-            "-o", f"bitcoind.rpc_user={bitcoind_config["bitcoind_user"]}",
-            "-o", f"bitcoind.rpc_password={bitcoind_config["bitcoind_pass"]}",
-            "-o", "bitcoind.network=regtest",
-
-            # reth
-            "-o", f"exec.reth.rpc_url={reth_config["reth_socket"]}",
-            "-o", f"exec.reth.secret={reth_config["reth_secret_path"]}",
             "--sequencer"
         ]
         # fmt: on
@@ -189,8 +172,8 @@ class FullNodeFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_fullnode(
         self,
-        bitcoind_config: BitcoinRpcConfig,
-        reth_config: RethConfig,
+        bitcoind_config: BitcoindConfig,
+        reth_config: RethELConfig,
         sequencer_rpc: str,
         rollup_params: str,
         ctx: flexitest.EnvContext,
@@ -207,8 +190,12 @@ class FullNodeFactory(flexitest.Factory):
         with open(rollup_params_file, "w") as f:
             f.write(rollup_params)
 
-        # Get default config
-        config = default_config()
+        # Create config
+        config = Config(
+            bitcoind=bitcoind_config,
+            client=ClientConfig(sync_endpoint=sequencer_rpc),
+            exec=ExecConfig(reth=reth_config),
+        )
 
         # Also write config as toml
         config_file = os.path.join(datadir, "config.toml")
@@ -224,19 +211,7 @@ class FullNodeFactory(flexitest.Factory):
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
 
-            # bitcoind
-            "-o", f"bitcoind.rpc_url={bitcoind_config["bitcoind_sock"]}",
-            "-o", f"bitcoind.rpc_user={bitcoind_config["bitcoind_user"]}",
-            "-o", f"bitcoind.rpc_password={bitcoind_config["bitcoind_pass"]}",
-            "-o", "bitcoind.network=regtest",
-
-            # reth
-            "-o", f"exec.reth.rpc_url={reth_config["reth_socket"]}",
-            "-o", f"exec.reth.secret={reth_config["reth_secret_path"]}",
-            "--sequencer"
-
-            # client
-            "-o", f"client.sync_endpoint={sequencer_rpc}",
+            "--sequencer",
         ]
         # fmt: on
 
@@ -347,7 +322,7 @@ class ProverClientFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_prover_client(
         self,
-        bitcoind_config: BitcoinRpcConfig,
+        bitcoind_config: BitcoindConfig,
         sequencer_url: str,
         reth_url: str,
         rollup_params: str,
@@ -366,9 +341,9 @@ class ProverClientFactory(flexitest.Factory):
             "--rpc-port", str(rpc_port),
             "--sequencer-rpc", sequencer_url,
             "--reth-rpc", reth_url,
-            "--bitcoind-url", bitcoind_config["bitcoind_sock"],
-            "--bitcoind-user", bitcoind_config["bitcoind_user"],
-            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
+            "--bitcoind-url", bitcoind_config.rpc_url,
+            "--bitcoind-user", bitcoind_config.rpc_user,
+            "--bitcoind-password", bitcoind_config.rpc_password,
             "--datadir", datadir,
             "--native-workers", str(settings.native_workers),
             "--polling-interval", str(settings.polling_interval),
