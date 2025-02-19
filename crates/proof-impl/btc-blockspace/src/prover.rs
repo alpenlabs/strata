@@ -35,9 +35,9 @@ impl ZkVmProver for BtcBlockspaceProver {
 
         let serialized_block = serialize(&input.block);
         let zkvm_input = B::new()
-            .write_serde(&input.rollup_params)?
             .write_buf(&serialized_block)?
             .write_borsh(&inclusion_proof)?
+            .write_borsh(&input.tx_filters)?
             .build()?;
 
         Ok(zkvm_input)
