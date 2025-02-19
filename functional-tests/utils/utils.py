@@ -270,52 +270,40 @@ def check_nth_checkpoint_finalized(
     prover_rpc,
     manual_gen: ManualGenBlocksConfig | None = None,
     proof_timeout: int | None = None,
+    **kwargs
 ):
     """
-    This check expects nth checkpoint to be finalized
+    This check expects nth checkpoint to be finalized.
+
+    It used to do this in an indirect way that had to be done in lockstep with
+    the client state, but it's more flexible now.
 
     Params:
         - idx: The index of checkpoint
         - seqrpc: The sequencer rpc
         - manual_gen: If we need to generate blocks manually
     """
-    syncstat = seqrpc.strata_syncStatus()
 
-    # Wait until we find our expected checkpoint.
-    ckpt_info = wait_until_with_value(
-        lambda: seqrpc.strata_getCheckpointInfo(idx),
-        predicate=lambda v: v is not None,
-        error_with=f"Could not find checkpoint info for index {idx}",
-        timeout=3,
-    )
+    def _maybe_do_gen():
+        if manual_gen:
+            nblocks = manual_gen.finality_depth + 1
+            logging.debug(f"generating {nblocks} L1 blocks to try to finalize")
+            manual_gen.btcrpc.proxy.generatetoaddress(nblocks, manual_gen.gen_addr)
 
-    assert syncstat["finalized_block_id"] != ckpt_info["l2_range"][1]["blkid"], (
-        "Checkpoint block should not yet finalize"
-    )
-    assert ckpt_info["idx"] == idx
-    checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
-    assert checkpoint_info_next is None, f"There should be no checkpoint info for next checkpoint {idx + 1}"
+    def _check():
+        cs = seqrpc.strata_clientStatus()
+        l1_height = cs["tip_l1_block"]["height"]
+        fin_epoch = cs["finalized_epoch"]
+        ss = seqrpc.strata_syncStatus()
+        cur_epoch = ss["cur_epoch"]
+        chain_l1_height = ss["safe_l1_block"]["height"]
+        logging.info(f"finalized epoch as of {l1_height}: {fin_epoch} (cur chain epoch {cur_epoch}, last L1 {chain_l1_height})")
+        if fin_epoch is not None and fin_epoch["epoch"] >= idx:
+            return True
+        _maybe_do_gen()
+        return False
 
-    to_finalize_blkid = ckpt_info["l2_range"][1]["blkid"]
-
-    # Submit checkpoint if proof_timeout is not set
-    if proof_timeout is None:
-        submit_checkpoint(idx, seqrpc, prover_rpc, manual_gen)
-
-    if manual_gen:
-        # Produce l1 blocks until proof is finalized
-        # TODO encapsulate this somehow do we don't have to do it manually,
-        # maybe just pass the `RunContext` entirely?
-        manual_gen.btcrpc.proxy.generatetoaddress(
-            manual_gen.finality_depth + 1, manual_gen.gen_addr
-        )
-
-    # Check if finalized
-    wait_until(
-        lambda: seqrpc.strata_syncStatus()["finalized_block_id"] == to_finalize_blkid,
-        error_with="Block not finalized",
-        timeout=(proof_timeout or 0) + 10,
-    )
+    wait_until(_check, **kwargs)
 
 
 def submit_checkpoint(

@@ -30,23 +30,24 @@ class BlockFinalizationSeqRestartTest(testenv.StrataTester):
 
         check_submit_proof_fails_for_nonexistent_batch(seqrpc, 100)
 
-        # Check for first 2 checkpoints
+        # Check for first 2 checkpoints.  I don't know why this takes so long to
+        # get started, but once it does it goes fairly quickly.
         for n in range(2):
-            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
-            logging.debug(f"Pass checkpoint finalization for checkpoint {n}")
+            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc, timeout=120)
+            logging.info(f"Found checkpoint {n} finalized")
 
-        # Stop sequencer
+        # Restart sequencer.
+        logging.info("Restarting sequencer's node...")
         seq.stop()
-
-        # Now restart service
         seq.start()
-
+        logging.info("Waiting for it to come back up...")
         seqrpc = seq.create_rpc()
         wait_until(seqrpc.strata_protocolVersion, timeout=5)
 
         # Check for next 2 checkpoints
+        logging.info("Now we look for more checkpoints")
         for n in range(2, 4):
-            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
-            logging.debug(f"Pass checkpoint finalization for checkpoint {n}")
+            check_nth_checkpoint_finalized(n, seqrpc, prover_rpc, timeout=120)
+            logging.info(f"Found checkpoint {n} finalized")
 
         check_already_sent_proof(seqrpc, 0)
