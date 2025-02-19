@@ -5,5 +5,5 @@ def get_fast_batch_settings() -> RollupParamsSettings:
     v = RollupParamsSettings.new_default()
     v.epoch_slots = 5
     v.genesis_trigger = 5
-    v.proof_timeout = 5
+    v.proof_timeout = 1
     return v
