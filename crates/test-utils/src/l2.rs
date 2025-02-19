@@ -140,6 +140,6 @@ pub fn get_genesis_chainstate() -> Chainstate {
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(&params);
     let pregenesis_mfs =
-        vec![get_btc_chain().get_block_record(params.rollup().horizon_l1_height as u32)];
+        vec![get_btc_chain().get_block_manifest(params.rollup().genesis_l1_height as u32)];
     make_genesis_chainstate(&gblock, pregenesis_mfs, &params)
 }

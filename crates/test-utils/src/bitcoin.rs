@@ -14,7 +14,7 @@ use strata_primitives::{
     buf::Buf32,
     l1::{
         get_difficulty_adjustment_start_height, BitcoinAddress, BtcParams, HeaderVerificationState,
-        L1BlockId, L1BlockRecord, OutputRef, TimestampStore,
+        L1BlockId, L1BlockManifest, L1HeaderRecord, OutputRef, TimestampStore,
     },
 };
 
@@ -32,11 +32,11 @@ pub fn get_test_bitcoin_txs() -> Vec<Transaction> {
         .collect()
 }
 
-pub fn gen_l1_chain(len: usize) -> Vec<L1BlockRecord> {
+pub fn gen_l1_chain(len: usize) -> Vec<L1HeaderRecord> {
     // FIXME this is bad, the blocks generated are nonsensical
     let mut blocks = vec![];
     for _ in 0..len {
-        let block: L1BlockRecord = ArbitraryGenerator::new().generate();
+        let block: L1HeaderRecord = ArbitraryGenerator::new().generate();
         blocks.push(block);
     }
     blocks
@@ -123,19 +123,33 @@ impl BtcChainSegment {
         }
     }
 
-    pub fn get_block_record(&self, height: u32) -> L1BlockRecord {
+    pub fn get_block_record(&self, height: u32) -> L1HeaderRecord {
         let header = self.get_header(height);
-        L1BlockRecord::new(
+        L1HeaderRecord::new(
             header.block_hash().into(),
             serialize(&header),
             Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
         )
     }
 
-    pub fn get_block_records(&self, from_height: u32, len: usize) -> Vec<L1BlockRecord> {
+    pub fn get_block_records(&self, from_height: u32, len: usize) -> Vec<L1HeaderRecord> {
         let mut blocks = Vec::with_capacity(len);
         for i in 0..len {
             let block = self.get_block_record(from_height + i as u32);
+            blocks.push(block);
+        }
+        blocks
+    }
+
+    pub fn get_block_manifest(&self, height: u32) -> L1BlockManifest {
+        let rec = self.get_block_record(height);
+        L1BlockManifest::new(rec, HeaderVerificationState::default(), Vec::new(), 1)
+    }
+
+    pub fn get_block_manifests(&self, from_height: u32, len: usize) -> Vec<L1BlockManifest> {
+        let mut blocks = Vec::with_capacity(len);
+        for i in 0..len {
+            let block = self.get_block_manifest(from_height + i as u32);
             blocks.push(block);
         }
         blocks
