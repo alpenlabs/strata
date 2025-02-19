@@ -13,8 +13,8 @@ pub enum InitError {
     #[error("io: {0}")]
     Io(#[from] io::Error),
 
-    #[error("unparseable params file: {0}")]
-    UnparseableParamsFile(#[from] SerdeError),
+    #[error("unparsable params file: {0}")]
+    UnparsableParamsFile(#[from] SerdeError),
 
     #[error("config: {0:?}")]
     MalformedConfig(#[from] ConfigError),

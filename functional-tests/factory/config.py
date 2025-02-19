@@ -76,23 +76,13 @@ class RelayerConfig:
 
 @dataclass
 class Config:
-    client: ClientConfig
-    bitcoind: BitcoindConfig
-    btcio: BtcioConfig
-    sync: SyncConfig
-    exec: ExecConfig
-    relayer: RelayerConfig
+    client: ClientConfig = field(default_factory=ClientConfig)
+    bitcoind: BitcoindConfig = field(default_factory=BitcoindConfig)
+    btcio: BtcioConfig = field(default_factory=BtcioConfig)
+    sync: SyncConfig = field(default_factory=SyncConfig)
+    exec: ExecConfig = field(default_factory=ExecConfig)
+    relayer: RelayerConfig = field(default_factory=RelayerConfig)
 
     def as_toml_string(self) -> str:
         d = asdict(self)
         return toml.dumps(d)
-
-
-def default_config() -> Config:
-    client = ClientConfig()
-    bitcoind = BitcoindConfig()
-    btcio = BtcioConfig()
-    sync = SyncConfig()
-    exec = ExecConfig()
-    relayer = RelayerConfig()
-    return Config(client, bitcoind, btcio, sync, exec, relayer)

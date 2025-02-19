@@ -5,12 +5,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{bridge::RelayerConfig, btcio::BtcioConfig};
 
-/// Default values for some of the [`ClientConfig`] attributes.
+/// Default value for `rpc_port` in [`ClientConfig`].
 const DEFAULT_RPC_PORT: u16 = 8542;
+/// Default value for `p2p_port` in [`ClientConfig`].
 const DEFAULT_P2P_PORT: u16 = 8543;
+/// Default value for `datadir` in [`ClientConfig`].
 const DEFAULT_DATADIR: &str = "strata-data";
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(Default))]
 pub struct ClientConfig {
     /// Addr that the client rpc will listen to.
@@ -52,13 +54,13 @@ fn default_datadir() -> PathBuf {
     DEFAULT_DATADIR.into()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncConfig {
     pub l1_follow_distance: u64,
     pub client_checkpoint_interval: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BitcoindConfig {
     pub rpc_url: String,
     pub rpc_user: String,
@@ -70,18 +72,18 @@ pub struct BitcoindConfig {
     pub retry_interval: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RethELConfig {
     pub rpc_url: String,
     pub secret: PathBuf,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecConfig {
     pub reth: RethELConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub client: ClientConfig,
     pub bitcoind: BitcoindConfig,

@@ -18,7 +18,7 @@ impl EnvArgs {
         Self {}
     }
 
-    /// Override some of the config params from env. Returns if config was overridden or not.
+    /// Get strings of overrides gathered from env.
     pub fn get_overrides(&self) -> Vec<String> {
         // TODO: add stuffs as necessary
         Vec::new()
@@ -64,18 +64,16 @@ pub struct Args {
 }
 
 impl Args {
-    /// Overrides config. First overrides with the generic overrides passed via `-o` and then
-    /// overrides the result with some of the commonly passed args. Returns if config was overridden
-    /// or not.
+    /// Get strings of overrides gathered from args.
     pub fn get_overrides(&self) -> Vec<String> {
         let mut overrides = self.overrides.clone();
         overrides.extend_from_slice(&self.get_direct_overrides());
         overrides
     }
 
+    /// Overrides passed directly as args and not as overrides.
     fn get_direct_overrides(&self) -> Vec<String> {
         let mut overrides = Vec::new();
-        // Override by explicitly parsed args like datadir, rpc_host and rpc_port.
         if let Some(datadir) = &self.datadir {
             overrides.push(format!("client.datadir={}", datadir.to_string_lossy()));
         }
@@ -152,7 +150,10 @@ fn parse_value(str_value: &str) -> toml::Value {
 mod test {
 
     use bitcoin::Network;
-    use strata_config::{ClientConfig, Config};
+    use strata_config::{
+        bridge::RelayerConfig, btcio::BtcioConfig, BitcoindConfig, ClientConfig, Config,
+        ExecConfig, RethELConfig, SyncConfig,
+    };
 
     use super::*;
 
@@ -167,7 +168,7 @@ mod test {
                 datadir: "".into(),
                 db_retry_count: 3,
             },
-            bitcoind: strata_config::BitcoindConfig {
+            bitcoind: BitcoindConfig {
                 rpc_url: "".to_string(),
                 rpc_user: "".to_string(),
                 rpc_password: "".to_string(),
@@ -175,23 +176,23 @@ mod test {
                 retry_count: None,
                 retry_interval: None,
             },
-            btcio: strata_config::btcio::BtcioConfig {
+            btcio: BtcioConfig {
                 reader: Default::default(),
                 writer: Default::default(),
                 broadcaster: Default::default(),
             },
-            exec: strata_config::ExecConfig {
-                reth: strata_config::RethELConfig {
+            exec: ExecConfig {
+                reth: RethELConfig {
                     rpc_url: "".to_string(),
                     secret: "".into(),
                 },
             },
-            relayer: strata_config::bridge::RelayerConfig {
+            relayer: RelayerConfig {
                 refresh_interval: 1,
                 stale_duration: 2,
                 relay_misc: false,
             },
-            sync: strata_config::SyncConfig {
+            sync: SyncConfig {
                 l1_follow_distance: 1,
                 client_checkpoint_interval: 2,
             },

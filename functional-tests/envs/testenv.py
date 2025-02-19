@@ -9,6 +9,7 @@ from strata_utils import (
 )
 
 from envs.rollup_params_cfg import RollupConfig
+from factory.config import BitcoindConfig, RethELConfig
 from load.cfg import LoadConfig, LoadConfigBuilder
 from utils import *
 from utils.constants import *
@@ -209,15 +210,12 @@ class BasicEnvConfig(flexitest.EnvConfig):
         rpc_user = bitcoind.get_prop("rpc_user")
         rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}/wallet/{walletname}"
-        bitcoind_config = {
-            "bitcoind_sock": rpc_sock,
-            "bitcoind_user": rpc_user,
-            "bitcoind_pass": rpc_pass,
-        }
-        reth_config = {
-            "reth_socket": f"localhost:{reth_port}",
-            "reth_secret_path": reth_secret_path,
-        }
+        bitcoind_config = BitcoindConfig(rpc_url=rpc_sock, rpc_user=rpc_user, rpc_password=rpc_pass)
+
+        reth_config = RethELConfig(
+            rpc_url=f"localhost:{reth_port}",
+            secret=reth_secret_path,
+        )
         sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
