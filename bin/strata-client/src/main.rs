@@ -344,14 +344,12 @@ fn start_core_tasks(
     )?
     .into();
 
-    let l1db = database.l1_db().clone();
-    let l1_manager = Arc::new(L1BlockManager::new(pool.clone(), l1db));
     // Start the L1 tasks to get that going.
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",
         bitcoin_data_reader_task(
             bitcoin_client.clone(),
-            l1_manager.clone(),
+            storage.l1().clone(),
             Arc::new(config.btcio.reader.clone()),
             sync_manager.get_params(),
             status_channel.clone(),
