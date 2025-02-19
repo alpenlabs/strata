@@ -33,7 +33,6 @@ risc0-build = "1.1.2"
 methods = [
   "guest-evm-ee-stf",
   "guest-cl-stf",
-  "guest-cl-agg",
   "guest-btc-blockspace",
   "guest-checkpoint",
 ]

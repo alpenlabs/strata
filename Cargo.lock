@@ -13295,15 +13295,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-proofimpl-cl-agg"
-version = "0.1.0"
-dependencies = [
- "borsh",
- "strata-proofimpl-cl-stf",
- "zkaleido",
-]
-
-[[package]]
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
@@ -13377,7 +13368,6 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-agg",
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
  "strata-prover-client-rpc-api",
@@ -13916,7 +13906,6 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-agg",
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
  "strata-risc0-guest-builder",
@@ -13941,7 +13930,6 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-agg",
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
  "strata-risc0-guest-builder",

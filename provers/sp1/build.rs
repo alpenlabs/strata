@@ -20,29 +20,19 @@ cfg_if! {
 const EVM_EE_STF: &str = "guest-evm-ee-stf";
 const CL_STF: &str = "guest-cl-stf";
 const BTC_BLOCKSPACE: &str = "guest-btc-blockspace";
-const L1_BATCH: &str = "guest-l1-batch";
-const CL_AGG: &str = "guest-cl-agg";
 const CHECKPOINT: &str = "guest-checkpoint";
 
 /// Returns a map of program dependencies.
 fn get_program_dependencies() -> HashMap<&'static str, Vec<&'static str>> {
     let mut dependencies = HashMap::new();
-    dependencies.insert(CL_STF, vec![EVM_EE_STF]);
-    dependencies.insert(CL_AGG, vec![CL_STF]);
-    dependencies.insert(CHECKPOINT, vec![L1_BATCH, CL_AGG]);
+    dependencies.insert(CL_STF, vec![EVM_EE_STF, BTC_BLOCKSPACE]);
+    dependencies.insert(CHECKPOINT, vec![CL_STF]);
     dependencies
 }
 
 fn main() {
     // List of guest programs to build
-    let guest_programs = [
-        BTC_BLOCKSPACE,
-        L1_BATCH,
-        EVM_EE_STF,
-        CL_STF,
-        CL_AGG,
-        CHECKPOINT,
-    ];
+    let guest_programs = [BTC_BLOCKSPACE, EVM_EE_STF, CL_STF, CHECKPOINT];
 
     // HashSet to keep track of programs that have been built
     let mut built_programs = HashSet::new();

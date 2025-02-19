@@ -3,7 +3,6 @@
 //! chain and that all L1-L2 transactions were processed.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_proofimpl_cl_stf::L2BatchProofOutput;
 use strata_state::batch::CheckpointProofOutput;
 use zkaleido::ZkVmEnv;
 
