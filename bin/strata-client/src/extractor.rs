@@ -581,8 +581,8 @@ mod tests {
         num_deposits: usize,
     ) -> (Chainstate, usize, DepositEntry) {
         let l1_block_id = L1BlockId::from(Buf32::zero());
-        let safe_block = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
-        let l1_state = L1ViewState::new_at_horizon(0, safe_block);
+        let safe_block_rec = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
+        let l1_state = L1ViewState::new_at_genesis(0, 0, safe_block_rec);
 
         let operator_table = OperatorTable::new_empty();
 
@@ -619,7 +619,7 @@ mod tests {
             let tx_ref: OutputRef = arb.generate();
             let amt: BitcoinAmount = arb.generate();
 
-            deposits_table.add_deposits(&tx_ref, &operators, amt);
+            deposits_table.add_deposit(tx_ref, operators.clone(), amt);
 
             // dispatch about half of the deposits
             let should_dispatch = OsRng.gen_bool(0.5);
