@@ -363,6 +363,7 @@ fn create_checkpoint_prep_data_from_summary(
 ) -> anyhow::Result<CheckpointPrepData> {
     let l1man = storage.l1();
     let l2man = storage.l2();
+    let chsman = storage.chainstate();
     let rollup_params_hash = params.compute_hash();
 
     let epoch = summary.epoch();
@@ -404,11 +405,28 @@ fn create_checkpoint_prep_data_from_summary(
     let l1_range = (l1_start_block, *summary.new_l1());
 
     // Compute the new L1 sync state commitments.
-    // FIXME this is wrong but it's hard to get this state properly now
-    let tip_vs = HeaderVerificationState::default();
-    let genesis_vs_hash = tip_vs.compute_hash().unwrap();
-    let tip_vs_hash = tip_vs.compute_hash().unwrap();
-    let l1_transition = (genesis_vs_hash, tip_vs_hash);
+    let l1_transition = {
+        let prev_epoch_final_blocknum = l1_start_height - 1;
+        let prev_mf = l1man
+            .get_block_manifest(prev_epoch_final_blocknum)?
+            .ok_or(DbError::MissingL1BlockBody(prev_epoch_final_blocknum))?;
+        let current_epoch_final_blocknum = summary.new_l1().height();
+        let mf = l1man
+            .get_block_manifest(current_epoch_final_blocknum)?
+            .ok_or(DbError::MissingL1BlockBody(current_epoch_final_blocknum))?;
+
+        warn!(%epoch, %prev_epoch_final_blocknum, %current_epoch_final_blocknum, "Compute the new L1 sync state commitments");
+
+        (
+            prev_mf
+                .header_verification_state()
+                .compute_hash()
+                .expect("compute vs hash"),
+            mf.header_verification_state()
+                .compute_hash()
+                .expect("compute vs hash"),
+        )
+    };
 
     // Now just pull out the data about the blocks from the transition here.
     //
@@ -420,10 +438,15 @@ fn create_checkpoint_prep_data_from_summary(
     let initial_l2_commitment =
         L2BlockCommitment::new(first_block.blockidx(), first_block.get_blockid());
     let l2_range = (initial_l2_commitment, *summary.terminal());
-    let l2_transition = (
-        prev_summary.map(|ps| *ps.final_state()).unwrap_or_default(),
-        *summary.final_state(),
-    );
+    let l2_initial_state = if is_genesis_epoch {
+        let genesis_chainstate = chsman
+            .get_toplevel_chainstate_blocking(0)?
+            .ok_or(DbError::NotBootstrapped)?;
+        genesis_chainstate.compute_state_root()
+    } else {
+        prev_summary.map(|ps| *ps.final_state()).unwrap_or_default()
+    };
+    let l2_transition = (l2_initial_state, *summary.final_state());
 
     // Assemble the final parts together.
     let new_transition = BatchTransition::new(l1_transition, l2_transition, rollup_params_hash);
@@ -431,7 +454,7 @@ fn create_checkpoint_prep_data_from_summary(
 
     // TODO make sure this is correct, what even is this "base state commitment"?
     let base_state_commitment = match prev_checkpoint {
-        Some(ckpt) if ckpt.is_proof_ready() => {
+        Some(ckpt) if ckpt.is_proof_ready() && !ckpt.checkpoint.proof().is_empty() => {
             ckpt.into_batch_checkpoint().base_state_commitment().clone()
         }
         _ => new_transition.get_initial_base_state_commitment(),
@@ -467,8 +490,9 @@ fn fetch_epoch_l2_headers(
         let cur = headers.last().unwrap();
         let cur_parent = cur.parent();
 
-        // If we're at the genesis block we can just exit.
-        if cur.blockidx() == 0 {
+        // If we're at the first block we can just exit.
+        // Checkpoint 0 range starts from block 1.
+        if cur.blockidx() == 1 {
             break;
         }
 
