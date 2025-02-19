@@ -7,8 +7,9 @@ use std::{cmp::max, collections::HashMap};
 use bitcoin::{OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
+    batch::SignedCheckpoint,
     epoch::EpochCommitment,
-    l1::{BitcoinAmount, L1HeaderPayload, L1TxRef, OutputRef},
+    l1::{BitcoinAmount, DepositInfo, L1BlockManifest, L1TxRef, OutputRef, ProtocolOperation},
     params::RollupParams,
 };
 use strata_state::{
@@ -17,7 +18,6 @@ use strata_state::{
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
     exec_env::ExecEnvState,
     exec_update::{self, construct_ops_from_deposit_intents, ELDepositData, Op},
-    l1::L1MaturationEntry,
     prelude::*,
     state_op::StateCache,
     state_queue,
@@ -64,7 +64,7 @@ pub fn process_block(
 
     // If we checked in with L1, then advance the epoch.
     if new_epoch {
-        advance_epoch(state, header)?;
+        advance_epoch_tracking(state, header)?;
     }
 
     Ok(())
@@ -91,26 +91,38 @@ fn process_l1_view_update(
 ) -> Result<bool, TsnError> {
     let l1v = state.state().l1_view();
 
-    // Accept new blocks, comparing the tip against the current to figure out if
-    // we need to do a reorg.
+    // Accept new blocks.
     // FIXME this should actually check PoW, it just does it based on block heights
-    if !l1seg.new_payloads().is_empty() {
-        let l1v = state.state().l1_view();
+    if !l1seg.new_manifests().is_empty() {
+        let cur_safe_height = l1v.safe_height();
 
         // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
         // more complicated to check the PoW.
-        let new_tip_block = l1seg.new_payloads().last().unwrap();
-        let new_tip_height = new_tip_block.idx();
+        let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
+        if new_tip_height <= l1v.safe_height() {
+            return Err(TsnError::L1SegNotExtend);
+        }
+
+        // First check that the blocks are correct.
+        check_chain_integrity(
+            cur_safe_height,
+            l1v.safe_blkid(),
+            l1seg.new_height(),
+            l1seg.new_manifests(),
+        )?;
+
+        // Go through each manifest and process it.
+        for (off, b) in l1seg.new_manifests().iter().enumerate() {
+            let height = cur_safe_height + off as u64 + 1;
+            process_l1_block(state, b)?;
+            state.update_safe_block(height, b.record().clone());
+        }
+
+        /*
         let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
         let implied_pivot_height = first_new_block_height - 1;
         let next_exp_height = l1v.next_expected_height();
         let cur_safe_height = l1v.safe_height();
-
-        // Check that the new chain is actually longer, if it's shorter then we didn't do anything.
-        // TODO This probably needs to be adjusted for PoW.
-        if new_tip_height <= next_exp_height {
-            return Err(TsnError::L1SegNotExtend);
-        }
 
         // Now make sure that the block hashes all connect up sensibly.
         let pivot_idx = implied_pivot_height;
@@ -119,7 +131,6 @@ fn process_l1_view_update(
             .get_absolute(pivot_idx)
             .map(|b| b.blkid())
             .unwrap_or_else(|| l1v.safe_block().blkid());
-        check_chain_integrity(pivot_idx, pivot_blkid, l1seg.new_payloads())?;
 
         // Okay now that we've figured that out, let's actually how to actually do the reorg.
         if pivot_idx > params.horizon_l1_height && pivot_idx < next_exp_height {
@@ -140,7 +151,7 @@ fn process_l1_view_update(
 
         for idx in (cur_safe_height + 1..=new_safe_height) {
             state.mature_l1_block(idx);
-        }
+        }*/
 
         Ok(true)
     } else {
@@ -148,8 +159,77 @@ fn process_l1_view_update(
     }
 }
 
+fn process_l1_block(state: &mut StateCache, block_mf: &L1BlockManifest) -> Result<(), TsnError> {
+    // Just iterate through every tx's operation and call out to the handlers for that.
+    for tx in block_mf.txs() {
+        for op in tx.protocol_ops() {
+            match &op {
+                ProtocolOperation::Checkpoint(ckpt) => {
+                    process_l1_checkpoint(state, block_mf, ckpt)?;
+                }
+
+                ProtocolOperation::Deposit(info) => {
+                    process_l1_deposit(state, block_mf, info)?;
+                }
+
+                // Other operations we don't do anything with for now.
+                _ => {}
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn process_l1_checkpoint(
+    state: &mut StateCache,
+    src_block_mf: &L1BlockManifest,
+    signed_ckpt: &SignedCheckpoint,
+) -> Result<(), TsnError> {
+    // TODO verify signature?  it should already have been validated but it
+    // doesn't hurt to do it again (just costs)
+    // TODO should we verify the proof here too?  the L1 scan proof probably
+    // should have done it, but it wouldn't be excessively complicated to
+    // re-verify it, we should formally define the answers to these questions
+
+    let ckpt = signed_ckpt.checkpoint(); // inner data
+
+    // Copy the epoch commitment and make it finalized.
+    let old_fin_epoch = state.state().finalized_epoch();
+    let new_fin_epoch = ckpt.batch_info().get_epoch_commitment();
+
+    // TODO go through and do whatever stuff we need to do now that's finalized
+
+    state.set_finalized_epoch(new_fin_epoch);
+
+    Ok(())
+}
+
+fn process_l1_deposit(
+    state: &mut StateCache,
+    src_block_mf: &L1BlockManifest,
+    info: &DepositInfo,
+) -> Result<(), TsnError> {
+    let outpoint = info.outpoint;
+
+    // Create the deposit entry to track it on the bridge side.
+    //
+    // Right now all operators sign all deposits, take them all.
+    let all_operators = state.state().operator_table().indices().collect::<_>();
+    state.insert_deposit_entry(outpoint, info.amt, all_operators);
+
+    // Insert an intent to credit the destination with it.
+    let deposit_intent = DepositIntent::new(info.amt, info.address.clone());
+    state.insert_deposit_intent(0, deposit_intent);
+
+    // Logging so we know if it got there.
+    debug!(?outpoint, "handled deposit");
+
+    Ok(())
+}
+
 /// Advances the epoch bookkeeping, using the provided header as the terminal.
-fn advance_epoch(state: &mut StateCache, header: &impl L2Header) -> Result<(), TsnError> {
+fn advance_epoch_tracking(state: &mut StateCache, header: &impl L2Header) -> Result<(), TsnError> {
     let cur_epoch = state.state().cur_epoch();
     let this_epoch = EpochCommitment::new(cur_epoch, header.blockidx(), header.get_blockid());
     state.set_prev_epoch(this_epoch);
@@ -160,20 +240,30 @@ fn advance_epoch(state: &mut StateCache, header: &impl L2Header) -> Result<(), T
 /// Checks the attested block IDs and parent blkid connections in new blocks.
 // TODO unit tests
 fn check_chain_integrity(
-    pivot_idx: u64,
-    pivot_blkid: &L1BlockId,
-    new_blocks: &[L1HeaderPayload],
+    cur_safe_height: u64,
+    cur_safe_blkid: &L1BlockId,
+    new_height: u64,
+    new_blocks: &[L1BlockManifest],
 ) -> Result<(), TsnError> {
+    // Check that the heights match.
+    if new_height != cur_safe_height + new_blocks.len() as u64 {
+        // This is basically right for both cases.
+        return Err(TsnError::SkippedBlock);
+    }
+
     // Iterate over all the blocks in the new list and make sure they match.
     for (i, e) in new_blocks.iter().enumerate() {
-        let h = e.idx();
-        assert_eq!(pivot_idx + 1 + i as u64, h);
+        let height = cur_safe_height + i as u64;
 
         // Make sure the hash matches.
-        let computed_id = L1BlockId::compute_from_header_buf(e.header_buf());
+        let computed_id = L1BlockId::compute_from_header_buf(e.header());
         let attested_id = e.record().blkid();
         if computed_id != *attested_id {
-            return Err(TsnError::L1BlockIdMismatch(h, *attested_id, computed_id));
+            return Err(TsnError::L1BlockIdMismatch(
+                height,
+                *attested_id,
+                computed_id,
+            ));
         }
 
         // Make sure matches parent.

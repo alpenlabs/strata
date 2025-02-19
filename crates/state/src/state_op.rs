@@ -14,6 +14,7 @@ use strata_primitives::{
 };
 
 use crate::{
+    bridge_ops::DepositIntent,
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::Chainstate,
     header::L2Header,
@@ -189,6 +190,13 @@ impl StateCache {
         state.l1_state.safe_block_header = record;
     }
 
+    /// Writes a deposit intent into an execution environment's input queue.
+    pub fn insert_deposit_intent(&mut self, ee_id: u32, intent: DepositIntent) {
+        assert_eq!(ee_id, 0, "stateop: only support execution env 0 right now");
+        let state = self.state_mut();
+        state.exec_env_state.pending_deposits.push_back(intent);
+    }
+
     /// Remove a deposit intent from the pending deposits queue.
     ///
     /// This actually removes possibly multiple deposit intents.
@@ -217,7 +225,7 @@ impl StateCache {
     }
 
     /// Inserts a new deposit with some settings.
-    pub fn insert_deposit(
+    pub fn insert_deposit_entry(
         &mut self,
         tx_ref: OutputRef,
         amt: BitcoinAmount,

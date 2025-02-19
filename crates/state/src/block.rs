@@ -3,7 +3,7 @@ use std::ops::Deref;
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{l1::L1HeaderPayload, prelude::*};
+use strata_primitives::prelude::*;
 
 use crate::{
     exec_update,
@@ -87,26 +87,54 @@ impl L2BlockBody {
 
 /// Container for additional messages that we've observed from the L1, if there
 /// are any.
+///
+/// Soon this will be refactored so that it only includes the new tip's
+/// `L1BlockCommitment` and we will "sideload" the blocks in the epoch
+/// finalization.  So the manifests here contains kinda a lot of data, but it
+/// won't be present in DA payloads so it's fine.
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
 pub struct L1Segment {
-    /// New headers that we've seen from L1 that we didn't see in the previous
+    /// New L1 block height.  This should correspond with the last manifest in
+    /// the new_manifests, or the current chainstate height if it's not being
+    /// extended.
+    ///
+    /// This partly serves as a safety measure to make sure we don't update the
+    /// block heights wrong.
+    new_height: u64,
+
+    /// New manifests that we've seen from L1 that we didn't see in the previous
     /// L2 block.
-    new_payloads: Vec<L1HeaderPayload>,
+    new_manifests: Vec<L1BlockManifest>,
 }
 
 impl L1Segment {
-    pub fn new(new_payloads: Vec<L1HeaderPayload>) -> Self {
-        Self { new_payloads }
+    /// Constructs a new instance.  These new manifests MUST be sorted in order
+    /// of block height.
+    pub fn new(new_height: u64, new_manifests: Vec<L1BlockManifest>) -> Self {
+        Self {
+            new_height,
+            new_manifests,
+        }
     }
 
-    pub fn new_empty() -> Self {
-        Self::new(Vec::new())
+    pub fn new_empty(cur_height: u64) -> Self {
+        Self::new(cur_height, Vec::new())
     }
 
-    pub fn new_payloads(&self) -> &[L1HeaderPayload] {
-        &self.new_payloads
+    pub fn new_height(&self) -> u64 {
+        self.new_height
+    }
+
+    pub fn new_manifests(&self) -> &[L1BlockManifest] {
+        &self.new_manifests
+    }
+
+    /// Returns a the new tip L1 blkid, if there is one and this is
+    /// well-formed.
+    pub fn new_tip_blkid(&self) -> Option<L1BlockId> {
+        self.new_manifests().last().map(|mf| *mf.blkid())
     }
 }
 

@@ -2,7 +2,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-use super::{DaTx, DepositUpdateTx, L1BlockId, L1BlockRecord};
+use super::L1BlockId;
 use crate::{buf::Buf32, hash};
 
 /// Header and the wtxs root.
@@ -36,7 +36,9 @@ impl L1HeaderRecord {
         }
     }
 
+    /// Creates a new instance serialized header and the wtxs root.
     pub fn create_from_serialized_header(buf: Vec<u8>, wtxs_root: Buf32) -> Self {
+        assert_eq!(buf.len(), 80, "l1: header record not 80 bytes");
         let blkid = hash::sha256d(&buf).into();
         Self::new(blkid, buf, wtxs_root)
     }
@@ -62,16 +64,6 @@ impl L1HeaderRecord {
     }
 }
 
-impl From<&L1BlockRecord> for L1HeaderRecord {
-    fn from(value: &L1BlockRecord) -> Self {
-        Self {
-            blkid: value.block_hash(),
-            buf: value.header().to_vec(),
-            wtxs_root: value.txs_root(),
-        }
-    }
-}
-
 impl<'a> Arbitrary<'a> for L1HeaderRecord {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // Bitcoin headers are always 80 bytes, so we generate it like that.
@@ -82,83 +74,5 @@ impl<'a> Arbitrary<'a> for L1HeaderRecord {
             arr.to_vec(),
             Buf32::arbitrary(u)?,
         ))
-    }
-}
-
-/// Represents a serialized L1 header.
-#[derive(
-    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct L1HeaderPayload {
-    /// Index in the L1 chain.  This helps us in case there's reorgs that the L2
-    /// chain observes.
-    pub(crate) idx: u64,
-
-    /// Header record that contains the actual data.
-    pub(crate) record: L1HeaderRecord,
-
-    /// Txs related to deposits.
-    ///
-    /// MUST be sorted by [`DepositUpdateTx`] index within block.
-    pub(crate) deposit_update_txs: Vec<DepositUpdateTx>,
-
-    /// Txs representing L1 DA.
-    ///
-    /// MUST be sorted by [`DaTx`] index within block.
-    pub(crate) da_txs: Vec<DaTx>,
-}
-
-impl L1HeaderPayload {
-    pub fn new(idx: u64, record: L1HeaderRecord) -> Self {
-        Self {
-            idx,
-            record,
-            deposit_update_txs: Vec::new(),
-            da_txs: Vec::new(),
-        }
-    }
-
-    pub fn with_deposit_update_txs(mut self, txs: Vec<DepositUpdateTx>) -> Self {
-        self.deposit_update_txs = txs;
-        self
-    }
-
-    pub fn with_da_txs(mut self, txs: Vec<DaTx>) -> Self {
-        self.da_txs = txs;
-        self
-    }
-
-    pub fn idx(&self) -> u64 {
-        self.idx
-    }
-
-    pub fn record(&self) -> &L1HeaderRecord {
-        &self.record
-    }
-
-    pub fn deposit_update_txs(&self) -> &[DepositUpdateTx] {
-        &self.deposit_update_txs
-    }
-
-    pub fn da_txs(&self) -> &[DaTx] {
-        &self.da_txs
-    }
-
-    pub fn header_buf(&self) -> &[u8] {
-        self.record().buf()
-    }
-
-    pub fn wtxs_root(&self) -> &Buf32 {
-        self.record().wtxs_root()
-    }
-
-    // FIXME remove this
-    pub fn build(self) -> L1HeaderPayload {
-        L1HeaderPayload {
-            idx: self.idx,
-            record: self.record,
-            deposit_update_txs: self.deposit_update_txs,
-            da_txs: self.da_txs,
-        }
     }
 }
