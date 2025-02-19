@@ -5,7 +5,7 @@ from functools import partial
 import flexitest
 
 from envs import testenv
-from utils import wait_until_with_value
+from utils import wait_until_with_value, wait_for_genesis
 
 
 @flexitest.register
@@ -14,9 +14,11 @@ class ElBlockGenerationTest(testenv.StrataTester):
         ctx.set_env(testenv.BasicEnvConfig(1000))
 
     def main(self, ctx: flexitest.RunContext):
+        seqrpc = ctx.get_service("sequencer").create_rpc()
         reth = ctx.get_service("reth")
-
         rethrpc = reth.create_rpc()
+
+        wait_for_genesis(seqrpc, timeout=20)
 
         last_blocknum = int(rethrpc.eth_blockNumber(), 16)
         logging.info(f"initial EL blocknum is {last_blocknum}")
