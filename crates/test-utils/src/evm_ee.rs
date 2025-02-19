@@ -103,7 +103,7 @@ impl L2Segment {
         let el_proof_outs = evm_segment.get_outputs();
 
         for (el_proof_in, el_proof_out) in el_proof_ins.iter().zip(el_proof_outs.iter()) {
-            let l1_segment = L1Segment::new_empty();
+            let l1_segment = L1Segment::new_empty(params.rollup().genesis_l1_height);
             let body = L2BlockBody::new(l1_segment, el_proof_out.clone());
 
             let slot = prev_block.header().blockidx() + 1;

@@ -14,13 +14,9 @@ use bitcoin::{
 };
 use jsonrpsee::core::RpcResult;
 use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
-use strata_primitives::l1::BitcoinAddress;
+use strata_primitives::l1::{BitcoinAddress, L1Tx, ProtocolOperation};
 use strata_rpc_types::RpcServerError;
-use strata_state::{
-    bridge_state::{DepositState, DepositsTable},
-    l1::L1Tx,
-    tx::ProtocolOperation,
-};
+use strata_state::bridge_state::{DepositState, DepositsTable};
 use strata_storage::L1BlockManager;
 use tracing::*;
 
@@ -235,7 +231,11 @@ mod tests {
     use strata_primitives::{
         bridge::OperatorIdx,
         buf::Buf32,
-        l1::{BitcoinAmount, L1BlockManifest, OutputRef, RawBitcoinTx, XOnlyPk},
+        l1::{
+            BitcoinAmount, DepositRequestInfo, L1BlockId, L1BlockManifest, L1HeaderRecord, L1Tx,
+            L1TxProof, OutputRef, RawBitcoinTx, XOnlyPk,
+        },
+        l2::L2BlockId,
     };
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
@@ -247,9 +247,7 @@ mod tests {
         exec_env::ExecEnvState,
         exec_update::UpdateInput,
         genesis::GenesisStateData,
-        id::L2BlockId,
-        l1::{L1BlockId, L1HeaderRecord, L1Tx, L1TxProof, L1ViewState},
-        tx::DepositRequestInfo,
+        l1::L1ViewState,
     };
     use strata_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
     use threadpool::ThreadPool;
@@ -583,8 +581,8 @@ mod tests {
         num_deposits: usize,
     ) -> (Chainstate, usize, DepositEntry) {
         let l1_block_id = L1BlockId::from(Buf32::zero());
-        let safe_block = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
-        let l1_state = L1ViewState::new_at_horizon(0, safe_block);
+        let safe_block_rec = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
+        let l1_state = L1ViewState::new_at_genesis(0, 0, safe_block_rec);
 
         let operator_table = OperatorTable::new_empty();
 
@@ -621,7 +619,7 @@ mod tests {
             let tx_ref: OutputRef = arb.generate();
             let amt: BitcoinAmount = arb.generate();
 
-            deposits_table.add_deposits(&tx_ref, &operators, amt);
+            deposits_table.add_deposit(tx_ref, operators.clone(), amt);
 
             // dispatch about half of the deposits
             let should_dispatch = OsRng.gen_bool(0.5);

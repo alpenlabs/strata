@@ -1,9 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::l1::L1BlockId;
-
-use super::{L1HeaderRecord, L1MaturationEntry};
-use crate::prelude::StateQueue;
+use strata_primitives::l1::{L1BlockCommitment, L1BlockId, L1HeaderRecord};
 
 /// Describes state relating to the CL's view of L1.  Updated by entries in the
 /// L1 segment of CL blocks.
@@ -13,23 +10,18 @@ pub struct L1ViewState {
     /// change unless we want to do Bitcoin history expiry or something.
     pub(crate) horizon_height: u64,
 
-    /// The "safe" L1 block.  This block is the last block inserted into the L1 MMR.
-    pub(crate) safe_block: L1HeaderRecord,
+    /// The actual first block we ever looked at.
+    pub(crate) genesis_height: u64,
 
-    /// L1 blocks that might still be reorged.
-    pub(crate) maturation_queue: StateQueue<L1MaturationEntry>,
-    // TODO include L1 MMR state that we mature blocks into
+    /// The "safe" L1 block height.
+    pub(crate) safe_block_height: u64,
+
+    /// The "safe" L1 block header.  This block is the last block inserted into the L1 MMR.
+    pub(crate) safe_block_header: L1HeaderRecord,
 }
 
 impl L1ViewState {
-    pub fn new_at_horizon(horizon_height: u64, safe_block: L1HeaderRecord) -> Self {
-        Self {
-            horizon_height,
-            safe_block,
-            maturation_queue: StateQueue::new_at_index(horizon_height),
-        }
-    }
-
+    /// Creates a new instance with the genesis trigger L1 block already ingested.
     pub fn new_at_genesis(
         horizon_height: u64,
         genesis_height: u64,
@@ -37,35 +29,40 @@ impl L1ViewState {
     ) -> Self {
         Self {
             horizon_height,
-            safe_block: genesis_trigger_block,
-            maturation_queue: StateQueue::new_at_index(genesis_height),
+            genesis_height,
+            safe_block_height: genesis_height,
+            safe_block_header: genesis_trigger_block,
         }
     }
 
     pub fn safe_block(&self) -> &L1HeaderRecord {
-        &self.safe_block
+        &self.safe_block_header
     }
 
     pub fn safe_blkid(&self) -> &L1BlockId {
-        &self.safe_block.blkid
+        self.safe_block_header.blkid()
     }
 
     pub fn safe_height(&self) -> u64 {
-        self.maturation_queue.base_idx()
+        self.safe_block_height
     }
 
-    pub fn tip_height(&self) -> u64 {
-        self.maturation_queue.next_idx()
+    /// Gets the safe block as a [`L1BlockCommitment`].
+    pub fn get_safe_block(&self) -> L1BlockCommitment {
+        L1BlockCommitment::new(self.safe_height(), *self.safe_blkid())
     }
 
-    pub fn maturation_queue(&self) -> &StateQueue<L1MaturationEntry> {
-        &self.maturation_queue
+    /// The height of the next block we expect to be added.
+    pub fn next_expected_height(&self) -> u64 {
+        self.safe_block_height + 1
     }
 }
 
 impl<'a> Arbitrary<'a> for L1ViewState {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let hh = u8::arbitrary(u)? as u64;
+        let gh = hh + u16::arbitrary(u)? as u64;
         let blk = L1HeaderRecord::arbitrary(u)?;
-        Ok(Self::new_at_horizon(u64::arbitrary(u)?, blk))
+        Ok(Self::new_at_genesis(hh, gh, blk))
     }
 }

@@ -1,4 +1,5 @@
 import time
+import logging
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -6,13 +7,7 @@ from flexitest.service import Service
 
 from envs import net_settings, testenv
 from envs.rollup_params_cfg import RollupConfig
-from utils import (
-    ManualGenBlocksConfig,
-    check_nth_checkpoint_finalized,
-    check_submit_proof_fails_for_nonexistent_batch,
-    submit_checkpoint,
-    wait_until,
-)
+from utils import *
 
 
 @flexitest.register
@@ -43,11 +38,7 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         cfg: RollupConfig = ctx.env.rollup_cfg()
         finality_depth = cfg.l1_reorg_safe_depth
 
-        # Wait for seq
-        wait_until(
-            lambda: seqrpc.strata_protocolVersion() is not None,
-            error_with="Sequencer did not start on time",
-        )
+        wait_for_genesis(seqrpc, timeout=20, step=2)
 
         # Wait for prover
         wait_until(
@@ -64,7 +55,7 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         # Sanity Check for first checkpoint
         idx = 0
         check_nth_checkpoint_finalized(idx, seqrpc, prover_rpc, manual_gen)
-        self.debug(f"Pass checkpoint finalization for checkpoint {idx}")
+        logging.info(f"Pass checkpoint finalization for checkpoint {idx}")
 
         # TODO remove this after adding a proper config file
         # We need to wait for the tx to be published to L1

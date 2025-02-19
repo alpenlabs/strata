@@ -1,3 +1,5 @@
+// why do we even have this module?
+
 use bitcoin::params::{Params, MAINNET};
 
 #[derive(Debug, Clone)]
@@ -25,10 +27,13 @@ impl BtcParams {
 /// `non_exhaustive`.
 ///
 /// # Note
+///
 /// If adjustments to the parameters are required, modify them as shown below:
+///
 /// ```
 /// use bitcoin::params::MAINNET;
-/// use strata_state::l1::BtcParams;
+/// use strata_primitives::l1::BtcParams;
+///
 /// fn get_btc_params() -> BtcParams {
 ///     let mut btc_params = MAINNET.clone();
 ///     btc_params.pow_target_spacing = 25 * 30; // Adjusted to 2.5 minutes
@@ -37,6 +42,7 @@ impl BtcParams {
 /// ```
 ///
 /// # Returns
+///
 /// Returns the default Bitcoin Parameters used in our rollup.
 pub fn get_btc_params() -> BtcParams {
     BtcParams(MAINNET.clone())

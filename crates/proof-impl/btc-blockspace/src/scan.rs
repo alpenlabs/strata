@@ -2,8 +2,7 @@
 
 use bitcoin::{consensus::serialize, Block};
 use strata_l1tx::filter::TxFilterConfig;
-use strata_primitives::params::RollupParams;
-use strata_state::l1::L1TxProof;
+use strata_primitives::{l1::L1TxProof, params::RollupParams};
 
 use crate::{block::check_integrity, filter::extract_relevant_info, logic::BlockScanResult};
 

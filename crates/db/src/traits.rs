@@ -6,13 +6,14 @@ use std::sync::Arc;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_mmr::CompactMmr;
 use strata_primitives::{
-    l1::*,
+    batch::EpochSummary,
+    l1::{L1Tx, *},
     prelude::*,
     proof::{ProofContext, ProofKey},
 };
 use strata_state::{
-    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate, l1::L1Tx,
-    operation::*, state_op::WriteBatch, sync_event::SyncEvent,
+    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate, operation::*,
+    state_op::WriteBatch, sync_event::SyncEvent,
 };
 use zkaleido::ProofReceipt;
 
@@ -202,20 +203,34 @@ pub trait ChainstateDatabase {
     fn get_earliest_write_idx(&self) -> DbResult<u64>;
 }
 
-/// Db trait for Checkpoint data
+/// Database for checkpoint data.
 pub trait CheckpointDatabase {
-    /// Get a [`CheckpointEntry`] by it's index
-    fn get_batch_checkpoint(&self, batchidx: u64) -> DbResult<Option<CheckpointEntry>>;
+    /// Inserts an epoch summary retrievable by its epoch commitment.
+    ///
+    /// Fails if there's already an entry there.
+    fn insert_epoch_summary(&self, epoch: EpochSummary) -> DbResult<()>;
 
-    /// Get last batch index
-    fn get_last_batch_idx(&self) -> DbResult<Option<u64>>;
+    /// Gets an epoch summary given an epoch commitment.
+    fn get_epoch_summary(&self, epoch: EpochCommitment) -> DbResult<Option<EpochSummary>>;
+
+    /// Gets all commitments for an epoch.  This makes no guarantees about ordering.
+    fn get_epoch_commitments_at(&self, epoch: u64) -> DbResult<Vec<EpochCommitment>>;
+
+    /// Gets the index of the last epoch that we have a summary for, if any.
+    fn get_last_summarized_epoch(&self) -> DbResult<Option<u64>>;
 
     /// Store a [`CheckpointEntry`]
     ///
     /// `batchidx` for the Checkpoint is expected to increase monotonically and
     /// correspond to the value of `cur_epoch` in
     /// [`strata_state::chain_state::Chainstate`].
-    fn put_batch_checkpoint(&self, batchidx: u64, entry: CheckpointEntry) -> DbResult<()>;
+    fn put_checkpoint(&self, epoch: u64, entry: CheckpointEntry) -> DbResult<()>;
+
+    /// Get a [`CheckpointEntry`] by its index.
+    fn get_checkpoint(&self, epoch: u64) -> DbResult<Option<CheckpointEntry>>;
+
+    /// Get last written checkpoint index.
+    fn get_last_checkpoint_idx(&self) -> DbResult<Option<u64>>;
 }
 
 /// Encapsulates provider and store traits to create/update [`BundledPayloadEntry`] in the

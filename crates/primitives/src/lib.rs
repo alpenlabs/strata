@@ -6,10 +6,12 @@
 #[macro_use]
 mod macros;
 
+pub mod batch;
 pub mod block_credential;
 pub mod bridge;
 pub mod buf;
 pub mod constants;
+pub mod crypto;
 pub mod epoch;
 pub mod errors;
 pub mod evm_exec;

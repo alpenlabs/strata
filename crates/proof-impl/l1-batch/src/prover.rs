@@ -1,7 +1,9 @@
 use bitcoin::{consensus::serialize, Block};
-use strata_primitives::params::RollupParams;
+use strata_primitives::{
+    l1::{HeaderVerificationState, L1TxProof},
+    params::RollupParams,
+};
 use strata_proofimpl_btc_blockspace::block::witness_commitment_from_coinbase;
-use strata_state::l1::{HeaderVerificationState, L1TxProof};
 use zkaleido::{PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
 
 use crate::logic::L1BatchProofOutput;

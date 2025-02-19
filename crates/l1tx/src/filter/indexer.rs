@@ -1,7 +1,7 @@
 use bitcoin::{Block, Transaction};
-use strata_state::{
+use strata_primitives::{
     batch::SignedCheckpoint,
-    tx::{DepositInfo, DepositRequestInfo},
+    l1::{DepositInfo, DepositRequestInfo},
 };
 
 use super::{

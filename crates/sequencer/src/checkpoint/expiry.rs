@@ -11,6 +11,7 @@ use tracing::{debug, error, warn};
 
 use crate::checkpoint::CheckpointHandle;
 
+// FIXME WHAT DO THESE FIELDS REPRESENT????????
 #[derive(Debug, PartialEq, Eq)]
 struct CheckpointExpiry(u64, Instant);
 

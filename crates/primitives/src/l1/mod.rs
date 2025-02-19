@@ -1,10 +1,26 @@
 mod block;
 mod btc;
+mod header;
+mod header_verification;
+mod inclusion_proof;
+mod ops;
+mod params;
 pub mod payload;
 mod proof;
 mod status;
+mod timestamp_store;
+mod tx;
+mod utils;
 
 pub use block::*;
 pub use btc::*;
+pub use header::*;
+pub use header_verification::*;
+pub use inclusion_proof::*;
+pub use ops::*;
+pub use params::*;
 pub use proof::*;
 pub use status::*;
+pub use timestamp_store::*;
+pub use tx::*;
+pub use utils::*;

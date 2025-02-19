@@ -2,7 +2,11 @@
 use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use strata_db::types::{L1TxEntry, L1TxStatus};
-use strata_primitives::bridge::{OperatorIdx, PublickeyTable};
+use strata_primitives::{
+    batch::EpochSummary,
+    bridge::{OperatorIdx, PublickeyTable},
+    epoch::EpochCommitment,
+};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
     HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcBridgeDuties, RpcChainState,
@@ -17,6 +21,7 @@ use strata_state::{
     sync_event::SyncEvent,
 };
 use zkaleido::ProofReceipt;
+
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "strata"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "strata"))]
 pub trait StrataApi {
@@ -53,6 +58,20 @@ pub trait StrataApi {
 
     #[method(name = "getExecUpdateById")]
     async fn get_exec_update_by_id(&self, block_id: L2BlockId) -> RpcResult<Option<RpcExecUpdate>>;
+
+    /// Fetches the list of epoch commitments that have been stored for an
+    /// epoch.
+    #[method(name = "getEpochCommitments")]
+    async fn get_epoch_commitments(&self, epoch: u64) -> RpcResult<Vec<EpochCommitment>>;
+
+    /// Fetches a particular epoch summary.
+    #[method(name = "getEpochSummary")]
+    async fn get_epoch_summary(
+        &self,
+        epoch: u64,
+        slot: u64,
+        terminal: L2BlockId,
+    ) -> RpcResult<Option<EpochSummary>>;
 
     #[method(name = "getCLBlockWitness")]
     async fn get_cl_block_witness_raw(&self, block_id: L2BlockId) -> RpcResult<Vec<u8>>;

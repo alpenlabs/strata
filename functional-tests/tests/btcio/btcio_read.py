@@ -1,10 +1,11 @@
 import time
+import logging
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
-from utils import generate_n_blocks, wait_until
+from utils import *
 from utils.constants import MAX_HORIZON_POLL_INTERVAL_SECS
 
 
@@ -23,10 +24,9 @@ class L1StatusTest(testenv.StrataTester):
         generate_n_blocks(btcrpc, 5)
 
         # Wait for seq
-        wait_until(
-            lambda: seqrpc.strata_protocolVersion() is not None,
-            error_with="Sequencer did not start on time",
-        )
+        wait_for_genesis(seqrpc, timeout=30)
+
+        time.sleep(3)
 
         received_block = btcrpc.getblock(btcrpc.proxy.getbestblockhash())
         l1stat = seqrpc.strata_l1status()
@@ -35,10 +35,12 @@ class L1StatusTest(testenv.StrataTester):
         cur_time = l1stat["last_update"] // 1000
 
         # check if height on bitcoin is same as, it is seen in sequencer
-        self.debug(f"L1 stat curr height: {l1stat['cur_height']}")
-        self.debug(f"Received from bitcoin: {received_block['height']}")
-        assert l1stat["cur_height"] == received_block["height"], (
-            "sequencer height doesn't match the bitcoin node height"
+        logging.info(f"L1 stat curr height: {l1stat['cur_height']}")
+        logging.info(f"Received from bitcoin: {received_block['height']}")
+        seq_height = l1stat["cur_height"]
+        block_height = received_block["height"]
+        assert seq_height == block_height , (
+            f"sequencer height {seq_height} doesn't match the bitcoin node height {block_height}"
         )
 
         # generate 2 more btc blocks
