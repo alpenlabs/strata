@@ -167,26 +167,26 @@ pub fn check_pow(block: &Header) -> bool {
 #[cfg(test)]
 mod tests {
     use bitcoin::Witness;
-    use strata_test_utils::bitcoin::{get_btc_chain, get_btc_mainnet_block};
+    use strata_test_utils::bitcoin_mainnet_segment::BtcChainSegment;
 
     use super::*;
 
     #[test]
     fn test_block_with_valid_witness() {
-        let block = get_btc_mainnet_block();
+        let block = BtcChainSegment::load_full_block();
         let coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
         assert!(check_integrity(&block, &Some(coinbase_inclusion_proof)));
     }
 
     #[test]
     fn test_block_with_invalid_coinbase_inclusion_proof() {
-        let block = get_btc_mainnet_block();
+        let block = BtcChainSegment::load_full_block();
         assert!(!check_integrity(&block, &None));
     }
 
     #[test]
     fn test_block_with_valid_inclusion_proof_of_other_tx() {
-        let block = get_btc_mainnet_block();
+        let block = BtcChainSegment::load_full_block();
         let non_coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 1);
         assert!(!check_integrity(
             &block,
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_block_with_witness_removed() {
-        let mut block = get_btc_mainnet_block();
+        let mut block = BtcChainSegment::load_full_block();
         let empty_witness = Witness::new();
 
         // Remove witness data from all transactions.
@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_block_with_removed_witness_but_valid_inclusion_proof() {
-        let mut block = get_btc_mainnet_block();
+        let mut block = BtcChainSegment::load_full_block();
         let empty_witness = Witness::new();
 
         // Remove witness data from all transactions.
@@ -227,20 +227,20 @@ mod tests {
 
     #[test]
     fn test_block_without_witness_data() {
-        let btc_chain = get_btc_chain();
-        let block = btc_chain.get_block(40321);
+        let btc_chain = BtcChainSegment::load();
+        let block = btc_chain.get_block_at(40321).unwrap();
 
         // Verify with an empty inclusion proof.
-        assert!(check_integrity(block, &None));
+        assert!(check_integrity(&block, &None));
 
         // Verify with a valid inclusion proof.
         let valid_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
-        assert!(check_integrity(block, &Some(valid_inclusion_proof)));
+        assert!(check_integrity(&block, &Some(valid_inclusion_proof)));
     }
 
     #[test]
     fn test_proof_of_work() {
-        let block = get_btc_mainnet_block();
+        let block = BtcChainSegment::load_full_block();
 
         // Validate the block's proof-of-work.
         assert!(block.header.validate_pow(block.header.target()).is_ok());

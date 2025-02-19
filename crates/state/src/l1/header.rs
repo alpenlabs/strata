@@ -10,6 +10,8 @@ use super::{DaTx, DepositUpdateTx, L1BlockId};
 /// omit the wtxs root, but we'd need to re-prove it every time, and that would
 /// waste space.  So we treat this like you would an "extended header" or
 /// something.
+//
+// REVIEW: is this different from `L1BlockRecord`?
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct L1HeaderRecord {
     /// L1 block ID here so that we don't have to recompute it too much, which
@@ -150,5 +152,13 @@ impl L1HeaderPayload {
 
     pub fn wtxs_root(&self) -> &Buf32 {
         self.record().wtxs_root()
+    }
+
+    pub fn deposit_update_txs(&self) -> &[DepositUpdateTx] {
+        &self.deposit_update_txs
+    }
+
+    pub fn da_txs(&self) -> &[DaTx] {
+        &self.da_txs
     }
 }

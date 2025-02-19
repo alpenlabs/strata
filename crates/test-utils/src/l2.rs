@@ -17,7 +17,7 @@ use strata_state::{
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
 };
 
-use crate::{bitcoin::get_btc_chain, ArbitraryGenerator};
+use crate::{bitcoin_mainnet_segment::BtcChainSegment, ArbitraryGenerator};
 
 pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
     let mut arb = ArbitraryGenerator::new_with_size(1 << 12);
@@ -137,9 +137,34 @@ pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
 
 pub fn get_genesis_chainstate() -> Chainstate {
     let params = gen_params();
+    let chain = BtcChainSegment::load();
+
+    let genesis_height = params.rollup().genesis_l1_height;
+    let horizon_height = params.rollup().horizon_l1_height;
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(&params);
-    let pregenesis_mfs =
-        vec![get_btc_chain().get_block_record(params.rollup().horizon_l1_height as u32)];
-    make_genesis_chainstate(&gblock, pregenesis_mfs, &params)
+    let l1_vs = chain
+        .get_verification_state(genesis_height + 1, params.rollup().l1_reorg_safe_depth)
+        .unwrap();
+
+    let pregenesis_mfs: Vec<_> = (horizon_height..genesis_height)
+        .map(|h| chain.get_block_record(h).unwrap())
+        .collect();
+
+    make_genesis_chainstate(&gblock, pregenesis_mfs, &params, l1_vs.clone())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_genesis_chainstate() {
+        let chs = get_genesis_chainstate();
+        let l1_vs_height = chs.l1_view().header_vs().last_verified_block.height();
+        dbg!(l1_vs_height);
+        let l1_tip_height = chs.l1_view().tip_height();
+        assert_eq!(l1_vs_height, l1_tip_height);
+    }
 }

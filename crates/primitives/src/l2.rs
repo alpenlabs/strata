@@ -34,6 +34,7 @@ impl_buf_wrapper!(L2BlockId, Buf32, 32);
     Ord,
     PartialOrd,
     Hash,
+    Default,
     Arbitrary,
     BorshDeserialize,
     BorshSerialize,

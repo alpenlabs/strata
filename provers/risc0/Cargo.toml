@@ -22,7 +22,6 @@ strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
 strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
-strata-proofimpl-l1-batch.workspace = true
 strata-state.workspace = true
 strata-test-utils.workspace = true
 zkaleido.workspace = true
@@ -34,9 +33,7 @@ risc0-build = "1.1.2"
 methods = [
   "guest-evm-ee-stf",
   "guest-cl-stf",
-  "guest-cl-agg",
   "guest-btc-blockspace",
-  "guest-l1-batch",
   "guest-checkpoint",
 ]
 

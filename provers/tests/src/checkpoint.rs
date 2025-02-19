@@ -2,24 +2,19 @@ use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInpu
 use strata_test_utils::l2::gen_params;
 use zkaleido::{AggregationInput, ZkVmHost, ZkVmResult};
 
-use super::{l1_batch::L1BatchProofGenerator, l2_batch::L2BatchProofGenerator, ProofGenerator};
+use super::ProofGenerator;
+use crate::cl::ClProofGenerator;
 
 #[derive(Clone)]
 pub struct CheckpointProofGenerator<H: ZkVmHost> {
-    l1_batch_prover: L1BatchProofGenerator<H>,
-    l2_batch_prover: L2BatchProofGenerator<H>,
+    cl_stf_prover: ClProofGenerator<H>,
     host: H,
 }
 
 impl<H: ZkVmHost> CheckpointProofGenerator<H> {
-    pub fn new(
-        l1_batch_proof_generator: L1BatchProofGenerator<H>,
-        l2_batch_proof_generator: L2BatchProofGenerator<H>,
-        host: H,
-    ) -> Self {
+    pub fn new(cl_stf_prover: ClProofGenerator<H>, host: H) -> Self {
         Self {
-            l1_batch_prover: l1_batch_proof_generator,
-            l2_batch_prover: l2_batch_proof_generator,
+            cl_stf_prover,
             host,
         }
     }
@@ -46,7 +41,7 @@ impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
 
         let l1_batch_proof = self
             .l1_batch_prover
-            .get_proof(&(l1_start_height as u32, l1_end_height as u32))
+            .get_proof(&(l1_start_height, l1_end_height))
             .unwrap();
         let l1_batch_vk = self.l1_batch_prover.get_host().get_verification_key();
         let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);

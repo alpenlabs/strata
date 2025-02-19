@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use bitcoin::{
     absolute::{Height, LockTime},
     bip32::Xpriv,
+    block::Header,
     consensus::{self, deserialize},
     hashes::Hash,
     key::{Parity, UntweakedKeypair},
@@ -71,6 +72,11 @@ impl ReaderRpc for TestBitcoinClient {
         Ok(block)
     }
 
+    async fn get_block_header(&self, _hash: &BlockHash) -> ClientResult<Header> {
+        let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
+        Ok(block.header)
+    }
+
     async fn get_block_height(&self, _hash: &BlockHash) -> ClientResult<u64> {
         Ok(100)
     }
@@ -78,6 +84,11 @@ impl ReaderRpc for TestBitcoinClient {
     async fn get_block_at(&self, _height: u64) -> ClientResult<Block> {
         let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
         Ok(block)
+    }
+
+    async fn get_block_header_at(&self, _height: u64) -> ClientResult<Header> {
+        let block: Block = deserialize(&hex::decode(TEST_BLOCKSTR).unwrap()).unwrap();
+        Ok(block.header)
     }
 
     async fn get_block_count(&self) -> ClientResult<u64> {

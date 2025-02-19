@@ -63,7 +63,7 @@ impl ProvingOp for BtcBlockspaceOperator {
 
         Ok(BlockScanProofInput {
             rollup_params: self.rollup_params.as_ref().clone(),
-            block,
+            btc_blocks: block,
         })
     }
 }

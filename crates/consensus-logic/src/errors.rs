@@ -1,6 +1,9 @@
 use strata_chaintsn::errors::TsnError;
 use strata_eectl::errors::EngineError;
-use strata_state::{id::L2BlockId, l1::L1BlockId};
+use strata_state::{
+    id::L2BlockId,
+    l1::{L1BlockId, L1VerificationError},
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -52,6 +55,13 @@ pub enum Error {
     /// Used when assembling blocks and we don't have an actual block ID to use.
     #[error("invalid state transition: {0}")]
     InvalidStateTsnImm(#[from] TsnError),
+
+    /// Invalid L1 Block.
+    ///
+    /// This error variant is returned when an L1 block fails verification, encapsulating a
+    /// [`L1VerificationError`] that provides detailed context on the verification failure.
+    #[error("invalid L1 Block: {0}")]
+    InvalidL1Block(#[from] L1VerificationError),
 
     #[error("csm dropped")]
     CsmDropped,
