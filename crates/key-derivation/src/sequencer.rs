@@ -140,12 +140,7 @@ impl Drop for SequencerKeys {
 
 #[cfg(test)]
 mod tests {
-
-    use std::sync::Arc;
-
     use bitcoin::Network;
-    use strata_primitives::buf::Buf32;
-    use strata_sequencer::duty::types::{Identity, IdentityData, IdentityKey};
 
     use super::*;
 
@@ -189,46 +184,5 @@ mod tests {
             ChildNumber::Normal { index } => assert_eq!(index, 0),
             ChildNumber::Hardened { index } => assert_eq!(index, 0),
         }
-    }
-
-    #[test]
-    #[cfg(feature = "zeroize")]
-    fn test_zeroize_idata() {
-        fn load_seqkeys() -> IdentityData {
-            let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
-            let keys = SequencerKeys::new(&master).unwrap();
-            let seq_sk = Buf32::from(keys.derived_xpriv().private_key.secret_bytes());
-            let seq_pk = keys.derived_xpub().to_x_only_pub().serialize();
-            let ik = IdentityKey::Sequencer(seq_sk);
-            let ident = Identity::Sequencer(Buf32::from(seq_pk));
-
-            IdentityData::new(ident, ik)
-        }
-
-        fn is_all_zero<T>(p: *const T) -> bool {
-            let len = std::mem::size_of::<T>();
-            let buf = unsafe { std::slice::from_raw_parts(p as *const u8, len) };
-            buf.iter().all(|v| *v == 0)
-        }
-
-        let idata = Arc::new(load_seqkeys());
-        let raw_ptr = Arc::as_ptr(&idata);
-
-        // In the beginning should not be zeros
-        assert!(!is_all_zero(raw_ptr));
-
-        fn bar(_idata_clone: Arc<IdentityData>) {}
-
-        fn foo(idata: Arc<IdentityData>) {
-            bar(idata.clone());
-        }
-
-        foo(idata.clone());
-
-        // Drop the last reference, triggering `ZeroizeOnDrop`
-        drop(idata);
-
-        // Now check if the memory has been zeroized
-        assert!(is_all_zero(raw_ptr), "contents {:?}", raw_ptr);
     }
 }

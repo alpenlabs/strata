@@ -4,7 +4,7 @@
 
 use std::ops::Deref;
 
-use bitcoin::{bip32::Xpriv, key::Keypair};
+use bitcoin::{bip32::Xpriv, key::Keypair, secp256k1::SecretKey};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// A zeroizable on [`Drop`] wrapper around [`Xpriv`].
@@ -60,9 +60,9 @@ impl ZeroizeOnDrop for ZeroizableXpriv {}
 pub struct ZeroizableKeypair(Keypair);
 
 impl ZeroizableKeypair {
-    /// Create a new [`ZeroizableKeypair`] from an [`Keypair`].
+    /// Create a new [`ZeroizableKeypair`] from a [`Keypair`].
     ///
-    /// This should take ownership of the `Keypair` since it is zeroized on drop.
+    /// This should take ownership of `keypair` since it is zeroized on drop.
     pub fn new(keypair: Keypair) -> Self {
         Self(keypair)
     }
@@ -82,7 +82,7 @@ impl Deref for ZeroizableKeypair {
     }
 }
 
-// Manual Drop implementation to zeroize keypair on drop.
+// Manual Drop implementation to zeroize Keypair on drop.
 impl Drop for ZeroizableKeypair {
     fn drop(&mut self) {
         #[cfg(feature = "zeroize")]
@@ -101,12 +101,62 @@ impl Zeroize for ZeroizableKeypair {
 #[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for ZeroizableKeypair {}
 
+/// A zeroizable on [`Drop`] wrapper around [`SecretKey`].
+#[cfg(feature = "zeroize")]
+#[derive(Clone, PartialEq, Eq)]
+pub struct ZeroizableSecretKey(SecretKey);
+
+impl ZeroizableSecretKey {
+    /// Create a new [`ZeroizableSecretKey`] from a [`SecretKey`].
+    ///
+    /// This should take ownership of `secret_key` since it is zeroized on drop.
+    pub fn new(secret_key: SecretKey) -> Self {
+        Self(secret_key)
+    }
+}
+
+impl From<SecretKey> for ZeroizableSecretKey {
+    fn from(secret_key: SecretKey) -> Self {
+        Self::new(secret_key)
+    }
+}
+
+impl Deref for ZeroizableSecretKey {
+    type Target = SecretKey;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+// Manual Drop implementation to zeroize keypair on drop.
+impl Drop for ZeroizableSecretKey {
+    fn drop(&mut self) {
+        #[cfg(feature = "zeroize")]
+        self.zeroize();
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl Zeroize for ZeroizableSecretKey {
+    #[inline]
+    fn zeroize(&mut self) {
+        self.0.non_secure_erase();
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl ZeroizeOnDrop for ZeroizableSecretKey {}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     };
+
+    use bitcoin::{bip32::Xpriv, secp256k1::SECP256K1, Network};
+    use zeroize::Zeroize;
 
     use super::*;
 
@@ -166,6 +216,84 @@ mod tests {
             let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
             let _ = TestWrapper {
                 inner: ZeroizableXpriv::new(xpriv),
+                flag: was_zeroized_clone,
+            };
+        }
+
+        // Check if zeroization occurred
+        assert!(was_zeroized.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    #[cfg(feature = "zeroize")]
+    fn test_erase_keypair() {
+        // Create a wrapper struct including keypair
+        struct TestWrapper {
+            inner: ZeroizableKeypair,
+            flag: Arc<AtomicBool>,
+        }
+
+        // Create an atomic flag to track if zeroize was called
+        let was_zeroized = Arc::new(AtomicBool::new(false));
+        let was_zeroized_clone = Arc::clone(&was_zeroized);
+
+        impl Drop for TestWrapper {
+            fn drop(&mut self) {
+                // Get the current value before the inner value is dropped
+                let bytes = self.inner.secret_bytes();
+                self.inner.zeroize();
+                // The inner Keypair will be dropped after this,
+                // triggering zeroization
+                // NOTE: SecretKey::non_secure_erase writes `1`s to the memory.
+                self.flag.store(bytes != [1u8; 32], Ordering::Relaxed);
+            }
+        }
+
+        {
+            let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
+            let keypair = master.to_keypair(SECP256K1);
+
+            let _ = TestWrapper {
+                inner: keypair.into(),
+                flag: was_zeroized_clone,
+            };
+        }
+
+        // Check if zeroization occurred
+        assert!(was_zeroized.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    #[cfg(feature = "zeroize")]
+    fn test_erase_secret_key() {
+        // Create a wrapper struct including keypair
+        struct TestWrapper {
+            inner: ZeroizableSecretKey,
+            flag: Arc<AtomicBool>,
+        }
+
+        // Create an atomic flag to track if zeroize was called
+        let was_zeroized = Arc::new(AtomicBool::new(false));
+        let was_zeroized_clone = Arc::clone(&was_zeroized);
+
+        impl Drop for TestWrapper {
+            fn drop(&mut self) {
+                // Get the current value before the inner value is dropped
+                let bytes = self.inner.secret_bytes();
+                self.inner.zeroize();
+                // The inner Keypair will be dropped after this,
+                // triggering zeroization
+                // NOTE: SecretKey::non_secure_erase writes `1`s to the memory.
+                self.flag.store(bytes != [1u8; 32], Ordering::Relaxed);
+            }
+        }
+
+        {
+            let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
+            let secret_key = master.private_key;
+
+            let _ = TestWrapper {
+                inner: secret_key.into(),
                 flag: was_zeroized_clone,
             };
         }

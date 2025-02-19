@@ -16,8 +16,5 @@ secp256k1.workspace = true
 thiserror.workspace = true
 zeroize = { workspace = true, optional = true }
 
-[dev-dependencies]
-strata-sequencer.workspace = true
-
 [features]
 default = ["zeroize"]
