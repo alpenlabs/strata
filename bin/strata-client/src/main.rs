@@ -3,7 +3,6 @@ use std::{sync::Arc, time::Duration};
 use bitcoin::{hashes::Hash, BlockHash};
 use el_sync::sync_chainstate_to_el;
 use jsonrpsee::Methods;
-use parking_lot::lock_api::RwLock;
 use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
@@ -32,7 +31,6 @@ use strata_rpc_api::{
 use strata_sequencer::{
     block_template,
     checkpoint::{checkpoint_expiry_worker, checkpoint_worker, CheckpointHandle},
-    duty::{tracker::DutyTracker, worker as duty_worker},
 };
 use strata_status::StatusChannel;
 use strata_storage::{create_node_storage, ops::bridge_relay::BridgeMsgOps, NodeStorage};
@@ -417,36 +415,17 @@ fn start_sequencer_tasks(
     )?;
 
     let template_manager_handle = start_template_manager_task(&ctx, executor);
-    let duty_tracker = Arc::new(RwLock::new(DutyTracker::new_empty()));
 
     let admin_rpc = rpc_server::SequencerServerImpl::new(
-        envelope_handle.clone(),
+        envelope_handle,
         broadcast_handle,
         params.clone(),
         checkpoint_handle.clone(),
         template_manager_handle,
-        duty_tracker.clone(),
+        storage.clone(),
+        status_channel.clone(),
     );
     methods.merge(admin_rpc.into_rpc())?;
-
-    // Spawn duty tasks.
-    let t_storage = storage.clone();
-    let t_checkpoint_handle = checkpoint_handle.clone();
-    let t_status_ch = status_channel.clone();
-    let t_rt = runtime.clone();
-    let t_params = params.clone();
-    executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
-        duty_worker::duty_tracker_task(
-            shutdown,
-            duty_tracker,
-            t_status_ch,
-            t_storage,
-            t_checkpoint_handle,
-            t_rt,
-            t_params,
-        )
-        .map_err(Into::into)
-    });
 
     match params.rollup().proof_publish_mode {
         ProofPublishMode::Strict => {}

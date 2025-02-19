@@ -10,7 +10,6 @@ use bitcoin::{
 };
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
-use parking_lot::RwLock;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
@@ -40,10 +39,7 @@ use strata_sequencer::{
         BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
     },
     checkpoint::{verify_checkpoint_sig, CheckpointHandle},
-    duty::{
-        tracker::DutyTracker,
-        types::{Duty, DutyEntry},
-    },
+    duty::{extractor::extract_duties, types::Duty},
 };
 use strata_state::{
     batch::{Checkpoint, SignedCheckpoint},
@@ -730,7 +726,8 @@ pub struct SequencerServerImpl {
     checkpoint_handle: Arc<CheckpointHandle>,
     template_manager_handle: TemplateManagerHandle,
     params: Arc<Params>,
-    duty_tracker: Arc<RwLock<DutyTracker>>,
+    storage: Arc<NodeStorage>,
+    status: StatusChannel,
 }
 
 impl SequencerServerImpl {
@@ -741,7 +738,8 @@ impl SequencerServerImpl {
         params: Arc<Params>,
         checkpoint_handle: Arc<CheckpointHandle>,
         template_manager_handle: TemplateManagerHandle,
-        duty_tracker: Arc<RwLock<DutyTracker>>,
+        storage: Arc<NodeStorage>,
+        status: StatusChannel,
     ) -> Self {
         Self {
             envelope_handle,
@@ -749,7 +747,8 @@ impl SequencerServerImpl {
             params,
             checkpoint_handle,
             template_manager_handle,
-            duty_tracker,
+            storage,
+            status,
         }
     }
 }
@@ -847,14 +846,26 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 
     async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>> {
-        let duties = self
-            .duty_tracker
-            .read()
-            .duties()
-            .iter()
-            .map(DutyEntry::duty)
-            .cloned()
-            .collect();
+        let chain_state = self
+            .status
+            .get_cur_tip_chainstate()
+            .ok_or(Error::BeforeGenesis)?;
+        let client_state = self.status.get_cur_client_state();
+
+        let client_int_state = client_state
+            .get_last_internal_state()
+            .ok_or(Error::MissingInternalState)?;
+
+        let duties = extract_duties(
+            chain_state.as_ref(),
+            client_int_state,
+            &self.checkpoint_handle,
+            self.storage.l2().as_ref(),
+            &self.params,
+        )
+        .await
+        .map_err(to_jsonrpsee_error("failed to extract duties"))?;
+
         Ok(duties)
     }
 

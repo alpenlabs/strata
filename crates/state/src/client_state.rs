@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment};
+use strata_primitives::{epoch::EpochCommitment, l1::L1BlockCommitment};
 use tracing::*;
 
 use crate::{
@@ -232,7 +232,7 @@ impl ClientState {
 
         // We need *some* last block to do this successfully.
         if self.int_states.is_empty() {
-            let fake_blkid = L1BlockId::from(Buf32::zero());
+            let fake_blkid = L1BlockId::from(strata_primitives::buf::Buf32::zero());
             self.int_states
                 .push_back(InternalState::new(fake_blkid, None));
         }

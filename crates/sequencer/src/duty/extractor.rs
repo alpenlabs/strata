@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Extracts new duties given a current chainstate and an identity.
-pub(crate) fn extract_duties(
+pub async fn extract_duties(
     chstate: &Chainstate,
     cistate: &InternalState,
     checkpoint_handle: &CheckpointHandle,
@@ -21,8 +21,8 @@ pub(crate) fn extract_duties(
     params: &Params,
 ) -> Result<Vec<Duty>, Error> {
     let mut duties = vec![];
-    duties.extend(extract_block_duties(chstate, l2_block_manager, params)?);
-    duties.extend(extract_batch_duties(cistate, checkpoint_handle)?);
+    duties.extend(extract_block_duties(chstate, l2_block_manager, params).await?);
+    duties.extend(extract_batch_duties(cistate, checkpoint_handle).await?);
 
     if !duties.is_empty() {
         debug!(cnt = %duties.len(), "have some duties");
@@ -31,7 +31,7 @@ pub(crate) fn extract_duties(
     Ok(duties)
 }
 
-fn extract_block_duties(
+async fn extract_block_duties(
     state: &Chainstate,
     l2_block_manager: &L2BlockManager,
     params: &Params,
@@ -40,7 +40,8 @@ fn extract_block_duties(
     let tip_blkid = *state.chain_tip_blkid();
 
     let tip_block_ts = l2_block_manager
-        .get_block_data_blocking(&tip_blkid)?
+        .get_block_data_async(&tip_blkid)
+        .await?
         .ok_or(Error::MissingL2Block(tip_blkid))?
         .header()
         .timestamp();
@@ -56,7 +57,7 @@ fn extract_block_duties(
     ))])
 }
 
-fn extract_batch_duties(
+async fn extract_batch_duties(
     cistate: &InternalState,
     checkpoint_handle: &CheckpointHandle,
 ) -> Result<Vec<Duty>, Error> {
@@ -64,7 +65,7 @@ fn extract_batch_duties(
     let first_epoch_idx = cistate.get_next_expected_epoch_conf();
 
     // get checkpoints ready to be signed
-    let Some(last_checkpoint_idx) = checkpoint_handle.get_last_checkpoint_idx_blocking()? else {
+    let Some(last_checkpoint_idx) = checkpoint_handle.get_last_checkpoint_idx().await? else {
         // No checkpoints generated yet, nothing to publish.
         return Ok(Vec::new());
     };
@@ -72,7 +73,7 @@ fn extract_batch_duties(
     let mut duties = Vec::new();
 
     for i in first_epoch_idx..=last_checkpoint_idx {
-        let Some(ckpt) = checkpoint_handle.get_checkpoint_blocking(i)? else {
+        let Some(ckpt) = checkpoint_handle.get_checkpoint(i).await? else {
             error!(ckpt = %i, "database told us we had checkpoint but it was missing, moving on");
             break;
         };
