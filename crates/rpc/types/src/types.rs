@@ -239,9 +239,11 @@ pub struct RpcExecUpdate {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcSyncStatus {
     /// Current head L2 slot known to this node
+    // TODO consolidate into using L2BlockCommitment
     pub tip_height: u64,
 
     /// Last L2 block we've chosen as the current tip.
+    // TODO consolidate into using L2BlockCommitment
     pub tip_block_id: strata_state::id::L2BlockId,
 
     /// Current epoch from chainstate.
@@ -252,6 +254,9 @@ pub struct RpcSyncStatus {
 
     /// Observed finalized epoch from chainstate.
     pub observed_finalized_epoch: EpochCommitment,
+
+    /// Most recent L1 block we've acted on on-chain.
+    pub safe_l1_block: L1BlockCommitment,
 
     /// Terminal blkid of observed finalized epoch from chainstate.
     ///

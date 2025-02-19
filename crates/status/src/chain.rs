@@ -16,6 +16,9 @@ pub struct ChainSyncStatus {
 
     /// The finalized epoch, ie what's witnessed on L1.
     pub finalized_epoch: EpochCommitment,
+
+    /// The last L1 block we've observed.
+    pub safe_l1: L1BlockCommitment,
 }
 
 impl ChainSyncStatus {
@@ -41,11 +44,13 @@ impl ChainSyncStatus {
         tip: L2BlockCommitment,
         prev_epoch: EpochCommitment,
         finalized_epoch: EpochCommitment,
+        safe_l1: L1BlockCommitment,
     ) -> Self {
         Self {
             tip,
             prev_epoch,
             finalized_epoch,
+            safe_l1,
         }
     }
 
@@ -53,7 +58,12 @@ impl ChainSyncStatus {
     /// type from a chainstate.
     pub fn from_transitional(chs: &Chainstate) -> Self {
         let tip = L2BlockCommitment::new(chs.chain_tip_slot(), *chs.chain_tip_blkid());
-        Self::new(tip, *chs.prev_epoch(), *chs.finalized_epoch())
+        Self::new(
+            tip,
+            *chs.prev_epoch(),
+            *chs.finalized_epoch(),
+            chs.l1_view().get_safe_block(),
+        )
     }
 }
 

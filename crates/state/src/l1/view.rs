@@ -1,6 +1,6 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::l1::{L1BlockId, L1HeaderRecord};
+use strata_primitives::l1::{L1BlockCommitment, L1BlockId, L1HeaderRecord};
 
 /// Describes state relating to the CL's view of L1.  Updated by entries in the
 /// L1 segment of CL blocks.
@@ -45,6 +45,11 @@ impl L1ViewState {
 
     pub fn safe_height(&self) -> u64 {
         self.safe_block_height
+    }
+
+    /// Gets the safe block as a [`L1BlockCommitment`].
+    pub fn get_safe_block(&self) -> L1BlockCommitment {
+        L1BlockCommitment::new(self.safe_height(), *self.safe_blkid())
     }
 
     /// The height of the next block we expect to be added.

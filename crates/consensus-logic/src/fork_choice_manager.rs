@@ -430,6 +430,8 @@ fn process_fc_message(
                     tip: fcm_state.cur_best_block,
                     prev_epoch: *fcm_state.get_chainstate_prev_epoch(),
                     finalized_epoch: *fcm_state.chain_tracker.finalized_epoch(),
+                    // FIXME this is a bit convoluted, could this be simpler?
+                    safe_l1: fcm_state.cur_chainstate.l1_view().get_safe_block(),
                 };
 
                 let update = ChainSyncStatusUpdate::new(status, fcm_state.cur_chainstate.clone());

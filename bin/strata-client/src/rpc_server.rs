@@ -444,6 +444,7 @@ impl StrataApiServer for StrataRpcImpl {
                 cur_epoch: css.cur_epoch(),
                 prev_epoch: css.prev_epoch,
                 observed_finalized_epoch: css.finalized_epoch,
+                safe_l1_block: css.safe_l1,
                 finalized_block_id: *css.finalized_blkid(),
             })
             .ok_or(Error::BeforeGenesis)?)
