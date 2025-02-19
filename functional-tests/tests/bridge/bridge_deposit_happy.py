@@ -4,7 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
-from envs import testenv
+from envs import testenv, net_settings
 from envs.testenv import BasicEnvConfig
 from utils import *
 
@@ -23,7 +23,12 @@ class BridgeDepositHappyTest(testenv.StrataTester):
 
     def __init__(self, ctx: flexitest.InitContext):
         # Note: using copy of basic env her to have independent sequencer for this test
-        ctx.set_env(BasicEnvConfig(101))
+        ctx.set_env(
+            BasicEnvConfig(
+                101,
+                rollup_settings=net_settings.get_fast_batch_settings(),
+            )
+        )
 
     def main(self, ctx: flexitest.RunContext):
         btcrpc = ctx.get_service("bitcoin").create_rpc()
@@ -170,7 +175,9 @@ class BridgeDepositHappyTest(testenv.StrataTester):
 
         n_deposits_post = len(seqrpc.strata_getCurrentDeposits())
         self.debug(f"Current deposits: {n_deposits_post}")
-        assert n_deposits_post == n_deposits_pre + 1, f"deposit was not registered (pre {n_deposits_pre}, post {n_deposits_post})"
+        assert n_deposits_post == n_deposits_pre + 1, (
+            f"deposit was not registered (pre {n_deposits_pre}, post {n_deposits_post})"
+        )
 
         # wait for new block to be generated on rollup
         block_number = int(rethrpc.eth_blockNumber(), 16)

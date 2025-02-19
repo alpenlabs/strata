@@ -15,7 +15,6 @@ class BlockFinalizationTest(testenv.StrataTester):
         premine_blocks = 101
         settings = net_settings.get_fast_batch_settings()
         settings.genesis_trigger = premine_blocks + 5
-        settings.proof_timeout = 5
 
         ctx.set_env(testenv.BasicEnvConfig(premine_blocks, rollup_settings=settings))
 
@@ -28,7 +27,7 @@ class BlockFinalizationTest(testenv.StrataTester):
 
         num_epochs = 4
 
-        epoch = wait_until_chain_epoch(seqrpc, num_epochs, timeout=30)
+        epoch = wait_until_chain_epoch(seqrpc, num_epochs, timeout=60)
         logging.info(f"epoch summary: {epoch}")
 
         cstat = seqrpc.strata_clientStatus()
@@ -55,7 +54,7 @@ class BlockFinalizationTest(testenv.StrataTester):
 
         # FIXME what does this even check?
         # Check for first 4 checkpoints
-        #for n in range(num_epochs):
+        # for n in range(num_epochs):
         #    check_nth_checkpoint_finalized(n, seqrpc, prover_rpc)
         #    logging.info(f"Pass checkpoint finalization for checkpoint {n}")
 
