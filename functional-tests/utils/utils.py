@@ -236,6 +236,8 @@ def submit_checkpoint(
             error_with="Published envelope not confirmed",
         )
 
+    return published_txid
+
 
 def check_submit_proof_fails_for_nonexistent_batch(seqrpc, nonexistent_batch: int):
     """

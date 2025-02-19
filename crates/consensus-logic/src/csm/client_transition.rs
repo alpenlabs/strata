@@ -26,7 +26,7 @@ use crate::{checkpoint_verification::verify_proof, errors::*, genesis::make_gene
 /// Interface for external context necessary specifically for event validation.
 pub trait EventContext {
     fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error>;
-    fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error>;
+    fn get_l2_block_data(&self, blockid: &L2BlockId) -> Result<L2BlockBundle, Error>;
     fn get_toplevel_chainstate(&self, slot: u64) -> Result<Chainstate, Error>;
 }
 
@@ -45,7 +45,7 @@ impl EventContext for StorageEventContext<'_> {
     fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
         self.storage
             .l1()
-            .get_block_manifest(height)?
+            .get_block_manifest_at_height(height)?
             .ok_or(Error::MissingL1BlockHeight(height))
     }
 
@@ -96,7 +96,7 @@ pub fn process_event(
             if let Some(l1_vs) = l1_vs {
                 let l1_vs_height = l1_vs.last_verified_block_num as u64;
                 let mut updated_l1vs = l1_vs.clone();
-                for height in (l1_vs_height + 1..cur_seen_tip_height) {
+                for height in (l1_vs_height + 1..=*height) {
                     let block_mf = context.get_l1_block_manifest(height)?;
                     let header: Header =
                         bitcoin::consensus::deserialize(block_mf.header()).unwrap();
@@ -179,7 +179,9 @@ pub fn process_event(
                 return Err(Error::ReorgTooDeep(*to_height, buried));
             }
 
-            state.rollback_l1_blocks(*to_height);
+            let mf = context.get_l1_block_manifest(*to_height)?;
+
+            state.rollback_l1_blocks(*to_height, mf.block_hash());
         }
 
         SyncEvent::L1DABatch(height, checkpoints) => {
@@ -522,7 +524,12 @@ mod tests {
     impl EventContext for DummyEventContext {
         fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
             let rec = self.chainseg.get_block_record(height as u32);
-            Ok(L1BlockManifest::new(rec, height))
+            let prev_blockid = self
+                .chainseg
+                .get_header(height as u32)
+                .prev_blockhash
+                .into();
+            Ok(L1BlockManifest::new(rec, prev_blockid, height, 0))
         }
 
         fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {

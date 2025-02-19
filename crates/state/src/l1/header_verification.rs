@@ -199,10 +199,10 @@ impl HeaderVerificationState {
 
         // TODO: skipping this for now
         // Check continuity
-        // assert_eq!(
-        //     Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()),
-        //     new_self.last_verified_block_hash,
-        // );
+        assert_eq!(
+            L1BlockId::from(header.prev_blockhash),
+            self.last_verified_block_hash,
+        );
 
         let block_hash_raw = compute_block_hash(header);
 

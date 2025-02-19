@@ -221,9 +221,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
         sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
-        # Sleeping some more for safety
-        if self.auto_generate_blocks:
-            time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
+        # Also need to wait for sequencer to startup regardless of block generation.
+        time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         seq_host = sequencer.get_prop("rpc_host")
         seq_port = sequencer.get_prop("rpc_port")
