@@ -10,7 +10,7 @@ use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEnt
 use strata_primitives::{
     bridge::OperatorIdx,
     epoch::EpochCommitment,
-    l1::{BitcoinAmount, L1BlockCommitment, L1TxRef, OutputRef},
+    l1::{BitcoinAmount, L1BlockCommitment, OutputRef},
     l2::L2BlockCommitment,
     prelude::L1Status,
 };
@@ -396,14 +396,6 @@ pub struct RpcDepositEntry {
     /// Deposit amount, in the native asset.
     amt: BitcoinAmount,
 
-    /// Refs to txs in the maturation queue that will update the deposit entry
-    /// when they mature.  This is here so that we don't have to scan a
-    /// potentially very large set of pending transactions to reason about the
-    /// state of the deposits.  This must be kept in sync when we do things
-    /// though.
-    // TODO probably removing this actually
-    pending_update_txs: Vec<L1TxRef>,
-
     /// Deposit state.
     state: DepositState,
 }
@@ -415,7 +407,6 @@ impl RpcDepositEntry {
             output: ent.output().clone(),
             notary_operators: ent.notary_operators().to_vec(),
             amt: ent.amt(),
-            pending_update_txs: ent.pending_update_txs().to_vec(),
             state: ent.deposit_state().clone(),
         }
     }
