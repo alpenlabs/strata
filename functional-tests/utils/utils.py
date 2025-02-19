@@ -221,6 +221,46 @@ def wait_until_epoch_observed_final(rpc, epoch: int, **kwargs):
     wait_until(_check, **kwargs)
 
 
+def wait_until_l1_observed(rpc, height: int, **kwargs):
+    """
+    Waits until the provided L1 height has been observed by the chain.
+    """
+
+    def _check():
+        ss = rpc.strata_syncStatus()
+        slot = ss["tip_height"] # TODO rename to slot
+        epoch = ss["cur_epoch"]
+        view_l1 = ss["safe_l1_block"]["height"]
+        logging.info(f"chain now at slot {slot}, epoch {epoch}, observed L1 height is {view_l1}")
+        return view_l1 >= height
+
+    wait_until(_check, **kwargs)
+
+
+def wait_until_csm_l1_tip_observed(rpc, **kwargs):
+    """
+    Waits until the CSM's current L1 tip block height has been observed by the OL.
+    """
+
+    init_cs = rpc.strata_clientStatus()
+    init_l1_height = init_cs["tip_l1_block"]["height"]
+    logging.info(f"target L1 height from CSM is {init_l1_height}")
+    wait_until_l1_observed(init_l1_height, **kwargs)
+
+
+def wait_until_cur_l1_tip_observed(btcrpc, seqrpc, **kwargs) -> int:
+    """
+    Waits until the current L1 tip block as requested from the L1 RPC has been
+    observed by the CSM.
+
+    Returns the L1 block height.
+    """
+    info = btcrpc.proxy.getblockchaininfo()
+    h = info["blocks"]
+    logging.info(f"current bitcoin height is {h}")
+    wait_until_l1_observed(seqrpc, h, **kwargs)
+
+
 @dataclass
 class ManualGenBlocksConfig:
     btcrpc: BitcoindClient

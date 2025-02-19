@@ -6,7 +6,7 @@ from strata_utils import deposit_request_transaction, drain_wallet
 
 from envs import testenv
 from envs.testenv import BasicEnvConfig
-from utils import get_bridge_pubkey, wait_until
+from utils import *
 
 
 @flexitest.register
@@ -26,12 +26,18 @@ class BridgeDepositHappyTest(testenv.StrataTester):
         ctx.set_env(BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
+        btcrpc = ctx.get_service("bitcoin").create_rpc()
+        seqrpc = ctx.get_service("sequencer").create_rpc()
+
         el_address_1 = ctx.env.gen_el_address()
         el_address_2 = ctx.env.gen_el_address()
 
         addr_1 = ctx.env.gen_ext_btc_address()
         addr_2 = ctx.env.gen_ext_btc_address()
         addr_3 = ctx.env.gen_ext_btc_address()
+
+        wait_for_genesis(seqrpc, timeout=20)
+        wait_until_cur_l1_tip_observed(btcrpc, seqrpc, timeout=20)
 
         # 1st deposit
         self.test_deposit(ctx, addr_1, el_address_1)
@@ -66,21 +72,27 @@ class BridgeDepositHappyTest(testenv.StrataTester):
                 el_address, musig_bridge_pk, btc_url, btc_user, btc_password
             )
         ).hex()
-        self.debug(f"Deposit request tx: {tx}")
+        logging.info(f"Deposit request tx: {tx}")
 
         # Send the transaction to the Bitcoin network
         txid = btcrpc.proxy.sendrawtransaction(tx)
-        self.debug(f"sent deposit request with txid = {txid} for address {el_address}")
+        logging.info(f"sent deposit request with txid {txid} for address {el_address}")
         # this transaction is not in the bitcoind wallet, so we cannot use gettransaction
         time.sleep(1)
 
+        wait_until_cur_l1_tip_observed(btcrpc, seq.create_rpc(), timeout=20)
+
         # time to mature DRT
-        btcrpc.proxy.generatetoaddress(6, seq_addr)
+        btcrpc.proxy.generatetoaddress(10, seq_addr)
         time.sleep(3)
 
+        wait_until_cur_l1_tip_observed(btcrpc, seq.create_rpc(), timeout=20)
+
         # time to mature DT
-        btcrpc.proxy.generatetoaddress(6, seq_addr)
+        btcrpc.proxy.generatetoaddress(10, seq_addr)
         time.sleep(3)
+
+        wait_until_cur_l1_tip_observed(btcrpc, seq.create_rpc(), timeout=20)
 
     def drain_wallet(self, ctx: flexitest.RunContext):
         """
@@ -110,6 +122,8 @@ class BridgeDepositHappyTest(testenv.StrataTester):
         Test depositing funds into the bridge and verifying the corresponding increase in balance
         on the Strata side.
         """
+        logging.info(f"trying deposit from {address} to {el_address}")
+
         rollup_deposit_amount = ctx.env.rollup_cfg().deposit_amount
 
         btc = ctx.get_service("bitcoin")
@@ -156,7 +170,7 @@ class BridgeDepositHappyTest(testenv.StrataTester):
 
         n_deposits_post = len(seqrpc.strata_getCurrentDeposits())
         self.debug(f"Current deposits: {n_deposits_post}")
-        assert n_deposits_post == n_deposits_pre + 1, "deposit was not registered"
+        assert n_deposits_post == n_deposits_pre + 1, f"deposit was not registered (pre {n_deposits_pre}, post {n_deposits_post})"
 
         # wait for new block to be generated on rollup
         block_number = int(rethrpc.eth_blockNumber(), 16)

@@ -2,9 +2,7 @@ import flexitest
 from web3 import Web3
 
 from envs import testenv
-from utils import (
-    wait_until,
-)
+from utils import *
 
 
 def send_tx(web3: Web3):
@@ -46,7 +44,10 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
         reth = ctx.get_service("reth")
         web3: Web3 = reth.create_web3()
 
+        seqrpc = seq.create_rpc()
         rethrpc = reth.create_rpc()
+
+        wait_for_genesis(seqrpc, timeout=20)
 
         # workaround for issue restarting reth with no transactions
         for _ in range(3):
