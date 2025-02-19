@@ -657,7 +657,10 @@ pub fn filter_verified_checkpoints(
 mod tests {
     use bitcoin::params::MAINNET;
     use strata_db::traits::L1Database;
-    use strata_primitives::{block_credential, l1::L1BlockRecord};
+    use strata_primitives::{
+        block_credential,
+        l1::{L1BlockManifest, L1HeaderRecord},
+    };
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{l1::L1BlockId, operation};
     use strata_test_utils::{
@@ -762,10 +765,10 @@ mod tests {
         let l1_blocks = l1_chain
             .iter()
             .enumerate()
-            .map(|(i, block)| L1BlockCommitment::new(horizon + i as u64, block.block_hash()))
+            .map(|(i, block)| L1BlockCommitment::new(horizon + i as u64, *block.blkid()))
             .collect::<Vec<_>>();
 
-        let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| b.block_hash()).collect();
+        let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| *b.blkid()).collect();
 
         let test_cases = [
             // These are kinda weird out because we got rid of pre-genesis
@@ -783,7 +786,7 @@ mod tests {
                         assert!(!state.is_chain_active());
                         /*assert_eq!(
                             state.most_recent_l1_block(),
-                            Some(&l1_chain[0].block_hash())
+                            Some(&l1_chain[0].blkid())
                         );*/
                         //assert_eq!(state.next_exp_l1_block(), horizon + 1);
                     }
@@ -801,7 +804,7 @@ mod tests {
                         assert!(!state.is_chain_active());
                         /*assert_eq!(
                             state.most_recent_l1_block(),
-                            Some(&l1_chain[1].block_hash())
+                            Some(&l1_chain[1].blkid())
                         );*/
                         // Because values for horizon is 40318, genesis is 40320
                         assert_eq!(state.next_exp_l1_block(), genesis);
@@ -833,7 +836,7 @@ mod tests {
                         assert!(state.is_chain_active());
                         assert_eq!(
                             state.most_recent_l1_block(),
-                            Some(&l1_chain[(genesis + 1 - horizon) as usize].block_hash(),)
+                            Some(l1_chain[(genesis + 1 - horizon) as usize].blkid(),)
                         );
                         assert_eq!(state.next_exp_l1_block(), genesis + 2);
                     }
@@ -852,7 +855,7 @@ mod tests {
                         assert!(state.is_chain_active());
                         assert_eq!(
                             state.most_recent_l1_block(),
-                            Some(&l1_chain[(genesis + 2 - horizon) as usize].block_hash())
+                            Some(l1_chain[(genesis + 2 - horizon) as usize].blkid())
                         );
                         assert_eq!(state.next_exp_l1_block(), genesis + 3);
                     }
