@@ -44,8 +44,13 @@ fn compute_evm_fc_state_from_chainstate(
     let l2man = storage.l2();
     let latest_block_hash = get_evm_block_hash_by_id(chs.chain_tip_blkid(), l2man)?
         .expect("evmexec: missing expected block");
-    let finalized_block_hash = get_evm_block_hash_by_id(chs.finalized_epoch().last_blkid(), l2man)?
-        .expect("evmexec: missing expected block");
+    let finalized_block_hash = if chs.finalized_epoch().is_null() {
+        // no finalized epoch present yet
+        B256::ZERO
+    } else {
+        get_evm_block_hash_by_id(chs.finalized_epoch().last_blkid(), l2man)?
+            .expect("evmexec: missing expected block")
+    };
     Ok(ForkchoiceState {
         head_block_hash: latest_block_hash,
         safe_block_hash: latest_block_hash,
