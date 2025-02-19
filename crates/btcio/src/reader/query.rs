@@ -345,7 +345,6 @@ async fn process_block<R: ReaderRpc>(
     block: Block,
 ) -> anyhow::Result<(Vec<L1Event>, BlockHash)> {
     let txs = block.txdata.len();
-    let params = ctx.params.clone();
 
     // Index all the stuff in the block.
     let entries: Vec<RelevantTxEntry> =
@@ -362,9 +361,9 @@ async fn process_block<R: ReaderRpc>(
     status_updates.push(L1StatusUpdate::CurHeight(height));
     status_updates.push(L1StatusUpdate::CurTip(l1blkid.to_string()));
 
-    let threshold = params.rollup().l1_reorg_safe_depth;
-    let genesis_ht = params.rollup().genesis_l1_height;
-    let genesis_threshold = genesis_ht + threshold as u64;
+    // let threshold = params.rollup().l1_reorg_safe_depth;
+    // let genesis_ht = params.rollup().genesis_l1_height;
+    // let genesis_threshold = genesis_ht + threshold as u64;
 
     //trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
 

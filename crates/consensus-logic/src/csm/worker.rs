@@ -4,10 +4,6 @@
 
 use std::{sync::Arc, thread};
 
-use strata_db::{
-    traits::*,
-    types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus},
-};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{

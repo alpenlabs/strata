@@ -74,7 +74,7 @@ fn duty_tracker_task_inner(
         }
 
         // Wait for a new update.
-        if let Err(_) = status_rx.changed() {
+        if status_rx.changed().is_err() {
             break;
         }
 

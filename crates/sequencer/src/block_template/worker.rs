@@ -189,7 +189,7 @@ fn generate_block_template_inner(
     params: &Params,
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
-    status_channel: &StatusChannel,
+    _status_channel: &StatusChannel,
 ) -> Result<FullBlockTemplate, Error> {
     // get parent block
     let parent_blkid = config.parent_block_id();

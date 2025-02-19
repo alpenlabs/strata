@@ -3,8 +3,6 @@
 //! implement the consensus logic.
 // TODO move this to another crate that contains our sync logic
 
-use std::collections::*;
-
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -452,14 +450,13 @@ impl ClientStateMut {
     /// If the new height is below the buried height or it's somehow otherwise
     /// unable to perform the rollback.
     pub fn rollback_l1_blocks(&mut self, new_block: L1BlockCommitment) {
-        let height = new_block.height();
-
         let deepest_block = self
             .state
             .get_deepest_l1_block()
             .expect("clientstate: rolling back without blocks");
 
-        let cur_tip_block = self
+        // TODO: should this be removed ?
+        let _cur_tip_block = self
             .state
             .get_tip_l1_block()
             .expect("clientstate: rolling back without blocks");
@@ -554,7 +551,7 @@ impl ClientStateMut {
     /// Updates the buried L1 block.
     // TODO remove this function
     #[deprecated]
-    pub fn update_buried(&mut self, new_idx: u64) {
+    pub fn update_buried(&mut self, _new_idx: u64) {
         debug!("call to update_buried, we don't do anything here anymore");
 
         /*let l1v = self.state.l1_view_mut();

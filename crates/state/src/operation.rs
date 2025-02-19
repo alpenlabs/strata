@@ -6,9 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::epoch::EpochCommitment;
 
-use crate::{
-    batch::L1CommittedCheckpoint, client_state::ClientState, id::L2BlockId, l1::L1BlockId,
-};
+use crate::{client_state::ClientState, l1::L1BlockId};
 
 /// Output of a consensus state transition.  Both the consensus state writes and
 /// sync actions.

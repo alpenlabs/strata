@@ -49,10 +49,7 @@ async fn handle_blockdata<R: ReaderRpc>(
     epoch: u64,
 ) -> anyhow::Result<Vec<SyncEvent>> {
     let ReaderContext {
-        seq_pubkey,
-        params,
-        l1_manager,
-        ..
+        params, l1_manager, ..
     } = ctx;
 
     let height = blockdata.block_num();

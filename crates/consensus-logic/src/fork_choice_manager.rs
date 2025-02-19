@@ -162,7 +162,7 @@ pub fn init_forkchoice_manager(
     // TODO: get finalized block id without depending on client state
     // or ensure client state and chain state are in-sync during startup
     let sync_state = init_csm_state.sync().expect("csm state should be init");
-    let chain_tip_height = storage.chainstate().get_last_write_idx_blocking()?;
+    // let chain_tip_height = storage.chainstate().get_last_write_idx_blocking()?;
 
     // XXX right now we have to do some special casing for if we don't have an
     // initial checkpoint for the genesis epoch
@@ -463,7 +463,7 @@ fn handle_new_block(
     // First, decide if the block seems correctly signed and we haven't
     // already marked it as invalid.
     let chstate = fcm_state.cur_chainstate.as_ref();
-    let correctly_signed = check_new_block(&blkid, &bundle, chstate, fcm_state)?;
+    let correctly_signed = check_new_block(blkid, bundle, chstate, fcm_state)?;
     if !correctly_signed {
         // It's invalid, write that and return.
         return Ok(false);
@@ -475,7 +475,7 @@ fn handle_new_block(
     // actually have a well-formed accessory and it gets mad at us.
     if slot > 0 {
         let exec_hash = bundle.header().exec_payload_hash();
-        let eng_payload = ExecPayloadData::from_l2_block_bundle(&bundle);
+        let eng_payload = ExecPayloadData::from_l2_block_bundle(bundle);
         debug!(?blkid, ?exec_hash, "submitting execution payload");
         let res = engine.submit_payload(eng_payload)?;
 
@@ -492,7 +492,7 @@ fn handle_new_block(
     // should switch to it as a potential head.  This returns if we
     // created a new tip instead of advancing an existing tip.
     let cur_tip = *fcm_state.cur_best_block.blkid();
-    let new_tip = fcm_state.attach_block(&blkid, &bundle)?;
+    let new_tip = fcm_state.attach_block(blkid, bundle)?;
     if new_tip {
         debug!(?blkid, "created new branching tip");
     }

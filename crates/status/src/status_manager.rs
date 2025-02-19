@@ -153,7 +153,7 @@ impl StatusChannel {
             .chs
             .borrow()
             .as_ref()
-            .map(|chs| chs.new_status().clone())
+            .map(|chs| chs.new_status())
     }
 
     // Subscription functions.

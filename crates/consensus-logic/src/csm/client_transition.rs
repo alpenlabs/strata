@@ -207,7 +207,7 @@ fn handle_block(
     // let's just do this anyways.
     if height == params.rollup().genesis_l1_height {
         // Do genesis here.
-        let istate = process_genesis_trigger_block(&block_mf, params.rollup())?;
+        let istate = process_genesis_trigger_block(block_mf, params.rollup())?;
         state.accept_l1_block_state(block, istate);
         state.activate_chain();
 
@@ -225,7 +225,7 @@ fn handle_block(
             .get_internal_state(height - 1)
             .expect("clientstate: missing expected block state");
 
-        let new_istate = process_l1_block(prev_istate, height, &block_mf, params.rollup())?;
+        let new_istate = process_l1_block(prev_istate, height, block_mf, params.rollup())?;
         state.accept_l1_block_state(block, new_istate);
 
         // TODO make max states configurable
@@ -361,7 +361,7 @@ fn process_l1_block(
                     // if the proof is invalid.
                     // TODO update this proof checking to use simplified
                     // interface, see comment in checkpoint_verification
-                    if !verify_checkpoint(ckpt, checkpoint.as_ref(), params).is_ok() {
+                    if verify_checkpoint(ckpt, checkpoint.as_ref(), params).is_err() {
                         // If it's invalid then just print a warning and move on.
                         warn!(%height, "ignoring invalid checkpoint in L1 block");
                         continue;
@@ -489,7 +489,7 @@ fn handle_mature_l1_height(
 
             Err(e) => {
                 error!(%blkid, err = %e, "error while checking for block present");
-                return Err(e.into());
+                return Err(e);
             }
         }
     } else {

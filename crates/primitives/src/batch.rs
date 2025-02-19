@@ -482,7 +482,7 @@ pub fn verify_signed_checkpoint_sig(
     let checkpoint_sighash = signed_checkpoint.checkpoint().hash();
 
     verify_schnorr_sig(
-        &signed_checkpoint.signature(),
+        signed_checkpoint.signature(),
         &checkpoint_sighash,
         &seq_pubkey,
     )

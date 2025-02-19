@@ -8,9 +8,7 @@ use strata_consensus_logic::{
     sync_manager::SyncManager,
 };
 use strata_primitives::epoch::EpochCommitment;
-use strata_state::{
-    block::L2BlockBundle, client_state::ClientState, header::L2Header, id::L2BlockId,
-};
+use strata_state::{block::L2BlockBundle, client_state::ClientState, header::L2Header};
 use strata_storage::L2BlockManager;
 use tracing::*;
 

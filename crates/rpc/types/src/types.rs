@@ -409,7 +409,7 @@ impl RpcDepositEntry {
     pub fn from_deposit_entry(ent: &DepositEntry) -> Self {
         Self {
             deposit_idx: ent.idx(),
-            output: ent.output().clone(),
+            output: *ent.output(),
             notary_operators: ent.notary_operators().to_vec(),
             amt: ent.amt(),
             state: ent.deposit_state().clone(),

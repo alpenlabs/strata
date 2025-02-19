@@ -230,7 +230,7 @@ impl<T> StateQueue<T> {
     /// elements than there are in the queue.  Returns if successful or not.
     pub fn drop_n(&mut self, n: u64) -> bool {
         let nn = n as usize;
-        if nn as usize > self.entries.len() {
+        if nn > self.entries.len() {
             return false;
         }
 

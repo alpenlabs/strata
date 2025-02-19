@@ -9,7 +9,7 @@ use strata_eectl::{
 };
 use strata_primitives::{
     buf::Buf32,
-    l1::{L1BlockManifest, L1HeaderRecord, ProtocolOperation},
+    l1::{L1BlockManifest, ProtocolOperation},
     params::{Params, RollupParams},
 };
 use strata_state::{
@@ -22,11 +22,6 @@ use strata_state::{
 };
 use strata_storage::{L1BlockManager, NodeStorage};
 use tracing::*;
-
-/// Max number of L1 block entries to include per L2Block.
-/// This is relevant when sequencer starts at L1 height >> genesis height
-/// to prevent L2Block from becoming very large in size.
-const MAX_L1_ENTRIES_PER_BLOCK: usize = 100;
 
 /// Build contents for a new L2 block with the provided configuration.
 /// Needs to be signed to be a valid L2Block.
@@ -138,7 +133,7 @@ fn prepare_l1_segment(
 
         for tx in rec.txs() {
             for op in tx.protocol_ops() {
-                let ProtocolOperation::Checkpoint(signed_checkpoint) = op else {
+                let ProtocolOperation::Checkpoint(_signed_checkpoint) = op else {
                     continue;
                 };
 
@@ -169,6 +164,7 @@ fn prepare_l1_segment(
     }
 }
 
+#[allow(unused)]
 fn fetch_manifest(h: u64, l1man: &L1BlockManager) -> Result<L1BlockManifest, Error> {
     try_fetch_manifest(h, l1man)?.ok_or(Error::MissingL1BlockHeight(h))
 }

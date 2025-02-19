@@ -405,10 +405,7 @@ mod tests {
     use std::collections::HashSet;
 
     use strata_db::traits::{BlockStatus, Database, L2BlockDatabase};
-    use strata_primitives::{
-        epoch::EpochCommitment,
-        l2::{L2BlockCommitment, L2BlockId},
-    };
+    use strata_primitives::{epoch::EpochCommitment, l2::L2BlockId};
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::header::L2Header;
     use strata_storage::L2BlockManager;

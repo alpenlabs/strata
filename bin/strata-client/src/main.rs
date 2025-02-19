@@ -18,10 +18,7 @@ use strata_consensus_logic::{
     genesis,
     sync_manager::{self, SyncManager},
 };
-use strata_db::{
-    traits::{BroadcastDatabase, Database},
-    DbError,
-};
+use strata_db::{traits::BroadcastDatabase, DbError};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, ProofPublishMode};
@@ -38,9 +35,7 @@ use strata_sequencer::{
     duty::{tracker::DutyTracker, worker as duty_worker},
 };
 use strata_status::StatusChannel;
-use strata_storage::{
-    create_node_storage, ops::bridge_relay::BridgeMsgOps, L1BlockManager, NodeStorage,
-};
+use strata_storage::{create_node_storage, ops::bridge_relay::BridgeMsgOps, NodeStorage};
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{

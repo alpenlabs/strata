@@ -2,7 +2,7 @@ use strata_db::errors::DbError;
 use strata_primitives::{
     buf::{Buf32, Buf64},
     evm_exec::create_evm_extra_payload,
-    l1::{L1BlockManifest, L1HeaderRecord},
+    l1::L1BlockManifest,
     params::{OperatorConfig, Params},
 };
 use strata_state::{

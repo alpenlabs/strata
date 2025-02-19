@@ -5,7 +5,6 @@ use bitcoin::Block;
 use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
 use strata_primitives::{
     batch::{verify_signed_checkpoint_sig, Checkpoint},
-    block_credential::CredRule,
     l1::{DepositInfo, ProtocolOperation},
     params::RollupParams,
 };

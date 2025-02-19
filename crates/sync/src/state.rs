@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 use strata_consensus_logic::unfinalized_tracker::UnfinalizedBlockTracker;
 use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment};
 use strata_state::{

@@ -2,7 +2,6 @@
 
 use strata_primitives::{params::*, proof::RollupVerifyingKey};
 use strata_state::{batch::*, client_state::L1Checkpoint};
-use thiserror::Error;
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
 use zkaleido_risc0_adapter;
@@ -71,7 +70,7 @@ pub fn verify_checkpoint(
 fn verify_checkpoint_extends(
     checkpoint: &Checkpoint,
     prev: &L1Checkpoint,
-    params: &RollupParams,
+    _params: &RollupParams,
 ) -> Result<(), CheckpointError> {
     let epoch = checkpoint.batch_info().epoch();
     let prev_epoch = prev.batch_info.epoch();

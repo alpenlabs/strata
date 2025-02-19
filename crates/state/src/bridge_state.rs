@@ -311,7 +311,7 @@ impl DepositEntry {
     ) -> Self {
         Self {
             deposit_idx: idx,
-            output: output.clone(),
+            output,
             notary_operators: operators,
             amt,
             state: DepositState::Accepted,

@@ -54,7 +54,6 @@ use strata_state::{
     client_state::ClientState,
     header::L2Header,
     id::L2BlockId,
-    l1::L1BlockId,
     operation::ClientUpdateOutput,
     sync_event::SyncEvent,
 };
@@ -299,7 +298,7 @@ impl StrataApiServer for StrataRpcImpl {
         let tip_blkid = css.tip_blkid();
 
         // check the tip idx
-        let tip_block = self.fetch_l2_block_ok(&tip_blkid).await?;
+        let tip_block = self.fetch_l2_block_ok(tip_blkid).await?;
         let tip_idx = tip_block.header().blockidx();
 
         if idx > tip_idx {

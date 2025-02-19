@@ -55,7 +55,7 @@ pub fn checkpoint_worker(
         }
 
         // Wait for a new update.
-        if let Err(_) = chs_rx.changed() {
+        if chs_rx.changed().is_err() {
             break;
         }
 
