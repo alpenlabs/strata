@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use strata_primitives::buf::Buf32;
 
 use super::{DaTx, DepositUpdateTx, L1BlockId};
-use crate::tx::{DepositInfo, ProtocolOperation};
 /// Header and the wtxs root.
 ///
 /// This is the core data we need to make proof against a L1 block.  We could
