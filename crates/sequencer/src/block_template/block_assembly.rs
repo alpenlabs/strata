@@ -9,7 +9,7 @@ use strata_eectl::{
 };
 use strata_primitives::{
     buf::Buf32,
-    l1::{DepositUpdateTx, L1HeaderPayload, L1HeaderRecord, ProtocolOperation},
+    l1::{L1BlockManifest, L1HeaderRecord, ProtocolOperation},
     params::{Params, RollupParams},
 };
 use strata_state::{
@@ -106,17 +106,17 @@ fn prepare_l1_segment(
     let cur_real_l1_height = l1man
         .get_chain_tip()?
         .expect("blockasm: should have L1 blocks by now");
-    let target_height = cur_real_l1_height - 1; // -1 to give some buffer
+    let target_height = cur_real_l1_height - 1; // -1 to give some buffer for very short reorgs
     trace!(%target_height, "figuring out which blocks to include in L1 segment");
 
     // Check to see if there's actually no blocks in the queue.  In that case we can just give
     // everything we know about.
-    let _maturation_queue_size = prev_chstate.l1_view().maturation_queue().len();
+    let cur_safe_height = prev_chstate.l1_view().safe_height();
     let cur_next_exp_height = prev_chstate.l1_view().next_expected_height();
 
     // If there isn't any new blocks to pull then we just give nothing.
     if target_height <= cur_next_exp_height {
-        return Ok(L1Segment::new_empty());
+        return Ok(L1Segment::new_empty(cur_safe_height));
     }
 
     // This is much simpler than it was before because I'm removing the ability
@@ -129,133 +129,30 @@ fn prepare_l1_segment(
             break;
         }
 
-        let Some(rec) = try_fetch_header_record(height, l1man)? else {
+        let Some(rec) = try_fetch_manifest(height, l1man)? else {
             // If we are missing a record, then something is weird, but it would
             // still be safe to abort.
             warn!(%height, "missing expected L1 block during assembly");
             break;
         };
 
-        let deposits = fetch_deposit_update_txs(height, l1man)?;
-
-        payloads.push(
-            L1HeaderPayload::new(height, rec)
-                .with_deposit_update_txs(deposits)
-                .build(),
-        );
+        payloads.push(rec);
     }
 
     if !payloads.is_empty() {
         debug!(n = %payloads.len(), "have new L1 blocks to provide");
     }
 
-    Ok(L1Segment::new(payloads))
+    let new_height = cur_safe_height + payloads.len() as u64;
+    Ok(L1Segment::new(new_height, payloads))
 }
 
-fn fetch_header_record(h: u64, l1man: &L1BlockManager) -> Result<L1HeaderRecord, Error> {
-    try_fetch_header_record(h, l1man)?.ok_or(Error::MissingL1BlockHeight(h))
+fn fetch_manifest(h: u64, l1man: &L1BlockManager) -> Result<L1BlockManifest, Error> {
+    try_fetch_manifest(h, l1man)?.ok_or(Error::MissingL1BlockHeight(h))
 }
 
-fn try_fetch_header_record(
-    h: u64,
-    l1man: &L1BlockManager,
-) -> Result<Option<L1HeaderRecord>, Error> {
-    let Some(mf) = l1man.get_block_manifest(h)? else {
-        return Ok(None);
-    };
-
-    // TODO need to include tx root proof we can verify
-    Ok(Some(L1HeaderRecord::create_from_serialized_header(
-        mf.header().to_vec(),
-        mf.txs_root(),
-    )))
-}
-
-fn fetch_deposit_update_txs(h: u64, l1man: &L1BlockManager) -> Result<Vec<DepositUpdateTx>, Error> {
-    let relevant_tx_ref = l1man
-        .get_block_txs(h)?
-        .ok_or(Error::MissingL1BlockHeight(h))?;
-
-    let mut deposit_update_txs = Vec::new();
-    for tx_ref in relevant_tx_ref {
-        let tx = l1man.get_tx(tx_ref)?.ok_or(Error::MissingL1Tx)?;
-
-        for op in tx.protocol_ops() {
-            if let ProtocolOperation::Deposit(_dep) = op {
-                deposit_update_txs.push(DepositUpdateTx::new(tx.clone(), tx_ref.position()))
-            }
-        }
-    }
-
-    Ok(deposit_update_txs)
-}
-
-/// Takes two partially-overlapping lists of block indexes and IDs and returns a
-/// ref to the last index and ID they share, if any.
-fn find_pivot_block_height<'c>(
-    a: &'c [(u64, &'c L1BlockId)],
-    b: &'c [(u64, &'c L1BlockId)],
-) -> Option<(u64, &'c L1BlockId)> {
-    if a.is_empty() || b.is_empty() {
-        return None;
-    }
-
-    let a_start = a[0].0 as i64;
-    let b_start = b[0].0 as i64;
-    let a_end = a_start + (a.len() as i64);
-    let b_end = b_start + (b.len() as i64);
-
-    #[cfg(test)]
-    eprintln!("ranges {a_start}..{a_end}, {b_start}..{b_end}");
-
-    // Check if they're actually overlapping.
-    if !(a_start < b_end && b_start < a_end) {
-        return None;
-    }
-
-    // Depending on how the windows overlap at the start we figure out the offsets for how we're
-    // iterating here.
-    let (a_off, b_off) = match b_start - a_start {
-        0 => (0, 0),
-        n if n > 0 => (n, 0),
-        n if n < 0 => (0, -n),
-        _ => unreachable!(),
-    };
-
-    #[cfg(test)]
-    eprintln!("offsets {a_off} {b_off}");
-
-    // Sanity checks.
-    assert!(a_off >= 0);
-    assert!(b_off >= 0);
-
-    let overlap_len = i64::min(a_end, b_end) - i64::max(a_start, b_start);
-
-    #[cfg(test)]
-    eprintln!("overlap {overlap_len}");
-
-    // Now iterate over the overlap range and return if it makes sense.
-    let mut last = None;
-    for i in 0..overlap_len {
-        let (ai, aid) = a[(i + a_off) as usize];
-        let (bi, bid) = b[(i + b_off) as usize];
-
-        #[cfg(test)]
-        {
-            eprintln!("Ai {ai} {aid}");
-            eprintln!("Bi {bi} {bid}");
-        }
-
-        assert_eq!(ai, bi); // Sanity check.
-
-        if aid != bid {
-            break;
-        }
-
-        last = Some((ai, aid));
-    }
-
-    last
+fn try_fetch_manifest(h: u64, l1man: &L1BlockManager) -> Result<Option<L1BlockManifest>, Error> {
+    Ok(l1man.get_block_manifest(h)?)
 }
 
 /// Prepares the execution segment for the block.
@@ -332,7 +229,7 @@ fn poll_status_loop<E: ExecEngineCtl>(
     Ok(None)
 }
 
-// TODO do we want to do this here?
+// TODO when we build the "block executor" logic we should shift this out
 fn compute_post_state(
     prev_chstate: Chainstate,
     header: &impl L2Header,
@@ -343,200 +240,4 @@ fn compute_post_state(
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
     let (post_state, wb) = state_cache.finalize();
     Ok((post_state, wb))
-}
-
-#[cfg(test)]
-mod tests {
-    // TODO to improve these tests, they could use a bit more randomization of lengths and offsets
-
-    use strata_state::l1::L1BlockId;
-    use strata_test_utils::ArbitraryGenerator;
-
-    use super::find_pivot_block_height;
-
-    #[test]
-    fn test_find_pivot_noop() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 12);
-
-        let blkids: [L1BlockId; 10] = ag.generate();
-        eprintln!("{blkids:#?}");
-
-        let blocks = blkids
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let max_height = blocks.last().unwrap().0;
-        let max_id = blocks.last().unwrap().1;
-
-        let (shared_h, shared_id) =
-            find_pivot_block_height(&blocks, &blocks).expect("test: find pivot");
-
-        assert_eq!(shared_h, max_height);
-        assert_eq!(shared_id, max_id);
-    }
-
-    #[test]
-    fn test_find_pivot_noop_offset() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 12);
-
-        let blkids: [L1BlockId; 10] = ag.generate();
-        eprintln!("{blkids:#?}");
-
-        let blocks = blkids
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let max_height = blocks[7].0;
-        let max_id = blocks[7].1;
-
-        let (shared_h, shared_id) =
-            find_pivot_block_height(&blocks[..8], &blocks[2..]).expect("test: find pivot");
-
-        assert_eq!(shared_h, max_height);
-        assert_eq!(shared_id, max_id);
-    }
-
-    #[test]
-    fn test_find_pivot_simple_extend() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 12);
-
-        let blkids1: [L1BlockId; 10] = ag.generate();
-        let mut blkids2 = Vec::from(blkids1);
-        blkids2.push(ag.generate());
-        blkids2.push(ag.generate());
-        eprintln!("{blkids1:#?}");
-
-        let blocks1 = blkids1
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let blocks2 = blkids2
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let max_height = blocks1.last().unwrap().0;
-        let max_id = blocks1.last().unwrap().1;
-
-        let (shared_h, shared_id) =
-            find_pivot_block_height(&blocks1, &blocks2).expect("test: find pivot");
-
-        assert_eq!(shared_h, max_height);
-        assert_eq!(shared_id, max_id);
-    }
-
-    #[test]
-    fn test_find_pivot_typical_reorg() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 16);
-
-        let mut blkids1: Vec<L1BlockId> = Vec::new();
-        for _ in 0..10 {
-            blkids1.push(ag.generate());
-        }
-
-        let mut blkids2 = blkids1.clone();
-        blkids2.pop();
-        blkids2.push(ag.generate());
-        blkids2.push(ag.generate());
-
-        let blocks1 = blkids1
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let blocks2 = blkids2
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let max_height = blocks1[blocks1.len() - 2].0;
-        let max_id = blocks1[blocks1.len() - 2].1;
-
-        // Also using a pretty deep offset here.
-        let (shared_h, shared_id) =
-            find_pivot_block_height(&blocks1, &blocks2[5..]).expect("test: find pivot");
-
-        assert_eq!(shared_h, max_height);
-        assert_eq!(shared_id, max_id);
-    }
-
-    #[test]
-    fn test_find_pivot_cur_shorter_reorg() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 16);
-
-        let mut blkids1: Vec<L1BlockId> = Vec::new();
-        for _ in 0..10 {
-            blkids1.push(ag.generate());
-        }
-
-        let mut blkids2 = blkids1.clone();
-        blkids2.pop();
-        blkids2.pop();
-        blkids2.pop();
-        blkids2.pop();
-        let len = blkids2.len();
-        blkids2.push(ag.generate());
-        blkids2.push(ag.generate());
-
-        let blocks1 = blkids1
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let blocks2 = blkids2
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let max_height = blocks2[len - 1].0;
-        let max_id = blocks2[len - 1].1;
-
-        // Also using a pretty deep offset here.
-        let (shared_h, shared_id) =
-            find_pivot_block_height(&blocks1, &blocks2[5..]).expect("test: find pivot");
-
-        assert_eq!(shared_h, max_height);
-        assert_eq!(shared_id, max_id);
-    }
-
-    #[test]
-    fn test_find_pivot_disjoint() {
-        let mut ag = ArbitraryGenerator::new_with_size(1 << 16);
-
-        let mut blkids1: Vec<L1BlockId> = Vec::new();
-        for _ in 0..10 {
-            blkids1.push(ag.generate());
-        }
-
-        let mut blkids2: Vec<L1BlockId> = Vec::new();
-        for _ in 0..10 {
-            blkids2.push(ag.generate());
-        }
-
-        let blocks1 = blkids1
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let blocks2 = blkids2
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (i as u64 + 8, b))
-            .collect::<Vec<_>>();
-
-        let res = find_pivot_block_height(&blocks1[2..], &blocks2[..3]);
-        assert!(res.is_none());
-    }
 }

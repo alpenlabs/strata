@@ -23,9 +23,6 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
-[dev-dependencies]
-strata-test-utils.workspace = true
-
 [lints]
 rust.rust_2018_idioms = { level = "deny", priority = -1 }
 rust.unreachable_pub = "warn"

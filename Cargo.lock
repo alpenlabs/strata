@@ -13765,7 +13765,6 @@ dependencies = [
  "strata-status",
  "strata-storage",
  "strata-tasks",
- "strata-test-utils",
  "thiserror 2.0.11",
  "tokio",
  "tracing",
