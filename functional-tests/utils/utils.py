@@ -295,6 +295,14 @@ class RollupParamsSettings:
             proof_timeout=DEFAULT_PROOF_TIMEOUT,
         )
 
+    def fast_batch(self):
+        self.proof_timeout = 1
+        return self
+
+    def strict_mode(self):
+        self.proof_timeout = None
+        return self
+
 
 @dataclass
 class ProverClientSettings:
