@@ -17,31 +17,34 @@ use strata_storage::{L2BlockManager, NodeStorage};
 use tokio::runtime::Handle;
 use tracing::*;
 
-use crate::{args::Args, errors::InitError, network};
+use crate::{
+    args::{apply_overrides, Args, EnvArgs},
+    errors::{ConfigError, InitError},
+    network,
+};
 
 pub fn get_config(args: Args) -> Result<Config, InitError> {
-    match args.config.as_ref() {
-        Some(config_path) => {
-            // Values passed over arguments get the precedence over the configuration files
-            let mut config = load_configuration(config_path)?;
-            args.update_config(&mut config);
-            Ok(config)
-        }
-        None => match args.derive_config() {
-            Err(msg) => {
-                eprintln!("Error: {}", msg);
-                std::process::exit(1);
-            }
-            Ok(cfg) => Ok(cfg),
-        },
-    }
+    // First load from config file.
+    let mut config_toml = load_configuration(args.config.as_ref())?;
+    let mut overrides = Vec::new();
+
+    // Override from env
+    let env_args = EnvArgs::from_env();
+    overrides.extend_from_slice(&env_args.get_overrides());
+
+    overrides.extend_from_slice(&args.get_overrides());
+
+    Ok(apply_overrides(
+        overrides,
+        config_toml
+            .as_table_mut()
+            .ok_or(ConfigError::ConfigNotTomlTable)?,
+    )?)
 }
 
-fn load_configuration(path: &Path) -> Result<Config, InitError> {
+fn load_configuration(path: &Path) -> Result<toml::Value, InitError> {
     let config_str = fs::read_to_string(path)?;
-    let conf =
-        toml::from_str::<Config>(&config_str).map_err(|err| SerdeError::new(config_str, err))?;
-    Ok(conf)
+    Ok(toml::from_str(&config_str).map_err(|_| ConfigError::ConfigNotParseable)?)
 }
 
 pub fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
@@ -97,18 +100,18 @@ fn load_rollup_params(path: &Path) -> Result<RollupParams, InitError> {
 // TODO: remove this after builder is done
 pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinClient>> {
     // Set up Bitcoin client RPC.
-    let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
+    let bitcoind_url = format!("http://{}", config.bitcoind.rpc_url);
     let btc_rpc = BitcoinClient::new(
         bitcoind_url,
-        config.bitcoind_rpc.rpc_user.clone(),
-        config.bitcoind_rpc.rpc_password.clone(),
-        config.bitcoind_rpc.retry_count,
-        config.bitcoind_rpc.retry_interval,
+        config.bitcoind.rpc_user.clone(),
+        config.bitcoind.rpc_password.clone(),
+        config.bitcoind.retry_count,
+        config.bitcoind.retry_interval,
     )
     .map_err(anyhow::Error::from)?;
 
     // TODO remove this
-    if config.bitcoind_rpc.network != Network::Regtest {
+    if config.bitcoind.network != Network::Regtest {
         warn!("network not set to regtest, ignoring");
     }
     Ok(btc_rpc.into())

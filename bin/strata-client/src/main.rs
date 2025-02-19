@@ -1,7 +1,10 @@
+#![feature(slice_pattern)]
 use std::{sync::Arc, time::Duration};
 
+use anyhow::anyhow;
 use bitcoin::{hashes::Hash, BlockHash};
 use el_sync::sync_chainstate_to_el;
+use errors::InitError;
 use jsonrpsee::Methods;
 use parking_lot::lock_api::RwLock;
 use rpc_client::sync_client;
@@ -13,7 +16,7 @@ use strata_btcio::{
     writer::start_envelope_task,
 };
 use strata_common::logging;
-use strata_config::{ClientMode, Config};
+use strata_config::Config;
 use strata_consensus_logic::{
     genesis,
     sync_manager::{self, SyncManager},
@@ -137,9 +140,9 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     let mut methods = jsonrpsee::Methods::new();
 
-    match &config.client.client_mode {
+    match &args.sequencer {
         // If we're a sequencer, start the sequencer db and duties task.
-        ClientMode::Sequencer(_) => {
+        true => {
             let broadcast_database = init_broadcaster_database(rbdb.clone(), ops_config);
             let broadcast_handle = start_broadcaster_tasks(
                 broadcast_database,
@@ -163,11 +166,15 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
             )?;
         }
 
-        ClientMode::FullNode(fullnode_config) => {
-            let sequencer_rpc = &fullnode_config.sequencer_rpc;
-            info!(?sequencer_rpc, "initing fullnode task");
+        false => {
+            let sync_endpoint = &config
+                .client
+                .sync_endpoint
+                .clone()
+                .ok_or(InitError::Anyhow(anyhow!("Missing sync_endpoint")))?;
+            info!(?sync_endpoint, "initing fullnode task");
 
-            let rpc_client = sync_client(sequencer_rpc);
+            let rpc_client = sync_client(sync_endpoint);
             let sync_peer = RpcSyncPeer::new(rpc_client, 10);
             let l2_sync_context = L2SyncContext::new(
                 sync_peer,
