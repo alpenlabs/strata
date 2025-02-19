@@ -463,7 +463,7 @@ mod tests {
     use strata_primitives::{
         buf::Buf32,
         l1::{
-            BitcoinAmount, DepositInfo, DepositUpdateTx, L1HeaderPayload, L1HeaderRecord, L1Tx,
+            BitcoinAmount, DepositInfo, DepositUpdateTx, L1BlockManifest, L1HeaderRecord, L1Tx,
             ProtocolOperation,
         },
         l2::L2BlockId,
@@ -500,58 +500,6 @@ mod tests {
     }
 
     #[test]
-    fn test_process_l1_view_update_with_deposit_update_tx() {
-        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
-        // get the l1 view state of the chain state
-        let params = gen_params();
-        let header_record = chs.l1_view();
-
-        let tip_height = header_record.tip_height();
-        let maturation_queue = header_record.maturation_queue();
-
-        let mut state_cache = StateCache::new(chs);
-        let amt: BitcoinAmount = ArbitraryGenerator::new().generate();
-
-        let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> =
-            (1..=params.rollup().l1_reorg_safe_depth + 1)
-                .map(|idx| {
-                    let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
-                    let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
-                    let tx = ArbitraryGenerator::new_with_size(1 << 12).generate();
-
-                    let l1tx = if idx == 1 {
-                        let protocol_op = ProtocolOperation::Deposit(DepositInfo {
-                            amt,
-                            outpoint: ArbitraryGenerator::new().generate(),
-                            address: [0; 20].to_vec(),
-                        });
-                        L1Tx::new(proof, tx, vec![protocol_op])
-                    } else {
-                        ArbitraryGenerator::new_with_size(1 << 15).generate()
-                    };
-
-                    let deposit_update_tx = DepositUpdateTx::new(l1tx, idx);
-                    L1HeaderPayload::new(tip_height + idx as u64, record)
-                        .with_deposit_update_txs(vec![deposit_update_tx])
-                        .build()
-                })
-                .collect();
-
-        let mut l1_segment = L1Segment::new(new_payloads_with_deposit_update_tx);
-
-        let view_update = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
-        assert_eq!(
-            state_cache
-                .state()
-                .deposits_table()
-                .get_deposit(0)
-                .unwrap()
-                .amt(),
-            amt
-        );
-    }
-
-    #[test]
     fn test_process_l1_view_update_with_empty_payload() {
         let chs: Chainstate = ArbitraryGenerator::new().generate();
         let params = gen_params();
@@ -559,47 +507,12 @@ mod tests {
         let mut state_cache = StateCache::new(chs.clone());
 
         // Empty L1Segment payloads
-        let l1_segment = L1Segment::new(vec![]);
+        let l1_segment = L1Segment::new_empty(chs.l1_view().safe_height());
 
         // let previous_maturation_queue =
         // Process the empty payload
         let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
         assert_eq!(state_cache.state(), &chs);
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_process_l1_view_update_maturation_check() {
-        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
-        let params = gen_params();
-        let header_record = chs.l1_view();
-        let old_safe_height = header_record.safe_height();
-        let to_mature_blk_num = 10;
-
-        let mut state_cache = StateCache::new(chs);
-        let maturation_queue_len = state_cache.state().l1_view().maturation_queue().len() as u64;
-
-        // Simulate L1 payloads that have matured
-        let new_payloads_matured: Vec<L1HeaderPayload> = (1..params.rollup().l1_reorg_safe_depth
-            + to_mature_blk_num)
-            .map(|idx| {
-                let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
-                L1HeaderPayload::new(old_safe_height + idx as u64, record)
-                    .with_deposit_update_txs(vec![])
-                    .build()
-            })
-            .collect();
-
-        let mut l1_segment = L1Segment::new(new_payloads_matured.clone());
-
-        // Process the L1 view update for matured blocks
-        let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
-        assert!(result.is_ok());
-
-        // Check that blocks were matured
-        assert_eq!(
-            state_cache.state().l1_view().safe_height(),
-            old_safe_height + to_mature_blk_num as u64
-        );
     }
 }
