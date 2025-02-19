@@ -41,6 +41,5 @@ pub enum ProofVm {
     ELProving,
     CLProving,
     CLAggregation,
-    L1Batch,
     Checkpoint,
 }

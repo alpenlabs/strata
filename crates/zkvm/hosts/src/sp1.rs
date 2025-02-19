@@ -8,9 +8,6 @@ use crate::ProofVm;
 pub static BTC_BLOCKSPACE_HOST: LazyLock<SP1Host> =
     std::sync::LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_BTC_BLOCKSPACE_PK));
 
-pub static L1_BATCH_HOST: LazyLock<SP1Host> =
-    std::sync::LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_L1_BATCH_PK));
-
 pub static EVM_EE_STF_HOST: LazyLock<SP1Host> =
     std::sync::LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_EVM_EE_STF_PK));
 
@@ -26,7 +23,6 @@ pub static CHECKPOINT_HOST: LazyLock<SP1Host> =
 pub fn get_host(vm: ProofVm) -> &'static SP1Host {
     match vm {
         ProofVm::BtcProving => &BTC_BLOCKSPACE_HOST,
-        ProofVm::L1Batch => &L1_BATCH_HOST,
         ProofVm::ELProving => &EVM_EE_STF_HOST,
         ProofVm::CLProving => &CL_STF_HOST,
         ProofVm::CLAggregation => &CL_AGG_HOST,
