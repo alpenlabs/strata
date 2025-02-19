@@ -61,12 +61,7 @@ pub fn prepare_block(
 
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = prepare_l1_segment(
-        &prev_chstate,
-        l1man.as_ref(),
-        MAX_L1_ENTRIES_PER_BLOCK,
-        params.rollup(),
-    )?;
+    let l1_seg = prepare_l1_segment(&prev_chstate, l1man.as_ref(), params.rollup())?;
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
@@ -99,14 +94,13 @@ pub fn prepare_block(
 fn prepare_l1_segment(
     prev_chstate: &Chainstate,
     l1man: &L1BlockManager,
-    max_l1_entries: usize,
-    _params: &RollupParams,
+    params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     // We aren't going to reorg, so we'll include blocks right up to the tip.
     let cur_real_l1_height = l1man
         .get_chain_tip()?
         .expect("blockasm: should have L1 blocks by now");
-    let target_height = cur_real_l1_height - 1; // -1 to give some buffer for very short reorgs
+    let target_height = cur_real_l1_height.saturating_sub(params.l1_reorg_safe_depth as u64); // -1 to give some buffer for very short reorgs
     trace!(%target_height, "figuring out which blocks to include in L1 segment");
 
     // Check to see if there's actually no blocks in the queue.  In that case we can just give
@@ -123,12 +117,18 @@ fn prepare_l1_segment(
     // to handle reorgs properly.  This is fine, we'll readd it later when we
     // make the L1 scan proof stuff more sophisticated.
     let mut payloads = Vec::new();
-    for height in cur_next_exp_height..=target_height {
-        // If we've reached the max we want then move on.
-        if payloads.len() >= max_l1_entries {
-            break;
+    let mut is_epoch_final_block = {
+        if prev_chstate.cur_epoch() == 0 {
+            // no previous epoch, end epoch and send commitment immediately
+            true
+        } else {
+            // check for previous epoch's checkpoint in referenced l1 blocks
+            // end epoch once previous checkpoint is seen
+            false
         }
+    };
 
+    for height in cur_next_exp_height..=target_height {
         let Some(rec) = try_fetch_manifest(height, l1man)? else {
             // If we are missing a record, then something is weird, but it would
             // still be safe to abort.
@@ -136,15 +136,37 @@ fn prepare_l1_segment(
             break;
         };
 
+        for tx in rec.txs() {
+            for op in tx.protocol_ops() {
+                let ProtocolOperation::Checkpoint(signed_checkpoint) = op else {
+                    continue;
+                };
+
+                // TODO: check signed_checkpoint is the checkpoint we want
+                // FIXME: we really need to do this
+                is_epoch_final_block = true;
+            }
+        }
+
         payloads.push(rec);
+
+        if is_epoch_final_block {
+            // if epoch = 0, include first seen l1 block and create checkpoint
+            // if epoch > 0, include till first seen block with correct checkpoint
+            break;
+        }
     }
 
     if !payloads.is_empty() {
         debug!(n = %payloads.len(), "have new L1 blocks to provide");
     }
 
-    let new_height = cur_safe_height + payloads.len() as u64;
-    Ok(L1Segment::new(new_height, payloads))
+    if is_epoch_final_block {
+        let new_height = cur_safe_height + payloads.len() as u64;
+        Ok(L1Segment::new(new_height, payloads))
+    } else {
+        Ok(L1Segment::new(cur_safe_height, Vec::new()))
+    }
 }
 
 fn fetch_manifest(h: u64, l1man: &L1BlockManager) -> Result<L1BlockManifest, Error> {
