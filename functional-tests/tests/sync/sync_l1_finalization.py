@@ -63,6 +63,12 @@ class BlockFinalizationTest(testenv.StrataTester):
         cstatdump = json.dumps(cstat, indent=2)
         logging.info(f"client status: {cstatdump}")
 
+        ss = seqrpc.strata_syncStatus()
+        ssdump = json.dumps(ss, indent=2)
+        logging.info(f"sync status: {ssdump}")
+
+        wait_until_epoch_observed_final(seqrpc, num_epochs, timeout=30, step=2)
+
         # Proof for checkpoint 0 is already sent above
         # FIXME do we still need this if we have the other checks?
         check_already_sent_proof(seqrpc, 0)

@@ -169,7 +169,7 @@ def wait_until_next_chain_epoch(rpc, **kwargs) -> int:
     return wait_until_with_value(_query, _check, **kwargs)
 
 
-def wait_until_epoch_confirmed(rpc, epoch: int, **kwargs) -> int:
+def wait_until_epoch_confirmed(rpc, epoch: int, **kwargs):
     """
     Waits until at least the given epoch is confirmed on L1, according to
     calling `strata_clientStatus`.
@@ -187,7 +187,7 @@ def wait_until_epoch_confirmed(rpc, epoch: int, **kwargs) -> int:
     wait_until(_check, **kwargs)
 
 
-def wait_until_epoch_finalized(rpc, epoch: int, **kwargs) -> int:
+def wait_until_epoch_finalized(rpc, epoch: int, **kwargs):
     """
     Waits until at least the given epoch is finalized on L1, according to
     calling `strata_clientStatus`.
@@ -198,9 +198,25 @@ def wait_until_epoch_finalized(rpc, epoch: int, **kwargs) -> int:
         l1_height = cs["tip_l1_block"]["height"]
         fin_epoch = cs["finalized_epoch"]
         logging.info(f"finalized epoch as of {l1_height}: {fin_epoch}")
-        if fin_epoch is None:
-            return False
+        if fin_epoch is None: return False
         return fin_epoch["epoch"] >= epoch
+
+    wait_until(_check, **kwargs)
+
+
+def wait_until_epoch_observed_final(rpc, epoch: int, **kwargs):
+    """
+    Waits until at least the given epoch is observed as final on L2, according
+    to calling `strata_syncStatus`.
+    """
+
+    def _check():
+        ss = rpc.strata_syncStatus()
+        slot = ss["tip_height"] # TODO rename to tip_slot
+        of_epoch = ss["observed_finalized_epoch"]
+        logging.info(f"observed final epoch as of L2 slot {slot}: {of_epoch}")
+        if not of_epoch: return False
+        return of_epoch["epoch"] >= epoch
 
     wait_until(_check, **kwargs)
 

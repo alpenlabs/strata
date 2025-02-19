@@ -201,6 +201,7 @@ fn process_l1_checkpoint(
     // TODO go through and do whatever stuff we need to do now that's finalized
 
     state.set_finalized_epoch(new_fin_epoch);
+    debug!(?new_fin_epoch, "observed finalized checkpoint");
 
     Ok(())
 }
