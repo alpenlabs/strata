@@ -32,11 +32,8 @@ class L1StatusTest(testenv.StrataTester):
             error_with="Sequencer did not catch up",
         )
 
-        print(received_block)
-        print(l1stat)
-
         # Time is in millis
-        cur_time = l1stat["last_update"] // 1000
+        cur_time = l1stat["last_update"]
 
         # check if height on bitcoin is same as, it is seen in sequencer
         self.debug(f"L1 stat curr height: {l1stat['cur_height']}")
@@ -61,7 +58,7 @@ class L1StatusTest(testenv.StrataTester):
             error_with="Sequencer did not catch up",
         )
 
-        elapsed_time = next_l1stat["last_update"] // 1000
+        elapsed_time = next_l1stat["last_update"]
 
         # check if L1 reader is seeing new L1 activity
         assert next_l1stat["cur_tip_blkid"] == received_block["block_hash"], (
