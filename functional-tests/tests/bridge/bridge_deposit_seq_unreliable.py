@@ -4,6 +4,7 @@ from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
 from mixins import bridge_mixin
 from utils import (
+    RollupParamsSettings,
     check_initial_eth_balance,
     check_sequencer_down,
     get_bridge_pubkey,
@@ -22,7 +23,11 @@ class BridgeDepositSequencerUnreliableTest(bridge_mixin.BridgeMixin):
     """
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(testenv.BasicEnvConfig(101))
+        ctx.set_env(
+            testenv.BasicEnvConfig(
+                101, rollup_settings=RollupParamsSettings.new_default().fast_batch()
+            )
+        )
 
     def main(self, ctx: flexitest.RunContext):
         address = ctx.env.gen_ext_btc_address()
