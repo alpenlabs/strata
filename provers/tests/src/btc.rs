@@ -25,7 +25,7 @@ impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
         let params = gen_params();
         let rollup_params = params.rollup();
         let input = BlockScanProofInput {
-            block: block.clone(),
+            btc_blocks: block.clone(),
             rollup_params: rollup_params.clone(),
         };
         Ok(input)

@@ -6,14 +6,14 @@ use zkaleido::{
 
 use crate::{
     block::witness_commitment_from_coinbase,
-    logic::{BlockScanProofInput, BlockScanResult},
+    logic::{BlockScanProofInput, BlockscanProofOutput},
 };
 
 pub struct BtcBlockspaceProver;
 
 impl ZkVmProver for BtcBlockspaceProver {
     type Input = BlockScanProofInput;
-    type Output = BlockScanResult;
+    type Output = BlockscanProofOutput;
 
     fn name() -> String {
         "Bitcoin Blockspace".to_string()
@@ -28,19 +28,22 @@ impl ZkVmProver for BtcBlockspaceProver {
     where
         B: ZkVmInputBuilder<'a>,
     {
-        let block = &input.block;
+        let mut zkvm_input = B::new();
 
-        let inclusion_proof = witness_commitment_from_coinbase(&block.txdata[0])
-            .map(|_| L1TxProof::generate(&block.txdata, 0));
+        zkvm_input.write_serde(&input.btc_blocks.len())?;
+        zkvm_input.write_borsh(&input.tx_filters)?;
 
-        let serialized_block = serialize(&input.block);
-        let zkvm_input = B::new()
-            .write_buf(&serialized_block)?
-            .write_borsh(&inclusion_proof)?
-            .write_borsh(&input.tx_filters)?
-            .build()?;
+        for block in &input.btc_blocks {
+            let inclusion_proof = witness_commitment_from_coinbase(&block.txdata[0])
+                .map(|_| L1TxProof::generate(&block.txdata, 0));
 
-        Ok(zkvm_input)
+            let serialized_block = serialize(block);
+            zkvm_input
+                .write_buf(&serialized_block)?
+                .write_borsh(&inclusion_proof)?;
+        }
+
+        zkvm_input.build()
     }
 
     fn process_output<H>(public_values: &PublicValues) -> ZkVmResult<Self::Output>
