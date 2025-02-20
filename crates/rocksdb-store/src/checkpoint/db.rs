@@ -38,7 +38,7 @@ impl CheckpointDatabase for RBCheckpointDB {
                 rockbound::TransactionRetry::Count(self.ops.retry_count),
                 |txn| {
                     let mut summaries: Vec<EpochSummary> = txn
-                        .get::<EpochSummarySchema>(&epoch_idx)?
+                        .get_for_update::<EpochSummarySchema>(&epoch_idx)?
                         .unwrap_or_else(Vec::new);
 
                     // Find where the summary should go, or return error if it's
