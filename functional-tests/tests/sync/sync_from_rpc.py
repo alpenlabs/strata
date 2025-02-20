@@ -1,10 +1,9 @@
-import time
 import logging
+import time
 
 import flexitest
 
 from envs import testenv
-
 
 FOLLOW_DIST = 1
 
@@ -58,5 +57,8 @@ class SyncFromRpcTest(testenv.StrataTester):
         assert block_from_fullnode, "follower EL client missing block"
         fn_el_hash = block_from_fullnode["hash"]
 
-        logging.info(f"block at height {test_blocknum},\n\tseq {block_from_sequencer},\n\tfn {block_from_fullnode}")
+        logging.info(
+            f"block at height {test_blocknum},\n \
+            \tseq {block_from_sequencer},\n\tfn {block_from_fullnode}"
+        )
         assert seq_el_hash == fn_el_hash, "EL blocks don't match"

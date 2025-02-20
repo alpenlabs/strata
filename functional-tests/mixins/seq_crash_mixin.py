@@ -51,7 +51,7 @@ class SeqCrashMixin(BaseMixin):
         wait_until(
             lambda: not check_sequencer_down(self.seqrpc),
             error_with="Sequencer didn't start",
-            **kwargs
+            **kwargs,
         )
 
         return cur_chain_tip

@@ -1,11 +1,10 @@
 import logging
 import time
-from functools import partial
 
 import flexitest
 
 from envs import testenv
-from utils import wait_until_with_value, wait_for_genesis
+from utils import wait_for_genesis
 
 
 @flexitest.register

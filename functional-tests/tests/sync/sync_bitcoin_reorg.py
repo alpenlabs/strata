@@ -1,5 +1,5 @@
-import time
 import logging
+import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient

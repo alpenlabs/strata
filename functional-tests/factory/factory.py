@@ -1,6 +1,6 @@
+import logging
 import os
 import shutil
-import logging
 from typing import Optional, TypedDict
 
 import flexitest

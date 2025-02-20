@@ -1,8 +1,8 @@
 import flexitest
 
+from envs import testenv
 from mixins import seq_crash_mixin
 from utils import wait_until
-from envs import testenv
 
 
 @flexitest.register
@@ -15,7 +15,7 @@ class CrashSyncEventFinalizeEpochTest(seq_crash_mixin.SeqCrashMixin):
 
         wait_until(
             lambda: self.seqrpc.strata_syncStatus()["tip_height"] > cur_chain_tip + 1,
-            error_with="chain tip slot not progressing"
+            error_with="chain tip slot not progressing",
         )
 
         return True

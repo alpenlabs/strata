@@ -1,8 +1,8 @@
 import flexitest
 
+from envs import testenv
 from mixins import seq_crash_mixin
 from utils import wait_until
-from envs import testenv
 
 
 @flexitest.register

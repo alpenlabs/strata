@@ -4,7 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import deposit_request_transaction, drain_wallet
 
-from envs import testenv, net_settings
+from envs import net_settings, testenv
 from envs.testenv import BasicEnvConfig
 from utils import *
 

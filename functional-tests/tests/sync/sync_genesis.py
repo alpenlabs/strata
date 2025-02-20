@@ -1,10 +1,9 @@
-import time
 import logging
+import time
 
 import flexitest
 
 from envs import testenv
-from factory import seqrpc
 from utils import *
 
 

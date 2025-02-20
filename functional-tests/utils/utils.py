@@ -169,8 +169,13 @@ def wait_until_next_chain_epoch(rpc, **kwargs) -> int:
     Returns the new epoch number.
     """
     init_epoch = rpc.strata_syncStatus()["cur_epoch"]
-    _query = lambda: rpc.strata_syncStatus()["cur_epoch"]
-    _check = lambda epoch: epoch > init_epoch
+
+    def _query():
+        return rpc.strata_syncStatus()["cur_epoch"]
+
+    def _check(epoch):
+        return epoch > init_epoch
+
     return wait_until_with_value(_query, _check, **kwargs)
 
 
@@ -361,7 +366,8 @@ def check_nth_checkpoint_finalized(
         cur_epoch = ss["cur_epoch"]
         chain_l1_height = ss["safe_l1_block"]["height"]
         logging.info(
-            f"finalized epoch as of {l1_height}: {fin_epoch} (cur chain epoch {cur_epoch}, last L1 {chain_l1_height})"
+            f"finalized epoch as of {l1_height}: {fin_epoch} (cur chain epoch {cur_epoch}, \
+                last L1 {chain_l1_height})"
         )
         if fin_epoch is not None and fin_epoch["epoch"] >= idx:
             return True

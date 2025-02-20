@@ -1,5 +1,5 @@
-import time
 import logging
+import time
 
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
@@ -39,7 +39,7 @@ class L1StatusTest(testenv.StrataTester):
         logging.info(f"Received from bitcoin: {received_block['height']}")
         seq_height = l1stat["cur_height"]
         block_height = received_block["height"]
-        assert seq_height == block_height , (
+        assert seq_height == block_height, (
             f"sequencer height {seq_height} doesn't match the bitcoin node height {block_height}"
         )
 
