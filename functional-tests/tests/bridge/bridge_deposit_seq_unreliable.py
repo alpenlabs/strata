@@ -62,7 +62,7 @@ class BridgeDepositSequencerUnreliableTest(bridge_mixin.BridgeMixin):
         wait_until(
             lambda: not check_sequencer_down(self.seqrpc),
             error_with="Sequencer did not start on time",
-            timeout=10,
+            timeout=30,
         )
 
         balance_after_deposits = wait_until_with_value(

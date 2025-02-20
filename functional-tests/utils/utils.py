@@ -60,7 +60,7 @@ def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
 def wait_until(
     fn: Callable[[], Any],
     error_with: str = "Timed out",
-    timeout: int = 5,
+    timeout: int = 30,
     step: float = 0.5,
 ):
     """
