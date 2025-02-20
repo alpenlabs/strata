@@ -751,8 +751,8 @@ mod tests {
         let params = gen_params();
         let mut state = gen_client_state(Some(&params));
 
-        let horizon = params.rollup().horizon_l1_height;
-        let genesis = params.rollup().genesis_l1_height;
+        let horizon = params.rollup().horizon_l1_height as u64;
+        let genesis = params.rollup().genesis_l1_height as u64;
 
         let chain = get_btc_chain();
         let l1_verification_state =
