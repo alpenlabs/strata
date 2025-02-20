@@ -165,28 +165,17 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 # Since the pre-funding is enabled, we have to ensure the amount of pre-generated
                 # blocks is enough to deal with the coinbase maturation.
                 # Also, leave a log-message to indicate that the setup is little inconsistent.
-                if self.pre_generate_blocks < 101:
+                if self.pre_generate_blocks < 110:
                     print(
                         "Env setup: pre_fund_addrs is enabled, specify pre_generate_blocks >= 101."
                     )
-                    self.pre_generate_blocks = 101
+                    self.pre_generate_blocks = 110
 
-            chunk_size = 500
             while self.pre_generate_blocks > 0:
-                batch_size = min(self.pre_generate_blocks, 1000)
+                batch_size = min(self.pre_generate_blocks, 500)
 
-                # generate blocks in chunks to avoid timeout
-                num_chunks = ceil(batch_size / chunk_size)
-                for i in range(0, batch_size, chunk_size):
-                    chunk = int(i / chunk_size) + 1
-                    num_blocks = int(min(chunk_size, batch_size - (chunk - 1) * chunk_size))
-                    chunk = f"{chunk}/{num_chunks}"
-
-                    print(
-                        f"Pre generating {num_blocks} blocks to address {seqaddr}; chunk = {chunk}"
-                    )
-                    brpc.proxy.generatetoaddress(chunk_size, seqaddr)
-
+                print(f"Pre generating {batch_size} blocks to address {seqaddr}")
+                brpc.proxy.generatetoaddress(batch_size, seqaddr)
                 self.pre_generate_blocks -= batch_size
 
             if self.pre_fund_addrs:
@@ -195,8 +184,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 brpc.proxy.sendmany(
                     "",
                     {
-                        get_recovery_address(i, bridge_pk) if i < 100 else get_address(i - 100): 50
-                        for i in range(200)
+                        get_recovery_address(i, bridge_pk) if i < 10 else get_address(i - 10): 20
+                        for i in range(20)
                     },
                 )
                 brpc.proxy.generatetoaddress(1, seqaddr)
