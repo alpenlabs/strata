@@ -450,6 +450,7 @@ pub async fn fetch_verification_state(
     Ok(header_vs)
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod test {
     use bitcoin::hashes::Hash;
@@ -626,7 +627,7 @@ mod test {
             .await
             .unwrap();
 
-        for h in height..height + len {
+        for h in height + 1..=height + len {
             let block = client.get_block_at(h).await.unwrap();
             header_vs.check_and_update_continuity(&block.header, &params);
         }
