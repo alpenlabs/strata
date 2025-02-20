@@ -115,9 +115,6 @@ def main(argv):
         "operator_lag": testenv.BasicEnvConfig(101, message_interval=10 * 60 * 1_000),
         # Devnet production env
         "devnet": testenv.BasicEnvConfig(101, custom_chain="devnet"),
-        "fast_batches": testenv.BasicEnvConfig(
-            101, rollup_settings=net_settings.get_fast_batch_settings()
-        ),
         "hub1": testenv.HubNetworkEnvConfig(
             2
         ),  # TODO: Need to generate at least horizon blocks, based on params

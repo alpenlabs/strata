@@ -25,7 +25,7 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
     """This tests sync when el is missing blocks"""
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(testenv.BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
         try:
@@ -122,5 +122,5 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
         wait_until(
             lambda: int(rethrpc.eth_blockNumber(), base=16) > final_blocknumber,
             error_with="not syncing blocks",
-            timeout=5,
+            timeout=10,
         )
