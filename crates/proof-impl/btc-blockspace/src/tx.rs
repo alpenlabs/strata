@@ -36,13 +36,13 @@ pub fn compute_wtxid(tx: &Transaction) -> Buf32 {
 #[cfg(test)]
 mod tests {
     use bitcoin::{hashes::Hash, Txid, Wtxid};
-    use strata_test_utils::bitcoin::get_btc_mainnet_block;
+    use strata_test_utils::bitcoin_mainnet_segment::BtcChainSegment;
 
     use super::*;
 
     #[test]
     fn test_txid() {
-        let block = get_btc_mainnet_block();
+        let block = BtcChainSegment::load_full_block();
         for tx in &block.txdata {
             assert_eq!(
                 tx.compute_txid(),
@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn test_wtxid() {
-        let block = get_btc_mainnet_block();
+        let block = BtcChainSegment::load_full_block();
         for tx in &block.txdata {
             assert_eq!(
                 tx.compute_wtxid(),

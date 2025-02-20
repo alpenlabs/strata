@@ -4,6 +4,7 @@
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 
+use bitcoin::{block::Header, params::Params};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
@@ -17,7 +18,7 @@ use crate::{
     bridge_state::{DepositState, DispatchCommand, DispatchedState},
     chain_state::Chainstate,
     header::L2Header,
-    l1::L1MaturationEntry,
+    l1::{L1MaturationEntry, L1VerificationError},
     tx::ProtocolOperation::Deposit,
 };
 
@@ -181,10 +182,58 @@ impl StateCache {
             .expect("stateop: unable to consume deposit intent");
     }
 
+    /// Checks and consumes a deposit intent from the pending deposits queue.
+    /// # Panics
+    ///
+    /// This function will panic if:
+    /// - The deposit intents queue is empty.
+    /// - The front deposit intent is not at the provided index (`idx`).
+    /// - The deposit intent at the provided index does not exist.
+    /// - The expected deposit intent does not match the provided `intent`.
+    /// - The deposit intent cannot be consumed from the queue.
+    pub fn check_and_consume_deposit_intent(&mut self, idx: u64, intent: &DepositIntent) {
+        let deposits = self.state_mut().exec_env_state.pending_deposits_mut();
+
+        // Ensure the deposit intents queue is not empty and get the index of the front deposit.
+        let front_idx = deposits
+            .front_idx()
+            .expect("stateop: empty deposit intent queue");
+
+        // Validate that the front deposit intent's index matches the provided index.
+        assert_eq!(front_idx, idx, "stateop: deposit out of sequence");
+
+        // Retrieve the expected deposit intent at the given index.
+        let expected_deposit = deposits
+            .get_absolute(idx)
+            .expect("stateop: deposit intent not found");
+
+        assert_eq!(
+            expected_deposit, intent,
+            "stateop: expected deposit doesn't match"
+        );
+
+        // Consume the deposit intent by removing it from the front of the queue.
+        deposits
+            .pop_front()
+            .expect("stateop: unable to consume deposit intent");
+    }
+
     /// Inserts a new operator with the specified pubkeys into the operator table.
     pub fn insert_operator(&mut self, signing_pk: Buf32, wallet_pk: Buf32) {
         let state = self.state_mut();
         state.operator_table.insert(signing_pk, wallet_pk);
+    }
+
+    pub fn reorg_l1_vs(
+        &mut self,
+        old_headers: &[Header],
+        new_headers: &[Header],
+        params: &Params,
+    ) -> Result<(), L1VerificationError> {
+        self.state_mut()
+            .l1_state
+            .header_vs
+            .reorg(old_headers, new_headers, params)
     }
 
     /// L1 revert
@@ -233,10 +282,9 @@ impl StateCache {
         let (header_record, deposit_txs, _) = matured_block.into_parts();
         for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
             if let Deposit(deposit_info) = op {
+                let amt = deposit_info.intent.amt();
                 trace!("we got some deposit_txs");
-                let amt = deposit_info.amt;
-                let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
-                deposits.push_back(deposit_intent);
+                deposits.push_back(deposit_info.intent.clone());
                 self.new_state
                     .deposits_table
                     .add_deposits(&deposit_info.outpoint, &operators, amt)

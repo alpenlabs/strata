@@ -3,16 +3,23 @@ use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
 use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::{el::ElProofGenerator, ProofGenerator};
+use crate::btc::BtcBlockProofGenerator;
 
 #[derive(Clone)]
 pub struct ClProofGenerator<H: ZkVmHost> {
+    pub btc_proof_generator: BtcBlockProofGenerator<H>,
     pub el_proof_generator: ElProofGenerator<H>,
     host: H,
 }
 
 impl<H: ZkVmHost> ClProofGenerator<H> {
-    pub fn new(el_proof_generator: ElProofGenerator<H>, host: H) -> Self {
+    pub fn new(
+        btc_proof_generator: BtcBlockProofGenerator<H>,
+        el_proof_generator: ElProofGenerator<H>,
+        host: H,
+    ) -> Self {
         Self {
+            btc_proof_generator,
             el_proof_generator,
             host,
         }
@@ -25,9 +32,6 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
     type H = H;
 
     fn get_input(&self, block_range: &(u64, u64)) -> ZkVmResult<ClStfInput> {
-        // Generate EL proof required for aggregation
-        let el_proof = self.el_proof_generator.get_proof(block_range)?;
-
         // Read CL witness data
         let params = gen_params();
         let rollup_params = params.rollup();
@@ -36,17 +40,24 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
         let l2_blocks = l2_segment.blocks;
         let pre_states = l2_segment.pre_states;
 
-        let mut stf_witness_payloads = Vec::new();
-        for (block, pre_state) in l2_blocks.iter().zip(pre_states.iter()) {
-            let witness = borsh::to_vec(&(pre_state, block)).unwrap();
-            stf_witness_payloads.push(witness);
-        }
+        // TODO: use some btc blocks
+        let btc_proof = self.btc_proof_generator.get_proof(&None)?;
+
+        // Generate EL proof required for aggregation
+        let el_proof = self.el_proof_generator.get_proof(block_range)?;
 
         Ok(ClStfInput {
             rollup_params: rollup_params.clone(),
-            stf_witness_payloads,
-            evm_ee_proof: el_proof,
-            evm_ee_vk: self.el_proof_generator.get_host().get_verification_key(),
+            chainstate: pre_states[0].clone(),
+            l2_blocks,
+            evm_ee_proof_with_vk: (
+                el_proof.clone(),
+                self.el_proof_generator.get_host().get_verification_key(),
+            ),
+            btc_blockspace_proof_with_vk: (
+                btc_proof,
+                self.btc_proof_generator.get_host().get_verification_key(),
+            ),
         })
     }
 

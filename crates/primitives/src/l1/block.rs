@@ -54,6 +54,7 @@ impl From<L1BlockId> for BlockHash {
     Ord,
     PartialOrd,
     Hash,
+    Default,
     Arbitrary,
     BorshDeserialize,
     BorshSerialize,
@@ -156,7 +157,9 @@ impl L1BlockManifest {
 }
 
 /// Describes an L1 block and associated data that we need to keep around.
-// TODO should we include the block index here?
+// TODO: should we include the block index here?
+//
+// REVIEW: is this different from `L1BlockRecord`?
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
 pub struct L1BlockRecord {
     /// Block hash/ID, kept here so we don't have to be aware of the hash function

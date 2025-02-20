@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use strata_consensus_logic::genesis::make_genesis_block;
 use strata_primitives::buf::{Buf32, Buf64};
-use strata_proofimpl_cl_stf::{Chainstate, StateCache};
 use strata_proofimpl_evm_ee_stf::{
     primitives::{EvmEeProofInput, EvmEeProofOutput},
     process_block_transaction,
@@ -12,7 +11,9 @@ use strata_proofimpl_evm_ee_stf::{
 };
 use strata_state::{
     block::{L1Segment, L2Block, L2BlockBody},
+    chain_state::Chainstate,
     header::{L2BlockHeader, L2Header, SignedL2BlockHeader},
+    state_op::StateCache,
 };
 
 use crate::l2::{gen_params, get_genesis_chainstate};

@@ -5,7 +5,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
-    buf::Buf32, evm_exec::create_evm_extra_payload, prelude::payload::BlobSpec,
+    buf::Buf32, evm_exec::create_evm_extra_payload, l1::BitcoinAmount, prelude::payload::BlobSpec,
 };
 
 use crate::{
@@ -179,49 +179,44 @@ pub fn construct_ops_from_deposit_intents(
         }
         let pending_deposit = pending_deposits.pop_front().unwrap();
 
-        el_ops.push(Op::Deposit(ELDepositData::new(
-            idx,
-            pending_deposit.amt(),
-            pending_deposit.dest_ident().to_vec(),
-        )));
+        let intent = DepositIntent::new(pending_deposit.amt(), pending_deposit.dest_ident());
+        el_ops.push(Op::Deposit(ELDepositData::new(idx, intent)));
     }
     el_ops
 }
 
+/// `ELDepositData` represents the deposit information specific to the execution layer.
+///
+/// It contains the base index of the applied deposit intent and the corresponding deposit data.
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
 pub struct ELDepositData {
     /// base index of applied deposit intent.
     intent_idx: u64,
-
-    /// Amount in L1 native asset.  For Bitcoin this is sats.
-    amt: u64,
-
-    /// Dest addr encoded in a portable format, assumed to be valid but must be
-    /// checked by EL before committing to building block.
-    dest_addr: Vec<u8>,
+    /// Deposit details including the amount in bitcoins and the execution layer address.
+    intent: DepositIntent,
 }
 
 impl ELDepositData {
-    pub fn new(intent_idx: u64, amt: u64, dest_addr: Vec<u8>) -> Self {
-        Self {
-            intent_idx,
-            amt,
-            dest_addr,
-        }
+    pub fn new(intent_idx: u64, intent: DepositIntent) -> Self {
+        Self { intent_idx, intent }
     }
 
-    pub fn amt(&self) -> u64 {
-        self.amt
+    pub fn amt(&self) -> BitcoinAmount {
+        self.intent.amt()
     }
 
     pub fn dest_addr(&self) -> &[u8] {
-        &self.dest_addr
+        self.intent.dest_ident()
     }
 
     pub fn intent_idx(&self) -> u64 {
         self.intent_idx
+    }
+
+    pub fn intent(&self) -> &DepositIntent {
+        &self.intent
     }
 }
 

@@ -43,6 +43,10 @@ impl L1MaturationEntry {
         self.record.blkid()
     }
 
+    pub fn header_buf(&self) -> &[u8] {
+        &self.record.buf
+    }
+
     pub fn into_parts(self) -> (L1HeaderRecord, Vec<DepositUpdateTx>, Vec<DaTx>) {
         (self.record, self.deposit_update_txs, self.da_txs)
     }
