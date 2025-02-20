@@ -310,12 +310,15 @@ impl UnfinalizedBlockTracker {
                 // to be processed?
                 match l2_block_manager.get_block_status_blocking(&blkid) {
                     Ok(Some(status)) => {
-                        if status == BlockStatus::Invalid {
-                            debug!(%blkid, "skipping attaching invalid block");
+                        if status != BlockStatus::Valid {
+                            debug!(%blkid, "skipping attaching block not known to be valid");
                             continue;
                         }
                     }
-                    Ok(_) => {}
+                    Ok(_) => {
+                        debug!(%blkid, "block status not available, will check later");
+                        continue;
+                    }
                     Err(e) => {
                         error!(%blkid, err = %e, "error loading block status, continuing");
                         continue;

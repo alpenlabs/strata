@@ -288,17 +288,18 @@ fn handle_unprocessed_blocks(
     engine: &impl ExecEngineCtl,
     status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
-    info!("check for unprocessed l2blocks");
+    info!("checking for unprocessed L2 blocks");
 
     let l2_block_manager = storage.l2();
     let mut slot = fcm.cur_best_block.slot();
     loop {
-        let blocksids = l2_block_manager.get_blocks_at_height_blocking(slot)?;
-        if blocksids.is_empty() {
+        let blkids = l2_block_manager.get_blocks_at_height_blocking(slot)?;
+        if blkids.is_empty() {
             break;
         }
-        warn!(?blocksids, ?slot, "found extra l2blocks");
-        for blockid in blocksids {
+
+        warn!(%slot, ?blkids, "found extra L2 blocks");
+        for blockid in blkids {
             let status = l2_block_manager.get_block_status_blocking(&blockid)?;
             if let Some(BlockStatus::Invalid) = status {
                 continue;
@@ -313,7 +314,8 @@ fn handle_unprocessed_blocks(
         }
         slot += 1;
     }
-    info!("completed check for unprocessed l2blocks");
+
+    info!("finished processing extra blocks");
 
     Ok(())
 }
