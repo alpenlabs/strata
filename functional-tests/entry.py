@@ -121,7 +121,7 @@ def main(argv):
         "hub1": testenv.HubNetworkEnvConfig(
             2
         ),  # TODO: Need to generate at least horizon blocks, based on params
-        "prover": testenv.BasicEnvConfig(101),
+        "prover": testenv.BasicEnvConfig(101, rollup_settings=RollupParamsSettings.new_default().strict_mode()),
         "load_reth": reth_load_env,
         # seperate env for running crash_* tests
         "crash": testenv.BasicEnvConfig(101),
