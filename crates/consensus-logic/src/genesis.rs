@@ -65,7 +65,7 @@ pub fn init_genesis_chainstate(
     // Now insert things into the database.
     storage.chainstate().write_genesis_state(gchstate.clone())?;
     storage.l2().put_block_data_blocking(gblock)?;
-    // TODO: Status channel shoud probably be updated.
+    // TODO: Status channel should probably be updated.
 
     // TODO make ^this be atomic so we can't accidentally not write both, or
     // make it so we can overwrite the genesis chainstate if there's no other

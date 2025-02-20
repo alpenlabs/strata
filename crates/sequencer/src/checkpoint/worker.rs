@@ -77,7 +77,7 @@ pub fn checkpoint_worker(
 
         // Fetch the epochs that seem ready to have checkpoints generated.  We
         // don't actually use the update for this, it's just a signal to check.
-        // Maybe that could be simplfied?
+        // Maybe that could be simplified?
 
         let ready_epochs = find_ready_checkpoints(last_saved_epoch, ckman)?;
 
