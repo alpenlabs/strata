@@ -335,7 +335,7 @@ pub struct BatchTransition {
     /// The inclusive hash range of `Chainstate` for L2 blocks.
     ///
     /// Represents a transition from the starting L2 state to the ending L2 state.
-    /// The state root is computed via [`super::chain_state::Chainstate::compute_state_root`].
+    /// The state root is computed via `Chainstate::compute_state_root`.
     pub l2_transition: (Buf32, Buf32),
 
     /// A commitment to the `RollupParams`, as computed by `RollupParams::compute_hash`.
