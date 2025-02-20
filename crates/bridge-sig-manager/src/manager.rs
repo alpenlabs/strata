@@ -29,7 +29,6 @@ use strata_primitives::{
 };
 use strata_storage::ops::bridge::BridgeTxStateOps;
 use tracing::info;
-use zeroize::Zeroize;
 
 use super::errors::{BridgeSigError, BridgeSigResult};
 use crate::operations::{create_message_hash, sign_state_partial, verify_partial_sig};
@@ -442,12 +441,6 @@ impl SignatureManager {
         let signed_tx = psbt.extract_tx()?;
 
         Ok(signed_tx)
-    }
-}
-
-impl Drop for SignatureManager {
-    fn drop(&mut self) {
-        self.keypair.zeroize();
     }
 }
 

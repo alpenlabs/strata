@@ -21,7 +21,6 @@ bitcoin = { workspace = true, features = ["rand-std"] }
 musig2.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-zeroize.workspace = true
 
 [dev-dependencies]
 arbitrary.workspace = true

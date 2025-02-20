@@ -20,7 +20,6 @@ use strata_primitives::{
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::HexBytes;
 use tracing::{debug, info, warn};
-use zeroize::Zeroize;
 
 use crate::{
     errors::{ExecError, ExecResult},
@@ -344,14 +343,5 @@ where
             self.own_index,
             self.keypair.public_key()
         )
-    }
-}
-
-impl<TxBuildContext> Drop for ExecHandler<TxBuildContext>
-where
-    TxBuildContext: BuildContext + Sync + Send,
-{
-    fn drop(&mut self) {
-        self.keypair.zeroize();
     }
 }
