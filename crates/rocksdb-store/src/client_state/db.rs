@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_write_consensus_output() {
-        let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
+        let output: ClientUpdateOutput = ArbitraryGenerator::new_with_size(4_096).generate();
         let db = setup_db();
 
         let res = db.put_client_update(2, output.clone());
@@ -113,7 +113,7 @@ mod tests {
         let idx = db.get_last_state_idx();
         assert!(matches!(idx, Err(DbError::NotBootstrapped)));
 
-        let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
+        let output: ClientUpdateOutput = ArbitraryGenerator::new_with_size(4_096).generate();
         db.put_client_update(0, output.clone())
             .expect("test: insert");
         db.put_client_update(1, output.clone())
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_get_consensus_update() {
-        let output: ClientUpdateOutput = ArbitraryGenerator::new().generate();
+        let output: ClientUpdateOutput = ArbitraryGenerator::new_with_size(4_096).generate();
 
         let db = setup_db();
         db.put_client_update(0, output.clone())

@@ -385,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_with_deposit_update_tx() {
-        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
+        let mut chs: Chainstate = ArbitraryGenerator::new_with_size(4096 * 2).generate();
         // get the l1 view state of the chain state
         let params = gen_params();
         let header_record = chs.l1_view();
@@ -399,9 +399,9 @@ mod tests {
         let new_payloads_with_deposit_update_tx: Vec<L1HeaderPayload> =
             (1..=params.rollup().l1_reorg_safe_depth + 1)
                 .map(|idx| {
-                    let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
-                    let proof = ArbitraryGenerator::new_with_size(1 << 12).generate();
-                    let tx = ArbitraryGenerator::new_with_size(1 << 12).generate();
+                    let record = ArbitraryGenerator::new_with_size(32_768).generate();
+                    let proof = ArbitraryGenerator::new_with_size(4_096).generate();
+                    let tx = ArbitraryGenerator::new_with_size(4_096).generate();
 
                     let l1tx = if idx == 1 {
                         let protocol_op = ProtocolOperation::Deposit(DepositInfo {
@@ -411,7 +411,7 @@ mod tests {
                         });
                         L1Tx::new(proof, tx, vec![protocol_op])
                     } else {
-                        ArbitraryGenerator::new_with_size(1 << 15).generate()
+                        ArbitraryGenerator::new_with_size(32_768).generate()
                     };
 
                     let deposit_update_tx = DepositUpdateTx::new(l1tx, idx);
@@ -437,7 +437,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_with_empty_payload() {
-        let chs: Chainstate = ArbitraryGenerator::new().generate();
+        let chs: Chainstate = ArbitraryGenerator::new_with_size(4_096).generate();
         let params = gen_params();
 
         let mut state_cache = StateCache::new(chs.clone());
@@ -454,7 +454,7 @@ mod tests {
 
     #[test]
     fn test_process_l1_view_update_maturation_check() {
-        let mut chs: Chainstate = ArbitraryGenerator::new().generate();
+        let mut chs: Chainstate = ArbitraryGenerator::new_with_size(4_096).generate();
         let params = gen_params();
         let header_record = chs.l1_view();
         let old_safe_height = header_record.safe_height();
@@ -467,7 +467,7 @@ mod tests {
         let new_payloads_matured: Vec<L1HeaderPayload> = (1..params.rollup().l1_reorg_safe_depth
             + to_mature_blk_num)
             .map(|idx| {
-                let record = ArbitraryGenerator::new_with_size(1 << 15).generate();
+                let record = ArbitraryGenerator::new_with_size(32_768).generate();
                 L1HeaderPayload::new(old_safe_height + idx as u64, record)
                     .with_deposit_update_txs(vec![])
                     .build()

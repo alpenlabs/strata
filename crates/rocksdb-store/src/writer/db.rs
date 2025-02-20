@@ -107,7 +107,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
 
-        let blob: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let blob: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
 
         seq_db.put_payload_entry(0, blob.clone()).unwrap();
 
@@ -119,7 +119,7 @@ mod tests {
     fn test_put_blob_existing_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
-        let blob: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let blob: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
 
         seq_db.put_payload_entry(0, blob.clone()).unwrap();
 
@@ -134,12 +134,13 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
 
-        let entry: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let entry: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
 
         // Insert
         seq_db.put_payload_entry(0, entry.clone()).unwrap();
 
-        let updated_entry: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let updated_entry: BundledPayloadEntry =
+            ArbitraryGenerator::new_with_size(4_096).generate();
 
         // Update existing idx
         seq_db.put_payload_entry(0, updated_entry.clone()).unwrap();
@@ -152,7 +153,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
 
-        let blob: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let blob: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
 
         let next_blob_idx = seq_db.get_next_payload_idx().unwrap();
         assert_eq!(
@@ -165,7 +166,7 @@ mod tests {
             .unwrap();
         // Now the next idx is 1
 
-        let blob: BundledPayloadEntry = ArbitraryGenerator::new().generate();
+        let blob: BundledPayloadEntry = ArbitraryGenerator::new_with_size(4_096).generate();
 
         seq_db.put_payload_entry(1, blob.clone()).unwrap();
         let next_blob_idx = seq_db.get_next_payload_idx().unwrap();
@@ -181,7 +182,7 @@ mod tests {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
 
-        let intent: IntentEntry = ArbitraryGenerator::new().generate();
+        let intent: IntentEntry = ArbitraryGenerator::new_with_size(4_096).generate();
         let intent_id: Buf32 = [0; 32].into();
 
         seq_db.put_intent_entry(intent_id, intent.clone()).unwrap();
@@ -194,7 +195,7 @@ mod tests {
     fn test_put_intent_entry() {
         let (db, db_ops) = get_rocksdb_tmp_instance().unwrap();
         let seq_db = RBL1WriterDb::new(db, db_ops);
-        let intent: IntentEntry = ArbitraryGenerator::new().generate();
+        let intent: IntentEntry = ArbitraryGenerator::new_with_size(4_096).generate();
         let intent_id: Buf32 = [0; 32].into();
 
         let result = seq_db.put_intent_entry(intent_id, intent.clone());
