@@ -1,7 +1,6 @@
 // TODO this all needs to be reworked to just follow what the FCM state
 // publishing is, waiting for that to be ready before getting started
 
-use alloy_rpc_types::engine::ForkchoiceState;
 use anyhow::{Context, Result};
 use revm_primitives::B256;
 use strata_db::errors::DbError;
@@ -15,7 +14,7 @@ use crate::block::EVML2Block;
 pub fn fetch_init_fork_choice_state(
     storage: &NodeStorage,
     rollup_params: &RollupParams,
-) -> Result<ForkchoiceState> {
+) -> Result<B256> {
     // TODO switch these logs to debug
     match get_last_chainstate(storage)? {
         Some(chs) => {
@@ -26,36 +25,18 @@ pub fn fetch_init_fork_choice_state(
         }
         None => {
             info!("preparing EVM initial state from genesis");
-            let genesis =
+            let evm_genesis_block_hash =
                 revm_primitives::FixedBytes(*rollup_params.evm_genesis_block_hash.as_ref());
-            Ok(ForkchoiceState {
-                head_block_hash: genesis,
-                safe_block_hash: genesis,
-                finalized_block_hash: B256::ZERO,
-            })
+            Ok(evm_genesis_block_hash)
         }
     }
 }
 
-fn compute_evm_fc_state_from_chainstate(
-    chs: &Chainstate,
-    storage: &NodeStorage,
-) -> Result<ForkchoiceState> {
+fn compute_evm_fc_state_from_chainstate(chs: &Chainstate, storage: &NodeStorage) -> Result<B256> {
     let l2man = storage.l2();
-    let latest_block_hash = get_evm_block_hash_by_id(chs.chain_tip_blkid(), l2man)?
+    let latest_evm_block_hash = get_evm_block_hash_by_id(chs.chain_tip_blkid(), l2man)?
         .expect("evmexec: missing expected block");
-    let finalized_block_hash = if chs.finalized_epoch().is_null() {
-        // no finalized epoch present yet
-        B256::ZERO
-    } else {
-        get_evm_block_hash_by_id(chs.finalized_epoch().last_blkid(), l2man)?
-            .expect("evmexec: missing expected block")
-    };
-    Ok(ForkchoiceState {
-        head_block_hash: latest_block_hash,
-        safe_block_hash: latest_block_hash,
-        finalized_block_hash,
-    })
+    Ok(latest_evm_block_hash)
 }
 
 fn get_last_chainstate(storage: &NodeStorage) -> Result<Option<Chainstate>> {
