@@ -2,7 +2,7 @@
 
 use bitcoin::{
     hashes::Hash,
-    secp256k1::{Keypair, Message, SecretKey},
+    secp256k1::{Message, SecretKey},
     sighash::{self, Prevouts, SighashCache},
     taproot::LeafVersion,
     ScriptBuf, TapLeafHash, Transaction, TxOut,
@@ -11,6 +11,7 @@ use musig2::{sign_partial, verify_partial, AggNonce, KeyAggContext, PartialSigna
 use strata_db::entities::bridge_tx_state::BridgeTxState;
 use strata_primitives::{
     bridge::{Musig2SecNonce, OperatorPartialSig, PublickeyTable},
+    keys::ZeroizableKeypair,
     l1::TaprootSpendPath,
 };
 
@@ -81,7 +82,7 @@ pub fn create_key_spend_hash(
 pub fn sign_state_partial(
     pubkey_table: &PublickeyTable,
     secnonce: &Musig2SecNonce,
-    keypair: &Keypair,
+    keypair: &ZeroizableKeypair,
     aggregated_nonce: &AggNonce,
     message: impl AsRef<[u8]>,
     keypath_spend_only: bool,
@@ -177,7 +178,7 @@ mod tests {
         absolute::LockTime,
         hashes::sha256d,
         key::rand::{self, RngCore},
-        secp256k1::{PublicKey, SECP256K1},
+        secp256k1::{Keypair, PublicKey, SECP256K1},
         transaction::Version,
         Amount, Network, OutPoint, Sequence, Txid, Witness,
     };
@@ -294,10 +295,11 @@ mod tests {
         // Step 1: Generate a partial signature
 
         let keypair = Keypair::from_secret_key(SECP256K1, &sks[own_index]);
+        let zeroizable_keypair = keypair.into();
         let partial_sig_result = sign_state_partial(
             tx_state.pubkeys(),
             tx_state.secnonce(),
-            &keypair,
+            &zeroizable_keypair,
             &aggregated_nonce,
             txid.as_byte_array(),
             keypath_spend_only,

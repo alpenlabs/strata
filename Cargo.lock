@@ -13751,6 +13751,7 @@ name = "strata-sequencer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bitcoin",
  "borsh",
  "parking_lot 0.12.3",
  "serde",
@@ -13759,6 +13760,7 @@ dependencies = [
  "strata-consensus-logic",
  "strata-db",
  "strata-eectl",
+ "strata-key-derivation",
  "strata-primitives",
  "strata-state",
  "strata-status",
@@ -13768,6 +13770,7 @@ dependencies = [
  "thiserror 2.0.11",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]

@@ -726,7 +726,7 @@ pub(crate) fn setup_sig_manager(index: OperatorIdx, keypair: Keypair) -> Signatu
 
     event!(Level::INFO, event = "database handler initialized");
 
-    SignatureManager::new(Arc::new(db_ops), index, keypair)
+    SignatureManager::new(Arc::new(db_ops), index, keypair.into())
 }
 
 #[allow(dead_code)] // This not used in the `cooperative-bridge-out-flow`.
