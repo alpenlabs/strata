@@ -31,10 +31,6 @@ pub enum InitError {
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    /// Config is not a toml table.
-    #[error("Config is not a toml table")]
-    ConfigNotTomlTable,
-
     /// Missing key in table.
     #[error("missing key: {0}")]
     MissingKey(String),
@@ -43,13 +39,7 @@ pub enum ConfigError {
     #[error("can't traverse into primitive: {0}")]
     TraversePrimitiveAt(String),
 
-    /// Bad override string.
-    #[error("malformed override string")]
-    MalformedOverrideStr,
-
-    #[error("Config is not parseable")]
-    ConfigNotParseable,
-
+    /// Invalid override string.
     #[error("Invalid override: '{0}'")]
     InvalidOverride(String),
 }
