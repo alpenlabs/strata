@@ -13,7 +13,7 @@ pub enum L1StatusUpdate {
 }
 
 pub async fn apply_status_updates(st_updates: &[L1StatusUpdate], st_chan: &StatusChannel) {
-    let mut l1_status = st_chan.l1_status();
+    let mut l1_status = st_chan.get_l1_status();
     for event in st_updates {
         match event {
             L1StatusUpdate::CurHeight(height) => l1_status.cur_height = *height,

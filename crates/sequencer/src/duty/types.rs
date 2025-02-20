@@ -2,7 +2,7 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{buf::Buf32, hash::compute_borsh_hash, l2::L2BlockCommitment};
+use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use strata_state::{batch::Checkpoint, id::L2BlockId};
 
 /// Describes when we'll stop working to fulfill a duty.

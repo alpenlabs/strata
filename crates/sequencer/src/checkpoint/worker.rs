@@ -401,7 +401,7 @@ fn create_checkpoint_prep_data_from_summary(
 
     // Reconstruct the L1 range.
     let l1_start_mf = fetch_l1_block_manifest(l1_start_height, l1man)?;
-    let l1_start_block = L1BlockCommitment::new(l1_start_height, l1_start_mf.block_hash());
+    let l1_start_block = L1BlockCommitment::new(l1_start_height, *l1_start_mf.blkid());
     let l1_range = (l1_start_block, *summary.new_l1());
 
     // Compute the new L1 sync state commitments.
@@ -600,7 +600,7 @@ fn fetch_block_manifest_at_epoch(
     let mf = fetch_l1_block_manifest(height, l1man)?;
 
     if mf.epoch() != epoch {
-        return Err(Error::L1ManifestEpochMismatch(mf.block_hash(), mf.epoch(), epoch).into());
+        return Err(Error::L1ManifestEpochMismatch(*mf.blkid(), mf.epoch(), epoch).into());
     }
 
     Ok(mf)

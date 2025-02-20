@@ -89,7 +89,7 @@ impl StrataRpcImpl {
 
     /// Gets a ref to the current client state as of the last update.
     async fn get_client_state(&self) -> ClientState {
-        self.sync_manager.status_channel().client_state()
+        self.sync_manager.status_channel().get_cur_client_state()
     }
 
     // TODO make these not return Arc
@@ -180,7 +180,7 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_l1_status(&self) -> RpcResult<RpcL1Status> {
-        let l1s = self.status_channel.l1_status();
+        let l1s = self.status_channel.get_l1_status();
         Ok(RpcL1Status::from_l1_status(
             l1s,
             self.sync_manager.params().rollup().network,
@@ -198,7 +198,7 @@ impl StrataApiServer for StrataRpcImpl {
             .get_block_manifest_async(height)
             .map_err(Error::Db)
             .await?;
-        Ok(blk_manifest.map(|mf| mf.block_hash().to_string()))
+        Ok(blk_manifest.map(|mf| mf.blkid().to_string()))
     }
 
     async fn get_client_status(&self) -> RpcResult<RpcClientStatus> {
@@ -246,6 +246,8 @@ impl StrataApiServer for StrataRpcImpl {
             finalized_blkid = (*fin_ckpt.batch_info.final_l2_block().blkid()).into();
         }
 
+        // FIXME: remove deprecated items
+        #[allow(deprecated)]
         Ok(RpcClientStatus {
             chain_tip: chain_tip.into(),
             chain_tip_slot,
@@ -430,6 +432,8 @@ impl StrataApiServer for StrataRpcImpl {
             .map(RpcDepositEntry::from_deposit_entry)?)
     }
 
+    // FIXME: remove deprecated
+    #[allow(deprecated)]
     async fn sync_status(&self) -> RpcResult<RpcSyncStatus> {
         let css = self.status_channel.get_chain_sync_status();
         Ok(css

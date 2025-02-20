@@ -137,7 +137,7 @@ impl StatusChannel {
             .map(|chs| chs.as_ref().clone())
     }
 
-    #[deprecated(note = "use `.cur_client_state()`")]
+    #[deprecated(note = "use `.get_cur_client_state()`")]
     pub fn client_state(&self) -> ClientState {
         self.receiver.cl.borrow().clone()
     }

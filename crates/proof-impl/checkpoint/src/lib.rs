@@ -80,6 +80,8 @@ pub fn process_checkpoint_proof(
                 let base_state_commitment = prev_checkpoint.base_state_commitment().clone();
                 (
                     base_state_commitment,
+                    // FIXME: remove deprecated
+                    #[allow(deprecated)]
                     Some(prev_checkpoint.get_proof_receipt()),
                 )
             }

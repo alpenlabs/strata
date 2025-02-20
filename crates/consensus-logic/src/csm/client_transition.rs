@@ -336,7 +336,7 @@ fn process_genesis_trigger_block(
     params: &RollupParams,
 ) -> Result<InternalState, Error> {
     // TODO maybe more bookkeeping?
-    Ok(InternalState::new(block_mf.block_hash(), None))
+    Ok(InternalState::new(*block_mf.blkid(), None))
 }
 
 fn process_l1_block(
@@ -345,7 +345,7 @@ fn process_l1_block(
     block_mf: &L1BlockManifest,
     params: &RollupParams,
 ) -> Result<InternalState, Error> {
-    let blkid = block_mf.block_hash();
+    let blkid = block_mf.blkid();
     let mut checkpoint = state.last_checkpoint().cloned();
 
     // Iterate through all of the protocol operations in all of the txs.
@@ -386,7 +386,7 @@ fn process_l1_block(
         }
     }
 
-    Ok(InternalState::new(blkid, checkpoint))
+    Ok(InternalState::new(*blkid, checkpoint))
 }
 
 // TODO remove this old code after we've reconsolidated its responsibilities
