@@ -1,11 +1,9 @@
 use std::sync::LazyLock;
 
 use tokio::sync::watch;
+use tracing::*;
 
-pub static BAIL_DUTY_SIGN_BLOCK: &str = "duty_sign_block";
-pub static BAIL_ADVANCE_CONSENSUS_STATE: &str = "advance_consensus_state";
-pub static BAIL_SYNC_EVENT: &str = "sync_event";
-pub static BAIL_SYNC_EVENT_NEW_TIP: &str = "sync_event_new_tip";
+pub const BAIL_DUTY_SIGN_BLOCK: &str = "duty_sign_block";
 
 struct BailWatch {
     sender: watch::Sender<Option<String>>,
@@ -16,7 +14,6 @@ struct BailWatch {
 /// contexts.
 static BAIL_MANAGER: LazyLock<BailWatch> = LazyLock::new(|| {
     let (sender, receiver) = watch::channel(None);
-
     BailWatch { sender, receiver }
 });
 
@@ -28,8 +25,10 @@ pub static BAIL_SENDER: LazyLock<watch::Sender<Option<String>>> =
 pub static BAIL_RECEIVER: LazyLock<watch::Receiver<Option<String>>> =
     LazyLock::new(|| BAIL_MANAGER.receiver.clone());
 
+/// Checks to see if we should bail out.
 pub fn check_bail_trigger(ctx: &str) {
     if let Some(val) = BAIL_RECEIVER.borrow().clone() {
+        warn!(%ctx, "tripped bail interrupt, exiting...");
         if ctx == val {
             std::process::exit(0);
         }

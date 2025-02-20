@@ -2,15 +2,16 @@ import flexitest
 
 from mixins import seq_crash_mixin
 from utils import wait_until
+from envs import testenv
 
 
 @flexitest.register
-class CrashAdvanceConsensusStateTest(seq_crash_mixin.SeqCrashMixin):
+class CrashFcmNewBlockTest(seq_crash_mixin.SeqCrashMixin):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("crash")
+        ctx.set_env(testenv.BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
-        cur_chain_tip = self.handle_bail(lambda: "advance_consensus_state")
+        cur_chain_tip = self.handle_bail(lambda: "fcm_new_block")
 
         wait_until(
             lambda: self.seqrpc.strata_clientStatus()["chain_tip_slot"] > cur_chain_tip + 1,

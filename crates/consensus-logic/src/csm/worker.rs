@@ -202,6 +202,8 @@ fn process_msg(
 ) -> anyhow::Result<()> {
     match msg {
         CsmMessage::EventInput(idx) => {
+            strata_common::check_bail_trigger("sync_event");
+
             // If we somehow missed a sync event we need to try to rerun those,
             // just in case.
             let cur_ev_idx = state.cur_event_idx();
@@ -321,6 +323,8 @@ fn apply_action(
             // For the fork choice manager this gets picked up later.  We don't have
             // to do anything here *necessarily*.
             info!(?epoch, "finalizing epoch");
+
+            strata_common::check_bail_trigger("sync_event_finalize_epoch");
 
             // TODO error checking here
             engine.update_finalized_block(*epoch.last_blkid())?;

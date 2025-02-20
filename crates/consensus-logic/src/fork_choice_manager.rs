@@ -3,8 +3,6 @@
 use std::sync::Arc;
 
 use strata_chaintsn::transition::process_block;
-#[cfg(feature = "debug-utils")]
-use strata_common::bail_manager::{check_bail_trigger, BAIL_ADVANCE_CONSENSUS_STATE};
 use strata_db::{errors::DbError, traits::BlockStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::{
@@ -263,6 +261,10 @@ pub fn tracker_task<E: ExecEngineCtl>(
 
     handle_unprocessed_blocks(&mut fcm, &storage, engine.as_ref(), &status_channel)?;
 
+    // Before we get going we also want to load the finalized block from disk.
+    let init_fin_tip = fcm.finalized_tip();
+    engine.as_ref().update_finalized_block(*init_fin_tip)?;
+
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
         handle,
@@ -401,9 +403,7 @@ fn process_fc_message(
 ) -> anyhow::Result<()> {
     match msg {
         ForkChoiceMessage::NewBlock(blkid) => {
-            // TODO change this to "processing new block"
-            #[cfg(feature = "debug-utils")]
-            check_bail_trigger(BAIL_ADVANCE_CONSENSUS_STATE);
+            strata_common::check_bail_trigger("fcm_new_block");
 
             let block_bundle = fcm_state
                 .get_block_data(&blkid)?
@@ -522,9 +522,8 @@ fn handle_new_block(
             info!(%tip_blkid, "new chain tip");
 
             // Also this is the point at which we update the engine head and
-            // safe blocks.  These are technically different, but in practice
-            // they mean the same thing and we have to update them both anyways.
-            engine.update_head_block(tip_blkid)?;
+            // safe blocks.  We only have to actually call this one, it counts
+            // for both.
             engine.update_safe_block(tip_blkid)?;
 
             Ok(true)
