@@ -842,9 +842,8 @@ fn handle_finish_epoch(
 
     let epoch = summary.get_epoch_commitment();
 
-    // TODO convert to debug after we figure things out
     // TODO convert to Display
-    info!(?epoch, "finishing chain epoch");
+    debug!(?epoch, "finishing chain epoch");
 
     fcm_state
         .storage
@@ -882,9 +881,7 @@ fn handle_new_client_state(
         .update_finalized_epoch(&new_fin_epoch)?;
     info!(?new_fin_epoch, "updated finalized tip");
     trace!(?fin_report, "finalization report");
-    // TODO do something with the finalization report
+    // TODO do something with the finalization report?
 
-    // TODO recheck every remaining block's validity using the new state
-    // starting from the bottom up, putting into a new chain tracker
     Ok(())
 }

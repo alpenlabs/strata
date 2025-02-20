@@ -1,9 +1,8 @@
 //! Consensus logic worker task.
 
-// TODO massively refactor this module
-
 use std::{sync::Arc, thread};
 
+use strata_db::types::CheckpointConfStatus;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{
@@ -328,6 +327,16 @@ fn apply_action(
 
             // TODO error checking here
             engine.update_finalized_block(*epoch.last_blkid())?;
+
+            // Write that the checkpoint is finalized.
+            //
+            // TODO In the future we should just be able to determine this on the fly.
+            let ckman = state.storage.checkpoint();
+            update_checkpoint_status(
+                epoch.epoch(),
+                CheckpointConfStatus::Finalized,
+                ckman.as_ref(),
+            )?;
         }
 
         SyncAction::L2Genesis(l1blkid) => {
@@ -349,39 +358,20 @@ fn apply_action(
     Ok(())
 }
 
-/*
-SyncAction::WriteCheckpoints(_height, checkpoints) => {
-    for c in checkpoints.iter() {
-        let batch_ckp = &c.checkpoint;
-        let idx = batch_ckp.batch_info().epoch();
-        let pstatus = CheckpointProvingStatus::ProofReady;
-        let cstatus = CheckpointConfStatus::Confirmed;
-        let entry = CheckpointEntry::new(
-            batch_ckp.clone(),
-            pstatus,
-            cstatus,
-            Some(c.commitment.clone().into()),
-        );
+fn update_checkpoint_status(
+    idx: u64,
+    status: CheckpointConfStatus,
+    ckman: &CheckpointDbManager,
+) -> anyhow::Result<()> {
+    // This is a race, but we want to remove this fn anyways and just do it on
+    // the fly.
+    let Some(mut ckpt_entry) = ckman.get_checkpoint_blocking(idx)? else {
+        warn!(%idx, ?status, "missing checkpoint we wanted to set the state of, ignoring");
+        return Ok(());
+    };
 
-        // Store
-        state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
-    }
+    ckpt_entry.confirmation_status = status;
+    ckman.put_checkpoint_blocking(idx, ckpt_entry)?;
+
+    Ok(())
 }
-
-SyncAction::FinalizeCheckpoints(_height, checkpoints) => {
-    for c in checkpoints.iter() {
-        let batch_ckp = &c.checkpoint;
-        let idx = batch_ckp.batch_info().epoch();
-        let pstatus = CheckpointProvingStatus::ProofReady;
-        let cstatus = CheckpointConfStatus::Finalized;
-        let entry = CheckpointEntry::new(
-            batch_ckp.clone(),
-            pstatus,
-            cstatus,
-            Some(c.commitment.clone().into()),
-        );
-
-        // Update
-        state.checkpoint_db().put_checkpoint_blocking(idx, entry)?;
-    }
-}*/

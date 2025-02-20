@@ -132,6 +132,9 @@ pub enum CheckpointError {
     #[error("L2 state transition mismatch")]
     MismatchL2State,
 
+    #[error("signature is invalid")]
+    InvalidSignature,
+
     #[error("proof validation: {0}")]
     Proof(#[from] ZkVmError),
 }

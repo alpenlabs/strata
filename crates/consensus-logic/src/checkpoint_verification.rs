@@ -38,6 +38,8 @@ impl VerifyingKeyExt for RollupVerifyingKey {
 ///
 /// If this is the first checkpoint we verify, then there is no checkpoint to
 /// check against.
+///
+/// This does NOT check the signature.
 // TODO reduce this to actually just passing in the core information we really
 // need, not like the height
 pub fn verify_checkpoint(
@@ -49,9 +51,6 @@ pub fn verify_checkpoint(
     // the proof is invalid.
     let proof_receipt = construct_receipt(checkpoint);
     verify_proof(checkpoint, &proof_receipt, params)?;
-
-    // Then also verify the signature.
-    // TODO verify signature.
 
     // And check that we're building upon the previous state correctly.
     if let Some(prev) = prev_checkpoint {
