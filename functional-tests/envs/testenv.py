@@ -1,5 +1,4 @@
 import time
-from math import ceil
 from typing import Optional
 
 import flexitest
