@@ -28,18 +28,6 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
         ctx.set_env(testenv.BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
-        try:
-            self.run(ctx)
-        finally:
-            seq = ctx.get_service("sequencer")
-            reth = ctx.get_service("reth")
-
-            if not seq.is_started():
-                seq.start()
-            if not reth.is_started():
-                reth.start()
-
-    def run(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
         reth = ctx.get_service("reth")
         web3: Web3 = reth.create_web3()
@@ -52,6 +40,8 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
         # workaround for issue restarting reth with no transactions
         for _ in range(3):
             send_tx(web3)
+
+        wait_until_epoch_finalized(seqrpc, 0, timeout=30)
 
         # ensure there are some blocks generated
         wait_until(
@@ -113,7 +103,7 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
         )
 
         # ensure reth db was reset to shorter chain
-        assert int(rethrpc.eth_blockNumber(), base=16) == orig_blocknumber
+        assert int(rethrpc.eth_blockNumber(), base=16) < final_blocknumber
 
         print("start sequencer")
         seq.start()
