@@ -220,11 +220,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
         }
         sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
-        # Need to wait for at least `genesis_l1_height` blocks to be generated.
-        # Sleeping some more for safety
-        if self.auto_generate_blocks:
-            time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
-
         seq_host = sequencer.get_prop("rpc_host")
         seq_port = sequencer.get_prop("rpc_port")
         sequencer_signer = seq_signer_fac.create_sequencer_signer(seq_host, seq_port)
@@ -232,6 +227,11 @@ class BasicEnvConfig(flexitest.EnvConfig):
         svcs["sequencer"] = sequencer
         svcs["sequencer_signer"] = sequencer_signer
         svcs["reth"] = reth
+
+        # Need to wait for at least `genesis_l1_height` blocks to be generated.
+        # Sleeping some more for safety
+        if self.auto_generate_blocks:
+            time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         operator_message_interval = self.message_interval or settings.message_interval
         # Create all the bridge clients.
@@ -353,14 +353,14 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         }
         sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
+        seq_host = sequencer.get_prop("rpc_host")
+        seq_port = sequencer.get_prop("rpc_port")
+        sequencer_signer = seq_signer_fac.create_sequencer_signer(seq_host, seq_port)
+
         # Need to wait for at least `genesis_l1_height` blocks to be generated.
         # Sleeping some more for safety
         if self.auto_generate_blocks:
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
-
-        seq_host = sequencer.get_prop("rpc_host")
-        seq_port = sequencer.get_prop("rpc_port")
-        sequencer_signer = seq_signer_fac.create_sequencer_signer(seq_host, seq_port)
 
         fullnode_reth_port = fullnode_reth.get_prop("rpc_port")
         fullnode_reth_config = {
