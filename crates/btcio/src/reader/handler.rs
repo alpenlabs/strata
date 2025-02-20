@@ -78,19 +78,6 @@ async fn handle_blockdata<R: ReaderRpc>(
     let block_commitment = L1BlockCommitment::new(height, blkid.into());
     sync_evs.push(SyncEvent::L1Block(block_commitment));
 
-    // TODO remove all this outdated stuff
-    /*
-        // Check for checkpoint and create event accordingly
-    debug!(%height, "Checking for checkpoints in l1 block");
-        let checkpoints = check_for_commitments(&blockdata, *seq_pubkey);
-        debug!(?checkpoints, "Received checkpoints");
-
-        // TODO: Check for deposits and forced inclusions and emit appropriate events
-
-        if !checkpoints.is_empty() {
-            sync_evs.push(SyncEvent::L1DABatch(height, checkpoints));
-        }*/
-
     Ok(sync_evs)
 }
 

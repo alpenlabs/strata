@@ -35,14 +35,19 @@ use crate::{
 pub(crate) struct ReaderContext<R: ReaderRpc> {
     /// Bitcoin reader client
     pub client: Arc<R>,
+
     /// L1db manager
     pub l1_manager: Arc<L1BlockManager>,
+
     /// Config
     pub config: Arc<ReaderConfig>,
+
     /// Params
     pub params: Arc<Params>,
+
     /// Status transmitter
     pub status_channel: StatusChannel,
+
     /// Sequencer Pubkey
     pub seq_pubkey: Option<XOnlyPublicKey>,
 }
@@ -158,14 +163,14 @@ fn check_epoch_change<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
 ) -> anyhow::Result<Option<L1Event>> {
-    // FIXME something here might have gotten borked with the bookkeeping here
-    // in a rebase, let me (trey) know if there's something wrong here
+    // If we don't have a chainstate yet then we can just assume 0.  Right now
+    // we infer it all consistently from params anyways.
     let new_epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
 
-    // TODO: check if new_epoch < current epoch. should panic if so?
-    let curr_epoch = state.epoch();
+    // If we reorg out a checkpoint then we also want to go back to the earlier epoch.
+    let cur_epoch = state.epoch();
 
-    if curr_epoch != new_epoch {
+    if cur_epoch != new_epoch {
         state.set_epoch(new_epoch);
     }
 
@@ -361,40 +366,11 @@ async fn process_block<R: ReaderRpc>(
     status_updates.push(L1StatusUpdate::CurHeight(height));
     status_updates.push(L1StatusUpdate::CurTip(l1blkid.to_string()));
 
-    // let threshold = params.rollup().l1_reorg_safe_depth;
-    // let genesis_ht = params.rollup().genesis_l1_height;
-    // let genesis_threshold = genesis_ht + threshold as u64;
-
-    //trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
-
-    /*if height == genesis_threshold {
-        info!(%height, %genesis_ht, "time for genesis");
-        let l1_verification_state =
-            get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
-        let ev = L1Event::GenesisVerificationState(block_commitment, l1_verification_state);
-        l1_events.push(ev);
-    }*/
-
     let l1_verification_state =
         fetch_verification_state(ctx.client.as_ref(), height, &get_btc_params()).await?;
 
     let block_ev = L1Event::BlockData(block_data, state.epoch(), l1_verification_state);
     let l1_events = vec![block_ev];
-
-    /*if height == genesis_threshold {
-        info!(%height, %genesis_ht, "time for genesis");
-        if let Err(e) = ctx
-            .event_tx
-            .send(L1Event::GenesisVerificationState(
-                height,
-                l1_verification_state,
-            ))
-            .await
-        {
-            error!("failed to submit L1 block event, did the persistence task crash?");
-            return Err(e.into());
-        }
-    }*/
 
     Ok((l1_events, l1blkid))
 }
