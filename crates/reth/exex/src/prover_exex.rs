@@ -144,7 +144,7 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
     for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
         let slots: Vec<B256> = accessed_slots
             .iter()
-            .map(|el| B256::from_slice(el.as_le_slice()))
+            .map(|el| B256::from_slice(&el.to_be_bytes::<32>()))
             .collect();
 
         // Apply empty bundle state over previous block state.
@@ -163,7 +163,7 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
     for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
         let slots: Vec<B256> = accessed_slots
             .iter()
-            .map(|el| B256::from_slice(el.as_le_slice()))
+            .map(|el| B256::from_slice(&el.to_be_bytes::<32>()))
             .collect();
 
         let proof = previous_provider.proof(
