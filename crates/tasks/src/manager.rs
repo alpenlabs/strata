@@ -260,7 +260,7 @@ impl TaskExecutor {
                         let _ = panicked_tasks_tx.send(task_error);
                     } else {
                         // ended successfully
-                        debug!(%name, "critical task exiting successully");
+                        debug!(%name, "critical task exiting successfully");
                     }
                 }
                 Err(panic_err) => {

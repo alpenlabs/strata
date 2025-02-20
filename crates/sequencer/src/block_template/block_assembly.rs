@@ -109,7 +109,7 @@ fn prepare_l1_segment(
     }
 
     // This is much simpler than it was before because I'm removing the ability
-    // to handle reorgs properly.  This is fine, we'll readd it later when we
+    // to handle reorgs properly.  This is fine, we'll re-add it later when we
     // make the L1 scan proof stuff more sophisticated.
     let mut payloads = Vec::new();
     let mut is_epoch_final_block = {

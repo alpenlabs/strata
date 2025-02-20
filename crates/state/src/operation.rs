@@ -52,7 +52,7 @@ impl ClientUpdateOutput {
 pub enum SyncAction {
     /// Finalizes an epoch, indicating that we won't revert it.
     ///
-    /// This also implicitly finalizes all blocks preceeding the epoch terminal.
+    /// This also implicitly finalizes all blocks preceding the epoch terminal.
     FinalizeEpoch(EpochCommitment),
 
     /// Indicates to the worker that it's safe to perform the L2 genesis

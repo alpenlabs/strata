@@ -1,4 +1,4 @@
-//! Sync wrapper around [`tokio::sync::watch::Reciever`].
+//! Sync wrapper around [`tokio::sync::watch::Receiver`].
 //!
 //! All methods are direct wrappers around their counterparts.
 

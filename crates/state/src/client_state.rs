@@ -78,7 +78,7 @@ impl ClientState {
         self.sync_state.as_ref()
     }
 
-    /// Returns if genesis has occured.
+    /// Returns if genesis has occurred.
     pub fn has_genesis_occurred(&self) -> bool {
         self.chain_active
     }
@@ -478,7 +478,7 @@ impl ClientStateMut {
     ///
     /// * If the blkids are inconsistent.
     /// * If the block already has a corresponding state.
-    /// * If there isn't a preceeding block.
+    /// * If there isn't a preceding block.
     pub fn accept_l1_block_state(&mut self, l1block: &L1BlockCommitment, intstate: InternalState) {
         let h = l1block.height();
         let int_states = &mut self.state.int_states;

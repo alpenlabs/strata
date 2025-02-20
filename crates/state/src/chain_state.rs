@@ -29,7 +29,7 @@ pub struct Chainstate {
     /// checkpoint 0, moving us into checkpoint period 1.
     pub(crate) cur_epoch: u64,
 
-    /// The immediately preceeding epoch.
+    /// The immediately preceding epoch.
     pub(crate) prev_epoch: EpochCommitment,
 
     /// The epoch that we have observed in a checkpoint in L1.
@@ -88,7 +88,7 @@ impl Chainstate {
         self.cur_epoch
     }
 
-    /// Gets the commitment to the immediately preceeding epoch.
+    /// Gets the commitment to the immediately preceding epoch.
     pub fn prev_epoch(&self) -> &EpochCommitment {
         &self.prev_epoch
     }
