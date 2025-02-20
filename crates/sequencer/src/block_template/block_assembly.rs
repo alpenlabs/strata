@@ -49,7 +49,7 @@ pub fn prepare_block(
         .get_toplevel_chainstate_blocking(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_blkid))?;
 
-    // Figure out the save L1 blkid.
+    // Figure out the safe L1 blkid.
     // FIXME this is somewhat janky, should get it from the MMR
     let safe_l1_block_rec = prev_chstate.l1_view().safe_block();
     let safe_l1_blkid = strata_primitives::hash::sha256d(safe_l1_block_rec.buf());

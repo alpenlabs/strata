@@ -8,7 +8,7 @@ use strata_primitives::epoch::EpochCommitment;
 
 use crate::{client_state::ClientState, l1::L1BlockId};
 
-/// Output of a consensus state transition.  Both the consensus state writes and
+/// Output of a consensus state transition. Right now it consists of full [`ClientState`] and
 /// sync actions.
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,

@@ -28,13 +28,11 @@ use crate::errors::Error;
 pub fn init_client_state(params: &Params, csman: &ClientStateManager) -> anyhow::Result<()> {
     debug!("initializing client state in database!");
 
-    let init_state = ClientState::from_genesis_params(
-        params.rollup().horizon_l1_height,
-        params.rollup().genesis_l1_height,
-    );
+    let init_state = ClientState::from_genesis_params(params);
 
     // Write the state into the database.
     csman.put_update_blocking(0, ClientUpdateOutput::new_state(init_state))?;
+    // TODO: status channel should probably be updated.
 
     Ok(())
 }
@@ -67,6 +65,7 @@ pub fn init_genesis_chainstate(
     // Now insert things into the database.
     storage.chainstate().write_genesis_state(gchstate.clone())?;
     storage.l2().put_block_data_blocking(gblock)?;
+    // TODO: Status channel shoud probably be updated.
 
     // TODO make ^this be atomic so we can't accidentally not write both, or
     // make it so we can overwrite the genesis chainstate if there's no other

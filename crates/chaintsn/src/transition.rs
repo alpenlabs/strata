@@ -58,12 +58,12 @@ pub fn process_block(
     state.set_cur_header(header);
 
     // Go through each stage and play out the operations it has.
-    let new_epoch = process_l1_view_update(state, body.l1_segment(), params)?;
+    let has_new_epoch = process_l1_view_update(state, body.l1_segment(), params)?;
     let ready_withdrawals = process_execution_update(state, body.exec_segment().update())?;
     process_deposit_updates(state, ready_withdrawals, &mut rng, params)?;
 
     // If we checked in with L1, then advance the epoch.
-    if new_epoch {
+    if has_new_epoch {
         advance_epoch_tracking(state, header)?;
     }
 
@@ -99,6 +99,7 @@ fn process_l1_view_update(
         // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
         // more complicated to check the PoW.
         let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
+        // FIXME: This check is just redundant.
         if new_tip_height <= l1v.safe_height() {
             return Err(TsnError::L1SegNotExtend);
         }
@@ -117,41 +118,6 @@ fn process_l1_view_update(
             process_l1_block(state, b)?;
             state.update_safe_block(height, b.record().clone());
         }
-
-        /*
-        let first_new_block_height = new_tip_height - l1seg.new_payloads().len() as u64 + 1;
-        let implied_pivot_height = first_new_block_height - 1;
-        let next_exp_height = l1v.next_expected_height();
-        let cur_safe_height = l1v.safe_height();
-
-        // Now make sure that the block hashes all connect up sensibly.
-        let pivot_idx = implied_pivot_height;
-        let pivot_blkid = l1v
-            .maturation_queue()
-            .get_absolute(pivot_idx)
-            .map(|b| b.blkid())
-            .unwrap_or_else(|| l1v.safe_block().blkid());
-
-        // Okay now that we've figured that out, let's actually how to actually do the reorg.
-        if pivot_idx > params.horizon_l1_height && pivot_idx < next_exp_height {
-            state.revert_l1_view_to(pivot_idx);
-        }
-
-        let maturation_threshold = params.l1_reorg_safe_depth as u64;
-
-        for e in l1seg.new_payloads() {
-            let ment = L1MaturationEntry::from(e.clone());
-            state.apply_l1_block_entry(ment.clone());
-        }
-
-        let new_safe_height = max(
-            new_tip_height.saturating_sub(maturation_threshold),
-            cur_safe_height,
-        );
-
-        for idx in (cur_safe_height + 1..=new_safe_height) {
-            state.mature_l1_block(idx);
-        }*/
 
         Ok(true)
     } else {

@@ -6,7 +6,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{epoch::EpochCommitment, l1::L1BlockCommitment};
+use strata_primitives::{epoch::EpochCommitment, l1::L1BlockCommitment, params::Params};
 use tracing::*;
 
 use crate::{
@@ -54,14 +54,15 @@ pub struct ClientState {
 impl ClientState {
     /// Creates the basic genesis client state from the genesis parameters.
     // TODO do we need this or should we load it at run time from the rollup params?
-    pub fn from_genesis_params(horizon_l1_height: u64, genesis_l1_height: u64) -> Self {
+    pub fn from_genesis_params(params: &Params) -> Self {
+        let rparams = params.rollup();
+        let genesis_l1_height = rparams.genesis_l1_height;
         Self {
             chain_active: false,
             sync_state: None,
-            horizon_l1_height,
+            horizon_l1_height: rparams.horizon_l1_height,
             genesis_l1_height,
-            // TODO make configurable
-            finalization_depth: 3,
+            finalization_depth: rparams.l1_reorg_safe_depth as u64,
             declared_final_epoch: None,
             int_states: StateQueue::new_at_index(genesis_l1_height),
         }

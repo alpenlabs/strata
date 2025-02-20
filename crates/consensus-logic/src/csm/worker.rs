@@ -302,7 +302,7 @@ fn handle_sync_event(
     status_channel.update_client_state(new_state.as_ref().clone());
 
     trace!(%ev_idx, "sending client update notif");
-    let update = ClientUpdateNotif::new(ev_idx, outp, new_state);
+    let update = ClientUpdateNotif::new(ev_idx, new_state);
     if state.cupdate_tx.send(Arc::new(update)).is_err() {
         // Is this actually useful?  Does this just error if there's no
         // listeners?

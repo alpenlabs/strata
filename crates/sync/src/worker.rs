@@ -101,30 +101,6 @@ async fn handle_new_client_update<T: SyncClient>(
 
     let finalized_blkid = *fin_epoch.last_blkid();
 
-    // I think this can just be removed.
-    /*
-
-        let block = match context
-            .l2_block_manager
-            .get_block_data_async(finalized_blkid)
-            .await
-        {
-            Ok(Some(block)) => block,
-
-            Ok(None) => {
-                // FIXME should we really just ignore it here?
-                error!(%finalized_blkid, "missing newly finalized block, ignoring");
-                return Ok(());
-            }
-
-            Err(e) => {
-                // FIXME should we REALLY just ignore it here???
-                error!(%finalized_blkid, err = %e, "error fetching finalized block, ignoring");
-                return Ok(());
-            }
-        };
-    */
-
     if let Err(e) = handle_block_finalized(state, fin_epoch).await {
         error!(%finalized_blkid, err = %e, "failed to handle newly finalized block");
     }

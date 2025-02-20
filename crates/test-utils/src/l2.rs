@@ -121,10 +121,7 @@ pub fn gen_client_state(params: Option<&Params>) -> ClientState {
         Some(p) => p,
         None => &gen_params(),
     };
-    ClientState::from_genesis_params(
-        params.rollup.horizon_l1_height,
-        params.rollup.genesis_l1_height,
-    )
+    ClientState::from_genesis_params(params)
 }
 
 pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {

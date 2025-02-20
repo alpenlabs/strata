@@ -77,7 +77,8 @@ pub fn checkpoint_worker(
 
         // Fetch the epochs that seem ready to have checkpoints generated.  We
         // don't actually use the update for this, it's just a signal to check.
-        // Maybe that could be simplified?
+        // Maybe that could be simplfied?
+
         let ready_epochs = find_ready_checkpoints(last_saved_epoch, ckman)?;
 
         if !ready_epochs.is_empty() {
@@ -139,6 +140,10 @@ fn find_ready_checkpoints(
             warn!(epoch = %i, %ignored_count, "ignoring some summaries at epoch");
         }
 
+        // TODO: this is not actually correct although should be fine under the assumption of
+        // no-reorg.
+        // This function should be passed the last accepted checkpoint and this should be the
+        // commitment that continues the last checkpoint.
         let ec = commitments[0];
         if ckman.get_checkpoint_blocking(ec.epoch())?.is_none() {
             trace!(epoch = %i, "found epoch ready to checkpoint");
