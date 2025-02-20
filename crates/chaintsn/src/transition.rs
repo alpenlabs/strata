@@ -167,7 +167,7 @@ fn process_l1_checkpoint(
     // TODO go through and do whatever stuff we need to do now that's finalized
 
     state.set_finalized_epoch(new_fin_epoch);
-    debug!(?new_fin_epoch, "observed finalized checkpoint");
+    trace!(?new_fin_epoch, "observed finalized checkpoint");
 
     Ok(())
 }
@@ -190,7 +190,7 @@ fn process_l1_deposit(
     state.insert_deposit_intent(0, deposit_intent);
 
     // Logging so we know if it got there.
-    debug!(?outpoint, "handled deposit");
+    trace!(?outpoint, "handled deposit");
 
     Ok(())
 }
