@@ -261,9 +261,11 @@ pub fn tracker_task<E: ExecEngineCtl>(
 
     handle_unprocessed_blocks(&mut fcm, &storage, engine.as_ref(), &status_channel)?;
 
-    // Before we get going we also want to load the finalized block from disk.
-    let init_fin_tip = fcm.finalized_tip();
-    engine.as_ref().update_finalized_block(*init_fin_tip)?;
+    // FIXME: engine api errors our here sometimes. Need to figure out why.
+    // Do we really need to do this ?
+    // // Before we get going we also want to load the finalized block from disk.
+    // let init_fin_tip = fcm.finalized_tip();
+    // engine.as_ref().update_finalized_block(*init_fin_tip)?;
 
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
