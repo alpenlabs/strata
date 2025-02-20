@@ -32,9 +32,6 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
     type H = H;
 
     fn get_input(&self, block_range: &(u64, u64)) -> ZkVmResult<ClStfInput> {
-        // Generate EL proof required for aggregation
-        let el_proof = self.el_proof_generator.get_proof(block_range)?;
-
         // Read CL witness data
         let params = gen_params();
         let rollup_params = params.rollup();
@@ -42,6 +39,12 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
         let l2_segment = L2Segment::initialize_from_saved_evm_ee_data(block_range.0, block_range.1);
         let l2_blocks = l2_segment.blocks;
         let pre_states = l2_segment.pre_states;
+
+        // TODO: use some btc blocks
+        let btc_proof = self.btc_proof_generator.get_proof(&None)?;
+
+        // Generate EL proof required for aggregation
+        let el_proof = self.el_proof_generator.get_proof(block_range)?;
 
         Ok(ClStfInput {
             rollup_params: rollup_params.clone(),
@@ -51,10 +54,9 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
                 el_proof.clone(),
                 self.el_proof_generator.get_host().get_verification_key(),
             ),
-            // FIXME: this: this should be BTC
             btc_blockspace_proof_with_vk: (
-                el_proof,
-                self.el_proof_generator.get_host().get_verification_key(),
+                btc_proof,
+                self.btc_proof_generator.get_host().get_verification_key(),
             ),
         })
     }

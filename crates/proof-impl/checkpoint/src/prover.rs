@@ -33,6 +33,7 @@ impl ZkVmProver for CheckpointProver {
         let mut input_builder = B::new();
 
         input_builder.write_serde(&input.rollup_params)?;
+        input_builder.write_serde(&input.cl_stf_proofs.len())?;
 
         for cl_stf_proof in &input.cl_stf_proofs {
             let cl_stf_proof_with_vk =

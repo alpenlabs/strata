@@ -20,9 +20,7 @@ use zkaleido::ZkVmEnv;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ClStfOutput {
-    pub initial_epoch: u64,
     pub initial_chainstate_root: Buf32,
-    pub final_epoch: u64,
     pub final_chainstate_root: Buf32,
 }
 
@@ -33,7 +31,6 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     // 2. Read the initial chainstate from which we start the transition and create the state cache
     let initial_chainstate: Chainstate = zkvm.read_borsh();
     let initial_chainstate_root = initial_chainstate.compute_state_root();
-    let initial_epoch = initial_chainstate.cur_epoch();
     let mut state_cache = StateCache::new(initial_chainstate);
 
     // 3. Read L2 blocks
@@ -130,9 +127,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
 
     let output = ClStfOutput {
         initial_chainstate_root,
-        initial_epoch,
         final_chainstate_root: final_chain_state.compute_state_root(),
-        final_epoch: final_chain_state.cur_epoch(),
     };
 
     zkvm.commit_borsh(&output);
