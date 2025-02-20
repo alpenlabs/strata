@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use argh::FromArgs;
-use strata_config::Config;
 use toml::value::Table;
 
 use crate::errors::ConfigError;
@@ -33,7 +32,7 @@ pub struct Args {
     pub config: PathBuf,
 
     // Config overriding args
-    /// Data directory path that will override the path in the [`Config`].
+    /// Data directory path that will override the path in the config toml.
     #[argh(
         option,
         short = 'd',
@@ -45,7 +44,7 @@ pub struct Args {
     #[argh(switch, description = "is sequencer")]
     pub sequencer: bool,
 
-    /// Rollup params path that will override the params in the [`Config`].
+    /// Rollup params path that will override the params in the config toml.
     #[argh(option, description = "rollup params")]
     pub rollup_params: Option<PathBuf>,
 
@@ -57,7 +56,7 @@ pub struct Args {
     #[argh(option, description = "rpc port")]
     pub rpc_port: Option<u16>,
 
-    /// Other generic overrides to the [`Config`].
+    /// Other generic overrides to the config toml.
     /// Will be used, for example, as `-o btcio.reader.client_poll_dur_ms=1000 -o exec.reth.rpc_url=http://reth`
     #[argh(option, short = 'o', description = "generic config overrides")]
     pub overrides: Vec<String>,
@@ -74,65 +73,54 @@ impl Args {
     /// Overrides passed directly as args and not as overrides.
     fn get_direct_overrides(&self) -> Vec<String> {
         let mut overrides = Vec::new();
+        if self.sequencer {
+            overrides.push("client.is_sequencer=true".to_string());
+        }
         if let Some(datadir) = &self.datadir {
-            overrides.push(format!("client.datadir={}", datadir.to_string_lossy()));
+            overrides.push(format!("client.datadir={datadir:?}"));
         }
         if let Some(rpc_host) = &self.rpc_host {
-            overrides.push(format!("client.rpc_host={}", rpc_host));
+            overrides.push(format!("client.rpc_host={rpc_host}"));
         }
         if let Some(rpc_port) = &self.rpc_port {
-            overrides.push(format!("client.rpc_port={}", rpc_port));
+            overrides.push(format!("client.rpc_port={rpc_port}"));
         }
 
         overrides
     }
 }
 
-type Override = (Vec<String>, String);
+type Override = (String, toml::Value);
 
 /// Parses an overrides This first splits the string by '=' to get key and value and then splits
 /// the key by '.' which is the update path.
 pub fn parse_override(override_str: &str) -> Result<Override, ConfigError> {
-    let (key, value) = override_str
+    let (key, value_str) = override_str
         .split_once("=")
         .ok_or(ConfigError::InvalidOverride(override_str.to_string()))?;
-    let path: Vec<_> = key.split(".").map(|x| x.to_string()).collect();
-    Ok((path, value.to_string()))
-}
-
-pub fn apply_overrides(overrides: Vec<String>, table: &mut Table) -> Result<Config, ConfigError> {
-    for res in overrides.iter().map(String::as_str).map(parse_override) {
-        let (path, val) = res?;
-        apply_override(&path, &val, table)?;
-    }
-
-    toml::Value::Table(table.clone())
-        .try_into()
-        .map_err(|_| ConfigError::ConfigNotParseable)
+    Ok((key.to_string(), parse_value(value_str)))
 }
 
 /// Apply override to config.
 pub fn apply_override(
-    path: &[String],
-    str_value: &str,
+    path: &str,
+    value: toml::Value,
     table: &mut Table,
 ) -> Result<(), ConfigError> {
-    match path {
-        [key] => {
-            let value = parse_value(str_value);
-            table.insert(key.to_string(), value);
+    match path.split_once(".") {
+        None => {
+            table.insert(path.to_string(), value);
             Ok(())
         }
-        [key, other @ ..] => {
+        Some((key, rest)) => {
             if let Some(t) = table.get_mut(key).and_then(|v| v.as_table_mut()) {
-                apply_override(other, str_value, t)
+                apply_override(rest, value, t)
             } else if table.contains_key(key) {
                 Err(ConfigError::TraversePrimitiveAt(key.to_string()))
             } else {
                 Err(ConfigError::MissingKey(key.to_string()))
             }
         }
-        [] => Err(ConfigError::MalformedOverrideStr), // TODO: this might be a better variant
     }
 }
 
@@ -143,7 +131,7 @@ fn parse_value(str_value: &str) -> toml::Value {
         .parse::<i64>()
         .map(toml::Value::Integer)
         .or_else(|_| str_value.parse::<bool>().map(toml::Value::Boolean))
-        .unwrap_or(toml::Value::String(str_value.to_string()))
+        .unwrap_or_else(|_| toml::Value::String(str_value.to_string()))
 }
 
 #[cfg(test)]
@@ -167,6 +155,7 @@ mod test {
                 l2_blocks_fetch_limit: 20,
                 datadir: "".into(),
                 db_retry_count: 3,
+                is_sequencer: false,
             },
             bitcoind: BitcoindConfig {
                 rpc_url: "".to_string(),
@@ -202,13 +191,12 @@ mod test {
     #[test]
     fn test_apply_override() {
         let config = get_config();
-        let mut toml = toml::Value::try_from(config).unwrap();
+        let mut toml = toml::Value::try_from(&config).unwrap();
         let table = toml.as_table_mut().unwrap();
-        let datadir: PathBuf = "new/data/dir/".into();
         let args = Args {
             config: "config_path".into(),
-            datadir: Some(datadir.clone()),
-            sequencer: false,
+            datadir: None,
+            sequencer: true,
             rollup_params: None,
             rpc_host: None,
             rpc_port: None,
@@ -217,16 +205,29 @@ mod test {
                 "sync.l1_follow_distance=30".to_string(),
                 "client.rpc_host=rpchost".to_string(),
                 "bitcoind.network=signet".to_string(),
+                "client.datadir=some/data/dir/".to_string(),
             ],
         };
 
-        let overrides = args.get_overrides();
-        let config = apply_overrides(overrides, table).unwrap();
+        let overrides = args
+            .get_overrides()
+            .into_iter()
+            .map(|x| parse_override(&x).unwrap());
 
-        assert!(config.btcio.reader.client_poll_dur_ms == 50);
-        assert!(config.sync.l1_follow_distance == 30);
-        assert!(&config.client.rpc_host == "rpchost");
-        assert!(config.bitcoind.network == Network::Signet);
-        assert!(config.client.datadir == datadir);
+        for (path, val) in overrides {
+            apply_override(&path, val, table).unwrap();
+        }
+
+        let new_config: Config = toml.try_into().unwrap();
+
+        assert_eq!(new_config.btcio.reader.client_poll_dur_ms, 50);
+        assert_eq!(new_config.sync.l1_follow_distance, 30);
+        assert_eq!(&new_config.client.rpc_host, "rpchost");
+        assert_eq!(new_config.bitcoind.network, Network::Signet);
+        assert!(new_config.client.is_sequencer);
+        assert_eq!(
+            &new_config.client.datadir.to_string_lossy(),
+            "some/data/dir/"
+        );
     }
 }

@@ -38,8 +38,12 @@ pub struct ClientConfig {
     #[serde(default = "default_datadir")]
     pub datadir: PathBuf,
 
-    /// This is for optimistic transaction, how many times to retry if a write fails.
+    /// For optimistic transactions, how many times to retry if a write fails.
     pub db_retry_count: u16,
+
+    /// If sequencer tasks should run or not. Default to false.
+    #[serde(default)]
+    pub is_sequencer: bool,
 }
 
 fn default_p2p_port() -> u16 {

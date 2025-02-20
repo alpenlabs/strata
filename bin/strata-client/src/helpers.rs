@@ -17,7 +17,7 @@ use tokio::runtime::Handle;
 use tracing::*;
 
 use crate::{
-    args::{apply_overrides, Args, EnvArgs},
+    args::{apply_override, parse_override, Args, EnvArgs},
     errors::{ConfigError, InitError},
     network,
 };
@@ -25,25 +25,38 @@ use crate::{
 pub fn get_config(args: Args) -> Result<Config, InitError> {
     // First load from config file.
     let mut config_toml = load_configuration(args.config.as_ref())?;
-    let mut overrides = Vec::new();
 
-    // Override from env
+    // Extend overrides from env.
     let env_args = EnvArgs::from_env();
-    overrides.extend_from_slice(&env_args.get_overrides());
+    let mut override_strs = env_args.get_overrides();
 
-    overrides.extend_from_slice(&args.get_overrides());
+    // Extend overrides from args.
+    override_strs.extend_from_slice(&args.get_overrides());
 
-    Ok(apply_overrides(
-        overrides,
-        config_toml
-            .as_table_mut()
-            .ok_or(ConfigError::ConfigNotTomlTable)?,
-    )?)
+    // Parse overrides.
+    let overrides = override_strs
+        .iter()
+        .map(|o| parse_override(o))
+        .collect::<Result<Vec<_>, ConfigError>>()?;
+
+    // Apply overrides to toml table.
+    let table = config_toml
+        .as_table_mut()
+        .ok_or(ConfigError::TraversePrimitiveAt("".to_string()))?;
+
+    for (path, val) in overrides {
+        apply_override(&path, val, table)?;
+    }
+
+    // Convert back to Config.
+    config_toml
+        .try_into::<Config>()
+        .map_err(|e| InitError::Anyhow(e.into()))
 }
 
 fn load_configuration(path: &Path) -> Result<toml::Value, InitError> {
     let config_str = fs::read_to_string(path)?;
-    Ok(toml::from_str(&config_str).map_err(|_| ConfigError::ConfigNotParseable)?)
+    toml::from_str(&config_str).map_err(|e| InitError::Anyhow(e.into()))
 }
 
 pub fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
