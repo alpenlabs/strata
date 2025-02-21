@@ -195,7 +195,7 @@ impl StrataApiServer for StrataRpcImpl {
         Ok(self
             .storage
             .l1()
-            .get_canonical_blockid_async(height)
+            .get_canonical_blockid_at_height_async(height)
             .await
             .map_err(Error::Db)?
             .map(|blockid| blockid.to_string()))
