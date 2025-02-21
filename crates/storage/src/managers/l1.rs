@@ -118,7 +118,7 @@ impl L1BlockManager {
         }
         self.chaintip_cache.purge(&());
         self.ops
-            .remove_canonical_chain_range_blocking(height + 1, tip_height)
+            .remove_canonical_chain_entries_blocking(height + 1, tip_height)
     }
 
     pub async fn revert_canonical_chain_async(&self, height: u64) -> DbResult<()> {
@@ -135,7 +135,7 @@ impl L1BlockManager {
         }
         self.chaintip_cache.purge(&());
         self.ops
-            .remove_canonical_chain_range_async(height + 1, tip_height)
+            .remove_canonical_chain_entries_async(height + 1, tip_height)
             .await
     }
 

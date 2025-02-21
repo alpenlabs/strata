@@ -56,11 +56,11 @@ pub trait L1Database {
     /// error.
     fn put_mmr_checkpoint(&self, blockid: L1BlockId, mmr: CompactMmr) -> DbResult<()>;
 
-    /// Set block at specific height as part of canonical chain.
+    /// Set a specific height, blockid in canonical chain records.
     fn set_canonical_chain_entry(&self, height: u64, blockid: L1BlockId) -> DbResult<()>;
 
-    /// remove entries from canonical chain in given range (inclusive)
-    fn remove_canonical_chain_range(&self, start_height: u64, end_height: u64) -> DbResult<()>;
+    /// remove canonical chain records in given range (inclusive)
+    fn remove_canonical_chain_entries(&self, start_height: u64, end_height: u64) -> DbResult<()>;
 
     /// Prune earliest blocks till height
     fn prune_to_height(&self, height: u64) -> DbResult<()>;
