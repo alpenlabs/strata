@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use bitcoin::{
     absolute::Height,
     address::{self, NetworkUnchecked},
+    block::Header,
     consensus::{self, encode},
     Address, Amount, Block, BlockHash, SignedAmount, Transaction, Txid,
 };
@@ -79,6 +80,22 @@ pub struct GetBlockchainInfo {
     pub automatic_pruning: Option<bool>,
     /// The target size used by pruning (only present if automatic pruning is enabled).
     pub prune_target_size: Option<u64>,
+}
+
+/// Result of JSON-RPC method `getblockheader` with verbosity set to 0.
+///
+/// A string that is serialized, hex-encoded data for block 'hash'.
+///
+/// Method call: `getblockheader "blockhash" ( verbosity )`
+#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+pub struct GetBlockHeaderVerbosityZero(pub String);
+
+impl GetBlockHeaderVerbosityZero {
+    /// Converts json straight to a [`Header`].
+    pub fn header(self) -> Result<Header, encode::FromHexError> {
+        let header: Header = encode::deserialize_hex(&self.0)?;
+        Ok(header)
+    }
 }
 
 /// Result of JSON-RPC method `getblock` with verbosity set to 0.

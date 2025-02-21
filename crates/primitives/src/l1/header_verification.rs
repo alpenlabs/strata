@@ -261,7 +261,7 @@ pub fn get_difficulty_adjustment_start_height(height: u32, params: &BtcParams) -
 mod tests {
     use bitcoin::params::MAINNET;
     use rand::{rngs::OsRng, Rng};
-    use strata_test_utils::bitcoin::get_btc_chain;
+    use strata_test_utils::bitcoin_mainnet_segment::BtcChainSegment;
 
     use super::*;
 
@@ -299,9 +299,9 @@ mod tests {
 
     #[test]
     fn test_hash() {
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
         let r1 = 42000;
-        let verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
+        let verification_state = chain.get_verification_state(r1).unwrap();
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
     }

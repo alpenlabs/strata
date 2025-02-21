@@ -372,7 +372,8 @@ mod tests {
     use strata_rocksdb::test_utils::get_common_db;
     use strata_state::{l1::L1BlockId, operation};
     use strata_test_utils::{
-        bitcoin::{gen_l1_chain, get_btc_chain, BtcChainSegment},
+        bitcoin::gen_l1_chain,
+        bitcoin_mainnet_segment::BtcChainSegment,
         l2::{gen_client_state, gen_params},
         ArbitraryGenerator,
     };
@@ -387,14 +388,14 @@ mod tests {
     impl DummyEventContext {
         pub fn new() -> Self {
             Self {
-                chainseg: get_btc_chain(),
+                chainseg: BtcChainSegment::load(),
             }
         }
     }
 
     impl EventContext for DummyEventContext {
         fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
-            let rec = self.chainseg.get_block_record(height as u32);
+            let rec = self.chainseg.get_header_record(height).unwrap();
             Ok(L1BlockManifest::new(
                 rec,
                 HeaderVerificationState::default(),
@@ -462,13 +463,12 @@ mod tests {
         let horizon = params.rollup().horizon_l1_height as u64;
         let genesis = params.rollup().genesis_l1_height as u64;
 
-        let chain = get_btc_chain();
-        let l1_verification_state =
-            chain.get_verification_state(genesis as u32 + 1, &MAINNET.clone().into());
+        let chain = BtcChainSegment::load();
+        let l1_verification_state = chain.get_verification_state(genesis + 1).unwrap();
 
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();
-        let l1_chain = chain.get_block_records(horizon as u32, 10);
+        let l1_chain = chain.get_header_records(horizon, 10).unwrap();
 
         let l1_blocks = l1_chain
             .iter()

@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
 use bitcoin::{
     bip32::Xpriv,
+    block::Header,
     consensus::{self, encode::serialize_hex},
     Address, Block, BlockHash, Network, Transaction, Txid,
 };
@@ -27,6 +28,7 @@ use serde_json::{
 use tokio::time::sleep;
 use tracing::*;
 
+use super::types::GetBlockHeaderVerbosityZero;
 use crate::rpc::{
     error::{BitcoinRpcError, ClientError},
     traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
@@ -243,6 +245,19 @@ impl ReaderRpc for BitcoinClient {
         Ok((btc_vkb * 100_000_000.0 / 1000.0) as u64)
     }
 
+    async fn get_block_header(&self, hash: &BlockHash) -> ClientResult<Header> {
+        let get_block_header = self
+            .call::<GetBlockHeaderVerbosityZero>(
+                "getblockheader",
+                &[to_value(hash.to_string())?, to_value(false)?],
+            )
+            .await?;
+        let header = get_block_header
+            .header()
+            .map_err(|err| ClientError::Other(format!("header decode: {}", err)))?;
+        Ok(header)
+    }
+
     async fn get_block(&self, hash: &BlockHash) -> ClientResult<Block> {
         let get_block = self
             .call::<GetBlockVerbosityZero>("getblock", &[to_value(hash.to_string())?, to_value(0)?])
@@ -260,6 +275,11 @@ impl ReaderRpc for BitcoinClient {
 
         let block_height = block_verobose.height as u64;
         Ok(block_height)
+    }
+
+    async fn get_block_header_at(&self, height: u64) -> ClientResult<Header> {
+        let hash = self.get_block_hash(height).await?;
+        self.get_block_header(&hash).await
     }
 
     async fn get_block_at(&self, height: u64) -> ClientResult<Block> {
