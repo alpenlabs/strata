@@ -17,6 +17,7 @@ strata-storage.workspace = true
 
 anyhow.workspace = true
 arbitrary.workspace = true
+async-trait.workspace = true
 bitcoin = { workspace = true, features = ["rand-std"] }
 hex.workspace = true
 musig2.workspace = true
@@ -26,3 +27,4 @@ revm.workspace = true
 rockbound.workspace = true
 serde_json.workspace = true
 threadpool.workspace = true
+tokio.workspace = true

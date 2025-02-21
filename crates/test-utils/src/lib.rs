@@ -2,6 +2,7 @@ use arbitrary::{Arbitrary, Unstructured};
 use rand_core::{CryptoRngCore, OsRng};
 
 pub mod bitcoin;
+pub mod bitcoin_mainnet_segment;
 pub mod bridge;
 pub mod evm_ee;
 pub mod l2;
