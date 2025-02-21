@@ -375,7 +375,16 @@ async fn process_block<R: ReaderRpc>(
     Ok((l1_events, l1blkid))
 }
 
-/// Fetches the [`HeaderVerificationState`] for the particular block.
+/// Returns the [`HeaderVerificationState`] after applying the given block height. This state can be
+/// used to verify the next block header.
+///
+/// This function assumes that `block_height` is valid and gathers all necessary
+/// blockchain data, such as difficulty adjustment headers, block timestamps, and target
+/// values, to compute the verification state.
+///
+/// It calculates the current and previous epoch adjustment headers, fetches the required
+/// timestamps (including a safe margin for potential reorg depth), and determines the next
+/// block's target.
 pub async fn fetch_verification_state(
     client: &impl ReaderRpc,
     height: u64,
@@ -383,11 +392,10 @@ pub async fn fetch_verification_state(
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
     let h1 = get_difficulty_adjustment_start_height(height as u32, params);
-    let b1 = client.get_block_at(h1 as u64).await?;
+    let b1 = client.get_block_header_at(h1 as u64).await?;
 
-    // Consider the block before `block_height` to be the last verified block
-    let vh = height; // verified_height
-    let vb = client.get_block_at(vh).await?; // verified_block
+    // Consider the block header at `height` to be the verified block
+    let vh = client.get_block_header_at(height).await?; // verified_header
 
     const N: usize = 11;
     let mut timestamps: [u32; N] = [0u32; N];
@@ -395,8 +403,8 @@ pub async fn fetch_verification_state(
     // Fetch the previous timestamps of block from `vh`
     // This fetches timestamps of `vh-10`,`vh-9`, ... `vh-1`, `vh`
     for i in 0..N {
-        if vh >= i as u64 {
-            let height_to_fetch = vh - i as u64;
+        if height >= i as u64 {
+            let height_to_fetch = height - i as u64;
             let h = client.get_block_at(height_to_fetch).await?;
             timestamps[N - 1 - i] = h.header.time;
         } else {
@@ -410,13 +418,13 @@ pub async fn fetch_verification_state(
     let head = (height + 1) as usize % N;
     let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head);
 
-    let l1_blkid: L1BlockId = vb.header.block_hash().into();
+    let l1_blkid: L1BlockId = vh.block_hash().into();
 
     let header_vs = HeaderVerificationState {
-        last_verified_block_num: vh as u32,
+        last_verified_block_num: height as u32,
         last_verified_block_hash: l1_blkid,
-        next_block_target: vb.header.target().to_compact_lossy().to_consensus(),
-        interval_start_timestamp: b1.header.time,
+        next_block_target: vh.target().to_compact_lossy().to_consensus(),
+        interval_start_timestamp: b1.time,
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
     };
