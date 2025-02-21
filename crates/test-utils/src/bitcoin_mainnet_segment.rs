@@ -19,7 +19,7 @@ use strata_btcio::{
 };
 use strata_primitives::{
     buf::Buf32,
-    l1::{get_btc_params, HeaderVerificationState, L1HeaderRecord},
+    l1::{get_btc_params, HeaderVerificationState, L1BlockManifest, L1HeaderRecord},
 };
 pub struct BtcChainSegment {
     pub headers: Vec<Header>,
@@ -97,6 +97,11 @@ impl BtcChainSegment {
         }
         let idx = height - self.start;
         Ok(self.headers[idx as usize])
+    }
+
+    pub fn get_block_manifest(&self, height: u32) -> L1BlockManifest {
+        let rec = self.get_header_record(height.into()).unwrap();
+        L1BlockManifest::new(rec, HeaderVerificationState::default(), Vec::new(), 1)
     }
 }
 
