@@ -25,6 +25,15 @@ pub enum DbError {
     #[error("missing L1 block (height {0})")]
     MissingL1Block(u64),
 
+    #[error("L1 canonical chain is empty")]
+    L1CanonicalChainEmpty,
+
+    #[error("Revert height {0} above chain tip height {0}")]
+    L1InvalidRevertHeight(u64, u64),
+
+    #[error("Block does not extend canonical chain tip")]
+    L1InvalidNextBlock(u64, L1BlockId),
+
     #[error("missing L2 state (idx {0})")]
     MissingL2State(u64),
 

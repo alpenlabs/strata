@@ -90,7 +90,7 @@ fn calculate_target_next_block(
 ) -> anyhow::Result<u64> {
     // TODO switch to checking the L1 tip in the consensus/client state
     let target_next_block = l1_manager
-        .get_chain_tip()?
+        .get_canonical_chain_tip()?
         .map(|(height, _)| height + 1)
         .unwrap_or(horz_height);
     assert!(target_next_block >= horz_height);
