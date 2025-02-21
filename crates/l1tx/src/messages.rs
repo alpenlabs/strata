@@ -1,24 +1,19 @@
 use bitcoin::Block;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_state::{
-    l1::HeaderVerificationState,
-    tx::{DaCommitment, DepositRequestInfo, ProtocolOperation},
+use strata_primitives::l1::{
+    DaCommitment, DepositRequestInfo, HeaderVerificationState, L1BlockCommitment, ProtocolOperation,
 };
 
 /// L1 events that we observe and want the persistence task to work on.
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum L1Event {
     /// Data that contains block number, block and relevant transactions, and also the epoch whose
     /// rules are applied to
-    BlockData(BlockData, u64),
+    BlockData(BlockData, u64, HeaderVerificationState),
 
     /// Revert to the provided block height
-    RevertTo(u64),
-
-    /// HeaderVerificationState for the block after genesis
-    ///
-    /// Note: This event is expected to emit only once after the genesis_block has reached maturity
-    GenesisVerificationState(u64, HeaderVerificationState),
+    RevertTo(L1BlockCommitment),
 }
 
 /// Indexed transaction entry taken from a block.

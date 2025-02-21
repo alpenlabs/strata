@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
-    l1::{BitcoinAmount, L1BlockCommitment, L1TxRef, OutputRef},
+    epoch::EpochCommitment,
+    l1::{BitcoinAmount, L1BlockCommitment, OutputRef},
     l2::L2BlockCommitment,
     prelude::L1Status,
 };
@@ -126,25 +127,46 @@ impl Default for RpcL1Status {
     }
 }
 
+/// In reference to checkpointed client state tracked by the CSM.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcClientStatus {
     /// Blockchain tip.
+    // TODO remove this since the CSM doesn't track this anymore, we're pulling it in indirectly
     #[serde(with = "hex::serde")]
+    #[deprecated(note = "no longer tracked by client state")]
     pub chain_tip: [u8; 32],
 
     /// L1 chain tip slot.
+    // TODO remove this since the CSM doesn't track this anymore, we're pulling it in indirectly
+    #[deprecated(note = "no longer tracked by client state")]
     pub chain_tip_slot: u64,
 
     /// L2 block that's been finalized and proven on L1.
     #[serde(with = "hex::serde")]
+    #[deprecated(note = "implied by finalized_epoch, use that instead")]
     pub finalized_blkid: [u8; 32],
+
+    /// Epoch that's been confirmed and buried on L1 and we can assume won't
+    /// roll back.
+    pub finalized_epoch: Option<EpochCommitment>,
+
+    /// Epoch that's been confirmed on L1 but might still roll back.
+    pub confirmed_epoch: Option<EpochCommitment>,
 
     /// Recent L1 block that we might still reorg.
     #[serde(with = "hex::serde")]
+    #[deprecated(note = "use `tip_l1_block`")]
     pub last_l1_block: [u8; 32],
 
     /// L1 block index we treat as being "buried" and won't reorg.
+    #[deprecated(note = "use `buried_l1_block`")]
     pub buried_l1_height: u64,
+
+    /// Tip L1 block that we're following.
+    pub tip_l1_block: Option<L1BlockCommitment>,
+
+    /// Buried L1 block that we use to determine the finalized epoch.
+    pub buried_l1_block: Option<L1BlockCommitment>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -217,12 +239,33 @@ pub struct RpcExecUpdate {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcSyncStatus {
     /// Current head L2 slot known to this node
+    // TODO consolidate into using L2BlockCommitment
     pub tip_height: u64,
 
     /// Last L2 block we've chosen as the current tip.
+    // TODO consolidate into using L2BlockCommitment
     pub tip_block_id: strata_state::id::L2BlockId,
 
-    /// L2 block that's been finalized and proven on L1.
+    /// Current epoch from chainstate.
+    pub cur_epoch: u64,
+
+    /// Previous epoch from chainstate.
+    pub prev_epoch: EpochCommitment,
+
+    /// Observed finalized epoch from chainstate.
+    pub observed_finalized_epoch: EpochCommitment,
+
+    /// Most recent L1 block we've acted on on-chain.
+    pub safe_l1_block: L1BlockCommitment,
+
+    /// Terminal blkid of observed finalized epoch from chainstate.
+    ///
+    /// Note that this is not necessarily the most recently finalized epoch,
+    /// it's the one we've also observed, so it's behind by >~1.
+    ///
+    /// If you want the real one from L1, use another method.
+    // TODO which other method?
+    #[deprecated]
     pub finalized_block_id: L2BlockId,
 }
 
@@ -358,14 +401,6 @@ pub struct RpcDepositEntry {
     /// Deposit amount, in the native asset.
     amt: BitcoinAmount,
 
-    /// Refs to txs in the maturation queue that will update the deposit entry
-    /// when they mature.  This is here so that we don't have to scan a
-    /// potentially very large set of pending transactions to reason about the
-    /// state of the deposits.  This must be kept in sync when we do things
-    /// though.
-    // TODO probably removing this actually
-    pending_update_txs: Vec<L1TxRef>,
-
     /// Deposit state.
     state: DepositState,
 }
@@ -374,10 +409,9 @@ impl RpcDepositEntry {
     pub fn from_deposit_entry(ent: &DepositEntry) -> Self {
         Self {
             deposit_idx: ent.idx(),
-            output: ent.output().clone(),
+            output: *ent.output(),
             notary_operators: ent.notary_operators().to_vec(),
             amt: ent.amt(),
-            pending_update_txs: ent.pending_update_txs().to_vec(),
             state: ent.deposit_state().clone(),
         }
     }

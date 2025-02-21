@@ -4,11 +4,10 @@
 pub mod prover;
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, params::RollupParams};
+use strata_primitives::{buf::Buf32, l1::DepositInfo, params::RollupParams};
 use strata_state::{
     block::ExecSegment,
     block_validation::{check_block_credential, validate_block_segments},
-    tx::DepositInfo,
 };
 pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateCache};
 use zkaleido::ZkVmEnv;

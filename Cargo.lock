@@ -13253,6 +13253,7 @@ dependencies = [
  "thiserror 2.0.11",
  "tracing",
  "zeroize",
+ "zkaleido",
 ]
 
 [[package]]
@@ -13752,7 +13753,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "borsh",
- "parking_lot 0.12.3",
  "serde",
  "strata-chaintsn",
  "strata-common",
@@ -13764,7 +13764,6 @@ dependencies = [
  "strata-status",
  "strata-storage",
  "strata-tasks",
- "strata-test-utils",
  "thiserror 2.0.11",
  "tokio",
  "tracing",

@@ -115,14 +115,13 @@ def main(argv):
         "operator_lag": testenv.BasicEnvConfig(101, message_interval=10 * 60 * 1_000),
         # Devnet production env
         "devnet": testenv.BasicEnvConfig(101, custom_chain="devnet"),
-        "fast_batches": testenv.BasicEnvConfig(
-            101, rollup_settings=net_settings.get_fast_batch_settings()
-        ),
         "hub1": testenv.HubNetworkEnvConfig(
             2
         ),  # TODO: Need to generate at least horizon blocks, based on params
-        "prover": testenv.BasicEnvConfig(101),
+        "prover": testenv.BasicEnvConfig(101, rollup_settings=RollupParamsSettings.new_default().strict_mode()),
         "load_reth": reth_load_env,
+        # separate env for running crash_* tests
+        "crash": testenv.BasicEnvConfig(101),
     }
 
     setup_root_logger()

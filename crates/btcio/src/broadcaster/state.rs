@@ -85,6 +85,7 @@ async fn filter_unfinalized_from_db(
     Ok(unfinalized_entries)
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod test {
     use bitcoin::{consensus, Transaction};

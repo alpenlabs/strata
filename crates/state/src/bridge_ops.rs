@@ -71,11 +71,8 @@ pub struct DepositIntent {
 }
 
 impl DepositIntent {
-    pub fn new(amt: BitcoinAmount, dest_ident: &[u8]) -> Self {
-        Self {
-            amt,
-            dest_ident: dest_ident.to_vec(),
-        }
+    pub fn new(amt: BitcoinAmount, dest_ident: Vec<u8>) -> Self {
+        Self { amt, dest_ident }
     }
 
     pub fn amt(&self) -> u64 {

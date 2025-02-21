@@ -3,10 +3,10 @@
 use std::collections::*;
 
 use strata_db::traits::BlockStatus;
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, epoch::EpochCommitment, l2::L2BlockCommitment};
 use strata_state::prelude::*;
 use strata_storage::L2BlockManager;
-use tracing::warn;
+use tracing::*;
 
 use crate::errors::ChainTipError;
 
@@ -14,6 +14,7 @@ use crate::errors::ChainTipError;
 /// relatives.
 #[derive(Debug)]
 struct BlockEntry {
+    slot: u64,
     parent: L2BlockId,
     children: HashSet<L2BlockId>,
 }
@@ -23,7 +24,7 @@ struct BlockEntry {
 pub struct UnfinalizedBlockTracker {
     /// Block that we treat as a base that all of the other blocks that we're
     /// considering uses.
-    finalized_tip: L2BlockId,
+    finalized_epoch: EpochCommitment,
 
     /// Table of pending blocks near the tip of the block tree.
     pending_table: HashMap<L2BlockId, BlockEntry>,
@@ -35,41 +36,55 @@ pub struct UnfinalizedBlockTracker {
 
 impl UnfinalizedBlockTracker {
     /// Creates a new tracker with just a finalized tip and no pending blocks.
-    pub fn new_empty(finalized_tip: L2BlockId) -> Self {
+    pub fn new_empty(finalized_epoch: EpochCommitment) -> Self {
+        let fin_tip = *finalized_epoch.last_blkid();
+
         let mut pending_tbl = HashMap::new();
         pending_tbl.insert(
-            finalized_tip,
+            fin_tip,
             BlockEntry {
+                slot: finalized_epoch.last_slot(),
                 parent: L2BlockId::from(Buf32::zero()),
                 children: HashSet::new(),
             },
         );
 
         let mut unf_tips = HashSet::new();
-        unf_tips.insert(finalized_tip);
+        unf_tips.insert(fin_tip);
         Self {
-            finalized_tip,
+            finalized_epoch,
             pending_table: pending_tbl,
             unfinalized_tips: unf_tips,
         }
     }
 
-    /// Returns the "finalized tip", which is the base of the unfinalized tree.
+    /// Returns the finalized epoch that we build blocks off of.
+    pub fn finalized_epoch(&self) -> &EpochCommitment {
+        &self.finalized_epoch
+    }
+
+    /// Returns the "finalized tip", which is the terminal block of the
+    /// finalized epoch and the base of the unfinalized tree.
     pub fn finalized_tip(&self) -> &L2BlockId {
-        &self.finalized_tip
+        self.finalized_epoch.last_blkid()
     }
 
     /// Returns `true` if the block is either the finalized tip or is already
     /// known to the tracker.
     pub fn is_seen_block(&self, id: &L2BlockId) -> bool {
-        self.finalized_tip == *id || self.pending_table.contains_key(id)
+        self.finalized_tip() == id || self.pending_table.contains_key(id)
+    }
+
+    /// Returns the slot of some block, if present in the tracker.
+    pub fn get_slot(&self, id: &L2BlockId) -> Option<u64> {
+        self.pending_table.get(id).map(|ent| ent.slot)
     }
 
     /// Gets the parent of a block from within the tree.  Returns `None` if the
     /// block or its parent isn't in the tree.  Returns `None` for the finalized
     /// tip block, since its parent isn't in the tree.
     pub fn get_parent(&self, id: &L2BlockId) -> Option<&L2BlockId> {
-        if *id == self.finalized_tip {
+        if id == self.finalized_tip() {
             return None;
         }
         self.pending_table.get(id).map(|ent| &ent.parent)
@@ -80,9 +95,15 @@ impl UnfinalizedBlockTracker {
         self.unfinalized_tips.iter()
     }
 
+    /// Returns an iterator over the block commitments of the chain tips.
+    pub fn chain_tip_blocks_iter(&self) -> impl Iterator<Item = L2BlockCommitment> + '_ {
+        self.chain_tips_iter()
+            .map(|id| L2BlockCommitment::new(self.pending_table[id].slot, *id))
+    }
+
     /// Checks if the block is traceable all the way back to the finalized tip.
     fn sanity_check_parent_seq(&self, blkid: &L2BlockId) -> bool {
-        if *blkid == self.finalized_tip {
+        if blkid == self.finalized_tip() {
             return true;
         }
 
@@ -105,19 +126,27 @@ impl UnfinalizedBlockTracker {
         header: &SignedL2BlockHeader,
     ) -> Result<bool, ChainTipError> {
         if self.pending_table.contains_key(&blkid) {
-            warn!(blkid = ?blkid, "block already attached");
+            warn!(?blkid, "block already attached");
             return Ok(false);
         }
 
         let parent_blkid = header.parent();
 
         if let Some(parent_ent) = self.pending_table.get_mut(parent_blkid) {
+            if header.blockidx() <= parent_ent.slot {
+                return Err(ChainTipError::ChildBeforeParent(
+                    header.blockidx(),
+                    parent_ent.slot,
+                ));
+            }
+
             parent_ent.children.insert(blkid);
         } else {
             return Err(ChainTipError::AttachMissingParent(blkid, *header.parent()));
         }
 
         let ent = BlockEntry {
+            slot: header.blockidx(),
             parent: *header.parent(),
             children: HashSet::new(),
         };
@@ -134,18 +163,20 @@ impl UnfinalizedBlockTracker {
     /// Updates the finalized block tip, returning a report that includes the
     /// precise blocks that were finalized transatively and any blocks on
     /// competing chains that were rejected.
-    pub fn update_finalized_tip(
+    pub fn update_finalized_epoch(
         &mut self,
-        blkid: &L2BlockId,
+        epoch: &EpochCommitment,
     ) -> Result<FinalizeReport, ChainTipError> {
+        let blkid = epoch.last_blkid();
+
         // Sanity check the block so we know it's here.
         if !self.sanity_check_parent_seq(blkid) {
             return Err(ChainTipError::MissingBlock(*blkid));
         }
 
-        if *blkid == self.finalized_tip {
+        if blkid == self.finalized_tip() {
             return Ok(FinalizeReport {
-                prev_tip: *blkid,
+                old_epoch: self.finalized_epoch,
                 finalized: vec![*blkid],
                 rejected: Vec::new(),
             });
@@ -155,7 +186,7 @@ impl UnfinalizedBlockTracker {
         let mut at = *blkid;
 
         // Walk down to the current finalized tip and put everything as finalized.
-        while at != self.finalized_tip {
+        while at != *self.finalized_tip() {
             finalized.push(at);
 
             // Get the parent of the block we're at
@@ -175,7 +206,7 @@ impl UnfinalizedBlockTracker {
                     to_evict.push(*child);
                 }
             }
-            if at == self.finalized_tip {
+            if at == *self.finalized_tip() {
                 break;
             }
             at = ent.parent;
@@ -201,8 +232,8 @@ impl UnfinalizedBlockTracker {
         }
 
         // Just update the finalized tip now.
-        let old_tip = self.finalized_tip;
-        self.finalized_tip = *blkid;
+        let old_epoch = self.finalized_epoch;
+        self.finalized_epoch = *epoch;
 
         // Sanity check and construct the report.
         assert!(
@@ -210,7 +241,7 @@ impl UnfinalizedBlockTracker {
             "chaintip: somehow finalized no blocks"
         );
         Ok(FinalizeReport {
-            prev_tip: old_tip,
+            old_epoch,
             finalized,
             rejected: evicted,
         })
@@ -252,51 +283,75 @@ impl UnfinalizedBlockTracker {
     /// Loads the unfinalized blocks into the tracker which are already in the DB
     pub fn load_unfinalized_blocks(
         &mut self,
-        finalized_height: u64,
-        chain_tip_height: u64,
         l2_block_manager: &L2BlockManager,
     ) -> anyhow::Result<()> {
-        for height in (finalized_height + 1)..=chain_tip_height {
-            let Ok(block_ids) = l2_block_manager.get_blocks_at_height_blocking(height) else {
-                return Err(anyhow::anyhow!("failed to get blocks at height {}", height));
-            };
-            let block_ids = block_ids
-                .into_iter()
-                .filter(|block_id| {
-                    let Ok(Some(block_status)) =
-                        l2_block_manager.get_block_status_blocking(block_id)
-                    else {
-                        // missing block status
-                        warn!(block_id = ?block_id, "missing block status");
-                        return false;
-                    };
-                    block_status == BlockStatus::Valid
-                })
-                .collect::<Vec<_>>();
+        let mut height = self.finalized_epoch.last_slot() + 1;
 
-            if block_ids.is_empty() {
-                return Err(anyhow::anyhow!("missing blocks at height {}", height));
+        loop {
+            let blkids = match l2_block_manager.get_blocks_at_height_blocking(height) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    error!(%height, err = %e, "failed to get new blocks");
+                    return Err(e.into());
+                }
+            };
+
+            if blkids.is_empty() {
+                debug!(%height, "found no more blocks, assuming we're past tip");
+                break;
             }
 
-            for block_id in block_ids {
-                if let Some(block) = l2_block_manager.get_block_data_blocking(&block_id)? {
+            for blkid in blkids {
+                // Check the status so we can skip trying to attach blocks we
+                // don't care about.
+                //
+                // TODO if a block doesn't have a concrete status (either
+                // missing or explicit unchecked) should we put it into a queue
+                // to be processed?
+                match l2_block_manager.get_block_status_blocking(&blkid) {
+                    Ok(Some(status)) => {
+                        if status != BlockStatus::Valid {
+                            debug!(%blkid, "skipping attaching block not known to be valid");
+                            continue;
+                        }
+                    }
+                    Ok(_) => {
+                        debug!(%blkid, "block status not available, will check later");
+                        continue;
+                    }
+                    Err(e) => {
+                        error!(%blkid, err = %e, "error loading block status, continuing");
+                        continue;
+                    }
+                }
+
+                // Once we've decided if we want to attach a block, we can
+                // continue now.
+                if let Some(block) = l2_block_manager.get_block_data_blocking(&blkid)? {
                     let header = block.header();
-                    let _ = self.attach_block(block_id, header);
+                    if let Err(e) = self.attach_block(blkid, header) {
+                        warn!(%blkid, err = %e, "failed to attach block, continuing");
+                    }
+                } else {
+                    error!(%blkid, "missing expected block from database!  wtf?");
                 }
             }
+
+            height += 1;
         }
 
         Ok(())
     }
 
     #[cfg(test)]
-    pub fn unchecked_set_finalized_tip(&mut self, id: L2BlockId) {
-        self.finalized_tip = id;
+    pub fn unchecked_set_finalized_tip(&mut self, epoch: EpochCommitment) {
+        self.finalized_epoch = epoch;
     }
 
     #[cfg(test)]
-    pub fn insert_fake_block(&mut self, id: L2BlockId, parent: L2BlockId) {
+    pub fn insert_fake_block(&mut self, slot: u64, id: L2BlockId, parent: L2BlockId) {
         let ent = BlockEntry {
+            slot,
             parent,
             children: HashSet::new(),
         };
@@ -309,8 +364,8 @@ impl UnfinalizedBlockTracker {
 /// we've permanently rejected.
 #[derive(Clone, Debug)]
 pub struct FinalizeReport {
-    /// Previous tip.
-    prev_tip: L2BlockId,
+    /// Previously finalized epoch.
+    old_epoch: EpochCommitment,
 
     /// Block we've newly finalized.  The first one of this
     finalized: Vec<L2BlockId>,
@@ -323,13 +378,13 @@ impl FinalizeReport {
     /// Returns the blkid that was the previously finalized tip.  It's still
     /// finalized, but there's newer blocks that are also finalized now.
     pub fn prev_tip(&self) -> &L2BlockId {
-        &self.prev_tip
+        self.old_epoch.last_blkid()
     }
 
     /// The new chain tip that's finalized now.
     pub fn new_tip(&self) -> &L2BlockId {
         if self.finalized.is_empty() {
-            &self.prev_tip
+            self.prev_tip()
         } else {
             &self.finalized[0]
         }
@@ -353,8 +408,9 @@ mod tests {
     use std::collections::HashSet;
 
     use strata_db::traits::{BlockStatus, Database, L2BlockDatabase};
+    use strata_primitives::{epoch::EpochCommitment, l2::L2BlockId};
     use strata_rocksdb::test_utils::get_common_db;
-    use strata_state::{header::L2Header, id::L2BlockId};
+    use strata_state::header::L2Header;
     use strata_storage::L2BlockManager;
     use strata_test_utils::l2::gen_l2_chain;
 
@@ -411,21 +467,34 @@ mod tests {
         l2_blkman: &L2BlockManager,
     ) {
         // Init the chain tracker from the state we figured out.
-        let mut chain_tracker =
-            unfinalized_tracker::UnfinalizedBlockTracker::new_empty(prev_finalized_tip);
 
-        chain_tracker
-            .load_unfinalized_blocks(0, 3, l2_blkman)
-            .unwrap();
+        let prev_tip = l2_blkman
+            .get_block_data_blocking(&prev_finalized_tip)
+            .expect("test: load block")
+            .expect("test: missing block");
+        let prev_tip_slot = prev_tip.header().blockidx();
 
-        let report = chain_tracker
-            .update_finalized_tip(&new_finalized_tip)
-            .unwrap();
+        let epoch = EpochCommitment::new(0, prev_tip_slot, prev_finalized_tip);
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
+
+        chain_tracker.load_unfinalized_blocks(l2_blkman).unwrap();
+
+        let new_tip = l2_blkman
+            .get_block_data_blocking(&new_finalized_tip)
+            .expect("test: load block")
+            .expect("test: missing block");
+        let new_tip_slot = new_tip.header().blockidx();
+
+        let new_epoch = EpochCommitment::new(1, new_tip_slot, new_finalized_tip);
+        let report = chain_tracker.update_finalized_epoch(&new_epoch).unwrap();
 
         assert_eq!(report.prev_tip(), &prev_finalized_tip);
         assert_eq!(report.finalized, finalized_blocks);
         assert_eq!(report.rejected(), rejected_blocks);
-        assert_eq!(chain_tracker.finalized_tip, new_finalized_tip);
+        assert_eq!(
+            *chain_tracker.finalized_epoch().last_blkid(),
+            new_finalized_tip
+        );
         assert_eq!(chain_tracker.unfinalized_tips, unfinalized_tips);
     }
 
@@ -437,14 +506,13 @@ mod tests {
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         // Init the chain tracker from the state we figured out.
-        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
+        let epoch = EpochCommitment::new(0, 0, g);
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
 
         let pool = threadpool::ThreadPool::new(1);
         let blkman = L2BlockManager::new(pool, db);
 
-        chain_tracker
-            .load_unfinalized_blocks(0, 3, &blkman)
-            .unwrap();
+        chain_tracker.load_unfinalized_blocks(&blkman).unwrap();
 
         assert_eq!(chain_tracker.get_parent(&g), None);
         assert_eq!(chain_tracker.get_parent(&a1), Some(&g));
@@ -484,14 +552,13 @@ mod tests {
         let [g, a1, c1, a2, b2, a3, b3] = setup_test_chain(l2_db.as_ref());
 
         // Init the chain tracker from the state we figured out.
-        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(g);
+        let epoch = EpochCommitment::new(0, 0, g);
+        let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
 
         let pool = threadpool::ThreadPool::new(1);
         let blkman = L2BlockManager::new(pool, db);
 
-        chain_tracker
-            .load_unfinalized_blocks(0, 3, &blkman)
-            .unwrap();
+        chain_tracker.load_unfinalized_blocks(&blkman).unwrap();
 
         assert_eq!(
             chain_tracker.get_all_descendants(&g),

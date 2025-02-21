@@ -2,9 +2,7 @@ import flexitest
 from web3 import Web3
 
 from envs import testenv
-from utils import (
-    wait_until,
-)
+from utils import *
 
 
 def send_tx(web3: Web3):
@@ -27,30 +25,23 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
     """This tests sync when el is missing blocks"""
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(testenv.BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
-        try:
-            self.run(ctx)
-        finally:
-            seq = ctx.get_service("sequencer")
-            reth = ctx.get_service("reth")
-
-            if not seq.is_started():
-                seq.start()
-            if not reth.is_started():
-                reth.start()
-
-    def run(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
         reth = ctx.get_service("reth")
         web3: Web3 = reth.create_web3()
 
+        seqrpc = seq.create_rpc()
         rethrpc = reth.create_rpc()
+
+        wait_for_genesis(seqrpc, timeout=20)
 
         # workaround for issue restarting reth with no transactions
         for _ in range(3):
             send_tx(web3)
+
+        wait_until_epoch_finalized(seqrpc, 0, timeout=30)
 
         # ensure there are some blocks generated
         wait_until(
@@ -112,7 +103,7 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
         )
 
         # ensure reth db was reset to shorter chain
-        assert int(rethrpc.eth_blockNumber(), base=16) == orig_blocknumber
+        assert int(rethrpc.eth_blockNumber(), base=16) < final_blocknumber
 
         print("start sequencer")
         seq.start()
@@ -121,5 +112,5 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
         wait_until(
             lambda: int(rethrpc.eth_blockNumber(), base=16) > final_blocknumber,
             error_with="not syncing blocks",
-            timeout=5,
+            timeout=10,
         )

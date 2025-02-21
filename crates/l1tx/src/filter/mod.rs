@@ -1,8 +1,7 @@
 use bitcoin::Transaction;
-use strata_primitives::l1::payload::L1PayloadType;
-use strata_state::{
+use strata_primitives::{
     batch::SignedCheckpoint,
-    tx::{DepositInfo, DepositRequestInfo},
+    l1::{payload::L1PayloadType, DepositInfo, DepositRequestInfo},
 };
 use tracing::warn;
 

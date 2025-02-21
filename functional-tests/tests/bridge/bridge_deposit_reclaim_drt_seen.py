@@ -92,7 +92,8 @@ class BridgeDepositReclaimDrtSeenTest(testenv.StrataTester):
         # Make sure that the BTC refund address has the expected balance
         wait_until(
             lambda: get_balance(refund_addr, btc_url, btc_user, btc_password)
-            == initial_refund_btc_balance
+            == initial_refund_btc_balance,
+            timeout=30,
         )
         refund_btc_balance = get_balance(
             refund_addr,
@@ -122,7 +123,8 @@ class BridgeDepositReclaimDrtSeenTest(testenv.StrataTester):
         btcrpc.proxy.generatetoaddress(2, UNSPENDABLE_ADDRESS)
         wait_until(
             lambda: get_balance_recovery(recovery_addr, bridge_pk, btc_url, btc_user, btc_password)
-            < original_recovery_balance
+            < original_recovery_balance,
+            timeout=30,
         )
 
         # Make sure that the BTC recovery address has 0 BTC

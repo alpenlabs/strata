@@ -2,11 +2,9 @@
 
 use strata_db::types::CheckpointConfStatus;
 use strata_primitives::params::Params;
-use strata_state::{
-    client_state::{ClientState, SyncState},
-    header::L2Header,
-};
+use strata_state::{chain_state::Chainstate, client_state::InternalState, header::L2Header};
 use strata_storage::L2BlockManager;
+use tracing::*;
 
 use super::types::{BlockSigningDuty, Duty};
 use crate::{
@@ -14,37 +12,36 @@ use crate::{
     duty::{errors::Error, types::CheckpointDuty},
 };
 
-/// Extracts new duties given a consensus state and a identity.
-pub(crate) fn extract_duties(
-    state: &ClientState,
+/// Extracts new duties given a current chainstate and an identity.
+pub async fn extract_duties(
+    chstate: &Chainstate,
+    cistate: &InternalState,
     checkpoint_handle: &CheckpointHandle,
     l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<Vec<Duty>, Error> {
-    // If a sync state isn't present then we probably don't have anything we
-    // want to do.  We might change this later.
-    let Some(ss) = state.sync() else {
-        return Ok(Vec::new());
-    };
-
     let mut duties = vec![];
+    duties.extend(extract_block_duties(chstate, l2_block_manager, params).await?);
+    duties.extend(extract_batch_duties(cistate, checkpoint_handle).await?);
 
-    duties.extend(extract_block_duties(ss, l2_block_manager, params)?);
-    duties.extend(extract_batch_duties(checkpoint_handle)?);
+    if !duties.is_empty() {
+        debug!(cnt = %duties.len(), "have some duties");
+    }
 
     Ok(duties)
 }
 
-fn extract_block_duties(
-    ss: &SyncState,
+async fn extract_block_duties(
+    state: &Chainstate,
     l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<Vec<Duty>, Error> {
-    let tip_height = ss.chain_tip_height();
-    let tip_blkid = *ss.chain_tip_blkid();
+    let tip_slot = state.chain_tip_slot();
+    let tip_blkid = *state.chain_tip_blkid();
 
     let tip_block_ts = l2_block_manager
-        .get_block_data_blocking(&tip_blkid)?
+        .get_block_data_async(&tip_blkid)
+        .await?
         .ok_or(Error::MissingL2Block(tip_blkid))?
         .header()
         .timestamp();
@@ -54,28 +51,44 @@ fn extract_block_duties(
     // Since we're not rotating sequencers, for now we just *always* produce a
     // new block.
     Ok(vec![Duty::SignBlock(BlockSigningDuty::new_simple(
-        tip_height + 1,
+        tip_slot + 1,
         tip_blkid,
         target_ts,
     ))])
 }
 
-fn extract_batch_duties(checkpoint_handle: &CheckpointHandle) -> Result<Vec<Duty>, Error> {
+async fn extract_batch_duties(
+    cistate: &InternalState,
+    checkpoint_handle: &CheckpointHandle,
+) -> Result<Vec<Duty>, Error> {
+    // Get the next epoch we expect to be confirmed and start looking there.
+    let first_epoch_idx = cistate.get_next_expected_epoch_conf();
+
     // get checkpoints ready to be signed
-    let last_checkpoint_idx = checkpoint_handle.get_last_checkpoint_idx_blocking()?;
+    let Some(last_checkpoint_idx) = checkpoint_handle.get_last_checkpoint_idx().await? else {
+        // No checkpoints generated yet, nothing to publish.
+        return Ok(Vec::new());
+    };
 
-    let last_checkpoint = last_checkpoint_idx
-        .map(|idx| checkpoint_handle.get_checkpoint_blocking(idx))
-        .transpose()?
-        .flatten();
+    let mut duties = Vec::new();
 
-    last_checkpoint
-        .filter(|entry| {
-            entry.is_proof_ready() && entry.confirmation_status == CheckpointConfStatus::Pending
-        })
-        .map(|entry| {
-            let batch_duty = CheckpointDuty::new(entry.into());
-            Ok(vec![Duty::CommitBatch(batch_duty)])
-        })
-        .unwrap_or(Ok(vec![]))
+    for i in first_epoch_idx..=last_checkpoint_idx {
+        let Some(ckpt) = checkpoint_handle.get_checkpoint(i).await? else {
+            error!(ckpt = %i, "database told us we had checkpoint but it was missing, moving on");
+            break;
+        };
+
+        let epoch = ckpt.checkpoint.batch_info().epoch;
+        let publish_ready =
+            ckpt.is_proof_ready() && ckpt.confirmation_status == CheckpointConfStatus::Pending;
+        trace!(%epoch, %publish_ready, "considering generating checkpoint publish duty");
+
+        // Need to wait for a proof.  Also avoid generating a duty if it's already in the pipe
+        if publish_ready {
+            let duty = CheckpointDuty::new(ckpt.into());
+            duties.push(Duty::CommitBatch(duty));
+        }
+    }
+
+    Ok(duties)
 }

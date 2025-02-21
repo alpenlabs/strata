@@ -123,7 +123,6 @@ pub fn start_sync_tasks<E: ExecEngineCtl + Sync + Send + 'static>(
 
     executor.spawn_critical("client_worker_task", move |shutdown| {
         worker::client_worker_task(shutdown, client_worker_state, csm_engine, csm_rx, st_ch)
-            .map_err(Into::into)
     });
 
     Ok(SyncManager {

@@ -1,7 +1,7 @@
 use strata_l1tx::filter::indexer::TxVisitor;
-use strata_state::{
+use strata_primitives::{
     batch::SignedCheckpoint,
-    tx::{DaCommitment, DepositInfo, ProtocolOperation},
+    l1::{DaCommitment, DepositInfo, ProtocolOperation},
 };
 
 /// Ops indexer for use with the prover.
@@ -57,10 +57,10 @@ mod test {
     use strata_btcio::test_utils::create_checkpoint_envelope_tx;
     use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
     use strata_primitives::{
-        l1::{payload::L1Payload, BitcoinAmount},
+        batch::SignedCheckpoint,
+        l1::{payload::L1Payload, BitcoinAmount, ProtocolOperation},
         params::Params,
     };
-    use strata_state::{batch::SignedCheckpoint, tx::ProtocolOperation};
     use strata_test_utils::{
         bitcoin::{build_test_deposit_script, create_test_deposit_tx, test_taproot_addr},
         l2::gen_params,

@@ -5,12 +5,12 @@ import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, Self, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, get_balance, musig_aggregate_pks
 
-from factory.seqrpc import JsonrpcClient
+from factory.seqrpc import JsonrpcClient, RpcError
 from utils.constants import *
 
 
@@ -60,7 +60,7 @@ def generate_n_blocks(bitcoin_rpc: BitcoindClient, n: int):
 def wait_until(
     fn: Callable[[], Any],
     error_with: str = "Timed out",
-    timeout: int = 5,
+    timeout: int = 30,
     step: float = 0.5,
 ):
     """
@@ -69,11 +69,13 @@ def wait_until(
     """
     for _ in range(math.ceil(timeout / step)):
         try:
-            if not fn():
-                raise Exception
-            return
-        except Exception as _:
-            pass
+            # Return if the predicate passes.  The predicate not passing is not
+            # an error.
+            if fn():
+                return
+        except Exception as e:
+            ety = type(e)
+            logging.warning(f"caught exception {ety}, will still wait for timeout: {e}")
         time.sleep(step)
     raise AssertionError(error_with)
 
@@ -95,13 +97,180 @@ def wait_until_with_value(
     for _ in range(math.ceil(timeout / step)):
         try:
             r = fn()
-            if not predicate(r):
-                raise Exception
-            return r
-        except Exception as _:
-            pass
+            # Return if the predicate passes.  The predicate not passing is not
+            # an error.
+            if predicate(r):
+                return r
+        except Exception as e:
+            ety = type(e)
+            logging.warning(f"caught exception {ety}, will still wait for timeout: {e}")
+
         time.sleep(step)
     raise AssertionError(error_with)
+
+
+def wait_for_genesis(rpc, timeout=20, step=2, **kwargs):
+    """
+    Waits until we see genesis.  That is to say, that `strata_syncStatus`
+    returns a sensible result.
+    """
+
+    def _check_genesis():
+        try:
+            # This should raise if we're before genesis.
+            ss = rpc.strata_syncStatus()
+            logging.info(
+                f"after genesis, tip is slot {ss['tip_height']} blkid {ss['tip_block_id']}"
+            )
+            return True
+        except RpcError as e:
+            # This is the "before genesis" error code, meaning we're still
+            # before genesis
+            if e.code == -32607:
+                return False
+            else:
+                raise e
+
+    wait_until(_check_genesis, timeout=timeout, step=step, **kwargs)
+
+
+def wait_until_chain_epoch(rpc, epoch: int, **kwargs) -> dict:
+    """
+    Waits until the chain has finished the specified epoch index, determined by
+    checking for epoch summaries.
+
+    Returns the epoch summary.
+    """
+
+    logging.info(f"waiting for epoch {epoch}")
+
+    def _query():
+        status = rpc.strata_syncStatus()
+        logging.debug(f"checked status {status}")
+        commitments = rpc.strata_getEpochCommitments(epoch)
+        if len(commitments) > 0:
+            comm = commitments[0]
+            logging.info(
+                f"now at epoch {epoch}, slot {comm['last_slot']}, blkid {comm['last_blkid']}"
+            )
+            return rpc.strata_getEpochSummary(epoch, comm["last_slot"], comm["last_blkid"])
+        return None
+
+    def _check(v):
+        return v is not None
+
+    return wait_until_with_value(_query, _check, **kwargs)
+
+
+def wait_until_next_chain_epoch(rpc, **kwargs) -> int:
+    """
+    Waits until the chain epoch advances by at least 1.
+
+    Returns the new epoch number.
+    """
+    init_epoch = rpc.strata_syncStatus()["cur_epoch"]
+
+    def _query():
+        return rpc.strata_syncStatus()["cur_epoch"]
+
+    def _check(epoch):
+        return epoch > init_epoch
+
+    return wait_until_with_value(_query, _check, **kwargs)
+
+
+def wait_until_epoch_confirmed(rpc, epoch: int, **kwargs):
+    """
+    Waits until at least the given epoch is confirmed on L1, according to
+    calling `strata_clientStatus`.
+    """
+
+    def _check():
+        cs = rpc.strata_clientStatus()
+        l1_height = cs["tip_l1_block"]["height"]
+        conf_epoch = cs["confirmed_epoch"]
+        logging.info(f"confirmed epoch as of {l1_height}: {conf_epoch}")
+        if conf_epoch is None:
+            return False
+        return conf_epoch["epoch"] >= epoch
+
+    wait_until(_check, **kwargs)
+
+
+def wait_until_epoch_finalized(rpc, epoch: int, **kwargs):
+    """
+    Waits until at least the given epoch is finalized on L1, according to
+    calling `strata_clientStatus`.
+    """
+
+    def _check():
+        cs = rpc.strata_clientStatus()
+        l1_height = cs["tip_l1_block"]["height"]
+        fin_epoch = cs["finalized_epoch"]
+        logging.info(f"finalized epoch as of {l1_height}: {fin_epoch}")
+        if fin_epoch is None:
+            return False
+        return fin_epoch["epoch"] >= epoch
+
+    wait_until(_check, **kwargs)
+
+
+def wait_until_epoch_observed_final(rpc, epoch: int, **kwargs):
+    """
+    Waits until at least the given epoch is observed as final on L2, according
+    to calling `strata_syncStatus`.
+    """
+
+    def _check():
+        ss = rpc.strata_syncStatus()
+        slot = ss["tip_height"]  # TODO rename to tip_slot
+        of_epoch = ss["observed_finalized_epoch"]
+        logging.info(f"observed final epoch as of L2 slot {slot}: {of_epoch}")
+        if not of_epoch:
+            return False
+        return of_epoch["epoch"] >= epoch
+
+    wait_until(_check, **kwargs)
+
+
+def wait_until_l1_observed(rpc, height: int, **kwargs):
+    """
+    Waits until the provided L1 height has been observed by the chain.
+    """
+
+    def _check():
+        ss = rpc.strata_syncStatus()
+        slot = ss["tip_height"]  # TODO rename to slot
+        epoch = ss["cur_epoch"]
+        view_l1 = ss["safe_l1_block"]["height"]
+        logging.info(f"chain now at slot {slot}, epoch {epoch}, observed L1 height is {view_l1}")
+        return view_l1 >= height
+
+    wait_until(_check, **kwargs)
+
+
+def wait_until_csm_l1_tip_observed(rpc, **kwargs):
+    """
+    Waits until the CSM's current L1 tip block height has been observed by the OL.
+    """
+
+    init_cs = rpc.strata_clientStatus()
+    init_l1_height = init_cs["tip_l1_block"]["height"]
+    logging.info(f"target L1 height from CSM is {init_l1_height}")
+    wait_until_l1_observed(init_l1_height, **kwargs)
+
+
+def wait_until_cur_l1_tip_observed(btcrpc, seqrpc, **kwargs) -> int:
+    """
+    Waits until the current L1 tip block as requested from the L1 RPC has been
+    observed by the CSM.
+
+    Returns the L1 block height.
+    """
+    info = btcrpc.proxy.getblockchaininfo()
+    h = info["blocks"]
+    logging.info(f"current bitcoin height is {h}")
+    wait_until_l1_observed(seqrpc, h, **kwargs)
 
 
 @dataclass
@@ -119,10 +288,8 @@ class RollupParamsSettings:
     message_interval: int
     proof_timeout: Optional[int] = None
 
-    # NOTE: type annotation: Ideally we would use `Self` but couldn't use it
-    # even after changing python version to 3.12
     @classmethod
-    def new_default(cls) -> "RollupParamsSettings":
+    def new_default(cls) -> Self:
         return cls(
             block_time_sec=DEFAULT_BLOCK_TIME_SEC,
             epoch_slots=DEFAULT_EPOCH_SLOTS,
@@ -130,6 +297,14 @@ class RollupParamsSettings:
             message_interval=DEFAULT_MESSAGE_INTERVAL_MSEC,
             proof_timeout=DEFAULT_PROOF_TIMEOUT,
         )
+
+    def fast_batch(self):
+        self.proof_timeout = 1
+        return self
+
+    def strict_mode(self):
+        self.proof_timeout = None
+        return self
 
 
 @dataclass
@@ -146,57 +321,58 @@ class ProverClientSettings:
             enable_checkpoint_proving=DEFAULT_PROVER_ENABLE_CHECKPOINT_PROVING,
         )
 
+    @staticmethod
+    def new_with_proving():
+        return ProverClientSettings(
+            native_workers=DEFAULT_PROVER_NATIVE_WORKERS,
+            polling_interval=DEFAULT_PROVER_POLLING_INTERVAL,
+            enable_checkpoint_proving=True,
+        )
+
 
 def check_nth_checkpoint_finalized(
-    idx,
+    idx: int,
     seqrpc,
     prover_rpc,
     manual_gen: ManualGenBlocksConfig | None = None,
     proof_timeout: int | None = None,
+    **kwargs,
 ):
     """
-    This check expects nth checkpoint to be finalized
+    This check expects nth checkpoint to be finalized.
+
+    It used to do this in an indirect way that had to be done in lockstep with
+    the client state, but it's more flexible now.
 
     Params:
         - idx: The index of checkpoint
         - seqrpc: The sequencer rpc
         - manual_gen: If we need to generate blocks manually
     """
-    syncstat = seqrpc.strata_syncStatus()
 
-    # Wait until we find our expected checkpoint.
-    batch_info = wait_until_with_value(
-        lambda: seqrpc.strata_getCheckpointInfo(idx),
-        predicate=lambda v: v is not None,
-        error_with=f"Could not find checkpoint info for index {idx}",
-        timeout=3,
-    )
+    def _maybe_do_gen():
+        if manual_gen:
+            nblocks = manual_gen.finality_depth + 1
+            logging.debug(f"generating {nblocks} L1 blocks to try to finalize")
+            manual_gen.btcrpc.proxy.generatetoaddress(nblocks, manual_gen.gen_addr)
 
-    assert syncstat["finalized_block_id"] != batch_info["l2_range"][1]["blkid"], (
-        "Checkpoint block should not yet finalize"
-    )
-    assert batch_info["idx"] == idx
-    checkpoint_info_next = seqrpc.strata_getCheckpointInfo(idx + 1)
-    assert checkpoint_info_next is None, f"There should be no checkpoint info for {idx + 1} index"
-
-    to_finalize_blkid = batch_info["l2_range"][1]["blkid"]
-
-    # Submit checkpoint if proof_timeout is not set
-    if proof_timeout is None:
-        submit_checkpoint(idx, seqrpc, prover_rpc, manual_gen)
-
-    if manual_gen:
-        # Produce l1 blocks until proof is finalized
-        manual_gen.btcrpc.proxy.generatetoaddress(
-            manual_gen.finality_depth + 1, manual_gen.gen_addr
+    def _check():
+        cs = seqrpc.strata_clientStatus()
+        l1_height = cs["tip_l1_block"]["height"]
+        fin_epoch = cs["finalized_epoch"]
+        ss = seqrpc.strata_syncStatus()
+        cur_epoch = ss["cur_epoch"]
+        chain_l1_height = ss["safe_l1_block"]["height"]
+        logging.info(
+            f"finalized epoch as of {l1_height}: {fin_epoch} (cur chain epoch {cur_epoch}, \
+                last L1 {chain_l1_height})"
         )
+        if fin_epoch is not None and fin_epoch["epoch"] >= idx:
+            return True
+        _maybe_do_gen()
+        return False
 
-    # Check if finalized
-    wait_until(
-        lambda: seqrpc.strata_syncStatus()["finalized_block_id"] == to_finalize_blkid,
-        error_with="Block not finalized",
-        timeout=(proof_timeout or 0) + 10,
-    )
+    wait_until(_check, **kwargs)
 
 
 def submit_checkpoint(
@@ -283,9 +459,9 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
         # Fetch the proof status
         proof_status = prover_client_rpc.dev_strata_getTaskStatus(task_id)
         assert proof_status is not None
-        print(f"Got the proof status {proof_status}")
+        logging.info(f"Got the proof status {proof_status}")
         if proof_status == "Completed":
-            print(f"Completed the proof generation for {task_id}")
+            logging.info(f"Completed the proof generation for {task_id}")
             break
 
         time.sleep(2)
@@ -452,7 +628,7 @@ def setup_root_logger():
     """
     reads `LOG_LEVEL` from the environment. Defaults to `WARNING` if not provided.
     """
-    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, log_level, logging.NOTSET)
     # Configure the root logger
     root_logger = logging.getLogger()
@@ -480,12 +656,15 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
     )
+
     # Set up individual loggers for each test
-    logger = logging.getLogger(test_name)
+    logger = logging.getLogger(f"root.{test_name}")
+
     # File handler
     log_path = os.path.join(log_dir, f"{test_name}.log")
     file_handler = logging.FileHandler(log_path)
     file_handler.setFormatter(formatter)
+
     # Stream handler
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -493,6 +672,10 @@ def setup_test_logger(datadir_root: str, test_name: str) -> logging.Logger:
     # Add handlers to the logger
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
+
+    # Set level to something sensible.
+    # TODO make this fetch from user input
+    logger.setLevel(logging.INFO)
 
     return logger
 

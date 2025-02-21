@@ -189,7 +189,7 @@ fn generate_block_template_inner(
     params: &Params,
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
-    status_channel: &StatusChannel,
+    _status_channel: &StatusChannel,
 ) -> Result<FullBlockTemplate, Error> {
     // get parent block
     let parent_blkid = config.parent_block_id();
@@ -199,6 +199,8 @@ fn generate_block_template_inner(
         .ok_or(Error::UnknownTemplateId(parent_blkid))?;
 
     let parent_ts = parent.header().timestamp();
+
+    // TODO get and use chainstate
 
     // next slot idx
     let slot = parent.header().blockidx() + 1;
@@ -211,11 +213,8 @@ fn generate_block_template_inner(
         Err(Error::TimestampTooEarly(ts))?;
     }
 
-    // latest l1 view from client state
-    let l1_state = status_channel.l1_view();
-
-    let (header, body, accessory) =
-        prepare_block(slot, parent, &l1_state, ts, storage, engine, params)?;
+    // Actually put the template together.
+    let (header, body, accessory) = prepare_block(slot, parent, ts, storage, engine, params)?;
 
     Ok(FullBlockTemplate::new(header, body, accessory))
 }

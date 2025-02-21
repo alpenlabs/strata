@@ -9,7 +9,7 @@ use strata_primitives::{
     bitcoin_bosd::Descriptor,
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
-    l1::{self, BitcoinAmount, OutputRef},
+    l1::{BitcoinAmount, OutputRef},
     operator::{OperatorKeyProvider, OperatorPubkeys},
 };
 
@@ -260,12 +260,18 @@ impl DepositsTable {
         self.deposits.get(pos as usize)
     }
 
-    pub fn add_deposits(&mut self, tx_ref: &OutputRef, operators: &[u32], amt: BitcoinAmount) {
-        // TODO: work out what we want to do with pending update transaction
-        let deposit_entry = DepositEntry::new(self.next_idx(), tx_ref, operators, amt, Vec::new());
-
+    /// Adds a new deposit to the table and returns the index of the new deposit.
+    pub fn add_deposit(
+        &mut self,
+        tx_ref: OutputRef,
+        operators: Vec<OperatorIdx>,
+        amt: BitcoinAmount,
+    ) -> u32 {
+        let idx = self.next_idx();
+        let deposit_entry = DepositEntry::new(idx, tx_ref, operators, amt);
         self.deposits.push(deposit_entry);
         self.next_idx += 1;
+        idx
     }
 
     pub fn next_idx(&self) -> u32 {
@@ -292,74 +298,48 @@ pub struct DepositEntry {
     /// Deposit amount, in the native asset.
     amt: BitcoinAmount,
 
-    /// Refs to txs in the maturation queue that will update the deposit entry
-    /// when they mature.  This is here so that we don't have to scan a
-    /// potentially very large set of pending transactions to reason about the
-    /// state of the deposits.  This must be kept in sync when we do things
-    /// though.
-    // TODO probably removing this actually
-    pending_update_txs: Vec<l1::L1TxRef>,
-
     /// Deposit state.
     state: DepositState,
 }
 
 impl DepositEntry {
-    pub fn idx(&self) -> u32 {
-        self.deposit_idx
-    }
-
     pub fn new(
         idx: u32,
-        output: &OutputRef,
-        operators: &[OperatorIdx],
+        output: OutputRef,
+        operators: Vec<OperatorIdx>,
         amt: BitcoinAmount,
-        pending_update_txs: Vec<l1::L1TxRef>,
     ) -> Self {
         Self {
             deposit_idx: idx,
-            output: output.clone(),
-            notary_operators: operators.to_vec(),
+            output,
+            notary_operators: operators,
             amt,
-            pending_update_txs,
             state: DepositState::Accepted,
         }
     }
 
-    pub fn next_pending_update_tx(&self) -> Option<&l1::L1TxRef> {
-        self.pending_update_txs.first()
+    pub fn idx(&self) -> u32 {
+        self.deposit_idx
     }
 
-    pub fn pop_next_pending_deposit(&mut self) -> Option<l1::L1TxRef> {
-        if !self.pending_update_txs.is_empty() {
-            Some(self.pending_update_txs.remove(0))
-        } else {
-            None
-        }
-    }
-
-    pub fn pending_update_txs(&self) -> &[l1::L1TxRef] {
-        &self.pending_update_txs
-    }
-
-    pub fn deposit_state(&self) -> &DepositState {
-        &self.state
+    pub fn output(&self) -> &OutputRef {
+        &self.output
     }
 
     pub fn notary_operators(&self) -> &[OperatorIdx] {
         &self.notary_operators
     }
 
-    pub fn deposit_state_mut(&mut self) -> &mut DepositState {
-        &mut self.state
-    }
-
     pub fn amt(&self) -> BitcoinAmount {
         self.amt
     }
 
-    pub fn output(&self) -> &OutputRef {
-        &self.output
+    pub fn deposit_state(&self) -> &DepositState {
+        &self.state
+    }
+
+    pub fn deposit_state_mut(&mut self) -> &mut DepositState {
+        &mut self.state
     }
 
     pub fn set_state(&mut self, new_state: DepositState) {

@@ -22,14 +22,14 @@ class SeqCrashMixin(BaseMixin):
         protocol_version = self.seqrpc.strata_protocolVersion()
         assert protocol_version is not None, "Sequencer RPC inactive"
 
-    def handle_bail(self, bail_tag: Callable[[], str]) -> int:
+    def handle_bail(self, bail_tag: Callable[[], str], **kwargs) -> int:
         """
         Handles the bailout process for the given sequencer RPC.
 
         Returns the chain_tip_slot before the bailout.
         """
         time.sleep(2)
-        cur_chain_tip = self.seqrpc.strata_clientStatus()["chain_tip_slot"]
+        cur_chain_tip = self.seqrpc.strata_syncStatus()["tip_height"]
 
         # Trigger the bailout
         self.seqrpc.debug_bail(bail_tag())
@@ -38,7 +38,9 @@ class SeqCrashMixin(BaseMixin):
         wait_until(
             lambda: check_sequencer_down(self.seqrpc),
             error_with="Sequencer didn't bail out",
+            **kwargs,
         )
+
         # Stop the sequencer to update bookkeeping, we know the sequencer has
         # already stopped
         self.seq.stop()
@@ -49,7 +51,7 @@ class SeqCrashMixin(BaseMixin):
         wait_until(
             lambda: not check_sequencer_down(self.seqrpc),
             error_with="Sequencer didn't start",
-            timeout=20,
+            **kwargs,
         )
 
         return cur_chain_tip

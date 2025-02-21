@@ -52,6 +52,10 @@ pub enum RpcServerError {
     #[error("missing proof in checkpoint for index {0}")]
     MissingCheckpointProof(u64),
 
+    // TODO: better error message?
+    #[error("missing client internal state")]
+    MissingInternalState,
+
     #[error("invalid checkpoint signature for index {0}")]
     InvalidCheckpointSignature(u64),
 
@@ -99,6 +103,7 @@ impl RpcServerError {
             Self::MissingCheckpointProof(_) => -32615,
             Self::InvalidCheckpointSignature(_) => -32616,
             Self::CheckpointAlreadyPosted(_) => -32617,
+            Self::MissingInternalState => -32618,
             Self::Other(_) => -32000,
             Self::OtherEx(_, _) => -32001,
             Self::BlockingAbort(_) => -32002,

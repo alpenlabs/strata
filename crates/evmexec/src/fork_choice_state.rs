@@ -1,78 +1,71 @@
-use std::sync::Arc;
+// TODO this all needs to be reworked to just follow what the FCM state
+// publishing is, waiting for that to be ready before getting started
 
-use alloy_rpc_types::engine::ForkchoiceState;
 use anyhow::{Context, Result};
 use revm_primitives::B256;
-use strata_db::{
-    errors::DbError,
-    traits::{ClientStateDatabase, Database, L2BlockDatabase},
-};
+use strata_db::errors::DbError;
 use strata_primitives::params::RollupParams;
-use strata_state::{block::L2BlockBundle, client_state::ClientState, id::L2BlockId};
+use strata_state::{block::L2BlockBundle, chain_state::Chainstate, id::L2BlockId};
+use strata_storage::*;
+use tracing::*;
 
 use crate::block::EVML2Block;
 
-pub fn fork_choice_state_initial<D: Database>(
-    db: Arc<D>,
+pub fn fetch_init_fork_choice_state(
+    storage: &NodeStorage,
     rollup_params: &RollupParams,
-) -> Result<ForkchoiceState> {
-    let last_cstate = get_last_checkpoint_state(db.as_ref())?;
-
-    let latest_block_hash = get_block_hash_by_id(
-        db.as_ref(),
-        last_cstate
-            .as_ref()
-            .and_then(|state| state.sync())
-            .map(|sync_state| sync_state.chain_tip_blkid()),
-    )?
-    .unwrap_or(revm_primitives::FixedBytes(
-        *rollup_params.evm_genesis_block_hash.as_ref(),
-    ));
-
-    let finalized_block_hash = get_block_hash_by_id(
-        db.as_ref(),
-        last_cstate
-            .as_ref()
-            .and_then(|state| state.sync())
-            .map(|sync_state| sync_state.finalized_blkid()),
-    )?
-    .unwrap_or(B256::ZERO);
-
-    Ok(ForkchoiceState {
-        head_block_hash: latest_block_hash,
-        safe_block_hash: latest_block_hash,
-        finalized_block_hash,
-    })
+) -> Result<B256> {
+    // TODO switch these logs to debug
+    match get_last_chainstate(storage)? {
+        Some(chs) => {
+            let tip = chs.chain_tip_blkid();
+            let slot = chs.chain_tip_slot();
+            info!(%slot, %tip, "preparing EVM initial state from chainstate");
+            compute_evm_fc_state_from_chainstate(&chs, storage)
+        }
+        None => {
+            info!("preparing EVM initial state from genesis");
+            let evm_genesis_block_hash =
+                revm_primitives::FixedBytes(*rollup_params.evm_genesis_block_hash.as_ref());
+            Ok(evm_genesis_block_hash)
+        }
+    }
 }
 
-fn get_block_hash(l2_block: L2BlockBundle) -> Result<B256> {
-    EVML2Block::try_from(l2_block)
+fn compute_evm_fc_state_from_chainstate(chs: &Chainstate, storage: &NodeStorage) -> Result<B256> {
+    let l2man = storage.l2();
+    let latest_evm_block_hash = get_evm_block_hash_by_id(chs.chain_tip_blkid(), l2man)?
+        .expect("evmexec: missing expected block");
+    Ok(latest_evm_block_hash)
+}
+
+fn get_last_chainstate(storage: &NodeStorage) -> Result<Option<Chainstate>> {
+    let chsman = storage.chainstate();
+
+    let last_write_idx = match chsman.get_last_write_idx_blocking() {
+        Ok(idx) => idx,
+        Err(DbError::NotBootstrapped) => {
+            // before genesis block ready; use hardcoded genesis state
+            return Ok(None);
+        }
+        Err(e) => return Err(e.into()),
+    };
+
+    Ok(chsman.get_toplevel_chainstate_blocking(last_write_idx)?)
+}
+
+fn get_evm_block_hash_by_id(
+    block_id: &L2BlockId,
+    l2man: &L2BlockManager,
+) -> anyhow::Result<Option<B256>> {
+    l2man
+        .get_block_data_blocking(block_id)?
+        .map(|bundle| compute_evm_block_hash(&bundle))
+        .transpose()
+}
+
+fn compute_evm_block_hash(l2_block: &L2BlockBundle) -> Result<B256> {
+    EVML2Block::try_extract(l2_block)
         .map(|block| block.block_hash())
         .context("Failed to convert L2Block to EVML2Block")
-}
-
-fn get_last_checkpoint_state<D: Database>(db: &D) -> Result<Option<ClientState>> {
-    let last_checkpoint_idx = db.client_state_db().get_last_state_idx();
-
-    if let Err(DbError::NotBootstrapped) = last_checkpoint_idx {
-        // before genesis block ready; use hardcoded genesis state
-        return Ok(None);
-    }
-
-    last_checkpoint_idx
-        .and_then(|ckpt_idx| db.client_state_db().get_client_update(ckpt_idx))
-        .map(|res| res.map(|update| update.into_state()))
-        .context("Failed to get last checkpoint state")
-}
-
-fn get_block_hash_by_id<D: Database>(
-    db: &D,
-    block_id: Option<&L2BlockId>,
-) -> anyhow::Result<Option<B256>> {
-    block_id
-        .and_then(|id| db.l2_db().get_block_data(*id).transpose())
-        .transpose()
-        .context("Failed to get block data")?
-        .map(get_block_hash)
-        .transpose()
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strata_state::{client_state::ClientState, id::L2BlockId, operation::ClientUpdateOutput};
+use strata_state::{client_state::ClientState, id::L2BlockId};
 
 /// Sync control message.
 #[derive(Copy, Clone, Debug)]
@@ -20,29 +20,19 @@ pub enum ForkChoiceMessage {
 #[derive(Clone, Debug)]
 pub struct ClientUpdateNotif {
     sync_event_idx: u64,
-    tsn_output: Arc<ClientUpdateOutput>,
     new_state: Arc<ClientState>,
 }
 
 impl ClientUpdateNotif {
-    pub fn new(
-        sync_event_idx: u64,
-        tsn_output: Arc<ClientUpdateOutput>,
-        new_state: Arc<ClientState>,
-    ) -> Self {
+    pub fn new(sync_event_idx: u64, new_state: Arc<ClientState>) -> Self {
         Self {
             sync_event_idx,
-            tsn_output,
             new_state,
         }
     }
 
     pub fn sync_event_idx(&self) -> u64 {
         self.sync_event_idx
-    }
-
-    pub fn tsn_output(&self) -> &ClientUpdateOutput {
-        &self.tsn_output
     }
 
     pub fn new_state(&self) -> &ClientState {

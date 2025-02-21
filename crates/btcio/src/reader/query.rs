@@ -12,14 +12,15 @@ use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
     messages::{BlockData, L1Event, RelevantTxEntry},
 };
-use strata_primitives::{block_credential::CredRule, params::Params};
-use strata_state::{
+use strata_primitives::{
+    block_credential::CredRule,
     l1::{
-        get_btc_params, get_difficulty_adjustment_height, BtcParams, HeaderVerificationState,
-        L1BlockId, TimestampStore,
+        get_btc_params, get_difficulty_adjustment_start_height, BtcParams, HeaderVerificationState,
+        L1BlockCommitment, L1BlockId, TimestampStore,
     },
-    sync_event::EventSubmitter,
+    params::Params,
 };
+use strata_state::sync_event::EventSubmitter;
 use strata_status::StatusChannel;
 use strata_storage::L1BlockManager;
 use tracing::*;
@@ -34,14 +35,19 @@ use crate::{
 pub(crate) struct ReaderContext<R: ReaderRpc> {
     /// Bitcoin reader client
     pub client: Arc<R>,
+
     /// L1db manager
     pub l1_manager: Arc<L1BlockManager>,
+
     /// Config
     pub config: Arc<ReaderConfig>,
+
     /// Params
     pub params: Arc<Params>,
+
     /// Status transmitter
     pub status_channel: StatusChannel,
+
     /// Sequencer Pubkey
     pub seq_pubkey: Option<XOnlyPublicKey>,
 }
@@ -92,10 +98,10 @@ fn calculate_target_next_block(
 }
 
 /// Inner function that actually does the reading task.
-async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
+async fn do_reader_task<R: ReaderRpc>(
     ctx: ReaderContext<R>,
     target_next_block: u64,
-    event_submitter: &E,
+    event_submitter: &impl EventSubmitter,
 ) -> anyhow::Result<()> {
     info!(%target_next_block, "started L1 reader task!");
 
@@ -139,7 +145,7 @@ async fn do_reader_task<R: ReaderRpc, E: EventSubmitter>(
 
 /// Handles errors encountered during polling.
 fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdate>) {
-    warn!(err = %err, "failed to poll Bitcoin client");
+    warn!(%err, "failed to poll Bitcoin client");
     status_updates.push(L1StatusUpdate::RpcError(err.to_string()));
 
     if let Some(reqwest_err) = err.downcast_ref::<reqwest::Error>() {
@@ -157,11 +163,14 @@ fn check_epoch_change<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
 ) -> anyhow::Result<Option<L1Event>> {
-    let new_epoch = ctx.status_channel.epoch().unwrap_or(0);
-    // TODO: check if new_epoch < current epoch. should panic if so?
-    let curr_epoch = state.epoch();
+    // If we don't have a chainstate yet then we can just assume 0.  Right now
+    // we infer it all consistently from params anyways.
+    let new_epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
 
-    if curr_epoch != new_epoch {
+    // If we reorg out a checkpoint then we also want to go back to the earlier epoch.
+    let cur_epoch = state.epoch();
+
+    if cur_epoch != new_epoch {
         state.set_epoch(new_epoch);
     }
 
@@ -172,17 +181,18 @@ fn check_epoch_change<R: ReaderRpc>(
     if new_config != curr_filter_config {
         state.set_filter_config(new_config.clone());
 
-        let last_checkpt_height = ctx
+        let last_ckpt = ctx
             .status_channel
             .get_last_checkpoint()
-            .expect("got epoch change without checkpoint finalized")
-            .height;
+            .expect("got epoch change without checkpoint finalized");
+
+        let last_ckpt_block = last_ckpt.batch_info.l1_range.1;
 
         // Now, we need to revert to the point before the last checkpoint height.
-        state.rollback_to_height(last_checkpt_height);
+        state.rollback_to_height(last_ckpt_block.height());
 
         // Create revert event
-        Ok(Some(L1Event::RevertTo(last_checkpt_height)))
+        Ok(Some(L1Event::RevertTo(last_ckpt_block)))
     } else {
         Ok(None)
     }
@@ -225,7 +235,7 @@ async fn init_reader_state<R: ReaderRpc>(
 
     let params = ctx.params.clone();
     let filter_config = TxFilterConfig::derive_from(params.rollup())?;
-    let epoch = ctx.status_channel.epoch().unwrap_or(0);
+    let epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
     let state = ReaderState::new(
         real_cur_height + 1,
         lookback,
@@ -260,9 +270,11 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
     if let Some((pivot_height, pivot_blkid)) = find_pivot_block(ctx.client.as_ref(), state).await? {
         if pivot_height < state.best_block_idx() {
             info!(%pivot_height, %pivot_blkid, "found apparent reorg");
+            let block = L1BlockCommitment::new(pivot_height, L1BlockId::from(pivot_blkid));
             state.rollback_to_height(pivot_height);
-            let revert_ev = L1Event::RevertTo(pivot_height);
+
             // Return with the revert event immediately
+            let revert_ev = L1Event::RevertTo(block);
             return Ok(vec![revert_ev]);
         }
     } else {
@@ -338,7 +350,6 @@ async fn process_block<R: ReaderRpc>(
     block: Block,
 ) -> anyhow::Result<(Vec<L1Event>, BlockHash)> {
     let txs = block.txdata.len();
-    let params = ctx.params.clone();
 
     // Index all the stuff in the block.
     let entries: Vec<RelevantTxEntry> =
@@ -349,43 +360,33 @@ async fn process_block<R: ReaderRpc>(
     let block_data = BlockData::new(height, block, entries);
 
     let l1blkid = block_data.block().block_hash();
+
     trace!(%height, %l1blkid, %txs, "fetched block from client");
 
     status_updates.push(L1StatusUpdate::CurHeight(height));
     status_updates.push(L1StatusUpdate::CurTip(l1blkid.to_string()));
 
-    let threshold = params.rollup().l1_reorg_safe_depth;
-    let genesis_ht = params.rollup().genesis_l1_height;
-    let genesis_threshold = genesis_ht + threshold as u64;
+    let l1_verification_state =
+        fetch_verification_state(ctx.client.as_ref(), height, &get_btc_params()).await?;
 
-    trace!(%genesis_ht, %threshold, %genesis_threshold, "should genesis?");
-
-    let block_ev = L1Event::BlockData(block_data, state.epoch());
-    let mut l1_events = vec![block_ev];
-
-    if height == genesis_threshold {
-        info!(%height, %genesis_ht, "time for genesis");
-        let l1_verification_state =
-            get_verification_state(ctx.client.as_ref(), genesis_ht + 1, &get_btc_params()).await?;
-        let ev = L1Event::GenesisVerificationState(height, l1_verification_state);
-        l1_events.push(ev);
-    }
+    let block_ev = L1Event::BlockData(block_data, state.epoch(), l1_verification_state);
+    let l1_events = vec![block_ev];
 
     Ok((l1_events, l1blkid))
 }
 
-/// Gets the [`HeaderVerificationState`] for the particular block
-pub async fn get_verification_state(
+/// Fetches the [`HeaderVerificationState`] for the particular block.
+pub async fn fetch_verification_state(
     client: &impl ReaderRpc,
     height: u64,
     params: &BtcParams,
 ) -> anyhow::Result<HeaderVerificationState> {
     // Get the difficulty adjustment block just before `block_height`
-    let h1 = get_difficulty_adjustment_height(0, height as u32, params);
+    let h1 = get_difficulty_adjustment_start_height(height as u32, params);
     let b1 = client.get_block_at(h1 as u64).await?;
 
     // Consider the block before `block_height` to be the last verified block
-    let vh = height - 1; // verified_height
+    let vh = height; // verified_height
     let vb = client.get_block_at(vh).await?; // verified_block
 
     const N: usize = 11;
@@ -406,7 +407,7 @@ pub async fn get_verification_state(
 
     // Calculate the 'head' index for the ring buffer based on the current block height.
     // The 'head' represents the position in the buffer where the next timestamp will be inserted.
-    let head = height as usize % N;
+    let head = (height + 1) as usize % N;
     let last_11_blocks_timestamps = TimestampStore::new_with_head(timestamps, head);
 
     let l1_blkid: L1BlockId = vb.header.block_hash().into();
@@ -419,11 +420,13 @@ pub async fn get_verification_state(
         total_accumulated_pow: 0u128,
         last_11_blocks_timestamps,
     };
-    trace!(%height, ?header_vs, "HeaderVerificationState");
+
+    trace!(%height, ?header_vs, "new HeaderVerificationState");
 
     Ok(header_vs)
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod test {
     use bitcoin::hashes::Hash;
@@ -433,6 +436,7 @@ mod test {
         chain_state::Chainstate,
         client_state::{ClientState, L1Checkpoint},
     };
+    use strata_status::ChainSyncStatusUpdate;
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
     use threadpool::ThreadPool;
 
@@ -448,7 +452,8 @@ mod test {
     fn get_reader_ctx(chs: Chainstate, cls: ClientState) -> ReaderContext<TestBitcoinClient> {
         let mut gen = ArbitraryGenerator::new();
         let l1status: L1Status = gen.generate();
-        let status_channel = StatusChannel::new(cls, l1status, Some(chs));
+        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chs.clone()));
+        let status_channel = StatusChannel::new(cls, l1status, Some(css));
         let params = Arc::new(gen_params());
         let config = Arc::new(ReaderConfig::default());
         let client = Arc::new(TestBitcoinClient::new(1));
@@ -485,7 +490,7 @@ mod test {
             n_recent_blocks,
             recent_blocks,
             filter_config,
-            ctx.status_channel.epoch().unwrap(),
+            ctx.status_channel.get_cur_chain_epoch().unwrap(),
         )
     }
 
@@ -503,7 +508,8 @@ mod test {
 
         // Update new chainstate from status channel
         chstate.set_epoch(curr_epoch + 1);
-        ctx.status_channel.update_chainstate(chstate);
+        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chstate));
+        ctx.status_channel.update_chain_sync_status(css);
 
         let ev = check_epoch_change(&ctx, &mut state).unwrap();
 
@@ -525,11 +531,17 @@ mod test {
 
         // Create client state with a finalized checkpoint
         let mut clstate: ClientState = ArbitraryGenerator::new().generate();
-        let mut checkpt: L1Checkpoint = ArbitraryGenerator::new().generate();
+        let mut ckpt: L1Checkpoint = ArbitraryGenerator::new().generate();
 
-        let chkpt_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
-        checkpt.height = chkpt_height;
-        clstate.set_last_finalized_checkpoint(checkpt);
+        let ckpt_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
+        ckpt.height = ckpt_height;
+
+        // This is a horrible hack to update the height.
+        ckpt.batch_info.l1_range.1 =
+            L1BlockCommitment::new(ckpt_height, *ckpt.batch_info.l1_range.1.blkid());
+
+        #[allow(deprecated)]
+        clstate.set_last_finalized_checkpoint(ckpt);
 
         // Create reader context and state
         let mut ctx = get_reader_ctx(chstate.clone(), clstate.clone());
@@ -551,7 +563,8 @@ mod test {
 
         // Update new chainstate from status channel
         chstate.set_epoch(curr_epoch + 1);
-        ctx.status_channel.update_chainstate(chstate);
+        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chstate));
+        ctx.status_channel.update_chain_sync_status(css);
 
         // Check for epoch change, this should not trigger L1 revert because filter config has not
         // changed
@@ -564,7 +577,7 @@ mod test {
         // Check the reader state's next_height
         assert_eq!(
             state.next_height(),
-            chkpt_height + 1,
+            ckpt_height + 1,
             "Reader's next sheight should be updated"
         );
 
@@ -586,16 +599,16 @@ mod test {
 
         let len = 15;
         let height = 100;
-        let mut header_vs = get_verification_state(&client, height, &params)
+        let mut header_vs = fetch_verification_state(&client, height, &params)
             .await
             .unwrap();
 
-        for h in height..height + len {
+        for h in height + 1..=height + len {
             let block = client.get_block_at(h).await.unwrap();
             header_vs.check_and_update_continuity(&block.header, &params);
         }
 
-        let new_header_vs = get_verification_state(&client, height + len, &params)
+        let new_header_vs = fetch_verification_state(&client, height + len, &params)
             .await
             .unwrap();
 
