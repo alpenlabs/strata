@@ -1,5 +1,6 @@
 mod block;
 mod btc;
+mod error;
 mod header;
 mod header_verification;
 mod inclusion_proof;
@@ -14,6 +15,7 @@ mod utils;
 
 pub use block::*;
 pub use btc::*;
+pub use error::*;
 pub use header::*;
 pub use header_verification::*;
 pub use inclusion_proof::*;
