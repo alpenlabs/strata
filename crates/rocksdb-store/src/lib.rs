@@ -49,7 +49,7 @@ use l2::{
     db::L2Db,
     schemas::{L2BlockHeightSchema, L2BlockSchema, L2BlockStatusSchema},
 };
-use rockbound::{schema::ColumnFamilyName, Schema};
+use rockbound::{schema::ColumnFamilyName, Schema, TransactionRetry};
 pub use sync_event::db::SyncEventDb;
 pub use writer::db::RBL1WriterDb;
 use writer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
@@ -57,7 +57,9 @@ use writer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
 use crate::{
     chain_state::schemas::WriteBatchSchema,
     client_state::schemas::ClientUpdateOutputSchema,
-    l1::schemas::{L1BlockSchema, MmrSchema, TxnSchema},
+    l1::schemas::{
+        L1BlockSchema, L1BlocksByHeightSchema, L1CanonicalBlockSchema, MmrSchema, TxnSchema,
+    },
     sequence::SequenceSchema,
     sync_event::schemas::SyncEventSchema,
 };
@@ -71,8 +73,10 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     ClientUpdateOutputSchema::COLUMN_FAMILY_NAME,
     L1BlockSchema::COLUMN_FAMILY_NAME,
     MmrSchema::COLUMN_FAMILY_NAME,
-    SyncEventSchema::COLUMN_FAMILY_NAME,
     TxnSchema::COLUMN_FAMILY_NAME,
+    L1BlocksByHeightSchema::COLUMN_FAMILY_NAME,
+    L1CanonicalBlockSchema::COLUMN_FAMILY_NAME,
+    SyncEventSchema::COLUMN_FAMILY_NAME,
     L2BlockSchema::COLUMN_FAMILY_NAME,
     L2BlockStatusSchema::COLUMN_FAMILY_NAME,
     L2BlockHeightSchema::COLUMN_FAMILY_NAME,
@@ -116,6 +120,10 @@ pub struct DbOpsConfig {
 impl DbOpsConfig {
     pub fn new(retry_count: u16) -> Self {
         Self { retry_count }
+    }
+
+    pub fn txn_retry_count(&self) -> TransactionRetry {
+        TransactionRetry::Count(self.retry_count)
     }
 }
 
