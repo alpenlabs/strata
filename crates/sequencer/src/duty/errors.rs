@@ -10,6 +10,7 @@ pub enum Error {
     #[error("L2 blkid {0:?} missing from database")]
     MissingL2Block(L2BlockId),
 
+    /// Checkpoint missing.
     #[error("missing expected checkpoint {0} in database")]
     MissingCheckpoint(u64),
 
