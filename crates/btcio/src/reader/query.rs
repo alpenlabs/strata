@@ -405,8 +405,8 @@ pub async fn fetch_verification_state(
     for i in 0..N {
         if height >= i as u64 {
             let height_to_fetch = height - i as u64;
-            let h = client.get_block_at(height_to_fetch).await?;
-            timestamps[N - 1 - i] = h.header.time;
+            let h = client.get_block_header_at(height_to_fetch).await?;
+            timestamps[N - 1 - i] = h.time;
         } else {
             // No more blocks to fetch; the rest remain zero
             timestamps[N - 1 - i] = 0;
