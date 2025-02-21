@@ -333,7 +333,7 @@ mod tests {
         let r1 = OsRng.gen_range(h2..chain.end);
         let mut verification_state = chain.get_verification_state(r1, 0).unwrap();
 
-        for header_idx in r1..chain.end {
+        for header_idx in r1 + 1..chain.end {
             verification_state
                 .check_and_update_full(&chain.get_block_header_at(header_idx).unwrap(), &MAINNET)
                 .unwrap()
@@ -367,7 +367,7 @@ mod tests {
             .map(|h| chain.get_block_header_at(h).unwrap())
             .collect();
         let mut verification_state = chain
-            .get_verification_state(reorg.start, reorg_len)
+            .get_verification_state(reorg.start - 1, reorg_len)
             .unwrap();
 
         for header in &headers {
@@ -412,7 +412,7 @@ mod tests {
         let reorg = (h5 - 5, h5 + 5);
         test_reorg(reorg);
 
-        // Reorg of 10 blocks from difficulty adjusted block
+        // Reorg exactly at the difficulty adjusted block
         let reorg = (h3, h3 + 10);
         test_reorg(reorg);
 

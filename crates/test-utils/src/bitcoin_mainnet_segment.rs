@@ -19,7 +19,7 @@ use strata_btcio::{
 };
 use strata_primitives::{
     buf::Buf32,
-    l1::{get_btc_params, HeaderVerificationState, L1BlockManifest, L1HeaderRecord},
+    l1::{HeaderVerificationState, L1BlockManifest, L1HeaderRecord},
 };
 pub struct BtcChainSegment {
     pub headers: Vec<Header>,
@@ -223,8 +223,12 @@ impl BtcChainSegment {
         Ok(blocks)
     }
 
-    pub fn get_verification_state(&self, height: u64) -> Result<HeaderVerificationState, Error> {
-        block_on(fetch_verification_state(self, height, &get_btc_params()))
+    pub fn get_verification_state(
+        &self,
+        height: u64,
+        l1_reorg_safe_depth: u32,
+    ) -> Result<HeaderVerificationState, Error> {
+        block_on(fetch_verification_state(self, height, l1_reorg_safe_depth))
     }
 }
 

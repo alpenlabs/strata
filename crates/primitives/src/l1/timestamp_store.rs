@@ -5,19 +5,19 @@ use serde::{Deserialize, Serialize};
 /// The number of timestamps used for calculating the median.
 /// According to Bitcoin consensus rules, we need to check that a block's timestamp
 /// is not lower than the median of the last eleven blocks' timestamps.
-pub const N: usize = 11;
+pub const TIMESTAMPS_FOR_MEDIAN: usize = 11;
 
 /// The middle index for selecting the median timestamp.
-/// Since N is odd, the median is the element at index 5 (the 6th element)
+/// Since TIMESTAMPS_FOR_MEDIAN is odd, the median is the element at index 5 (the 6th element)
 /// after the timestamps are sorted.
-pub const MID: usize = 5;
+pub const MEDIAN_TIMESTAMP_INDEX: usize = TIMESTAMPS_FOR_MEDIAN / 2;
 
 /// A ring buffer that stores timestamps. The internal buffer is stored as a
-/// [`Vec<u32>`] so that its length can be greater than `N`. The buffer always
-/// holds at least `N` timestamps. When inserting a new timestamp, the oldest
+/// [`Vec<u32>`] so that its length can be greater than `TIMESTAMPS_FOR_MEDIAN`. The buffer always
+/// holds at least `TIMESTAMPS_FOR_MEDIAN` timestamps. When inserting a new timestamp, the oldest
 /// timestamp is overwritten and the head pointer is advanced in a circular manner.
 ///
-/// The median is computed using the last `N` inserted timestamps.
+/// The median is computed using the last `TIMESTAMPS_FOR_MEDIAN` inserted timestamps.
 #[derive(
     Debug,
     Clone,
@@ -32,8 +32,8 @@ pub const MID: usize = 5;
 )]
 pub struct TimestampStore {
     /// The vector that holds the timestamps.
-    /// Its length may be greater than `N`, but only the last `N` timestamps are
-    /// used for computing the median.
+    /// Its length may be greater than `TIMESTAMPS_FOR_MEDIAN`, but only the last
+    /// `TIMESTAMPS_FOR_MEDIAN` timestamps are used for computing the median.
     pub buffer: Vec<u32>,
     /// The index in the buffer where the next timestamp will be inserted.
     head: usize,
@@ -46,11 +46,11 @@ impl TimestampStore {
     ///
     /// # Panics
     ///
-    /// Panics if `initial_timestamps.len() < N`.
+    /// Panics if `initial_timestamps.len() < TIMESTAMPS_FOR_MEDIAN`.
     pub fn new(initial_timestamps: &[u32]) -> Self {
         assert!(
-            initial_timestamps.len() >= N,
-            "at least N timestamps required"
+            initial_timestamps.len() >= TIMESTAMPS_FOR_MEDIAN,
+            "at least TIMESTAMPS_FOR_MEDIAN timestamps required"
         );
         Self {
             buffer: initial_timestamps.to_vec(),
@@ -73,14 +73,18 @@ impl TimestampStore {
     /// Panics if `head` is not less than the number of timestamps.
     pub fn new_with_head(timestamps: &[u32], head: usize) -> Self {
         let len = timestamps.len();
-        assert!(len >= N, "at least N timestamps required");
+        assert!(
+            len >= TIMESTAMPS_FOR_MEDIAN,
+            "at least TIMESTAMPS_FOR_MEDIAN timestamps required"
+        );
         assert!(head < len, "head index out of bounds");
 
         let mut buffer = vec![0; len];
 
         // Rearrange the timestamps into the internal buffer representation.
         // The internal buffer expects the oldest timestamp at position `head`,
-        // and the newest timestamp at position `(head + N - 1) % N`.
+        // and the newest timestamp at position `(head + TIMESTAMPS_FOR_MEDIAN - 1) %
+        // TIMESTAMPS_FOR_MEDIAN`.
         for (i, &timestamp) in timestamps.iter().enumerate() {
             // Calculate the position in the internal buffer.
             let pos = (head + i) % len;
@@ -106,19 +110,20 @@ impl TimestampStore {
         self.head = (self.head + len - 1) % len;
     }
 
-    /// Computes and returns the median timestamp from the last `N` inserted timestamps.
+    /// Computes and returns the median timestamp from the last `TIMESTAMPS_FOR_MEDIAN` inserted
+    /// timestamps.
     ///
-    /// The median is calculated by taking a copy of the last `N` timestamps, sorting them,
-    /// and selecting the element at the middle index `MID`.
+    /// The median is calculated by taking a copy of the last `TIMESTAMPS_FOR_MEDIAN` timestamps,
+    /// sorting them, and selecting the element at the middle index `MEDIAN_TIMESTAMP_INDEX`.
     pub fn median(&self) -> u32 {
         let len = self.buffer.len();
-        let mut last_n_timestamps = Vec::with_capacity(N);
-        for i in 0..N {
+        let mut last_n_timestamps = Vec::with_capacity(TIMESTAMPS_FOR_MEDIAN);
+        for i in 0..TIMESTAMPS_FOR_MEDIAN {
             let pos = (self.head + len - 1 - i) % len;
             last_n_timestamps.push(self.buffer[pos]);
         }
         last_n_timestamps.sort_unstable();
-        last_n_timestamps[MID]
+        last_n_timestamps[MEDIAN_TIMESTAMP_INDEX]
     }
 }
 
