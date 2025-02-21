@@ -67,9 +67,6 @@ pub struct HeaderVerificationState {
     /// most recent 11 timestamps. However, it retains additional timestamps to support chain reorg
     /// scenarios.
     pub block_timestamp_history: TimestampStore,
-
-    /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)
-    pub total_accumulated_pow: u128,
 }
 
 /// `EpochTimestamps` stores the timestamps corresponding to the boundaries of difficulty adjustment
@@ -184,9 +181,6 @@ impl HeaderVerificationState {
         // Update the timestamps
         self.update_timestamps(header.time, params);
 
-        // Update the total accumulated PoW
-        self.total_accumulated_pow += header.difficulty(params);
-
         // Set the target for the next block
         self.next_block_target = self.next_target(header, params);
 
@@ -221,9 +215,6 @@ impl HeaderVerificationState {
 
         // Update the timestamps
         self.update_timestamps(header.time, params);
-
-        // Update the total accumulated PoW
-        self.total_accumulated_pow += header.difficulty(params);
 
         Ok(())
     }
@@ -292,7 +283,6 @@ impl HeaderVerificationState {
             );
             self.block_timestamp_history.remove();
             self.next_block_target = old_header.bits.to_consensus();
-            self.total_accumulated_pow -= old_header.difficulty(params);
         }
 
         for new_header in new_headers {
@@ -333,7 +323,7 @@ mod tests {
         let r1 = OsRng.gen_range(h2..chain.end);
         let mut verification_state = chain.get_verification_state(r1, 0).unwrap();
 
-        for header_idx in r1..chain.end {
+        for header_idx in r1 + 1..chain.end {
             verification_state
                 .check_and_update_full(&chain.get_block_header_at(header_idx).unwrap(), &MAINNET)
                 .unwrap()
@@ -367,7 +357,7 @@ mod tests {
             .map(|h| chain.get_block_header_at(h).unwrap())
             .collect();
         let mut verification_state = chain
-            .get_verification_state(reorg.start, reorg_len)
+            .get_verification_state(reorg.start - 1, reorg_len)
             .unwrap();
 
         for header in &headers {
@@ -412,7 +402,7 @@ mod tests {
         let reorg = (h5 - 5, h5 + 5);
         test_reorg(reorg);
 
-        // Reorg of 10 blocks from difficulty adjusted block
+        // Reorg exactly at the difficulty adjusted block
         let reorg = (h3, h3 + 10);
         test_reorg(reorg);
 

@@ -19,13 +19,14 @@ use strata_btcio::{
 };
 use strata_primitives::{
     buf::Buf32,
-    l1::{get_btc_params, HeaderVerificationState, L1BlockManifest, L1HeaderRecord},
+    l1::{HeaderVerificationState, L1BlockManifest, L1HeaderRecord},
 };
 pub struct BtcChainSegment {
     pub headers: Vec<Header>,
     pub start: u64,
     pub end: u64,
     pub custom_blocks: HashMap<u64, Block>,
+    pub custom_headers: HashMap<u64, Header>,
 }
 
 impl BtcChainSegment {
@@ -50,6 +51,13 @@ impl BtcChainSegment {
             headers.push(header);
         }
 
+        let custom_headers: HashMap<u64, Header> = vec![(38304, "01000000858a5c6d458833aa83f7b7e56d71c604cb71165ebb8104b82f64de8d00000000e408c11029b5fdbb92ea0eeb8dfa138ffa3acce0f69d7deebeb1400c85042e01723f6b4bc38c001d09bd8bd5")].into_iter().map(|(h, raw_block)| {
+            let header_bytes = hex::decode(raw_block).unwrap();
+            let header: Header = bitcoin::consensus::deserialize(&header_bytes).unwrap();
+            (h, header)
+        })
+        .collect();
+
         // This custom blocks are chose because this is where the first difficulty happened
         let custom_blocks: HashMap<u64, Block> = vec![
         (40320, "010000001a231097b6ab6279c80f24674a2c8ee5b9a848e1d45715ad89b6358100000000a822bafe6ed8600e3ffce6d61d10df1927eafe9bbf677cb44c4d209f143c6ba8db8c784b5746651cce2221180101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c02db02ffffffff0100f2052a010000004341046477f88505bef7e3c1181a7e3975c4cd2ac77ffe23ea9b28162afbb63bd71d3f7c3a07b58cf637f1ec68ed532d5b6112d57a9744010aae100e4a48cd831123b8ac00000000"),
@@ -71,6 +79,7 @@ impl BtcChainSegment {
             start: 40_000,
             end: 50_000,
             custom_blocks,
+            custom_headers,
         }
     }
 }
@@ -90,6 +99,10 @@ impl BtcChainSegment {
 
     /// Retrieve a block at a given height.
     pub fn get_block_header_at(&self, height: u64) -> ClientResult<Header> {
+        if let Some(header) = self.custom_headers.get(&height) {
+            return Ok(*header);
+        }
+
         if !(self.start..self.end).contains(&height) {
             return Err(ClientError::Body(format!(
                 "Block header at height {} not available",
@@ -223,8 +236,12 @@ impl BtcChainSegment {
         Ok(blocks)
     }
 
-    pub fn get_verification_state(&self, height: u64) -> Result<HeaderVerificationState, Error> {
-        block_on(fetch_verification_state(self, height, &get_btc_params()))
+    pub fn get_verification_state(
+        &self,
+        height: u64,
+        l1_reorg_safe_depth: u32,
+    ) -> Result<HeaderVerificationState, Error> {
+        block_on(fetch_verification_state(self, height, l1_reorg_safe_depth))
     }
 }
 
