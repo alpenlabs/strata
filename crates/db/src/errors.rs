@@ -20,7 +20,7 @@ pub enum DbError {
     MissingBlockInRange(&'static str, u64, u64, u64),
 
     #[error("missing L1 block body (id {0})")]
-    MissingL1BlockBody(L1BlockId),
+    MissingL1BlockManifest(L1BlockId),
 
     #[error("missing L1 block (height {0})")]
     MissingL1Block(u64),

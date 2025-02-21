@@ -135,7 +135,7 @@ impl L1Database for L1Db {
     fn get_block_txs(&self, blockid: L1BlockId) -> DbResult<Option<Vec<L1TxRef>>> {
         let Some(txs) = self.db.get::<TxnSchema>(&blockid)? else {
             warn!(%blockid, "missing L1 block body");
-            return Err(DbError::MissingL1BlockBody(blockid));
+            return Err(DbError::MissingL1BlockManifest(blockid));
         };
 
         let txs_refs = txs

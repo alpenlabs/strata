@@ -51,7 +51,7 @@ impl L1BlockManager {
     pub fn extend_canonical_chain(&self, blockid: &L1BlockId) -> DbResult<()> {
         let new_block = self
             .get_block_manifest(blockid)?
-            .ok_or(DbError::MissingL1BlockBody(*blockid))?;
+            .ok_or(DbError::MissingL1BlockManifest(*blockid))?;
         let height = new_block.height();
 
         if let Some((tip_height, tip_blockid)) = self.get_chain_tip()? {
@@ -79,7 +79,7 @@ impl L1BlockManager {
         let new_block = self
             .get_block_manifest_async(blockid)
             .await?
-            .ok_or(DbError::MissingL1BlockBody(*blockid))?;
+            .ok_or(DbError::MissingL1BlockManifest(*blockid))?;
         let height = new_block.height();
 
         if let Some((tip_height, tip_blockid)) = self.get_chain_tip_async().await? {
