@@ -12,7 +12,7 @@ inst_ops_simple! {
         put_block_data(mf: L1BlockManifest) => ();
         // put_mmr_checkpoint(blockid: L1BlockId, mmr: CompactMmr) => ();
         set_canonical_chain_entry(height: u64, blockid: L1BlockId) => ();
-        remove_canonical_chain_range(start_height: u64, end_height: u64) => ();
+        remove_canonical_chain_entries(start_height: u64, end_height: u64) => ();
         prune_to_height(height: u64) => ();
         get_canonical_chain_tip() => Option<(u64, L1BlockId)>;
         get_block_manifest(blockid: L1BlockId) => Option<L1BlockManifest>;

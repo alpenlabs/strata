@@ -64,7 +64,7 @@ impl L1Database for L1Db {
         Ok(())
     }
 
-    fn remove_canonical_chain_range(&self, start_height: u64, end_height: u64) -> DbResult<()> {
+    fn remove_canonical_chain_entries(&self, start_height: u64, end_height: u64) -> DbResult<()> {
         let mut batch = SchemaBatch::new();
         for height in (start_height..=end_height).rev() {
             batch.delete::<L1CanonicalBlockSchema>(&height)?;
@@ -294,7 +294,7 @@ mod tests {
         let remove_start_height = 5;
         let remove_end_height = 15;
         assert!(db
-            .remove_canonical_chain_range(remove_start_height, remove_end_height)
+            .remove_canonical_chain_entries(remove_start_height, remove_end_height)
             .is_ok());
 
         // all removed items are gone from canonical chain
