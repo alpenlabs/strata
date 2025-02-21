@@ -13082,6 +13082,10 @@ dependencies = [
  "secp256k1",
  "sha2 0.10.8",
  "strata-primitives",
+ "zkaleido",
+ "zkaleido-native-adapter",
+ "zkaleido-risc0-adapter",
+ "zkaleido-sp1-adapter",
 ]
 
 [[package]]

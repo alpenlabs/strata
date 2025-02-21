@@ -8,7 +8,10 @@ strata-primitives.workspace = true
 
 secp256k1.workspace = true
 sha2.workspace = true
-
+zkaleido.workspace = true
+zkaleido-native-adapter.workspace = true
+zkaleido-risc0-adapter.workspace = true
+zkaleido-sp1-adapter.workspace = true
 
 [dev-dependencies]
 rand = { version = "0.8.5", features = ["getrandom", "std_rng"] }
