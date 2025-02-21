@@ -49,7 +49,7 @@ pub trait L1Database {
     /// Atomically extends the chain with a new block, providing the manifest
     /// and a list of transactions we find relevant.  Returns error if
     /// provided out-of-order.
-    fn put_block_data(&self, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()>;
+    fn put_block_data(&self, mf: L1BlockManifest) -> DbResult<()>;
 
     /// Stores an MMR checkpoint so we have to query less far back.  If the
     /// provided height does not match the entries in the MMR, will return an
@@ -68,13 +68,13 @@ pub trait L1Database {
     // TODO DA scraping storage
 
     // Gets current chain tip height, blockid
-    fn get_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>>;
+    fn get_canonical_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>>;
 
     /// Gets the block manifest for a blockid.
     fn get_block_manifest(&self, blockid: L1BlockId) -> DbResult<Option<L1BlockManifest>>;
 
     /// Gets the blockid at height for the current chain.
-    fn get_canonical_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>>;
+    fn get_canonical_blockid_at_height(&self, height: u64) -> DbResult<Option<L1BlockId>>;
 
     // TODO: This should not exist in database level and should be handled by downstream manager.
     /// Returns a half-open interval of block hashes, if we have all of them

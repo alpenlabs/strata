@@ -34,18 +34,18 @@ impl L1BlockManager {
         }
     }
 
-    pub fn put_block_data(&self, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
+    pub fn put_block_data(&self, mf: L1BlockManifest) -> DbResult<()> {
         let blockid = mf.blkid();
         self.manifest_cache.purge(blockid);
         self.txs_cache.purge(blockid);
-        self.ops.put_block_data_blocking(mf, txs)
+        self.ops.put_block_data_blocking(mf)
     }
 
-    pub async fn put_block_data_async(&self, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
+    pub async fn put_block_data_async(&self, mf: L1BlockManifest) -> DbResult<()> {
         let blockid = mf.blkid();
         self.manifest_cache.purge(blockid);
         self.txs_cache.purge(blockid);
-        self.ops.put_block_data_async(mf, txs).await
+        self.ops.put_block_data_async(mf).await
     }
 
     pub fn extend_canonical_chain(&self, blockid: &L1BlockId) -> DbResult<()> {
@@ -105,7 +105,7 @@ impl L1BlockManager {
     }
 
     pub fn revert_canonical_chain(&self, height: u64) -> DbResult<()> {
-        let Some((tip_height, _)) = self.ops.get_chain_tip_blocking()? else {
+        let Some((tip_height, _)) = self.ops.get_canonical_chain_tip_blocking()? else {
             // no chain to revert
             // but clear cache anyway
             self.blockheight_cache.clear();
@@ -122,7 +122,7 @@ impl L1BlockManager {
     }
 
     pub async fn revert_canonical_chain_async(&self, height: u64) -> DbResult<()> {
-        let Some((tip_height, _)) = self.ops.get_chain_tip_async().await? else {
+        let Some((tip_height, _)) = self.ops.get_canonical_chain_tip_async().await? else {
             // no chain to revert
             // but clear cache anyway
             self.blockheight_cache.clear();
@@ -141,12 +141,12 @@ impl L1BlockManager {
 
     pub fn get_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>> {
         self.chaintip_cache
-            .get_or_fetch_blocking(&(), || self.ops.get_chain_tip_blocking())
+            .get_or_fetch_blocking(&(), || self.ops.get_canonical_chain_tip_blocking())
     }
 
     pub async fn get_chain_tip_async(&self) -> DbResult<Option<(u64, L1BlockId)>> {
         self.chaintip_cache
-            .get_or_fetch(&(), || self.ops.get_chain_tip_chan())
+            .get_or_fetch(&(), || self.ops.get_canonical_chain_tip_chan())
             .await
     }
 
@@ -192,13 +192,16 @@ impl L1BlockManager {
     }
 
     pub fn get_canonical_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>> {
-        self.blockheight_cache
-            .get_or_fetch_blocking(&height, || self.ops.get_canonical_blockid_blocking(height))
+        self.blockheight_cache.get_or_fetch_blocking(&height, || {
+            self.ops.get_canonical_blockid_at_height_blocking(height)
+        })
     }
 
     pub async fn get_canonical_blockid_async(&self, height: u64) -> DbResult<Option<L1BlockId>> {
         self.blockheight_cache
-            .get_or_fetch(&height, || self.ops.get_canonical_blockid_chan(height))
+            .get_or_fetch(&height, || {
+                self.ops.get_canonical_blockid_at_height_chan(height)
+            })
             .await
     }
 

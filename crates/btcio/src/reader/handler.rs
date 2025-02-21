@@ -64,10 +64,10 @@ async fn handle_blockdata<R: ReaderRpc>(
 
     let txs: Vec<_> = generate_l1txs(&blockdata);
     let num_txs = txs.len();
-    let manifest = generate_block_manifest(blockdata.block(), hvs, txs.clone(), epoch, height);
+    let manifest = generate_block_manifest(blockdata.block(), hvs, txs, epoch, height);
     let l1blockid = *manifest.blkid();
 
-    l1_manager.put_block_data_async(manifest, txs).await?;
+    l1_manager.put_block_data_async(manifest).await?;
     l1_manager.extend_canonical_chain_async(&l1blockid).await?;
     info!(%height, %l1blockid, txs = %num_txs, "wrote L1 block manifest");
 

@@ -419,10 +419,16 @@ mod tests {
                 })
                 .collect();
 
-            let mf: L1BlockManifest = arb.generate();
+            let mf = L1BlockManifest::new(
+                arb.generate(),
+                arb.generate(),
+                txs,
+                arb.generate(),
+                arb.generate(),
+            );
 
             // Insert block data
-            let res = l1_db.put_block_data(mf.clone(), txs.clone());
+            let res = l1_db.put_block_data(mf.clone());
             assert!(
                 res.is_ok(),
                 "should be able to put block data into the L1Database"
