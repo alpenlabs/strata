@@ -178,6 +178,10 @@ impl L1BlockManifest {
         &self.txs
     }
 
+    pub fn txs_vec(&self) -> &Vec<L1Tx> {
+        &self.txs
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }

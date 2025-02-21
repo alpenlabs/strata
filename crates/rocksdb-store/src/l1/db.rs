@@ -34,7 +34,7 @@ impl L1Db {
 }
 
 impl L1Database for L1Db {
-    fn put_block_data(&self, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()> {
+    fn put_block_data(&self, mf: L1BlockManifest) -> DbResult<()> {
         let blockid = mf.blkid();
         let height = mf.height();
 
@@ -46,7 +46,7 @@ impl L1Database for L1Db {
                 blocks_at_height.push(*blockid);
 
                 txn.put::<L1BlockSchema>(blockid, &mf)?;
-                txn.put::<TxnSchema>(blockid, &txs)?;
+                txn.put::<TxnSchema>(blockid, mf.txs_vec())?;
                 txn.put::<L1BlocksByHeightSchema>(&height, &blocks_at_height)?;
 
                 Ok::<(), DbError>(())
@@ -128,7 +128,7 @@ impl L1Database for L1Db {
         Ok(tx?)
     }
 
-    fn get_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>> {
+    fn get_canonical_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>> {
         self.get_latest_block()
     }
 
@@ -175,7 +175,7 @@ impl L1Database for L1Db {
         Ok(res)
     }
 
-    fn get_canonical_blockid(&self, height: u64) -> DbResult<Option<L1BlockId>> {
+    fn get_canonical_blockid_at_height(&self, height: u64) -> DbResult<Option<L1BlockId>> {
         Ok(self.db.get::<L1CanonicalBlockSchema>(&height)?)
     }
 
@@ -206,7 +206,6 @@ mod tests {
         let mut arb = ArbitraryGenerator::new_with_size(1 << 12);
 
         // TODO maybe tweak this to make it a bit more realistic?
-        let mf: L1BlockManifest = arb.generate();
         let txs: Vec<L1Tx> = (0..num_txs)
             .map(|i| {
                 let proof = L1TxProof::new(i as u32, arb.generate());
@@ -214,10 +213,18 @@ mod tests {
                 L1Tx::new(proof, arb.generate(), vec![parsed_tx])
             })
             .collect();
+        let mf = L1BlockManifest::new(
+            arb.generate(),
+            arb.generate(),
+            txs.clone(),
+            arb.generate(),
+            arb.generate(),
+        );
+
         let mmr: CompactMmr = arb.generate();
 
         // Insert block data
-        let res = db.put_block_data(mf.clone(), txs.clone());
+        let res = db.put_block_data(mf.clone());
         assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
         let res = db.set_canonical_chain_entry(height, *mf.blkid());
         assert!(res.is_ok(), "put should work but got: {}", res.unwrap_err());
@@ -250,19 +257,24 @@ mod tests {
         let heights = vec![1, 2, 5000, 1000, 1002, 999];
         let mut blockids = Vec::new();
         for height in &heights {
-            let txs: Vec<L1Tx> = (0..10)
-                .map(|_| ArbitraryGenerator::new().generate())
-                .collect();
-            let mf: L1BlockManifest = ArbitraryGenerator::new().generate();
+            let mut arb = ArbitraryGenerator::new();
+            let txs: Vec<L1Tx> = (0..10).map(|_| arb.generate()).collect();
+            let mf = L1BlockManifest::new(
+                arb.generate(),
+                arb.generate(),
+                txs,
+                arb.generate(),
+                arb.generate(),
+            );
             let blockid = *mf.blkid();
-            db.put_block_data(mf, txs).unwrap();
+            db.put_block_data(mf).unwrap();
             assert!(db.set_canonical_chain_entry(*height, blockid).is_ok());
             blockids.push(blockid);
         }
 
         for (height, expected_blockid) in heights.into_iter().zip(blockids) {
             assert!(matches!(
-                db.get_canonical_blockid(height),
+                db.get_canonical_blockid_at_height(height),
                 Ok(Some(blockid)) if blockid == expected_blockid
             ));
         }
@@ -287,11 +299,11 @@ mod tests {
 
         // all removed items are gone from canonical chain
         for h in remove_start_height..=remove_end_height {
-            assert!(matches!(db.get_canonical_blockid(h), Ok(None)));
+            assert!(matches!(db.get_canonical_blockid_at_height(h), Ok(None)));
         }
         // everything else is retained
         for h in start_height..remove_start_height {
-            assert!(matches!(db.get_canonical_blockid(h), Ok(Some(_))));
+            assert!(matches!(db.get_canonical_blockid_at_height(h), Ok(Some(_))));
         }
     }
 
@@ -317,13 +329,13 @@ mod tests {
         // fetch non existent block
         let non_idx = 200;
         let observed_blockid = db
-            .get_canonical_blockid(non_idx)
+            .get_canonical_blockid_at_height(non_idx)
             .expect("Could not fetch from db");
         assert_eq!(observed_blockid, None);
 
         // fetch and check, existent block
         let blockid = db
-            .get_canonical_blockid(idx)
+            .get_canonical_blockid_at_height(idx)
             .expect("Could not fetch from db")
             .expect("Expected block missing");
         let observed_mf = db
@@ -371,7 +383,7 @@ mod tests {
     fn test_get_chain_tip() {
         let db = setup_db();
         assert_eq!(
-            db.get_chain_tip().unwrap(),
+            db.get_canonical_chain_tip().unwrap(),
             None,
             "chain tip of empty db should be unset"
         );
@@ -379,9 +391,15 @@ mod tests {
         // Insert some block data
         let num_txs = 10;
         insert_block_data(1, &db, num_txs);
-        assert!(matches!(db.get_chain_tip().unwrap(), Some((1, _))));
+        assert!(matches!(
+            db.get_canonical_chain_tip().unwrap(),
+            Some((1, _))
+        ));
         insert_block_data(2, &db, num_txs);
-        assert!(matches!(db.get_chain_tip().unwrap(), Some((2, _))));
+        assert!(matches!(
+            db.get_canonical_chain_tip().unwrap(),
+            Some((2, _))
+        ));
     }
 
     #[test]
@@ -393,7 +411,7 @@ mod tests {
         insert_block_data(2, &db, num_txs);
         insert_block_data(3, &db, num_txs);
 
-        let blockid = db.get_canonical_blockid(2).unwrap().unwrap();
+        let blockid = db.get_canonical_blockid_at_height(2).unwrap().unwrap();
         let block_txs = db.get_block_txs(blockid).unwrap().unwrap();
         let expected: Vec<_> = (0..10).map(|i| (blockid, i).into()).collect(); // 10 because insert_block_data inserts 10 txs
         assert_eq!(block_txs, expected);
