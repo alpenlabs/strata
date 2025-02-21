@@ -75,22 +75,19 @@ pub trait ProvingOp {
             .get_proof_deps(proof_ctx)
             .map_err(ProvingTaskError::DatabaseError)?;
 
-        let deps_ctx = match proof_deps {
-            // Reuse the existing dependency tasks fetched from DB.
-            Some(v) => v,
-            // Create new dependency tasks.
-            None => {
-                let deps_keys = self
-                    .create_deps_tasks(params, db, task_tracker.clone())
-                    .await?;
-                let deps: Vec<_> = deps_keys.iter().map(|v| v.context().to_owned()).collect();
+        let deps_ctx = {
+            // Create proving dependency tasks.
+            let deps_keys = self
+                .create_deps_tasks(params, db, task_tracker.clone())
+                .await?;
+            let deps: Vec<_> = deps_keys.iter().map(|v| v.context().to_owned()).collect();
 
-                if !deps.is_empty() {
-                    db.put_proof_deps(proof_ctx, deps.clone())
-                        .map_err(ProvingTaskError::DatabaseError)?;
-                }
-                deps
+            // Only insert deps into DB if any and not in the DB already.
+            if !deps.is_empty() && proof_deps.is_none() {
+                db.put_proof_deps(proof_ctx, deps.clone())
+                    .map_err(ProvingTaskError::DatabaseError)?;
             }
+            deps
         };
 
         let mut task_tracker = task_tracker.lock().await;
@@ -183,5 +180,255 @@ pub trait ProvingOp {
             .map_err(ProvingTaskError::DatabaseError)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use strata_primitives::buf::Buf32;
+    use strata_rocksdb::{prover::db::ProofDb, test_utils::get_rocksdb_tmp_instance_for_prover};
+    use strata_rpc_types::ProofKey;
+    use tokio::sync::Mutex;
+    use zkaleido::ZkVmProver;
+
+    use super::ProvingOp;
+    use crate::{errors::ProvingTaskError, status::ProvingTaskStatus, task_tracker::TaskTracker};
+
+    // Test stub of zkaleido::ZkVmProver.
+    struct TestProver;
+
+    impl ZkVmProver for TestProver {
+        type Input = u64;
+
+        type Output = String;
+
+        fn name() -> String {
+            "test_prover".to_string()
+        }
+
+        fn proof_type() -> zkaleido::ProofType {
+            zkaleido::ProofType::Compressed
+        }
+
+        fn prepare_input<'a, B>(_input: &'a Self::Input) -> zkaleido::ZkVmInputResult<B::Input>
+        where
+            B: zkaleido::ZkVmInputBuilder<'a>,
+        {
+            todo!()
+        }
+
+        fn process_output<H>(
+            _public_values: &zkaleido::PublicValues,
+        ) -> zkaleido::ZkVmResult<Self::Output>
+        where
+            H: zkaleido::ZkVmHost,
+        {
+            Ok("test output".to_string())
+        }
+    }
+
+    /// Grandparent proving ops that has [`ParentOps`] as a dependency.
+    /// The full dependency graph for proving ops:
+    /// [`GrandparentOps`] (this) -> [`ParentOps`] -> [`ChildOps`]
+    struct GrandparentOps;
+
+    impl ProvingOp for GrandparentOps {
+        type Prover = TestProver;
+
+        type Params = u64;
+
+        fn construct_proof_ctx(
+            &self,
+            params: &Self::Params,
+        ) -> Result<strata_primitives::proof::ProofContext, crate::errors::ProvingTaskError>
+        {
+            Ok(strata_primitives::proof::ProofContext::Checkpoint(*params))
+        }
+
+        async fn fetch_input(
+            &self,
+            _task_id: &strata_rpc_types::ProofKey,
+            _db: &strata_rocksdb::prover::db::ProofDb,
+        ) -> Result<<Self::Prover as zkaleido::ZkVmProver>::Input, crate::errors::ProvingTaskError>
+        {
+            todo!()
+        }
+
+        async fn create_deps_tasks(
+            &self,
+            params: Self::Params,
+            db: &ProofDb,
+            task_tracker: Arc<Mutex<TaskTracker>>,
+        ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+            let child = ParentOps;
+            child.create_task(params as u8, task_tracker, db).await
+        }
+    }
+
+    /// Parent proving ops that has [`ChildOps`] as a dependency.
+    /// The full dependency graph for proving ops:
+    /// [`GrandparentOps`] -> [`ParentOps`] (this) -> [`ChildOps`]
+    struct ParentOps;
+
+    impl ProvingOp for ParentOps {
+        type Prover = TestProver;
+
+        type Params = u8;
+
+        fn construct_proof_ctx(
+            &self,
+            params: &Self::Params,
+        ) -> Result<strata_primitives::proof::ProofContext, crate::errors::ProvingTaskError>
+        {
+            let mut batch = Buf32::default();
+            batch.0[0] = *params;
+            Ok(strata_primitives::proof::ProofContext::L1Batch(
+                batch.into(),
+                batch.into(),
+            ))
+        }
+
+        async fn fetch_input(
+            &self,
+            _task_id: &strata_rpc_types::ProofKey,
+            _db: &strata_rocksdb::prover::db::ProofDb,
+        ) -> Result<<Self::Prover as zkaleido::ZkVmProver>::Input, crate::errors::ProvingTaskError>
+        {
+            todo!()
+        }
+
+        async fn create_deps_tasks(
+            &self,
+            params: Self::Params,
+            db: &ProofDb,
+            task_tracker: Arc<Mutex<TaskTracker>>,
+        ) -> Result<Vec<ProofKey>, ProvingTaskError> {
+            let child = ChildOps;
+            child.create_task(params, task_tracker, db).await
+        }
+    }
+
+    // Child proving ops that has no dependencies.
+    // The full dependency graph for proving ops:
+    /// [`GrandparentOps`] -> [`ParentOps`] -> [`ChildOps`] (this)
+    struct ChildOps;
+
+    impl ProvingOp for ChildOps {
+        type Prover = TestProver;
+
+        type Params = u8;
+
+        fn construct_proof_ctx(
+            &self,
+            params: &Self::Params,
+        ) -> Result<strata_primitives::proof::ProofContext, crate::errors::ProvingTaskError>
+        {
+            let mut batch = Buf32::default();
+            batch.0[0] = *params;
+            Ok(strata_primitives::proof::ProofContext::BtcBlockspace(
+                batch.into(),
+            ))
+        }
+
+        async fn fetch_input(
+            &self,
+            _task_id: &strata_rpc_types::ProofKey,
+            _db: &strata_rocksdb::prover::db::ProofDb,
+        ) -> Result<<Self::Prover as zkaleido::ZkVmProver>::Input, crate::errors::ProvingTaskError>
+        {
+            todo!()
+        }
+    }
+
+    fn setup_db() -> ProofDb {
+        let (db, db_ops) = get_rocksdb_tmp_instance_for_prover().unwrap();
+        ProofDb::new(db, db_ops)
+    }
+
+    #[tokio::test]
+    async fn test_success_ops() {
+        let tracker = Arc::new(Mutex::new(TaskTracker::new()));
+        let db = setup_db();
+
+        // Create a single grandparent proving op, assert it waits for dependencies.
+        let grand_ops = GrandparentOps {};
+        let create_res = grand_ops.create_task(12, tracker.clone(), &db).await;
+        let proving_keys = create_res.unwrap();
+        let pkey = proving_keys.first().unwrap();
+        assert_eq!(
+            *tracker.lock().await.get_task(*pkey).unwrap(),
+            ProvingTaskStatus::WaitingForDependencies
+        );
+
+        // Create another one.
+        let create_res = grand_ops.create_task(117, tracker.clone(), &db).await;
+        create_res.unwrap();
+
+        // Create a child op and assert it's pending.
+        let child_ops = ChildOps {};
+        let create_res = child_ops.create_task(29, tracker.clone(), &db).await;
+        let proving_keys = create_res.unwrap();
+        let pkey = proving_keys.first().unwrap();
+        assert_eq!(
+            *tracker.lock().await.get_task(*pkey).unwrap(),
+            ProvingTaskStatus::Pending
+        );
+    }
+
+    #[tokio::test]
+    async fn test_fail_creation_same_ops() {
+        let tracker = Arc::new(Mutex::new(TaskTracker::new()));
+        let db = setup_db();
+
+        // Create a single grandparent proving op.
+        let grand_ops = GrandparentOps {};
+        let res = grand_ops.create_task(117, tracker.clone(), &db).await;
+        res.unwrap();
+
+        // Create another grandparent proving op with the same input, assert it fails.
+        let res = grand_ops.create_task(117, tracker.clone(), &db).await;
+        assert!(matches!(res, Err(ProvingTaskError::TaskAlreadyFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_prover_client_restart() {
+        let tracker = Arc::new(Mutex::new(TaskTracker::new()));
+        let db = setup_db();
+
+        // Create two grandparent proving op.
+        let grand_ops = GrandparentOps {};
+        let res = grand_ops.create_task(12, tracker.clone(), &db).await;
+        res.unwrap();
+        let res = grand_ops.create_task(117, tracker.clone(), &db).await;
+        res.unwrap();
+
+        // Emulate the prover-client restart:
+        // 1. Clear the internal state of the task tracker.
+        // 2. Leave the DB state (the task deps table) as is.
+        tracker.lock().await.clear_state();
+
+        // Create the already existing grandparent proving op.
+        let res = grand_ops.create_task(12, tracker.clone(), &db).await;
+        let proving_keys = res.unwrap();
+        let pkey = proving_keys.first().unwrap();
+        // Expect that a task is successfully inserted as waiting for dependencies.
+        assert_eq!(
+            *tracker.lock().await.get_task(*pkey).unwrap(),
+            ProvingTaskStatus::WaitingForDependencies
+        );
+        // Expect that a child task in a pending state.
+        assert!(!tracker
+            .lock()
+            .await
+            .get_tasks_by_status(|status| matches!(status, ProvingTaskStatus::Pending))
+            .is_empty(),);
+
+        let parent_ops = ParentOps {};
+        // Create a parent proving op with the same input - it should fail, because the
+        // corresponding task already got inserted.
+        let res = parent_ops.create_task(12, tracker.clone(), &db).await;
+        assert!(matches!(res, Err(ProvingTaskError::TaskAlreadyFound(_))));
     }
 }
