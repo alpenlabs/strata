@@ -1,3 +1,8 @@
+# This workflow is triggered when a PR is merged on the main branch or manually triggered.
+# It detects the changes in the codebase and builds and pushes the Docker images for the
+# changed programs. It then updates the Helm values with the new Docker image tags and
+# commits and pushes the changes to the deployments repo.
+
 name: Continuous Deployment
 on:
   pull_request:
@@ -25,6 +30,7 @@ env:
 permissions:
   id-token: write
   contents: read
+  pull-requests: read
 
 jobs:
   detect-changes:
@@ -110,9 +116,6 @@ jobs:
     needs: [build-and-push, detect-changes]
     runs-on: ubuntu-latest
     environment: ${{ needs.detect-changes.outputs.environment }}
-    strategy:
-      matrix:
-        program: [strata-client, strata-sequencer-client, strata-reth, prover-client]
     steps:
       - name: Set up SSH for private repo access
         uses: webfactory/ssh-agent@v0.7.0
@@ -132,13 +135,7 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
 
       - name: Update Docker image tag in Helm values
-        if: |
-          (matrix.program == 'strata-client' && needs.detect-changes.outputs.strata-client_changed == 'true') ||
-          (matrix.program == 'strata-sequencer-client' && needs.detect-changes.outputs.strata-sequencer-client_changed == 'true') ||
-          (matrix.program == 'strata-reth' && needs.detect-changes.outputs.strata-reth_changed == 'true') ||
-          (matrix.program == 'prover-client' && needs.detect-changes.outputs.prover-client_changed == 'true')
         env:
-          PROGRAM: ${{ matrix.program }}
           SHORT_TAG: ${{ github.sha }}
           CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
         run: |
@@ -146,22 +143,21 @@ jobs:
           VALUES_FILE_NODES="deployments/clusters/$CLUSTER_NAME/values/strata-nodes-values.yaml"
           VALUES_FILE_PROVER="deployments/clusters/$CLUSTER_NAME/values/strata-prover-values.yaml"
 
-          if [[ "$PROGRAM" == "strata-client" ]]; then
+          if [[ "${{ needs.detect-changes.outputs.strata-client_changed }}" == "true" ]]; then
             yq eval -i ".client.image.tag = \"$SHORT_TAG\"" $VALUES_FILE_NODES
-
-          elif [[ "$PROGRAM" == "strata-sequencer-client" ]]; then
+          fi
+          if [[ "${{ needs.detect-changes.outputs.strata-sequencer-client_changed }}" == "true" ]]; then
             yq eval -i ".sequencerSigner.image.tag = \"$SHORT_TAG\"" $VALUES_FILE_NODES
-
-          elif [[ "$PROGRAM" == "strata-reth" ]]; then
+          fi
+          if [[ "${{ needs.detect-changes.outputs.strata-reth_changed }}" == "true" ]]; then
             yq eval -i ".reth.image.tag = \"$SHORT_TAG\"" $VALUES_FILE_NODES
-
-          elif [[ "$PROGRAM" == "prover-client" ]]; then
+          fi
+          if [[ "${{ needs.detect-changes.outputs.prover-client_changed }}" == "true" ]]; then
             yq eval -i ".proverClient.image.tag = \"$SHORT_TAG\"" $VALUES_FILE_PROVER
           fi
 
       - name: Commit and push changes
         env:
-          PROGRAM: ${{ matrix.program }}
           SHORT_TAG: ${{ github.sha }}
           GH_ACTIONS_USER_NAME: ${{ vars.GH_ACTIONS_USER_NAME }}
           CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
