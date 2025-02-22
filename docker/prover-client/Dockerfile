@@ -17,7 +17,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
     build-essential \
     curl \
     libclang-dev \
- && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # setup sp1up
 RUN curl -fsSL --proto https --tlsv1.2 https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up --c-toolchain
@@ -61,6 +61,7 @@ RUN apt-get update && \
 # Copy the built binaries and the entrypoint script from the builder stage
 COPY --from=builder /app/strata-prover-client /usr/local/bin/strata-prover-client
 COPY ./docker/prover-client/entrypoint.sh entrypoint.sh
+COPY ./docker/prover-client/elfs /app/elfs
 
 EXPOSE 9851
 
