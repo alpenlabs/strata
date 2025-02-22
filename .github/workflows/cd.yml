@@ -177,7 +177,7 @@ jobs:
             echo "No changes to commit."
           else
             git add clusters/$CLUSTER_NAME/values
-            git commit -m "Update $PROGRAM image tag to $SHORT_TAG"
+            git commit -m "Update image tags to $SHORT_TAG for changed programs"
             git pull --rebase origin $BRANCH_OF_DEPLOYMENT_REPO
             git push origin $BRANCH_OF_DEPLOYMENT_REPO
           fi
