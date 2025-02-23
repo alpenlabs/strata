@@ -1,0 +1,187 @@
+# This workflow is triggered when a PR is merged on the main branch or manually triggered.
+# It detects the changes in the codebase and builds and pushes the Docker images for the
+# changed programs. It then updates the Helm values with the new Docker image tags and
+# commits and pushes the changes to the deployments repo.
+
+name: Continuous Deployment
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          # an extra option for running the workflow manually in a separate cluster
+          - staging1
+          # currently we only desire to support cd to staging(s), production is only
+          # for future reference
+          - production
+
+env:
+  CI: false
+  COMMIT: ${{ github.sha }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect-changes:
+    # only run this job when a PR is merged or manually triggered
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    env:
+      # select environment based on manual entry or choose staging for main branch by default.
+      # we may add more environments programmatically if needed.
+      ENVIRONMENT: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'staging') }}
+    outputs:
+      strata-client_changed: ${{ steps.filter.outputs.strata-client }}
+      strata-sequencer-client_changed: ${{ steps.filter.outputs.strata-sequencer-client }}
+      strata-reth_changed: ${{ steps.filter.outputs.strata-reth }}
+      prover-client_changed: ${{ steps.filter.outputs.prover-client }}
+      environment: ${{ env.ENVIRONMENT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check changed files
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            strata-client:
+              - 'bin/strata-client/**'
+            strata-sequencer-client:
+              - 'bin/strata-sequencer-client/**'
+            strata-reth:
+              - 'bin/strata-reth/**'
+            prover-client:
+              - 'bin/prover-client/**'
+
+  build-and-push:
+    permissions:
+      id-token: write
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    environment: ${{ needs.detect-changes.outputs.environment }}
+    strategy:
+      matrix:
+        # The names of the programs should match the names of the directories that we
+        # are building the Docker images from.
+        # The directories `bin` and `docker` must contain the subdirectories in the
+        # matrix below.
+        program: [strata-client, strata-sequencer-client, strata-reth, prover-client]
+    outputs:
+      program: ${{ matrix.program }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS ECR Details
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ECR_ROLE }}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: "true"
+      - name: Build and push Docker image
+        id: build-and-push
+        # we only build and push the Docker image if the corresponding program has changed
+        if: |
+          (matrix.program == 'strata-client' && needs.detect-changes.outputs.strata-client_changed == 'true') ||
+          (matrix.program == 'strata-sequencer-client' && needs.detect-changes.outputs.strata-sequencer-client_changed == 'true') ||
+          (matrix.program == 'strata-reth' && needs.detect-changes.outputs.strata-reth_changed == 'true') ||
+          (matrix.program == 'prover-client' && needs.detect-changes.outputs.prover-client_changed == 'true')
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
+        run: |
+          IMAGE_TAG=${COMMIT::7}
+          PROGRAM="${{ matrix.program }}"
+          echo "Building and pushing $PROGRAM image with tag $IMAGE_TAG"
+
+          DOCKERFILE_PATH="docker/$PROGRAM/Dockerfile"
+          ECR_REPOSITORY="$ECR_REPOSITORY_PREFIX/${PROGRAM}"
+
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f $DOCKERFILE_PATH .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+  update-helm-values:
+    name: Update Helm Values
+    needs: [build-and-push, detect-changes]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.detect-changes.outputs.environment }}
+    steps:
+      - name: Set up SSH for private repo access
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOYMENTS_REPO_WRITE }}
+      - name: Clone deployments repo (specific branch)
+        env:
+          BRANCH_OF_DEPLOYMENT_REPO: ${{ vars.BRANCH_OF_DEPLOYMENT_REPO }}
+        run: |
+          git clone --depth=1 --branch $BRANCH_OF_DEPLOYMENT_REPO git@github.com:alpenlabs/deployments.git deployments
+          cd deployments
+          git checkout $BRANCH_OF_DEPLOYMENT_REPO
+
+      - name: Install yq
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Update Docker image tag in Helm values
+        env:
+          SHORT_TAG: ${{ github.sha }}
+          CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
+        run: |
+          SHORT_TAG="${SHORT_TAG::7}"
+          VALUES_FILE_NODES="deployments/clusters/${CLUSTER_NAME}/values/strata-nodes-values.yaml"
+          VALUES_FILE_PROVER="deployments/clusters/${CLUSTER_NAME}/values/strata-prover-values.yaml"
+
+          if [[ "${{ needs.detect-changes.outputs.strata-client_changed }}" == "true" ]]; then
+            yq eval -i ".client.image.tag = \"$SHORT_TAG\"" "${VALUES_FILE_NODES}"
+          fi
+
+          if [[ "${{ needs.detect-changes.outputs.strata-sequencer-client_changed }}" == "true" ]]; then
+            yq eval -i ".sequencerSigner.image.tag = \"$SHORT_TAG\"" "${VALUES_FILE_NODES}"
+          fi
+
+          if [[ "${{ needs.detect-changes.outputs.strata-reth_changed }}" == "true" ]]; then
+            yq eval -i ".reth.image.tag = \"$SHORT_TAG\"" "${VALUES_FILE_NODES}"
+          fi
+
+          if [[ "${{ needs.detect-changes.outputs.prover-client_changed }}" == "true" ]]; then
+            yq eval -i ".proverClient.image.tag = \"$SHORT_TAG\"" "${VALUES_FILE_PROVER}"
+          fi
+
+      - name: Commit and push changes
+        env:
+          SHORT_TAG: ${{ github.sha }}
+          GH_ACTIONS_USER_NAME: ${{ vars.GH_ACTIONS_USER_NAME }}
+          CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
+          BRANCH_OF_DEPLOYMENT_REPO: ${{ vars.BRANCH_OF_DEPLOYMENT_REPO }}
+        run: |
+          SHORT_TAG=${SHORT_TAG::7}
+          cd deployments
+          git config user.name "$GH_ACTIONS_USER_NAME"
+          git config user.email "$GH_ACTIONS_USER_NAME@alpenlabs.io"
+
+          # only if there is a change in any of the values file, commit and push
+          if git diff --quiet; then
+            echo "No changes to commit."
+          else
+            git add clusters/$CLUSTER_NAME/values
+            git commit -m "Update image tags to $SHORT_TAG for changed programs"
+            git pull --rebase origin $BRANCH_OF_DEPLOYMENT_REPO
+            git push origin $BRANCH_OF_DEPLOYMENT_REPO
+          fi
