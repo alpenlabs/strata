@@ -325,6 +325,11 @@ impl EvmProcessor<InMemoryDB> {
                 code_hash: account.info.code_hash,
             };
 
+            println!(
+                "Abishek adding the account to the state trie {:?} {:?}",
+                address, account
+            );
+
             state_trie
                 .insert_rlp(&state_trie_index, state_account)
                 .expect("MPT is corrupted");
