@@ -425,9 +425,13 @@ fn create_checkpoint_prep_data_from_summary(
         (
             prev_mf
                 .header_verification_state()
+                .as_ref()
+                .unwrap()
                 .compute_hash()
                 .expect("compute vs hash"),
             mf.header_verification_state()
+                .as_ref()
+                .unwrap()
                 .compute_hash()
                 .expect("compute vs hash"),
         )

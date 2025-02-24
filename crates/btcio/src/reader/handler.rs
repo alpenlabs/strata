@@ -45,7 +45,7 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
 async fn handle_blockdata<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     blockdata: BlockData,
-    hvs: HeaderVerificationState,
+    hvs: Option<HeaderVerificationState>,
     epoch: u64,
 ) -> anyhow::Result<Vec<SyncEvent>> {
     let ReaderContext {
@@ -123,7 +123,7 @@ fn find_checkpoints(blockdata: &BlockData, params: &RollupParams) -> Vec<L1Commi
 /// store in the database.
 fn generate_block_manifest(
     block: &Block,
-    hvs: HeaderVerificationState,
+    hvs: Option<HeaderVerificationState>,
     txs: Vec<L1Tx>,
     epoch: u64,
     height: u64,

@@ -10,7 +10,7 @@ use strata_primitives::l1::{
 pub enum L1Event {
     /// Data that contains block number, block and relevant transactions, and also the epoch whose
     /// rules are applied to
-    BlockData(BlockData, u64, HeaderVerificationState),
+    BlockData(BlockData, u64, Option<HeaderVerificationState>),
 
     /// Revert to the provided block height
     RevertTo(L1BlockCommitment),

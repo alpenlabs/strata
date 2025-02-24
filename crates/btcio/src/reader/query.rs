@@ -366,12 +366,18 @@ async fn process_block<R: ReaderRpc>(
     status_updates.push(L1StatusUpdate::CurHeight(height));
     status_updates.push(L1StatusUpdate::CurTip(l1blkid.to_string()));
 
-    let l1_verification_state = fetch_verification_state(
-        ctx.client.as_ref(),
-        height,
-        ctx.params.rollup.l1_reorg_safe_depth,
-    )
-    .await?;
+    let l1_verification_state = if height == ctx.params.rollup.genesis_l1_height {
+        Some(
+            fetch_verification_state(
+                ctx.client.as_ref(),
+                height,
+                ctx.params.rollup.l1_reorg_safe_depth,
+            )
+            .await?,
+        )
+    } else {
+        None
+    };
 
     let block_ev = L1Event::BlockData(block_data, state.epoch(), l1_verification_state);
     let l1_events = vec![block_ev];
