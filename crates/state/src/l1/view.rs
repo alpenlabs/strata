@@ -1,6 +1,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::l1::{L1BlockCommitment, L1BlockId, L1HeaderRecord};
+use strata_primitives::l1::{
+    HeaderVerificationState, L1BlockCommitment, L1BlockId, L1HeaderRecord,
+};
 
 /// Describes state relating to the CL's view of L1.  Updated by entries in the
 /// L1 segment of CL blocks.
@@ -18,6 +20,9 @@ pub struct L1ViewState {
 
     /// The "safe" L1 block header.  This block is the last block inserted into the L1 MMR.
     pub(crate) safe_block_header: L1HeaderRecord,
+
+    /// State against which the new L1 block header are verified
+    pub(crate) header_vs: HeaderVerificationState,
 }
 
 impl L1ViewState {
@@ -26,12 +31,14 @@ impl L1ViewState {
         horizon_height: u64,
         genesis_height: u64,
         genesis_trigger_block: L1HeaderRecord,
+        header_vs: HeaderVerificationState,
     ) -> Self {
         Self {
             horizon_height,
             genesis_height,
             safe_block_height: genesis_height,
             safe_block_header: genesis_trigger_block,
+            header_vs,
         }
     }
 
@@ -45,6 +52,10 @@ impl L1ViewState {
 
     pub fn safe_height(&self) -> u64 {
         self.safe_block_height
+    }
+
+    pub fn header_vs(&self) -> &HeaderVerificationState {
+        &self.header_vs
     }
 
     /// Gets the safe block as a [`L1BlockCommitment`].
@@ -63,6 +74,7 @@ impl<'a> Arbitrary<'a> for L1ViewState {
         let hh = u8::arbitrary(u)? as u64;
         let gh = hh + u16::arbitrary(u)? as u64;
         let blk = L1HeaderRecord::arbitrary(u)?;
-        Ok(Self::new_at_genesis(hh, gh, blk))
+        let header_vs = HeaderVerificationState::arbitrary(u)?;
+        Ok(Self::new_at_genesis(hh, gh, blk, header_vs))
     }
 }

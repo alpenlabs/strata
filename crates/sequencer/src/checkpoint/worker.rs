@@ -444,18 +444,28 @@ fn create_checkpoint_prep_data_from_summary(
     // block, for now) of the previous epoch.
     let l2_blocks = fetch_epoch_l2_headers(summary, l2man)?;
     let first_block = l2_blocks.first().unwrap();
+    let last_block = l2_blocks.last().unwrap();
     let initial_l2_commitment =
         L2BlockCommitment::new(first_block.blockidx(), first_block.get_blockid());
     let l2_range = (initial_l2_commitment, *summary.terminal());
-    let l2_initial_state = if is_genesis_epoch {
-        let genesis_chainstate = chsman
-            .get_toplevel_chainstate_blocking(0)?
-            .ok_or(DbError::NotBootstrapped)?;
-        genesis_chainstate.compute_state_root()
-    } else {
-        prev_summary.map(|ps| *ps.final_state()).unwrap_or_default()
-    };
-    let l2_transition = (l2_initial_state, *summary.final_state());
+
+    // Initial state is the state before applying the first block
+    let initial_state_height = first_block.blockidx() - 1;
+    let initial_state = chsman
+        .get_toplevel_chainstate_blocking(initial_state_height)?
+        .ok_or(Error::MissingIdxChainstate(initial_state_height))?;
+    let l1_initial_state = initial_state.l1_view().header_vs().compute_hash()?;
+    let l2_initial_state = initial_state.compute_state_root();
+
+    let final_state_height = last_block.blockidx();
+    let final_state = chsman
+        .get_toplevel_chainstate_blocking(final_state_height)?
+        .ok_or(Error::MissingIdxChainstate(final_state_height))?;
+    let l1_final_state = final_state.l1_view().header_vs().compute_hash()?;
+    let l2_final_state = final_state.compute_state_root();
+
+    let l1_transition = (l1_initial_state, l1_final_state);
+    let l2_transition = (l2_initial_state, l2_final_state);
 
     // Assemble the final parts together.
     let new_transition = BatchTransition::new(l1_transition, l2_transition, rollup_params_hash);

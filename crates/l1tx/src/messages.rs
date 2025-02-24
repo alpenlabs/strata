@@ -9,7 +9,8 @@ use strata_primitives::l1::{
 #[allow(clippy::large_enum_variant)]
 pub enum L1Event {
     /// Data that contains block number, block and relevant transactions, and also the epoch whose
-    /// rules are applied to
+    /// rules are applied to. In most cases, the [`HeaderVerificationState`] is `None`, with a
+    /// meaningful state provided only under during genesis
     BlockData(BlockData, u64, Option<HeaderVerificationState>),
 
     /// Revert to the provided block height
