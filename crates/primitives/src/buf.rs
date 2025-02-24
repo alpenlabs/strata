@@ -6,7 +6,6 @@ use bitcoin::{
     BlockHash, Txid, Wtxid,
 };
 use const_hex as hex;
-#[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
 
 use crate::{errors::ParseError, macros::internal};
@@ -147,7 +146,6 @@ impl From<XOnlyPublicKey> for Buf32 {
 }
 
 // NOTE: we cannot do `ZeroizeOnDrop` since `Buf32` is `Copy`.
-#[cfg(feature = "zeroize")]
 impl Zeroize for Buf32 {
     #[inline]
     fn zeroize(&mut self) {
@@ -188,7 +186,6 @@ impl From<schnorr::Signature> for Buf64 {
 }
 
 // NOTE: we cannot do `ZeroizeOnDrop` since `Buf64` is `Copy`.
-#[cfg(feature = "zeroize")]
 impl Zeroize for Buf64 {
     #[inline]
     fn zeroize(&mut self) {
@@ -251,7 +248,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "zeroize")]
     fn test_zeroize() {
         let mut buf20 = Buf20::from([1; 20]);
         let mut buf32 = Buf32::from([1; 32]);

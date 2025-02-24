@@ -8,7 +8,6 @@ use bitcoin::{bip32::Xpriv, key::Keypair};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// A zeroizable on [`Drop`] wrapper around [`Xpriv`].
-#[cfg(feature = "zeroize")]
 #[derive(Clone, PartialEq, Eq)]
 pub struct ZeroizableXpriv(Xpriv);
 
@@ -38,12 +37,10 @@ impl Deref for ZeroizableXpriv {
 // Manual Drop implementation to zeroize keys on drop.
 impl Drop for ZeroizableXpriv {
     fn drop(&mut self) {
-        #[cfg(feature = "zeroize")]
         self.zeroize();
     }
 }
 
-#[cfg(feature = "zeroize")]
 impl Zeroize for ZeroizableXpriv {
     #[inline]
     fn zeroize(&mut self) {
@@ -51,11 +48,9 @@ impl Zeroize for ZeroizableXpriv {
     }
 }
 
-#[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for ZeroizableXpriv {}
 
 /// A zeroizable on [`Drop`] wrapper around [`Keypair`].
-#[cfg(feature = "zeroize")]
 #[derive(Clone, PartialEq, Eq)]
 pub struct ZeroizableKeypair(Keypair);
 
@@ -85,12 +80,10 @@ impl Deref for ZeroizableKeypair {
 // Manual Drop implementation to zeroize Keypair on drop.
 impl Drop for ZeroizableKeypair {
     fn drop(&mut self) {
-        #[cfg(feature = "zeroize")]
         self.zeroize();
     }
 }
 
-#[cfg(feature = "zeroize")]
 impl Zeroize for ZeroizableKeypair {
     #[inline]
     fn zeroize(&mut self) {
@@ -98,7 +91,6 @@ impl Zeroize for ZeroizableKeypair {
     }
 }
 
-#[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for ZeroizableKeypair {}
 
 #[cfg(test)]
@@ -127,7 +119,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "zeroize")]
     fn test_zeroizable_xpriv() {
         let xpriv = XPRIV_STR.parse::<Xpriv>().unwrap();
         let mut zeroizable_xpriv = ZeroizableXpriv::new(xpriv);
@@ -141,7 +132,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "zeroize")]
     fn test_zeroize_on_drop_xpriv() {
         // Create an atomic flag to track if zeroize was called
         let was_zeroized = Arc::new(AtomicBool::new(false));
@@ -178,8 +168,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "zeroize")]
-    fn test_erase_keypair() {
+    fn test_zeroize_on_drop_keypair() {
         // Create a wrapper struct including keypair
         struct TestWrapper {
             inner: ZeroizableKeypair,
