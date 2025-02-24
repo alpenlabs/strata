@@ -1,6 +1,8 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, hash::compute_borsh_hash, l2::L2BlockCommitment};
+use strata_primitives::{
+    buf::Buf32, epoch::EpochCommitment, hash::compute_borsh_hash, l2::L2BlockCommitment,
+};
 
 use crate::{
     bridge_ops,
@@ -27,6 +29,12 @@ pub struct Chainstate {
     /// checkpoint 0, moving us into checkpoint period 1.
     pub(crate) cur_epoch: u64,
 
+    /// The immediately preceding epoch.
+    pub(crate) prev_epoch: EpochCommitment,
+
+    /// The epoch that we have observed in a checkpoint in L1.
+    pub(crate) finalized_epoch: EpochCommitment,
+
     /// Rollup's view of L1 state.
     pub(crate) l1_state: l1::L1ViewState,
 
@@ -50,6 +58,8 @@ impl Chainstate {
         Self {
             last_block: L2BlockCommitment::new(0, gdata.genesis_blkid()),
             cur_epoch: 0,
+            prev_epoch: EpochCommitment::null(),
+            finalized_epoch: EpochCommitment::null(),
             l1_state: gdata.l1_state().clone(),
             pending_withdraws: StateQueue::new_empty(),
             exec_env_state: gdata.exec_state().clone(),
@@ -78,12 +88,24 @@ impl Chainstate {
         self.cur_epoch
     }
 
+    /// Gets the commitment to the immediately preceding epoch.
+    pub fn prev_epoch(&self) -> &EpochCommitment {
+        &self.prev_epoch
+    }
+
+    /// Gets the commitment to the finalized epoch, which we don't expect to
+    /// roll back.
+    pub fn finalized_epoch(&self) -> &EpochCommitment {
+        &self.finalized_epoch
+    }
+
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
         let hashed_state = HashedChainState {
             last_block: compute_borsh_hash(&self.last_block),
             cur_epoch: self.cur_epoch,
+            prev_epoch: compute_borsh_hash(&self.prev_epoch),
             l1_state_hash: compute_borsh_hash(&self.l1_state),
             pending_withdraws_hash: compute_borsh_hash(&self.pending_withdraws),
             exec_env_hash: compute_borsh_hash(&self.exec_env_state),
@@ -118,6 +140,7 @@ impl Chainstate {
 pub struct HashedChainState {
     pub last_block: Buf32,
     pub cur_epoch: u64,
+    pub prev_epoch: Buf32,
     pub l1_state_hash: Buf32,
     pub pending_withdraws_hash: Buf32,
     pub exec_env_hash: Buf32,

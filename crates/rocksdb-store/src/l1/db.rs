@@ -6,8 +6,7 @@ use rockbound::{
 };
 use strata_db::{errors::DbError, traits::*, DbResult};
 use strata_mmr::CompactMmr;
-use strata_primitives::l1::{L1BlockManifest, L1TxRef};
-use strata_state::l1::{L1BlockId, L1Tx};
+use strata_primitives::l1::{L1BlockId, L1BlockManifest, L1Tx, L1TxRef};
 use tracing::*;
 
 use super::schemas::{L1BlockSchema, MmrSchema, TxnSchema};
@@ -50,7 +49,7 @@ impl L1Database for L1Db {
         }
         let mut batch = SchemaBatch::new();
         batch.put::<L1BlockSchema>(&idx, &mf)?;
-        batch.put::<TxnSchema>(&mf.block_hash(), &txs)?;
+        batch.put::<TxnSchema>(mf.blkid(), &txs)?;
         self.db.write_schemas(batch)?;
         Ok(())
     }
@@ -86,10 +85,10 @@ impl L1Database for L1Db {
                 .expect("Expected block not found");
 
             // Get corresponding block hash
-            let blockhash = blk_manifest.block_hash();
+            let blockhash = blk_manifest.blkid();
 
             // Delete txn data
-            batch.delete::<TxnSchema>(&blockhash)?;
+            batch.delete::<TxnSchema>(blockhash)?;
 
             // Delete MMR data
             batch.delete::<MmrSchema>(&height)?;
@@ -110,7 +109,7 @@ impl L1Database for L1Db {
             .get::<L1BlockSchema>(&block_height)
             .and_then(|mf_opt| match mf_opt {
                 Some(mf) => {
-                    let txs_opt = self.db.get::<TxnSchema>(&mf.block_hash())?;
+                    let txs_opt = self.db.get::<TxnSchema>(mf.blkid())?;
                     // we only save subset of transaction in a block, while the txindex refers to
                     // original position in txblock.
                     // TODO: txs should be hashmap with original index
@@ -139,7 +138,7 @@ impl L1Database for L1Db {
             return Ok(None);
         };
 
-        let Some(txs) = self.db.get::<TxnSchema>(&mf.block_hash())? else {
+        let Some(txs) = self.db.get::<TxnSchema>(mf.blkid())? else {
             warn!(%idx, "missing L1 block body");
             return Err(DbError::MissingL1BlockBody(idx));
         };
@@ -171,7 +170,7 @@ impl L1Database for L1Db {
         let res = self
             .db
             .iter_with_opts::<L1BlockSchema>(options)?
-            .map(|item_result| item_result.map(|item| item.into_tuple().1.block_hash()))
+            .map(|item_result| item_result.map(|item| *item.into_tuple().1.blkid()))
             .collect::<Result<Vec<L1BlockId>, anyhow::Error>>()?;
 
         Ok(res)
@@ -185,7 +184,7 @@ impl L1Database for L1Db {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_state::{l1::L1TxProof, tx::ProtocolOperation};
+    use strata_primitives::l1::{L1TxProof, ProtocolOperation};
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -459,7 +458,7 @@ mod tests {
         let range = db.get_blockid_range(1, 4).unwrap();
         assert_eq!(range.len(), 3);
         for (exp, obt) in vec![mf1, mf2, mf3].iter().zip(range) {
-            assert_eq!(exp.block_hash(), obt);
+            assert_eq!(*exp.blkid(), obt);
         }
     }
 

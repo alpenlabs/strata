@@ -1,5 +1,6 @@
 import flexitest
 
+from envs import testenv
 from mixins import seq_crash_mixin
 from utils import wait_until
 
@@ -7,7 +8,7 @@ from utils import wait_until
 @flexitest.register
 class CrashDutySignBlockTest(seq_crash_mixin.SeqCrashMixin):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env("basic")
+        ctx.set_env(testenv.BasicEnvConfig(101))
 
     def main(self, ctx: flexitest.RunContext):
         cur_chain_tip = self.handle_bail(lambda: "duty_sign_block")

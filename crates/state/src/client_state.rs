@@ -6,14 +6,15 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::buf::Buf32;
+use strata_primitives::{epoch::EpochCommitment, l1::L1BlockCommitment, params::Params};
 use tracing::*;
 
 use crate::{
     batch::{BaseStateCommitment, BatchInfo, BatchTransition},
     id::L2BlockId,
-    l1::{HeaderVerificationState, L1BlockId},
+    l1::L1BlockId,
     operation::{ClientUpdateOutput, SyncAction},
+    state_queue::StateQueue,
 };
 
 /// High level client's state of the network.  This is local to the client, not
@@ -33,10 +34,6 @@ pub struct ClientState {
     /// valid chain.
     pub(super) sync_state: Option<SyncState>,
 
-    /// Local view of the L1 state that we compare against the chain's view of
-    /// L1 state.
-    pub(super) local_l1_view: LocalL1State,
-
     /// L1 block we start watching the chain from.  We can't access anything
     /// before this chain height.
     pub(super) horizon_l1_height: u64,
@@ -44,22 +41,30 @@ pub struct ClientState {
     /// Height at which we'll create the L2 genesis block from.
     pub(super) genesis_l1_height: u64,
 
-    /// Hash of verification state at `genesis_l1_height`. The hash is computed via
-    /// [`super::l1::HeaderVerificationState::compute_hash`]
-    pub(super) genesis_l1_verification_state_hash: Option<Buf32>,
+    /// The depth at which we accept blocks to be finalized.
+    pub(super) finalization_depth: u64,
+
+    /// The epoch that we've emitted as the final epoch.
+    pub(super) declared_final_epoch: Option<EpochCommitment>,
+
+    /// Internal states according to each block height.
+    pub(crate) int_states: StateQueue<InternalState>,
 }
 
 impl ClientState {
     /// Creates the basic genesis client state from the genesis parameters.
     // TODO do we need this or should we load it at run time from the rollup params?
-    pub fn from_genesis_params(horizon_l1_height: u64, genesis_l1_height: u64) -> Self {
+    pub fn from_genesis_params(params: &Params) -> Self {
+        let rparams = params.rollup();
+        let genesis_l1_height = rparams.genesis_l1_height;
         Self {
             chain_active: false,
             sync_state: None,
-            local_l1_view: LocalL1State::new(horizon_l1_height),
-            horizon_l1_height,
+            horizon_l1_height: rparams.horizon_l1_height,
             genesis_l1_height,
-            genesis_l1_verification_state_hash: None,
+            finalization_depth: rparams.l1_reorg_safe_depth as u64,
+            declared_final_epoch: None,
+            int_states: StateQueue::new_at_index(genesis_l1_height),
         }
     }
 
@@ -74,17 +79,9 @@ impl ClientState {
         self.sync_state.as_ref()
     }
 
+    /// Returns if genesis has occurred.
     pub fn has_genesis_occurred(&self) -> bool {
-        self.chain_active && self.sync().is_some()
-    }
-
-    /// Returns a ref to the local L1 view.
-    pub fn l1_view(&self) -> &LocalL1State {
-        &self.local_l1_view
-    }
-
-    pub fn l1_view_mut(&mut self) -> &mut LocalL1State {
-        &mut self.local_l1_view
+        self.chain_active
     }
 
     /// Overwrites the sync state.
@@ -101,28 +98,156 @@ impl ClientState {
     }
 
     pub fn most_recent_l1_block(&self) -> Option<&L1BlockId> {
-        self.local_l1_view.local_unaccepted_blocks.last()
+        self.int_states.back().map(|is| is.blkid())
     }
 
     pub fn next_exp_l1_block(&self) -> u64 {
-        self.local_l1_view.next_expected_block
+        self.int_states.next_idx()
     }
 
     pub fn genesis_l1_height(&self) -> u64 {
         self.genesis_l1_height
     }
 
-    pub fn genesis_verification_hash(&self) -> Option<Buf32> {
-        self.genesis_l1_verification_state_hash
+    /// Gets the internal state for a height, if present.
+    pub fn get_internal_state(&self, height: u64) -> Option<&InternalState> {
+        self.int_states.get_absolute(height)
+    }
+
+    /// Gets the number of internal states tracked.
+    pub fn internal_state_cnt(&self) -> usize {
+        self.int_states.len()
+    }
+
+    /// Returns the deepest L1 block we have, if there is one.
+    pub fn get_deepest_l1_block(&self) -> Option<L1BlockCommitment> {
+        self.int_states
+            .front_entry()
+            .map(|(h, is)| L1BlockCommitment::new(h, is.blkid))
+    }
+
+    /// Returns the deepest L1 block we have, if there is one.
+    pub fn get_tip_l1_block(&self) -> Option<L1BlockCommitment> {
+        self.int_states
+            .back_entry()
+            .map(|(h, is)| L1BlockCommitment::new(h, is.blkid))
+    }
+
+    /// Gets the highest internal state we have.
+    ///
+    /// This isn't durable, as it's possible it might be rolled back in the
+    /// future.
+    pub fn get_last_internal_state(&self) -> Option<&InternalState> {
+        self.int_states.back()
+    }
+
+    /// Gets the last checkpoint as of the last internal state.
+    ///
+    /// This isn't durable, as it's possible it might be rolled back in the
+    /// future, although it becomes less likely the longer it's buried.
+    pub fn get_last_checkpoint(&self) -> Option<&L1Checkpoint> {
+        self.get_last_internal_state()
+            .and_then(|st| st.last_checkpoint())
+    }
+
+    /// Checks if there is any checkpoint available at or before the given height.
+    // TODO handling if we ask for a block outside this range
+    pub fn has_verified_checkpoint_before(&self, height: u64) -> bool {
+        match self.int_states.get_absolute(height) {
+            Some(istate) => istate.last_checkpoint().is_some(),
+            None => false,
+        }
+    }
+
+    /// Gets the last verified checkpoint found as of some L1 height.
+    // TODO handling if we ask for a block outside this range
+    pub fn get_last_verified_checkpoint_before(&self, height: u64) -> Option<&L1Checkpoint> {
+        self.int_states
+            .get_absolute(height)
+            .and_then(|ck| ck.last_checkpoint())
+    }
+
+    /// Gets the height that an L2 block was last verified at, if it was
+    /// verified.
+    // FIXME this is a weird function, what purpose does this serve?
+    pub fn get_verified_l1_height(&self, slot: u64) -> Option<u64> {
+        self.get_last_checkpoint().and_then(|ckpt| {
+            if ckpt.batch_info.includes_l2_block(slot) {
+                Some(ckpt.height)
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Gets the last checkpoint as of some depth.  This depth is relative to
+    /// the current L1 tip.  A depth of 0 would refer to the current L1 tip
+    /// block.
+    pub fn get_last_checkpoint_at_depth(&self, depth: u64) -> Option<&L1Checkpoint> {
+        let cur_height = self.get_tip_l1_block()?.height();
+        let target = cur_height - depth;
+        self.get_internal_state(target)?.last_checkpoint()
+    }
+
+    /// Gets the apparent finalized checkpoint based on our current view of L1
+    /// from the internal states.
+    ///
+    /// This uses the internal "finalization depth", checking relative to the
+    /// current chain tip.
+    pub fn get_apparent_finalized_checkpoint(&self) -> Option<&L1Checkpoint> {
+        self.get_last_checkpoint_at_depth(self.finalization_depth)
+    }
+
+    /// Gets the `EpochCommitment` for the finalized epoch, if there is one.
+    pub fn get_apparent_finalized_epoch(&self) -> Option<EpochCommitment> {
+        self.get_apparent_finalized_checkpoint()
+            .map(|ck| ck.batch_info.get_epoch_commitment())
+    }
+
+    /// Gets the L1 block we treat as buried, if there is one and we have it.
+    pub fn get_buried_l1_block(&self) -> Option<L1BlockCommitment> {
+        let tip_block = self.get_tip_l1_block()?;
+        let buried_height = tip_block.height().saturating_sub(self.finalization_depth);
+        let istate = self.get_internal_state(buried_height)?;
+        Some(L1BlockCommitment::new(buried_height, *istate.blkid()))
+    }
+
+    /// Gets the final epoch that we've externally declared.
+    pub fn get_declared_final_epoch(&self) -> Option<&EpochCommitment> {
+        self.declared_final_epoch.as_ref()
     }
 }
 
 #[cfg(feature = "test_utils")]
 impl ClientState {
-    pub fn set_last_finalized_checkpoint(&mut self, chp: L1Checkpoint) {
-        self.local_l1_view.last_finalized_checkpoint = Some(chp);
+    // TODO figure out a way to remove this function, this is only used in one
+    // reader test and we should rework that to have some "status update" type
+    // that it actually pulls from the status channel
+    #[deprecated(note = "this should not exist, rework something")]
+    pub fn set_last_finalized_checkpoint(&mut self, ckpt: L1Checkpoint) {
+        eprintln!("doing evil set_last_finalized_checkpoint things");
+
+        // First overwrite the declared epoch.  Maybe this is all we actually
+        // need to do for this test?
+        self.declared_final_epoch = Some(ckpt.batch_info.get_epoch_commitment());
+
+        // We need *some* last block to do this successfully.
+        if self.int_states.is_empty() {
+            let fake_blkid = L1BlockId::from(strata_primitives::buf::Buf32::zero());
+            self.int_states
+                .push_back(InternalState::new(fake_blkid, None));
+        }
+
+        // Overwriting this is horrible and will probably break something.
+        let last = self
+            .int_states
+            .back_mut()
+            .expect("clientstate: get last state");
+        last.last_checkpoint = Some(ckpt);
     }
 }
+
+type L1BlockHeight = u64;
 
 /// Relates to our view of the L2 chain, does not exist before genesis.
 // TODO maybe include tip height and finalized height?  or their headers?
@@ -130,38 +255,26 @@ impl ClientState {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct SyncState {
-    /// Height of last L2 block we've chosen as the current tip.
-    pub(super) tip_height: u64,
-
-    /// Last L2 block we've chosen as the current tip.
-    pub(super) tip_blkid: L2BlockId,
+    /// The genesis blockid.  This does not change and is here for legacy reasons.
+    pub(super) genesis_blkid: L2BlockId,
 
     /// L2 checkpoint blocks that have been confirmed on L1 and proven along with L1 block height.
     /// These are ordered by height
+    // What do we do with this?
     pub(super) confirmed_checkpoint_blocks: Vec<(L1BlockHeight, L2BlockId)>,
-
-    /// L2 block that's been finalized on L1 and proven
-    pub(super) finalized_blkid: L2BlockId,
 }
-
-type L1BlockHeight = u64;
 
 impl SyncState {
     pub fn from_genesis_blkid(gblkid: L2BlockId) -> Self {
         Self {
-            tip_height: 0,
-            tip_blkid: gblkid,
+            genesis_blkid: gblkid,
             confirmed_checkpoint_blocks: Vec::new(),
-            finalized_blkid: gblkid,
         }
     }
 
-    pub fn chain_tip_blkid(&self) -> &L2BlockId {
-        &self.tip_blkid
-    }
-
-    pub fn finalized_blkid(&self) -> &L2BlockId {
-        &self.finalized_blkid
+    /// Gets the genesis blkid.
+    pub fn genesis_blkid(&self) -> &L2BlockId {
+        &self.genesis_blkid
     }
 
     pub fn confirmed_checkpoint_blocks(&self) -> &[(u64, L2BlockId)] {
@@ -175,124 +288,77 @@ impl SyncState {
             .find(|(h, _)| *h == l1_height)
             .map(|e| e.1)
     }
-
-    pub fn chain_tip_height(&self) -> u64 {
-        self.tip_height
-    }
 }
 
+/// This is the internal state that's produced as the output of a block and
+/// tracked internally.  When the L1 reorgs, we discard copies of this after the
+/// reorg.
+///
+/// Eventually, when we do away with global bookkeeping around client state,
+/// this will become the full client state that we determine on the fly based on
+/// what L1 blocks are available and what we have persisted.
 #[derive(
-    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize, Deserialize, Serialize,
 )]
-pub struct LocalL1State {
-    /// Local sequence of blocks that should reorg blocks in the chainstate.
+pub struct InternalState {
+    /// Corresponding block ID.  This entry is stored keyed by height, so we
+    /// always have that.
+    blkid: L1BlockId,
+
+    /// Last checkpoint as of this height.  Includes the height it was found at.
     ///
-    /// This MUST be ordered by block height, so the first block here is the
-    /// buried height +1.
-    // TODO this needs more tracking to make it remember where we are properly
-    pub(super) local_unaccepted_blocks: Vec<L1BlockId>,
-
-    /// Next L1 block height we expect to receive
-    pub(super) next_expected_block: u64,
-
-    /// Last finalized checkpoint
-    pub(super) last_finalized_checkpoint: Option<L1Checkpoint>,
-
-    /// Checkpoints that are in L1 but yet to be finalized.
-    pub(super) verified_checkpoints: Vec<L1Checkpoint>,
-
-    /// This state is used to verify the `next_expected_block`
-    pub(super) header_verification_state: Option<HeaderVerificationState>,
+    /// At genesis, this is `None`.
+    last_checkpoint: Option<L1Checkpoint>,
 }
 
-impl LocalL1State {
-    /// Constructs a new instance of the local L1 state bookkeeping.
-    ///
-    /// # Panics
-    ///
-    /// If we try to construct it in a way that implies we don't have the L1 genesis block.
-    pub fn new(next_expected_block: u64) -> Self {
-        if next_expected_block == 0 {
-            panic!("clientstate: tried to construct without known L1 genesis block");
-        }
-
+impl InternalState {
+    pub fn new(blkid: L1BlockId, last_checkpoint: Option<L1Checkpoint>) -> Self {
         Self {
-            local_unaccepted_blocks: Vec::new(),
-            next_expected_block,
-            verified_checkpoints: Vec::new(),
-            last_finalized_checkpoint: None,
-            header_verification_state: None,
+            blkid,
+            last_checkpoint,
         }
     }
 
-    /// Returns a slice of the unaccepted blocks.
-    pub fn local_unaccepted_blocks(&self) -> &[L1BlockId] {
-        &self.local_unaccepted_blocks
+    /// Returns a ref to the L1 block ID that produced this state.
+    pub fn blkid(&self) -> &L1BlockId {
+        &self.blkid
     }
 
-    /// Returns the height of the next block we expected to receive.
-    pub fn next_expected_block(&self) -> u64 {
-        self.next_expected_block
+    /// Returns the last stored checkpoint, if there was one.
+    pub fn last_checkpoint(&self) -> Option<&L1Checkpoint> {
+        self.last_checkpoint.as_ref()
     }
 
-    /// Returned the height of the buried L1 block, which we can't reorg to.
-    pub fn buried_l1_height(&self) -> u64 {
-        self.next_expected_block - self.local_unaccepted_blocks.len() as u64
+    /// Returns the last known epoch as of this state.
+    ///
+    /// If there is no last epoch, returns a null epoch.
+    pub fn get_last_epoch(&self) -> EpochCommitment {
+        self.last_checkpoint
+            .as_ref()
+            .map(|ck| ck.batch_info.get_epoch_commitment())
+            .unwrap_or_else(EpochCommitment::null)
     }
 
-    /// Returns an iterator over the unaccepted L2 blocks, from the lowest up.
-    pub fn unacc_blocks_iter(&self) -> impl Iterator<Item = (u64, &L1BlockId)> {
-        self.local_unaccepted_blocks()
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (self.buried_l1_height() + i as u64, b))
-    }
-
-    pub fn tip_height(&self) -> u64 {
-        if self.next_expected_block == 0 {
-            panic!("clientstate: started without L1 genesis block somehow");
+    /// Gets the next epoch we expect to be confirmed.
+    pub fn get_next_expected_epoch_conf(&self) -> u64 {
+        let last_epoch = self.get_last_epoch();
+        if last_epoch.is_null() {
+            0
+        } else {
+            last_epoch.epoch() + 1
         }
-
-        self.next_expected_block - 1
     }
 
-    pub fn tip_blkid(&self) -> Option<&L1BlockId> {
-        self.local_unaccepted_blocks().last()
+    /// Returns the last witnessed L1 block from the last checkpointed state.
+    pub fn last_witnessed_l1_block(&self) -> Option<&L1BlockCommitment> {
+        self.last_checkpoint
+            .as_ref()
+            .map(|ck| ck.batch_info.final_l1_block())
     }
 
-    pub fn last_finalized_checkpoint(&self) -> Option<&L1Checkpoint> {
-        self.last_finalized_checkpoint.as_ref()
-    }
-
-    pub fn verified_checkpoints(&self) -> &[L1Checkpoint] {
-        &self.verified_checkpoints
-    }
-
-    pub fn has_verified_checkpoint_before(&self, height: u64) -> bool {
-        self.verified_checkpoints
-            .iter()
-            .any(|cp| cp.height <= height)
-    }
-
-    pub fn get_last_verified_checkpoint_before(&self, height: u64) -> Option<&L1Checkpoint> {
-        self.verified_checkpoints
-            .iter()
-            .take_while(|cp| cp.height <= height)
-            .last()
-    }
-
-    pub fn tip_verification_state(&self) -> Option<&HeaderVerificationState> {
-        self.header_verification_state.as_ref()
-    }
-
-    pub fn get_verified_l1_height(&self, block_height: u64) -> Option<u64> {
-        self.verified_checkpoints.last().and_then(|ch| {
-            if ch.batch_info.includes_l2_block(block_height) {
-                Some(ch.height)
-            } else {
-                None
-            }
-        })
+    /// Returns the height that the last checkpoint was included at, if there was one..
+    pub fn last_checkpoint_height(&self) -> Option<u64> {
+        self.last_checkpoint.as_ref().map(|ck| ck.height)
     }
 }
 
@@ -300,19 +366,20 @@ impl LocalL1State {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct L1Checkpoint {
-    /// The inner checkpoint batch info
+    /// The inner checkpoint batch info.
     pub batch_info: BatchInfo,
 
-    /// The inner checkpoint batch transition
+    /// The inner checkpoint batch transition.
     pub batch_transition: BatchTransition,
 
-    /// Reference state commitment against which batch transitions is verified
+    /// Reference state commitment against which batch transitions is verified.
     pub base_state_commitment: BaseStateCommitment,
 
-    /// If the checkpoint included proof
+    /// If the checkpoint included proof.
     pub is_proved: bool,
 
-    /// L1 block height it appears in
+    /// L1 block height the checkpoint was found in.
+    // TODO remove this?
     pub height: u64,
 }
 
@@ -377,72 +444,118 @@ impl ClientStateMut {
         self.state.chain_active = true;
     }
 
-    pub fn update_verification_state(&mut self, l1_vs: HeaderVerificationState) {
-        debug!(?l1_vs, "received HeaderVerificationState");
-
-        if self.state.genesis_verification_hash().is_none() {
-            info!(?l1_vs, "Setting genesis L1 verification state");
-            self.state.genesis_l1_verification_state_hash = Some(l1_vs.compute_hash().unwrap());
-        }
-
-        self.state.l1_view_mut().header_verification_state = Some(l1_vs);
-    }
-
     /// Rolls back blocks and stuff to a particular height.
     ///
     /// # Panics
     ///
-    /// If the new height is below the buried height.
-    pub fn rollback_l1_blocks(&mut self, height: u64) {
-        let l1v = self.state.l1_view_mut();
-        let buried_height = l1v.buried_l1_height();
+    /// If the new height is below the buried height or it's somehow otherwise
+    /// unable to perform the rollback.
+    pub fn rollback_l1_blocks(&mut self, new_block: L1BlockCommitment) {
+        let deepest_block = self
+            .state
+            .get_deepest_l1_block()
+            .expect("clientstate: rolling back without blocks");
 
-        if height < buried_height {
-            error!(%height, %buried_height, "unable to roll back past buried height");
-            panic!("clientstate: rollback below buried height");
+        // TODO: should this be removed ?
+        let _cur_tip_block = self
+            .state
+            .get_tip_l1_block()
+            .expect("clientstate: rolling back without blocks");
+
+        if new_block.height() < deepest_block.height() {
+            panic!("clientstate: tried to roll back past deepest block");
         }
 
-        let new_unacc_len = (height - buried_height) as usize;
-        let l1_vs = l1v.tip_verification_state();
-        if let Some(l1_vs) = l1_vs {
-            if height > l1_vs.last_verified_block_num as u64 {
-                panic!("clientstate: attempted rollback above current tip");
-            }
+        let remove_start_height = new_block.height() + 1;
+        assert!(
+            self.state.int_states.truncate_abs(remove_start_height),
+            "clientstate: remove reorged blocks"
+        );
+    }
 
-            // TODO: handle other things
-            let mut rollbacked_l1_vs = l1_vs.clone();
-            rollbacked_l1_vs.last_verified_block_num = height as u32;
-            rollbacked_l1_vs.last_verified_block_hash = l1v.local_unaccepted_blocks[new_unacc_len];
+    /// Accepts a new L1 block that extends the chain directly.
+    ///
+    /// # Panics
+    ///
+    /// * If the blkids are inconsistent.
+    /// * If the block already has a corresponding state.
+    /// * If there isn't a preceding block.
+    pub fn accept_l1_block_state(&mut self, l1block: &L1BlockCommitment, intstate: InternalState) {
+        let h = l1block.height();
+        let int_states = &mut self.state.int_states;
+
+        if int_states.is_empty() {
+            // Sanity checks.
+            assert_eq!(
+                l1block.blkid(),
+                intstate.blkid(),
+                "clientstate: inserting invalid block state"
+            );
+
+            assert_eq!(
+                int_states.next_idx(),
+                h,
+                "clientstate: inserting out of order block state"
+            );
         }
-        l1v.local_unaccepted_blocks.truncate(new_unacc_len);
-        l1v.next_expected_block = height + 1;
 
-        // Keep pending checkpoints whose l1 height is less than or equal to rollback height
-        l1v.verified_checkpoints
-            .retain(|ckpt| ckpt.height <= height);
+        let new_h = int_states.push_back(intstate);
+
+        // Extra, probably redundant, sanity check.
+        assert_eq!(
+            new_h, h,
+            "clientstate: inserted block state is for unexpected height"
+        );
     }
 
-    // TODO convert to L1BlockCommitment?
-    pub fn accept_l1_block(&mut self, l1blkid: L1BlockId) {
-        debug!(?l1blkid, "received AcceptL1Block");
-        // TODO make this also do something
-        let l1v = self.state.l1_view_mut();
-        l1v.local_unaccepted_blocks.push(l1blkid);
-        l1v.next_expected_block += 1;
+    /// Discards old block states up to a certain height which becomes the new oldest.
+    ///
+    /// # Panics
+    ///
+    /// * If trying to discard the newest.
+    /// * If there are no states to discard, for any reason.
+    pub fn discard_old_l1_states(&mut self, new_oldest: u64) {
+        let int_states = &mut self.state.int_states;
+
+        let oldest = int_states
+            .front_idx()
+            .expect("clientstate: missing expected block state");
+
+        let newest = int_states
+            .back_idx()
+            .expect("clientstate: missing expected block state");
+
+        if new_oldest <= oldest {
+            panic!("clientstate: discard earlier than oldest state ({new_oldest})");
+        }
+
+        if new_oldest >= newest {
+            panic!("clientstate: discard newer than newest state ({new_oldest})");
+        }
+
+        // Actually do the operation.
+        int_states.drop_abs(new_oldest);
+
+        // Sanity checks.
+        assert_eq!(
+            int_states.front_idx(),
+            Some(new_oldest),
+            "chainstate: new oldest is unexpected"
+        );
     }
 
-    // TODO convert to L2BlockCommitment?
-    pub fn accept_l2_block(&mut self, blkid: L2BlockId, height: u64) {
-        // TODO do any other bookkeeping
-        debug!(%height, %blkid, "received AcceptL2Block");
-        let ss = self.state.expect_sync_mut();
-        ss.tip_blkid = blkid;
-        ss.tip_height = height;
+    /// Sets the declared final epoch.
+    pub fn set_decl_final_epoch(&mut self, epoch: EpochCommitment) {
+        self.state.declared_final_epoch = Some(epoch);
     }
 
     /// Updates the buried L1 block.
-    pub fn update_buried(&mut self, new_idx: u64) {
-        let l1v = self.state.l1_view_mut();
+    // TODO remove this function
+    #[deprecated]
+    pub fn update_buried(&mut self, _new_idx: u64) {
+        debug!("call to update_buried, we don't do anything here anymore");
+
+        /*let l1v = self.state.l1_view_mut();
 
         // Check that it's increasing.
         let old_idx = l1v.buried_l1_height();
@@ -461,23 +574,14 @@ impl ClientStateMut {
         let _blocks = l1v
             .local_unaccepted_blocks
             .drain(..diff)
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>();*/
 
         // TODO merge these blocks into the L1 MMR in the client state if
         // we haven't already
     }
 
-    /// Does validation logic to accept a list of checkpoints.
-    // TODO This should probably be removed.
-    pub fn accept_checkpoints(&mut self, ckpts: &[L1Checkpoint]) {
-        // Extend the pending checkpoints
-        self.state
-            .l1_view_mut()
-            .verified_checkpoints
-            .extend(ckpts.iter().cloned());
-    }
-
-    /// Finalizes checkpoints based on L1 height.
+    // FIXME remove all this since I think it's irrelevant now
+    /*/// Finalizes checkpoints based on L1 height.
     // TODO This should probably be broken out to happen fallibly as part of the client transition
     pub fn finalize_checkpoint(&mut self, l1height: u64) {
         let l1v = self.state.l1_view_mut();
@@ -490,7 +594,7 @@ impl ClientStateMut {
 
         let new_finalized = finalized_checkpts.last().cloned().cloned();
         let total_finalized = finalized_checkpts.len();
-        debug!(?new_finalized, ?total_finalized, "Finalized checkpoints");
+        debug!(?new_finalized, %total_finalized, "Finalized checkpoints");
 
         // Remove the finalized from pending and then mark the last one as last_finalized
         // checkpoint
@@ -508,13 +612,13 @@ impl ClientStateMut {
                 panic!("clientstate: mismatched indices of pending checkpoint");
             }
 
-            let fin_blockid = *ckpt.batch_info.final_l2_blockid();
+            let epoch_idx = ckpt.batch_info.epoch;
+            let fin_block = ckpt.batch_info.l2_range.1;
             l1v.last_finalized_checkpoint = Some(ckpt);
 
-            // Update finalized blockid in StateSync
-            self.state.expect_sync_mut().finalized_blkid = fin_blockid;
+            // Update finalized block in SyncState.
+            let fin_epoch = EpochCommitment::new(epoch_idx, fin_block.slot(), *fin_block.blkid());
+            self.state.expect_sync_mut().finalized_epoch = fin_epoch;
         }
-    }
-
-    // TODO add operation stuff
+    }*/
 }

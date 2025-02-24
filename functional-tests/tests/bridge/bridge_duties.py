@@ -4,7 +4,6 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 from envs import testenv
 from envs.rollup_params_cfg import RollupConfig
 from utils import broadcast_tx, wait_until
-from utils.constants import SEQ_PUBLISH_BATCH_INTERVAL_SECS
 
 
 @flexitest.register
@@ -55,7 +54,7 @@ class BridgeDutiesTest(testenv.StrataTester):
         # wait for the transactions to have at least 2 confirmations
         wait_until(
             lambda: all(btcrpc.proxy.gettransaction(txid)["confirmations"] >= 2 for txid in txids),
-            timeout=SEQ_PUBLISH_BATCH_INTERVAL_SECS * 2,
+            timeout=30,
         )
 
         operator_idx = 0

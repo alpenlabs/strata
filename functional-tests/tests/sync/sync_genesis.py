@@ -1,11 +1,10 @@
+import logging
 import time
 
 import flexitest
 
 from envs import testenv
-
-UNSET_ID = "0000000000000000000000000000000000000000000000000000000000000000"
-MAX_GENESIS_TRIES = 10
+from utils import *
 
 
 @flexitest.register
@@ -19,37 +18,19 @@ class SyncGenesisTest(testenv.StrataTester):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
 
-        time.sleep(3)
-
-        # Wait until genesis.  This might need to be tweaked if we change how
-        # long we wait for genesis in tests.
-        tries = 0
-        last_slot = None
-        while True:
-            assert tries <= MAX_GENESIS_TRIES, "did not observe genesis before timeout"
-
-            self.debug("waiting for genesis")
-            stat = seqrpc.strata_clientStatus()
-            self.debug(stat)
-            if stat["finalized_blkid"] != UNSET_ID:
-                last_slot = stat["chain_tip_slot"]
-                self.debug(f"observed genesis, now at slot {last_slot}")
-                break
-
-            time.sleep(0.5)
-            self.debug(f"waiting for genesis... -- tries {tries}")
-            tries += 1
-
-        assert last_slot is not None, "last slot never set"
+        wait_for_genesis(seqrpc, timeout=20, step=2)
 
         # Make sure we're making progress.
+        logging.info("observed genesis, checking that we're still making progress...")
         stat = None
+        last_slot = 0
         for _ in range(5):
             time.sleep(3)
-            stat = seqrpc.strata_clientStatus()
-            tip_slot = stat["chain_tip_slot"]
-            tip_blkid = stat["chain_tip"]
-            self.debug(f"cur tip slot {tip_slot} blkid {tip_blkid}")
+            stat = seqrpc.strata_syncStatus()
+            tip_slot = stat["tip_height"]
+            tip_blkid = stat["tip_block_id"]
+            cur_epoch = stat["cur_epoch"]
+            logging.info(f"cur tip slot {tip_slot}, blkid {tip_blkid}, epoch {cur_epoch}")
             assert tip_slot >= last_slot, "cur slot went backwards"
-            assert tip_slot > last_slot, "seems not to be making progress"
+            assert tip_slot > last_slot, "seem to not be making progress"
             last_slot = tip_slot

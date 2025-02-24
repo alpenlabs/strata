@@ -2,7 +2,7 @@ use strata_db::errors::DbError;
 use strata_primitives::{
     buf::{Buf32, Buf64},
     evm_exec::create_evm_extra_payload,
-    l1::L1BlockRecord,
+    l1::L1BlockManifest,
     params::{OperatorConfig, Params},
 };
 use strata_state::{
@@ -14,7 +14,7 @@ use strata_state::{
     exec_update::{ExecUpdate, UpdateInput, UpdateOutput},
     genesis::GenesisStateData,
     header::L2BlockHeader,
-    l1::{L1HeaderRecord, L1ViewState},
+    l1::L1ViewState,
     operation::ClientUpdateOutput,
     prelude::*,
 };
@@ -28,13 +28,11 @@ use crate::errors::Error;
 pub fn init_client_state(params: &Params, csman: &ClientStateManager) -> anyhow::Result<()> {
     debug!("initializing client state in database!");
 
-    let init_state = ClientState::from_genesis_params(
-        params.rollup().horizon_l1_height,
-        params.rollup().genesis_l1_height,
-    );
+    let init_state = ClientState::from_genesis_params(params);
 
     // Write the state into the database.
     csman.put_update_blocking(0, ClientUpdateOutput::new_state(init_state))?;
+    // TODO: status channel should probably be updated.
 
     Ok(())
 }
@@ -67,6 +65,7 @@ pub fn init_genesis_chainstate(
     // Now insert things into the database.
     storage.chainstate().write_genesis_state(gchstate.clone())?;
     storage.l2().put_block_data_blocking(gblock)?;
+    // TODO: Status channel should probably be updated.
 
     // TODO make ^this be atomic so we can't accidentally not write both, or
     // make it so we can overwrite the genesis chainstate if there's no other
@@ -86,14 +85,14 @@ fn load_pre_genesis_l1_manifests(
     l1man: &L1BlockManager,
     horizon_height: u64,
     genesis_height: u64,
-) -> anyhow::Result<Vec<L1BlockRecord>> {
+) -> anyhow::Result<Vec<L1BlockManifest>> {
     let mut manifests = Vec::new();
     for height in horizon_height..=genesis_height {
         let Some(mf) = l1man.get_block_manifest(height)? else {
             return Err(Error::MissingL1BlockHeight(height).into());
         };
 
-        manifests.push(mf.into_record());
+        manifests.push(mf);
     }
 
     Ok(manifests)
@@ -114,7 +113,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     );
 
     // This has to be empty since everyone should have an unambiguous view of the genesis block.
-    let l1_seg = L1Segment::new_empty();
+    let l1_seg = L1Segment::new_empty(params.rollup().genesis_l1_height);
 
     // TODO this is a total stub, we have to fill it in with something
     let exec_seg = ExecSegment::new(genesis_update);
@@ -140,7 +139,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
 
 pub fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
-    pregenesis_mfs: Vec<L1BlockRecord>,
+    pregenesis_mfs: Vec<L1BlockManifest>,
     params: &Params,
 ) -> Chainstate {
     let genesis_blkid = gblock.header().get_blockid();
@@ -150,8 +149,9 @@ pub fn make_genesis_chainstate(
         ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
 
     let horizon_blk_height = params.rollup.horizon_l1_height;
-    let genesis_blk_rec = L1HeaderRecord::from(pregenesis_mfs.last().unwrap());
-    let l1vs = L1ViewState::new_at_horizon(horizon_blk_height, genesis_blk_rec);
+    let genesis_blk_height = params.rollup.genesis_l1_height;
+    let genesis_blk_rec = pregenesis_mfs.last().unwrap().record().clone();
+    let l1vs = L1ViewState::new_at_genesis(horizon_blk_height, genesis_blk_height, genesis_blk_rec);
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
     let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);

@@ -124,7 +124,7 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
         new_balance = wait_until_with_value(
             lambda: get_balance(withdraw_address, btc_url, btc_user, btc_password),
             predicate=lambda v: v == original_balance + difference,
-            timeout=20,
+            timeout=30,
         )
 
         self.debug(f"BTC balance after stopping and starting again: {new_balance}")

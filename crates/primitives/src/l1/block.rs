@@ -1,8 +1,9 @@
 use arbitrary::Arbitrary;
-use bitcoin::{consensus::serialize, hashes::Hash, Block, BlockHash};
+use bitcoin::{hashes::Hash, BlockHash};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+use super::{header_verification::HeaderVerificationState, L1HeaderRecord, L1Tx};
 use crate::{buf::Buf32, hash::sha256d, impl_buf_wrapper};
 
 /// ID of an L1 block, usually the hash of its header.
@@ -121,92 +122,72 @@ impl From<(u64, u32)> for L1TxRef {
 }
 
 /// Includes [`L1BlockManifest`] along with scan rules that it is applied to.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Deserialize, Serialize,
+)]
 pub struct L1BlockManifest {
     /// The actual l1 record
-    record: L1BlockRecord,
-    /// Epoch, which was used to generate this manifest
+    record: L1HeaderRecord,
+
+    /// Header verification state, with PoW.
+    verif_state: HeaderVerificationState,
+
+    /// List of interesting transactions we took out.
+    txs: Vec<L1Tx>,
+
+    /// Epoch, which was used to generate this manifest.
     epoch: u64,
 }
 
 impl L1BlockManifest {
-    pub fn new(record: L1BlockRecord, epoch: u64) -> Self {
-        Self { record, epoch }
+    pub fn new(
+        record: L1HeaderRecord,
+        verif_state: HeaderVerificationState,
+        txs: Vec<L1Tx>,
+        epoch: u64,
+    ) -> Self {
+        Self {
+            record,
+            verif_state,
+            txs,
+            epoch,
+        }
     }
 
-    pub fn header(&self) -> &[u8] {
-        self.record.header()
+    pub fn record(&self) -> &L1HeaderRecord {
+        &self.record
     }
 
-    pub fn block_hash(&self) -> L1BlockId {
-        self.record.block_hash()
+    pub fn header_verification_state(&self) -> &HeaderVerificationState {
+        &self.verif_state
     }
 
-    pub fn txs_root(&self) -> Buf32 {
-        self.record.txs_root()
+    pub fn txs(&self) -> &[L1Tx] {
+        &self.txs
     }
 
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
 
-    pub fn into_record(self) -> L1BlockRecord {
-        self.record
-    }
-}
-
-/// Describes an L1 block and associated data that we need to keep around.
-// TODO should we include the block index here?
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct L1BlockRecord {
-    /// Block hash/ID, kept here so we don't have to be aware of the hash function
-    /// here. This is what we use in the MMR.
-    blockid: L1BlockId,
-
-    /// Block header and whatever additional data we might want to query.
-    header: Vec<u8>,
-
-    /// Merkle root for the transactions in the block. For Bitcoin, this is
-    /// actually the witness transactions root, since we care about the witness
-    /// data.
-    txs_root: Buf32,
-}
-
-impl L1BlockRecord {
-    pub fn new(blockid: L1BlockId, header: Vec<u8>, txs_root: Buf32) -> Self {
-        Self {
-            blockid,
-            header,
-            txs_root,
-        }
+    pub fn blkid(&self) -> &L1BlockId {
+        &self.record.blkid
     }
 
+    #[deprecated(note = "use .blkid()")]
     pub fn block_hash(&self) -> L1BlockId {
-        self.blockid
+        *self.record.blkid()
     }
 
     pub fn header(&self) -> &[u8] {
-        &self.header
+        self.record.buf()
     }
 
-    /// Witness transactions root.
     pub fn txs_root(&self) -> Buf32 {
-        self.txs_root
+        *self.record.wtxs_root()
     }
-}
 
-impl From<Block> for L1BlockRecord {
-    fn from(block: Block) -> Self {
-        let blockid = block.block_hash().into();
-        let root = block
-            .witness_root()
-            .map(|x| x.to_byte_array())
-            .unwrap_or_default();
-        let header = serialize(&block.header);
-        Self {
-            blockid,
-            txs_root: Buf32(root),
-            header,
-        }
+    pub fn into_record(self) -> L1HeaderRecord {
+        self.record
     }
 }

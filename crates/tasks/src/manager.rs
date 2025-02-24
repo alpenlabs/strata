@@ -33,20 +33,6 @@ pub struct TaskError {
     reason: FailureReason,
 }
 
-impl Display for TaskError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let task_name = &self.task_name;
-        match &self.reason {
-            FailureReason::Err(error) => {
-                write!(f, "Critical task `{task_name}` ended with err: `{error}`")
-            }
-            FailureReason::Panic(error) => {
-                write!(f, "Critical task `{task_name}` panicked: `{error}`")
-            }
-        }
-    }
-}
-
 impl TaskError {
     fn from_panic(task_name: &str, error: Box<dyn Any>) -> Self {
         let error_message = match error.downcast::<String>() {
@@ -67,6 +53,20 @@ impl TaskError {
         Self {
             task_name: task_name.to_string(),
             reason: FailureReason::Err(err),
+        }
+    }
+}
+
+impl Display for TaskError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let task_name = &self.task_name;
+        match &self.reason {
+            FailureReason::Err(error) => {
+                write!(f, "critical task '{task_name}' exited with err: {error}")
+            }
+            FailureReason::Panic(error) => {
+                write!(f, "critical task '{task_name}' panicked: {error}")
+            }
         }
     }
 }
@@ -247,7 +247,7 @@ impl TaskExecutor {
             self.pending_tasks_counter.clone(),
         );
 
-        info!(%name, "Starting critical task");
+        debug!(%name, "starting critical task");
         std::thread::spawn(move || {
             let result = panic::catch_unwind(AssertUnwindSafe(|| func(shutdown)));
 
@@ -255,17 +255,18 @@ impl TaskExecutor {
                 Ok(task_result) => {
                     if let Err(e) = task_result {
                         // Log the error with backtrace if available
-                        error!(%name, error = %e, "Critical task returned an error");
-                        let _ = panicked_tasks_tx.send(TaskError::from_err(name, e));
+                        let task_error = TaskError::from_err(name, e);
+                        log_task_error(&task_error);
+                        let _ = panicked_tasks_tx.send(task_error);
                     } else {
                         // ended successfully
-                        info!(%name, "Critical task ended");
+                        debug!(%name, "critical task exiting successfully");
                     }
                 }
                 Err(panic_err) => {
                     // Task panicked
                     let task_error = TaskError::from_panic(name, panic_err);
-                    error!(%name, err = %task_error, "Critical task panicked");
+                    log_task_error(&task_error);
                     let _ = panicked_tasks_tx.send(task_error);
                 }
             };
@@ -291,17 +292,18 @@ impl TaskExecutor {
                         Ok(task_result) => {
                             if let Err(e) = task_result {
                                 // Log the error with backtrace if available
-                                error!(%name, error = %e, "Critical async task returned an error");
-                                let _ = panicked_tasks_tx.send(TaskError::from_err(name, e));
+                                let task_error = TaskError::from_err(name, e);
+                                log_task_error(&task_error);
+                                let _ = panicked_tasks_tx.send(task_error);
                             } else {
                                 // ended successfully
-                                info!(%name, "Critical task ended");
+                                debug!(%name, "critical task exiting successfully");
                             }
                         }
                         Err(panic_err) => {
                             // Task panicked
                             let task_error = TaskError::from_panic(name, panic_err);
-                            error!(%name, err = %task_error, "Critical async task panicked");
+                            log_task_error(&task_error);
                             let _ = panicked_tasks_tx.send(task_error);
                         }
                     }
@@ -345,17 +347,18 @@ impl TaskExecutor {
                         Ok(task_result) => {
                             if let Err(e) = task_result {
                                 // Log the error with backtrace if available
-                                error!(%name, error = %e, "Critical async task returned an error");
-                                let _ = panicked_tasks_tx.send(TaskError::from_err(name, e));
+                                let task_error = TaskError::from_err(name, e);
+                                log_task_error(&task_error);
+                                let _ = panicked_tasks_tx.send(task_error);
                             } else {
                                 // ended successfully
-                                info!(%name, "Critical task ended");
+                                debug!(%name, "critical task exiting successfully");
                             }
                         }
                         Err(panic_err) => {
                             // Task panicked
                             let task_error = TaskError::from_panic(name, panic_err);
-                            error!(%name, err = %task_error, "Critical async task panicked");
+                            log_task_error(&task_error);
                             let _ = panicked_tasks_tx.send(task_error);
                         }
                     }
@@ -364,6 +367,20 @@ impl TaskExecutor {
             .map(drop);
 
         self.tokio_handle.spawn(task);
+    }
+}
+
+fn log_task_error(task_error: &TaskError) {
+    let name = &task_error.task_name;
+    match &task_error.reason {
+        FailureReason::Err(e) => {
+            let bt = e.backtrace();
+            error!(%name, err = %e, "critical task exited with error");
+            error!("backtrace\n{bt}");
+        }
+        FailureReason::Panic(message) => {
+            error!(%name, %message, "critical task panicked")
+        }
     }
 }
 

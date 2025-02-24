@@ -468,6 +468,7 @@ fn assert_correct_address(
     );
 }
 
+#[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;

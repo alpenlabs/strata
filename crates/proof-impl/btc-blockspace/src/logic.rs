@@ -3,8 +3,11 @@
 use bitcoin::{consensus::deserialize, Block};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_l1tx::filter::TxFilterConfig;
-use strata_primitives::params::RollupParams;
-use strata_state::{batch::Checkpoint, l1::L1TxProof, tx::DepositInfo};
+use strata_primitives::{
+    batch::Checkpoint,
+    l1::{DepositInfo, L1TxProof},
+    params::RollupParams,
+};
 use zkaleido::ZkVmEnv;
 
 use crate::scan::process_blockscan;
@@ -40,10 +43,7 @@ pub fn process_blockspace_proof_outer(zkvm: &impl ZkVmEnv) {
 mod tests {
     use std::sync::Arc;
 
-    use strata_test_utils::{
-        bitcoin::{get_btc_chain, get_btc_mainnet_block},
-        l2::gen_params,
-    };
+    use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
     use zkaleido::ZkVmProver;
     use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
@@ -63,7 +63,7 @@ mod tests {
     fn test_process_blockspace_proof_before_segwit() {
         let params = gen_params();
         let rollup_params = params.rollup();
-        let btc_block = get_btc_chain().get_block(40321).clone();
+        let btc_block = BtcChainSegment::load().get_block_at(40321).unwrap();
         let input = BlockScanProofInput {
             block: btc_block,
             rollup_params: rollup_params.clone(),
@@ -75,7 +75,7 @@ mod tests {
     fn test_process_blockspace_proof_after_segwit() {
         let params = gen_params();
         let rollup_params = params.rollup();
-        let btc_block = get_btc_mainnet_block();
+        let btc_block = BtcChainSegment::load_full_block();
         let input = BlockScanProofInput {
             block: btc_block,
             rollup_params: rollup_params.clone(),

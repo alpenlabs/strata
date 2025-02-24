@@ -26,6 +26,7 @@ use strata_state::{
 };
 use strata_storage::L2BlockManager;
 use tokio::{runtime::Handle, sync::Mutex};
+use tracing::*;
 
 use crate::{
     block::EVML2Block,
@@ -48,16 +49,20 @@ const fn gwei_to_sats(gwei: u64) -> u64 {
     gwei / 10
 }
 
+struct StateCache {
+    head_block_hash: B256,
+}
+
 struct RpcExecEngineInner<T: EngineRpc> {
     pub client: T,
-    pub fork_choice_state: Mutex<ForkchoiceState>,
+    pub state_cache: Mutex<StateCache>,
 }
 
 impl<T: EngineRpc> RpcExecEngineInner<T> {
-    fn new(client: T, fork_choice_state: ForkchoiceState) -> Self {
+    fn new(client: T, head_block_hash: B256) -> Self {
         Self {
             client,
-            fork_choice_state: Mutex::new(fork_choice_state),
+            state_cache: Mutex::new(StateCache { head_block_hash }),
         }
     }
 
@@ -66,17 +71,11 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
         fcs_partial: ForkchoiceStatePartial,
     ) -> EngineResult<BlockStatus> {
         let fork_choice_state = {
-            let existing = self.fork_choice_state.lock().await;
+            let existing_head = self.state_cache.lock().await.head_block_hash;
             ForkchoiceState {
-                head_block_hash: fcs_partial
-                    .head_block_hash
-                    .unwrap_or(existing.head_block_hash),
-                safe_block_hash: fcs_partial
-                    .safe_block_hash
-                    .unwrap_or(existing.safe_block_hash),
-                finalized_block_hash: fcs_partial
-                    .finalized_block_hash
-                    .unwrap_or(existing.finalized_block_hash),
+                head_block_hash: fcs_partial.head_block_hash.unwrap_or(existing_head),
+                safe_block_hash: fcs_partial.safe_block_hash.unwrap_or(existing_head),
+                finalized_block_hash: fcs_partial.finalized_block_hash.unwrap_or(B256::ZERO),
             }
         };
 
@@ -90,7 +89,8 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
 
         match update_status.payload_status.status {
             PayloadStatusEnum::Valid => {
-                *self.fork_choice_state.lock().await = fork_choice_state;
+                let mut cache = self.state_cache.lock().await;
+                cache.head_block_hash = fork_choice_state.head_block_hash;
                 EngineResult::Ok(BlockStatus::Valid)
             }
             PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
@@ -130,8 +130,11 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             suggested_fee_recipient: COINBASE_ADDRESS,
         });
 
-        let mut fcs = *self.fork_choice_state.lock().await;
-        fcs.head_block_hash = prev_block.block_hash();
+        let fcs = ForkchoiceState {
+            head_block_hash: prev_block.block_hash(),
+            safe_block_hash: B256::ZERO,
+            finalized_block_hash: B256::ZERO,
+        };
 
         let forkchoice_result = self
             .client
@@ -211,8 +214,11 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
     }
 
     async fn submit_new_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
-        let el_payload = borsh::from_slice::<ElPayload>(payload.accessory_data())
-            .map_err(|_| EngineError::Other("Invalid payload".to_string()))?;
+        let Ok(el_payload) = borsh::from_slice::<ElPayload>(payload.accessory_data()) else {
+            // In particular, this happens if we try to call it with for genesis block.
+            warn!("submit_new_payload called with malformed block accessory, this might be a bug");
+            return Ok(BlockStatus::Invalid);
+        };
 
         // actually bridge-in deposits
         let withdrawals: Vec<Withdrawal> = payload
@@ -265,12 +271,12 @@ pub struct RpcExecEngineCtl<T: EngineRpc> {
 impl<T: EngineRpc> RpcExecEngineCtl<T> {
     pub fn new(
         client: T,
-        fork_choice_state: ForkchoiceState,
+        evm_head_block_hash: B256,
         handle: Handle,
         l2_block_manager: Arc<L2BlockManager>,
     ) -> Self {
         Self {
-            inner: RpcExecEngineInner::new(client, fork_choice_state),
+            inner: RpcExecEngineInner::new(client, evm_head_block_hash),
             tokio_handle: handle,
             l2_block_manager,
         }
@@ -292,7 +298,7 @@ impl<T: EngineRpc> RpcExecEngineCtl<T> {
     }
 
     fn get_block_info(&self, l2block: L2BlockBundle) -> EngineResult<EVML2Block> {
-        EVML2Block::try_from(l2block).map_err(|err| EngineError::Other(err.to_string()))
+        EVML2Block::try_extract(&l2block).map_err(|err| EngineError::Other(err.to_string()))
     }
 }
 
@@ -306,7 +312,7 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
         let prev_l2block = self
             .get_l2block(env.prev_l2_block_id())
             .map_err(|err| EngineError::Other(err.to_string()))?;
-        let prev_block = EVML2Block::try_from(prev_l2block)
+        let prev_block = EVML2Block::try_extract(&prev_l2block)
             .map_err(|err| EngineError::Other(err.to_string()))?;
         self.tokio_handle
             .block_on(self.inner.build_block_from_mempool(env, prev_block))
@@ -322,13 +328,12 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
             .get_evm_block_hash(&id)
             .map_err(|err| EngineError::Other(err.to_string()))?;
 
+        // Send forkchoiceupdate { headBlockHash, safeBlockHash: 0, finalizedBlockHash: 0 }
+
         self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {
                 head_block_hash: Some(block_hash),
-                // NOTE: reth accepts safe and finalized block hashes to be zero
-                // and does not update the existing values
-                safe_block_hash: Some(B256::ZERO),
-                finalized_block_hash: Some(B256::ZERO),
+                ..Default::default()
             };
             self.inner
                 .update_block_state(fork_choice_state)
@@ -342,10 +347,10 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
             .get_evm_block_hash(&id)
             .map_err(|err| EngineError::Other(err.to_string()))?;
 
+        // Send forkchoiceupdate { headBlockHash: h, safeBlockHash: h, finalizedBlockHash: 0 }
+
         self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {
-                // NOTE: update_head_block is not called currently; so update head and safe block
-                // together
                 head_block_hash: Some(block_hash),
                 safe_block_hash: Some(block_hash),
                 ..Default::default()
@@ -445,13 +450,9 @@ mod tests {
             .expect_fork_choice_updated_v2()
             .returning(move |_, _| Ok(ForkchoiceUpdated::from_status(PayloadStatusEnum::Valid)));
 
-        let initial_fcs = ForkchoiceState {
-            head_block_hash: B256::random(),
-            safe_block_hash: B256::random(),
-            finalized_block_hash: B256::random(),
-        };
+        let initial_head_block_hash = B256::random();
 
-        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, initial_fcs);
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, initial_head_block_hash);
 
         let fcs_update = ForkchoiceStatePartial {
             head_block_hash: Some(B256::random()),
@@ -463,12 +464,13 @@ mod tests {
 
         assert!(matches!(result, EngineResult::Ok(BlockStatus::Valid)));
         assert!(
-            *rpc_exec_engine_inner.fork_choice_state.lock().await
-                == ForkchoiceState {
-                    head_block_hash: fcs_update.head_block_hash.unwrap(),
-                    safe_block_hash: initial_fcs.safe_block_hash,
-                    finalized_block_hash: initial_fcs.finalized_block_hash,
-                }
+            *rpc_exec_engine_inner
+                .state_cache
+                .lock()
+                .await
+                .head_block_hash
+                == fcs_update.head_block_hash.unwrap(),
+            "cached head block hash updated"
         )
     }
 
@@ -484,13 +486,9 @@ mod tests {
                 }))
             });
 
-        let initial_fcs = ForkchoiceState {
-            head_block_hash: B256::random(),
-            safe_block_hash: B256::random(),
-            finalized_block_hash: B256::random(),
-        };
+        let initial_head_block_hash = B256::random();
 
-        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, initial_fcs);
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, initial_head_block_hash);
 
         let fcs_update = ForkchoiceStatePartial {
             head_block_hash: Some(B256::random()),
@@ -501,13 +499,21 @@ mod tests {
         let result = rpc_exec_engine_inner.update_block_state(fcs_update).await;
 
         assert!(matches!(result, EngineResult::Ok(BlockStatus::Invalid)));
-        assert!(*rpc_exec_engine_inner.fork_choice_state.lock().await == initial_fcs)
+        assert!(
+            *rpc_exec_engine_inner
+                .state_cache
+                .lock()
+                .await
+                .head_block_hash
+                == initial_head_block_hash,
+            "cached head block hash remains unchanged"
+        )
     }
 
     #[tokio::test]
     async fn test_build_block_from_mempool() {
         let mut mock_client = MockEngineRpc::new();
-        let fcs = ForkchoiceState::default();
+        let head_block_hash = B256::random();
 
         mock_client
             .expect_fork_choice_updated_v2()
@@ -523,9 +529,9 @@ mod tests {
         let accessory = L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap());
         let l2block_bundle = L2BlockBundle::new(l2block, accessory);
 
-        let evm_l2_block = EVML2Block::try_from(l2block_bundle.clone()).unwrap();
+        let evm_l2_block = EVML2Block::try_extract(&l2block_bundle).unwrap();
 
-        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, fcs);
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, head_block_hash);
 
         let timestamp = 0;
         let el_ops = vec![];
@@ -539,16 +545,21 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        // let exec_payload = ExecutionPayloadV1::from(el_payload);
         assert!(
-            *rpc_exec_engine_inner.fork_choice_state.lock().await == ForkchoiceState::default()
+            *rpc_exec_engine_inner
+                .state_cache
+                .lock()
+                .await
+                .head_block_hash
+                == head_block_hash,
+            "cached head block remains unchanged"
         );
     }
 
     #[tokio::test]
     async fn test_get_payload_status() {
         let mut mock_client = MockEngineRpc::new();
-        let fcs = ForkchoiceState::default();
+        let head_block_hash = B256::random();
 
         mock_client.expect_get_payload_v2().returning(move |_| {
             Ok(StrataExecutionPayloadEnvelopeV2 {
@@ -560,7 +571,7 @@ mod tests {
             })
         });
 
-        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, fcs);
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, head_block_hash);
 
         let result = rpc_exec_engine_inner.get_payload_status(0).await;
 
@@ -570,7 +581,7 @@ mod tests {
     #[tokio::test]
     async fn test_submit_new_payload() {
         let mut mock_client = MockEngineRpc::new();
-        let fcs = ForkchoiceState::default();
+        let head_block_hash = B256::random();
 
         let el_payload = ElPayload {
             base_fee_per_gas: Buf32(FixedBytes::<32>::from(U256::from(10)).into()),
@@ -606,7 +617,7 @@ mod tests {
             })
         });
 
-        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, fcs);
+        let rpc_exec_engine_inner = RpcExecEngineInner::new(mock_client, head_block_hash);
 
         let result = rpc_exec_engine_inner.submit_new_payload(payload_data).await;
 

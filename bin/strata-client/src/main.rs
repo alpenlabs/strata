@@ -3,7 +3,6 @@ use std::{sync::Arc, time::Duration};
 use bitcoin::{hashes::Hash, BlockHash};
 use el_sync::sync_chainstate_to_el;
 use jsonrpsee::Methods;
-use parking_lot::lock_api::RwLock;
 use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
@@ -18,10 +17,7 @@ use strata_consensus_logic::{
     genesis,
     sync_manager::{self, SyncManager},
 };
-use strata_db::{
-    traits::{BroadcastDatabase, Database},
-    DbError,
-};
+use strata_db::{traits::BroadcastDatabase, DbError};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_evmexec::{engine::RpcExecEngineCtl, EngineRpcClient};
 use strata_primitives::params::{Params, ProofPublishMode};
@@ -35,12 +31,9 @@ use strata_rpc_api::{
 use strata_sequencer::{
     block_template,
     checkpoint::{checkpoint_expiry_worker, checkpoint_worker, CheckpointHandle},
-    duty::{types::DutyTracker, worker as duty_worker},
 };
 use strata_status::StatusChannel;
-use strata_storage::{
-    create_node_storage, ops::bridge_relay::BridgeMsgOps, L1BlockManager, NodeStorage,
-};
+use strata_storage::{create_node_storage, ops::bridge_relay::BridgeMsgOps, NodeStorage};
 use strata_sync::{self, L2SyncContext, RpcSyncPeer};
 use strata_tasks::{ShutdownSignal, TaskExecutor, TaskManager};
 use tokio::{
@@ -91,6 +84,7 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
         .build()
         .expect("init: build rt");
     let task_manager = TaskManager::new(runtime.handle().clone());
+    //strata_tasks::set_panic_hook(); // only if necessary for troubleshooting
     let executor = task_manager.executor();
 
     init_logging(executor.handle());
@@ -232,6 +226,7 @@ fn init_logging(rt: &Handle) {
 /// Shared low-level services that secondary services depend on.
 #[derive(Clone)]
 pub struct CoreContext {
+    pub runtime: Handle,
     pub database: Arc<CommonDb>,
     pub storage: Arc<NodeStorage>,
     pub pool: threadpool::ThreadPool,
@@ -316,16 +311,13 @@ fn start_core_tasks(
     bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
+    let runtime = executor.handle().clone();
+
     // init status tasks
     let status_channel = init_status_channel(storage.as_ref())?;
 
-    let engine = init_engine_controller(
-        config,
-        database.clone(),
-        params.as_ref(),
-        storage.l2().clone(),
-        executor.handle(),
-    )?;
+    let engine =
+        init_engine_controller(config, params.as_ref(), storage.as_ref(), executor.handle())?;
 
     // do startup checks
     do_startup_checks(
@@ -345,14 +337,12 @@ fn start_core_tasks(
     )?
     .into();
 
-    let l1db = database.l1_db().clone();
-    let l1_manager = Arc::new(L1BlockManager::new(pool.clone(), l1db));
     // Start the L1 tasks to get that going.
     executor.spawn_critical_async(
         "bitcoin_data_reader_task",
         bitcoin_data_reader_task(
             bitcoin_client.clone(),
-            l1_manager.clone(),
+            storage.l1().clone(),
             Arc::new(config.btcio.reader.clone()),
             sync_manager.get_params(),
             status_channel.clone(),
@@ -369,6 +359,7 @@ fn start_core_tasks(
     );
 
     Ok(CoreContext {
+        runtime,
         database,
         storage,
         pool,
@@ -392,11 +383,10 @@ fn start_sequencer_tasks(
     methods: &mut Methods,
 ) -> anyhow::Result<()> {
     let CoreContext {
-        database,
+        runtime,
         storage,
         pool,
         params,
-        sync_manager,
         status_channel,
         bitcoin_client,
         ..
@@ -425,34 +415,17 @@ fn start_sequencer_tasks(
     )?;
 
     let template_manager_handle = start_template_manager_task(&ctx, executor);
-    let duty_tracker = Arc::new(RwLock::new(DutyTracker::new_empty()));
 
     let admin_rpc = rpc_server::SequencerServerImpl::new(
-        envelope_handle.clone(),
+        envelope_handle,
         broadcast_handle,
         params.clone(),
         checkpoint_handle.clone(),
         template_manager_handle,
-        duty_tracker.clone(),
+        storage.clone(),
+        status_channel.clone(),
     );
     methods.merge(admin_rpc.into_rpc())?;
-
-    // Spawn duty tasks.
-    let cupdate_rx = sync_manager.create_cstate_subscription();
-    let t_storage = storage.clone();
-    let t_checkpoint_handle = checkpoint_handle.clone();
-    let t_params = params.clone();
-    executor.spawn_critical("duty_worker::duty_tracker_task", move |shutdown| {
-        duty_worker::duty_tracker_task(
-            shutdown,
-            duty_tracker,
-            cupdate_rx,
-            t_storage,
-            t_checkpoint_handle,
-            t_params,
-        )
-        .map_err(Into::into)
-    });
 
     match params.rollup().proof_publish_mode {
         ProofPublishMode::Strict => {}
@@ -466,15 +439,17 @@ fn start_sequencer_tasks(
         }
     }
 
-    let cupdate_rx = sync_manager.create_cstate_subscription();
+    // FIXME this moves values out of the CoreContext, do we want that?
+    let t_status_ch = status_channel.clone();
+    let t_rt = runtime.clone();
     executor.spawn_critical("checkpoint-tracker", |shutdown| {
         checkpoint_worker(
             shutdown,
-            cupdate_rx,
+            t_status_ch,
             params,
-            database,
             storage,
             checkpoint_handle,
+            t_rt,
         )
     });
 
@@ -550,7 +525,7 @@ async fn start_rpc(
     let rpc_handle = rpc_server.start(methods);
 
     // start a Btcio event handler
-    info!("started RPC server");
+    info!(%rpc_host, %rpc_port, "started RPC server");
 
     // Wait for a stop signal.
     let _ = stop_rx.await;

@@ -50,11 +50,19 @@ impl L2BlockCommitment {
         Self { slot, blkid }
     }
 
+    pub fn null() -> Self {
+        Self::new(0, L2BlockId::from(Buf32::zero()))
+    }
+
     pub fn slot(&self) -> u64 {
         self.slot
     }
 
     pub fn blkid(&self) -> &L2BlockId {
         &self.blkid
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.slot == 0 && self.blkid.0.is_zero()
     }
 }

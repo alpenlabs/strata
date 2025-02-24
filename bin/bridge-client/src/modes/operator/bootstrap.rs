@@ -39,6 +39,28 @@ use crate::{
     xpriv::resolve_xpriv,
 };
 
+// TODO: move this to some common util and make this usable outside tokio
+macro_rules! retry {
+    ($expr:expr) => {
+        retry!(5, $expr)
+    };
+    ($max:expr, $expr:expr) => {{
+        let mut attempts = 0;
+        loop {
+            match $expr {
+                Ok(val) => break Ok(val),
+                Err(err) => {
+                    attempts += 1;
+                    if attempts >= $max {
+                        break Err(err);
+                    }
+                    ::tokio::time::sleep(::core::time::Duration::from_secs(2)).await
+                }
+            }
+        }
+    }};
+}
+
 /// Bootstraps the bridge client in Operator mode by hooking up all the required auxiliary services
 /// including database, rpc server, etc. Logging needs to be initialized at the call
 /// site (main function) itself.
@@ -106,7 +128,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let pubkey = PublicKey::from_secret_key(SECP256K1, &sk);
 
     // Get this client's pubkey from the bitcoin wallet.
-    let operator_pubkeys = l2_rpc_client.get_active_operator_chain_pubkey_set().await?;
+    let operator_pubkeys = retry!(l2_rpc_client.get_active_operator_chain_pubkey_set().await)?;
     let own_index: OperatorIdx = operator_pubkeys
         .0
         .iter()
@@ -122,7 +144,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let sig_manager = SignatureManager::new(bridge_tx_db_ops, own_index, keypair.into());
 
     // Set up the TxBuildContext.
-    let network = l1_rpc_client.network().await?;
+    let network = retry!(l1_rpc_client.network().await)?;
     let tx_context = TxBuildContext::new(network, operator_pubkeys, own_index);
 
     // Spawn RPC server.

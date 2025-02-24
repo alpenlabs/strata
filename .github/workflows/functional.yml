@@ -120,6 +120,7 @@ jobs:
         continue-on-error: true
         env:
           NO_COLOR: "1"
+          LOG_LEVEL: "info"
         run: |
           NEWPATH="$(realpath target/debug/)"
           export PATH="${NEWPATH}:${PATH}"
@@ -135,7 +136,7 @@ jobs:
           RUST_LOG: "trace,hyper=warn,soketto=warn,jsonrpsee-server=warn,mio=warn"
           NO_COLOR: "1"
           RUST_BACKTRACE: "1"
-          LOG_LEVEL: "debug"
+          LOG_LEVEL: "info"
         run: |
           NEWPATH="$(realpath target/debug/)"
           export PATH="${NEWPATH}:${PATH}"

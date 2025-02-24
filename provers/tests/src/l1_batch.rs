@@ -1,6 +1,5 @@
-use bitcoin::params::MAINNET;
 use strata_proofimpl_l1_batch::{L1BatchProofInput, L1BatchProver};
-use strata_test_utils::{bitcoin::get_btc_chain, l2::gen_params};
+use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
 use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
@@ -23,15 +22,17 @@ impl<H: ZkVmHost> ProofGenerator for L1BatchProofGenerator<H> {
 
     fn get_input(&self, heights: &(u32, u32)) -> ZkVmResult<L1BatchProofInput> {
         let (start_height, end_height) = *heights;
-        let btc_chain = get_btc_chain();
+        let btc_chain = BtcChainSegment::load();
 
         let params = gen_params();
         let rollup_params = params.rollup().clone();
-        let state = btc_chain.get_verification_state(start_height, &MAINNET.clone().into());
+        let state = btc_chain
+            .get_verification_state(start_height as u64 - 1)
+            .unwrap();
 
         let mut blocks = Vec::new();
         for height in start_height..=end_height {
-            let block = btc_chain.get_block(height).clone();
+            let block = btc_chain.get_block_at(height.into()).unwrap().clone();
             blocks.push(block);
         }
 

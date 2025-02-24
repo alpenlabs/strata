@@ -13253,6 +13253,7 @@ dependencies = [
  "thiserror 2.0.11",
  "tracing",
  "zeroize",
+ "zkaleido",
 ]
 
 [[package]]
@@ -13753,7 +13754,6 @@ dependencies = [
  "anyhow",
  "bitcoin",
  "borsh",
- "parking_lot 0.12.3",
  "serde",
  "strata-chaintsn",
  "strata-common",
@@ -13766,7 +13766,6 @@ dependencies = [
  "strata-status",
  "strata-storage",
  "strata-tasks",
- "strata-test-utils",
  "thiserror 2.0.11",
  "tokio",
  "tracing",
@@ -13904,6 +13903,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "async-trait",
  "bitcoin",
  "hex",
  "musig2",
@@ -13923,6 +13923,7 @@ dependencies = [
  "strata-state",
  "strata-storage",
  "threadpool",
+ "tokio",
 ]
 
 [[package]]

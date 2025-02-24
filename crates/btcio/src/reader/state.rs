@@ -120,7 +120,10 @@ impl ReaderState {
 
     pub fn rollback_to_height(&mut self, new_height: u64) -> Vec<BlockHash> {
         if new_height > self.next_height {
-            panic!("reader: new height greater than cur height");
+            panic!(
+                "reader: new height {new_height} greater than cur height {}",
+                self.next_height
+            );
         }
 
         let rollback_cnt = self.best_block_idx() - new_height;

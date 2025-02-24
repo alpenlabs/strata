@@ -53,6 +53,12 @@ impl EpochCommitment {
         }
     }
 
+    /// Creates a new instance given the terminal block of an epoch and the
+    /// epoch index.
+    pub fn from_terminal(epoch: u64, block: L2BlockCommitment) -> Self {
+        Self::new(epoch, block.slot(), *block.blkid())
+    }
+
     /// Creates a "null" epoch with 0 slot, epoch 0, and zeroed blkid.
     pub fn null() -> Self {
         Self::new(0, 0, L2BlockId::from(Buf32::zero()))

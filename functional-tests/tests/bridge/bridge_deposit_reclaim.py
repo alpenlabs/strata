@@ -96,7 +96,8 @@ class BridgeDepositReclaimTest(testenv.StrataTester):
         # Make sure that the BTC refund address has the expected balance
         wait_until(
             lambda: get_balance(refund_addr, btc_url, btc_user, btc_password)
-            == initial_refund_btc_balance
+            == initial_refund_btc_balance,
+            timeout=30,
         )
         refund_btc_balance = get_balance(
             refund_addr,

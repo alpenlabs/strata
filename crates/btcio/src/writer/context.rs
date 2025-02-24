@@ -8,17 +8,21 @@ use strata_status::StatusChannel;
 use crate::rpc::traits::WriterRpc;
 
 /// All the items that writer tasks need as context.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct WriterContext<W: WriterRpc> {
-    // Params for rollup.
+    /// Params for rollup.
     pub params: Arc<Params>,
-    // Btcio specific configuration.
+
+    /// Btcio specific configuration.
     pub config: Arc<WriterConfig>,
-    // Sequencer's address to watch utxos for and spend change amount to.
+
+    /// Sequencer's address to watch utxos for and spend change amount to.
     pub sequencer_address: Address,
-    // Bitcoin client to sign and submit transactions.
+
+    /// Bitcoin client to sign and submit transactions.
     pub client: Arc<W>,
-    // Channel for receiving latest states.
+
+    /// Channel for receiving latest states.
     pub status_channel: StatusChannel,
 }
 

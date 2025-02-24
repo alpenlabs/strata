@@ -1,11 +1,17 @@
-use strata_primitives::{params::RollupParams, proof::RollupVerifyingKey};
-use strata_state::batch::{Checkpoint, CheckpointProofOutput};
+//! General handling around checkpoint verification.
+
+use strata_primitives::{params::*, proof::RollupVerifyingKey};
+use strata_state::{batch::*, client_state::L1Checkpoint};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
 use zkaleido_risc0_adapter;
 use zkaleido_sp1_adapter;
 
-/// A trait to extend [`RollupVerifyingKey`] with verification logic.
+use crate::errors::CheckpointError;
+
+// FIXME this isn't really an extension trait since it's not being used to
+// blanket impl over another trait
+/// Extends [`RollupVerifyingKey`] with verification logic.
 pub trait VerifyingKeyExt {
     fn verify_groth16(&self, proof_receipt: &ProofReceipt) -> ZkVmResult<()>;
 }
@@ -28,6 +34,78 @@ impl VerifyingKeyExt for RollupVerifyingKey {
     }
 }
 
+/// Verifies if a checkpoint if valid, given the context of a previous checkpoint.
+///
+/// If this is the first checkpoint we verify, then there is no checkpoint to
+/// check against.
+///
+/// This does NOT check the signature.
+// TODO reduce this to actually just passing in the core information we really
+// need, not like the height
+pub fn verify_checkpoint(
+    checkpoint: &Checkpoint,
+    prev_checkpoint: Option<&L1Checkpoint>,
+    params: &RollupParams,
+) -> Result<(), CheckpointError> {
+    // First thing obviously is to verify the proof.  No sense in continuing if
+    // the proof is invalid.
+    let proof_receipt = construct_receipt(checkpoint);
+    verify_proof(checkpoint, &proof_receipt, params)?;
+
+    // And check that we're building upon the previous state correctly.
+    if let Some(prev) = prev_checkpoint {
+        verify_checkpoint_extends(checkpoint, prev, params)?;
+    } else {
+        // If it's the first checkpoint we want it to be the initial epoch.
+        if checkpoint.batch_info().epoch() != 0 {
+            return Err(CheckpointError::SkippedGenesis);
+        }
+    }
+
+    Ok(())
+}
+
+/// Verifies that the a checkpoint extends the state of a previous checkpoint.
+fn verify_checkpoint_extends(
+    checkpoint: &Checkpoint,
+    prev: &L1Checkpoint,
+    _params: &RollupParams,
+) -> Result<(), CheckpointError> {
+    let epoch = checkpoint.batch_info().epoch();
+    let prev_epoch = prev.batch_info.epoch();
+    let last_l1_tsn = prev.batch_transition.l1_transition;
+    let last_l2_tsn = prev.batch_transition.l2_transition;
+    let l1_tsn = checkpoint.batch_transition().l1_transition;
+    let l2_tsn = checkpoint.batch_transition().l2_transition;
+
+    // Check that the epoch numbers line up.
+    if epoch != prev_epoch + 1 {
+        return Err(CheckpointError::Sequencing(epoch, prev_epoch));
+    }
+
+    // Check that the L1 blocks match up.
+    if l1_tsn.0 != last_l1_tsn.1 {
+        warn!("checkpoint mismatch on L1 state!");
+        return Err(CheckpointError::MismatchL1State);
+    }
+
+    if l2_tsn.0 != last_l2_tsn.1 {
+        warn!("checkpoint mismatch on L2 state!");
+        return Err(CheckpointError::MismatchL2State);
+    }
+
+    Ok(())
+}
+
+/// Constructs a receipt from a checkpoint.
+///
+/// This is here because we want to move `.get_proof_receipt()` out of the
+/// checkpoint type itself soon.
+fn construct_receipt(checkpoint: &Checkpoint) -> ProofReceipt {
+    #[allow(deprecated)]
+    checkpoint.get_proof_receipt()
+}
+
 /// Verify that the provided checkpoint proof is valid for the verifier key.
 ///
 /// # Caution
@@ -48,7 +126,7 @@ pub fn verify_proof(
         && proof_receipt.proof().is_empty()
         && proof_receipt.public_values().is_empty()
     {
-        warn!(%checkpoint_idx, "Allow empty set. Verifying empty proof as correct");
+        warn!(%checkpoint_idx, "verifying empty proof as correct");
         return Ok(());
     }
 

@@ -10,7 +10,6 @@ use bitcoin::{
 };
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
-use parking_lot::RwLock;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
@@ -18,8 +17,10 @@ use strata_common::bail_manager::BAIL_SENDER;
 use strata_consensus_logic::{checkpoint_verification::verify_proof, sync_manager::SyncManager};
 use strata_db::types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus};
 use strata_primitives::{
+    batch::EpochSummary,
     bridge::{OperatorIdx, PublickeyTable},
     buf::Buf32,
+    epoch::EpochCommitment,
     hash,
     l1::payload::{L1Payload, PayloadDest, PayloadIntent},
     params::Params,
@@ -38,7 +39,7 @@ use strata_sequencer::{
         BlockCompletionData, BlockGenerationConfig, BlockTemplate, TemplateManagerHandle,
     },
     checkpoint::{verify_checkpoint_sig, CheckpointHandle},
-    duty::types::{Duty, DutyEntry, DutyTracker},
+    duty::{extractor::extract_duties, types::Duty},
 };
 use strata_state::{
     batch::{Checkpoint, SignedCheckpoint},
@@ -49,7 +50,6 @@ use strata_state::{
     client_state::ClientState,
     header::L2Header,
     id::L2BlockId,
-    l1::L1BlockId,
     operation::ClientUpdateOutput,
     sync_event::SyncEvent,
 };
@@ -89,13 +89,14 @@ impl StrataRpcImpl {
 
     /// Gets a ref to the current client state as of the last update.
     async fn get_client_state(&self) -> ClientState {
-        self.sync_manager.status_channel().client_state()
+        self.sync_manager.status_channel().get_cur_client_state()
     }
 
     // TODO make these not return Arc
 
     /// Gets a clone of the current client state and fetches the chainstate that
     /// of the L2 block that it considers the tip state.
+    // TODO remove this RPC, we aren't supposed to be exposing this
     async fn get_cur_states(&self) -> Result<(ClientState, Option<Arc<Chainstate>>), Error> {
         let cs = self.get_client_state().await;
 
@@ -103,15 +104,16 @@ impl StrataRpcImpl {
             return Ok((cs, None));
         }
 
-        let chs = self.status_channel.chain_state().map(Arc::new);
+        let chs = self.status_channel.get_cur_tip_chainstate().clone();
 
         Ok((cs, chs))
     }
 
+    // TODO remove this RPC, we aren't supposed to be exposing this
     async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
-        let client_state = self.status_channel.client_state();
+        let client_state = self.status_channel.get_cur_client_state();
 
-        let Some(last_checkpoint) = client_state.l1_view().last_finalized_checkpoint() else {
+        let Some(last_checkpoint) = client_state.get_last_checkpoint() else {
             return Ok(None);
         };
 
@@ -178,7 +180,7 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_l1_status(&self) -> RpcResult<RpcL1Status> {
-        let l1s = self.status_channel.l1_status();
+        let l1s = self.status_channel.get_l1_status();
         Ok(RpcL1Status::from_l1_status(
             l1s,
             self.sync_manager.params().rollup().network,
@@ -196,49 +198,76 @@ impl StrataApiServer for StrataRpcImpl {
             .get_block_manifest_async(height)
             .map_err(Error::Db)
             .await?;
-        Ok(blk_manifest.map(|mf| mf.block_hash().to_string()))
+        Ok(blk_manifest.map(|mf| mf.blkid().to_string()))
     }
 
     async fn get_client_status(&self) -> RpcResult<RpcClientStatus> {
-        let sync_state = self.status_channel.sync_state();
-        let l1_view = self.status_channel.l1_view();
+        let css = self.status_channel.get_chain_sync_status();
+        let cstate = self.status_channel.get_cur_client_state();
 
-        let last_l1 = l1_view.tip_blkid().cloned().unwrap_or_else(|| {
-            // TODO figure out a better way to do this
-            warn!("last L1 block not set in client state, returning zero");
-            L1BlockId::from(Buf32::zero())
-        });
+        // Define default values for all of the fields that we'll fill in later.
+        let mut chain_tip = Buf32::zero();
+        let mut chain_tip_slot = 0;
+        let mut finalized_blkid = Buf32::zero();
+        let mut last_l1_block = Buf32::zero();
+        let mut buried_l1_height = 0;
+        let mut finalized_epoch = None;
+        let mut confirmed_epoch = None;
+        let mut tip_l1_block = None;
+        let mut buried_l1_block = None;
 
-        // Copy these out of the sync state, if they're there.
-        let (chain_tip_blkid, finalized_blkid) = sync_state
-            .map(|ss| (*ss.chain_tip_blkid(), *ss.finalized_blkid()))
-            .unwrap_or_default();
+        // Maybe set the chain tip fields.
+        // TODO remove this after actually removing the fields
+        if let Some(css) = css {
+            chain_tip = (*css.tip_blkid()).into();
+            chain_tip_slot = css.tip_slot();
+        }
 
-        // FIXME make this load from cache, and put the data we actually want
-        // here in the client state
-        // FIXME error handling
-        let slot: u64 = self
-            .storage
-            .l2()
-            .get_block_data_async(&chain_tip_blkid)
-            .map_err(Error::Db)
-            .await?
-            .map(|b| b.header().blockidx())
-            .unwrap_or(u64::MAX);
+        // Maybe set last L1 block.
+        if let Some(block) = cstate.get_tip_l1_block() {
+            tip_l1_block = Some(block);
+            last_l1_block = (*block.blkid()).into(); // TODO remove
+        }
 
+        // Maybe set buried L1 block.
+        if let Some(block) = cstate.get_buried_l1_block() {
+            buried_l1_block = Some(block);
+            buried_l1_height = block.height(); // TODO remove
+        }
+
+        // Maybe set confirmed epoch.
+        if let Some(last_ckpt) = cstate.get_last_checkpoint() {
+            confirmed_epoch = Some(last_ckpt.batch_info.get_epoch_commitment());
+        }
+
+        // Maybe set finalized epoch.
+        if let Some(fin_ckpt) = cstate.get_apparent_finalized_checkpoint() {
+            finalized_epoch = Some(fin_ckpt.batch_info.get_epoch_commitment());
+            finalized_blkid = (*fin_ckpt.batch_info.final_l2_block().blkid()).into();
+        }
+
+        // FIXME: remove deprecated items
+        #[allow(deprecated)]
         Ok(RpcClientStatus {
-            chain_tip: *chain_tip_blkid.as_ref(),
-            chain_tip_slot: slot,
+            chain_tip: chain_tip.into(),
+            chain_tip_slot,
             finalized_blkid: *finalized_blkid.as_ref(),
-            last_l1_block: *last_l1.as_ref(),
-            buried_l1_height: l1_view.buried_l1_height(),
+            last_l1_block: last_l1_block.into(),
+            finalized_epoch,
+            confirmed_epoch,
+            buried_l1_height,
+            tip_l1_block,
+            buried_l1_block,
         })
     }
 
     async fn get_recent_block_headers(&self, count: u64) -> RpcResult<Vec<RpcBlockHeader>> {
         // FIXME: sync state should have a block number
-        let sync_state = self.status_channel.sync_state();
-        let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
+        let css = self
+            .status_channel
+            .get_chain_sync_status()
+            .ok_or(Error::ClientNotStarted)?;
+        let tip_blkid = css.tip_blkid();
 
         let fetch_limit = self.sync_manager.params().run().l2_blocks_fetch_limit;
         if count > fetch_limit {
@@ -246,7 +275,7 @@ impl StrataApiServer for StrataRpcImpl {
         }
 
         let mut output = Vec::new();
-        let mut cur_blkid = tip_blkid;
+        let mut cur_blkid = *tip_blkid;
         while output.len() < count as usize {
             let l2_blk = self.fetch_l2_block_ok(&cur_blkid).await?;
             output.push(conv_blk_header_to_rpc(l2_blk.header()));
@@ -260,11 +289,14 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_headers_at_idx(&self, idx: u64) -> RpcResult<Option<Vec<RpcBlockHeader>>> {
-        let sync_state = self.status_channel.sync_state();
-        let tip_blkid = *sync_state.ok_or(Error::ClientNotStarted)?.chain_tip_blkid();
+        let css = self
+            .status_channel
+            .get_chain_sync_status()
+            .ok_or(Error::ClientNotStarted)?;
+        let tip_blkid = css.tip_blkid();
 
         // check the tip idx
-        let tip_block = self.fetch_l2_block_ok(&tip_blkid).await?;
+        let tip_block = self.fetch_l2_block_ok(tip_blkid).await?;
         let tip_idx = tip_block.header().blockidx();
 
         if idx > tip_idx {
@@ -333,6 +365,33 @@ impl StrataApiServer for StrataRpcImpl {
         }
     }
 
+    async fn get_epoch_commitments(&self, epoch: u64) -> RpcResult<Vec<EpochCommitment>> {
+        let commitments = self
+            .storage
+            .checkpoint()
+            .get_epoch_commitments_at(epoch)
+            .map_err(Error::Db)
+            .await?;
+        Ok(commitments)
+    }
+
+    async fn get_epoch_summary(
+        &self,
+        epoch: u64,
+        slot: u64,
+        terminal: L2BlockId,
+    ) -> RpcResult<Option<EpochSummary>> {
+        let commitment = EpochCommitment::new(epoch, slot, terminal);
+        let summary = self
+            .storage
+            .checkpoint()
+            .get_epoch_summary(commitment)
+            .map_err(Error::Db)
+            .await?;
+        Ok(summary)
+    }
+
+    // TODO rework this, at least to use new OL naming?
     async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
         let l2_blk_bundle = self.fetch_l2_block_ok(&blkid).await?;
 
@@ -356,7 +415,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_current_deposits(&self) -> RpcResult<Vec<u32>> {
         let deps = self
             .status_channel
-            .deposits_table()
+            .cur_tip_deposits_table()
             .ok_or(Error::BeforeGenesis)?;
 
         Ok(deps.get_all_deposits_idxs_iters_iter().collect())
@@ -365,7 +424,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_current_deposit_by_id(&self, deposit_id: u32) -> RpcResult<RpcDepositEntry> {
         let deps = self
             .status_channel
-            .deposits_table()
+            .cur_tip_deposits_table()
             .ok_or(Error::BeforeGenesis)?;
         Ok(deps
             .get_deposit(deposit_id)
@@ -373,15 +432,21 @@ impl StrataApiServer for StrataRpcImpl {
             .map(RpcDepositEntry::from_deposit_entry)?)
     }
 
+    // FIXME: remove deprecated
+    #[allow(deprecated)]
     async fn sync_status(&self) -> RpcResult<RpcSyncStatus> {
-        let sync_state = self.status_channel.sync_state();
-        Ok(sync_state
-            .map(|sync| RpcSyncStatus {
-                tip_height: sync.chain_tip_height(),
-                tip_block_id: *sync.chain_tip_blkid(),
-                finalized_block_id: *sync.finalized_blkid(),
+        let css = self.status_channel.get_chain_sync_status();
+        Ok(css
+            .map(|css| RpcSyncStatus {
+                tip_height: css.tip_slot(),
+                tip_block_id: *css.tip_blkid(),
+                cur_epoch: css.cur_epoch(),
+                prev_epoch: css.prev_epoch,
+                observed_finalized_epoch: css.finalized_epoch,
+                safe_l1_block: css.safe_l1,
+                finalized_block_id: *css.finalized_blkid(),
             })
-            .ok_or(Error::ClientNotStarted)?)
+            .ok_or(Error::BeforeGenesis)?)
     }
 
     async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes> {
@@ -504,7 +569,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
         let operator_table = self
             .status_channel
-            .operator_table()
+            .cur_tip_operator_table()
             .ok_or(Error::BeforeGenesis)?;
         let operator_map: BTreeMap<OperatorIdx, PublicKey> = operator_table
             .operators()
@@ -547,14 +612,17 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_latest_checkpoint_index(&self, finalized: Option<bool>) -> RpcResult<Option<u64>> {
         let finalized = finalized.unwrap_or(false);
         if finalized {
+            // FIXME when this was written, by "finalized" they really meant
+            // just the confirmed or "last" checkpoint, we'll replicate this
+            // behavior for now
+
             // get last finalized checkpoint index from state
             let (client_state, _) = self.get_cur_states().await?;
             Ok(client_state
-                .l1_view()
-                .last_finalized_checkpoint()
+                .get_last_checkpoint()
                 .map(|checkpoint| checkpoint.batch_info.epoch()))
         } else {
-            // get latest checkpoint index from db
+            // get latest checkpoint index from d
             let idx = self
                 .checkpoint_handle
                 .get_last_checkpoint_idx()
@@ -565,22 +633,31 @@ impl StrataApiServer for StrataRpcImpl {
         }
     }
 
-    async fn get_l2_block_status(&self, block_height: u64) -> RpcResult<L2BlockStatus> {
-        let sync_state = self.status_channel.sync_state();
-        let l1_view = self.status_channel.l1_view();
-        if let Some(last_checkpoint) = l1_view.last_finalized_checkpoint() {
-            if last_checkpoint.batch_info.includes_l2_block(block_height) {
+    // TODO this logic should be moved into `SyncManager` or *something* that
+    // has easier access to the context about block status instead of
+    // implementing protocol-aware deliberation in the RPC method impl
+    async fn get_l2_block_status(&self, block_slot: u64) -> RpcResult<L2BlockStatus> {
+        let css = self
+            .status_channel
+            .get_chain_sync_status()
+            .ok_or(Error::BeforeGenesis)?;
+        let cstate = self.status_channel.get_cur_client_state();
+
+        // FIXME when this was written, "finalized" just meant included in a
+        // checkpoint, not that the checkpoint was buried, so we're replicating
+        // that behavior here
+        if let Some(last_checkpoint) = cstate.get_last_checkpoint() {
+            if last_checkpoint.batch_info.includes_l2_block(block_slot) {
                 return Ok(L2BlockStatus::Finalized(last_checkpoint.height));
             }
         }
-        if let Some(l1_height) = l1_view.get_verified_l1_height(block_height) {
+
+        if let Some(l1_height) = cstate.get_verified_l1_height(block_slot) {
             return Ok(L2BlockStatus::Verified(l1_height));
         }
 
-        if let Some(sync_status) = sync_state {
-            if block_height < sync_status.chain_tip_height() {
-                return Ok(L2BlockStatus::Confirmed);
-            }
+        if block_slot < css.tip_slot() {
+            return Ok(L2BlockStatus::Confirmed);
         }
 
         Ok(L2BlockStatus::Unknown)
@@ -653,7 +730,8 @@ pub struct SequencerServerImpl {
     checkpoint_handle: Arc<CheckpointHandle>,
     template_manager_handle: TemplateManagerHandle,
     params: Arc<Params>,
-    duty_tracker: Arc<RwLock<DutyTracker>>,
+    storage: Arc<NodeStorage>,
+    status: StatusChannel,
 }
 
 impl SequencerServerImpl {
@@ -664,7 +742,8 @@ impl SequencerServerImpl {
         params: Arc<Params>,
         checkpoint_handle: Arc<CheckpointHandle>,
         template_manager_handle: TemplateManagerHandle,
-        duty_tracker: Arc<RwLock<DutyTracker>>,
+        storage: Arc<NodeStorage>,
+        status: StatusChannel,
     ) -> Self {
         Self {
             envelope_handle,
@@ -672,7 +751,8 @@ impl SequencerServerImpl {
             params,
             checkpoint_handle,
             template_manager_handle,
-            duty_tracker,
+            storage,
+            status,
         }
     }
 }
@@ -723,6 +803,9 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         idx: u64,
         proof_receipt: ProofReceipt,
     ) -> RpcResult<()> {
+        // TODO shift all this logic somewhere else that's closer to where it's
+        // relevant and not in the RPC method impls
+
         debug!(%idx, "received checkpoint proof request");
         let mut entry = self
             .checkpoint_handle
@@ -741,7 +824,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
         verify_proof(&checkpoint, &proof_receipt, self.params.rollup())
             .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
 
-        entry.checkpoint.update_proof(proof_receipt.proof().clone());
+        entry.checkpoint.set_proof(proof_receipt.proof().clone());
         entry.proving_status = CheckpointProvingStatus::ProofReady;
 
         debug!(%idx, "Proof is pending, setting proof ready");
@@ -767,14 +850,26 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 
     async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>> {
-        let duties = self
-            .duty_tracker
-            .read()
-            .duties()
-            .iter()
-            .map(DutyEntry::duty)
-            .cloned()
-            .collect();
+        let chain_state = self
+            .status
+            .get_cur_tip_chainstate()
+            .ok_or(Error::BeforeGenesis)?;
+        let client_state = self.status.get_cur_client_state();
+
+        let client_int_state = client_state
+            .get_last_internal_state()
+            .ok_or(Error::MissingInternalState)?;
+
+        let duties = extract_duties(
+            chain_state.as_ref(),
+            client_int_state,
+            &self.checkpoint_handle,
+            self.storage.l2().as_ref(),
+            &self.params,
+        )
+        .await
+        .map_err(to_jsonrpsee_error("failed to extract duties"))?;
+
         Ok(duties)
     }
 
@@ -796,40 +891,49 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .map_err(to_jsonrpsee_error("failed to complete block template"))
     }
 
-    async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()> {
-        println!("complete_checkpoint_signature: {}; {:?}", idx, sig);
+    async fn complete_checkpoint_signature(
+        &self,
+        checkpoint_idx: u64,
+        sig: HexBytes64,
+    ) -> RpcResult<()> {
+        // TODO shift all this logic somewhere else that's closer to where it's
+        // relevant and not in the RPC method impls
+        trace!(%checkpoint_idx, ?sig, "call to complete_checkpoint_signature");
+
         let entry = self
             .checkpoint_handle
-            .get_checkpoint(idx)
+            .get_checkpoint(checkpoint_idx)
             .await
             .map_err(|e| Error::Other(e.to_string()))?
-            .ok_or(Error::MissingCheckpointInDb(idx))?;
+            .ok_or(Error::MissingCheckpointInDb(checkpoint_idx))?;
 
         if entry.proving_status != CheckpointProvingStatus::ProofReady {
-            Err(Error::MissingCheckpointProof(idx))?;
+            Err(Error::MissingCheckpointProof(checkpoint_idx))?;
         }
 
         if entry.confirmation_status == CheckpointConfStatus::Confirmed
             || entry.confirmation_status == CheckpointConfStatus::Finalized
         {
-            Err(Error::CheckpointAlreadyPosted(idx))?;
+            Err(Error::CheckpointAlreadyPosted(checkpoint_idx))?;
         }
 
         let checkpoint = Checkpoint::from(entry);
         let signed_checkpoint = SignedCheckpoint::new(checkpoint, sig.0.into());
 
         if !verify_checkpoint_sig(&signed_checkpoint, &self.params) {
-            Err(Error::InvalidCheckpointSignature(idx))?;
+            Err(Error::InvalidCheckpointSignature(checkpoint_idx))?;
         }
+
+        trace!(%checkpoint_idx, "signature OK");
 
         let payload = L1Payload::new_checkpoint(
             borsh::to_vec(&signed_checkpoint).map_err(|e| Error::Other(e.to_string()))?,
         );
         let sighash = signed_checkpoint.checkpoint().hash();
 
-        let blob_intent = PayloadIntent::new(PayloadDest::L1, sighash, payload);
+        let payload_intent = PayloadIntent::new(PayloadDest::L1, sighash, payload);
         self.envelope_handle
-            .submit_intent_async(blob_intent)
+            .submit_intent_async(payload_intent)
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
 

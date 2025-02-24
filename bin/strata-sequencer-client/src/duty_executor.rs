@@ -17,8 +17,10 @@ use crate::helpers::{sign_checkpoint, sign_header};
 enum DutyExecError {
     #[error("failed generating template: {0}")]
     GenerateTemplate(jsonrpsee::core::ClientError),
+
     #[error("failed completing template: {0}")]
     CompleteTemplate(jsonrpsee::core::ClientError),
+
     #[error("failed submitting checkpoint signature: {0}")]
     CompleteCheckpoint(jsonrpsee::core::ClientError),
 }
@@ -41,12 +43,12 @@ where
         select! {
             duty = duty_rx.recv() => {
                 if let Some(duty) = duty {
-                    let duty_id = duty.id();
+                    let duty_id = duty.generate_id();
                     if seen_duties.contains(&duty_id) {
                         debug!(%duty_id, "skipping already seen duty");
                         continue;
                     }
-                    seen_duties.insert(duty_id);
+                    seen_duties.insert(duty.generate_id());
                     handle.spawn(handle_duty(rpc.clone(), duty, idata.clone(), failed_duties_tx.clone()));
                 } else {
                     // tx is closed, we are done
@@ -72,16 +74,16 @@ async fn handle_duty<R>(
 ) where
     R: StrataSequencerApiClient + Send + Sync,
 {
-    let duty_id = duty.id();
+    let duty_id = duty.generate_id();
     debug!(%duty_id, ?duty, "handle_duty");
     let duty_result = match duty.clone() {
         Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, duty_id, &idata).await,
         Duty::CommitBatch(duty) => handle_commit_batch_duty(rpc, duty, duty_id, &idata).await,
     };
 
-    if let Err(error) = duty_result {
-        error!(%duty_id, %error, "duty failed");
-        let _ = failed_duties_tx.send(duty.id()).await;
+    if let Err(err) = duty_result {
+        error!(%duty_id, %err, "duty failed");
+        let _ = failed_duties_tx.send(duty_id).await;
     }
 }
 
@@ -136,9 +138,10 @@ async fn handle_commit_batch_duty<R>(
 where
     R: StrataSequencerApiClient + Send + Sync,
 {
+    let epoch = duty.inner().batch_info().epoch();
     let sig = sign_checkpoint(duty.inner(), &idata.key);
 
-    debug!(%duty_id, %sig, "checkpoint signature");
+    debug!(%epoch, %duty_id, %sig, "signed checkpoint");
 
     rpc.complete_checkpoint_signature(duty.inner().batch_info().epoch(), HexBytes64(sig.0))
         .await
