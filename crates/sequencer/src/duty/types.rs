@@ -203,7 +203,7 @@ mod tests {
                     IdentityKey::Sequencer(buf) => buf.as_bytes(),
                 };
 
-                // The inner will be dropped after this,
+                // The inner IdentityData will be dropped after this,
                 // triggering zeroization
                 self.flag.store(bytes != [0u8; 32], Ordering::Relaxed);
             }
