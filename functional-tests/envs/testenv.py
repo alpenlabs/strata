@@ -351,10 +351,10 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         fullnode_reth_port = fullnode_reth.get_prop("rpc_port")
-        fullnode_reth_config = {
-            "reth_socket": f"localhost:{fullnode_reth_port}",
-            "reth_secret_path": reth_secret_path,
-        }
+        fullnode_reth_config = RethELConfig(
+            rpc_url=f"localhost:{fullnode_reth_port}",
+            secret=reth_secret_path,
+        )
 
         sequencer_rpc = f"ws://localhost:{sequencer.get_prop('rpc_port')}"
 

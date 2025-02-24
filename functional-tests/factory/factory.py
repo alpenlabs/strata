@@ -210,12 +210,8 @@ class FullNodeFactory(flexitest.Factory):
             "--rollup-params", rollup_params_file,
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
-
-            "--sequencer",
         ]
         # fmt: on
-
-        cmd.extend(["--rollup-params", rollup_params_file])
 
         rpc_url = f"ws://localhost:{rpc_port}"
         props = {
@@ -335,12 +331,17 @@ class ProverClientFactory(flexitest.Factory):
         rpc_port = self.next_port()
         rpc_url = f"ws://localhost:{rpc_port}"
 
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        with open(rollup_params_file, "w") as f:
+            f.write(rollup_params)
+
         # fmt: off
         cmd = [
             "strata-prover-client",
             "--rpc-port", str(rpc_port),
             "--sequencer-rpc", sequencer_url,
             "--reth-rpc", reth_url,
+            "--rollup-params", rollup_params_file,
             "--bitcoind-url", bitcoind_config.rpc_url,
             "--bitcoind-user", bitcoind_config.rpc_user,
             "--bitcoind-password", bitcoind_config.rpc_password,
@@ -350,12 +351,6 @@ class ProverClientFactory(flexitest.Factory):
             "--enable-checkpoint-runner", "true" if settings.enable_checkpoint_proving else "false"
         ]
         # fmt: on
-
-        rollup_params_file = os.path.join(datadir, "rollup_params.json")
-        with open(rollup_params_file, "w") as f:
-            f.write(rollup_params)
-
-        cmd.extend(["--rollup-params", rollup_params_file])
 
         props = {"rpc_port": rpc_port}
 
