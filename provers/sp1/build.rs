@@ -314,14 +314,16 @@ fn migrate_elf(program: &str) {
     let destination_elf_path = cache_dir.join(format!("{}.elf", program));
 
     // Source path: program/target/elf-compilation/.../release/{built_elf_name}
+    let elf_subdir = if cfg!(feature = "docker-build") {
+        "docker/riscv32im-succinct-zkvm-elf"
+    } else {
+        "riscv32im-succinct-zkvm-elf"
+    };
+
     let built_elf_path = program_path
         .join("target")
         .join("elf-compilation")
-        .join(if cfg!(feature = "docker-build") {
-            std::path::Path::new("docker").join("riscv32im-succinct-zkvm-elf")
-        } else {
-            std::path::Path::new("riscv32im-succinct-zkvm-elf")
-        })
+        .join(elf_subdir)
         .join("release")
         .join(&built_elf_name);
 

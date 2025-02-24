@@ -2786,6 +2786,7 @@ dependencies = [
  "thiserror 2.0.11",
  "tracing",
  "zeroize",
+ "zkaleido",
 ]
 
 [[package]]
