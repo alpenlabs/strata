@@ -36,8 +36,8 @@ pub enum ConfigError {
     MissingKey(String),
 
     /// Tried to traverse into a primitive.
-    #[error("can't traverse into primitive: {0}")]
-    TraversePrimitiveAt(String),
+    #[error("can't traverse into non-table key: {0}")]
+    TraverseNonTableAt(String),
 
     /// Invalid override string.
     #[error("Invalid override: '{0}'")]

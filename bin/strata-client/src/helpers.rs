@@ -31,7 +31,7 @@ pub fn get_config(args: Args) -> Result<Config, InitError> {
     let mut override_strs = env_args.get_overrides();
 
     // Extend overrides from args.
-    override_strs.extend_from_slice(&args.get_overrides());
+    override_strs.extend_from_slice(&args.get_overrides()?);
 
     // Parse overrides.
     let overrides = override_strs
@@ -42,7 +42,7 @@ pub fn get_config(args: Args) -> Result<Config, InitError> {
     // Apply overrides to toml table.
     let table = config_toml
         .as_table_mut()
-        .ok_or(ConfigError::TraversePrimitiveAt("".to_string()))?;
+        .ok_or(ConfigError::TraverseNonTableAt("".to_string()))?;
 
     for (path, val) in overrides {
         apply_override(&path, val, table)?;

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use argh::FromArgs;
 use toml::value::Table;
 
-use crate::errors::ConfigError;
+use crate::errors::{ConfigError, InitError};
 
 /// Configs overridable by environment. Mostly for sensitive data.
 #[derive(Debug, Clone)]
@@ -64,20 +64,24 @@ pub struct Args {
 
 impl Args {
     /// Get strings of overrides gathered from args.
-    pub fn get_overrides(&self) -> Vec<String> {
+    pub fn get_overrides(&self) -> Result<Vec<String>, InitError> {
         let mut overrides = self.overrides.clone();
-        overrides.extend_from_slice(&self.get_direct_overrides());
-        overrides
+        overrides.extend_from_slice(&self.get_direct_overrides()?);
+        Ok(overrides)
     }
 
     /// Overrides passed directly as args and not as overrides.
-    fn get_direct_overrides(&self) -> Vec<String> {
+    fn get_direct_overrides(&self) -> Result<Vec<String>, InitError> {
         let mut overrides = Vec::new();
         if self.sequencer {
             overrides.push("client.is_sequencer=true".to_string());
         }
         if let Some(datadir) = &self.datadir {
-            overrides.push(format!("client.datadir={datadir:?}"));
+            let dd = datadir.to_str().ok_or(anyhow::anyhow!(
+                "Invalid datadir override path {:?}",
+                datadir
+            ))?;
+            overrides.push(format!("client.datadir={dd}"));
         }
         if let Some(rpc_host) = &self.rpc_host {
             overrides.push(format!("client.rpc_host={rpc_host}"));
@@ -86,7 +90,7 @@ impl Args {
             overrides.push(format!("client.rpc_port={rpc_port}"));
         }
 
-        overrides
+        Ok(overrides)
     }
 }
 
@@ -116,7 +120,7 @@ pub fn apply_override(
             if let Some(t) = table.get_mut(key).and_then(|v| v.as_table_mut()) {
                 apply_override(rest, value, t)
             } else if table.contains_key(key) {
-                Err(ConfigError::TraversePrimitiveAt(key.to_string()))
+                Err(ConfigError::TraverseNonTableAt(key.to_string()))
             } else {
                 Err(ConfigError::MissingKey(key.to_string()))
             }
@@ -211,6 +215,7 @@ mod test {
 
         let overrides = args
             .get_overrides()
+            .unwrap()
             .into_iter()
             .map(|x| parse_override(&x).unwrap());
 
