@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bitcoin::{params::MAINNET, Block};
+use bitcoin::Block;
 use strata_btcio::{
     reader::query::fetch_verification_state,
     rpc::{traits::ReaderRpc, BitcoinClient},
@@ -120,7 +120,7 @@ impl ProvingOp for L1BatchOperator {
         let state = fetch_verification_state(
             self.btc_client.as_ref(),
             start_height - 1,
-            &MAINNET.clone().into(),
+            self.rollup_params.l1_reorg_safe_depth,
         )
         .await
         .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;

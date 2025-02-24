@@ -1,15 +1,14 @@
-use std::io::{Cursor, Write};
-
 use arbitrary::Arbitrary;
-use bitcoin::{block::Header, hashes::Hash, BlockHash, CompactTarget, Target};
+use bitcoin::{block::Header, hashes::Hash, params::Params, BlockHash, CompactTarget};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use tracing::*;
 
-use super::{
-    params::BtcParams, timestamp_store::TimestampStore, utils::compute_block_hash, L1BlockId,
+use super::{error::L1VerificationError, timestamp_store::TimestampStore, L1BlockId};
+use crate::{
+    buf::Buf32,
+    hash::compute_borsh_hash,
+    l1::{utils::compute_block_hash, L1BlockCommitment},
 };
-use crate::{buf::Buf32, hash};
 
 /// A struct containing all necessary information for validating a Bitcoin block header.
 ///
@@ -32,6 +31,56 @@ use crate::{buf::Buf32, hash};
 #[derive(
     Clone,
     Debug,
+    PartialEq,
+    Eq,
+    Default,
+    Arbitrary,
+    BorshSerialize,
+    BorshDeserialize,
+    Deserialize,
+    Serialize,
+)]
+pub struct HeaderVerificationState {
+    /// Commitment to the last verified block, containing both its height and block hash.
+    pub last_verified_block: L1BlockCommitment,
+
+    /// [Target](bitcoin::pow::CompactTarget) for the next block to verify
+    pub next_block_target: u32,
+
+    /// Timestamps marking the boundaries of the difficulty adjustment epochs.
+    ///
+    /// These timestamps are used in the computation of the new difficulty target. They correspond
+    /// to:
+    /// - `current`: The timestamp at the start of the current difficulty adjustment epoch (end
+    ///   boundary).
+    /// - `previous`: The timestamp at the start of the previous difficulty adjustment epoch (start
+    ///   boundary).
+    ///
+    /// For example, to successfully compute the first difficulty adjustment on the Bitcoin
+    /// network, one would pass the header for Block 2015 as `current` and the header for Block
+    /// 0 as `previous`.
+    pub epoch_timestamps: EpochTimestamps,
+
+    /// A ring buffer that maintains a history of block timestamps.
+    ///
+    /// This buffer is used to compute the median block time for consensus rules by considering the
+    /// most recent 11 timestamps. However, it retains additional timestamps to support chain reorg
+    /// scenarios.
+    pub block_timestamp_history: TimestampStore,
+}
+
+/// `EpochTimestamps` stores the timestamps corresponding to the boundaries of difficulty adjustment
+/// epochs.
+///
+/// This structure holds two values for handling reorg scenarios where the epoch boundary
+/// information might be lost:
+///
+/// On [MAINNET](bitcoin::consensus::params::MAINNET), a difficulty adjustment interval lasts
+/// for 2016 blocks. The interval starts at blocks with heights 0, 2016, 4032, 6048, 8064,
+/// etc.
+#[derive(
+    Clone,
+    Debug,
     Default,
     PartialEq,
     Eq,
@@ -41,268 +90,326 @@ use crate::{buf::Buf32, hash};
     Deserialize,
     Serialize,
 )]
-pub struct HeaderVerificationState {
-    /// [Block number](bitcoin::Block::bip34_block_height) of the last verified block
-    pub last_verified_block_num: u32,
+pub struct EpochTimestamps {
+    /// Timestamp of the block at the start of the current difficulty adjustment epoch.
+    pub current: u32,
 
-    /// [Hash](bitcoin::block::Header::block_hash) of the last verified block
-    pub last_verified_block_hash: L1BlockId,
-
-    /// [Target](bitcoin::pow::CompactTarget) for the next block to verify
-    pub next_block_target: u32,
-
-    /// Timestamp of the block at the start of a [difficulty adjustment
-    /// interval](bitcoin::consensus::params::Params::difficulty_adjustment_interval).
-    ///
-    /// On [MAINNET](bitcoin::consensus::params::MAINNET), a difficulty adjustment interval lasts
-    /// for 2016 blocks. The interval starts at blocks with heights 0, 2016, 4032, 6048, 8064,
-    /// etc.
-    ///
-    /// This field represents the timestamp of the starting block of the interval
-    /// (e.g., block 0, 2016, 4032, etc.).
-    pub interval_start_timestamp: u32,
-
-    /// Total accumulated [difficulty](bitcoin::pow::Target::difficulty)
-    pub total_accumulated_pow: u128,
-
-    /// Timestamps of the last 11 blocks in descending order.
-    /// The timestamp of the most recent block is at index 0, while the timestamp of the oldest
-    /// block is at index 10.
-    pub last_11_blocks_timestamps: TimestampStore,
+    /// Timestamp of the block at the start of the previous difficulty adjustment epoch.
+    pub previous: u32,
 }
 
 impl HeaderVerificationState {
-    /// Computes the [`CompactTarget`] from a difficulty adjustment.
-    ///
-    /// ref: <https://github.com/bitcoin/bitcoin/blob/0503cbea9aab47ec0a87d34611e5453158727169/src/pow.cpp>
-    ///
-    /// Given the previous Target, represented as a [`CompactTarget`], the difficulty is adjusted
-    /// by taking the timespan between them, and multiplying the current [`CompactTarget`] by a
-    /// factor of the net timespan and expected timespan. The [`CompactTarget`] may not adjust
-    /// by more than a factor of 4, or adjust beyond the maximum threshold for the network.
-    ///
-    /// # Note
-    ///
-    /// Under the consensus rules, the difference in the number of blocks between the headers does
-    /// not equate to the `difficulty_adjustment_interval` of [`Params`]. This is due to an
-    /// off-by-one error, and, the expected number of blocks in between headers is
-    /// `difficulty_adjustment_interval - 1` when calculating the difficulty adjustment.
-    ///
-    /// Take the example of the first difficulty adjustment. Block 2016 introduces a new
-    /// [`CompactTarget`], which takes the net timespan between Block 2015 and Block 0, and
-    /// recomputes the difficulty.
-    ///
-    /// # Returns
-    ///
-    /// The expected [`CompactTarget`] recalculation.
-    ///
-    /// # Note
-    /// The comments above and the implementation is based on [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/blob/0d9e8f8c992223869a57162c4afe5a6112d08049/bitcoin/src/pow.rs#L352-L398).
-    /// This has not been directly used since it is not available on the current release
-    fn next_target(&mut self, timestamp: u32, params: &BtcParams) -> u32 {
-        let params = params.inner();
-        if (self.last_verified_block_num + 1) % params.difficulty_adjustment_interval() as u32 != 0
-        {
+    fn next_target(&mut self, header: &Header, params: &Params) -> u32 {
+        if (self.last_verified_block.height() + 1) % params.difficulty_adjustment_interval() != 0 {
             return self.next_block_target;
         }
 
-        let min_timespan: u32 = (params.pow_target_timespan as u32) >> 2;
-        let max_timespan: u32 = (params.pow_target_timespan as u32) << 2;
+        let timespan = header.time - self.epoch_timestamps.current;
 
-        let timespan = timestamp - self.interval_start_timestamp;
-        let _actual_timespan = timespan.clamp(min_timespan, max_timespan);
-
-        let prev_target: Target = CompactTarget::from_consensus(self.next_block_target).into();
-
-        // FIXME XXX this is intentionally wrong because we got rid of the ethnum crate
-        warn!("intentionally doing retarget calculation incorrectly, please fix this");
-        /*let mut retarget = U256::from_le_bytes(prev_target.to_le_bytes());
-        retarget *= U256::from(actual_timespan);
-        retarget /= U256::from(params.pow_target_timespan);*/
-
-        let retarget = Target::from_le_bytes(prev_target.to_le_bytes());
-
-        if retarget > params.max_attainable_target {
-            return params
-                .max_attainable_target
-                .to_compact_lossy()
-                .to_consensus();
-        }
-
-        retarget.to_compact_lossy().to_consensus()
+        CompactTarget::from_next_work_required(header.bits, timespan as u64, params).to_consensus()
     }
 
     // Note/TODO: Figure out a better way so we don't have to params each time.
-    fn update_timestamps(&mut self, timestamp: u32, params: &BtcParams) {
-        self.last_11_blocks_timestamps.insert(timestamp);
+    fn update_timestamps(&mut self, timestamp: u32, params: &Params) {
+        self.block_timestamp_history.insert(timestamp);
 
-        let new_block_num = self.last_verified_block_num;
-        if new_block_num % params.inner().difficulty_adjustment_interval() as u32 == 0 {
-            self.interval_start_timestamp = timestamp;
+        let new_block_num = self.last_verified_block.height();
+        if new_block_num % params.difficulty_adjustment_interval() == 0 {
+            self.epoch_timestamps.previous = self.epoch_timestamps.current;
+            self.epoch_timestamps.current = timestamp;
         }
     }
 
-    pub fn check_and_update_full(&mut self, header: &Header, params: &BtcParams) {
+    /// Checks all verification criteria for a header and updates the state if all conditions pass.
+    ///
+    /// The checks include:
+    /// 1. Continuity: Ensuring the header's previous block hash matches the last verified hash.
+    /// 2. Proof-of-Work: Validating that the header’s target matches the expected target and that
+    ///    the computed block hash meets the target.
+    /// 3. Timestamp: Ensuring the header's timestamp is greater than the median of the last 11
+    ///    blocks.
+    /// # Errors
+    ///
+    /// Returns a [`L1VerificationError`] if any of the checks fail.
+    pub fn check_and_update_full(
+        &mut self,
+        header: &Header,
+        params: &Params,
+    ) -> Result<(), L1VerificationError> {
         // Check continuity
         let prev_blockhash: L1BlockId =
             Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()).into();
-        assert_eq!(prev_blockhash, self.last_verified_block_hash,);
+        if prev_blockhash != *self.last_verified_block.blkid() {
+            return Err(L1VerificationError::ContinuityError {
+                expected: *self.last_verified_block.blkid(),
+                found: prev_blockhash,
+            });
+        }
 
         let block_hash_raw = compute_block_hash(header);
         let block_hash = BlockHash::from_byte_array(*block_hash_raw.as_ref());
 
-        // Check PoW
-        assert_eq!(header.bits.to_consensus(), self.next_block_target);
-        header.target().is_met_by(block_hash);
+        // Check Proof-of-Work target encoding
+        if header.bits.to_consensus() != self.next_block_target {
+            return Err(L1VerificationError::PowMismatch {
+                expected: self.next_block_target,
+                found: header.bits.to_consensus(),
+            });
+        }
 
-        // Check timestamp
-        assert!(header.time > self.last_11_blocks_timestamps.median());
+        // Check that the block hash meets the target difficulty.
+        if !header.target().is_met_by(block_hash) {
+            return Err(L1VerificationError::PowNotMet {
+                block_hash,
+                target: header.bits.to_consensus(),
+            });
+        }
 
-        // Increase the last verified block number by 1
-        self.last_verified_block_num += 1;
+        // Check timestamp against the median of the last 11 timestamps.
+        let median = self.block_timestamp_history.median();
+        if header.time <= median {
+            return Err(L1VerificationError::TimestampError {
+                time: header.time,
+                median,
+            });
+        }
 
-        // Set the header block hash as the last verified block hash
-        self.last_verified_block_hash = block_hash_raw.into();
+        // Increase the last verified block number by 1 and set the new block hash
+        self.last_verified_block =
+            L1BlockCommitment::new(self.last_verified_block.height() + 1, block_hash_raw.into());
 
         // Update the timestamps
         self.update_timestamps(header.time, params);
 
-        // Update the total accumulated PoW
-        self.total_accumulated_pow += header.difficulty(params.inner());
-
         // Set the target for the next block
-        self.next_block_target = self.next_target(header.time, params);
+        self.next_block_target = self.next_target(header, params);
+
+        Ok(())
     }
 
-    // TODO: add errors
-    pub fn check_and_update_continuity(&mut self, header: &Header, params: &BtcParams) {
+    /// Checks header continuity and updates the state accordingly.
+    ///
+    /// This function verifies that the header's previous block hash matches the expected value,
+    /// updates the block number, the block hash, the timestamp store, and the total accumulated
+    /// PoW.
+    pub fn check_and_update_continuity(
+        &mut self,
+        header: &Header,
+        params: &Params,
+    ) -> Result<(), L1VerificationError> {
         // Check continuity
         let prev_blockhash: L1BlockId =
             Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()).into();
-        assert_eq!(prev_blockhash, self.last_verified_block_hash,);
+        if prev_blockhash != *self.last_verified_block.blkid() {
+            return Err(L1VerificationError::ContinuityError {
+                expected: *self.last_verified_block.blkid(),
+                found: prev_blockhash,
+            });
+        }
 
         let block_hash_raw = compute_block_hash(header);
 
-        // Increase the last verified block number by 1
-        self.last_verified_block_num += 1;
-
-        // Set the header block hash as the last verified block hash
-        self.last_verified_block_hash = block_hash_raw.into();
+        // Increase the last verified block number by 1 and set the new block hash
+        self.last_verified_block =
+            L1BlockCommitment::new(self.last_verified_block.height() + 1, block_hash_raw.into());
 
         // Update the timestamps
         self.update_timestamps(header.time, params);
 
-        // Update the total accumulated PoW
-        self.total_accumulated_pow += header.difficulty(params.inner());
+        Ok(())
     }
 
-    // TODO: add errors
-    pub fn check_and_update_continuity_new(&self, header: &Header, params: &BtcParams) -> Self {
-        let mut new_self = self.clone();
-
-        // TODO: skipping this for now
-        // Check continuity
-        // assert_eq!(
-        //     Buf32::from(header.prev_blockhash.as_raw_hash().to_byte_array()),
-        //     new_self.last_verified_block_hash,
-        // );
-
-        let block_hash_raw = compute_block_hash(header);
-
-        // Increase the last verified block number by 1
-        new_self.last_verified_block_num += 1;
-
-        // Set the header block hash as the last verified block hash
-        new_self.last_verified_block_hash = block_hash_raw.into();
-
-        // Update the timestamps
-        new_self.update_timestamps(header.time, params);
-
-        // Update the total accumulated PoW
-        new_self.total_accumulated_pow += header.difficulty(params.inner());
-
-        new_self
+    /// Checks header continuity and returns a new verification state with the updated values.
+    ///
+    /// This is a non-mutating version that clones the state, applies the continuity check, and
+    /// returns the updated state.
+    pub fn check_and_update_continuity_new(
+        &self,
+        header: &Header,
+        params: &Params,
+    ) -> Result<HeaderVerificationState, L1VerificationError> {
+        let mut vs = self.clone();
+        vs.check_and_update_continuity(header, params)?;
+        Ok(vs)
     }
 
     /// Calculate the hash of the verification state
-    pub fn compute_hash(&self) -> Result<Buf32, std::io::Error> {
-        // 4 + 32 + 4 + 4 + 16 + 11*4 = 104
-        let mut buf = [0u8; 104];
-        let mut cur = Cursor::new(&mut buf[..]);
-        cur.write_all(&self.last_verified_block_num.to_be_bytes())?;
-        cur.write_all(self.last_verified_block_hash.as_ref())?;
-        cur.write_all(&self.next_block_target.to_be_bytes())?;
-        cur.write_all(&self.interval_start_timestamp.to_be_bytes())?;
-        cur.write_all(&self.total_accumulated_pow.to_be_bytes())?;
+    pub fn compute_hash(&self) -> Result<Buf32, L1VerificationError> {
+        Ok(compute_borsh_hash(&self))
+    }
 
-        let mut serialized_timestamps = [0u8; 11 * 4];
-        for (i, &timestamp) in self.last_11_blocks_timestamps.buffer.iter().enumerate() {
-            serialized_timestamps[i * 4..(i + 1) * 4].copy_from_slice(&timestamp.to_be_bytes());
+    /// Reorganizes the verification state by removing headers from the old chain and applying
+    /// headers from the new chain.
+    ///
+    /// The function first "rolls back" the state by removing the effects of `old_headers` and then
+    /// applies `new_headers`. The new headers must be at least as long as the old headers.
+    ///
+    /// # Arguments
+    ///
+    /// * `old_headers` - A slice of headers representing the chain to be removed.
+    /// * `new_headers` - A slice of headers representing the new chain to be applied.
+    /// * `params` - The Bitcoin network parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`L1VerificationError::ReorgLengthError`] if the new headers are fewer than the
+    /// old headers, or any error from header verification.
+    pub fn reorg(
+        &mut self,
+        old_headers: &[Header],
+        new_headers: &[Header],
+        params: &Params,
+    ) -> Result<(), L1VerificationError> {
+        if new_headers.len() < old_headers.len() {
+            return Err(L1VerificationError::ReorgLengthError {
+                new_headers: new_headers.len(),
+                old_headers: old_headers.len(),
+            });
         }
 
-        cur.write_all(&serialized_timestamps)?;
-        Ok(hash::raw(&buf))
+        for old_header in old_headers.iter().rev() {
+            if compute_block_hash(old_header) != (*self.last_verified_block.blkid()).into() {
+                return Err(L1VerificationError::ContinuityError {
+                    expected: *self.last_verified_block.blkid(),
+                    found: old_header.prev_blockhash.into(),
+                });
+            }
+            if self.last_verified_block.height() % params.difficulty_adjustment_interval() == 0 {
+                self.epoch_timestamps.current = self.epoch_timestamps.previous;
+            }
+            self.last_verified_block = L1BlockCommitment::new(
+                self.last_verified_block.height() - 1,
+                old_header.prev_blockhash.into(),
+            );
+            self.block_timestamp_history.remove();
+            self.next_block_target = old_header.bits.to_consensus();
+        }
+
+        for new_header in new_headers {
+            self.check_and_update_full(new_header, params)?;
+        }
+
+        Ok(())
     }
 }
 
-/// Calculates the start height of the difficulty adjustment period of a block
-/// height.
+/// Calculates the height at which a specific difficulty adjustment occurs relative to a
+/// starting height.
 ///
 /// # Arguments
 ///
-/// * `height` - The index of the block we're looking at.
-/// * `params` - [`BtcParams`] of the bitcoin network in use
-pub fn get_difficulty_adjustment_start_height(height: u32, params: &BtcParams) -> u32 {
-    let adj_interval = params.inner().difficulty_adjustment_interval() as u32;
-    (height / adj_interval) * adj_interval
+/// * `idx` - The index of the difficulty adjustment (1-based). 1 for the first adjustment, 2 for
+///   the second, and so on.
+/// * `start` - The starting height from which to calculate.
+/// * `params` - [`Params`] of the bitcoin network in use
+pub fn get_relative_difficulty_adjustment_height(idx: u64, start: u64, params: &Params) -> u64 {
+    let difficulty_adjustment_interval = params.difficulty_adjustment_interval();
+    ((start / difficulty_adjustment_interval) + idx) * difficulty_adjustment_interval
 }
 
 #[cfg(test)]
 mod tests {
+
     use bitcoin::params::MAINNET;
     use rand::{rngs::OsRng, Rng};
     use strata_test_utils::bitcoin_mainnet_segment::BtcChainSegment;
 
     use super::*;
 
-    // FIXME WHAT DOES THIS TEST TEST?
-    // I am supposed to fix it but I don't know what it does so I don't know
-    // what to change.
-    /*#[test]
+    #[test]
     fn test_blocks() {
-        let chain = get_btc_chain();
+        let chain = BtcChainSegment::load();
+        let h2 = get_relative_difficulty_adjustment_height(2, chain.start, &MAINNET);
+        let r1 = OsRng.gen_range(h2..chain.end);
+        let mut verification_state = chain.get_verification_state(r1, 0).unwrap();
 
-        // TODO: figure out why passing btc_params to `check_and_update_full` doesn't work
-        let btc_params: BtcParams = MAINNET.clone().into();
-        let h1 = get_difficulty_adjustment_start_height(chain.start, &btc_params);
-        let r1 = OsRng.gen_range(h1..chain.end);
-        let mut verification_state = chain.get_verification_state(r1, &MAINNET.clone().into());
-
-        for header_idx in r1..chain.end {
+        for header_idx in r1 + 1..chain.end {
             verification_state
-                .check_and_update_full(&chain.get_header(header_idx), &MAINNET.clone().into())
+                .check_and_update_full(&chain.get_block_header_at(header_idx).unwrap(), &MAINNET)
+                .unwrap()
         }
-    }*/
+    }
 
     #[test]
     fn test_get_difficulty_adjustment_height() {
-        const SAMPLES: usize = 100;
-        for _ in 0..SAMPLES {
-            let off = OsRng.gen_range(1..1000);
-            let start_h = get_difficulty_adjustment_start_height(off, &MAINNET.clone().into());
-            assert_eq!(
-                start_h % (MAINNET.difficulty_adjustment_interval() as u32),
-                0
-            );
-        }
+        let start = 0;
+        let idx = OsRng.gen_range(1..1000);
+        let h = get_relative_difficulty_adjustment_height(idx, start, &MAINNET);
+        assert_eq!(h, MAINNET.difficulty_adjustment_interval() * idx);
     }
 
     #[test]
     fn test_hash() {
         let chain = BtcChainSegment::load();
-        let r1 = 42000;
-        let verification_state = chain.get_verification_state(r1).unwrap();
+        let r1 = 45000;
+        let verification_state = chain.get_verification_state(r1, 0).unwrap();
         let hash = verification_state.compute_hash();
         assert!(hash.is_ok());
+    }
+
+    fn test_reorg(reorg: (u64, u64)) {
+        let chain = BtcChainSegment::load();
+
+        let reorg_len = (reorg.1 - reorg.0) as u32;
+        let reorg = reorg.0..reorg.1;
+        let headers: Vec<Header> = reorg
+            .clone()
+            .map(|h| chain.get_block_header_at(h).unwrap())
+            .collect();
+        let mut verification_state = chain
+            .get_verification_state(reorg.start - 1, reorg_len)
+            .unwrap();
+
+        for header in &headers {
+            verification_state
+                .check_and_update_full(header, &MAINNET)
+                .unwrap();
+        }
+        let before_vs = verification_state.clone();
+
+        verification_state
+            .reorg(&headers, &headers, &MAINNET)
+            .unwrap();
+
+        // We use the same headers for reorg to check if they are consistent
+        assert_eq!(before_vs, verification_state);
+    }
+
+    #[test]
+    fn test_reorgs() {
+        let chain = BtcChainSegment::load();
+        let h3 = get_relative_difficulty_adjustment_height(3, chain.start, &MAINNET);
+        let h4 = get_relative_difficulty_adjustment_height(4, chain.start, &MAINNET);
+        let h5 = get_relative_difficulty_adjustment_height(5, chain.start, &MAINNET);
+
+        // Reorg of 10 blocks with no difficulty adjustment in between
+        let reorg = (h3 + 100, h3 + 110);
+        test_reorg(reorg);
+
+        let reorg = (h4 + 100, h4 + 110);
+        test_reorg(reorg);
+
+        let reorg = (h5 + 100, h5 + 110);
+        test_reorg(reorg);
+
+        // Reorg of 10 blocks with difficulty adjustment in between
+        let reorg = (h3 - 5, h3 + 5);
+        test_reorg(reorg);
+
+        let reorg = (h4 - 5, h4 + 5);
+        test_reorg(reorg);
+
+        let reorg = (h5 - 5, h5 + 5);
+        test_reorg(reorg);
+
+        // Reorg exactly at the difficulty adjusted block
+        let reorg = (h3, h3 + 10);
+        test_reorg(reorg);
+
+        let reorg = (h4, h4 + 10);
+        test_reorg(reorg);
+
+        let reorg = (h5, h5 + 10);
+        test_reorg(reorg);
     }
 }

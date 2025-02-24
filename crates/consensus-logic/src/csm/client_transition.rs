@@ -462,9 +462,12 @@ mod tests {
 
         let horizon = params.rollup().horizon_l1_height as u64;
         let genesis = params.rollup().genesis_l1_height as u64;
+        let reorg_safe_depth = params.rollup().l1_reorg_safe_depth;
 
         let chain = BtcChainSegment::load();
-        let l1_verification_state = chain.get_verification_state(genesis + 1).unwrap();
+        let l1_verification_state = chain
+            .get_verification_state(genesis + 1, reorg_safe_depth)
+            .unwrap();
 
         let genesis_block = genesis::make_genesis_block(&params);
         let genesis_blockid = genesis_block.header().get_blockid();

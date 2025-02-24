@@ -47,7 +47,9 @@ pub fn process_l1_batch_proof(zkvm: &impl ZkVmEnv) {
         let block: Block = deserialize(&serialized_block).unwrap();
         let blockscan_result =
             process_blockscan(&block, &inclusion_proof, &rollup_params, &filter_config);
-        state.check_and_update_continuity(&block.header, &get_btc_params());
+        state
+            .check_and_update_continuity(&block.header, get_btc_params().inner())
+            .expect("failed to update header vs");
         deposits.extend(blockscan_result.deposits);
         prev_checkpoint = prev_checkpoint.or(blockscan_result.prev_checkpoint);
     }
