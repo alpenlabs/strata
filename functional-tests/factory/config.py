@@ -71,7 +71,7 @@ class ExecConfig:
 class RelayerConfig:
     refresh_interval: int = field(default=200)
     stale_duration: int = field(default=20)
-    relay_misc: bool = field(default=False)
+    relay_misc: bool = field(default=True)
 
 
 @dataclass
