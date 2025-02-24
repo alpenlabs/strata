@@ -52,6 +52,8 @@ jobs:
       environment: ${{ env.ENVIRONMENT }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Check changed files
         id: filter
         uses: dorny/paths-filter@v3
@@ -84,6 +86,8 @@ jobs:
       program: ${{ matrix.program }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Configure AWS ECR Details
         uses: aws-actions/configure-aws-credentials@v4
         with:
