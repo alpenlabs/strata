@@ -13,7 +13,10 @@ use strata_btcio::{
     rpc::{
         error::ClientError,
         traits::ReaderRpc,
-        types::{GetBlockchainInfo, GetTxOut},
+        types::{
+            GetBlockchainInfo, GetRawTransactionVerbosityOne, GetRawTransactionVerbosityZero,
+            GetTxOut,
+        },
         ClientResult,
     },
 };
@@ -195,6 +198,22 @@ impl ReaderRpc for BtcChainSegment {
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         // For our in-memory segment, we assume there are no unconfirmed transactions.
         Ok(vec![])
+    }
+
+    /// Gets a raw transaction by its [`Txid`].
+    async fn get_raw_transaction_verbosity_zero(
+        &self,
+        _txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityZero> {
+        unimplemented!()
+    }
+
+    /// Gets a raw transaction by its [`Txid`].
+    async fn get_raw_transaction_verbosity_one(
+        &self,
+        _txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityOne> {
+        unimplemented!()
     }
 
     /// Return an error as this functionality is not implemented.
