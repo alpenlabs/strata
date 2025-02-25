@@ -6,7 +6,9 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{epoch::EpochCommitment, l1::L1BlockCommitment, params::Params};
+use strata_primitives::{
+    buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment, params::Params,
+};
 use tracing::*;
 
 use crate::{
@@ -156,7 +158,7 @@ impl ClientState {
     pub fn get_verified_l1_height(&self, slot: u64) -> Option<u64> {
         self.get_last_checkpoint().and_then(|ckpt| {
             if ckpt.batch_info.includes_l2_block(slot) {
-                Some(ckpt.height)
+                Some(ckpt.l1_reference.block_height)
             } else {
                 None
             }
@@ -340,6 +342,26 @@ impl InternalState {
     }
 }
 
+/// Represents a reference to a transaction in bitcoin. Redundantly puts block_height a well.
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
+pub struct CheckpointL1Ref {
+    pub block_height: u64,
+    pub txid: Buf32,
+    pub wtxid: Buf32,
+}
+
+impl CheckpointL1Ref {
+    pub fn new(block_height: u64, txid: Buf32, wtxid: Buf32) -> Self {
+        Self {
+            block_height,
+            txid,
+            wtxid,
+        }
+    }
+}
+
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
@@ -353,9 +375,8 @@ pub struct L1Checkpoint {
     /// Reference state commitment against which batch transitions is verified.
     pub base_state_commitment: BaseStateCommitment,
 
-    /// L1 block height the checkpoint was found in.
-    // TODO remove this?
-    pub height: u64,
+    /// L1 reference for this checkpoint.
+    pub l1_reference: CheckpointL1Ref,
 }
 
 impl L1Checkpoint {
@@ -363,13 +384,13 @@ impl L1Checkpoint {
         batch_info: BatchInfo,
         batch_transition: BatchTransition,
         base_state_commitment: BaseStateCommitment,
-        height: u64,
+        l1_reference: CheckpointL1Ref,
     ) -> Self {
         Self {
             batch_info,
             batch_transition,
             base_state_commitment,
-            height,
+            l1_reference,
         }
     }
 }

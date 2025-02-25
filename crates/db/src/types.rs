@@ -11,8 +11,9 @@ use strata_primitives::{
     buf::Buf32,
     l1::payload::{L1Payload, PayloadIntent},
 };
-use strata_state::batch::{
-    BaseStateCommitment, BatchInfo, BatchTransition, Checkpoint, CommitmentInfo,
+use strata_state::{
+    batch::{BaseStateCommitment, BatchInfo, BatchTransition, Checkpoint, CommitmentInfo},
+    client_state::CheckpointL1Ref,
 };
 use zkaleido::Proof;
 
@@ -196,7 +197,7 @@ pub struct CheckpointEntry {
     pub confirmation_status: CheckpointConfStatus,
 
     /// checkpoint txn info
-    pub commitment: Option<CheckpointCommitment>,
+    pub l1_reference: Option<CheckpointL1Ref>,
 }
 
 impl CheckpointEntry {
@@ -204,13 +205,13 @@ impl CheckpointEntry {
         checkpoint: Checkpoint,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
-        commitment: Option<CheckpointCommitment>,
+        l1_reference: Option<CheckpointL1Ref>,
     ) -> Self {
         Self {
             checkpoint,
             proving_status,
             confirmation_status,
-            commitment,
+            l1_reference,
         }
     }
 
@@ -257,10 +258,10 @@ pub enum CheckpointProvingStatus {
 pub enum CheckpointConfStatus {
     /// Pending to be posted on L1
     Pending,
-    /// Confirmed on L1
-    Confirmed,
-    /// Finalized on L1
-    Finalized,
+    /// Confirmed on L1, with reference.
+    Confirmed(CheckpointL1Ref),
+    /// Finalized on L1, with reference
+    Finalized(CheckpointL1Ref),
 }
 
 // TODO: why is this needed? can this information be part of `L1Checkpoint`?

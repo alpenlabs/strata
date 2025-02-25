@@ -503,7 +503,7 @@ mod test {
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
         chain_state::Chainstate,
-        client_state::{ClientState, L1Checkpoint},
+        client_state::{CheckpointL1Ref, ClientState, L1Checkpoint},
     };
     use strata_status::ChainSyncStatusUpdate;
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
@@ -603,8 +603,7 @@ mod test {
         let mut ckpt: L1Checkpoint = ArbitraryGenerator::new().generate();
 
         let ckpt_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
-        ckpt.height = ckpt_height;
-
+        ckpt.l1_reference = CheckpointL1Ref::new(ckpt_height, Buf32::zero(), Buf32::zero());
         // This is a horrible hack to update the height.
         ckpt.batch_info.l1_range.1 =
             L1BlockCommitment::new(ckpt_height, *ckpt.batch_info.l1_range.1.blkid());

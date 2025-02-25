@@ -3,7 +3,7 @@
 
 use std::cmp::min;
 
-use bitcoin::block::Header;
+use bitcoin::{block::Header, Transaction};
 use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
 use strata_primitives::{
     batch::{verify_signed_checkpoint_sig, BatchInfo, Checkpoint},
@@ -149,8 +149,11 @@ fn handle_block(
             .get_internal_state(height - 1)
             .expect("clientstate: missing expected block state");
 
-        let new_istate = process_l1_block(prev_istate, height, block_mf, params.rollup())?;
+        let (new_istate, sync_actions) =
+            process_l1_block(prev_istate, height, block_mf, params.rollup())?;
         state.accept_l1_block_state(block, new_istate);
+        // Push actions from processing l1 block if any
+        state.push_actions(sync_actions.into_iter());
 
         // TODO make max states configurable
         let max_states = 20;
@@ -218,9 +221,10 @@ fn process_l1_block(
     height: u64,
     block_mf: &L1BlockManifest,
     params: &RollupParams,
-) -> Result<InternalState, Error> {
+) -> Result<(InternalState, Vec<SyncAction>), Error> {
     let blkid = block_mf.blkid();
     let mut checkpoint = state.last_checkpoint().cloned();
+    let mut sync_actions = Vec::new();
 
     // Iterate through all of the protocol operations in all of the txs.
     // TODO split out each proto op handling into a separate function
@@ -243,16 +247,24 @@ fn process_l1_block(
                         continue;
                     }
 
+                    let ckpt_ref = get_l1_reference(tx, height)?;
+
                     // Construct the state bookkeeping entry for the checkpoint.
                     let l1ckpt = L1Checkpoint::new(
                         ckpt.batch_info().clone(),
                         ckpt.batch_transition().clone(),
                         ckpt.base_state_commitment().clone(),
-                        height,
+                        ckpt_ref.clone(),
                     );
 
                     // If it all looks good then overwrite the saved checkpoint.
                     checkpoint = Some(l1ckpt);
+
+                    // Emit a sync action to update checkpoint entry in db
+                    sync_actions.push(SyncAction::UpdateCheckpointInclusion {
+                        epoch: ckpt.batch_info().epoch(),
+                        l1_reference: ckpt_ref,
+                    });
                 }
 
                 // The rest we don't care about here.  Maybe we will in the
@@ -261,8 +273,24 @@ fn process_l1_block(
             }
         }
     }
+    let istate = InternalState::new(*blkid, checkpoint);
 
-    Ok(InternalState::new(*blkid, checkpoint))
+    Ok((istate, sync_actions))
+}
+
+fn get_l1_reference(tx: &L1Tx, height: u64) -> Result<CheckpointL1Ref, Error> {
+    let btx: Transaction = tx.tx_data().try_into().map_err(|e| {
+        warn!(%height, "Invalid bitcoin transaction data in L1Tx");
+        let msg = format!(
+            "Invalid bitcoin transaction data in L1Tx at height {}",
+            height
+        );
+        Error::Other(msg)
+    })?;
+
+    let txid = btx.compute_txid().into();
+    let wtxid = btx.compute_wtxid().into();
+    Ok(CheckpointL1Ref::new(height, txid, wtxid))
 }
 
 #[cfg(test)]

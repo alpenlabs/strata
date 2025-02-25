@@ -19,6 +19,7 @@ use strata_state::{
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     bridge_state::{DepositEntry, DepositState},
+    client_state::CheckpointL1Ref,
     id::L2BlockId,
     l1::L1BlockId,
 };
@@ -320,8 +321,8 @@ impl From<CheckpointConfStatus> for RpcCheckpointConfStatus {
     fn from(value: CheckpointConfStatus) -> Self {
         match value {
             CheckpointConfStatus::Pending => Self::Pending,
-            CheckpointConfStatus::Confirmed => Self::Confirmed,
-            CheckpointConfStatus::Finalized => Self::Finalized,
+            CheckpointConfStatus::Confirmed(_) => Self::Confirmed,
+            CheckpointConfStatus::Finalized(_) => Self::Finalized,
         }
     }
 }
@@ -341,9 +342,9 @@ pub struct RpcCheckpointInfo {
     /// L2 range the checkpoint covers
     pub l2_range: (L2BlockCommitment, L2BlockCommitment),
     /// Info on txn where checkpoint is committed on chain
-    pub commitment: Option<RpcCheckpointCommitmentInfo>,
+    pub l1_reference: Option<CheckpointL1Ref>,
     /// Confirmation status of checkpoint
-    pub confirmation_status: Option<RpcCheckpointConfStatus>,
+    pub confirmation_status: RpcCheckpointConfStatus,
 }
 
 impl From<BatchInfo> for RpcCheckpointInfo {
@@ -352,8 +353,8 @@ impl From<BatchInfo> for RpcCheckpointInfo {
             idx: value.epoch,
             l1_range: value.l1_range,
             l2_range: value.l2_range,
-            commitment: None,
-            confirmation_status: None,
+            l1_reference: None,
+            confirmation_status: RpcCheckpointConfStatus::Pending,
         }
     }
 }
@@ -361,8 +362,12 @@ impl From<BatchInfo> for RpcCheckpointInfo {
 impl From<CheckpointEntry> for RpcCheckpointInfo {
     fn from(value: CheckpointEntry) -> Self {
         let mut item: Self = value.checkpoint.batch_info().clone().into();
-        item.commitment = value.commitment.map(Into::into);
-        item.confirmation_status = Some(value.confirmation_status.into());
+        item.l1_reference = match value.confirmation_status.clone() {
+            CheckpointConfStatus::Pending => None,
+            CheckpointConfStatus::Confirmed(lref) => Some(lref),
+            CheckpointConfStatus::Finalized(lref) => Some(lref),
+        };
+        item.confirmation_status = value.confirmation_status.into();
         item
     }
 }

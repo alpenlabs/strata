@@ -318,25 +318,60 @@ fn apply_action(
     _status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     match action {
-        SyncAction::FinalizeEpoch(epoch) => {
+        SyncAction::FinalizeEpoch(epoch_comm) => {
             // For the fork choice manager this gets picked up later.  We don't have
             // to do anything here *necessarily*.
-            info!(?epoch, "finalizing epoch");
+            info!(?epoch_comm, "finalizing epoch");
 
             strata_common::check_bail_trigger("sync_event_finalize_epoch");
 
             // TODO error checking here
-            engine.update_finalized_block(*epoch.last_blkid())?;
+            engine.update_finalized_block(*epoch_comm.last_blkid())?;
 
             // Write that the checkpoint is finalized.
             //
             // TODO In the future we should just be able to determine this on the fly.
-            let ckman = state.storage.checkpoint();
-            update_checkpoint_status(
-                epoch.epoch(),
-                CheckpointConfStatus::Finalized,
-                ckman.as_ref(),
-            )?;
+            let epoch = epoch_comm.epoch();
+            let Some(mut ckpt_entry) = state.storage.checkpoint().get_checkpoint_blocking(epoch)?
+            else {
+                warn!(%epoch, "missing checkpoint we wanted to set the state of, ignoring");
+                return Ok(());
+            };
+
+            let CheckpointConfStatus::Confirmed(l1ref) = ckpt_entry.confirmation_status else {
+                warn!(
+                    ?epoch_comm,
+                    ?ckpt_entry.confirmation_status,
+                    "Expected epoch checkpoint to be confirmed in db, but has different status"
+                );
+                return Ok(());
+            };
+
+            // Mark it as finalized.
+            ckpt_entry.confirmation_status = CheckpointConfStatus::Finalized(l1ref);
+            state
+                .storage
+                .checkpoint()
+                .put_checkpoint_blocking(epoch, ckpt_entry)?;
+        }
+
+        // Update checkpoint entry in database to mark it as included in L1.
+        SyncAction::UpdateCheckpointInclusion {
+            epoch,
+            l1_reference,
+        } => {
+            let Some(mut ckpt_entry) = state.storage.checkpoint().get_checkpoint_blocking(epoch)?
+            else {
+                warn!(%epoch, "missing checkpoint we wanted to set the state of, ignoring");
+                return Ok(());
+            };
+
+            ckpt_entry.confirmation_status = CheckpointConfStatus::Confirmed(l1_reference);
+
+            state
+                .storage
+                .checkpoint()
+                .put_checkpoint_blocking(epoch, ckpt_entry)?;
         }
 
         SyncAction::L2Genesis(l1blkid) => {
