@@ -52,6 +52,16 @@ pub fn get_config(args: Args) -> Result<Config, InitError> {
     config_toml
         .try_into::<Config>()
         .map_err(|e| InitError::Anyhow(e.into()))
+        .and_then(validate_config)
+}
+
+/// Does any extra validations that need to be done for `Config` which are not enforced by type.
+fn validate_config(config: Config) -> Result<Config, InitError> {
+    // Check if the client is not running as sequencer then has sync endpoint.
+    if !config.client.is_sequencer && config.client.sync_endpoint.is_none() {
+        return Err(InitError::Anyhow(anyhow::anyhow!("Missing sync_endpoint")));
+    }
+    Ok(config)
 }
 
 fn load_configuration(path: &Path) -> Result<toml::Value, InitError> {
