@@ -1,23 +1,30 @@
-use strata_primitives::params::RollupParams;
+use borsh::{BorshDeserialize, BorshSerialize};
+use strata_primitives::{buf::Buf32, params::RollupParams};
+use strata_state::{block::L2Block, chain_state::Chainstate};
 use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
     ZkVmResult,
 };
 
-use crate::L2BatchProofOutput;
-
 pub struct ClStfInput {
     pub rollup_params: RollupParams,
-    pub stf_witness_payloads: Vec<Vec<u8>>,
-    pub evm_ee_proof: ProofReceipt,
-    pub evm_ee_vk: VerificationKey,
+    pub chainstate: Chainstate,
+    pub l2_blocks: Vec<L2Block>,
+    pub evm_ee_proof_with_vk: (ProofReceipt, VerificationKey),
+    pub btc_blockspace_proof_with_vk: (ProofReceipt, VerificationKey),
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct ClStfOutput {
+    pub initial_chainstate_root: Buf32,
+    pub final_chainstate_root: Buf32,
 }
 
 pub struct ClStfProver;
 
 impl ZkVmProver for ClStfProver {
     type Input = ClStfInput;
-    type Output = L2BatchProofOutput;
+    type Output = ClStfOutput;
 
     fn name() -> String {
         "CL STF".to_string()
@@ -33,15 +40,14 @@ impl ZkVmProver for ClStfProver {
     {
         let mut input_builder = B::new();
         input_builder.write_serde(&input.rollup_params)?;
-        input_builder.write_proof(&AggregationInput::new(
-            input.evm_ee_proof.clone(),
-            input.evm_ee_vk.clone(),
-        ))?;
+        input_builder.write_borsh(&input.chainstate)?;
+        input_builder.write_borsh(&input.l2_blocks)?;
 
-        input_builder.write_serde(&input.stf_witness_payloads.len())?;
-        for cl_stf_input in &input.stf_witness_payloads {
-            input_builder.write_buf(cl_stf_input)?;
-        }
+        let (proof, vk) = input.evm_ee_proof_with_vk.clone();
+        input_builder.write_proof(&AggregationInput::new(proof, vk))?;
+
+        let (proof, vk) = input.btc_blockspace_proof_with_vk.clone();
+        input_builder.write_proof(&AggregationInput::new(proof, vk))?;
 
         input_builder.build()
     }

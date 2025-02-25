@@ -6,7 +6,7 @@ use bitcoin::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
-use strata_primitives::l1::{DaCommitment, DepositInfo, L1TxProof, ProtocolOperation};
+use strata_primitives::l1::{L1TxProof, ProtocolOperation};
 use zkaleido::ZkVmEnv;
 
 use crate::{block::check_integrity, tx_indexer::ProverTxVisitorImpl};
@@ -17,10 +17,8 @@ use crate::{block::check_integrity, tx_indexer::ProverTxVisitorImpl};
 pub struct BlockScanResult {
     /// Raw header of the block that we procesed
     pub raw_header: [u8; 80],
-    /// Deposits that we found in the block
-    pub deposits: Vec<DepositInfo>,
-    /// DA Commitments that we found in the block
-    pub da_commitments: Vec<DaCommitment>,
+    /// Protocol Operations that we found after scanning the block
+    pub protocol_ops: Vec<ProtocolOperation>,
 }
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
@@ -59,20 +57,11 @@ pub fn process_blockscan_proof(zkvm: &impl ZkVmEnv) {
         assert!(check_integrity(&block, &inclusion_proof), "invalid block");
 
         // 3. Index the block for protocol ops
-        let protocol_ops = index_block(&block, ProverTxVisitorImpl::new, &tx_filters);
-
-        // 4. Collect deposits and DA commitments of a block
-        let mut deposits = Vec::new();
-        let mut da_commitments = Vec::new();
-        for tx_entry in protocol_ops.into_iter() {
-            for op in tx_entry.into_contents() {
-                match op {
-                    ProtocolOperation::Deposit(deposit) => deposits.push(deposit),
-                    ProtocolOperation::DaCommitment(commitment) => da_commitments.push(commitment),
-                    _ => {} // ignore other variants
-                }
-            }
-        }
+        let protocol_ops: Vec<ProtocolOperation> =
+            index_block(&block, ProverTxVisitorImpl::new, &tx_filters)
+                .into_iter()
+                .flat_map(|entry| entry.into_contents())
+                .collect();
 
         // 5. Create the blockscan result and append to blockscan results
         let raw_header = serialize(&block.header)
@@ -80,8 +69,7 @@ pub fn process_blockscan_proof(zkvm: &impl ZkVmEnv) {
             .expect("bitcoin block header is 80 bytes");
         let result = BlockScanResult {
             raw_header,
-            deposits,
-            da_commitments,
+            protocol_ops,
         };
         blockscan_results.push(result);
     }
