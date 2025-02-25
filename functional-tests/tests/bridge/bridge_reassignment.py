@@ -24,7 +24,7 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
         fast_batch_settings = net_settings.get_fast_batch_settings()
         ctx.set_env(
             testenv.BasicEnvConfig(
-                101,
+                110,
                 n_operators=2,
                 pre_fund_addrs=True,
                 duty_timeout_duration=10,
@@ -69,6 +69,11 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
         self.deposit(ctx, el_address, bridge_pk)
         self.deposit(ctx, el_address, bridge_pk)
 
+        # `self.deposit()` might perform deposit from balance in this address,
+        # so get original balance AFTER deposits
+        original_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
+        self.info(f"BTC balance before withdraw: {original_balance}")
+
         # withdraw
         xonlypk = extract_p2tr_pubkey(withdraw_address)
         self.debug(f"XOnly PK: {xonlypk}")
@@ -107,7 +112,7 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
             error_with="No new operator was assigned",
         )["payload"]["assigned_operator_idx"]
 
-        self.debug(f"new assigned operator: {new_assigned_op_idx}")
+        self.info(f"new assigned operator: {new_assigned_op_idx}")
 
         # Ensure a new operator is assigned
         assigned_operator.start()
