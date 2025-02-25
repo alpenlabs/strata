@@ -292,6 +292,7 @@ fn exec_genparams(cmd: SubcParams, ctx: &mut CmdContext) -> anyhow::Result<()> {
         // TODO make these consts
         block_time_sec: cmd.block_time.unwrap_or(15),
         epoch_slots: cmd.epoch_slots.unwrap_or(64),
+        horizon_height: cmd.horizon_height.unwrap_or(90),
         genesis_trigger: cmd.genesis_trigger_height.unwrap_or(100),
         seqkey,
         opkeys,
@@ -441,6 +442,8 @@ pub struct ParamsConfig {
     block_time_sec: u64,
     /// Number of slots in an epoch.
     epoch_slots: u32,
+    /// Height at which the we start reading L1 (< genesis_trigger).
+    horizon_height: u64,
     /// Height at which the genesis block is triggered.
     genesis_trigger: u64,
     /// Sequencer's key.
@@ -485,7 +488,7 @@ fn construct_params(config: ParamsConfig) -> RollupParams {
         checkpoint_tag: config.checkpoint_tag,
         cred_rule: cr,
         // TODO do we want to remove this?
-        horizon_l1_height: config.genesis_trigger / 2,
+        horizon_l1_height: config.horizon_height,
         genesis_l1_height: config.genesis_trigger,
         operator_config: strata_primitives::params::OperatorConfig::Static(opkeys),
         evm_genesis_block_hash: config.evm_genesis_info.blockhash.0.into(),
