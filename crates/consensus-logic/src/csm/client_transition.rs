@@ -202,14 +202,6 @@ fn handle_block(
         state.push_action(SyncAction::FinalizeEpoch(*decl_epoch));
     }
 
-    // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
-    let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
-    let maturable_height = next_exp_height.saturating_sub(safe_depth);
-
-    if maturable_height > params.rollup().horizon_l1_height && state.state().is_chain_active() {
-        handle_mature_l1_height(state, maturable_height, context);
-    }
-
     Ok(())
 }
 
@@ -271,83 +263,6 @@ fn process_l1_block(
     }
 
     Ok(InternalState::new(*blkid, checkpoint))
-}
-
-/// Handles the maturation of L1 height by finalizing checkpoints and emitting
-/// sync actions.
-///
-/// This function checks if there are any verified checkpoints at or before the
-/// given `maturable_height`. If such checkpoints exist, it attempts to
-/// finalize them by checking if the corresponding L2 block is available in the
-/// L2 database. If the L2 block is found, it marks the checkpoint as finalized
-/// and emits a sync action to finalize the L2 block. If the L2 block is not
-/// found, it logs a warning and skips the finalization.
-///
-/// # Arguments
-///
-/// * `state` - A reference to the current client state.
-/// * `maturable_height` - The height at which L1 blocks are considered mature.
-/// * `database` - A reference to the database interface.
-///
-/// # Returns
-///
-/// A tuple containing:
-/// * A vector of [`ClientStateWrite`] representing the state changes to be written.
-/// * A vector of [`SyncAction`] representing the actions to be synchronized.
-fn handle_mature_l1_height(
-    state: &mut ClientStateMut,
-    maturable_height: u64,
-    context: &impl EventContext,
-) -> Result<(), Error> {
-    // If there are no checkpoints then return early.
-    if !state
-        .state()
-        .has_verified_checkpoint_before(maturable_height)
-    {
-        return Ok(());
-    }
-
-    // If there *are* checkpoints at or before the maturable height, mark them
-    // as finalized
-    if let Some(checkpt) = state
-        .state()
-        .get_last_verified_checkpoint_before(maturable_height)
-    {
-        // FinalizeBlock Should only be applied when l2_block is actually
-        // available in l2_db
-        // If l2 blocks is not in db then finalization will happen when
-        // l2Block is fetched from the network and the corresponding
-        //checkpoint is already finalized.
-        let epoch = checkpt.batch_info.get_epoch_commitment();
-        let blkid = *epoch.last_blkid();
-
-        match context.get_l2_block_data(&blkid) {
-            Ok(_) => {
-                // Emit sync action for finalizing an epoch
-                trace!(%maturable_height, %blkid, "epoch terminal block found in DB, emitting FinalizedEpoch action");
-                state.push_action(SyncAction::FinalizeEpoch(epoch));
-            }
-
-            // TODO figure out how to make this not matter
-            Err(Error::MissingL2Block(_)) => {
-                warn!(
-                    %maturable_height, ?epoch, "epoch terminal not in DB yet, skipping finalization"
-                );
-            }
-
-            Err(e) => {
-                error!(%blkid, err = %e, "error while checking for block present");
-                return Err(e);
-            }
-        }
-    } else {
-        warn!(
-        %maturable_height,
-        "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
-        );
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

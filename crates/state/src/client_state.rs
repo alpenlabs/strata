@@ -150,23 +150,6 @@ impl ClientState {
             .and_then(|st| st.last_checkpoint())
     }
 
-    /// Checks if there is any checkpoint available at or before the given height.
-    // TODO handling if we ask for a block outside this range
-    pub fn has_verified_checkpoint_before(&self, height: u64) -> bool {
-        match self.int_states.get_absolute(height) {
-            Some(istate) => istate.last_checkpoint().is_some(),
-            None => false,
-        }
-    }
-
-    /// Gets the last verified checkpoint found as of some L1 height.
-    // TODO handling if we ask for a block outside this range
-    pub fn get_last_verified_checkpoint_before(&self, height: u64) -> Option<&L1Checkpoint> {
-        self.int_states
-            .get_absolute(height)
-            .and_then(|ck| ck.last_checkpoint())
-    }
-
     /// Gets the height that an L2 block was last verified at, if it was
     /// verified.
     // FIXME this is a weird function, what purpose does this serve?
@@ -354,11 +337,6 @@ impl InternalState {
         self.last_checkpoint
             .as_ref()
             .map(|ck| ck.batch_info.final_l1_block())
-    }
-
-    /// Returns the height that the last checkpoint was included at, if there was one..
-    pub fn last_checkpoint_height(&self) -> Option<u64> {
-        self.last_checkpoint.as_ref().map(|ck| ck.height)
     }
 }
 
