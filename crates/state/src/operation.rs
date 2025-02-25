@@ -60,12 +60,3 @@ pub enum SyncAction {
     /// as the genesis lock-in block.
     L2Genesis(L1BlockId),
 }
-
-/*
-    /// Indicates to the worker to write the checkpoints to checkpoint db
-    WriteCheckpoints(u64, Vec<L1CommittedCheckpoint>),
-
-    /// Indicates the worker to write the checkpoints to checkpoint db that appear in given L1
-    /// height
-    FinalizeCheckpoints(u64, Vec<L1CommittedCheckpoint>),
-*/

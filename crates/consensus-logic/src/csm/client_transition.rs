@@ -6,7 +6,7 @@ use std::cmp::min;
 use bitcoin::block::Header;
 use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
 use strata_primitives::{
-    batch::{verify_signed_checkpoint_sig, BatchInfo, Checkpoint, L1CommittedCheckpoint},
+    batch::{verify_signed_checkpoint_sig, BatchInfo, Checkpoint},
     l1::{get_btc_params, HeaderVerificationState, L1BlockCommitment, L1BlockId},
     prelude::*,
 };
@@ -232,8 +232,8 @@ fn process_l1_block(
 
     // Iterate through all of the protocol operations in all of the txs.
     // TODO split out each proto op handling into a separate function
-    for txs in block_mf.txs() {
-        for op in txs.protocol_ops() {
+    for tx in block_mf.txs() {
+        for op in tx.protocol_ops() {
             match op {
                 ProtocolOperation::Checkpoint(signed_ckpt) => {
                     // Before we do anything, check its signature.
@@ -349,23 +349,6 @@ fn handle_mature_l1_height(
     }
 
     Ok(())
-}
-
-/// Searches for a given [`L2BlockId`] within a slice of [`L1Checkpoint`] structs
-/// and returns the height of the corresponding L1 block if found.
-fn find_l1_height_for_l2_blockid(
-    checkpoints: &[L1Checkpoint],
-    target_l2_blockid: &L2BlockId,
-) -> Option<u64> {
-    checkpoints
-        .binary_search_by(|checkpoint| {
-            checkpoint
-                .batch_info
-                .final_l2_blockid()
-                .cmp(target_l2_blockid)
-        })
-        .ok()
-        .map(|index| checkpoints[index].height)
 }
 
 #[cfg(test)]

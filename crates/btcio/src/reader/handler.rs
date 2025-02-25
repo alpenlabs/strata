@@ -1,13 +1,11 @@
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
-    batch::{verify_signed_checkpoint_sig, Checkpoint, CommitmentInfo, L1CommittedCheckpoint},
     buf::Buf32,
     l1::{
         generate_l1_tx, HeaderVerificationState, L1BlockCommitment, L1BlockManifest,
-        L1HeaderRecord, L1Tx, ProtocolOperation,
+        L1HeaderRecord, L1Tx,
     },
-    params::RollupParams,
 };
 use strata_state::sync_event::{EventSubmitter, SyncEvent};
 use tracing::*;
@@ -77,46 +75,6 @@ async fn handle_blockdata<R: ReaderRpc>(
     sync_evs.push(SyncEvent::L1Block(block_commitment));
 
     Ok(sync_evs)
-}
-
-/// Extracts checkpoints from the block.
-fn find_checkpoints(blockdata: &BlockData, params: &RollupParams) -> Vec<L1CommittedCheckpoint> {
-    blockdata
-        .relevant_txs()
-        .iter()
-        .flat_map(|txref| {
-            txref.contents().protocol_ops().iter().map(|x| match x {
-                ProtocolOperation::Checkpoint(envelope) => Some((
-                    envelope,
-                    &blockdata.block().txdata[txref.index() as usize],
-                    txref.index(),
-                )),
-                _ => None,
-            })
-        })
-        .filter_map(|ckpt_data| {
-            let (signed_checkpoint, tx, position) = ckpt_data?;
-            if !verify_signed_checkpoint_sig(signed_checkpoint, &params.cred_rule) {
-                error!(
-                    ?tx,
-                    ?signed_checkpoint,
-                    "signature verification failed on checkpoint"
-                );
-                return None;
-            }
-
-            let checkpoint: Checkpoint = signed_checkpoint.clone().into();
-
-            let blockhash = (*blockdata.block().block_hash().as_byte_array()).into();
-            let txid = (*tx.compute_txid().as_byte_array()).into();
-            let wtxid = (*tx.compute_wtxid().as_byte_array()).into();
-            let block_height = blockdata.block_num();
-            let commitment_info =
-                CommitmentInfo::new(blockhash, txid, wtxid, block_height, position);
-
-            Some(L1CommittedCheckpoint::new(checkpoint, commitment_info))
-        })
-        .collect()
 }
 
 /// Given a block, generates a manifest of the parts we care about that we can
