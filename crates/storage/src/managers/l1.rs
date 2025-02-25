@@ -3,6 +3,7 @@ use std::sync::Arc;
 use strata_db::{traits::L1Database, DbError, DbResult};
 use strata_primitives::l1::{L1BlockId, L1BlockManifest, L1Tx, L1TxRef};
 use threadpool::ThreadPool;
+use tracing::error;
 
 use crate::{cache::CacheTable, ops};
 
@@ -12,7 +13,6 @@ pub struct L1BlockManager {
     manifest_cache: CacheTable<L1BlockId, Option<L1BlockManifest>>,
     txs_cache: CacheTable<L1BlockId, Option<Vec<L1TxRef>>>,
     blockheight_cache: CacheTable<u64, Option<L1BlockId>>,
-    chaintip_cache: CacheTable<(), Option<(u64, L1BlockId)>>,
 }
 
 impl L1BlockManager {
@@ -22,13 +22,11 @@ impl L1BlockManager {
         let manifest_cache = CacheTable::new(64.try_into().unwrap());
         let txs_cache = CacheTable::new(64.try_into().unwrap());
         let blockheight_cache = CacheTable::new(64.try_into().unwrap());
-        let chaintip_cache = CacheTable::new(1.try_into().unwrap());
         Self {
             ops,
             manifest_cache,
             txs_cache,
             blockheight_cache,
-            chaintip_cache,
         }
     }
 
@@ -58,6 +56,7 @@ impl L1BlockManager {
 
         if let Some((tip_height, tip_blockid)) = self.get_canonical_chain_tip()? {
             if height != tip_height + 1 {
+                error!(expected = %(tip_height + 1), got = %height, "attempted to extend canonical chain out of order");
                 return Err(DbError::OooInsert("l1block", height));
             }
 
@@ -66,7 +65,6 @@ impl L1BlockManager {
             }
         };
 
-        self.chaintip_cache.clear();
         self.ops
             .set_canonical_chain_entry_blocking(height, *blockid)
     }
@@ -82,6 +80,7 @@ impl L1BlockManager {
 
         if let Some((tip_height, tip_blockid)) = self.get_canonical_chain_tip_async().await? {
             if height != tip_height + 1 {
+                error!(expected = %(tip_height + 1), got = %height, "attempted to extend canonical chain out of order");
                 return Err(DbError::OooInsert("l1block", height));
             }
 
@@ -90,7 +89,6 @@ impl L1BlockManager {
             }
         };
 
-        self.chaintip_cache.clear();
         self.ops
             .set_canonical_chain_entry_async(height, *blockid)
             .await
@@ -103,7 +101,6 @@ impl L1BlockManager {
             // no chain to revert
             // but clear cache anyway for sanity
             self.blockheight_cache.clear();
-            self.chaintip_cache.clear();
             return Err(DbError::L1CanonicalChainEmpty);
         };
 
@@ -114,7 +111,6 @@ impl L1BlockManager {
         // clear item from cache for range height +1..=tip_height
         self.blockheight_cache
             .purge_if(|h| height < *h && *h <= tip_height);
-        self.chaintip_cache.clear();
 
         self.ops
             .remove_canonical_chain_entries_blocking(height + 1, tip_height)
@@ -127,7 +123,7 @@ impl L1BlockManager {
             // no chain to revert
             // but clear cache anyway for sanity
             self.blockheight_cache.clear();
-            self.chaintip_cache.clear();
+
             return Err(DbError::L1CanonicalChainEmpty);
         };
 
@@ -138,7 +134,6 @@ impl L1BlockManager {
         // clear item from cache for range height +1..=tip_height
         self.blockheight_cache
             .purge_if(|h| height < *h && *h <= tip_height);
-        self.chaintip_cache.clear();
 
         self.ops
             .remove_canonical_chain_entries_async(height + 1, tip_height)
@@ -147,15 +142,12 @@ impl L1BlockManager {
 
     // Get tracked canonical chain tip height and blockid.
     pub fn get_canonical_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>> {
-        self.chaintip_cache
-            .get_or_fetch_blocking(&(), || self.ops.get_canonical_chain_tip_blocking())
+        self.ops.get_canonical_chain_tip_blocking()
     }
 
     // Get tracked canonical chain tip height and blockid.
     pub async fn get_canonical_chain_tip_async(&self) -> DbResult<Option<(u64, L1BlockId)>> {
-        self.chaintip_cache
-            .get_or_fetch(&(), || self.ops.get_canonical_chain_tip_chan())
-            .await
+        self.ops.get_canonical_chain_tip_async().await
     }
 
     // Get tracked canonical chain tip height.
