@@ -483,6 +483,6 @@ pub fn verify_signed_checkpoint_sig(
     verify_schnorr_sig(
         signed_checkpoint.signature(),
         &checkpoint_sighash,
-        &seq_pubkey,
+        seq_pubkey,
     )
 }
