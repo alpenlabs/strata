@@ -102,26 +102,26 @@ def main(argv):
         "load_generator": load_gen_fac,
     }
 
-    reth_load_env = testenv.LoadEnvConfig(101)
+    reth_load_env = testenv.LoadEnvConfig(110)
     reth_load_env.with_load_builder(
         RethLoadConfigBuilder().with_jobs([BasicRethBlockJob, BasicRethTxJob]).with_rate(30)
     )
 
     global_envs = {
         # Basic env is the default env for all tests.
-        "basic": testenv.BasicEnvConfig(101),
+        "basic": testenv.BasicEnvConfig(110),
         # Operator lag is a test that checks if the bridge can handle operator lag.
         # It is also useful for testing the reclaim path.
-        "operator_lag": testenv.BasicEnvConfig(101, message_interval=10 * 60 * 1_000),
+        "operator_lag": testenv.BasicEnvConfig(110, message_interval=10 * 60 * 1_000),
         # Devnet production env
-        "devnet": testenv.BasicEnvConfig(101, custom_chain="devnet"),
+        "devnet": testenv.BasicEnvConfig(110, custom_chain="devnet"),
         "hub1": testenv.HubNetworkEnvConfig(
-            2
+            110
         ),  # TODO: Need to generate at least horizon blocks, based on params
-        "prover": testenv.BasicEnvConfig(101, rollup_settings=RollupParamsSettings.new_default().strict_mode()),
+        "prover": testenv.BasicEnvConfig(110, rollup_settings=RollupParamsSettings.new_default().strict_mode()),
         "load_reth": reth_load_env,
         # separate env for running crash_* tests
-        "crash": testenv.BasicEnvConfig(101),
+        "crash": testenv.BasicEnvConfig(110),
     }
 
     setup_root_logger()

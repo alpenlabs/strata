@@ -167,7 +167,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 # Also, leave a log-message to indicate that the setup is little inconsistent.
                 if self.pre_generate_blocks < 110:
                     print(
-                        "Env setup: pre_fund_addrs is enabled, specify pre_generate_blocks >= 101."
+                        "Env setup: pre_fund_addrs is enabled, specify pre_generate_blocks >= 110."
                     )
                     self.pre_generate_blocks = 110
 
