@@ -256,7 +256,6 @@ fn process_l1_block(
                         ckpt.batch_info().clone(),
                         ckpt.batch_transition().clone(),
                         ckpt.base_state_commitment().clone(),
-                        !ckpt.proof().is_empty(),
                         height,
                     );
 

@@ -375,9 +375,6 @@ pub struct L1Checkpoint {
     /// Reference state commitment against which batch transitions is verified.
     pub base_state_commitment: BaseStateCommitment,
 
-    /// If the checkpoint included proof.
-    pub is_proved: bool,
-
     /// L1 block height the checkpoint was found in.
     // TODO remove this?
     pub height: u64,
@@ -388,14 +385,12 @@ impl L1Checkpoint {
         batch_info: BatchInfo,
         batch_transition: BatchTransition,
         base_state_commitment: BaseStateCommitment,
-        is_proved: bool,
         height: u64,
     ) -> Self {
         Self {
             batch_info,
             batch_transition,
             base_state_commitment,
-            is_proved,
             height,
         }
     }
