@@ -11,6 +11,7 @@ pub enum L1Event {
     /// Data that contains block number, block and relevant transactions, and also the epoch whose
     /// rules are applied to. In most cases, the [`HeaderVerificationState`] is `None`, with a
     /// meaningful state provided only under during genesis
+    // TODO: handle this properly: https://alpenlabs.atlassian.net/browse/STR-1104
     BlockData(BlockData, u64, Option<HeaderVerificationState>),
 
     /// Revert to the provided block height

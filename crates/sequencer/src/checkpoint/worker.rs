@@ -409,34 +409,6 @@ fn create_checkpoint_prep_data_from_summary(
     let l1_start_block = L1BlockCommitment::new(l1_start_height, *l1_start_mf.blkid());
     let l1_range = (l1_start_block, *summary.new_l1());
 
-    // Compute the new L1 sync state commitments.
-    let l1_transition = {
-        let prev_epoch_final_blocknum = l1_start_height - 1;
-        let prev_mf = l1man
-            .get_block_manifest_at_height(prev_epoch_final_blocknum)?
-            .ok_or(DbError::MissingL1Block(prev_epoch_final_blocknum))?;
-        let current_epoch_final_blocknum = summary.new_l1().height();
-        let mf = l1man
-            .get_block_manifest_at_height(current_epoch_final_blocknum)?
-            .ok_or(DbError::MissingL1Block(current_epoch_final_blocknum))?;
-
-        warn!(%epoch, %prev_epoch_final_blocknum, %current_epoch_final_blocknum, "Compute the new L1 sync state commitments");
-
-        (
-            prev_mf
-                .header_verification_state()
-                .as_ref()
-                .unwrap()
-                .compute_hash()
-                .expect("compute vs hash"),
-            mf.header_verification_state()
-                .as_ref()
-                .unwrap()
-                .compute_hash()
-                .expect("compute vs hash"),
-        )
-    };
-
     // Now just pull out the data about the blocks from the transition here.
     //
     // There's a slight weirdness here.  The "range" refers to the first block

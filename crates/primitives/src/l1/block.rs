@@ -143,6 +143,7 @@ pub struct L1BlockManifest {
     /// headers
     /// For all subsequent blocks, this field is `None`. It is used during the initialization of
     /// the Chainstate to bootstrap the header verification process.
+    // TODO: handle this properly: https://alpenlabs.atlassian.net/browse/STR-1104
     verif_state: Option<HeaderVerificationState>,
 
     /// List of interesting transactions we took out.
