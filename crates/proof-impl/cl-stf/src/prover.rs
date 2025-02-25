@@ -11,7 +11,7 @@ pub struct ClStfInput {
     pub chainstate: Chainstate,
     pub l2_blocks: Vec<L2Block>,
     pub evm_ee_proof_with_vk: (ProofReceipt, VerificationKey),
-    pub btc_blockspace_proof_with_vk: (ProofReceipt, VerificationKey),
+    pub btc_blockspace_proof_with_vk: Option<(ProofReceipt, VerificationKey)>,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
@@ -43,10 +43,17 @@ impl ZkVmProver for ClStfProver {
         input_builder.write_borsh(&input.chainstate)?;
         input_builder.write_borsh(&input.l2_blocks)?;
 
-        let (proof, vk) = input.evm_ee_proof_with_vk.clone();
-        input_builder.write_proof(&AggregationInput::new(proof, vk))?;
+        match input.btc_blockspace_proof_with_vk.clone() {
+            Some((proof, vk)) => {
+                input_builder.write_serde(&true)?;
+                input_builder.write_proof(&AggregationInput::new(proof, vk))?;
+            }
+            None => {
+                input_builder.write_serde(&false)?;
+            }
+        };
 
-        let (proof, vk) = input.btc_blockspace_proof_with_vk.clone();
+        let (proof, vk) = input.evm_ee_proof_with_vk.clone();
         input_builder.write_proof(&AggregationInput::new(proof, vk))?;
 
         input_builder.build()

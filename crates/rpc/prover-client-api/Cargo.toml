@@ -15,7 +15,6 @@ rustdoc.all = "warn"
 [dependencies]
 strata-primitives.workspace = true
 strata-rpc-types.workspace = true
-strata-state.workspace = true
 zkaleido.workspace = true
 
 jsonrpsee = { workspace = true, features = ["server", "macros"] }

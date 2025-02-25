@@ -1,4 +1,4 @@
-use strata_proofimpl_cl_stf::L2BatchProofOutput;
+use strata_proofimpl_cl_stf::prover::ClStfOutput;
 use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
     ZkVmResult,
@@ -13,7 +13,7 @@ pub struct ClAggProver;
 
 impl ZkVmProver for ClAggProver {
     type Input = ClAggInput;
-    type Output = L2BatchProofOutput;
+    type Output = ClStfOutput;
 
     fn name() -> String {
         "CL Agg".to_string()

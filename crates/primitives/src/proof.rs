@@ -61,7 +61,7 @@ impl RollupVerifyingKey {
 )]
 pub enum ProofContext {
     /// Identifier representing a Bitcoin L1 block for blockscan proof
-    BtcBlockspace(L1BlockId),
+    BtcBlockspace(L1BlockId, L1BlockId),
 
     /// Identifier for a batch of L1 blocks being proven.
     /// Includes the starting and ending block heights.

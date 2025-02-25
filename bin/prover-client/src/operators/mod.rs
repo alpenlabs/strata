@@ -28,10 +28,8 @@ use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
 pub mod btc;
 pub mod checkpoint;
-pub mod cl_agg;
 pub mod cl_stf;
 pub mod evm_ee;
-pub mod l1_batch;
 pub mod operator;
 
 pub use operator::ProofOperator;

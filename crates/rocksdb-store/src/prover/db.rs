@@ -102,7 +102,7 @@ mod tests {
     }
 
     fn generate_proof() -> (ProofKey, ProofReceipt) {
-        let proof_context = ProofContext::BtcBlockspace(L1BlockId::default());
+        let proof_context = ProofContext::BtcBlockspace(L1BlockId::default(), L1BlockId::default());
         let host = ProofZkVm::Native;
         let proof_key = ProofKey::new(proof_context, host);
         let proof = Proof::default();
@@ -116,8 +116,8 @@ mod tests {
         let l1_blkid_2: L1BlockId = Buf32::from([2u8; 32]).into();
         let proof_context = ProofContext::L1Batch(l1_blkid_1, l1_blkid_2);
         let deps = vec![
-            ProofContext::BtcBlockspace(l1_blkid_1),
-            ProofContext::BtcBlockspace(l1_blkid_2),
+            ProofContext::BtcBlockspace(l1_blkid_1, l1_blkid_1),
+            ProofContext::BtcBlockspace(l1_blkid_2, l1_blkid_2),
         ];
         (proof_context, deps)
     }

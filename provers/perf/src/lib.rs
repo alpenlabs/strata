@@ -1,7 +1,6 @@
 use strata_zkvm_tests::{
     proof_generators::{
         BtcBlockProofGenerator, CheckpointProofGenerator, ClProofGenerator, ElProofGenerator,
-        L1BatchProofGenerator, L2BatchProofGenerator,
     },
     ProofGenerator,
 };
@@ -52,6 +51,4 @@ pub trait ProofGeneratorPerf: ProofGenerator {
 impl<H: ZkVmHostPerf> ProofGeneratorPerf for BtcBlockProofGenerator<H> {}
 impl<H: ZkVmHostPerf> ProofGeneratorPerf for ElProofGenerator<H> {}
 impl<H: ZkVmHostPerf> ProofGeneratorPerf for ClProofGenerator<H> {}
-impl<H: ZkVmHostPerf> ProofGeneratorPerf for L1BatchProofGenerator<H> {}
-impl<H: ZkVmHostPerf> ProofGeneratorPerf for L2BatchProofGenerator<H> {}
 impl<H: ZkVmHostPerf> ProofGeneratorPerf for CheckpointProofGenerator<H> {}

@@ -274,7 +274,7 @@ mod tests {
         let end: L1BlockId = gen.generate();
         for _ in 0..n {
             let blkid: L1BlockId = gen.generate();
-            let id = ProofContext::BtcBlockspace(blkid);
+            let id = ProofContext::BtcBlockspace(blkid, blkid);
             let key = ProofKey::new(id, host);
             deps.push(key);
         }

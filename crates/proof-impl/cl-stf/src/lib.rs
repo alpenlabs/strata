@@ -29,7 +29,17 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     let l2_blocks: Vec<L2Block> = zkvm.read_borsh();
     assert!(!l2_blocks.is_empty(), "At least one L2 block is required");
 
-    // 4. Read the verified exec segments
+    // 4. Read the verified blockscan proof outputs if any
+    let is_l1_segment_present: bool = zkvm.read_serde();
+    let l1_updates = if is_l1_segment_present {
+        let btc_blockspace_proof_output: BlockscanProofOutput =
+            zkvm.read_verified_borsh(btc_blockscan_vkey);
+        btc_blockspace_proof_output.blockscan_results
+    } else {
+        vec![]
+    };
+
+    // 5. Read the verified exec segments
     // This is the expected output of EVM EE STF Proof
     // Right now, each L2 block must contain exactly one ExecSegment, but this may change in the
     // future
@@ -39,10 +49,6 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         exec_segments.len(),
         "mismatch len of l2 block and exec segments"
     );
-
-    // 5. Read the verified blockscan proof outputs
-    // This is the expected output of L1 Blockscan Proof
-    let l1_updates: BlockscanProofOutput = zkvm.read_verified_borsh(btc_blockscan_vkey);
 
     // Track the current index for Blockscan result
     // This index are necessary because while each ExecSegment in L2BlockBody corresponds
@@ -72,7 +78,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
 
             // 7a. Verify that the protocol ops matches
             assert_eq!(
-                &l1_updates.blockscan_results[blockscan_result_idx].protocol_ops,
+                &l1_updates[blockscan_result_idx].protocol_ops,
                 &protocol_ops,
                 "mismatch between protocol ops for {}",
                 manifest.blkid()
@@ -80,7 +86,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
 
             // 7b. Verify that the L1 Header matches
             assert_eq!(
-                &l1_updates.blockscan_results[blockscan_result_idx].raw_header,
+                &l1_updates[blockscan_result_idx].raw_header,
                 manifest.header(),
                 "mismatch between header for {}",
                 manifest.blkid()
