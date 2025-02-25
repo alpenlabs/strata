@@ -22,7 +22,6 @@ use strata_primitives::constants::{
     STRATA_OPERATOR_BASE_DERIVATION_PATH, STRATA_OPERATOR_MESSAGE_IDX, STRATA_OPERATOR_WALLET_IDX,
     STRATA_OP_MESSAGE_DERIVATION_PATH, STRATA_OP_WALLET_DERIVATION_PATH,
 };
-#[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::KeyError;
@@ -123,12 +122,10 @@ impl OperatorKeys {
 // Manual Drop implementation to zeroize keys on drop.
 impl Drop for OperatorKeys {
     fn drop(&mut self) {
-        #[cfg(feature = "zeroize")]
         self.zeroize();
     }
 }
 
-#[cfg(feature = "zeroize")]
 impl Zeroize for OperatorKeys {
     #[inline]
     fn zeroize(&mut self) {
@@ -257,7 +254,6 @@ impl Zeroize for OperatorKeys {
     }
 }
 
-#[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for OperatorKeys {}
 
 /// Converts the base [`Xpub`] to the message [`Xpub`].
@@ -385,7 +381,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "zeroize")]
     fn test_zeroize() {
         use bitcoin::Network;
 
