@@ -4,7 +4,8 @@ use bitcoin::{bip32::Xpriv, block::Header, Address, Block, BlockHash, Network, T
 use crate::rpc::{
     client::ClientResult,
     types::{
-        CreateRawTransaction, GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor,
+        CreateRawTransaction, GetBlockchainInfo, GetRawTransactionVerbosityOne,
+        GetRawTransactionVerbosityZero, GetTransaction, GetTxOut, ImportDescriptor,
         ImportDescriptorResult, ListTransactions, ListUnspent, PreviousTransactionOutput,
         SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
@@ -77,6 +78,18 @@ pub trait ReaderRpc {
 
     /// Gets all transaction ids in mempool.
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>>;
+
+    /// Gets a raw transaction by its [`Txid`].
+    async fn get_raw_transaction_verbosity_zero(
+        &self,
+        txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityZero>;
+
+    /// Gets a raw transaction by its [`Txid`].
+    async fn get_raw_transaction_verbosity_one(
+        &self,
+        txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityOne>;
 
     /// Returns details about an unspent transaction output.
     async fn get_tx_out(

@@ -34,7 +34,8 @@ use crate::rpc::{
     traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
     types::{
         CreateRawTransaction, CreateWallet, GetBlockVerbosityOne, GetBlockVerbosityZero,
-        GetBlockchainInfo, GetNewAddress, GetTransaction, GetTxOut, ImportDescriptor,
+        GetBlockchainInfo, GetNewAddress, GetRawTransactionVerbosityOne,
+        GetRawTransactionVerbosityZero, GetTransaction, GetTxOut, ImportDescriptor,
         ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
         PreviousTransactionOutput, SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
@@ -309,6 +310,28 @@ impl ReaderRpc for BitcoinClient {
 
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         self.call::<Vec<Txid>>("getrawmempool", &[]).await
+    }
+
+    async fn get_raw_transaction_verbosity_zero(
+        &self,
+        txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityZero> {
+        self.call::<GetRawTransactionVerbosityZero>(
+            "getrawtransaction",
+            &[to_value(txid.to_string())?, to_value(0)?],
+        )
+        .await
+    }
+
+    async fn get_raw_transaction_verbosity_one(
+        &self,
+        txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityOne> {
+        self.call::<GetRawTransactionVerbosityOne>(
+            "getrawtransaction",
+            &[to_value(txid.to_string())?, to_value(1)?],
+        )
+        .await
     }
 
     async fn get_tx_out(
