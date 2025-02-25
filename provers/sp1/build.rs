@@ -256,7 +256,7 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
     #[cfg(feature = "docker-build")]
     {
         build_args.docker = true;
-        build_args.workspace_directory = Some("../../..".to_owned());
+        build_args.workspace_directory = Some("../../".to_owned());
     }
 
     // Build the program with the specified arguments
@@ -314,10 +314,16 @@ fn migrate_elf(program: &str) {
     let destination_elf_path = cache_dir.join(format!("{}.elf", program));
 
     // Source path: program/target/elf-compilation/.../release/{built_elf_name}
+    let elf_subdir = if cfg!(feature = "docker-build") {
+        "docker/riscv32im-succinct-zkvm-elf"
+    } else {
+        "riscv32im-succinct-zkvm-elf"
+    };
+
     let built_elf_path = program_path
         .join("target")
         .join("elf-compilation")
-        .join("riscv32im-succinct-zkvm-elf")
+        .join(elf_subdir)
         .join("release")
         .join(&built_elf_name);
 
