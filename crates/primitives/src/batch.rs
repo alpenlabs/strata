@@ -11,7 +11,6 @@ use crate::{
     hash,
     l1::L1BlockCommitment,
     l2::{L2BlockCommitment, L2BlockId},
-    params::RollupParams,
 };
 
 /// Summary generated when we accept the last block of an epoch.
@@ -470,9 +469,9 @@ impl L1CommittedCheckpoint {
 // the ability to get that where we call this yet
 pub fn verify_signed_checkpoint_sig(
     signed_checkpoint: &SignedCheckpoint,
-    params: &RollupParams,
+    cred_rule: &CredRule,
 ) -> bool {
-    let seq_pubkey = match params.cred_rule {
+    let seq_pubkey = match cred_rule {
         CredRule::SchnorrKey(key) => key,
 
         // In this case we always just assume true.

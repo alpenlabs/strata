@@ -3,6 +3,7 @@ use strata_primitives::{
     batch::SignedCheckpoint,
     l1::{payload::L1PayloadType, DepositInfo, DepositRequestInfo},
 };
+use strata_state::batch::verify_signed_checkpoint_sig;
 use tracing::warn;
 
 pub mod indexer;
@@ -49,7 +50,7 @@ fn parse_checkpoint_envelopes<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> impl Iterator<Item = SignedCheckpoint> + 'a {
-    tx.input.iter().flat_map(|inp| {
+    tx.input.iter().flat_map(move |inp| {
         inp.witness
             .tapscript()
             .and_then(|scr| parse_envelope_payloads(&scr.into(), filter_conf).ok())
@@ -58,7 +59,14 @@ fn parse_checkpoint_envelopes<'a>(
                     .into_iter()
                     .filter_map(|item| match *item.payload_type() {
                         L1PayloadType::Checkpoint => {
-                            borsh::from_slice::<SignedCheckpoint>(item.data()).ok()
+                            borsh::from_slice::<SignedCheckpoint>(item.data())
+                                .ok()
+                                .filter(|signed_checkpoint| {
+                                    verify_signed_checkpoint_sig(
+                                        signed_checkpoint,
+                                        &filter_conf.sequencer_cred_rule,
+                                    )
+                                })
                         }
                         L1PayloadType::Da => {
                             warn!("Da parsing is not supported yet");

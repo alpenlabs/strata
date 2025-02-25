@@ -230,7 +230,7 @@ fn process_l1_block(
             match op {
                 ProtocolOperation::Checkpoint(signed_ckpt) => {
                     // Before we do anything, check its signature.
-                    if !verify_signed_checkpoint_sig(signed_ckpt, params) {
+                    if !verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule) {
                         warn!(%height, "ignoring checkpointing with invalid signature");
                         continue;
                     }

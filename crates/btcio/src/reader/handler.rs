@@ -96,7 +96,7 @@ fn find_checkpoints(blockdata: &BlockData, params: &RollupParams) -> Vec<L1Commi
         })
         .filter_map(|ckpt_data| {
             let (signed_checkpoint, tx, position) = ckpt_data?;
-            if !verify_signed_checkpoint_sig(signed_checkpoint, params) {
+            if !verify_signed_checkpoint_sig(signed_checkpoint, &params.cred_rule) {
                 error!(
                     ?tx,
                     ?signed_checkpoint,

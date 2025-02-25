@@ -29,7 +29,10 @@ pub fn extract_relevant_info(
             }
             ProtocolOperation::Checkpoint(signed_ckpt) => {
                 // Verify the signature.
-                assert!(verify_signed_checkpoint_sig(&signed_ckpt, rollup_params));
+                assert!(verify_signed_checkpoint_sig(
+                    &signed_ckpt,
+                    &rollup_params.cred_rule
+                ));
 
                 // Note: This assumes we will have one proper update
                 // FIXME: ^what if we have improper updates or more than one proper update?
