@@ -90,7 +90,7 @@ mod tests {
         buf::Buf32,
         proof::{ProofContext, ProofZkVm},
     };
-    use strata_state::l1::L1BlockId;
+    use strata_state::{id::L2BlockId, l1::L1BlockId};
     use zkaleido::{Proof, PublicValues};
 
     use super::*;
@@ -112,13 +112,13 @@ mod tests {
     }
 
     fn generate_proof_context_with_deps() -> (ProofContext, Vec<ProofContext>) {
-        let l1_blkid_1: L1BlockId = Buf32::from([1u8; 32]).into();
-        let l1_blkid_2: L1BlockId = Buf32::from([2u8; 32]).into();
-        let proof_context = ProofContext::L1Batch(l1_blkid_1, l1_blkid_2);
-        let deps = vec![
-            ProofContext::BtcBlockspace(l1_blkid_1, l1_blkid_1),
-            ProofContext::BtcBlockspace(l1_blkid_2, l1_blkid_2),
-        ];
+        let evm_blkid_1 = Buf32::from([1u8; 32]);
+        let evm_blkid_2 = Buf32::from([2u8; 32]);
+
+        let cl_blkid_1: L2BlockId = Buf32::from([1u8; 32]).into();
+        let cl_blkid_2: L2BlockId = Buf32::from([2u8; 32]).into();
+        let proof_context = ProofContext::ClStf(cl_blkid_1, cl_blkid_2);
+        let deps = vec![ProofContext::EvmEeStf(evm_blkid_1, evm_blkid_2)];
         (proof_context, deps)
     }
 

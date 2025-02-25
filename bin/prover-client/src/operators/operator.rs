@@ -124,9 +124,6 @@ impl ProofOperator {
                     .await;
                 Ok(())
             }
-            _ => {
-                panic!("should not exist")
-            }
         }
     }
 

@@ -40,7 +40,5 @@ pub enum ProofVm {
     BtcProving,
     ELProving,
     CLProving,
-    CLAggregation,
-    L1Batch,
     Checkpoint,
 }

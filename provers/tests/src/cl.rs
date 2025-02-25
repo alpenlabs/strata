@@ -36,9 +36,6 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
         let el_proof = self.el_proof_generator.get_proof(block_range)?;
         let el_proof_vk = self.el_proof_generator.get_host().get_verification_key();
 
-        let btc_proof = self.btc_proof_generator.get_proof(&Some(*block_range))?;
-        let btc_proof_vk = self.btc_proof_generator.get_host().get_verification_key();
-
         // Read CL witness data
         let params = gen_params();
         let rollup_params = params.rollup();
@@ -51,7 +48,7 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
             rollup_params: rollup_params.clone(),
             chainstate,
             l2_blocks,
-            btc_blockspace_proof_with_vk: Some((btc_proof, btc_proof_vk)),
+            btc_blockspace_proof_with_vk: None,
             evm_ee_proof_with_vk: (el_proof, el_proof_vk),
         })
     }

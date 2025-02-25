@@ -15,7 +15,7 @@ use crate::{block::check_integrity, tx_indexer::ProverTxVisitorImpl};
 /// Includes protocol-relevant data posted on L1 block.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct BlockScanResult {
-    /// Raw header of the block that we procesed
+    /// Raw header of the block that we processed
     pub raw_header: [u8; 80],
     /// Protocol Operations that we found after scanning the block
     pub protocol_ops: Vec<ProtocolOperation>,

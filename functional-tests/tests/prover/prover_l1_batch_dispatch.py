@@ -29,18 +29,14 @@ class ProverClientTest(testenv.StrataTester):
         time.sleep(5)
 
         start_block_height = L1_PROVER_PARAMS["START_BLOCK_HEIGHT"]
-        start_block_hash = bytes_to_big_endian(
-            btcrpc.proxy.getblockhash(start_block_height)
-        )
-        start_block_commitment = {"height": start_block_height, "blkid": start_block_hash}
+        start_block_hash = bytes_to_big_endian(btcrpc.proxy.getblockhash(start_block_height))
+        start_block = {"height": start_block_height, "blkid": start_block_hash}
 
         end_block_height = L1_PROVER_PARAMS["END_BLOCK_HEIGHT"]
-        end_block_hash = bytes_to_big_endian(
-            btcrpc.proxy.getblockhash(end_block_height)
-        )
-        end_block_commitment = {"height": end_block_height, "blkid": end_block_hash}
+        end_block_hash = bytes_to_big_endian(btcrpc.proxy.getblockhash(end_block_height))
+        end_block = {"height": end_block_height, "blkid": end_block_hash}
 
-        task_ids = prover_client_rpc.dev_strata_proveBtcBlocks((start_block_commitment, start_block_commitment))
+        task_ids = prover_client_rpc.dev_strata_proveBtcBlocks((start_block, end_block))
         self.debug(f"got task ids: {task_ids}")
         task_id = task_ids[0]
         self.debug(f"Using task id: {task_id}")

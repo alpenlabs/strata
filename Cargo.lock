@@ -13290,18 +13290,8 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-cl-stf",
- "strata-proofimpl-l1-batch",
  "strata-state",
  "strata-test-utils",
- "zkaleido",
-]
-
-[[package]]
-name = "strata-proofimpl-cl-agg"
-version = "0.1.0"
-dependencies = [
- "borsh",
- "strata-proofimpl-cl-stf",
  "zkaleido",
 ]
 
@@ -13353,23 +13343,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-proofimpl-l1-batch"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "borsh",
- "ethnum",
- "rand 0.8.5",
- "serde",
- "strata-l1tx",
- "strata-primitives",
- "strata-proofimpl-btc-blockspace",
- "strata-state",
- "strata-test-utils",
- "zkaleido",
-]
-
-[[package]]
 name = "strata-prover-client"
 version = "0.1.0"
 dependencies = [
@@ -13396,10 +13369,8 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-agg",
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
- "strata-proofimpl-l1-batch",
  "strata-prover-client-rpc-api",
  "strata-risc0-guest-builder",
  "strata-rocksdb",
@@ -13674,7 +13645,6 @@ dependencies = [
  "strata-proofimpl-checkpoint",
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
- "strata-proofimpl-l1-batch",
  "strata-state",
  "strata-test-utils",
  "zkaleido",
@@ -13934,10 +13904,8 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-agg",
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
- "strata-proofimpl-l1-batch",
  "strata-risc0-guest-builder",
  "strata-sp1-guest-builder",
  "thiserror 2.0.11",
@@ -13961,10 +13929,8 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-agg",
  "strata-proofimpl-cl-stf",
  "strata-proofimpl-evm-ee-stf",
- "strata-proofimpl-l1-batch",
  "strata-risc0-guest-builder",
  "strata-sp1-guest-builder",
  "strata-state",

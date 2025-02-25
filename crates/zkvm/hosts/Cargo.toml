@@ -18,10 +18,8 @@ zkaleido-native-adapter = { workspace = true, optional = true }
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true
-strata-proofimpl-cl-agg.workspace = true
 strata-proofimpl-cl-stf.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
-strata-proofimpl-l1-batch.workspace = true
 
 bincode.workspace = true
 borsh.workspace = true

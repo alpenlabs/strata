@@ -25,11 +25,7 @@ use crate::{
 ///
 /// It is responsible for managing the data and tasks required to generate Checkpoint Proof. It
 /// fetches the necessary inputs for the [`CheckpointProver`] by:
-///
-/// - utilizing the [`L1BatchOperator`] to create and manage proving tasks for L1Batch. The
-///   resulting L1 Batch proof is incorporated as part of the input for the Checkpoint Proof.
-/// - utilizing the [`ClAggOperator`] to create and manage proving tasks for CL Aggregation. The
-///   resulting CL Aggregated proof is incorporated as part of the input for the Checkpoint Proof.
+// TODO: update docstring here
 #[derive(Debug, Clone)]
 pub struct CheckpointOperator {
     cl_client: HttpClient,

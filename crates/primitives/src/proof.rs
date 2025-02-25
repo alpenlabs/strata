@@ -63,10 +63,6 @@ pub enum ProofContext {
     /// Identifier representing a Bitcoin L1 block for blockscan proof
     BtcBlockspace(L1BlockId, L1BlockId),
 
-    /// Identifier for a batch of L1 blocks being proven.
-    /// Includes the starting and ending block heights.
-    L1Batch(L1BlockId, L1BlockId),
-
     /// Identifier for the EVM Execution Environment (EE) blocks used in generating the State
     /// Transition Function (STF) proof.
     EvmEeStf(Buf32, Buf32),
@@ -74,10 +70,6 @@ pub enum ProofContext {
     /// Identifier for the Consensus Layer (CL) blocks used in generating the State Transition
     /// Function (STF) proof.
     ClStf(L2BlockId, L2BlockId),
-
-    /// Identifier for a batch of Consensus Layer (CL) blocks being proven.
-    /// Includes the starting and ending block heights.
-    ClAgg(L2BlockId, L2BlockId),
 
     /// Identifier for a specific checkpoint being proven.
     Checkpoint(u64),

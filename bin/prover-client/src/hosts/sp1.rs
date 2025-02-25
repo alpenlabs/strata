@@ -30,21 +30,6 @@ cfg_if! {
     }
 }
 
-// L1_BATCH_HOST
-cfg_if! {
-    if #[cfg(feature = "sp1-builder")] {
-        pub static L1_BATCH_HOST: LazyLock<SP1Host> =
-            LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_L1_BATCH_PK));
-    } else {
-        pub static L1_BATCH_HOST: LazyLock<SP1Host> = LazyLock::new(|| {
-            let elf_path = format!("{}/guest-l1-batch.elf", &*ELF_BASE_PATH);
-            let elf = std::fs::read(&elf_path)
-                .expect(&format!("Failed to read ELF file from {}", elf_path));
-            SP1Host::init(&elf)
-        });
-    }
-}
-
 // EVM_EE_STF_HOST
 cfg_if! {
     if #[cfg(feature = "sp1-builder")] {
@@ -75,21 +60,6 @@ cfg_if! {
     }
 }
 
-// CL_AGG_HOST
-cfg_if! {
-    if #[cfg(feature = "sp1-builder")] {
-        pub static CL_AGG_HOST: LazyLock<SP1Host> =
-            LazyLock::new(|| SP1Host::new_from_bytes(&GUEST_CL_AGG_PK));
-    } else {
-        pub static CL_AGG_HOST: LazyLock<SP1Host> = LazyLock::new(|| {
-            let elf_path = format!("{}/guest-cl-agg.elf", &*ELF_BASE_PATH);
-            let elf = std::fs::read(&elf_path)
-                .expect(&format!("Failed to read ELF file from {}", elf_path));
-            SP1Host::init(&elf)
-        });
-    }
-}
-
 // CHECKPOINT_HOST
 cfg_if! {
     if #[cfg(feature = "sp1-builder")] {
@@ -112,10 +82,8 @@ cfg_if! {
 pub fn get_host(id: &ProofContext) -> &'static SP1Host {
     match id {
         ProofContext::BtcBlockspace(..) => &BTC_BLOCKSPACE_HOST,
-        ProofContext::L1Batch(..) => &L1_BATCH_HOST,
         ProofContext::EvmEeStf(..) => &EVM_EE_STF_HOST,
         ProofContext::ClStf(..) => &CL_STF_HOST,
-        ProofContext::ClAgg(..) => &CL_AGG_HOST,
         ProofContext::Checkpoint(..) => &CHECKPOINT_HOST,
     }
 }
