@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde::Serialize;
 use serde_json::json;
 use strata_provers_perf::{ProofGeneratorPerf, ProofReport, ZkVmHostPerf};
-use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
+use strata_test_utils::l2::gen_params;
 use strata_zkvm_tests::{CheckpointBatchInfo, TestProverGenerators, TEST_SP1_GENERATORS};
 
 #[tokio::main]
@@ -94,16 +94,16 @@ fn run_generator_programs<H: ZkVmHostPerf>(
     let l2_start_height = 1;
     let l2_end_height = 3;
 
-    let btc_block_height = 40321;
-    let btc_chain = BtcChainSegment::load();
-    let btc_block = btc_chain.get_block_at(btc_block_height).unwrap();
     let evmee_block_range = (1, 1);
 
     // btc_blockspace
     println!("Generating a report for BTC_BLOCKSPACE");
     let btc_blockspace = generator.btc_blockspace();
     let btc_blockspace_report = btc_blockspace
-        .gen_proof_report(&btc_block, "BTC_BLOCKSPACE".to_owned())
+        .gen_proof_report(
+            &Some((l1_start_height.into(), l1_end_height.into())),
+            "BTC_BLOCKSPACE".to_owned(),
+        )
         .unwrap();
 
     reports.push(btc_blockspace_report.into());

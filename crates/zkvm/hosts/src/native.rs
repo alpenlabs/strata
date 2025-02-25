@@ -1,6 +1,6 @@
 use std::sync::{Arc, LazyLock};
 
-use strata_proofimpl_btc_blockspace::logic::process_blockspace_proof_outer;
+use strata_proofimpl_btc_blockspace::logic::process_blockscan_proof;
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
 use strata_proofimpl_cl_agg::process_cl_agg;
 use strata_proofimpl_cl_stf::batch_process_cl_stf;
@@ -19,7 +19,7 @@ const MOCK_VK: [u32; 8] = [0u32; 8];
 /// A native host for [`ProofVm::BtcProving`] prover.
 static BTC_BLOCKSPACE_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
     process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_blockspace_proof_outer(zkvm);
+        process_blockscan_proof(zkvm);
         Ok(())
     })),
 });

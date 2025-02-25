@@ -4,6 +4,7 @@ name = "strata-zkvm-tests"
 version = "0.1.0"
 
 [dependencies]
+strata-l1tx.workspace = true
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
 strata-proofimpl-checkpoint.workspace = true

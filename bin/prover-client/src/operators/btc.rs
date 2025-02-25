@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
+use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{
     params::RollupParams,
     proof::{ProofContext, ProofKey},
@@ -35,6 +36,7 @@ impl BtcBlockspaceOperator {
 
 impl ProvingOp for BtcBlockspaceOperator {
     type Prover = BtcBlockspaceProver;
+    // FIXME: this should be multiple
     type Params = L1BlockId;
 
     fn construct_proof_ctx(
@@ -61,9 +63,14 @@ impl ProvingOp for BtcBlockspaceOperator {
             .inspect_err(|_| error!(%block_id, "Failed to fetch BTC BlockId"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
+        // FIXME: this should be multiple
+        let btc_blocks = vec![block];
+
+        let tx_filters =
+            TxFilterConfig::derive_from(&self.rollup_params).expect("failed to derive tx filters");
         Ok(BlockScanProofInput {
-            rollup_params: self.rollup_params.as_ref().clone(),
-            block,
+            btc_blocks,
+            tx_filters,
         })
     }
 }

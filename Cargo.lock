@@ -13957,6 +13957,7 @@ dependencies = [
  "cfg-if",
  "hex",
  "serde_json",
+ "strata-l1tx",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-checkpoint",
