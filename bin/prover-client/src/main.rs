@@ -24,6 +24,7 @@ mod errors;
 mod hosts;
 mod operators;
 mod prover_manager;
+mod retry_policy;
 mod rpc_server;
 mod status;
 mod task_tracker;

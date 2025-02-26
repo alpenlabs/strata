@@ -18,6 +18,9 @@ pub enum ProvingTaskStatus {
     ProvingInProgress,
     /// Task has been completed successfully.
     Completed,
+    /// Task has failed, but the failure is transient in its nature, so the task is
+    /// going to be retried several times (according to the retry policy).
+    TransientFailure,
     /// Task has failed.
     Failed,
 }
@@ -37,6 +40,10 @@ impl ProvingTaskStatus {
             (ProvingTaskStatus::Pending, ProvingTaskStatus::ProvingInProgress) => true,
             (ProvingTaskStatus::ProvingInProgress, &ProvingTaskStatus::Completed) => true,
             (ProvingTaskStatus::WaitingForDependencies, &ProvingTaskStatus::Pending) => true,
+
+            // Allow for transient failures transitions:
+            (ProvingTaskStatus::ProvingInProgress, &ProvingTaskStatus::TransientFailure) => true,
+            (ProvingTaskStatus::TransientFailure, &ProvingTaskStatus::ProvingInProgress) => true,
 
             // All other transitions are invalid
             _ => false,
@@ -67,6 +74,7 @@ mod tests {
             ProvingTaskStatus::ProvingInProgress,
             ProvingTaskStatus::Completed,
             ProvingTaskStatus::WaitingForDependencies,
+            ProvingTaskStatus::TransientFailure,
             ProvingTaskStatus::Failed,
         ];
 
@@ -114,6 +122,26 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(status, ProvingTaskStatus::Pending);
+    }
+
+    #[test]
+    fn test_proving_in_progress_to_transient_failure() {
+        // Test transitioning from WaitingForDependencies to Pending with empty dependencies
+        let mut status = ProvingTaskStatus::ProvingInProgress;
+        let result = status.transition(ProvingTaskStatus::TransientFailure);
+
+        assert!(result.is_ok());
+        assert_eq!(status, ProvingTaskStatus::TransientFailure);
+    }
+
+    #[test]
+    fn test_transient_failure_to_proving_in_progress() {
+        // Test transitioning from WaitingForDependencies to Pending with empty dependencies
+        let mut status = ProvingTaskStatus::TransientFailure;
+        let result = status.transition(ProvingTaskStatus::ProvingInProgress);
+
+        assert!(result.is_ok());
+        assert_eq!(status, ProvingTaskStatus::ProvingInProgress);
     }
 
     #[test]
