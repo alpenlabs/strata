@@ -163,6 +163,9 @@ pub(crate) struct SubcParams {
     #[argh(option, description = "deposit amount in sats (default \"10 BTC\")")]
     pub(crate) deposit_sats: Option<String>,
 
+    #[argh(option, description = "horizon height (default 90)", short = 'h')]
+    pub(crate) horizon_height: Option<u64>,
+
     #[argh(
         option,
         description = "genesis trigger height (default 100)",

@@ -135,20 +135,23 @@ pub(super) async fn extract_deposit_requests(
 /// Fetches all L1 transactions from the provided height to the chain tip.
 ///
 /// Note that this could return a LOT of data!
-async fn get_txs_from_height(l1man: &L1BlockManager, height: u64) -> RpcResult<(Vec<L1Tx>, u64)> {
-    let tip = l1man
-        .get_chain_tip_async()
+async fn get_txs_from_height(
+    l1man: &L1BlockManager,
+    start_height: u64,
+) -> RpcResult<(Vec<L1Tx>, u64)> {
+    let tip_height = l1man
+        .get_chain_tip_height_async()
         .await
         .map_err(RpcServerError::Db)?
         .ok_or(RpcServerError::BeforeGenesis)?;
 
     let mut txs = Vec::new();
-    if height <= tip {
-        for h in height..=tip {
+    if start_height <= tip_height {
+        for height in start_height..=tip_height {
             // We don't actually care if we don't have txs at a particular
             // height, we can continue unconditionally.
-            let Some(h_tx_refs) = l1man
-                .get_block_txs_async(h)
+            let Some(tx_refs) = l1man
+                .get_block_txs_at_height_async(height)
                 .await
                 .map_err(RpcServerError::Db)?
             else {
@@ -156,9 +159,9 @@ async fn get_txs_from_height(l1man: &L1BlockManager, height: u64) -> RpcResult<(
                 continue;
             };
 
-            for txr in h_tx_refs {
+            for tx_ref in tx_refs {
                 let tx = l1man
-                    .get_tx_async(txr)
+                    .get_tx_async(tx_ref)
                     .await
                     .map_err(RpcServerError::Db)?
                     .expect("extractor: database inconsistent, missing expected tx");
@@ -167,7 +170,7 @@ async fn get_txs_from_height(l1man: &L1BlockManager, height: u64) -> RpcResult<(
         }
     }
 
-    Ok((txs, tip))
+    Ok((txs, tip_height))
 }
 
 /// Extract the withdrawal duties from the chain state.
@@ -394,7 +397,6 @@ mod tests {
                 None
             };
 
-            let idx = idx as u64;
             let txs: Vec<L1Tx> = (0..num_txs)
                 .map(|i| {
                     let proof = L1TxProof::new(i as u32, arb.generate());
@@ -417,18 +419,27 @@ mod tests {
                 })
                 .collect();
 
-            let mf: L1BlockManifest = arb.generate();
+            let mf = L1BlockManifest::new(
+                arb.generate(),
+                arb.generate(),
+                txs,
+                arb.generate(),
+                arb.generate(),
+            );
 
             // Insert block data
-            let res = l1_db.put_block_data(idx, mf.clone(), txs.clone());
+            let res = l1_db.put_block_data(mf.clone());
             assert!(
                 res.is_ok(),
                 "should be able to put block data into the L1Database"
             );
+            l1_db
+                .set_canonical_chain_entry(idx as u64, *mf.blkid())
+                .unwrap();
 
             // Insert mmr data
             let mmr: CompactMmr = arb.generate();
-            l1_db.put_mmr_checkpoint(idx, mmr.clone()).unwrap();
+            l1_db.put_mmr_checkpoint(*mf.blkid(), mmr.clone()).unwrap();
         }
 
         num_valid_duties

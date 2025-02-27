@@ -27,6 +27,7 @@ pub struct BtcChainSegment {
     pub end: u64,
     pub custom_blocks: HashMap<u64, Block>,
     pub custom_headers: HashMap<u64, Header>,
+    pub idx_by_blockhash: HashMap<BlockHash, usize>,
 }
 
 impl BtcChainSegment {
@@ -58,6 +59,12 @@ impl BtcChainSegment {
         })
         .collect();
 
+        let idx_by_blockhash = headers
+            .iter()
+            .enumerate()
+            .map(|(idx, header)| (header.block_hash(), idx))
+            .collect::<HashMap<BlockHash, usize>>();
+
         // This custom blocks are chose because this is where the first difficulty happened
         let custom_blocks: HashMap<u64, Block> = vec![
         (40320, "010000001a231097b6ab6279c80f24674a2c8ee5b9a848e1d45715ad89b6358100000000a822bafe6ed8600e3ffce6d61d10df1927eafe9bbf677cb44c4d209f143c6ba8db8c784b5746651cce2221180101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08045746651c02db02ffffffff0100f2052a010000004341046477f88505bef7e3c1181a7e3975c4cd2ac77ffe23ea9b28162afbb63bd71d3f7c3a07b58cf637f1ec68ed532d5b6112d57a9744010aae100e4a48cd831123b8ac00000000"),
@@ -80,6 +87,7 @@ impl BtcChainSegment {
             end: 50_000,
             custom_blocks,
             custom_headers,
+            idx_by_blockhash,
         }
     }
 }
@@ -113,9 +121,26 @@ impl BtcChainSegment {
         Ok(self.headers[idx as usize])
     }
 
+    /// Retrieve a block at a given height.
+    pub fn get_block_header(&self, blockhash: &BlockHash) -> ClientResult<Header> {
+        let Some(idx) = self.idx_by_blockhash.get(blockhash) else {
+            return Err(ClientError::Body(format!(
+                "Block header for blockhash {} not available",
+                *blockhash
+            )));
+        };
+        Ok(self.headers[*idx])
+    }
+
     pub fn get_block_manifest(&self, height: u32) -> L1BlockManifest {
         let rec = self.get_header_record(height.into()).unwrap();
-        L1BlockManifest::new(rec, HeaderVerificationState::default(), Vec::new(), 1)
+        L1BlockManifest::new(
+            rec,
+            HeaderVerificationState::default(),
+            Vec::new(),
+            1,
+            height as u64,
+        )
     }
 }
 
@@ -214,6 +239,32 @@ impl ReaderRpc for BtcChainSegment {
 }
 
 impl BtcChainSegment {
+    pub fn get_block_manifest_by_blockhash(
+        &self,
+        blockhash: &BlockHash,
+    ) -> Result<L1BlockManifest, Error> {
+        let Some(idx) = self.idx_by_blockhash.get(blockhash) else {
+            return Err(ClientError::Body(format!(
+                "Block header for blockhash {} not available",
+                *blockhash
+            )))?;
+        };
+        let height = self.start + *idx as u64;
+
+        let header = self.headers[*idx];
+        let header_record = L1HeaderRecord::new(
+            header.block_hash().into(),
+            serialize(&header),
+            Buf32::from(header.merkle_root.as_raw_hash().to_byte_array()),
+        );
+        Ok(L1BlockManifest::new(
+            header_record,
+            HeaderVerificationState::default(),
+            Vec::new(),
+            0,
+            height,
+        ))
+    }
     pub fn get_header_record(&self, height: u64) -> Result<L1HeaderRecord, Error> {
         let header = self.get_block_header_at(height)?;
         Ok(L1HeaderRecord::new(

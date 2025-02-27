@@ -284,6 +284,7 @@ class ManualGenBlocksConfig:
 class RollupParamsSettings:
     block_time_sec: int
     epoch_slots: int
+    horizon_height: int
     genesis_trigger: int
     message_interval: int
     proof_timeout: Optional[int] = None
@@ -293,6 +294,7 @@ class RollupParamsSettings:
         return cls(
             block_time_sec=DEFAULT_BLOCK_TIME_SEC,
             epoch_slots=DEFAULT_EPOCH_SLOTS,
+            horizon_height=DEFAULT_HORIZON_HT,
             genesis_trigger=DEFAULT_GENESIS_TRIGGER_HT,
             message_interval=DEFAULT_MESSAGE_INTERVAL_MSEC,
             proof_timeout=DEFAULT_PROOF_TIMEOUT,
@@ -535,6 +537,7 @@ def generate_params(settings: RollupParamsSettings, seqpubkey: str, oppubkeys: l
         "--name", "alpenstrata",
         "--block-time", str(settings.block_time_sec),
         "--epoch-slots", str(settings.epoch_slots),
+        "--horizon-height", str(settings.horizon_height),
         "--genesis-trigger-height", str(settings.genesis_trigger),
         "--seqkey", seqpubkey,
     ]

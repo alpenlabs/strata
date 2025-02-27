@@ -25,7 +25,7 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
             let height = block.height();
-            ctx.l1_manager.revert_to_height_async(height).await?;
+            ctx.l1_manager.revert_canonical_chain_async(height).await?;
             debug!(%height, "reverted L1 block database");
             vec![SyncEvent::L1Revert(block)]
         }
@@ -62,16 +62,14 @@ async fn handle_blockdata<R: ReaderRpc>(
         return Ok(sync_evs);
     }
 
-    let l1blkid = blockdata.block().block_hash();
-
     let txs: Vec<_> = generate_l1txs(&blockdata);
     let num_txs = txs.len();
-    let manifest = generate_block_manifest(blockdata.block(), hvs, txs.clone(), epoch);
+    let manifest = generate_block_manifest(blockdata.block(), hvs, txs, epoch, height);
+    let l1blockid = *manifest.blkid();
 
-    l1_manager
-        .put_block_data_async(blockdata.block_num(), manifest, txs)
-        .await?;
-    info!(%height, %l1blkid, txs = %num_txs, "wrote L1 block manifest");
+    l1_manager.put_block_data_async(manifest).await?;
+    l1_manager.extend_canonical_chain_async(&l1blockid).await?;
+    info!(%height, %l1blockid, txs = %num_txs, "wrote L1 block manifest");
 
     // Create a sync event if it's something we care about.
     let blkid: Buf32 = blockdata.block().block_hash().into();
@@ -98,7 +96,7 @@ fn find_checkpoints(blockdata: &BlockData, params: &RollupParams) -> Vec<L1Commi
         })
         .filter_map(|ckpt_data| {
             let (signed_checkpoint, tx, position) = ckpt_data?;
-            if !verify_signed_checkpoint_sig(signed_checkpoint, params) {
+            if !verify_signed_checkpoint_sig(signed_checkpoint, &params.cred_rule) {
                 error!(
                     ?tx,
                     ?signed_checkpoint,
@@ -128,6 +126,7 @@ fn generate_block_manifest(
     hvs: HeaderVerificationState,
     txs: Vec<L1Tx>,
     epoch: u64,
+    height: u64,
 ) -> L1BlockManifest {
     let blockid = block.block_hash().into();
     let root = block
@@ -137,7 +136,7 @@ fn generate_block_manifest(
     let header = serialize(&block.header);
 
     let rec = L1HeaderRecord::new(blockid, header, Buf32::from(root));
-    L1BlockManifest::new(rec, hvs, txs, epoch)
+    L1BlockManifest::new(rec, hvs, txs, epoch, height)
 }
 
 fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {

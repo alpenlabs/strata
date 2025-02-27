@@ -10,7 +10,7 @@ from utils import wait_for_genesis
 @flexitest.register
 class ElBlockGenerationTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(testenv.BasicEnvConfig(101))
+        ctx.set_env(testenv.BasicEnvConfig(110))
 
     def main(self, ctx: flexitest.RunContext):
         seqrpc = ctx.get_service("sequencer").create_rpc()

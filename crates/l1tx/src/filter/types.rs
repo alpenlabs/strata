@@ -1,5 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
+    block_credential::CredRule,
     buf::Buf32,
     l1::{BitcoinAddress, Outpoint},
     params::{DepositTxParams, RollupParams},
@@ -15,10 +16,13 @@ pub struct EnvelopeTags {
 }
 
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TxFilterConfig {
     /// Envelope tag names
     pub envelope_tags: EnvelopeTags,
+
+    /// Rules for verifying sequencer signature
+    pub sequencer_cred_rule: CredRule,
 
     /// For addresses that are expected to be spent to.
     pub expected_addrs: SortedVec<BitcoinAddress>,
@@ -58,6 +62,7 @@ impl TxFilterConfig {
         };
         Ok(Self {
             envelope_tags,
+            sequencer_cred_rule: rollup_params.cred_rule.clone(),
             expected_blobs,
             expected_addrs,
             expected_outpoints,

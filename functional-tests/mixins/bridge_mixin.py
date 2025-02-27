@@ -47,11 +47,11 @@ class BridgeMixin(BaseMixin):
         deposit_amount = cfg.deposit_amount
 
         # bridge pubkey
-        self.debug(f"Bridge pubkey: {bridge_pk}")
+        self.info(f"Bridge pubkey: {bridge_pk}")
 
         # check balance before deposit
         initial_balance = int(self.rethrpc.eth_getBalance(el_address), 16)
-        self.debug(f"Strata Balance right before deposit calls: {initial_balance}")
+        self.info(f"Strata Balance right before deposit calls: {initial_balance}")
 
         tx_id = self.make_drt(el_address, bridge_pk)
 
@@ -82,34 +82,34 @@ class BridgeMixin(BaseMixin):
         # Build the BOSD descriptor from the withdraw address
         # Assert is a valid BOSD
         assert is_valid_bosd(destination), "Invalid BOSD"
-        self.debug(f"Withdrawal Destination: {destination}")
+        self.info(f"Withdrawal Destination: {destination}")
 
         # Estimate gas
         estimated_withdraw_gas = self.__estimate_withdraw_gas(
             deposit_amount, el_address, destination
         )
-        self.debug(f"Estimated withdraw gas: {estimated_withdraw_gas}")
+        self.info(f"Estimated withdraw gas: {estimated_withdraw_gas}")
 
         l2_tx_hash = self.__make_withdraw(
             deposit_amount, el_address, destination, estimated_withdraw_gas
         ).hex()
-        self.debug(f"Sent withdrawal transaction with hash: {l2_tx_hash}")
+        self.info(f"Sent withdrawal transaction with hash: {l2_tx_hash}")
 
         # Wait for transaction receipt
         tx_receipt = wait_until_with_value(
             lambda: self.web3.eth.get_transaction_receipt(l2_tx_hash),
             predicate=lambda v: v is not None,
         )
-        self.debug(f"Transaction receipt: {tx_receipt}")
+        self.info(f"Transaction receipt: {tx_receipt}")
 
         total_gas_used = tx_receipt["gasUsed"] * tx_receipt["effectiveGasPrice"]
-        self.debug(f"Total gas used: {total_gas_used}")
+        self.info(f"Total gas used: {total_gas_used}")
 
         # Ensure the leftover in the EL address is what's expected (deposit minus gas)
         balance_post_withdraw = int(self.rethrpc.eth_getBalance(el_address), 16)
         difference = deposit_amount * SATS_TO_WEI - total_gas_used
-        self.debug(f"Strata Balance after withdrawal: {balance_post_withdraw}")
-        self.debug(f"Strata Balance difference: {difference}")
+        self.info(f"Strata Balance after withdrawal: {balance_post_withdraw}")
+        self.info(f"Strata Balance difference: {difference}")
         assert difference == balance_post_withdraw, "balance difference is not expected"
 
         return l2_tx_hash, tx_receipt, total_gas_used

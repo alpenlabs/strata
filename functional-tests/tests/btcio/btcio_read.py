@@ -12,7 +12,12 @@ from utils.constants import MAX_HORIZON_POLL_INTERVAL_SECS
 @flexitest.register
 class L1StatusTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(testenv.BasicEnvConfig(auto_generate_blocks=False))
+        rollup_params = RollupParamsSettings.new_default()
+        rollup_params.horizon_height = 2
+        rollup_params.genesis_trigger = 5
+        ctx.set_env(
+            testenv.BasicEnvConfig(0, rollup_settings=rollup_params, auto_generate_blocks=False)
+        )
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

@@ -43,44 +43,55 @@ pub trait Database {
 }
 
 /// Database interface to control our view of L1 data.
+/// Operations are NOT VALIDATED at this level.
+/// Ensure all operations are done through `L1BlockManager`
 pub trait L1Database {
     /// Atomically extends the chain with a new block, providing the manifest
     /// and a list of transactions we find relevant.  Returns error if
     /// provided out-of-order.
-    fn put_block_data(&self, idx: u64, mf: L1BlockManifest, txs: Vec<L1Tx>) -> DbResult<()>;
+    fn put_block_data(&self, mf: L1BlockManifest) -> DbResult<()>;
 
     /// Stores an MMR checkpoint so we have to query less far back.  If the
     /// provided height does not match the entries in the MMR, will return an
     /// error.
-    fn put_mmr_checkpoint(&self, idx: u64, mmr: CompactMmr) -> DbResult<()>;
+    fn put_mmr_checkpoint(&self, blockid: L1BlockId, mmr: CompactMmr) -> DbResult<()>;
 
-    /// Resets the L1 chain tip to the specified block index.  The provided
-    /// index will be the new chain tip that we store.
-    fn revert_to_height(&self, idx: u64) -> DbResult<()>;
+    /// Set a specific height, blockid in canonical chain records.
+    fn set_canonical_chain_entry(&self, height: u64, blockid: L1BlockId) -> DbResult<()>;
+
+    /// remove canonical chain records in given range (inclusive)
+    fn remove_canonical_chain_entries(&self, start_height: u64, end_height: u64) -> DbResult<()>;
+
+    /// Prune earliest blocks till height
+    fn prune_to_height(&self, height: u64) -> DbResult<()>;
 
     // TODO DA scraping storage
 
-    /// Gets the current chain tip index.
-    fn get_chain_tip(&self) -> DbResult<Option<u64>>;
+    // Gets current chain tip height, blockid
+    fn get_canonical_chain_tip(&self) -> DbResult<Option<(u64, L1BlockId)>>;
 
-    /// Gets the block manifest for a block index.
-    fn get_block_manifest(&self, idx: u64) -> DbResult<Option<L1BlockManifest>>;
+    /// Gets the block manifest for a blockid.
+    fn get_block_manifest(&self, blockid: L1BlockId) -> DbResult<Option<L1BlockManifest>>;
+
+    /// Gets the blockid at height for the current chain.
+    fn get_canonical_blockid_at_height(&self, height: u64) -> DbResult<Option<L1BlockId>>;
 
     // TODO: This should not exist in database level and should be handled by downstream manager.
     /// Returns a half-open interval of block hashes, if we have all of them
     /// present.  Otherwise, returns error.
-    fn get_blockid_range(&self, start_idx: u64, end_idx: u64) -> DbResult<Vec<L1BlockId>>;
+    fn get_canonical_blockid_range(&self, start_idx: u64, end_idx: u64)
+        -> DbResult<Vec<L1BlockId>>;
 
     /// Gets the relevant txs we stored in a block.
-    fn get_block_txs(&self, idx: u64) -> DbResult<Option<Vec<L1TxRef>>>;
+    fn get_block_txs(&self, blockid: L1BlockId) -> DbResult<Option<Vec<L1TxRef>>>;
 
     /// Gets the tx with proof given a tx ref, if present.
     fn get_tx(&self, tx_ref: L1TxRef) -> DbResult<Option<L1Tx>>;
 
-    /// Gets the last MMR checkpoint we stored before the given block height.
+    /// Gets the MMR checkpoint we stored at the given block.
     /// Up to the caller to advance the MMR the rest of the way to the desired
     /// state.
-    fn get_last_mmr_to(&self, idx: u64) -> DbResult<Option<CompactMmr>>;
+    fn get_mmr(&self, blockid: L1BlockId) -> DbResult<Option<CompactMmr>>;
 
     // TODO DA queries
 }

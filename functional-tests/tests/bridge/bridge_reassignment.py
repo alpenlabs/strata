@@ -24,7 +24,7 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
         fast_batch_settings = net_settings.get_fast_batch_settings()
         ctx.set_env(
             testenv.BasicEnvConfig(
-                101,
+                110,
                 n_operators=2,
                 pre_fund_addrs=True,
                 duty_timeout_duration=10,
@@ -38,9 +38,9 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
         withdraw_address = ctx.env.gen_ext_btc_address()
         el_address = self.eth_account.address
 
-        self.debug(f"Address: {address}")
-        self.debug(f"Change Address: {withdraw_address}")
-        self.debug(f"EL Address: {el_address}")
+        self.info(f"Address: {address}")
+        self.info(f"Change Address: {withdraw_address}")
+        self.info(f"EL Address: {el_address}")
 
         cfg: RollupConfig = ctx.env.rollup_cfg()
         # D BTC
@@ -57,27 +57,29 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
         btc_user = self.btc.get_prop("rpc_user")
         btc_password = self.btc.get_prop("rpc_password")
         bridge_pk = get_bridge_pubkey(self.seqrpc)
-        self.debug(f"Bridge pubkey: {bridge_pk}")
-
-        original_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
-        self.debug(f"BTC balance before withdraw: {original_balance}")
+        self.info(f"Bridge pubkey: {bridge_pk}")
 
         # Make sure starting ETH balance is 0
-        check_initial_eth_balance(self.rethrpc, el_address, self.debug)
+        check_initial_eth_balance(self.rethrpc, el_address, self.info)
 
         # Perform two deposits
         self.deposit(ctx, el_address, bridge_pk)
         self.deposit(ctx, el_address, bridge_pk)
 
+        # `self.deposit()` might perform deposit from balance in this address,
+        # so get original balance AFTER deposits
+        original_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
+        self.info(f"BTC balance before withdraw: {original_balance}")
+
         # withdraw
         xonlypk = extract_p2tr_pubkey(withdraw_address)
-        self.debug(f"XOnly PK: {xonlypk}")
+        self.info(f"XOnly PK: {xonlypk}")
         bosd = xonlypk_to_descriptor(xonlypk)
-        self.debug(f"BOSD: {bosd}")
+        self.info(f"BOSD: {bosd}")
         self.withdraw(ctx, el_address, bosd)
 
         new_balance = get_balance(withdraw_address, btc_url, btc_user, btc_password)
-        self.debug(f"BTC balance after withdraw: {new_balance}")
+        self.info(f"BTC balance after withdraw: {new_balance}")
 
         # Check assigned operator
         get_duties = self.seqrpc.strata_getBridgeDuties
@@ -88,10 +90,10 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
         )[0]
         assigned_op_idx = withdraw_duty["payload"]["assigned_operator_idx"]
         assigned_operator = ctx.get_service(f"bridge.{assigned_op_idx}")
-        self.debug(f"Assigned operator index: {assigned_op_idx}")
+        self.info(f"Assigned operator index: {assigned_op_idx}")
 
         # Stop assigned operator
-        self.debug("Stopping assigned operator ...")
+        self.info("Stopping assigned operator ...")
         assigned_operator.stop()
 
         # Let enough blocks pass so the assignment times out
@@ -107,7 +109,7 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
             error_with="No new operator was assigned",
         )["payload"]["assigned_operator_idx"]
 
-        self.debug(f"new assigned operator: {new_assigned_op_idx}")
+        self.info(f"new assigned operator: {new_assigned_op_idx}")
 
         # Ensure a new operator is assigned
         assigned_operator.start()
@@ -127,5 +129,5 @@ class BridgeWithdrawReassignmentTest(bridge_mixin.BridgeMixin):
             timeout=30,
         )
 
-        self.debug(f"BTC balance after stopping and starting again: {new_balance}")
+        self.info(f"BTC balance after stopping and starting again: {new_balance}")
         return True

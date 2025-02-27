@@ -27,8 +27,9 @@ use crate::{checkpoint_verification::verify_checkpoint, errors::*, genesis::make
 
 /// Interface for external context necessary specifically for event validation.
 pub trait EventContext {
-    fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error>;
-    fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error>;
+    fn get_l1_block_manifest(&self, blockid: &L1BlockId) -> Result<L1BlockManifest, Error>;
+    fn get_l1_block_manifest_at_height(&self, height: u64) -> Result<L1BlockManifest, Error>;
+    fn get_l2_block_data(&self, blockid: &L2BlockId) -> Result<L2BlockBundle, Error>;
     fn get_toplevel_chainstate(&self, slot: u64) -> Result<Chainstate, Error>;
 }
 
@@ -44,10 +45,16 @@ impl<'c> StorageEventContext<'c> {
 }
 
 impl EventContext for StorageEventContext<'_> {
-    fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
+    fn get_l1_block_manifest(&self, blockid: &L1BlockId) -> Result<L1BlockManifest, Error> {
         self.storage
             .l1()
-            .get_block_manifest(height)?
+            .get_block_manifest(blockid)?
+            .ok_or(Error::MissingL1Block(*blockid))
+    }
+    fn get_l1_block_manifest_at_height(&self, height: u64) -> Result<L1BlockManifest, Error> {
+        self.storage
+            .l1()
+            .get_block_manifest_at_height(height)?
             .ok_or(Error::MissingL1BlockHeight(height))
     }
 
@@ -94,7 +101,7 @@ pub fn process_event(
             // This doesn't do any SPV checks to make sure we only go to a
             // a longer chain, it just does it unconditionally.  This is fine,
             // since we'll be refactoring this more deeply soonish.
-            let block_mf = context.get_l1_block_manifest(height)?;
+            let block_mf = context.get_l1_block_manifest(block.blkid())?;
             handle_block(state, block, &block_mf, context, params)?;
             Ok(())
         }
@@ -230,7 +237,7 @@ fn process_l1_block(
             match op {
                 ProtocolOperation::Checkpoint(signed_ckpt) => {
                     // Before we do anything, check its signature.
-                    if !verify_signed_checkpoint_sig(signed_ckpt, params) {
+                    if !verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule) {
                         warn!(%height, "ignoring checkpointing with invalid signature");
                         continue;
                     }
@@ -363,7 +370,7 @@ fn find_l1_height_for_l2_blockid(
 
 #[cfg(test)]
 mod tests {
-    use bitcoin::params::MAINNET;
+    use bitcoin::{params::MAINNET, BlockHash};
     use strata_db::traits::L1Database;
     use strata_primitives::{
         block_credential,
@@ -394,12 +401,21 @@ mod tests {
     }
 
     impl EventContext for DummyEventContext {
-        fn get_l1_block_manifest(&self, height: u64) -> Result<L1BlockManifest, Error> {
+        fn get_l1_block_manifest(&self, blockid: &L1BlockId) -> Result<L1BlockManifest, Error> {
+            let blockhash: BlockHash = (*blockid).into();
+            Ok(self
+                .chainseg
+                .get_block_manifest_by_blockhash(&blockhash)
+                .unwrap())
+        }
+
+        fn get_l1_block_manifest_at_height(&self, height: u64) -> Result<L1BlockManifest, Error> {
             let rec = self.chainseg.get_header_record(height).unwrap();
             Ok(L1BlockManifest::new(
                 rec,
                 HeaderVerificationState::default(),
                 Vec::new(),
+                0,
                 height,
             ))
         }
