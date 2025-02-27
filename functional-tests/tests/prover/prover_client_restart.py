@@ -1,5 +1,3 @@
-import time
-
 import flexitest
 
 from envs import testenv
@@ -38,7 +36,10 @@ class ProverClientRestartTest(testenv.StrataTester):
         sequencer_rpc = sequencer.create_rpc()
 
         # Wait for the Prover Manager setup
-        time.sleep(5)
+        wait_until(
+            lambda: prover_client_rpc.dev_strata_getReport() is not None,
+            error_with="Prover did not start on time",
+        )
 
         # Test on with the latest checkpoint
         latest_checkpoint = sequencer_rpc.strata_getLatestCheckpointIndex()
