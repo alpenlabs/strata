@@ -67,6 +67,20 @@ jobs:
               - 'bin/strata-reth/**'
             prover-client:
               - 'bin/prover-client/**'
+      - name: Export change detection outputs
+        env:
+          STRATA_CLIENT_CHANGED_OUTPUT: ${{ steps.filter.outputs.strata-client }}
+          STRATA_SEQUENCER_CHANGED_OUTPUT: ${{ steps.filter.outputs.strata-sequencer-client }}
+          STRATA_RETH_CHANGED_OUTPUT: ${{ steps.filter.outputs.strata-reth }}
+          PROVER_CLIENT_CHANGED_OUTPUT: ${{ steps.filter.outputs.prover-client }}
+        run: |
+          # Safely write environment variables using printf
+          {
+            printf "STRATA_CLIENT_CHANGED=%q\n" "${STRATA_CLIENT_CHANGED_OUTPUT}"
+            printf "STRATA_SEQUENCER_CHANGED=%q\n" "${STRATA_SEQUENCER_CHANGED_OUTPUT}"
+            printf "STRATA_RETH_CHANGED=%q\n" "${STRATA_RETH_CHANGED_OUTPUT}"
+            printf "PROVER_CLIENT_CHANGED=%q\n" "${PROVER_CLIENT_CHANGED_OUTPUT}"
+          } >> "$GITHUB_ENV"
 
   build-and-push:
     permissions:
@@ -110,15 +124,17 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
         run: |
-          IMAGE_TAG=${COMMIT::7}
+          SHORT_TAG="${COMMIT//[^a-zA-Z0-9._-]/}"
+          SHORT_TAG="${SHORT_TAG:0:7}"
           PROGRAM="${{ matrix.program }}"
-          echo "Building and pushing $PROGRAM image with tag $IMAGE_TAG"
 
-          DOCKERFILE_PATH="docker/$PROGRAM/Dockerfile"
-          ECR_REPOSITORY="$ECR_REPOSITORY_PREFIX/${PROGRAM}"
+          echo "Building and pushing \"$PROGRAM\" image with tag \"$SHORT_TAG\""
 
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f $DOCKERFILE_PATH .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          DOCKERFILE_PATH="docker/${PROGRAM}/Dockerfile"
+          ECR_REPOSITORY="${ECR_REPOSITORY_PREFIX}/${PROGRAM}"
+
+          docker build -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_TAG}" -f "${DOCKERFILE_PATH}" .
+          docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_TAG}"
 
   update-helm-values:
     name: Update Helm Values
@@ -134,9 +150,9 @@ jobs:
         env:
           BRANCH_OF_DEPLOYMENT_REPO: ${{ vars.BRANCH_OF_DEPLOYMENT_REPO }}
         run: |
-          git clone --depth=1 --branch $BRANCH_OF_DEPLOYMENT_REPO git@github.com:alpenlabs/deployments.git deployments
-          cd deployments
-          git checkout $BRANCH_OF_DEPLOYMENT_REPO
+          git clone --depth=1 --branch "$BRANCH_OF_DEPLOYMENT_REPO" git@github.com:alpenlabs/deployments.git deployments
+          cd deployments || exit
+          git checkout "$BRANCH_OF_DEPLOYMENT_REPO"
 
       - name: Install yq
         run: |
@@ -148,24 +164,30 @@ jobs:
           SHORT_TAG: ${{ github.sha }}
           CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
         run: |
-          SHORT_TAG="${SHORT_TAG::7}"
+          # Sanitize SHORT_TAG
+          SHORT_TAG="${COMMIT//[^a-zA-Z0-9._-]/}"
+          SHORT_TAG="${SHORT_TAG:0:7}"
+
           VALUES_FILE_NODES="deployments/clusters/${CLUSTER_NAME}/values/strata-nodes-values.yaml"
           VALUES_FILE_PROVER="deployments/clusters/${CLUSTER_NAME}/values/strata-prover-values.yaml"
 
-          if [[ "${{ needs.detect-changes.outputs.strata-client_changed }}" == "true" ]]; then
-            yq eval -i ".client.image.tag = \"$SHORT_TAG\"" "${VALUES_FILE_NODES}"
+          # Validate booleans
+          validate_boolean() { [[ "$1" == "true" || "$1" == "false" ]]; }
+
+          if validate_boolean "$STRATA_CLIENT_CHANGED" && [[ "$STRATA_CLIENT_CHANGED" == "true" ]]; then
+            yq eval -i --arg tag "$SHORT_TAG" ".client.image.tag = $tag" "$VALUES_FILE_NODES"
           fi
 
-          if [[ "${{ needs.detect-changes.outputs.strata-sequencer-client_changed }}" == "true" ]]; then
-            yq eval -i ".sequencerSigner.image.tag = \"$SHORT_TAG\"" "${VALUES_FILE_NODES}"
+          if validate_boolean "$STRATA_SEQUENCER_CHANGED" && [[ "$STRATA_SEQUENCER_CHANGED" == "true" ]]; then
+            yq eval -i --arg tag "$SHORT_TAG" ".sequencerSigner.image.tag = $tag" "$VALUES_FILE_NODES"
           fi
 
-          if [[ "${{ needs.detect-changes.outputs.strata-reth_changed }}" == "true" ]]; then
-            yq eval -i ".reth.image.tag = \"$SHORT_TAG\"" "${VALUES_FILE_NODES}"
+          if validate_boolean "$STRATA_RETH_CHANGED" && [[ "$STRATA_RETH_CHANGED" == "true" ]]; then
+            yq eval -i --arg tag "$SHORT_TAG" ".reth.image.tag = $tag" "$VALUES_FILE_NODES"
           fi
 
-          if [[ "${{ needs.detect-changes.outputs.prover-client_changed }}" == "true" ]]; then
-            yq eval -i ".proverClient.image.tag = \"$SHORT_TAG\"" "${VALUES_FILE_PROVER}"
+          if validate_boolean "$PROVER_CLIENT_CHANGED" && [[ "$PROVER_CLIENT_CHANGED" == "true" ]]; then
+            yq eval -i --arg tag "$SHORT_TAG" ".proverClient.image.tag = $tag" "$VALUES_FILE_PROVER"
           fi
 
       - name: Commit and push changes
@@ -175,8 +197,10 @@ jobs:
           CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
           BRANCH_OF_DEPLOYMENT_REPO: ${{ vars.BRANCH_OF_DEPLOYMENT_REPO }}
         run: |
-          SHORT_TAG=${SHORT_TAG::7}
-          cd deployments
+          SHORT_TAG="${COMMIT//[^a-zA-Z0-9._-]/}"
+          SHORT_TAG="${SHORT_TAG:0:7}"
+
+          cd deployments || exit
           git config user.name "$GH_ACTIONS_USER_NAME"
           git config user.email "$GH_ACTIONS_USER_NAME@alpenlabs.io"
 
@@ -184,8 +208,8 @@ jobs:
           if git diff --quiet; then
             echo "No changes to commit."
           else
-            git add clusters/$CLUSTER_NAME/values
-            git commit -m "Update image tags to $SHORT_TAG for changed programs"
-            git pull --rebase origin $BRANCH_OF_DEPLOYMENT_REPO
-            git push origin $BRANCH_OF_DEPLOYMENT_REPO
+            git add "clusters/$CLUSTER_NAME/values"
+            git commit -m "Update image tags to \"$SHORT_TAG\" for changed programs"
+            git pull --rebase origin "$BRANCH_OF_DEPLOYMENT_REPO"
+            git push origin "$BRANCH_OF_DEPLOYMENT_REPO"
           fi
