@@ -4,9 +4,9 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use bitcoin::{hashes::Hash, Network, Txid, Wtxid};
+use bitcoin::{Network, Txid};
 use serde::{Deserialize, Serialize};
-use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry};
+use strata_db::types::{CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
     epoch::EpochCommitment,
@@ -19,8 +19,8 @@ use strata_state::{
     bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     bridge_state::{DepositEntry, DepositState},
+    client_state::CheckpointL1Ref,
     id::L2BlockId,
-    l1::L1BlockId,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -275,36 +275,6 @@ pub struct RawBlockWitness {
     pub raw_chain_state: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RpcCheckpointCommitmentInfo {
-    /// block where checkpoint was posted
-    pub blockhash: L1BlockId,
-
-    /// txid of txn for this checkpoint
-    pub txid: Txid,
-
-    /// wtxid of txn for this checkpoint
-    pub wtxid: Wtxid,
-
-    /// The height of the block where the checkpoint was posted.
-    pub height: u64,
-
-    /// The position of the checkpoint in the block.
-    pub position: u32,
-}
-
-impl From<CheckpointCommitment> for RpcCheckpointCommitmentInfo {
-    fn from(value: CheckpointCommitment) -> Self {
-        Self {
-            blockhash: value.blockhash.into(),
-            txid: Txid::from_byte_array(*value.txid.as_ref()),
-            wtxid: Wtxid::from_byte_array(*value.wtxid.as_ref()),
-            height: value.block_height,
-            position: value.position,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RpcCheckpointConfStatus {
@@ -320,8 +290,8 @@ impl From<CheckpointConfStatus> for RpcCheckpointConfStatus {
     fn from(value: CheckpointConfStatus) -> Self {
         match value {
             CheckpointConfStatus::Pending => Self::Pending,
-            CheckpointConfStatus::Confirmed => Self::Confirmed,
-            CheckpointConfStatus::Finalized => Self::Finalized,
+            CheckpointConfStatus::Confirmed(_) => Self::Confirmed,
+            CheckpointConfStatus::Finalized(_) => Self::Finalized,
         }
     }
 }
@@ -341,9 +311,9 @@ pub struct RpcCheckpointInfo {
     /// L2 range the checkpoint covers
     pub l2_range: (L2BlockCommitment, L2BlockCommitment),
     /// Info on txn where checkpoint is committed on chain
-    pub commitment: Option<RpcCheckpointCommitmentInfo>,
+    pub l1_reference: Option<CheckpointL1Ref>,
     /// Confirmation status of checkpoint
-    pub confirmation_status: Option<RpcCheckpointConfStatus>,
+    pub confirmation_status: RpcCheckpointConfStatus,
 }
 
 impl From<BatchInfo> for RpcCheckpointInfo {
@@ -352,8 +322,8 @@ impl From<BatchInfo> for RpcCheckpointInfo {
             idx: value.epoch,
             l1_range: value.l1_range,
             l2_range: value.l2_range,
-            commitment: None,
-            confirmation_status: None,
+            l1_reference: None,
+            confirmation_status: RpcCheckpointConfStatus::Pending,
         }
     }
 }
@@ -361,8 +331,12 @@ impl From<BatchInfo> for RpcCheckpointInfo {
 impl From<CheckpointEntry> for RpcCheckpointInfo {
     fn from(value: CheckpointEntry) -> Self {
         let mut item: Self = value.checkpoint.batch_info().clone().into();
-        item.commitment = value.commitment.map(Into::into);
-        item.confirmation_status = Some(value.confirmation_status.into());
+        item.l1_reference = match value.confirmation_status.clone() {
+            CheckpointConfStatus::Pending => None,
+            CheckpointConfStatus::Confirmed(lref) => Some(lref),
+            CheckpointConfStatus::Finalized(lref) => Some(lref),
+        };
+        item.confirmation_status = value.confirmation_status.into();
         item
     }
 }

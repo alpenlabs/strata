@@ -414,55 +414,6 @@ impl CheckpointProofOutput {
     }
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct CommitmentInfo {
-    pub blockhash: Buf32,
-    pub txid: Buf32,
-    pub wtxid: Buf32,
-    pub block_height: u64,
-    pub position: u32,
-}
-
-impl CommitmentInfo {
-    pub fn new(
-        blockhash: Buf32,
-        txid: Buf32,
-        wtxid: Buf32,
-        block_height: u64,
-        position: u32,
-    ) -> Self {
-        Self {
-            blockhash,
-            txid,
-            wtxid,
-            block_height,
-            position,
-        }
-    }
-}
-
-/// Contains the checkpoint data along with its commitment to l1.
-#[derive(
-    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
-pub struct L1CommittedCheckpoint {
-    /// The actual `Checkpoint` data.
-    pub checkpoint: Checkpoint,
-    /// Its commitment to L1 used to locate/identify the checkpoint in L1.
-    pub commitment: CommitmentInfo,
-}
-
-impl L1CommittedCheckpoint {
-    pub fn new(checkpoint: Checkpoint, commitment: CommitmentInfo) -> Self {
-        Self {
-            checkpoint,
-            commitment,
-        }
-    }
-}
-
 /// Verifies that a signed checkpoint has a proper signature according to rollup
 /// params.
 // TODO this might want to take a chainstate in the future, but we don't have

@@ -3,10 +3,10 @@
 
 use std::cmp::min;
 
-use bitcoin::block::Header;
+use bitcoin::{block::Header, Transaction};
 use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
 use strata_primitives::{
-    batch::{verify_signed_checkpoint_sig, BatchInfo, Checkpoint, L1CommittedCheckpoint},
+    batch::{verify_signed_checkpoint_sig, BatchInfo, Checkpoint},
     l1::{get_btc_params, HeaderVerificationState, L1BlockCommitment, L1BlockId},
     prelude::*,
 };
@@ -149,8 +149,11 @@ fn handle_block(
             .get_internal_state(height - 1)
             .expect("clientstate: missing expected block state");
 
-        let new_istate = process_l1_block(prev_istate, height, block_mf, params.rollup())?;
+        let (new_istate, sync_actions) =
+            process_l1_block(prev_istate, height, block_mf, params.rollup())?;
         state.accept_l1_block_state(block, new_istate);
+        // Push actions from processing l1 block if any
+        state.push_actions(sync_actions.into_iter());
 
         // TODO make max states configurable
         let max_states = 20;
@@ -202,14 +205,6 @@ fn handle_block(
         state.push_action(SyncAction::FinalizeEpoch(*decl_epoch));
     }
 
-    // If we have some number of L1 blocks finalized, also emit an `UpdateBuried` write.
-    let safe_depth = params.rollup().l1_reorg_safe_depth as u64;
-    let maturable_height = next_exp_height.saturating_sub(safe_depth);
-
-    if maturable_height > params.rollup().horizon_l1_height && state.state().is_chain_active() {
-        handle_mature_l1_height(state, maturable_height, context);
-    }
-
     Ok(())
 }
 
@@ -226,14 +221,15 @@ fn process_l1_block(
     height: u64,
     block_mf: &L1BlockManifest,
     params: &RollupParams,
-) -> Result<InternalState, Error> {
+) -> Result<(InternalState, Vec<SyncAction>), Error> {
     let blkid = block_mf.blkid();
     let mut checkpoint = state.last_checkpoint().cloned();
+    let mut sync_actions = Vec::new();
 
     // Iterate through all of the protocol operations in all of the txs.
     // TODO split out each proto op handling into a separate function
-    for txs in block_mf.txs() {
-        for op in txs.protocol_ops() {
+    for tx in block_mf.txs() {
+        for op in tx.protocol_ops() {
             match op {
                 ProtocolOperation::Checkpoint(signed_ckpt) => {
                     // Before we do anything, check its signature.
@@ -251,17 +247,24 @@ fn process_l1_block(
                         continue;
                     }
 
+                    let ckpt_ref = get_l1_reference(tx, height)?;
+
                     // Construct the state bookkeeping entry for the checkpoint.
                     let l1ckpt = L1Checkpoint::new(
                         ckpt.batch_info().clone(),
                         ckpt.batch_transition().clone(),
                         ckpt.base_state_commitment().clone(),
-                        !ckpt.proof().is_empty(),
-                        height,
+                        ckpt_ref.clone(),
                     );
 
                     // If it all looks good then overwrite the saved checkpoint.
                     checkpoint = Some(l1ckpt);
+
+                    // Emit a sync action to update checkpoint entry in db
+                    sync_actions.push(SyncAction::UpdateCheckpointInclusion {
+                        epoch: ckpt.batch_info().epoch(),
+                        l1_reference: ckpt_ref,
+                    });
                 }
 
                 // The rest we don't care about here.  Maybe we will in the
@@ -270,102 +273,24 @@ fn process_l1_block(
             }
         }
     }
+    let istate = InternalState::new(*blkid, checkpoint);
 
-    Ok(InternalState::new(*blkid, checkpoint))
+    Ok((istate, sync_actions))
 }
 
-/// Handles the maturation of L1 height by finalizing checkpoints and emitting
-/// sync actions.
-///
-/// This function checks if there are any verified checkpoints at or before the
-/// given `maturable_height`. If such checkpoints exist, it attempts to
-/// finalize them by checking if the corresponding L2 block is available in the
-/// L2 database. If the L2 block is found, it marks the checkpoint as finalized
-/// and emits a sync action to finalize the L2 block. If the L2 block is not
-/// found, it logs a warning and skips the finalization.
-///
-/// # Arguments
-///
-/// * `state` - A reference to the current client state.
-/// * `maturable_height` - The height at which L1 blocks are considered mature.
-/// * `database` - A reference to the database interface.
-///
-/// # Returns
-///
-/// A tuple containing:
-/// * A vector of [`ClientStateWrite`] representing the state changes to be written.
-/// * A vector of [`SyncAction`] representing the actions to be synchronized.
-fn handle_mature_l1_height(
-    state: &mut ClientStateMut,
-    maturable_height: u64,
-    context: &impl EventContext,
-) -> Result<(), Error> {
-    // If there are no checkpoints then return early.
-    if !state
-        .state()
-        .has_verified_checkpoint_before(maturable_height)
-    {
-        return Ok(());
-    }
-
-    // If there *are* checkpoints at or before the maturable height, mark them
-    // as finalized
-    if let Some(checkpt) = state
-        .state()
-        .get_last_verified_checkpoint_before(maturable_height)
-    {
-        // FinalizeBlock Should only be applied when l2_block is actually
-        // available in l2_db
-        // If l2 blocks is not in db then finalization will happen when
-        // l2Block is fetched from the network and the corresponding
-        //checkpoint is already finalized.
-        let epoch = checkpt.batch_info.get_epoch_commitment();
-        let blkid = *epoch.last_blkid();
-
-        match context.get_l2_block_data(&blkid) {
-            Ok(_) => {
-                // Emit sync action for finalizing an epoch
-                trace!(%maturable_height, %blkid, "epoch terminal block found in DB, emitting FinalizedEpoch action");
-                state.push_action(SyncAction::FinalizeEpoch(epoch));
-            }
-
-            // TODO figure out how to make this not matter
-            Err(Error::MissingL2Block(_)) => {
-                warn!(
-                    %maturable_height, ?epoch, "epoch terminal not in DB yet, skipping finalization"
-                );
-            }
-
-            Err(e) => {
-                error!(%blkid, err = %e, "error while checking for block present");
-                return Err(e);
-            }
-        }
-    } else {
-        warn!(
-        %maturable_height,
-        "expected to find blockid corresponding to buried l1 height in confirmed_blocks but could not find"
+fn get_l1_reference(tx: &L1Tx, height: u64) -> Result<CheckpointL1Ref, Error> {
+    let btx: Transaction = tx.tx_data().try_into().map_err(|e| {
+        warn!(%height, "Invalid bitcoin transaction data in L1Tx");
+        let msg = format!(
+            "Invalid bitcoin transaction data in L1Tx at height {}",
+            height
         );
-    }
+        Error::Other(msg)
+    })?;
 
-    Ok(())
-}
-
-/// Searches for a given [`L2BlockId`] within a slice of [`L1Checkpoint`] structs
-/// and returns the height of the corresponding L1 block if found.
-fn find_l1_height_for_l2_blockid(
-    checkpoints: &[L1Checkpoint],
-    target_l2_blockid: &L2BlockId,
-) -> Option<u64> {
-    checkpoints
-        .binary_search_by(|checkpoint| {
-            checkpoint
-                .batch_info
-                .final_l2_blockid()
-                .cmp(target_l2_blockid)
-        })
-        .ok()
-        .map(|index| checkpoints[index].height)
+    let txid = btx.compute_txid().into();
+    let wtxid = btx.compute_wtxid().into();
+    Ok(CheckpointL1Ref::new(height, txid, wtxid))
 }
 
 #[cfg(test)]

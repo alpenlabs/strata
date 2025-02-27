@@ -648,7 +648,9 @@ impl StrataApiServer for StrataRpcImpl {
         // that behavior here
         if let Some(last_checkpoint) = cstate.get_last_checkpoint() {
             if last_checkpoint.batch_info.includes_l2_block(block_slot) {
-                return Ok(L2BlockStatus::Finalized(last_checkpoint.height));
+                return Ok(L2BlockStatus::Finalized(
+                    last_checkpoint.l1_reference.block_height,
+                ));
             }
         }
 
@@ -911,9 +913,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             Err(Error::MissingCheckpointProof(checkpoint_idx))?;
         }
 
-        if entry.confirmation_status == CheckpointConfStatus::Confirmed
-            || entry.confirmation_status == CheckpointConfStatus::Finalized
-        {
+        if entry.confirmation_status != CheckpointConfStatus::Pending {
             Err(Error::CheckpointAlreadyPosted(checkpoint_idx))?;
         }
 

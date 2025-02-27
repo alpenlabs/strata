@@ -6,7 +6,9 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::{epoch::EpochCommitment, l1::L1BlockCommitment, params::Params};
+use strata_primitives::{
+    buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment, params::Params,
+};
 use tracing::*;
 
 use crate::{
@@ -150,30 +152,13 @@ impl ClientState {
             .and_then(|st| st.last_checkpoint())
     }
 
-    /// Checks if there is any checkpoint available at or before the given height.
-    // TODO handling if we ask for a block outside this range
-    pub fn has_verified_checkpoint_before(&self, height: u64) -> bool {
-        match self.int_states.get_absolute(height) {
-            Some(istate) => istate.last_checkpoint().is_some(),
-            None => false,
-        }
-    }
-
-    /// Gets the last verified checkpoint found as of some L1 height.
-    // TODO handling if we ask for a block outside this range
-    pub fn get_last_verified_checkpoint_before(&self, height: u64) -> Option<&L1Checkpoint> {
-        self.int_states
-            .get_absolute(height)
-            .and_then(|ck| ck.last_checkpoint())
-    }
-
     /// Gets the height that an L2 block was last verified at, if it was
     /// verified.
     // FIXME this is a weird function, what purpose does this serve?
     pub fn get_verified_l1_height(&self, slot: u64) -> Option<u64> {
         self.get_last_checkpoint().and_then(|ckpt| {
             if ckpt.batch_info.includes_l2_block(slot) {
-                Some(ckpt.height)
+                Some(ckpt.l1_reference.block_height)
             } else {
                 None
             }
@@ -355,10 +340,25 @@ impl InternalState {
             .as_ref()
             .map(|ck| ck.batch_info.final_l1_block())
     }
+}
 
-    /// Returns the height that the last checkpoint was included at, if there was one..
-    pub fn last_checkpoint_height(&self) -> Option<u64> {
-        self.last_checkpoint.as_ref().map(|ck| ck.height)
+/// Represents a reference to a transaction in bitcoin. Redundantly puts block_height a well.
+#[derive(
+    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
+pub struct CheckpointL1Ref {
+    pub block_height: u64,
+    pub txid: Buf32,
+    pub wtxid: Buf32,
+}
+
+impl CheckpointL1Ref {
+    pub fn new(block_height: u64, txid: Buf32, wtxid: Buf32) -> Self {
+        Self {
+            block_height,
+            txid,
+            wtxid,
+        }
     }
 }
 
@@ -375,12 +375,8 @@ pub struct L1Checkpoint {
     /// Reference state commitment against which batch transitions is verified.
     pub base_state_commitment: BaseStateCommitment,
 
-    /// If the checkpoint included proof.
-    pub is_proved: bool,
-
-    /// L1 block height the checkpoint was found in.
-    // TODO remove this?
-    pub height: u64,
+    /// L1 reference for this checkpoint.
+    pub l1_reference: CheckpointL1Ref,
 }
 
 impl L1Checkpoint {
@@ -388,15 +384,13 @@ impl L1Checkpoint {
         batch_info: BatchInfo,
         batch_transition: BatchTransition,
         base_state_commitment: BaseStateCommitment,
-        is_proved: bool,
-        height: u64,
+        l1_reference: CheckpointL1Ref,
     ) -> Self {
         Self {
             batch_info,
             batch_transition,
             base_state_commitment,
-            is_proved,
-            height,
+            l1_reference,
         }
     }
 }
