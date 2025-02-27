@@ -9,7 +9,7 @@ use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
 use strata_primitives::l1::{L1TxProof, ProtocolOperation};
 use zkaleido::ZkVmEnv;
 
-use crate::{block::check_integrity, tx_indexer::ProverTxVisitorImpl};
+use crate::{block::check_block_integrity, tx_indexer::ProverTxVisitorImpl};
 
 /// Defines the result of scanning an L1 block.
 /// Includes protocol-relevant data posted on L1 block.
@@ -40,21 +40,24 @@ pub struct BlockScanProofInput {
 
 pub fn process_blockscan_proof(zkvm: &impl ZkVmEnv) {
     // 1a. Read the count and transaction filters used to scan the block
-    let count: usize = zkvm.read_serde();
+    let btc_blocks_count: usize = zkvm.read_serde();
     let tx_filters: TxFilterConfig = zkvm.read_borsh();
 
-    let mut blockscan_results = Vec::with_capacity(count);
+    let mut blockscan_results = Vec::with_capacity(btc_blocks_count);
 
-    for _ in 0..count {
+    for _ in 0..btc_blocks_count {
         // 1b. Read the full serialized block and deserialize it
         let serialized_block = zkvm.read_buf();
         let block: Block = deserialize(&serialized_block).expect("invalid block serialization");
 
         // 1c. Read inclusion proof
-        let inclusion_proof: Option<L1TxProof> = zkvm.read_borsh();
+        let coinbase_inclusion_proof: Option<L1TxProof> = zkvm.read_borsh();
 
         // 2. Check that the content of the block is valid
-        assert!(check_integrity(&block, &inclusion_proof), "invalid block");
+        assert!(
+            check_block_integrity(&block, &coinbase_inclusion_proof),
+            "invalid block"
+        );
 
         // 3. Index the block for protocol ops
         let protocol_ops: Vec<ProtocolOperation> =

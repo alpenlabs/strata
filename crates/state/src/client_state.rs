@@ -7,9 +7,7 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
-    buf::Buf32, 
     buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment, params::Params,
-,
 };
 use tracing::*;
 
@@ -372,10 +370,7 @@ pub struct L1Checkpoint {
     pub batch_info: BatchInfo,
 
     /// The inner checkpoint batch transition.
-    pub batch_transition: BatchTransition,
-
-    /// Reference state commitment against which batch transitions is verified.
-    pub base_state_commitment: BaseStateCommitment,
+    pub batch_transition: (Buf32, Buf32),
 
     /// L1 reference for this checkpoint.
     pub l1_reference: CheckpointL1Ref,

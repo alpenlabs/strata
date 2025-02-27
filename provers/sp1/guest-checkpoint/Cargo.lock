@@ -2834,7 +2834,6 @@ dependencies = [
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-cl-stf",
- "strata-proofimpl-l1-batch",
  "strata-state",
  "zkaleido",
 ]
@@ -2847,6 +2846,7 @@ dependencies = [
  "strata-chaintsn",
  "strata-crypto",
  "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "zkaleido",
@@ -2878,21 +2878,6 @@ dependencies = [
  "strata-reth-primitives",
  "strata-state",
  "thiserror 2.0.11",
- "zkaleido",
-]
-
-[[package]]
-name = "strata-proofimpl-l1-batch"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "borsh",
- "ethnum",
- "serde",
- "strata-l1tx",
- "strata-primitives",
- "strata-proofimpl-btc-blockspace",
- "strata-state",
  "zkaleido",
 ]
 

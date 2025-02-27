@@ -12,7 +12,7 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadIntent},
 };
 use strata_state::{
-    batch::{BaseStateCommitment, BatchInfo, BatchTransition, Checkpoint},
+    batch::{BatchInfo, Checkpoint},
     client_state::CheckpointL1Ref,
 };
 use zkaleido::Proof;

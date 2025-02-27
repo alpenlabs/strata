@@ -131,8 +131,7 @@ impl EpochSummary {
 
 /// Consolidates all information required to describe and verify a batch checkpoint.
 /// This includes metadata about the batch, the state transitions, checkpoint base state,
-/// and the proof itself. The proof verifies that the transition in [`BatchTransition`]
-/// is valid for the batch described by [`BatchInfo`].
+/// and the proof itself. The proof verifies that the `transition` is valid.
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
