@@ -8,6 +8,7 @@ from strata_utils import (
 )
 
 from envs.rollup_params_cfg import RollupConfig
+from factory.config import BitcoindConfig, RethELConfig
 from load.cfg import LoadConfig, LoadConfigBuilder
 from utils import *
 from utils.constants import *
@@ -194,18 +195,17 @@ class BasicEnvConfig(flexitest.EnvConfig):
             generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
 
         rpc_port = bitcoind.get_prop("rpc_port")
-        rpc_user = bitcoind.get_prop("rpc_user")
-        rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}/wallet/{walletname}"
-        bitcoind_config = {
-            "bitcoind_sock": rpc_sock,
-            "bitcoind_user": rpc_user,
-            "bitcoind_pass": rpc_pass,
-        }
-        reth_config = {
-            "reth_socket": f"localhost:{reth_port}",
-            "reth_secret_path": reth_secret_path,
-        }
+        bitcoind_config = BitcoindConfig(
+            rpc_url=rpc_sock,
+            rpc_user=bitcoind.get_prop("rpc_user"),
+            rpc_password=bitcoind.get_prop("rpc_password"),
+        )
+
+        reth_config = RethELConfig(
+            rpc_url=f"localhost:{reth_port}",
+            secret=reth_secret_path,
+        )
         sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
         seq_host = sequencer.get_prop("rpc_host")
@@ -326,19 +326,19 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         # generate blocks every 500 millis
         if self.auto_generate_blocks:
             generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
+
         rpc_port = bitcoind.get_prop("rpc_port")
-        rpc_user = bitcoind.get_prop("rpc_user")
-        rpc_pass = bitcoind.get_prop("rpc_password")
         rpc_sock = f"localhost:{rpc_port}/wallet/{walletname}"
-        bitcoind_config = {
-            "bitcoind_sock": rpc_sock,
-            "bitcoind_user": rpc_user,
-            "bitcoind_pass": rpc_pass,
-        }
-        reth_config = {
-            "reth_socket": f"localhost:{reth_authrpc_port}",
-            "reth_secret_path": reth_secret_path,
-        }
+        bitcoind_config = BitcoindConfig(
+            rpc_url=rpc_sock,
+            rpc_user=bitcoind.get_prop("rpc_user"),
+            rpc_password=bitcoind.get_prop("rpc_password"),
+        )
+
+        reth_config = RethELConfig(
+            rpc_url=f"localhost:{reth_authrpc_port}",
+            secret=reth_secret_path,
+        )
         sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
         seq_host = sequencer.get_prop("rpc_host")
@@ -351,10 +351,10 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         fullnode_reth_port = fullnode_reth.get_prop("rpc_port")
-        fullnode_reth_config = {
-            "reth_socket": f"localhost:{fullnode_reth_port}",
-            "reth_secret_path": reth_secret_path,
-        }
+        fullnode_reth_config = RethELConfig(
+            rpc_url=f"localhost:{fullnode_reth_port}",
+            secret=reth_secret_path,
+        )
 
         sequencer_rpc = f"ws://localhost:{sequencer.get_prop('rpc_port')}"
 

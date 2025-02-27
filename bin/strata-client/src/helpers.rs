@@ -16,31 +16,57 @@ use strata_storage::NodeStorage;
 use tokio::runtime::Handle;
 use tracing::*;
 
-use crate::{args::Args, errors::InitError, network};
+use crate::{
+    args::{apply_override, parse_override, Args, EnvArgs},
+    errors::{ConfigError, InitError},
+    network,
+};
 
 pub fn get_config(args: Args) -> Result<Config, InitError> {
-    match args.config.as_ref() {
-        Some(config_path) => {
-            // Values passed over arguments get the precedence over the configuration files
-            let mut config = load_configuration(config_path)?;
-            args.update_config(&mut config);
-            Ok(config)
-        }
-        None => match args.derive_config() {
-            Err(msg) => {
-                eprintln!("Error: {}", msg);
-                std::process::exit(1);
-            }
-            Ok(cfg) => Ok(cfg),
-        },
+    // First load from config file.
+    let mut config_toml = load_configuration(args.config.as_ref())?;
+
+    // Extend overrides from env.
+    let env_args = EnvArgs::from_env();
+    let mut override_strs = env_args.get_overrides();
+
+    // Extend overrides from args.
+    override_strs.extend_from_slice(&args.get_overrides()?);
+
+    // Parse overrides.
+    let overrides = override_strs
+        .iter()
+        .map(|o| parse_override(o))
+        .collect::<Result<Vec<_>, ConfigError>>()?;
+
+    // Apply overrides to toml table.
+    let table = config_toml
+        .as_table_mut()
+        .ok_or(ConfigError::TraverseNonTableAt("".to_string()))?;
+
+    for (path, val) in overrides {
+        apply_override(&path, val, table)?;
     }
+
+    // Convert back to Config.
+    config_toml
+        .try_into::<Config>()
+        .map_err(|e| InitError::Anyhow(e.into()))
+        .and_then(validate_config)
 }
 
-fn load_configuration(path: &Path) -> Result<Config, InitError> {
+/// Does any extra validations that need to be done for `Config` which are not enforced by type.
+fn validate_config(config: Config) -> Result<Config, InitError> {
+    // Check if the client is not running as sequencer then has sync endpoint.
+    if !config.client.is_sequencer && config.client.sync_endpoint.is_none() {
+        return Err(InitError::Anyhow(anyhow::anyhow!("Missing sync_endpoint")));
+    }
+    Ok(config)
+}
+
+fn load_configuration(path: &Path) -> Result<toml::Value, InitError> {
     let config_str = fs::read_to_string(path)?;
-    let conf =
-        toml::from_str::<Config>(&config_str).map_err(|err| SerdeError::new(config_str, err))?;
-    Ok(conf)
+    toml::from_str(&config_str).map_err(|e| InitError::Anyhow(e.into()))
 }
 
 pub fn load_jwtsecret(path: &Path) -> Result<JwtSecret, InitError> {
@@ -96,18 +122,18 @@ fn load_rollup_params(path: &Path) -> Result<RollupParams, InitError> {
 // TODO: remove this after builder is done
 pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinClient>> {
     // Set up Bitcoin client RPC.
-    let bitcoind_url = format!("http://{}", config.bitcoind_rpc.rpc_url);
+    let bitcoind_url = format!("http://{}", config.bitcoind.rpc_url);
     let btc_rpc = BitcoinClient::new(
         bitcoind_url,
-        config.bitcoind_rpc.rpc_user.clone(),
-        config.bitcoind_rpc.rpc_password.clone(),
-        config.bitcoind_rpc.retry_count,
-        config.bitcoind_rpc.retry_interval,
+        config.bitcoind.rpc_user.clone(),
+        config.bitcoind.rpc_password.clone(),
+        config.bitcoind.retry_count,
+        config.bitcoind.retry_interval,
     )
     .map_err(anyhow::Error::from)?;
 
     // TODO remove this
-    if config.bitcoind_rpc.network != Network::Regtest {
+    if config.bitcoind.network != Network::Regtest {
         warn!("network not set to regtest, ignoring");
     }
     Ok(btc_rpc.into())

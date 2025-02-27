@@ -18,6 +18,9 @@ class BridgeMsgTest(testenv.StrataTester):
         # create both btc and sequencer RPC
         seqrpc = seq.create_rpc()
 
+        # NOTE: the Bridge config should have relay_misc set to True in order
+        # for this to pass since the scope of the message is Misc
+
         # BridgeMessage { source_id: 1,
         #                 sig: [00] * 64
         #                 scope: Misc, payload: [42] }

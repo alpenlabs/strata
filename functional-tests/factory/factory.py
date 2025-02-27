@@ -1,7 +1,7 @@
 import logging
 import os
 import shutil
-from typing import Optional, TypedDict
+from typing import Optional
 
 import flexitest
 import web3
@@ -9,21 +9,11 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from factory import seqrpc
+from factory.config import BitcoindConfig, ClientConfig, Config, ExecConfig, RethELConfig
 from load.cfg import LoadConfig
 from load.service import LoadGeneratorService
 from utils import *
 from utils.constants import *
-
-
-class BitcoinRpcConfig(TypedDict):
-    bitcoind_sock: str
-    bitcoind_user: str
-    bitcoind_pass: str
-
-
-class RethConfig(TypedDict):
-    reth_socket: str
-    reth_secret_path: str
 
 
 class BitcoinFactory(flexitest.Factory):
@@ -81,8 +71,8 @@ class StrataFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_sequencer_node(
         self,
-        bitcoind_config: BitcoinRpcConfig,
-        reth_config: RethConfig,
+        bitcoind_config: BitcoindConfig,
+        reth_config: RethELConfig,
         sequencer_address: str,  # TODO: remove this
         rollup_params: str,
         ctx: flexitest.EnvContext,
@@ -92,27 +82,34 @@ class StrataFactory(flexitest.Factory):
         rpc_host = "127.0.0.1"
         logfile = os.path.join(datadir, "service.log")
 
-        # fmt: off
-        cmd = [
-            "strata-client",
-            "--datadir", datadir,
-            "--rpc-host", rpc_host,
-            "--rpc-port", str(rpc_port),
-            "--bitcoind-host", bitcoind_config["bitcoind_sock"],
-            "--bitcoind-user", bitcoind_config["bitcoind_user"],
-            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
-            "--reth-authrpc", reth_config["reth_socket"],
-            "--reth-jwtsecret", reth_config["reth_secret_path"],
-            "--network", "regtest",
-            "--sequencer"
-        ]
-        # fmt: on
-
+        # Write rollup params to file
         rollup_params_file = os.path.join(datadir, "rollup_params.json")
         with open(rollup_params_file, "w") as f:
             f.write(rollup_params)
 
-        cmd.extend(["--rollup-params", rollup_params_file])
+        # Create config
+        config = Config(
+            bitcoind=bitcoind_config,
+            exec=ExecConfig(reth=reth_config),
+        )
+
+        # Also write config as toml
+        config_file = os.path.join(datadir, "config.toml")
+        with open(config_file, "w") as f:
+            f.write(config.as_toml_string())
+
+        # fmt: off
+        cmd = [
+            "strata-client",
+            "--datadir", datadir,
+            "--config", config_file,
+            "--rollup-params", rollup_params_file,
+            "--rpc-host", rpc_host,
+            "--rpc-port", str(rpc_port),
+
+            "--sequencer"
+        ]
+        # fmt: on
 
         rpc_url = f"ws://{rpc_host}:{rpc_port}"
         props = {
@@ -175,8 +172,8 @@ class FullNodeFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_fullnode(
         self,
-        bitcoind_config: BitcoinRpcConfig,
-        reth_config: RethConfig,
+        bitcoind_config: BitcoindConfig,
+        reth_config: RethELConfig,
         sequencer_rpc: str,
         rollup_params: str,
         ctx: flexitest.EnvContext,
@@ -189,27 +186,32 @@ class FullNodeFactory(flexitest.Factory):
         rpc_port = self.next_port()
         logfile = os.path.join(datadir, "service.log")
 
-        # fmt: off
-        cmd = [
-            "strata-client",
-            "--datadir", datadir,
-            "--rpc-host", rpc_host,
-            "--rpc-port", str(rpc_port),
-            "--bitcoind-host", bitcoind_config["bitcoind_sock"],
-            "--bitcoind-user", bitcoind_config["bitcoind_user"],
-            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
-            "--reth-authrpc", reth_config["reth_socket"],
-            "--reth-jwtsecret", reth_config["reth_secret_path"],
-            "--network", "regtest",
-            "--sequencer-rpc", sequencer_rpc,
-        ]
-        # fmt: on
-
         rollup_params_file = os.path.join(datadir, "rollup_params.json")
         with open(rollup_params_file, "w") as f:
             f.write(rollup_params)
 
-        cmd.extend(["--rollup-params", rollup_params_file])
+        # Create config
+        config = Config(
+            bitcoind=bitcoind_config,
+            client=ClientConfig(sync_endpoint=sequencer_rpc),
+            exec=ExecConfig(reth=reth_config),
+        )
+
+        # Also write config as toml
+        config_file = os.path.join(datadir, "config.toml")
+        with open(config_file, "w") as f:
+            f.write(config.as_toml_string())
+
+        # fmt: off
+        cmd = [
+            "strata-client",
+            "--datadir", datadir,
+            "--config", config_file,
+            "--rollup-params", rollup_params_file,
+            "--rpc-host", rpc_host,
+            "--rpc-port", str(rpc_port),
+        ]
+        # fmt: on
 
         rpc_url = f"ws://localhost:{rpc_port}"
         props = {
@@ -316,7 +318,7 @@ class ProverClientFactory(flexitest.Factory):
     @flexitest.with_ectx("ctx")
     def create_prover_client(
         self,
-        bitcoind_config: BitcoinRpcConfig,
+        bitcoind_config: BitcoindConfig,
         sequencer_url: str,
         reth_url: str,
         rollup_params: str,
@@ -329,27 +331,26 @@ class ProverClientFactory(flexitest.Factory):
         rpc_port = self.next_port()
         rpc_url = f"ws://localhost:{rpc_port}"
 
+        rollup_params_file = os.path.join(datadir, "rollup_params.json")
+        with open(rollup_params_file, "w") as f:
+            f.write(rollup_params)
+
         # fmt: off
         cmd = [
             "strata-prover-client",
             "--rpc-port", str(rpc_port),
             "--sequencer-rpc", sequencer_url,
             "--reth-rpc", reth_url,
-            "--bitcoind-url", bitcoind_config["bitcoind_sock"],
-            "--bitcoind-user", bitcoind_config["bitcoind_user"],
-            "--bitcoind-password", bitcoind_config["bitcoind_pass"],
+            "--rollup-params", rollup_params_file,
+            "--bitcoind-url", bitcoind_config.rpc_url,
+            "--bitcoind-user", bitcoind_config.rpc_user,
+            "--bitcoind-password", bitcoind_config.rpc_password,
             "--datadir", datadir,
             "--native-workers", str(settings.native_workers),
             "--polling-interval", str(settings.polling_interval),
             "--enable-checkpoint-runner", "true" if settings.enable_checkpoint_proving else "false"
         ]
         # fmt: on
-
-        rollup_params_file = os.path.join(datadir, "rollup_params.json")
-        with open(rollup_params_file, "w") as f:
-            f.write(rollup_params)
-
-        cmd.extend(["--rollup-params", rollup_params_file])
 
         props = {"rpc_port": rpc_port}
 
@@ -374,7 +375,7 @@ class BridgeClientFactory(flexitest.Factory):
         self,
         master_xpriv: str,
         node_url: str,
-        bitcoind_config: dict,
+        bitcoind_config: BitcoindConfig,
         ctx: flexitest.EnvContext,
         message_interval: int,
         duty_timeout_duration: int,
@@ -394,9 +395,9 @@ class BridgeClientFactory(flexitest.Factory):
             "--master-xpriv", master_xpriv,
             "--rpc-host", rpc_host,
             "--rpc-port", str(rpc_port),
-            "--btc-url", "http://" + bitcoind_config["bitcoind_sock"],
-            "--btc-user", bitcoind_config["bitcoind_user"],
-            "--btc-pass", bitcoind_config["bitcoind_pass"],
+            "--btc-url", "http://" + bitcoind_config.rpc_url,
+            "--btc-user", bitcoind_config.rpc_user,
+            "--btc-pass", bitcoind_config.rpc_password,
             "--rollup-url", node_url,
             "--message-interval", str(message_interval),
             "--duty-timeout-duration", str(duty_timeout_duration),

@@ -1,7 +1,10 @@
+#![feature(slice_pattern)]
 use std::{sync::Arc, time::Duration};
 
+use anyhow::anyhow;
 use bitcoin::{hashes::Hash, BlockHash};
 use el_sync::sync_chainstate_to_el;
+use errors::InitError;
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
 use strata_bridge_relay::relayer::RelayerHandle;
@@ -12,7 +15,7 @@ use strata_btcio::{
     writer::start_envelope_task,
 };
 use strata_common::logging;
-use strata_config::{ClientMode, Config};
+use strata_config::Config;
 use strata_consensus_logic::{
     genesis,
     sync_manager::{self, SyncManager},
@@ -131,55 +134,55 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
     let mut methods = jsonrpsee::Methods::new();
 
-    match &config.client.client_mode {
+    if config.client.is_sequencer {
         // If we're a sequencer, start the sequencer db and duties task.
-        ClientMode::Sequencer(_) => {
-            let broadcast_database = init_broadcaster_database(rbdb.clone(), ops_config);
-            let broadcast_handle = start_broadcaster_tasks(
-                broadcast_database,
-                ctx.pool.clone(),
-                &executor,
-                ctx.bitcoin_client.clone(),
-                params.clone(),
-                config.btcio.broadcaster.poll_interval_ms,
-            );
-            let writer_db = init_writer_database(rbdb.clone(), ops_config);
+        let broadcast_database = init_broadcaster_database(rbdb.clone(), ops_config);
+        let broadcast_handle = start_broadcaster_tasks(
+            broadcast_database,
+            ctx.pool.clone(),
+            &executor,
+            ctx.bitcoin_client.clone(),
+            params.clone(),
+            config.btcio.broadcaster.poll_interval_ms,
+        );
+        let writer_db = init_writer_database(rbdb.clone(), ops_config);
 
-            // TODO: split writer tasks from this
-            start_sequencer_tasks(
-                ctx.clone(),
-                &config,
-                &executor,
-                writer_db,
-                checkpoint_handle.clone(),
-                broadcast_handle,
-                &mut methods,
-            )?;
-        }
+        // TODO: split writer tasks from this
+        start_sequencer_tasks(
+            ctx.clone(),
+            &config,
+            &executor,
+            writer_db,
+            checkpoint_handle.clone(),
+            broadcast_handle,
+            &mut methods,
+        )?;
+    } else {
+        let sync_endpoint = &config
+            .client
+            .sync_endpoint
+            .clone()
+            .ok_or(InitError::Anyhow(anyhow!("Missing sync_endpoint")))?;
+        info!(?sync_endpoint, "initing fullnode task");
 
-        ClientMode::FullNode(fullnode_config) => {
-            let sequencer_rpc = &fullnode_config.sequencer_rpc;
-            info!(?sequencer_rpc, "initing fullnode task");
+        let rpc_client = sync_client(sync_endpoint);
+        let sync_peer = RpcSyncPeer::new(rpc_client, 10);
+        let l2_sync_context = L2SyncContext::new(
+            sync_peer,
+            ctx.storage.l2().clone(),
+            ctx.sync_manager.clone(),
+        );
+        // NOTE: this might block for some time during first run with empty db until genesis
+        // block is generated
+        let mut l2_sync_state =
+            strata_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
 
-            let rpc_client = sync_client(sequencer_rpc);
-            let sync_peer = RpcSyncPeer::new(rpc_client, 10);
-            let l2_sync_context = L2SyncContext::new(
-                sync_peer,
-                ctx.storage.l2().clone(),
-                ctx.sync_manager.clone(),
-            );
-            // NOTE: this might block for some time during first run with empty db until genesis
-            // block is generated
-            let mut l2_sync_state =
-                strata_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
-
-            executor.spawn_critical_async("l2-sync-manager", async move {
-                strata_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
-                    .await
-                    .map_err(Into::into)
-            });
-        }
-    }
+        executor.spawn_critical_async("l2-sync-manager", async move {
+            strata_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
+                .await
+                .map_err(Into::into)
+        });
+    };
 
     // FIXME we don't have the `CoreContext` anymore after this point
     executor.spawn_critical_async(
