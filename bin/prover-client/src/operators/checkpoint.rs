@@ -12,7 +12,7 @@ use strata_primitives::{
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
-use strata_rpc_types::RpcCheckpointInfo;
+use strata_rpc_types::{RpcCheckpointConfStatus, RpcCheckpointInfo};
 use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
 use tracing::{error, info};
@@ -161,7 +161,7 @@ impl CheckpointOperator {
             l1_range: (start_l1_commitment, end_l1_commitment),
             l2_range: (start_l2_commitment, end_l2_commitment),
             l1_reference: None,
-            confirmation_status: strata_rpc_types::RpcCheckpointConfStatus::Pending,
+            confirmation_status: RpcCheckpointConfStatus::Pending,
         };
         let proof_ctx = self.construct_proof_ctx(&checkpoint_idx)?;
 

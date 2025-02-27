@@ -4,9 +4,9 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use bitcoin::{hashes::Hash, Network, Txid, Wtxid};
+use bitcoin::{Network, Txid};
 use serde::{Deserialize, Serialize};
-use strata_db::types::{CheckpointCommitment, CheckpointConfStatus, CheckpointEntry};
+use strata_db::types::{CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
     epoch::EpochCommitment,
@@ -21,7 +21,6 @@ use strata_state::{
     bridge_state::{DepositEntry, DepositState},
     client_state::CheckpointL1Ref,
     id::L2BlockId,
-    l1::L1BlockId,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,36 +273,6 @@ pub struct RpcSyncStatus {
 pub struct RawBlockWitness {
     pub raw_l2_block: Vec<u8>,
     pub raw_chain_state: Vec<u8>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RpcCheckpointCommitmentInfo {
-    /// block where checkpoint was posted
-    pub blockhash: L1BlockId,
-
-    /// txid of txn for this checkpoint
-    pub txid: Txid,
-
-    /// wtxid of txn for this checkpoint
-    pub wtxid: Wtxid,
-
-    /// The height of the block where the checkpoint was posted.
-    pub height: u64,
-
-    /// The position of the checkpoint in the block.
-    pub position: u32,
-}
-
-impl From<CheckpointCommitment> for RpcCheckpointCommitmentInfo {
-    fn from(value: CheckpointCommitment) -> Self {
-        Self {
-            blockhash: value.blockhash.into(),
-            txid: Txid::from_byte_array(*value.txid.as_ref()),
-            wtxid: Wtxid::from_byte_array(*value.wtxid.as_ref()),
-            height: value.block_height,
-            position: value.position,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

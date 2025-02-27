@@ -317,6 +317,7 @@ fn apply_action(
     engine: &impl ExecEngineCtl,
     _status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
+    let ckpt_db = state.storage.checkpoint();
     match action {
         SyncAction::FinalizeEpoch(epoch_comm) => {
             // For the fork choice manager this gets picked up later.  We don't have
@@ -332,9 +333,8 @@ fn apply_action(
             //
             // TODO In the future we should just be able to determine this on the fly.
             let epoch = epoch_comm.epoch();
-            let Some(mut ckpt_entry) = state.storage.checkpoint().get_checkpoint_blocking(epoch)?
-            else {
-                warn!(%epoch, "missing checkpoint we wanted to set the state of, ignoring");
+            let Some(mut ckpt_entry) = ckpt_db.get_checkpoint_blocking(epoch)? else {
+                warn!(%epoch, "missing checkpoint we wanted to update the state of, ignoring");
                 return Ok(());
             };
 
@@ -349,10 +349,8 @@ fn apply_action(
 
             // Mark it as finalized.
             ckpt_entry.confirmation_status = CheckpointConfStatus::Finalized(l1ref);
-            state
-                .storage
-                .checkpoint()
-                .put_checkpoint_blocking(epoch, ckpt_entry)?;
+
+            ckpt_db.put_checkpoint_blocking(epoch, ckpt_entry)?;
         }
 
         // Update checkpoint entry in database to mark it as included in L1.
@@ -360,18 +358,14 @@ fn apply_action(
             epoch,
             l1_reference,
         } => {
-            let Some(mut ckpt_entry) = state.storage.checkpoint().get_checkpoint_blocking(epoch)?
-            else {
+            let Some(mut ckpt_entry) = ckpt_db.get_checkpoint_blocking(epoch)? else {
                 warn!(%epoch, "missing checkpoint we wanted to set the state of, ignoring");
                 return Ok(());
             };
 
             ckpt_entry.confirmation_status = CheckpointConfStatus::Confirmed(l1_reference);
 
-            state
-                .storage
-                .checkpoint()
-                .put_checkpoint_blocking(epoch, ckpt_entry)?;
+            ckpt_db.put_checkpoint_blocking(epoch, ckpt_entry)?;
         }
 
         SyncAction::L2Genesis(l1blkid) => {
@@ -389,24 +383,6 @@ fn apply_action(
             // TODO do we have to do anything here?
         }
     }
-
-    Ok(())
-}
-
-fn update_checkpoint_status(
-    idx: u64,
-    status: CheckpointConfStatus,
-    ckman: &CheckpointDbManager,
-) -> anyhow::Result<()> {
-    // This is a race, but we want to remove this fn anyways and just do it on
-    // the fly.
-    let Some(mut ckpt_entry) = ckman.get_checkpoint_blocking(idx)? else {
-        warn!(%idx, ?status, "missing checkpoint we wanted to set the state of, ignoring");
-        return Ok(());
-    };
-
-    ckpt_entry.confirmation_status = status;
-    ckman.put_checkpoint_blocking(idx, ckpt_entry)?;
 
     Ok(())
 }

@@ -12,7 +12,7 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadIntent},
 };
 use strata_state::{
-    batch::{BaseStateCommitment, BatchInfo, BatchTransition, Checkpoint, CommitmentInfo},
+    batch::{BaseStateCommitment, BatchInfo, BatchTransition, Checkpoint},
     client_state::CheckpointL1Ref,
 };
 use zkaleido::Proof;
@@ -195,9 +195,6 @@ pub struct CheckpointEntry {
 
     /// Confirmation Status
     pub confirmation_status: CheckpointConfStatus,
-
-    /// checkpoint txn info
-    pub l1_reference: Option<CheckpointL1Ref>,
 }
 
 impl CheckpointEntry {
@@ -205,13 +202,11 @@ impl CheckpointEntry {
         checkpoint: Checkpoint,
         proving_status: CheckpointProvingStatus,
         confirmation_status: CheckpointConfStatus,
-        l1_reference: Option<CheckpointL1Ref>,
     ) -> Self {
         Self {
             checkpoint,
             proving_status,
             confirmation_status,
-            l1_reference,
         }
     }
 
@@ -230,7 +225,6 @@ impl CheckpointEntry {
             checkpoint,
             CheckpointProvingStatus::PendingProof,
             CheckpointConfStatus::Pending,
-            None,
         )
     }
 
@@ -262,28 +256,6 @@ pub enum CheckpointConfStatus {
     Confirmed(CheckpointL1Ref),
     /// Finalized on L1, with reference
     Finalized(CheckpointL1Ref),
-}
-
-// TODO: why is this needed? can this information be part of `L1Checkpoint`?
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Arbitrary)]
-pub struct CheckpointCommitment {
-    pub blockhash: Buf32,
-    pub txid: Buf32,
-    pub wtxid: Buf32,
-    pub block_height: u64,
-    pub position: u32,
-}
-
-impl From<CommitmentInfo> for CheckpointCommitment {
-    fn from(value: CommitmentInfo) -> Self {
-        Self {
-            blockhash: value.blockhash,
-            txid: value.txid,
-            wtxid: value.wtxid,
-            block_height: value.block_height,
-            position: value.position,
-        }
-    }
 }
 
 #[cfg(test)]

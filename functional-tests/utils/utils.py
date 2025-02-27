@@ -89,6 +89,7 @@ def wait_until_with_value(
     error_with: str = "Timed out",
     timeout: int = 5,
     step: float = 0.5,
+    debug=False,
 ) -> T:
     """
     Similar to `wait_until` but this returns the value of the function.
@@ -99,6 +100,8 @@ def wait_until_with_value(
             r = fn()
             # Return if the predicate passes.  The predicate not passing is not
             # an error.
+            if debug:
+                print("Waiting.. current value:", r)
             if predicate(r):
                 return r
         except Exception as e:

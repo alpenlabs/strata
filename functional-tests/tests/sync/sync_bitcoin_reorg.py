@@ -15,12 +15,13 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
     """This tests finalization when there is reorg on L1"""
 
     def __init__(self, ctx: flexitest.InitContext):
+        self.rollup_settings = net_settings.get_fast_batch_settings()
         ctx.set_env(
             testenv.BasicEnvConfig(
                 # TODO: Need to generate at least horizon height blocks, can't
                 # get rollup params from here
                 2,
-                rollup_settings=net_settings.get_fast_batch_settings(),
+                rollup_settings=self.rollup_settings,
                 auto_generate_blocks=False,
             )
         )
@@ -64,11 +65,18 @@ class BitcoinReorgChecksTest(testenv.StrataTester):
         # We need to wait for the tx to be published to L1
         time.sleep(0.5)
         # Test reorg, without pruning anything, let mempool and wallet retain the txs
-        check_nth_checkpoint_finalized_on_reorg(ctx, idx + 1, seq, btcrpc, prover_rpc)
+        check_nth_checkpoint_finalized_on_reorg(
+            ctx, idx + 1, seq, btcrpc, prover_rpc, self.rollup_settings
+        )
 
 
 def check_nth_checkpoint_finalized_on_reorg(
-    ctx: flexitest.RunContext, checkpt_idx: int, seq: Service, btcrpc, prover_rpc
+    ctx: flexitest.RunContext,
+    checkpt_idx: int,
+    seq: Service,
+    btcrpc,
+    prover_rpc,
+    rollup_settings: RollupParamsSettings,
 ):
     # Now submit another checkpoint proof and produce a couple of blocks(less than reorg depth)
     seqrpc = seq.create_rpc()
@@ -81,7 +89,12 @@ def check_nth_checkpoint_finalized_on_reorg(
     # gen some blocks
     btcrpc.proxy.generatetoaddress(3, seq_addr)
 
-    submit_checkpoint(checkpt_idx, seqrpc, prover_rpc, manual_gen)
+    # Don't need to submit checkpoint
+    if rollup_settings.proof_timeout is None:
+        submit_checkpoint(checkpt_idx, seqrpc, prover_rpc, manual_gen)
+    else:
+        # Wait until the proof timeout plus delta
+        time.sleep(rollup_settings.proof_timeout + 0.5)
     published_txid = seqrpc.strata_l1status()["last_published_txid"]
 
     # wait until it gets confirmed
@@ -119,8 +132,10 @@ def check_nth_checkpoint_finalized_on_reorg(
     to_finalize_blkid = batch_info["l2_range"][1]["blkid"]
 
     # Check finalized
-    wait_until(
-        lambda: seqrpc.strata_syncStatus()["finalized_block_id"] == to_finalize_blkid,
+    _ = wait_until_with_value(
+        lambda: seqrpc.strata_syncStatus(),
+        lambda v: v["finalized_block_id"] == to_finalize_blkid,
         error_with="Block not finalized",
         timeout=10,
+        debug=True,
     )
