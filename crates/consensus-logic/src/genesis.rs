@@ -150,8 +150,22 @@ pub fn make_genesis_chainstate(
 
     let horizon_blk_height = params.rollup.horizon_l1_height;
     let genesis_blk_height = params.rollup.genesis_l1_height;
-    let genesis_blk_rec = pregenesis_mfs.last().unwrap().record().clone();
-    let l1vs = L1ViewState::new_at_genesis(horizon_blk_height, genesis_blk_height, genesis_blk_rec);
+    let genesis_mf = pregenesis_mfs
+        .last()
+        .expect("genesis block must be present")
+        .clone();
+    let gheader_vs = genesis_mf
+        .header_verification_state()
+        .as_ref()
+        .expect("genesis block must have HeaderVS")
+        .clone();
+    let genesis_blk_rec = genesis_mf.record().clone();
+    let l1vs = L1ViewState::new_at_genesis(
+        horizon_blk_height,
+        genesis_blk_height,
+        genesis_blk_rec,
+        gheader_vs,
+    );
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
     let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);

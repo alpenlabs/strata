@@ -409,30 +409,6 @@ fn create_checkpoint_prep_data_from_summary(
     let l1_start_block = L1BlockCommitment::new(l1_start_height, *l1_start_mf.blkid());
     let l1_range = (l1_start_block, *summary.new_l1());
 
-    // Compute the new L1 sync state commitments.
-    let l1_transition = {
-        let prev_epoch_final_blocknum = l1_start_height - 1;
-        let prev_mf = l1man
-            .get_block_manifest_at_height(prev_epoch_final_blocknum)?
-            .ok_or(DbError::MissingL1Block(prev_epoch_final_blocknum))?;
-        let current_epoch_final_blocknum = summary.new_l1().height();
-        let mf = l1man
-            .get_block_manifest_at_height(current_epoch_final_blocknum)?
-            .ok_or(DbError::MissingL1Block(current_epoch_final_blocknum))?;
-
-        warn!(%epoch, %prev_epoch_final_blocknum, %current_epoch_final_blocknum, "Compute the new L1 sync state commitments");
-
-        (
-            prev_mf
-                .header_verification_state()
-                .compute_hash()
-                .expect("compute vs hash"),
-            mf.header_verification_state()
-                .compute_hash()
-                .expect("compute vs hash"),
-        )
-    };
-
     // Now just pull out the data about the blocks from the transition here.
     //
     // There's a slight weirdness here.  The "range" refers to the first block
@@ -440,18 +416,28 @@ fn create_checkpoint_prep_data_from_summary(
     // block, for now) of the previous epoch.
     let l2_blocks = fetch_epoch_l2_headers(summary, l2man)?;
     let first_block = l2_blocks.first().unwrap();
+    let last_block = l2_blocks.last().unwrap();
     let initial_l2_commitment =
         L2BlockCommitment::new(first_block.blockidx(), first_block.get_blockid());
     let l2_range = (initial_l2_commitment, *summary.terminal());
-    let l2_initial_state = if is_genesis_epoch {
-        let genesis_chainstate = chsman
-            .get_toplevel_chainstate_blocking(0)?
-            .ok_or(DbError::NotBootstrapped)?;
-        genesis_chainstate.compute_state_root()
-    } else {
-        prev_summary.map(|ps| *ps.final_state()).unwrap_or_default()
-    };
-    let l2_transition = (l2_initial_state, *summary.final_state());
+
+    // Initial state is the state before applying the first block
+    let initial_state_height = first_block.blockidx() - 1;
+    let initial_state = chsman
+        .get_toplevel_chainstate_blocking(initial_state_height)?
+        .ok_or(Error::MissingIdxChainstate(initial_state_height))?;
+    let l1_initial_state = initial_state.l1_view().header_vs().compute_hash()?;
+    let l2_initial_state = initial_state.compute_state_root();
+
+    let final_state_height = last_block.blockidx();
+    let final_state = chsman
+        .get_toplevel_chainstate_blocking(final_state_height)?
+        .ok_or(Error::MissingIdxChainstate(final_state_height))?;
+    let l1_final_state = final_state.l1_view().header_vs().compute_hash()?;
+    let l2_final_state = final_state.compute_state_root();
+
+    let l1_transition = (l1_initial_state, l1_final_state);
+    let l2_transition = (l2_initial_state, l2_final_state);
 
     // Assemble the final parts together.
     let new_transition = BatchTransition::new(l1_transition, l2_transition, rollup_params_hash);

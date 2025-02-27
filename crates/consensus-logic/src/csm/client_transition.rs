@@ -411,13 +411,7 @@ mod tests {
 
         fn get_l1_block_manifest_at_height(&self, height: u64) -> Result<L1BlockManifest, Error> {
             let rec = self.chainseg.get_header_record(height).unwrap();
-            Ok(L1BlockManifest::new(
-                rec,
-                HeaderVerificationState::default(),
-                Vec::new(),
-                0,
-                height,
-            ))
+            Ok(L1BlockManifest::new(rec, None, Vec::new(), 0, height))
         }
 
         fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {

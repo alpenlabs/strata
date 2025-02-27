@@ -4,12 +4,13 @@
 //! decide to expand the chain state in the future such that we can't keep it
 //! entire in memory.
 
+use bitcoin::{block::Header, params::Params};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
     epoch::EpochCommitment,
-    l1::{BitcoinAmount, L1HeaderRecord, OutputRef},
+    l1::{BitcoinAmount, L1HeaderRecord, L1VerificationError, OutputRef},
     l2::L2BlockCommitment,
 };
 
@@ -188,6 +189,19 @@ impl StateCache {
         let state = self.state_mut();
         state.l1_state.safe_block_height = height;
         state.l1_state.safe_block_header = record;
+    }
+
+    /// Update HeaderVerificationState
+    pub fn update_header_vs(
+        &mut self,
+        header: &Header,
+        params: &Params,
+    ) -> Result<(), L1VerificationError> {
+        let state = self.state_mut();
+        state
+            .l1_state
+            .header_vs
+            .check_and_update_full(header, params)
     }
 
     /// Writes a deposit intent into an execution environment's input queue.

@@ -136,8 +136,15 @@ pub struct L1BlockManifest {
     /// The actual l1 record
     record: L1HeaderRecord,
 
-    /// Header verification state, with PoW.
-    verif_state: HeaderVerificationState,
+    /// Optional header verification state
+    ///
+    /// For the genesis block, this field is set to `Some` containing a
+    /// [HeaderVerificationState] that holds all necessary details for validating Bitcoin block
+    /// headers
+    /// For all subsequent blocks, this field is `None`. It is used during the initialization of
+    /// the Chainstate to bootstrap the header verification process.
+    // TODO: handle this properly: https://alpenlabs.atlassian.net/browse/STR-1104
+    verif_state: Option<HeaderVerificationState>,
 
     /// List of interesting transactions we took out.
     txs: Vec<L1Tx>,
@@ -152,7 +159,7 @@ pub struct L1BlockManifest {
 impl L1BlockManifest {
     pub fn new(
         record: L1HeaderRecord,
-        verif_state: HeaderVerificationState,
+        verif_state: Option<HeaderVerificationState>,
         txs: Vec<L1Tx>,
         epoch: u64,
         height: u64,
@@ -170,7 +177,7 @@ impl L1BlockManifest {
         &self.record
     }
 
-    pub fn header_verification_state(&self) -> &HeaderVerificationState {
+    pub fn header_verification_state(&self) -> &Option<HeaderVerificationState> {
         &self.verif_state
     }
 

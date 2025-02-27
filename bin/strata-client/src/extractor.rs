@@ -235,8 +235,8 @@ mod tests {
         bridge::OperatorIdx,
         buf::Buf32,
         l1::{
-            BitcoinAmount, DepositRequestInfo, L1BlockId, L1BlockManifest, L1HeaderRecord, L1Tx,
-            L1TxProof, OutputRef, RawBitcoinTx, XOnlyPk,
+            BitcoinAmount, DepositRequestInfo, HeaderVerificationState, L1BlockId, L1BlockManifest,
+            L1HeaderRecord, L1Tx, L1TxProof, OutputRef, RawBitcoinTx, XOnlyPk,
         },
         l2::L2BlockId,
     };
@@ -592,8 +592,9 @@ mod tests {
         num_deposits: usize,
     ) -> (Chainstate, usize, DepositEntry) {
         let l1_block_id = L1BlockId::from(Buf32::zero());
+        let l1_header_vs = HeaderVerificationState::default();
         let safe_block_rec = L1HeaderRecord::new(l1_block_id, vec![], Buf32::zero());
-        let l1_state = L1ViewState::new_at_genesis(0, 0, safe_block_rec);
+        let l1_state = L1ViewState::new_at_genesis(0, 0, safe_block_rec, l1_header_vs);
 
         let operator_table = OperatorTable::new_empty();
 

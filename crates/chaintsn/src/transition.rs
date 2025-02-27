@@ -4,7 +4,7 @@
 
 use std::{cmp::max, collections::HashMap};
 
-use bitcoin::{OutPoint, Transaction};
+use bitcoin::{block::Header, consensus, params::Params, OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
     batch::SignedCheckpoint,
@@ -92,7 +92,6 @@ fn process_l1_view_update(
     let l1v = state.state().l1_view();
 
     // Accept new blocks.
-    // FIXME this should actually check PoW, it just does it based on block heights
     if !l1seg.new_manifests().is_empty() {
         let cur_safe_height = l1v.safe_height();
 
@@ -104,16 +103,13 @@ fn process_l1_view_update(
             return Err(TsnError::L1SegNotExtend);
         }
 
-        // First check that the blocks are correct.
-        check_chain_integrity(
-            cur_safe_height,
-            l1v.safe_blkid(),
-            l1seg.new_height(),
-            l1seg.new_manifests(),
-        )?;
-
         // Go through each manifest and process it.
         for (off, b) in l1seg.new_manifests().iter().enumerate() {
+            // PoW checks are done when we try to update the HeaderVerificationState
+            let header: Header =
+                consensus::deserialize(b.header()).expect("invalid bitcoin header");
+            state.update_header_vs(&header, &Params::new(params.network))?;
+
             let height = cur_safe_height + off as u64 + 1;
             process_l1_block(state, b)?;
             state.update_safe_block(height, b.record().clone());
