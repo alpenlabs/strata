@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
@@ -7,11 +7,16 @@ use tracing::info;
 
 use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 
+pub(crate) const MAX_RETRY_COUNTER: u64 = 15;
+
 /// Manages tasks and their states for proving operations.
 #[derive(Debug, Clone)]
 pub struct TaskTracker {
     /// A map of task IDs to their statuses.
     tasks: HashMap<ProofKey, ProvingTaskStatus>,
+    /// A map of task IDs that have failed (transiently) to their retry counter.
+    /// Such a task will be retried for up to [`MAX_RETRY_COUNTER`] times.
+    transient_failed_tasks: HashMap<ProofKey, u64>,
     /// A map of task IDs to their dependencies that have not yet been proven.
     pending_dependencies: HashMap<ProofKey, HashSet<ProofKey>>,
     /// Count of the tasks that are in progress
@@ -42,6 +47,7 @@ impl TaskTracker {
 
         TaskTracker {
             tasks: HashMap::new(),
+            transient_failed_tasks: HashMap::new(),
             pending_dependencies: HashMap::new(),
             in_progress_tasks: HashMap::new(),
             vms,
@@ -50,6 +56,18 @@ impl TaskTracker {
 
     pub fn get_in_progress_tasks(&self) -> &HashMap<ProofZkVm, usize> {
         &self.in_progress_tasks
+    }
+
+    pub fn get_retriable_tasks(&self) -> HashMap<ProofKey, u64> {
+        let transient_failures = self
+            .get_tasks_by_status(|status| matches!(status, ProvingTaskStatus::TransientFailure));
+
+        let mut retriable_tasks = HashMap::new();
+        for task in transient_failures {
+            retriable_tasks.insert(task, *self.transient_failed_tasks.get(&task).unwrap_or(&0));
+        }
+
+        retriable_tasks
     }
 
     pub fn create_tasks(
@@ -127,6 +145,7 @@ impl TaskTracker {
     ///
     /// - Allows valid transitions as per the state machine.
     /// - Automatically resolves dependencies if a task is completed.
+    /// - Handles transient failures with the limit.
     ///
     /// Returns an error for invalid transitions or if the task does not exist.
     pub fn update_status(
@@ -138,32 +157,60 @@ impl TaskTracker {
             // Check for valid status transitions
             status.transition(new_status.clone())?;
 
-            if new_status == ProvingTaskStatus::ProvingInProgress {
-                // Increment value if key exists, or insert with a default value of 1
-                *self.in_progress_tasks.entry(*id.host()).or_insert(0) += 1;
-            }
-
-            if new_status == ProvingTaskStatus::Completed {
-                // Decrement value if key exists, or insert with a default value of 1
-                *self.in_progress_tasks.entry(*id.host()).or_insert(0) -= 1;
-
-                // Resolve dependencies for other tasks
-                let mut tasks_to_update = vec![];
-                for (dependent_task, deps) in self.pending_dependencies.iter_mut() {
-                    if deps.remove(&id) && deps.is_empty() {
-                        tasks_to_update.push(*dependent_task);
-                    }
+            // Handle the new status.
+            match new_status {
+                ProvingTaskStatus::ProvingInProgress => {
+                    // Just mark the task as in progress.
+                    *self.in_progress_tasks.entry(*id.host()).or_insert(0) += 1;
                 }
+                ProvingTaskStatus::Completed => {
+                    // Decrement value if key exists, or insert with a default value of 1
+                    *self.in_progress_tasks.entry(*id.host()).or_insert(0) -= 1;
 
-                for task in tasks_to_update {
-                    self.pending_dependencies.remove(&task);
-                    if let Some(task_status) = self.tasks.get_mut(&task) {
-                        task_status.transition(ProvingTaskStatus::Pending)?;
+                    // Resolve dependencies for other tasks
+                    let mut tasks_to_update = vec![];
+                    for (dependent_task, deps) in self.pending_dependencies.iter_mut() {
+                        if deps.remove(&id) && deps.is_empty() {
+                            tasks_to_update.push(*dependent_task);
+                        }
                     }
-                }
 
-                self.tasks.remove(&id);
-            }
+                    for task in tasks_to_update {
+                        self.pending_dependencies.remove(&task);
+                        if let Some(task_status) = self.tasks.get_mut(&task) {
+                            task_status.transition(ProvingTaskStatus::Pending)?;
+                        }
+                    }
+
+                    // Clean up state to not bloat the memory as the task has been completed.
+                    self.tasks.remove(&id);
+                    self.transient_failed_tasks.remove(&id);
+                }
+                ProvingTaskStatus::TransientFailure => {
+                    // Check the retry counter against the max retry limit or just increment.
+                    let retry_counter = self.transient_failed_tasks.entry(id);
+                    match retry_counter {
+                        Entry::Occupied(mut entry) => {
+                            if *entry.get() >= MAX_RETRY_COUNTER {
+                                // If the task has reached the retry limit, transition to Failed.
+                                status.transition(ProvingTaskStatus::Failed)?;
+                                self.transient_failed_tasks.remove(&id);
+                            } else {
+                                *entry.get_mut() += 1;
+                            }
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(1);
+                        }
+                    };
+                }
+                ProvingTaskStatus::Failed => {
+                    // The task has failed permanently and is not retriable, so we clean up failed
+                    // task counter entry.
+                    self.transient_failed_tasks.remove(&id);
+                }
+                _ => {}
+            };
             Ok(())
         } else {
             Err(ProvingTaskError::TaskNotFound(id))
@@ -305,5 +352,43 @@ mod tests {
             matches!(tracker.get_task(id), Ok(&ProvingTaskStatus::Pending)),
             "Task should become Pending after all dependencies are resolved"
         );
+    }
+
+    #[test]
+    fn test_transient_failures() {
+        let mut tracker = TaskTracker::new();
+        let (id, _) = gen_task_with_deps(0);
+        let db = setup_db();
+
+        // Insert task and mark it as in progress.
+        tracker.insert_task(id, &[], &db).unwrap();
+        tracker
+            .update_status(id, ProvingTaskStatus::ProvingInProgress)
+            .unwrap();
+
+        // Check transient failures up to MAX_RETRY_COUNTER.
+        for _ in 0..MAX_RETRY_COUNTER {
+            tracker
+                .update_status(id, ProvingTaskStatus::TransientFailure)
+                .unwrap();
+            assert!(matches!(
+                tracker.get_task(id),
+                Ok(&ProvingTaskStatus::TransientFailure)
+            ));
+
+            // Update back to in progress.
+            tracker
+                .update_status(id, ProvingTaskStatus::ProvingInProgress)
+                .unwrap();
+        }
+
+        // Check the final transient failure that results in permanent failure.
+        tracker
+            .update_status(id, ProvingTaskStatus::TransientFailure)
+            .unwrap();
+        assert!(matches!(
+            tracker.get_task(id),
+            Ok(&ProvingTaskStatus::Failed)
+        ));
     }
 }
