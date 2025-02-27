@@ -1,30 +1,22 @@
-# This workflow is triggered when a PR is merged on the main branch or manually triggered.
-# It detects the changes in the codebase and builds and pushes the Docker images for the
-# changed programs. It then updates the Helm values with the new Docker image tags and
-# commits and pushes the changes to the deployments repo.
+# This workflow is triggered when a new commit is made on main branch or manually triggered.
+# It builds and pushes the Docker images. Afterwards updates the Helm values with the new Docker
+# image tags and commits and pushes the changes to the deployments repo.
 
 name: Continuous Deployment
 on:
-  pull_request:
-    types:
-      - closed
+  push:
     branches:
       - main
 
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Select environment'
+        description: "Select environment"
         required: true
-        default: 'staging'
+        default: "staging"
         type: choice
         options:
           - staging
-          # an extra option for running the workflow manually in a separate cluster
-          - staging1
-          # currently we only desire to support cd to staging(s), production is only
-          # for future reference
-          - production
 
 env:
   CI: false
@@ -35,67 +27,20 @@ permissions:
   pull-requests: read
 
 jobs:
-  detect-changes:
-    # only run this job when a PR is merged or manually triggered
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
-    name: Detect Changes
-    runs-on: ubuntu-latest
-    env:
-      # select environment based on manual entry or choose staging for main branch by default.
-      # we may add more environments programmatically if needed.
-      ENVIRONMENT: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'staging') }}
-    outputs:
-      strata-client_changed: ${{ steps.filter.outputs.strata-client }}
-      strata-sequencer-client_changed: ${{ steps.filter.outputs.strata-sequencer-client }}
-      strata-reth_changed: ${{ steps.filter.outputs.strata-reth }}
-      prover-client_changed: ${{ steps.filter.outputs.prover-client }}
-      environment: ${{ env.ENVIRONMENT }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Check changed files
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            strata-client:
-              - 'bin/strata-client/**'
-            strata-sequencer-client:
-              - 'bin/strata-sequencer-client/**'
-            strata-reth:
-              - 'bin/strata-reth/**'
-            prover-client:
-              - 'bin/prover-client/**'
-      - name: Export change detection outputs
-        env:
-          STRATA_CLIENT_CHANGED_OUTPUT: ${{ steps.filter.outputs.strata-client }}
-          STRATA_SEQUENCER_CHANGED_OUTPUT: ${{ steps.filter.outputs.strata-sequencer-client }}
-          STRATA_RETH_CHANGED_OUTPUT: ${{ steps.filter.outputs.strata-reth }}
-          PROVER_CLIENT_CHANGED_OUTPUT: ${{ steps.filter.outputs.prover-client }}
-        run: |
-          # Safely write environment variables using printf
-          {
-            printf "STRATA_CLIENT_CHANGED=%q\n" "${STRATA_CLIENT_CHANGED_OUTPUT}"
-            printf "STRATA_SEQUENCER_CHANGED=%q\n" "${STRATA_SEQUENCER_CHANGED_OUTPUT}"
-            printf "STRATA_RETH_CHANGED=%q\n" "${STRATA_RETH_CHANGED_OUTPUT}"
-            printf "PROVER_CLIENT_CHANGED=%q\n" "${PROVER_CLIENT_CHANGED_OUTPUT}"
-          } >> "$GITHUB_ENV"
-
   build-and-push:
     permissions:
       id-token: write
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    needs: detect-changes
-    environment: ${{ needs.detect-changes.outputs.environment }}
+    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'staging') }}
     strategy:
       matrix:
-        # The names of the programs should match the names of the directories that we
+        # The names of the programs must match the names of the directories that we
         # are building the Docker images from.
         # The directories `bin` and `docker` must contain the subdirectories in the
         # matrix below.
-        program: [strata-client, strata-sequencer-client, strata-reth, prover-client]
+        program:
+          [strata-client, strata-sequencer-client, strata-reth, prover-client]
     outputs:
       program: ${{ matrix.program }}
     steps:
@@ -114,12 +59,7 @@ jobs:
           mask-password: "true"
       - name: Build and push Docker image
         id: build-and-push
-        # we only build and push the Docker image if the corresponding program has changed
-        if: |
-          (matrix.program == 'strata-client' && needs.detect-changes.outputs.strata-client_changed == 'true') ||
-          (matrix.program == 'strata-sequencer-client' && needs.detect-changes.outputs.strata-sequencer-client_changed == 'true') ||
-          (matrix.program == 'strata-reth' && needs.detect-changes.outputs.strata-reth_changed == 'true') ||
-          (matrix.program == 'prover-client' && needs.detect-changes.outputs.prover-client_changed == 'true')
+        # build and push the Docker image for every program
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
@@ -138,9 +78,9 @@ jobs:
 
   update-helm-values:
     name: Update Helm Values
-    needs: [build-and-push, detect-changes]
+    needs: [build-and-push]
     runs-on: ubuntu-latest
-    environment: ${{ needs.detect-changes.outputs.environment }}
+    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'staging') }}
     steps:
       - name: Set up SSH for private repo access
         uses: webfactory/ssh-agent@v0.9.0
@@ -171,24 +111,13 @@ jobs:
           VALUES_FILE_NODES="deployments/clusters/${CLUSTER_NAME}/values/strata-nodes-values.yaml"
           VALUES_FILE_PROVER="deployments/clusters/${CLUSTER_NAME}/values/strata-prover-values.yaml"
 
-          # Validate booleans
-          validate_boolean() { [[ "$1" == "true" || "$1" == "false" ]]; }
+          # update sequencer tags
+          yq eval -i --arg tag "$SHORT_TAG" ".client.image.tag = $tag" "$VALUES_FILE_NODES"
+          yq eval -i --arg tag "$SHORT_TAG" ".reth.image.tag = $tag" "$VALUES_FILE_NODES"
+          yq eval -i --arg tag "$SHORT_TAG" ".sequencerSigner.image.tag = $tag" "$VALUES_FILE_NODES"
 
-          if validate_boolean "$STRATA_CLIENT_CHANGED" && [[ "$STRATA_CLIENT_CHANGED" == "true" ]]; then
-            yq eval -i --arg tag "$SHORT_TAG" ".client.image.tag = $tag" "$VALUES_FILE_NODES"
-          fi
-
-          if validate_boolean "$STRATA_SEQUENCER_CHANGED" && [[ "$STRATA_SEQUENCER_CHANGED" == "true" ]]; then
-            yq eval -i --arg tag "$SHORT_TAG" ".sequencerSigner.image.tag = $tag" "$VALUES_FILE_NODES"
-          fi
-
-          if validate_boolean "$STRATA_RETH_CHANGED" && [[ "$STRATA_RETH_CHANGED" == "true" ]]; then
-            yq eval -i --arg tag "$SHORT_TAG" ".reth.image.tag = $tag" "$VALUES_FILE_NODES"
-          fi
-
-          if validate_boolean "$PROVER_CLIENT_CHANGED" && [[ "$PROVER_CLIENT_CHANGED" == "true" ]]; then
-            yq eval -i --arg tag "$SHORT_TAG" ".proverClient.image.tag = $tag" "$VALUES_FILE_PROVER"
-          fi
+          # update prover tags
+          yq eval -i --arg tag "$SHORT_TAG" ".proverClient.image.tag = $tag" "$VALUES_FILE_PROVER"
 
       - name: Commit and push changes
         env:
@@ -209,7 +138,7 @@ jobs:
             echo "No changes to commit."
           else
             git add "clusters/$CLUSTER_NAME/values"
-            git commit -m "Update image tags to \"$SHORT_TAG\" for changed programs"
+            git commit -m "Update image tags to \"$SHORT_TAG\"."
             git pull --rebase origin "$BRANCH_OF_DEPLOYMENT_REPO"
             git push origin "$BRANCH_OF_DEPLOYMENT_REPO"
           fi
