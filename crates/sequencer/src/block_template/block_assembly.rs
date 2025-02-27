@@ -1,7 +1,6 @@
 use std::{thread, time};
 
-// TODO: use local error type
-use strata_consensus_logic::errors::Error;
+use strata_consensus_logic::checkpoint_verification;
 use strata_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
     errors::EngineError,
@@ -20,8 +19,10 @@ use strata_state::{
     prelude::*,
     state_op::*,
 };
-use strata_storage::{L1BlockManager, NodeStorage};
+use strata_storage::{CheckpointDbManager, L1BlockManager, NodeStorage};
 use tracing::*;
+
+use super::error::BlockAssemblyError as Error;
 
 /// Build contents for a new L2 block with the provided configuration.
 /// Needs to be signed to be a valid L2Block.
@@ -38,6 +39,7 @@ pub fn prepare_block(
     debug!(%slot, %prev_blkid, "preparing block");
     let l1man = storage.l1();
     let chsman = storage.chainstate();
+    let ckptman = storage.checkpoint();
 
     let prev_global_sr = *prev_block.header().state_root();
 
@@ -56,7 +58,12 @@ pub fn prepare_block(
 
     // TODO Pull data from CSM state that we've observed from L1, including new
     // headers or any headers needed to perform a reorg if necessary.
-    let l1_seg = prepare_l1_segment(&prev_chstate, l1man.as_ref(), params.rollup())?;
+    let l1_seg = prepare_l1_segment(
+        &prev_chstate,
+        l1man.as_ref(),
+        ckptman.as_ref(),
+        params.rollup(),
+    )?;
 
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
@@ -79,6 +86,7 @@ pub fn prepare_block(
     // TODO do something with the write batch?  to prepare it in the database?
     let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
 
+    // FIXME: invalid stateroot. Remove l2blockid from ChainState or stateroot from L2Block header.
     let new_state_root = post_state.compute_state_root();
 
     let header = L2BlockHeader::new(slot, ts, prev_blkid, &body, new_state_root);
@@ -89,6 +97,7 @@ pub fn prepare_block(
 fn prepare_l1_segment(
     prev_chstate: &Chainstate,
     l1man: &L1BlockManager,
+    ckptman: &CheckpointDbManager,
     params: &RollupParams,
 ) -> Result<L1Segment, Error> {
     // We aren't going to reorg, so we'll include blocks right up to the tip.
@@ -115,12 +124,26 @@ fn prepare_l1_segment(
     let mut is_epoch_final_block = {
         if prev_chstate.cur_epoch() == 0 {
             // no previous epoch, end epoch and send commitment immediately
+            // including first L1 block available.
             true
         } else {
             // check for previous epoch's checkpoint in referenced l1 blocks
             // end epoch once previous checkpoint is seen
             false
         }
+    };
+
+    let prev_checkpoint = if prev_chstate.prev_epoch().is_null() {
+        None
+    } else {
+        let prev_epoch = prev_chstate.prev_epoch().epoch();
+        // previous checkpoint entry should exist in db
+        let checkpoint = ckptman
+            .get_checkpoint_blocking(prev_epoch)?
+            .ok_or(Error::MissingCheckpoint(prev_epoch))?
+            .checkpoint;
+
+        Some(checkpoint)
     };
 
     for height in cur_next_exp_height..=target_height {
@@ -133,13 +156,39 @@ fn prepare_l1_segment(
 
         for tx in rec.txs() {
             for op in tx.protocol_ops() {
-                let ProtocolOperation::Checkpoint(_signed_checkpoint) = op else {
+                let ProtocolOperation::Checkpoint(signed_checkpoint) = op else {
                     continue;
                 };
 
-                // TODO: check signed_checkpoint is the checkpoint we want
-                // FIXME: we really need to do this
+                // L1 Reader only adds a checkpoint ProtocolOperation if checkpoint signature valid.
+                let checkpoint = signed_checkpoint.checkpoint();
+
+                // Must have expected checkpoint.
+                // Can None before first checkpoint creation, where we dont care about this.
+                let Some(expected) = prev_checkpoint.as_ref() else {
+                    continue;
+                };
+
+                // Must get expected checkpoint.
+                if expected.commitment() != checkpoint.commitment() {
+                    warn!(got = ?checkpoint, ?expected, "got unexpected checkpoint");
+                    continue;
+                }
+
+                // Proof inside checkpoint must be valid.
+                let proof_receipt = checkpoint_verification::construct_receipt(checkpoint);
+                if let Err(err) =
+                    checkpoint_verification::verify_proof(checkpoint, &proof_receipt, params)
+                {
+                    warn!(?err, blockid = %rec.blkid(), tx = %tx.proof().position(), "checkpoint proof verification failed");
+                    continue;
+                }
+
+                // Found valid checkpoint for previous epoch. Should end current epoch.
                 is_epoch_final_block = true;
+
+                // TODO: some way to avoid rechecking l1 blocks already checked during previous
+                // block assemblies.
             }
         }
 

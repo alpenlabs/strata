@@ -33,11 +33,6 @@ pub enum Error {
     #[error("missing expected chainstate for block {0:?}")]
     MissingBlockChainstate(L2BlockId),
 
-    // This probably shouldn't happen, it would suggest the database is
-    // misbehaving.
-    #[error("missing expected state checkpoint at {0}")]
-    MissingCheckpoint(u64),
-
     #[error("unable to find reorg {0:?} -> {1:?})")]
     UnableToFindReorg(L2BlockId, L2BlockId),
 
@@ -68,12 +63,6 @@ pub enum Error {
     #[error("not yet implemented")]
     Unimplemented,
 
-    #[error("block assembly timed out")]
-    BlockAssemblyTimedOut,
-
-    #[error("cannot determine pivot point for L1Segment")]
-    BlockAssemblyL1SegmentUndetermined,
-
     #[error("deserializing failed")]
     Deserialization,
 
@@ -85,10 +74,6 @@ pub enum Error {
 
     #[error("checkpoint invalid: {0}")]
     InvalidCheckpoint(#[from] CheckpointError),
-
-    /// Used when assembling blocks and we don't have an actual block ID to use.
-    #[error("invalid state transition: {0}")]
-    InvalidStateTsnImm(#[from] TsnError),
 
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),

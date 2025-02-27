@@ -1,4 +1,6 @@
+use strata_chaintsn::errors::TsnError;
 use strata_db::DbError;
+use strata_eectl::errors::EngineError;
 use strata_primitives::l2::L2BlockId;
 use thiserror::Error;
 
@@ -26,8 +28,37 @@ pub enum Error {
     /// Database Error.
     #[error("db: {0}")]
     DbError(#[from] DbError),
-    /// Consensus Error.
-    /// TODO: remove this and use local error variants
+
+    /// Error during block assembly.
+    #[error("block_assembly: {0}")]
+    BlockAssemblyError(#[from] BlockAssemblyError),
+}
+
+#[derive(Debug, Error)]
+pub enum BlockAssemblyError {
+    #[error("missing expected chainstate for block {0:?}")]
+    MissingBlockChainstate(L2BlockId),
+
+    // This probably shouldn't happen, it would suggest the database is
+    // misbehaving.
+    #[error("missing expected state checkpoint at {0}")]
+    MissingCheckpoint(u64),
+
+    #[error("L1 block {0} missing from database")]
+    MissingL1BlockHeight(u64),
+
+    #[error("block assembly timed out")]
+    BlockAssemblyTimedOut,
+
     #[error("consensus: {0}")]
     ConsensusError(#[from] strata_consensus_logic::errors::Error),
+
+    #[error("invalid state transition: {0}")]
+    InvalidStateTsnImm(#[from] TsnError),
+
+    #[error("engine: {0}")]
+    Engine(#[from] EngineError),
+
+    #[error("db: {0}")]
+    Db(#[from] strata_db::errors::DbError),
 }
