@@ -625,7 +625,7 @@ mod test {
             .get_raw_transaction_verbosity_one(&txid)
             .await
             .unwrap()
-            .hex
+            .transaction
             .compute_txid();
         assert_eq!(expected, got);
 

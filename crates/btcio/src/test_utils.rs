@@ -145,7 +145,7 @@ impl ReaderRpc for TestBitcoinClient {
         let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
         Ok(GetRawTransactionVerbosityOne {
             in_active_chain: Some(true),
-            hex: some_tx.clone(),
+            transaction: some_tx.clone(),
             txid: some_tx.compute_txid(),
             hash: some_tx.compute_wtxid(),
             size: some_tx.base_size(),

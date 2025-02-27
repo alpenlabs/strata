@@ -188,7 +188,8 @@ impl GetRawTransactionVerbosityZero {
 pub struct GetRawTransactionVerbosityOne {
     pub in_active_chain: Option<bool>,
     #[serde(deserialize_with = "deserialize_tx")]
-    pub hex: Transaction,
+    #[serde(rename = "hex")]
+    pub transaction: Transaction,
     pub txid: Txid,
     pub hash: Wtxid,
     pub size: usize,
