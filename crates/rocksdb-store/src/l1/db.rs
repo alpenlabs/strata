@@ -413,7 +413,7 @@ mod tests {
 
         let blockid = db.get_canonical_blockid_at_height(2).unwrap().unwrap();
         let block_txs = db.get_block_txs(blockid).unwrap().unwrap();
-        let expected: Vec<_> = (0..10).map(|i| (blockid, i).into()).collect(); // 10 because insert_block_data inserts 10 txs
+        let expected: Vec<_> = (0..num_txs).map(|i| (blockid, i as u32).into()).collect(); // 10 because insert_block_data inserts 10 txs
         assert_eq!(block_txs, expected);
     }
 
