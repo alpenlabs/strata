@@ -1,6 +1,6 @@
 //! General handling around checkpoint verification.
 
-use strata_primitives::{params::*, proof::RollupVerifyingKey};
+use strata_primitives::{buf::Buf32, params::*, proof::RollupVerifyingKey};
 use strata_state::{batch::*, client_state::L1Checkpoint};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
@@ -73,23 +73,15 @@ fn verify_checkpoint_extends(
 ) -> Result<(), CheckpointError> {
     let epoch = checkpoint.batch_info().epoch();
     let prev_epoch = prev.batch_info.epoch();
-    let last_l1_tsn = prev.batch_transition.l1_transition;
-    let last_l2_tsn = prev.batch_transition.l2_transition;
-    let l1_tsn = checkpoint.batch_transition().l1_transition;
-    let l2_tsn = checkpoint.batch_transition().l2_transition;
+    let last_tsn = prev.batch_transition;
+    let tsn = checkpoint.batch_transition();
 
     // Check that the epoch numbers line up.
     if epoch != prev_epoch + 1 {
         return Err(CheckpointError::Sequencing(epoch, prev_epoch));
     }
 
-    // Check that the L1 blocks match up.
-    if l1_tsn.0 != last_l1_tsn.1 {
-        warn!("checkpoint mismatch on L1 state!");
-        return Err(CheckpointError::MismatchL1State);
-    }
-
-    if l2_tsn.0 != last_l2_tsn.1 {
+    if last_tsn.1 != tsn.0 {
         warn!("checkpoint mismatch on L2 state!");
         return Err(CheckpointError::MismatchL2State);
     }
@@ -130,8 +122,8 @@ pub fn verify_proof(
         return Ok(());
     }
 
-    let expected_public_output = checkpoint.get_proof_output();
-    let actual_public_output: CheckpointProofOutput =
+    let expected_public_output = *checkpoint.batch_transition();
+    let actual_public_output: (Buf32, Buf32) =
         borsh::from_slice(proof_receipt.public_values().as_bytes())
             .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
 

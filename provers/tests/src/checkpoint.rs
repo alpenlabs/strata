@@ -1,5 +1,4 @@
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
-use strata_test_utils::l2::gen_params;
 use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
@@ -26,14 +25,10 @@ impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
     type H = H;
 
     fn get_input(&self, l2_range: &(u64, u64)) -> ZkVmResult<CheckpointProverInput> {
-        let params = gen_params();
-        let rollup_params = params.rollup();
-
         let cl_stf_proofs = vec![self.cl_stf_prover.get_proof(l2_range).unwrap()];
         let cl_stf_vk = self.cl_stf_prover.get_host().get_verification_key();
 
         let input = CheckpointProverInput {
-            rollup_params: rollup_params.clone(),
             cl_stf_proofs,
             cl_stf_vk,
         };

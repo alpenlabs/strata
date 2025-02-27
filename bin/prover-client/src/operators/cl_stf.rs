@@ -33,7 +33,7 @@ use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 ///   transition proofs.
 #[derive(Debug, Clone)]
 pub struct ClStfOperator {
-    cl_client: HttpClient,
+    pub cl_client: HttpClient,
     evm_ee_operator: Arc<EvmEeOperator>,
     btc_blockspace_operator: Arc<BtcBlockspaceOperator>,
     rollup_params: Arc<RollupParams>,
@@ -123,7 +123,7 @@ impl ProvingOp for ClStfOperator {
         let (start, end) = l2_range;
         // Do some sanity checks
         assert!(
-            start.slot() >= end.slot(),
+            start.slot() <= end.slot(),
             "failed to construct CL STF proof context. start_slot: {} > end_slot {}",
             start.slot(),
             end.slot()

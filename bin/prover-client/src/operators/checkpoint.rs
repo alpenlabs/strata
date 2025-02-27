@@ -5,7 +5,6 @@ use strata_db::traits::ProofDatabase;
 use strata_primitives::{
     l1::L1BlockCommitment,
     l2::L2BlockCommitment,
-    params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
@@ -30,7 +29,6 @@ use crate::{
 pub struct CheckpointOperator {
     cl_client: HttpClient,
     cl_stf_operator: Arc<ClStfOperator>,
-    rollup_params: Arc<RollupParams>,
     enable_checkpoint_runner: bool,
 }
 
@@ -39,13 +37,11 @@ impl CheckpointOperator {
     pub fn new(
         cl_client: HttpClient,
         cl_stf_operator: Arc<ClStfOperator>,
-        rollup_params: Arc<RollupParams>,
         enable_checkpoint_runner: bool,
     ) -> Self {
         Self {
             cl_client,
             cl_stf_operator,
-            rollup_params,
             enable_checkpoint_runner,
         }
     }
@@ -229,9 +225,7 @@ impl ProvingOp for CheckpointOperator {
             cl_stf_proofs.push(proof);
         }
 
-        let rollup_params = self.rollup_params.as_ref().clone();
         Ok(CheckpointProverInput {
-            rollup_params,
             cl_stf_proofs,
             cl_stf_vk,
         })

@@ -20,7 +20,7 @@ use crate::errors::ProvingTaskError;
 /// required by the [`BtcBlockspaceProver`] for the proof generation.
 #[derive(Debug, Clone)]
 pub struct BtcBlockspaceOperator {
-    btc_client: Arc<BitcoinClient>,
+    pub btc_client: Arc<BitcoinClient>,
     rollup_params: Arc<RollupParams>,
 }
 
@@ -84,6 +84,9 @@ impl ProvingOp for BtcBlockspaceOperator {
                 current_block_id = prev_block_hash.into();
             }
         }
+
+        // Reverse the blocks to make them in ascending order
+        btc_blocks.reverse();
 
         let tx_filters =
             TxFilterConfig::derive_from(&self.rollup_params).expect("failed to derive tx filters");

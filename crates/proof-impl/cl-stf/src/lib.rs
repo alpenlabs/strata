@@ -60,7 +60,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         assert_eq!(
             l2_block.exec_segment(),
             &exec_segment,
-            "mismatch between exec segment at height {}",
+            "mismatch between exec segment at height {:?}",
             l2_block.header().blockidx()
         );
 
@@ -68,7 +68,15 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         // Since only some information of the L1BlockManifest is verified by the Blockspace Proof,
         // verify only those parts
         let new_l1_manifests = l2_block.l1_segment().new_manifests();
+
         for manifest in new_l1_manifests {
+            assert_eq!(
+                &l1_updates[blockscan_result_idx].raw_header,
+                manifest.header(),
+                "mismatch headers at idx: {:?}",
+                blockscan_result_idx
+            );
+
             // OPTIMIZE: if there's a way to compare things without additional cloned
             let protocol_ops: Vec<ProtocolOperation> = manifest
                 .txs()
@@ -76,19 +84,11 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
                 .flat_map(|tx| tx.protocol_ops().iter().cloned())
                 .collect();
 
-            // 7a. Verify that the protocol ops matches
+            // 7b. Verify that the protocol ops matches
             assert_eq!(
                 &l1_updates[blockscan_result_idx].protocol_ops,
                 &protocol_ops,
                 "mismatch between protocol ops for {}",
-                manifest.blkid()
-            );
-
-            // 7b. Verify that the L1 Header matches
-            assert_eq!(
-                &l1_updates[blockscan_result_idx].raw_header,
-                manifest.header(),
-                "mismatch between header for {}",
                 manifest.blkid()
             );
 

@@ -7,12 +7,14 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
+    buf::Buf32, 
     buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment, params::Params,
+,
 };
 use tracing::*;
 
 use crate::{
-    batch::{BaseStateCommitment, BatchInfo, BatchTransition},
+    batch::BatchInfo,
     id::L2BlockId,
     l1::L1BlockId,
     operation::{ClientUpdateOutput, SyncAction},
@@ -382,14 +384,12 @@ pub struct L1Checkpoint {
 impl L1Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
-        batch_transition: BatchTransition,
-        base_state_commitment: BaseStateCommitment,
+        batch_transition: (Buf32, Buf32),
         l1_reference: CheckpointL1Ref,
     ) -> Self {
         Self {
             batch_info,
             batch_transition,
-            base_state_commitment,
             l1_reference,
         }
     }

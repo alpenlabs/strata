@@ -69,7 +69,6 @@ impl ProofOperator {
         let checkpoint_operator = CheckpointOperator::new(
             cl_client.clone(),
             Arc::new(cl_stf_operator.clone()),
-            rollup_params.clone(),
             enable_checkpoint_runner,
         );
 

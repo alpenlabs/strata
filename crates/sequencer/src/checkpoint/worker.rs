@@ -13,7 +13,7 @@ use strata_primitives::{
     prelude::*,
 };
 use strata_state::{
-    batch::{BaseStateCommitment, BatchInfo, BatchTransition, EpochSummary},
+    batch::{BatchInfo, EpochSummary},
     block::L2BlockBundle,
     chain_state::Chainstate,
     header::*,
@@ -195,7 +195,7 @@ fn handle_ready_epoch(
 
     // else save a pending proof checkpoint entry
     debug!(%epoch, "saving unproven checkpoint");
-    let entry = CheckpointEntry::new_pending_proof(cpd.info, cpd.tsn, cpd.commitment);
+    let entry = CheckpointEntry::new_pending_proof(cpd.info, cpd.tsn);
     if let Err(e) = ckhandle.put_checkpoint_and_notify_blocking(epoch, entry) {
         warn!(%epoch, err = %e, "failed to save checkpoint");
     }
@@ -206,17 +206,12 @@ fn handle_ready_epoch(
 /// Container structure for convenience.
 struct CheckpointPrepData {
     info: BatchInfo,
-    tsn: BatchTransition,
-    commitment: BaseStateCommitment,
+    tsn: (Buf32, Buf32),
 }
 
 impl CheckpointPrepData {
-    fn new(info: BatchInfo, tsn: BatchTransition, commitment: BaseStateCommitment) -> Self {
-        Self {
-            info,
-            tsn,
-            commitment,
-        }
+    fn new(info: BatchInfo, tsn: (Buf32, Buf32)) -> Self {
+        Self { info, tsn }
     }
 }
 
@@ -286,36 +281,18 @@ fn create_checkpoint_prep_data_from_summary(
     let initial_state = chsman
         .get_toplevel_chainstate_blocking(initial_state_height)?
         .ok_or(Error::MissingIdxChainstate(initial_state_height))?;
-    let l1_initial_state = initial_state.l1_view().header_vs().compute_hash()?;
     let l2_initial_state = initial_state.compute_state_root();
 
     let final_state_height = last_block.blockidx();
     let final_state = chsman
         .get_toplevel_chainstate_blocking(final_state_height)?
         .ok_or(Error::MissingIdxChainstate(final_state_height))?;
-    let l1_final_state = final_state.l1_view().header_vs().compute_hash()?;
     let l2_final_state = final_state.compute_state_root();
 
-    let l1_transition = (l1_initial_state, l1_final_state);
-    let l2_transition = (l2_initial_state, l2_final_state);
-
-    // Assemble the final parts together.
-    let new_transition = BatchTransition::new(l1_transition, l2_transition, rollup_params_hash);
+    let new_transition = (l2_initial_state, l2_final_state);
     let new_batch_info = BatchInfo::new(summary.epoch(), l1_range, l2_range);
 
-    // TODO make sure this is correct, what even is this "base state commitment"?
-    let base_state_commitment = match prev_checkpoint {
-        Some(ckpt) if ckpt.is_proof_ready() && !ckpt.checkpoint.proof().is_empty() => {
-            ckpt.into_batch_checkpoint().base_state_commitment().clone()
-        }
-        _ => new_transition.get_initial_base_state_commitment(),
-    };
-
-    Ok(CheckpointPrepData::new(
-        new_batch_info,
-        new_transition,
-        base_state_commitment,
-    ))
+    Ok(CheckpointPrepData::new(new_batch_info, new_transition))
 }
 
 fn fetch_epoch_l2_headers(

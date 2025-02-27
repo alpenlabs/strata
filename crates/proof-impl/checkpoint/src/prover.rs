@@ -1,13 +1,10 @@
-use strata_primitives::params::RollupParams;
+use strata_primitives::buf::Buf32;
 use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
     ZkVmResult,
 };
 
-use crate::CheckpointProofOutput;
-
 pub struct CheckpointProverInput {
-    pub rollup_params: RollupParams,
     pub cl_stf_proofs: Vec<ProofReceipt>,
     pub cl_stf_vk: VerificationKey,
 }
@@ -16,7 +13,7 @@ pub struct CheckpointProver;
 
 impl ZkVmProver for CheckpointProver {
     type Input = CheckpointProverInput;
-    type Output = CheckpointProofOutput;
+    type Output = (Buf32, Buf32);
 
     fn name() -> String {
         "Checkpoint".to_string()
@@ -32,7 +29,6 @@ impl ZkVmProver for CheckpointProver {
     {
         let mut input_builder = B::new();
 
-        input_builder.write_serde(&input.rollup_params)?;
         input_builder.write_serde(&input.cl_stf_proofs.len())?;
 
         for cl_stf_proof in &input.cl_stf_proofs {
