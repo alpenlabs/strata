@@ -88,9 +88,9 @@ class BasicRethTxJob(BaseRethLoadJob):
         self.transfer.transfer(target_address, 0.1, TransactionType.EIP1559)
 
         # Increment Counter.
-        self.tx.call_contract("Counter", "increment")
+        self.tx.call_contract("Counter", "increment", wait=False)
 
         # Mint some SUSD.
-        self.tx.mint_erc20("SUSD", 100)
+        self.tx.mint_erc20("SUSD", 100, wait=False)
 
         self._logger.info("task completed successfully.")

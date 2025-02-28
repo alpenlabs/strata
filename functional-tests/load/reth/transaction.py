@@ -111,7 +111,7 @@ class TransactionSender(TransactionBuilder):
             self.log(f"An exception during transaction send: {e}")
             return None
 
-    def send_tx_and_wait(self, tx: Tx, timeout: int = 10) -> TxReceipt | None:
+    def send_tx_and_wait(self, tx: Tx, timeout: int = 100) -> TxReceipt | None:
         logs_caller = log_metadata_var.get()
         self.log(f"Sending tx=[{logs_caller}] with timeout={timeout}: {self._tx_fmt(tx)}")
 
@@ -134,12 +134,12 @@ class TransactionSender(TransactionBuilder):
         return self.send_tx(tx)
 
     def send_ensured_tx_and_wait(
-        self, tx: Tx, tx_type: TransactionType, timeout: int = 10
+        self, tx: Tx, tx_type: TransactionType, timeout: int = 100
     ) -> TxReceipt | None:
         self.fill_tx_fields(tx, tx_type)
         return self.send_tx_and_wait(tx, timeout=timeout)
 
-    def wait_tx(self, tx_hash: HexBytes, timeout: int = 10) -> TxReceipt | None:
+    def wait_tx(self, tx_hash: HexBytes, timeout: int = 100) -> TxReceipt | None:
         try:
             return self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=timeout)
         except Exception as e:
