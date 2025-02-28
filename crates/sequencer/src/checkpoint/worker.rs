@@ -364,64 +364,6 @@ fn fetch_epoch_l2_headers(
     Ok(headers)
 }
 
-/// Gets L1 epoch manifests back to a previous height.  This height should be
-/// the last L1 block we want to include.  This would be one higher than the
-/// previous epoch's new L1 block, or the genesis trigger height.
-///
-/// # Panics
-///
-/// If the prev epochs's L1 block is after the current summary's L1 block.
-fn fetch_epoch_l1_manifests(
-    summary: &EpochSummary,
-    initial_l1_height: u64,
-    l1man: &L1BlockManager,
-) -> anyhow::Result<Vec<L1BlockManifest>> {
-    if initial_l1_height > summary.new_l1().height() {
-        panic!("ckptworker: invalid L1 blocks query");
-    }
-
-    let start_height = summary.new_l1().height();
-    let break_height = initial_l1_height;
-    let limit = 2016; // TODO make a const?
-    let prev_epoch = summary.epoch() - 1;
-
-    let mut manifests = Vec::new();
-
-    // This isn't actually necessary due to how the loop works, but it will be
-    // necessary when we start fetching by blkid and we need to have an initial
-    // block to get the parent of.
-    let terminal = fetch_block_manifest_at_epoch(start_height, prev_epoch, l1man)?;
-    manifests.push(terminal);
-
-    // This keeps fetches the blocks in reverse since we want to switch this to
-    // using blkids for db queries.  This should be using the parent blkids
-    // instead.
-    //
-    // We also ensure that the manifest was generated using the previous epoch's
-    // scan configuration.
-    loop {
-        if manifests.len() >= limit {
-            return Err(Error::MalformedEpoch(summary.get_epoch_commitment()).into());
-        }
-
-        // Kinda hacky math but it works.
-        let cur_height = start_height - manifests.len() as u64;
-
-        let mf = fetch_block_manifest_at_epoch(cur_height, prev_epoch, l1man)?;
-        manifests.push(mf);
-
-        // If the next height is the final block we wanted, then we're done.
-        if cur_height == break_height {
-            break;
-        }
-    }
-
-    // Similarly to before, also reverse it so it's in order.
-    manifests.reverse();
-
-    Ok(manifests)
-}
-
 fn fetch_l2_block(blkid: &L2BlockId, l2man: &L2BlockManager) -> anyhow::Result<L2BlockBundle> {
     Ok(l2man
         .get_block_data_blocking(blkid)?

@@ -4,6 +4,7 @@ name = "strata-sync"
 version = "0.1.0"
 
 [dependencies]
+strata-common.workspace = true
 strata-consensus-logic.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
