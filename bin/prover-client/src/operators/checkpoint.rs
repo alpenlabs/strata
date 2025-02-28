@@ -3,42 +3,32 @@ use std::sync::Arc;
 use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::{
-    buf::Buf32,
     l1::L1BlockCommitment,
     l2::L2BlockCommitment,
-    params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
 use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::{RpcCheckpointConfStatus, RpcCheckpointInfo};
-use strata_state::id::L2BlockId;
 use tokio::sync::Mutex;
 use tracing::{error, info};
-use zkaleido::AggregationInput;
 
-use super::{cl_agg::ClAggOperator, l1_batch::L1BatchOperator, ProvingOp};
+use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{
     checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError, hosts,
-    task_tracker::TaskTracker,
+    operators::cl_stf::ClStfRange, task_tracker::TaskTracker,
 };
 
 /// A struct that implements the [`ProvingOp`] for Checkpoint Proof.
 ///
 /// It is responsible for managing the data and tasks required to generate Checkpoint Proof. It
 /// fetches the necessary inputs for the [`CheckpointProver`] by:
-///
-/// - utilizing the [`L1BatchOperator`] to create and manage proving tasks for L1Batch. The
-///   resulting L1 Batch proof is incorporated as part of the input for the Checkpoint Proof.
-/// - utilizing the [`ClAggOperator`] to create and manage proving tasks for CL Aggregation. The
-///   resulting CL Aggregated proof is incorporated as part of the input for the Checkpoint Proof.
+// TODO: update docstring here
 #[derive(Debug, Clone)]
 pub struct CheckpointOperator {
     cl_client: HttpClient,
-    l1_batch_operator: Arc<L1BatchOperator>,
-    l2_batch_operator: Arc<ClAggOperator>,
-    rollup_params: Arc<RollupParams>,
+    cl_stf_operator: Arc<ClStfOperator>,
     enable_checkpoint_runner: bool,
 }
 
@@ -46,16 +36,12 @@ impl CheckpointOperator {
     /// Creates a new BTC operations instance.
     pub fn new(
         cl_client: HttpClient,
-        l1_batch_operator: Arc<L1BatchOperator>,
-        l2_batch_operator: Arc<ClAggOperator>,
-        rollup_params: Arc<RollupParams>,
+        cl_stf_operator: Arc<ClStfOperator>,
         enable_checkpoint_runner: bool,
     ) -> Self {
         Self {
             cl_client,
-            l1_batch_operator,
-            l2_batch_operator,
-            rollup_params,
+            cl_stf_operator,
             enable_checkpoint_runner,
         }
     }
@@ -78,40 +64,24 @@ impl CheckpointOperator {
         task_tracker: Arc<Mutex<TaskTracker>>,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
         let ckp_idx = checkpoint_info.idx;
+        let l2_blocks_len = checkpoint_info.l2_range.1.slot() - checkpoint_info.l2_range.0.slot();
+        info!(%ckp_idx, %l2_blocks_len);
 
-        // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
-        // include the range in terms of block_id.
-        // https://alpenlabs.atlassian.net/browse/STR-756
-        let start_l1_block_id = checkpoint_info.l1_range.0.blkid();
-        let end_l1_block_id = checkpoint_info.l1_range.1.blkid();
-
-        let l1_batch_keys = self
-            .l1_batch_operator
-            .create_task(
-                (*start_l1_block_id, *end_l1_block_id),
-                task_tracker.clone(),
-                db,
-            )
-            .await?;
-        info!(%ckp_idx, "Created tasks for L1 Batch");
-
-        // Doing the manual block idx to id transformation. Will be removed once checkpoint_info
-        // include the range in terms of block_id.
-        // https://alpenlabs.atlassian.net/browse/STR-756
-        let start_l2_idx = checkpoint_info.l2_range.0.blkid();
-        let end_l2_idx = checkpoint_info.l2_range.1.blkid();
-        let l2_range = vec![(*start_l2_idx, *end_l2_idx)];
-
-        let l2_batch_keys = self
-            .l2_batch_operator
-            .create_task(l2_range, task_tracker.clone(), db)
-            .await?;
-
-        info!(%ckp_idx, "Created tasks for L2 Batch");
-
-        let mut all_keys = l1_batch_keys;
-        all_keys.extend(l2_batch_keys);
-        Ok(all_keys)
+        // Since the L1Manifests are only included on the terminal block of epoch transition, we can
+        // strategize to split the L2 Blocks as following:
+        // 1. Prove CL terminal block separately
+        // 2. Split other blocks on a on chunks of 20?
+        // TODO: add better heuristic to split, so that it is most efficient
+        // Since the EVM EE STF will be the heaviest, the splitting can be done based on that
+        //
+        // For now, do everything on a single chunk
+        let cl_stf_params = ClStfRange {
+            l1_range: Some(checkpoint_info.l1_range),
+            l2_range: checkpoint_info.l2_range,
+        };
+        self.cl_stf_operator
+            .create_task(cl_stf_params, task_tracker, db)
+            .await
     }
 
     /// Manual creation of checkpoint task. Intended to be used in tests.
@@ -136,30 +106,15 @@ impl CheckpointOperator {
     pub async fn create_task_raw(
         &self,
         checkpoint_idx: u64,
-        l1_range: (u64, u64),
-        l2_range: (u64, u64),
+        l1_range: (L1BlockCommitment, L1BlockCommitment),
+        l2_range: (L2BlockCommitment, L2BlockCommitment),
         task_tracker: Arc<Mutex<TaskTracker>>,
         db: &ProofDb,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let (start_l1_height, end_l1_height) = l1_range;
-        let (start_l2_height, end_l2_height) = l2_range;
-
-        let start_l1_block_id = self.l1_batch_operator.get_block_at(start_l1_height).await?;
-        let start_l1_commitment = L1BlockCommitment::new(start_l1_height, start_l1_block_id);
-
-        let end_l1_block_id = self.l1_batch_operator.get_block_at(end_l1_height).await?;
-        let end_l1_commitment = L1BlockCommitment::new(end_l1_height, end_l1_block_id);
-
-        let start_l2_block_id = self.get_l2id(start_l2_height).await?;
-        let start_l2_commitment = L2BlockCommitment::new(start_l2_height, start_l2_block_id);
-
-        let end_l2_block_id = self.get_l2id(end_l2_height).await?;
-        let end_l2_commitment = L2BlockCommitment::new(end_l2_height, end_l2_block_id);
-
         let checkpoint_info = RpcCheckpointInfo {
             idx: checkpoint_idx,
-            l1_range: (start_l1_commitment, end_l1_commitment),
-            l2_range: (start_l2_commitment, end_l2_commitment),
+            l1_range,
+            l2_range,
             l1_reference: None,
             confirmation_status: RpcCheckpointConfStatus::Pending,
         };
@@ -199,31 +154,6 @@ impl CheckpointOperator {
             .inspect_err(|_| error!(%ckp_idx, "Failed to fetch CheckpointInfo"))
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
             .ok_or(ProvingTaskError::WitnessNotFound)
-    }
-
-    /// Retrieves the [`L2BlockId`] for the given `block_num`
-    pub async fn get_l2id(&self, block_num: u64) -> Result<L2BlockId, ProvingTaskError> {
-        let l2_headers = self
-            .cl_client
-            .get_headers_at_idx(block_num)
-            .await
-            .inspect_err(|_| error!(%block_num, "Failed to fetch l2_headers"))
-            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
-
-        let headers = l2_headers.ok_or_else(|| {
-            error!(%block_num, "Failed to fetch L2 block");
-            ProvingTaskError::InvalidWitness(format!("Invalid L2 block height {}", block_num))
-        })?;
-
-        let first_header: Buf32 = headers
-            .first()
-            .ok_or_else(|| {
-                ProvingTaskError::InvalidWitness(format!("Invalid L2 block height {}", block_num))
-            })?
-            .block_id
-            .into();
-
-        Ok(first_header.into())
     }
 
     /// Retrieves the latest checkpoint index
@@ -276,29 +206,28 @@ impl ProvingOp for CheckpointOperator {
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::DependencyNotFound(*task_id))?;
 
-        let l1_batch_id = deps[0];
-        let l1_batch_key = ProofKey::new(l1_batch_id, *task_id.host());
-        let l1_batch_proof = db
-            .get_proof(&l1_batch_key)
-            .map_err(ProvingTaskError::DatabaseError)?
-            .ok_or(ProvingTaskError::ProofNotFound(l1_batch_key))?;
-        let l1_batch_vk = hosts::get_verification_key(&l1_batch_key);
-        let l1_batch = AggregationInput::new(l1_batch_proof, l1_batch_vk);
+        assert!(!deps.is_empty(), "checkpoint must have some CL STF proofs");
 
-        let cl_agg_id = deps[1];
-        let cl_agg_key = ProofKey::new(cl_agg_id, *task_id.host());
-        let cl_agg_proof = db
-            .get_proof(&cl_agg_key)
-            .map_err(ProvingTaskError::DatabaseError)?
-            .ok_or(ProvingTaskError::ProofNotFound(cl_agg_key))?;
-        let cl_agg_vk = hosts::get_verification_key(&cl_agg_key);
-        let l2_batch = AggregationInput::new(cl_agg_proof, cl_agg_vk);
+        let cl_stf_key = ProofKey::new(deps[0], *task_id.host());
+        let cl_stf_vk = hosts::get_verification_key(&cl_stf_key);
 
-        let rollup_params = self.rollup_params.as_ref().clone();
+        let mut cl_stf_proofs = Vec::with_capacity(deps.len());
+        for dep in deps {
+            match dep {
+                ProofContext::ClStf(..) => {}
+                _ => panic!("invalid"),
+            };
+            let cl_stf_key = ProofKey::new(dep, *task_id.host());
+            let proof = db
+                .get_proof(&cl_stf_key)
+                .map_err(ProvingTaskError::DatabaseError)?
+                .ok_or(ProvingTaskError::ProofNotFound(cl_stf_key))?;
+            cl_stf_proofs.push(proof);
+        }
+
         Ok(CheckpointProverInput {
-            rollup_params,
-            l1_batch,
-            l2_batch,
+            cl_stf_proofs,
+            cl_stf_vk,
         })
     }
 

@@ -3,147 +3,125 @@
 
 pub mod prover;
 
-use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{buf::Buf32, l1::DepositInfo, params::RollupParams};
+use prover::ClStfOutput;
+use strata_chaintsn::transition::process_block;
+use strata_primitives::{l1::ProtocolOperation, params::RollupParams};
+use strata_proofimpl_btc_blockspace::logic::BlockscanProofOutput;
 use strata_state::{
-    block::ExecSegment,
+    block::{ExecSegment, L2Block},
     block_validation::{check_block_credential, validate_block_segments},
+    chain_state::Chainstate,
+    header::L2Header,
+    state_op::StateCache,
 };
-pub use strata_state::{block::L2Block, chain_state::Chainstate, state_op::StateCache};
 use zkaleido::ZkVmEnv;
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct L2BatchProofOutput {
-    pub deposits: Vec<DepositInfo>,
-    pub initial_state_hash: Buf32,
-    pub final_state_hash: Buf32,
-    pub rollup_params_commitment: Buf32,
-}
-
-impl L2BatchProofOutput {
-    pub fn rollup_params_commitment(&self) -> Buf32 {
-        self.rollup_params_commitment
-    }
-}
-
-/// Verifies an L2 block and applies the chain state transition if the block is valid.
-pub fn verify_and_transition(
-    prev_chstate: Chainstate,
-    new_l2_block: L2Block,
-    exec_segment: &ExecSegment,
-    rollup_params: &RollupParams,
-) -> Chainstate {
-    verify_l2_block(&new_l2_block, exec_segment, rollup_params);
-    apply_state_transition(prev_chstate, &new_l2_block, rollup_params)
-}
-
-/// Verifies the L2 block.
-fn verify_l2_block(block: &L2Block, exec_segment: &ExecSegment, chain_params: &RollupParams) {
-    // Assert that the block has been signed by the designated signer
-    assert!(
-        check_block_credential(block.header(), chain_params),
-        "Block credential verification failed"
-    );
-
-    // Assert that the block body and header are consistent
-    assert!(
-        validate_block_segments(block),
-        "Block credential verification failed"
-    );
-
-    // Verify proof public params matches the exec segment
-    let block_exec_segment = block.body().exec_segment();
-    assert_eq!(exec_segment, block_exec_segment);
-}
-
-/// Applies a state transition for a given L2 block.
-fn apply_state_transition(
-    prev_chstate: Chainstate,
-    new_l2_block: &L2Block,
-    chain_params: &RollupParams,
-) -> Chainstate {
-    let mut state_cache = StateCache::new(prev_chstate);
-
-    strata_chaintsn::transition::process_block(
-        &mut state_cache,
-        new_l2_block.header(),
-        new_l2_block.body(),
-        chain_params,
-    )
-    .expect("Failed to process the L2 block");
-
-    state_cache.state().to_owned()
-}
-
-#[inline]
-fn process_cl_stf(
-    prev_state: Chainstate,
-    new_block: L2Block,
-    exec_update: &ExecSegment,
-    rollup_params: &RollupParams,
-    rollup_params_commitment: &Buf32,
-) -> L2BatchProofOutput {
-    let new_state =
-        verify_and_transition(prev_state.clone(), new_block, exec_update, rollup_params);
-
-    L2BatchProofOutput {
-        // TODO: Accumulate the deposits
-        deposits: Vec::new(),
-        initial_state_hash: prev_state.compute_state_root(),
-        final_state_hash: new_state.compute_state_root(),
-        rollup_params_commitment: *rollup_params_commitment,
-    }
-}
-
-pub fn batch_process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8]) {
+pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vkey: &[u32; 8]) {
+    // 1. Read the rollup params
     let rollup_params: RollupParams = zkvm.read_serde();
-    let exec_updates: Vec<ExecSegment> = zkvm.read_verified_borsh(el_vkey);
-    let num_blocks: u32 = zkvm.read_serde();
 
-    assert!(num_blocks > 0, "At least one block is required.");
+    // 2. Read the initial chainstate from which we start the transition and create the state cache
+    let initial_chainstate: Chainstate = zkvm.read_borsh();
+    let initial_chainstate_root = initial_chainstate.compute_state_root();
+    let mut state_cache = StateCache::new(initial_chainstate);
+
+    // 3. Read L2 blocks
+    let l2_blocks: Vec<L2Block> = zkvm.read_borsh();
+    assert!(!l2_blocks.is_empty(), "At least one L2 block is required");
+
+    // 4. Read the verified blockscan proof outputs if any
+    let is_l1_segment_present: bool = zkvm.read_serde();
+    let l1_updates = if is_l1_segment_present {
+        let btc_blockspace_proof_output: BlockscanProofOutput =
+            zkvm.read_verified_borsh(btc_blockscan_vkey);
+        btc_blockspace_proof_output.blockscan_results
+    } else {
+        vec![]
+    };
+
+    // 5. Read the verified exec segments
+    // This is the expected output of EVM EE STF Proof
+    // Right now, each L2 block must contain exactly one ExecSegment, but this may change in the
+    // future
+    let exec_segments: Vec<ExecSegment> = zkvm.read_verified_borsh(el_vkey);
     assert_eq!(
-        num_blocks as usize,
-        exec_updates.len(),
-        "Number of blocks and execution updates differ."
+        l2_blocks.len(),
+        exec_segments.len(),
+        "mismatch len of l2 block and exec segments"
     );
 
-    let (prev_state, new_block): (Chainstate, L2Block) = zkvm.read_borsh();
-    let rollup_params_commitment = rollup_params.compute_hash();
-    let initial_cl_update = process_cl_stf(
-        prev_state,
-        new_block,
-        &exec_updates[0],
-        &rollup_params,
-        &rollup_params_commitment,
-    );
+    // Track the current index for Blockscan result
+    // This index are necessary because while each ExecSegment in L2BlockBody corresponds
+    // directly to an L2 block, an L1Segment may be absent, or there may be multiple per L2 block.
+    let mut blockscan_result_idx = 0;
 
-    let mut deposits = initial_cl_update.deposits.clone();
-    let mut cl_update_acc = initial_cl_update.clone();
-
-    for exec_update in &exec_updates[1..] {
-        let (prev_state, new_block): (Chainstate, L2Block) = zkvm.read_borsh();
-        let cl_update = process_cl_stf(
-            prev_state,
-            new_block,
-            exec_update,
-            &rollup_params,
-            &rollup_params_commitment,
-        );
-
+    for (l2_block, exec_segment) in l2_blocks.iter().zip(exec_segments) {
+        // 6. Verify that the exec segment is the same that was proven
         assert_eq!(
-            cl_update.initial_state_hash, cl_update_acc.final_state_hash,
-            "Snapshot hash mismatch between consecutive updates."
+            l2_block.exec_segment(),
+            &exec_segment,
+            "mismatch between exec segment at height {:?}",
+            l2_block.header().blockidx()
         );
 
-        deposits.extend_from_slice(&cl_update.deposits);
-        cl_update_acc = cl_update;
+        // 7. Verify that the L1 manifests are consistent with the one that was proven
+        // Since only some information of the L1BlockManifest is verified by the Blockspace Proof,
+        // verify only those parts
+        let new_l1_manifests = l2_block.l1_segment().new_manifests();
+
+        for manifest in new_l1_manifests {
+            assert_eq!(
+                &l1_updates[blockscan_result_idx].raw_header,
+                manifest.header(),
+                "mismatch headers at idx: {:?}",
+                blockscan_result_idx
+            );
+
+            // OPTIMIZE: if there's a way to compare things without additional cloned
+            let protocol_ops: Vec<ProtocolOperation> = manifest
+                .txs()
+                .iter()
+                .flat_map(|tx| tx.protocol_ops().iter().cloned())
+                .collect();
+
+            // 7b. Verify that the protocol ops matches
+            assert_eq!(
+                &l1_updates[blockscan_result_idx].protocol_ops,
+                &protocol_ops,
+                "mismatch between protocol ops for {}",
+                manifest.blkid()
+            );
+
+            // Increase the blockscan result idx
+            blockscan_result_idx += 1;
+        }
+
+        // 8. Now that the L2 Block body is verified, check that the L2 Block header is consistent
+        //    with the body
+        assert!(validate_block_segments(l2_block), "block validation failed");
+
+        // 9. Verify that the block credential is valid
+        assert!(
+            check_block_credential(l2_block.header(), &rollup_params),
+            "Block credential verification failed"
+        );
+
+        // 10. Apply the state transition
+        process_block(
+            &mut state_cache,
+            l2_block.header(),
+            l2_block.body(),
+            &rollup_params,
+        )
+        .expect("failed to process L2 Block");
     }
 
-    let output = L2BatchProofOutput {
-        deposits,
-        initial_state_hash: initial_cl_update.initial_state_hash,
-        final_state_hash: cl_update_acc.final_state_hash,
-        rollup_params_commitment: cl_update_acc.rollup_params_commitment,
+    // 11. Get the final chainstate and construct the output
+    let (final_chain_state, _) = state_cache.finalize();
+
+    let output = ClStfOutput {
+        initial_chainstate_root,
+        final_chainstate_root: final_chain_state.compute_state_root(),
     };
 
     zkvm.commit_borsh(&output);

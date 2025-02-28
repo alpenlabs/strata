@@ -252,8 +252,7 @@ fn process_l1_block(
                     // Construct the state bookkeeping entry for the checkpoint.
                     let l1ckpt = L1Checkpoint::new(
                         ckpt.batch_info().clone(),
-                        ckpt.batch_transition().clone(),
-                        ckpt.base_state_commitment().clone(),
+                        *ckpt.batch_transition(),
                         ckpt_ref.clone(),
                     );
 

@@ -2764,6 +2764,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-l1tx"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bitcoin",
+ "borsh",
+ "hex",
+ "musig2",
+ "strata-bridge-tx-builder",
+ "strata-primitives",
+ "strata-state",
+ "thiserror 2.0.11",
+ "tracing",
+]
+
+[[package]]
 name = "strata-primitives"
 version = "0.1.0"
 dependencies = [
@@ -2790,6 +2807,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-proofimpl-btc-blockspace"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "borsh",
+ "digest 0.10.7",
+ "serde",
+ "sha2",
+ "strata-bridge-tx-builder",
+ "strata-l1tx",
+ "strata-primitives",
+ "strata-state",
+ "zkaleido",
+]
+
+[[package]]
 name = "strata-proofimpl-cl-stf"
 version = "0.1.0"
 dependencies = [
@@ -2797,6 +2830,7 @@ dependencies = [
  "strata-chaintsn",
  "strata-crypto",
  "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "zkaleido",

@@ -123,7 +123,7 @@ pub fn compute_witness_commitment(
 ///
 /// * `true` if all integrity checks pass.
 /// * `false` otherwise.
-pub fn check_integrity(block: &Block, inclusion_proof: &Option<L1TxProof>) -> bool {
+pub fn check_block_integrity(block: &Block, coinbase_inclusion_proof: &Option<L1TxProof>) -> bool {
     let Block { header, txdata } = block;
     if txdata.is_empty() {
         return false;
@@ -136,7 +136,7 @@ pub fn check_integrity(block: &Block, inclusion_proof: &Option<L1TxProof>) -> bo
 
     if let Some(commitment) = witness_commitment_from_coinbase(coinbase) {
         // If we have a witness commitment, we also need an inclusion proof.
-        let proof = match inclusion_proof {
+        let proof = match coinbase_inclusion_proof {
             Some(proof) => proof,
             None => return false,
         };
@@ -178,20 +178,23 @@ mod tests {
     fn test_block_with_valid_witness() {
         let block = BtcChainSegment::load_full_block();
         let coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
-        assert!(check_integrity(&block, &Some(coinbase_inclusion_proof)));
+        assert!(check_block_integrity(
+            &block,
+            &Some(coinbase_inclusion_proof)
+        ));
     }
 
     #[test]
     fn test_block_with_invalid_coinbase_inclusion_proof() {
         let block = BtcChainSegment::load_full_block();
-        assert!(!check_integrity(&block, &None));
+        assert!(!check_block_integrity(&block, &None));
     }
 
     #[test]
     fn test_block_with_valid_inclusion_proof_of_other_tx() {
         let block = BtcChainSegment::load_full_block();
         let non_coinbase_inclusion_proof = L1TxProof::generate(&block.txdata, 1);
-        assert!(!check_integrity(
+        assert!(!check_block_integrity(
             &block,
             &Some(non_coinbase_inclusion_proof)
         ));
@@ -209,7 +212,7 @@ mod tests {
             }
         }
 
-        assert!(!check_integrity(&block, &None));
+        assert!(!check_block_integrity(&block, &None));
     }
 
     #[test]
@@ -225,7 +228,7 @@ mod tests {
         }
 
         let valid_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
-        assert!(!check_integrity(&block, &Some(valid_inclusion_proof)));
+        assert!(!check_block_integrity(&block, &Some(valid_inclusion_proof)));
     }
 
     #[test]
@@ -234,11 +237,11 @@ mod tests {
         let block = btc_chain.get_block_at(40321).unwrap();
 
         // Verify with an empty inclusion proof.
-        assert!(check_integrity(&block, &None));
+        assert!(check_block_integrity(&block, &None));
 
         // Verify with a valid inclusion proof.
         let valid_inclusion_proof = L1TxProof::generate(&block.txdata, 0);
-        assert!(check_integrity(&block, &Some(valid_inclusion_proof)));
+        assert!(check_block_integrity(&block, &Some(valid_inclusion_proof)));
     }
 
     #[test]

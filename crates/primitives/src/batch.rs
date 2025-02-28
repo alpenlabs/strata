@@ -131,8 +131,7 @@ impl EpochSummary {
 
 /// Consolidates all information required to describe and verify a batch checkpoint.
 /// This includes metadata about the batch, the state transitions, checkpoint base state,
-/// and the proof itself. The proof verifies that the transition in [`BatchTransition`]
-/// is valid for the batch described by [`BatchInfo`].
+/// and the proof itself. The proof verifies that the `transition` is valid.
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
@@ -140,28 +139,21 @@ pub struct Checkpoint {
     /// Information regarding the current batches of l1 and l2 blocks along with epoch.
     batch_info: BatchInfo,
 
-    /// Transition data for L1 and L2 states, which is verified by the proof.
-    transition: BatchTransition,
-
-    /// Reference state commitment against which batch transition and corresponding proof is
-    /// verified
-    base_state_commitment: BaseStateCommitment,
+    /// Transition data for `Chainstate`, which is verified by the proof.
+    ///
+    /// Represents a transition from the starting chainstate to the ending chainstate.
+    /// The state root is computed via `Chainstate::compute_state_root`.
+    transition: (Buf32, Buf32),
 
     /// Proof for the batch obtained from prover manager
     proof: Proof,
 }
 
 impl Checkpoint {
-    pub fn new(
-        batch_info: BatchInfo,
-        transition: BatchTransition,
-        base_state_commitment: BaseStateCommitment,
-        proof: Proof,
-    ) -> Self {
+    pub fn new(batch_info: BatchInfo, transition: (Buf32, Buf32), proof: Proof) -> Self {
         Self {
             batch_info,
             transition,
-            base_state_commitment,
             proof,
         }
     }
@@ -170,12 +162,8 @@ impl Checkpoint {
         &self.batch_info
     }
 
-    pub fn batch_transition(&self) -> &BatchTransition {
+    pub fn batch_transition(&self) -> &(Buf32, Buf32) {
         &self.transition
-    }
-
-    pub fn base_state_commitment(&self) -> &BaseStateCommitment {
-        &self.base_state_commitment
     }
 
     pub fn proof(&self) -> &Proof {
@@ -186,19 +174,10 @@ impl Checkpoint {
         self.proof = proof
     }
 
-    /// Returns the output that should be expected from the checkpoint proof
-    /// verification.
-    pub fn get_proof_output(&self) -> CheckpointProofOutput {
-        CheckpointProofOutput::new(
-            self.batch_transition().clone(),
-            self.base_state_commitment().clone(),
-        )
-    }
-
     #[deprecated(note = "use `checkpoint_verification::construct_receipt`")]
     pub fn get_proof_receipt(&self) -> ProofReceipt {
         let proof = self.proof().clone();
-        let output = self.get_proof_output();
+        let output = self.batch_transition();
         let public_values =
             PublicValues::new(borsh::to_vec(&output).expect("checkpoint: proof output"));
         ProofReceipt::new(proof, public_values)
@@ -319,97 +298,51 @@ impl BatchInfo {
     }
 }
 
-/// Describes state transitions for both L1 and L2, along with a commitment to the
-/// rollup parameters. The proof associated with the batch verifies this transition.
 #[derive(
-    Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
-pub struct BatchTransition {
-    /// The inclusive hash range of `HeaderVerificationState` for L1 blocks.
-    ///
-    /// Represents a transition from the starting L1 state to the ending L1 state.
-    /// The hash is computed via [`super::l1::HeaderVerificationState::compute_hash`].
-    pub l1_transition: (Buf32, Buf32),
-
-    /// The inclusive hash range of `Chainstate` for L2 blocks.
-    ///
-    /// Represents a transition from the starting L2 state to the ending L2 state.
-    /// The state root is computed via `Chainstate::compute_state_root`.
-    pub l2_transition: (Buf32, Buf32),
-
-    /// A commitment to the `RollupParams`, as computed by `RollupParams::compute_hash`.
-    ///
-    /// This indicates that the transition is valid under these rollup parameters.
-    pub rollup_params_commitment: Buf32,
+pub struct CommitmentInfo {
+    pub blockhash: Buf32,
+    pub txid: Buf32,
+    pub wtxid: Buf32,
+    pub block_height: u64,
+    pub position: u32,
 }
 
-impl BatchTransition {
+impl CommitmentInfo {
     pub fn new(
-        l1_transition: (Buf32, Buf32),
-        l2_transition: (Buf32, Buf32),
-        rollup_params_commitment: Buf32,
+        blockhash: Buf32,
+        txid: Buf32,
+        wtxid: Buf32,
+        block_height: u64,
+        position: u32,
     ) -> Self {
         Self {
-            l1_transition,
-            l2_transition,
-            rollup_params_commitment,
+            blockhash,
+            txid,
+            wtxid,
+            block_height,
+            position,
         }
-    }
-
-    /// Creates a [`BaseStateCommitment`] by taking the initial state of the
-    /// [`BatchTransition`]
-    pub fn get_initial_base_state_commitment(&self) -> BaseStateCommitment {
-        BaseStateCommitment::new(self.l1_transition.0, self.l2_transition.0)
-    }
-
-    /// Creates a [`BaseStateCommitment`] by taking the final state of the
-    /// [`BatchTransition`]
-    pub fn get_final_base_state_commitment(&self) -> BaseStateCommitment {
-        BaseStateCommitment::new(self.l1_transition.1, self.l2_transition.1)
-    }
-
-    pub fn rollup_params_commitment(&self) -> Buf32 {
-        self.rollup_params_commitment
     }
 }
 
-/// Represents the reference state commitment against which batch transitions and proofs are
-/// verified.
-///
-/// NOTE/TODO: This state serves as the starting point for verifying a checkpoint proof. If we move
-/// towards a strict mode where we prove each checkpoint recursively, this should be replaced with
-/// `GenesisState`.
+/// Contains the checkpoint data along with its commitment to l1.
 #[derive(
-    Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
 )]
-pub struct BaseStateCommitment {
-    pub initial_l1_state: Buf32,
-    pub initial_l2_state: Buf32,
+pub struct L1CommittedCheckpoint {
+    /// The actual `Checkpoint` data.
+    pub checkpoint: Checkpoint,
+    /// Its commitment to L1 used to locate/identify the checkpoint in L1.
+    pub commitment: CommitmentInfo,
 }
 
-impl BaseStateCommitment {
-    pub fn new(initial_l1_state: Buf32, initial_l2_state: Buf32) -> Self {
+impl L1CommittedCheckpoint {
+    pub fn new(checkpoint: Checkpoint, commitment: CommitmentInfo) -> Self {
         Self {
-            initial_l1_state,
-            initial_l2_state,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
-pub struct CheckpointProofOutput {
-    pub batch_transition: BatchTransition,
-    pub base_state_commitment: BaseStateCommitment,
-}
-
-impl CheckpointProofOutput {
-    pub fn new(
-        batch_transition: BatchTransition,
-        base_state_commitment: BaseStateCommitment,
-    ) -> CheckpointProofOutput {
-        Self {
-            batch_transition,
-            base_state_commitment,
+            checkpoint,
+            commitment,
         }
     }
 }

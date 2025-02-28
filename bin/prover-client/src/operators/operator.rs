@@ -7,8 +7,8 @@ use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
 
 use super::{
-    btc::BtcBlockspaceOperator, checkpoint::CheckpointOperator, cl_agg::ClAggOperator,
-    cl_stf::ClStfOperator, evm_ee::EvmEeOperator, l1_batch::L1BatchOperator, ProvingOp,
+    btc::BtcBlockspaceOperator, checkpoint::CheckpointOperator, cl_stf::ClStfOperator,
+    evm_ee::EvmEeOperator, ProvingOp,
 };
 use crate::{
     errors::ProvingTaskError,
@@ -24,10 +24,8 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct ProofOperator {
     btc_blockspace_operator: BtcBlockspaceOperator,
-    l1_batch_operator: L1BatchOperator,
     evm_ee_operator: EvmEeOperator,
     cl_stf_operator: ClStfOperator,
-    cl_agg_operator: ClAggOperator,
     checkpoint_operator: CheckpointOperator,
 }
 
@@ -35,18 +33,14 @@ impl ProofOperator {
     /// Creates a new instance of `ProofOperator` with the provided proof operators.
     pub fn new(
         btc_blockspace_operator: BtcBlockspaceOperator,
-        l1_batch_operator: L1BatchOperator,
         evm_ee_operator: EvmEeOperator,
         cl_stf_operator: ClStfOperator,
-        cl_agg_operator: ClAggOperator,
         checkpoint_operator: CheckpointOperator,
     ) -> Self {
         Self {
             btc_blockspace_operator,
-            l1_batch_operator,
             evm_ee_operator,
             cl_stf_operator,
-            cl_agg_operator,
             checkpoint_operator,
         }
     }
@@ -65,28 +59,23 @@ impl ProofOperator {
         // Create each operator using the respective clients.
         let btc_blockspace_operator =
             BtcBlockspaceOperator::new(btc_client.clone(), rollup_params.clone());
-        let l1_batch_operator = L1BatchOperator::new(btc_client.clone(), rollup_params.clone());
         let evm_ee_operator = EvmEeOperator::new(evm_ee_client.clone());
         let cl_stf_operator = ClStfOperator::new(
             cl_client.clone(),
             Arc::new(evm_ee_operator.clone()),
+            Arc::new(btc_blockspace_operator.clone()),
             rollup_params.clone(),
         );
-        let cl_agg_operator = ClAggOperator::new(Arc::new(cl_stf_operator.clone()));
         let checkpoint_operator = CheckpointOperator::new(
             cl_client.clone(),
-            Arc::new(l1_batch_operator.clone()),
-            Arc::new(cl_agg_operator.clone()),
-            rollup_params.clone(),
+            Arc::new(cl_stf_operator.clone()),
             enable_checkpoint_runner,
         );
 
         ProofOperator::new(
             btc_blockspace_operator,
-            l1_batch_operator,
             evm_ee_operator,
             cl_stf_operator,
-            cl_agg_operator,
             checkpoint_operator,
         )
     }
@@ -118,20 +107,14 @@ impl ProofOperator {
         let host = resolve_host(proof_key);
 
         match proof_key.context() {
-            ProofContext::BtcBlockspace(_) => {
+            ProofContext::BtcBlockspace(..) => {
                 Self::prove(&self.btc_blockspace_operator, proof_key, db, host).await
             }
-            ProofContext::L1Batch(_, _) => {
-                Self::prove(&self.l1_batch_operator, proof_key, db, host).await
-            }
-            ProofContext::EvmEeStf(_, _) => {
+            ProofContext::EvmEeStf(..) => {
                 Self::prove(&self.evm_ee_operator, proof_key, db, host).await
             }
-            ProofContext::ClStf(_, _) => {
+            ProofContext::ClStf(..) => {
                 Self::prove(&self.cl_stf_operator, proof_key, db, host).await
-            }
-            ProofContext::ClAgg(_, _) => {
-                Self::prove(&self.cl_agg_operator, proof_key, db, host).await
             }
             ProofContext::Checkpoint(checkpoint_index) => {
                 Self::prove(&self.checkpoint_operator, proof_key, db, host).await?;
@@ -148,11 +131,6 @@ impl ProofOperator {
         &self.btc_blockspace_operator
     }
 
-    /// Returns a reference to the [`L1BatchOperator`]
-    pub fn l1_batch_operator(&self) -> &L1BatchOperator {
-        &self.l1_batch_operator
-    }
-
     /// Returns a reference to the [`EvmEeOperator`].
     pub fn evm_ee_operator(&self) -> &EvmEeOperator {
         &self.evm_ee_operator
@@ -161,11 +139,6 @@ impl ProofOperator {
     /// Returns a reference to the [`ClStfOperator`].
     pub fn cl_stf_operator(&self) -> &ClStfOperator {
         &self.cl_stf_operator
-    }
-
-    /// Returns a reference to the [`ClAggOperator`].
-    pub fn cl_agg_operator(&self) -> &ClAggOperator {
-        &self.cl_agg_operator
     }
 
     /// Returns a reference to the [`CheckpointOperator`].

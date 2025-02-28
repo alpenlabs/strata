@@ -29,9 +29,14 @@ class ProverClientTest(testenv.StrataTester):
 
         # Dispatch the prover task
         start_block_id = cl_slot_to_block_id(seqrpc, CL_PROVER_PARAMS["start_block"])
-        end_block_id = cl_slot_to_block_id(seqrpc, CL_PROVER_PARAMS["end_block"])
+        start_block_commitment = {"slot": CL_PROVER_PARAMS["start_block"], "blkid": start_block_id}
 
-        task_ids = prover_client_rpc.dev_strata_proveClBlocks((start_block_id, end_block_id))
+        end_block_id = cl_slot_to_block_id(seqrpc, CL_PROVER_PARAMS["end_block"])
+        end_block_commitment = {"slot": CL_PROVER_PARAMS["end_block"], "blkid": end_block_id}
+
+        task_ids = prover_client_rpc.dev_strata_proveClBlocks(
+            (start_block_commitment, end_block_commitment)
+        )
         task_id = task_ids[0]
 
         self.debug(f"using task id: {task_id}")

@@ -16,7 +16,7 @@ pub struct EnvelopeTags {
 }
 
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct TxFilterConfig {
     /// Envelope tag names
     pub envelope_tags: EnvelopeTags,

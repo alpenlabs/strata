@@ -4,20 +4,22 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Context;
 use async_trait::async_trait;
-use jsonrpsee::{core::RpcResult, RpcModule};
+use jsonrpsee::{core::RpcResult, http_client::HttpClient, RpcModule};
+use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
 use strata_db::traits::ProofDatabase;
-use strata_primitives::buf::Buf32;
+use strata_primitives::{buf::Buf32, l1::L1BlockCommitment, l2::L2BlockCommitment};
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use strata_rocksdb::prover::db::ProofDb;
+use strata_rpc_api::StrataDebugApiClient;
 use strata_rpc_types::ProofKey;
 use strata_rpc_utils::to_jsonrpsee_error;
-use strata_state::{id::L2BlockId, l1::L1BlockId};
+use strata_state::header::L2Header;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, warn};
 use zkaleido::ProofReceipt;
 
 use crate::{
-    operators::{ProofOperator, ProvingOp},
+    operators::{cl_stf::ClStfRange, ProofOperator, ProvingOp},
     status::ProvingTaskStatus,
     task_tracker::TaskTracker,
 };
@@ -84,10 +86,13 @@ impl ProverClientRpc {
 
 #[async_trait]
 impl StrataProverClientApiServer for ProverClientRpc {
-    async fn prove_btc_block(&self, block_id: L1BlockId) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_btc_blocks(
+        &self,
+        btc_range: (L1BlockCommitment, L1BlockCommitment),
+    ) -> RpcResult<Vec<ProofKey>> {
         self.operator
             .btc_operator()
-            .create_task(block_id, self.task_tracker.clone(), &self.db)
+            .create_task(btc_range, self.task_tracker.clone(), &self.db)
             .await
             .map_err(to_jsonrpsee_error("failed to create task for btc block"))
     }
@@ -102,32 +107,20 @@ impl StrataProverClientApiServer for ProverClientRpc {
 
     async fn prove_cl_blocks(
         &self,
-        cl_block_range: (L2BlockId, L2BlockId),
+        cl_block_range: (L2BlockCommitment, L2BlockCommitment),
     ) -> RpcResult<Vec<ProofKey>> {
+        let cl_client = &self.operator.cl_stf_operator().cl_client;
+        let btc_client = &self.operator.btc_operator().btc_client;
+        let l1_range = derive_l1_range(cl_client, btc_client, cl_block_range).await;
+        let cl_params = ClStfRange {
+            l2_range: cl_block_range,
+            l1_range,
+        };
         self.operator
             .cl_stf_operator()
-            .create_task(cl_block_range, self.task_tracker.clone(), &self.db)
+            .create_task(cl_params, self.task_tracker.clone(), &self.db)
             .await
             .map_err(to_jsonrpsee_error("failed to create task for cl block"))
-    }
-
-    async fn prove_l1_batch(&self, l1_range: (L1BlockId, L1BlockId)) -> RpcResult<Vec<ProofKey>> {
-        self.operator
-            .l1_batch_operator()
-            .create_task(l1_range, self.task_tracker.clone(), &self.db)
-            .await
-            .map_err(to_jsonrpsee_error("failed to create task for l1 batch"))
-    }
-
-    async fn prove_l2_batch(
-        &self,
-        l2_range: Vec<(L2BlockId, L2BlockId)>,
-    ) -> RpcResult<Vec<ProofKey>> {
-        self.operator
-            .cl_agg_operator()
-            .create_task(l2_range, self.task_tracker.clone(), &self.db)
-            .await
-            .map_err(to_jsonrpsee_error("failed to create task for l2 batch"))
     }
 
     async fn prove_checkpoint(&self, ckp_idx: u64) -> RpcResult<Vec<ProofKey>> {
@@ -160,8 +153,8 @@ impl StrataProverClientApiServer for ProverClientRpc {
     async fn prove_checkpoint_raw(
         &self,
         checkpoint_idx: u64,
-        l1_range: (u64, u64),
-        l2_range: (u64, u64),
+        l1_range: (L1BlockCommitment, L1BlockCommitment),
+        l2_range: (L2BlockCommitment, L2BlockCommitment),
     ) -> RpcResult<Vec<ProofKey>> {
         self.operator
             .checkpoint_operator()
@@ -213,4 +206,45 @@ impl StrataProverClientApiServer for ProverClientRpc {
         let task_tracker = self.task_tracker.lock().await;
         Ok(task_tracker.generate_report())
     }
+}
+
+async fn derive_l1_range(
+    cl_client: &HttpClient,
+    btc_client: &BitcoinClient,
+    l2_range: (L2BlockCommitment, L2BlockCommitment),
+) -> Option<(L1BlockCommitment, L1BlockCommitment)> {
+    // sanity check
+    assert!(l2_range.1.slot() >= l2_range.0.slot(), "");
+
+    let start_block_hash = *l2_range.0.blkid();
+    let mut current_block_hash = *l2_range.1.blkid();
+    loop {
+        let l2_block = cl_client
+            .get_block_by_id(current_block_hash)
+            .await
+            .expect("cannot find L2 block")
+            .expect("cannot find L2 block");
+
+        let new_l1_manifests = l2_block.l1_segment().new_manifests();
+        if !new_l1_manifests.is_empty() {
+            let blkid = *new_l1_manifests.first().unwrap().blkid();
+            let height = btc_client.get_block_height(&blkid.into()).await.unwrap();
+            let first_commitment = L1BlockCommitment::new(height, blkid);
+
+            let blkid = *new_l1_manifests.last().unwrap().blkid();
+            let height = btc_client.get_block_height(&blkid.into()).await.unwrap();
+            let last_commitment = L1BlockCommitment::new(height, blkid);
+
+            return Some((first_commitment, last_commitment));
+        }
+
+        let prev_l2_blkid = *l2_block.header().parent();
+
+        if current_block_hash == start_block_hash {
+            break;
+        } else {
+            current_block_hash = prev_l2_blkid;
+        }
+    }
+    None
 }
