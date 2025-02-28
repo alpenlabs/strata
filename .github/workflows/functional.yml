@@ -81,6 +81,14 @@ jobs:
           bitcoind --version
           rm -rf "bitcoin-$BITCOIND_VERSION" "bitcoin-$BITCOIND_VERSION-$BITCOIND_ARCH.tar.gz"
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2024-07-27
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
       - name: Set up Python
         uses: actions/setup-python@v5
         id: setup-python
@@ -103,14 +111,6 @@ jobs:
         working-directory: functional-tests
         #if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true' # this was giving issues in cache
         run: poetry install --no-root --no-interaction
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly-2024-07-27
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
 
       - name: Build Cargo project
         run: cargo build --locked -F debug-utils
