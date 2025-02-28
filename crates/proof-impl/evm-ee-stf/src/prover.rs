@@ -1,10 +1,10 @@
-use zkaleido::{ProofType, PublicValues, ZkVmInputResult, ZkVmProver, ZkVmResult};
+use zkaleido::{ProofType, PublicValues, ZkVmInputResult, ZkVmProgram, ZkVmResult};
 
 use crate::primitives::{EvmEeProofInput, EvmEeProofOutput};
 
 pub struct EvmEeProver;
 
-impl ZkVmProver for EvmEeProver {
+impl ZkVmProgram for EvmEeProver {
     type Input = EvmEeProofInput;
     type Output = EvmEeProofOutput;
 

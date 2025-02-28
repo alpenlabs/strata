@@ -55,7 +55,7 @@ struct EvalArgs {
     pub commit_hash: String,
 }
 
-/// Basic data about the performance of a certain [`ZkVmProver`].
+/// Basic data about the performance of a certain [`ZkVmProgram`].
 ///
 /// TODO: Currently, only program and cycles are used, populalate the rest
 /// as part of full execution with timings reporting.

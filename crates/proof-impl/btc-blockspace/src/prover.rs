@@ -1,7 +1,7 @@
 use bitcoin::consensus::serialize;
 use strata_primitives::l1::L1TxProof;
 use zkaleido::{
-    ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProver, ZkVmResult,
+    ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProgram, ZkVmResult,
 };
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
 
 pub struct BtcBlockspaceProver;
 
-impl ZkVmProver for BtcBlockspaceProver {
+impl ZkVmProgram for BtcBlockspaceProver {
     type Input = BlockScanProofInput;
     type Output = BlockscanProofOutput;
 

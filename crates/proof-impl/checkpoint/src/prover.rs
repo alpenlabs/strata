@@ -1,17 +1,17 @@
 use strata_primitives::buf::Buf32;
 use zkaleido::{
-    AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
+    AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
     ZkVmResult,
 };
 
 pub struct CheckpointProverInput {
     pub cl_stf_proofs: Vec<ProofReceipt>,
-    pub cl_stf_vk: VerificationKey,
+    pub cl_stf_vk: VerifyingKey,
 }
 
 pub struct CheckpointProver;
 
-impl ZkVmProver for CheckpointProver {
+impl ZkVmProgram for CheckpointProver {
     type Input = CheckpointProverInput;
     type Output = (Buf32, Buf32);
 

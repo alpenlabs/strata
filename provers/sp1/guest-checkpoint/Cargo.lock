@@ -3460,9 +3460,10 @@ dependencies = [
 [[package]]
 name = "zkaleido"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc2#737d8e591be90d84ab7639d8bf1bb2ed36f2735f"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
 dependencies = [
  "arbitrary",
+ "async-trait",
  "bincode",
  "borsh",
  "serde",
@@ -3472,7 +3473,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-sp1-adapter"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc2#737d8e591be90d84ab7639d8bf1bb2ed36f2735f"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
 dependencies = [
  "bincode",
  "cfg-if",

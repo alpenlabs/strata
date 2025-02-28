@@ -2,7 +2,7 @@
 extern crate cfg_if;
 use std::{fs, path::PathBuf, sync::LazyLock};
 
-use zkaleido::{ProofReceipt, ZkVmHost, ZkVmProofError, ZkVmProver, ZkVmResult};
+use zkaleido::{ProofReceipt, ZkVmHost, ZkVmProgram, ZkVmProofError, ZkVmResult};
 mod btc;
 mod checkpoint;
 mod cl;
@@ -49,11 +49,11 @@ cfg_if! {
 
 pub trait ProofGenerator {
     type Input;
-    type P: ZkVmProver;
+    type P: ZkVmProgram;
     type H: ZkVmHost;
 
     /// An input required to generate a proof.
-    fn get_input(&self, input: &Self::Input) -> ZkVmResult<<Self::P as ZkVmProver>::Input>;
+    fn get_input(&self, input: &Self::Input) -> ZkVmResult<<Self::P as ZkVmProgram>::Input>;
 
     // A host to generate the proof against.
     fn get_host(&self) -> Self::H;
@@ -95,7 +95,7 @@ pub trait ProofGenerator {
     fn gen_proof(&self, input: &Self::Input) -> ZkVmResult<ProofReceipt> {
         let input = self.get_input(input)?;
         let host = self.get_host();
-        <Self::P as ZkVmProver>::prove(&input, &host)
+        <Self::P as ZkVmProgram>::prove(&input, &host)
     }
 }
 

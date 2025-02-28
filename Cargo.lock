@@ -15891,7 +15891,7 @@ dependencies = [
 [[package]]
 name = "zkaleido"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc3#1de064bc8c7cca0e3e4d2fa6defb489b67ccb704"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
 dependencies = [
  "arbitrary",
  "async-trait",
@@ -15904,7 +15904,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-native-adapter"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc3#1de064bc8c7cca0e3e4d2fa6defb489b67ccb704"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
 dependencies = [
  "bincode",
  "borsh",
@@ -15915,7 +15915,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-risc0-adapter"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc3#1de064bc8c7cca0e3e4d2fa6defb489b67ccb704"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
 dependencies = [
  "bincode",
  "borsh",
@@ -15929,7 +15929,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-sp1-adapter"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc3#1de064bc8c7cca0e3e4d2fa6defb489b67ccb704"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
 dependencies = [
  "bincode",
  "borsh",
