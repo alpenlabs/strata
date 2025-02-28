@@ -130,12 +130,6 @@ async fn do_tick<T: SyncClient>(
 
     let span = debug_span!("sync", %start_slot, %end_slot);
 
-    /*debug!(
-        current_height = state.tip_height(),
-        target_height = status.tip_height,
-        "syncing to target height"
-    );*/
-
     if let Err(e) = sync_blocks_by_range(start_slot, end_slot, state, context)
         .instrument(span)
         .await
