@@ -56,7 +56,7 @@ jobs:
 
   run:
     name: Run functional tests
-    runs-on: self-hosted`
+    runs-on: self-hosted
     timeout-minutes: 60
 
     steps:
