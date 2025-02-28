@@ -12,6 +12,7 @@ use strata_primitives::{
     params::{Params, RollupParams},
 };
 use strata_state::{
+    batch::Checkpoint,
     block::{ExecSegment, L1Segment, L2BlockAccessory, L2BlockBundle},
     chain_state::Chainstate,
     exec_update::construct_ops_from_deposit_intents,
@@ -146,6 +147,8 @@ fn prepare_l1_segment(
         Some(checkpoint)
     };
 
+    // TODO: some way to avoid rechecking l1 blocks already checked during previous
+    // block assemblies.
     for height in cur_next_exp_height..=target_height {
         let Some(rec) = try_fetch_manifest(height, l1man)? else {
             // If we are missing a record, then something is weird, but it would
@@ -154,42 +157,9 @@ fn prepare_l1_segment(
             break;
         };
 
-        for tx in rec.txs() {
-            for op in tx.protocol_ops() {
-                let ProtocolOperation::Checkpoint(signed_checkpoint) = op else {
-                    continue;
-                };
-
-                // L1 Reader only adds a checkpoint ProtocolOperation if checkpoint signature valid.
-                let checkpoint = signed_checkpoint.checkpoint();
-
-                // Must have expected checkpoint.
-                // Can None before first checkpoint creation, where we dont care about this.
-                let Some(expected) = prev_checkpoint.as_ref() else {
-                    continue;
-                };
-
-                // Must get expected checkpoint.
-                if expected.commitment() != checkpoint.commitment() {
-                    warn!(got = ?checkpoint, ?expected, "got unexpected checkpoint");
-                    continue;
-                }
-
-                // Proof inside checkpoint must be valid.
-                let proof_receipt = checkpoint_verification::construct_receipt(checkpoint);
-                if let Err(err) =
-                    checkpoint_verification::verify_proof(checkpoint, &proof_receipt, params)
-                {
-                    warn!(?err, blockid = %rec.blkid(), tx = %tx.proof().position(), "checkpoint proof verification failed");
-                    continue;
-                }
-
-                // Found valid checkpoint for previous epoch. Should end current epoch.
-                is_epoch_final_block = true;
-
-                // TODO: some way to avoid rechecking l1 blocks already checked during previous
-                // block assemblies.
-            }
+        if has_expected_checkpoint(&rec, prev_checkpoint.as_ref(), params) {
+            // Found valid checkpoint for previous epoch. Should end current epoch.
+            is_epoch_final_block = true;
         }
 
         payloads.push(rec);
@@ -211,6 +181,48 @@ fn prepare_l1_segment(
     } else {
         Ok(L1Segment::new(cur_safe_height, Vec::new()))
     }
+}
+
+/// Check if block has the checkpoint we are expecting and checkpoint is valid.
+fn has_expected_checkpoint(
+    rec: &L1BlockManifest,
+    expected_checkpoint: Option<&Checkpoint>,
+    params: &RollupParams,
+) -> bool {
+    for op in rec.txs().iter().flat_map(|tx| tx.protocol_ops()) {
+        let ProtocolOperation::Checkpoint(signed_checkpoint) = op else {
+            continue;
+        };
+
+        // L1 Reader only adds a checkpoint ProtocolOperation if checkpoint signature valid.
+        let checkpoint = signed_checkpoint.checkpoint();
+
+        // Must have expected checkpoint.
+        // Can be None before first checkpoint creation, where we dont care about this.
+        let Some(expected) = expected_checkpoint else {
+            continue;
+        };
+
+        // Must get expected checkpoint.
+        if expected.commitment() != checkpoint.commitment() {
+            warn!(got = ?checkpoint, ?expected, "got unexpected checkpoint");
+            continue;
+        }
+
+        // Proof inside checkpoint must be valid.
+        let proof_receipt = checkpoint_verification::construct_receipt(checkpoint);
+        if let Err(err) = checkpoint_verification::verify_proof(checkpoint, &proof_receipt, params)
+        {
+            warn!(?err, blockid = %rec.blkid(), "checkpoint proof verification failed");
+            continue;
+        }
+
+        // Found valid checkpoint for previous epoch. Should end current epoch.
+        return true;
+    }
+
+    // Scanned all txn and did not find checkpoint
+    false
 }
 
 #[allow(unused)]
