@@ -2,7 +2,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{block::L2Block, chain_state::Chainstate};
 use zkaleido::{
-    AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
+    AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
     ZkVmResult,
 };
 
@@ -10,8 +10,8 @@ pub struct ClStfInput {
     pub rollup_params: RollupParams,
     pub chainstate: Chainstate,
     pub l2_blocks: Vec<L2Block>,
-    pub evm_ee_proof_with_vk: (ProofReceipt, VerificationKey),
-    pub btc_blockspace_proof_with_vk: Option<(ProofReceipt, VerificationKey)>,
+    pub evm_ee_proof_with_vk: (ProofReceipt, VerifyingKey),
+    pub btc_blockspace_proof_with_vk: Option<(ProofReceipt, VerifyingKey)>,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
@@ -22,7 +22,7 @@ pub struct ClStfOutput {
 
 pub struct ClStfProver;
 
-impl ZkVmProver for ClStfProver {
+impl ZkVmProgram for ClStfProver {
     type Input = ClStfInput;
     type Output = ClStfOutput;
 

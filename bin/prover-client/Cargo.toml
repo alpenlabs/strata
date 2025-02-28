@@ -60,7 +60,7 @@ zkaleido-risc0-adapter = { workspace = true, optional = true }
 strata-test-utils.workspace = true
 
 [features]
-default = []
+default = ["sp1", "risc0"]
 sp1 = ["zkaleido-sp1-adapter/prover"]
 sp1-builder = ["sp1", "strata-sp1-guest-builder/prover"]
 sp1-mock = ["sp1", "zkaleido-sp1-adapter/mock"]

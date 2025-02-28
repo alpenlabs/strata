@@ -90,7 +90,7 @@ mod tests {
     use std::sync::Arc;
 
     use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
-    use zkaleido::ZkVmProver;
+    use zkaleido::ZkVmProgram;
     use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
     use super::*;

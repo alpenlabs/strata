@@ -26,7 +26,7 @@ impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
 
     fn get_input(&self, l2_range: &(u64, u64)) -> ZkVmResult<CheckpointProverInput> {
         let cl_stf_proofs = vec![self.cl_stf_prover.get_proof(l2_range).unwrap()];
-        let cl_stf_vk = self.cl_stf_prover.get_host().get_verification_key();
+        let cl_stf_vk = self.cl_stf_prover.get_host().vk();
 
         let input = CheckpointProverInput {
             cl_stf_proofs,

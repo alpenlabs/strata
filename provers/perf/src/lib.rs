@@ -4,7 +4,7 @@ use strata_zkvm_tests::{
     },
     ProofGenerator,
 };
-use zkaleido::{ProofType, ZkVmHost, ZkVmInputBuilder, ZkVmProver, ZkVmResult};
+use zkaleido::{ProofType, ZkVmExecutor, ZkVmHost, ZkVmInputBuilder, ZkVmProgram, ZkVmResult};
 
 mod reports;
 /// A proof report containing a performance stats about proof generation.
@@ -32,14 +32,15 @@ pub trait ProofGeneratorPerf: ProofGenerator {
     where
         Self::H: ZkVmHostPerf,
     {
-        let input: <<Self as ProofGenerator>::P as ZkVmProver>::Input = self.get_input(input)?;
+        let input: <<Self as ProofGenerator>::P as ZkVmProgram>::Input = self.get_input(input)?;
         let host = self.get_host();
 
-        let zkvm_input =
-            <Self::P as ZkVmProver>::prepare_input::<<Self::H as ZkVmHost>::Input<'_>>(&input)?;
+        let zkvm_input = <Self::P as ZkVmProgram>::prepare_input::<
+            <Self::H as ZkVmExecutor>::Input<'_>,
+        >(&input)?;
         let report = host.perf_report(
             zkvm_input,
-            <Self::P as ZkVmProver>::proof_type(),
+            <Self::P as ZkVmProgram>::proof_type(),
             report_name,
         )?;
 

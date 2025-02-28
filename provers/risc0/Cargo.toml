@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 risc0-zkvm = "1.2.3"
-zkaleido-risc0-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc3", features = [
+zkaleido-risc0-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc4", features = [
   "prover",
 ], optional = true }
 

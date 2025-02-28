@@ -34,7 +34,7 @@ impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
     fn get_input(&self, block_range: &(u64, u64)) -> ZkVmResult<ClStfInput> {
         // Generate EL proof required for aggregation
         let el_proof = self.el_proof_generator.get_proof(block_range)?;
-        let el_proof_vk = self.el_proof_generator.get_host().get_verification_key();
+        let el_proof_vk = self.el_proof_generator.get_host().vk();
 
         // Read CL witness data
         let params = gen_params();
