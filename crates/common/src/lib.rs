@@ -5,6 +5,8 @@ pub mod logging;
 
 #[cfg(feature = "debug-utils")]
 pub mod bail_manager;
+#[cfg(feature = "debug-utils")]
+pub mod worker_pause_manager;
 pub mod ws_client;
 
 /// Checks to see if we should bail out.
