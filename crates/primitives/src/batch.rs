@@ -129,13 +129,11 @@ impl EpochSummary {
     }
 }
 
-/// Consolidates all information required to describe and verify a batch checkpoint.
-/// This includes metadata about the batch, the state transitions, checkpoint base state,
-/// and the proof itself. The proof verifies that the `transition` is valid.
+/// Consolidates all the information that the checkpoint is committing to, signing and proving.
 #[derive(
     Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
-pub struct Checkpoint {
+pub struct CheckpointCommitment {
     /// Information regarding the current batches of l1 and l2 blocks along with epoch.
     batch_info: BatchInfo,
 
@@ -144,26 +142,43 @@ pub struct Checkpoint {
     /// Represents a transition from the starting chainstate to the ending chainstate.
     /// The state root is computed via `Chainstate::compute_state_root`.
     transition: (Buf32, Buf32),
+}
 
-    /// Proof for the batch obtained from prover manager
+/// Consolidates all information required to describe and verify a batch checkpoint.
+/// This includes metadata about the batch, the state transitions, checkpoint base state,
+/// and the proof itself. The proof verifies that the `transition` is valid.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
+pub struct Checkpoint {
+    /// Data that this checkpoint is committing to
+    commitment: CheckpointCommitment,
+
+    /// Proof for this checkpoint obtained from prover manager.
     proof: Proof,
 }
 
 impl Checkpoint {
     pub fn new(batch_info: BatchInfo, transition: (Buf32, Buf32), proof: Proof) -> Self {
         Self {
-            batch_info,
-            transition,
+            commitment: CheckpointCommitment {
+                batch_info,
+                transition,
+            },
             proof,
         }
     }
 
     pub fn batch_info(&self) -> &BatchInfo {
-        &self.batch_info
+        &self.commitment.batch_info
     }
 
     pub fn batch_transition(&self) -> &(Buf32, Buf32) {
-        &self.transition
+        &self.commitment.transition
+    }
+
+    pub fn commitment(&self) -> &CheckpointCommitment {
+        &self.commitment
     }
 
     pub fn proof(&self) -> &Proof {
@@ -187,8 +202,8 @@ impl Checkpoint {
         // FIXME make this more structured and use incremental hashing
 
         let mut buf = vec![];
-        let batch_serialized =
-            borsh::to_vec(&self.batch_info).expect("could not serialize checkpoint info");
+        let batch_serialized = borsh::to_vec(&self.commitment.batch_info)
+            .expect("could not serialize checkpoint info");
 
         buf.extend(&batch_serialized);
         buf.extend(self.proof.as_bytes());
