@@ -7,7 +7,7 @@ use strata_primitives::{
     params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
-use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
+use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, program::BtcBlockspaceProgram};
 use strata_rocksdb::prover::db::ProofDb;
 use tracing::error;
 
@@ -17,7 +17,7 @@ use crate::errors::ProvingTaskError;
 /// A struct that implements the [`ProvingOp`] trait for Bitcoin blockspace proof generation.
 ///
 /// It interfaces with the Bitcoin blockchain via a [`BitcoinClient`] to fetch the necessary data
-/// required by the [`BtcBlockspaceProver`] for the proof generation.
+/// required by the [`BtcBlockspaceProgram`] for the proof generation.
 #[derive(Debug, Clone)]
 pub struct BtcBlockspaceOperator {
     pub btc_client: Arc<BitcoinClient>,
@@ -35,7 +35,7 @@ impl BtcBlockspaceOperator {
 }
 
 impl ProvingOp for BtcBlockspaceOperator {
-    type Prover = BtcBlockspaceProver;
+    type Program = BtcBlockspaceProgram;
 
     type Params = (L1BlockCommitment, L1BlockCommitment);
 

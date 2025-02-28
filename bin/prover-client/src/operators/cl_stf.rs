@@ -10,7 +10,7 @@ use strata_primitives::{
     params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
-use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
+use strata_proofimpl_cl_stf::program::{ClStfInput, ClStfProgram};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcBlockHeader;
@@ -25,7 +25,7 @@ use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 /// Function (STF) proof generation.
 ///
 /// It is responsible for managing the data and tasks required to generate proofs for CL state
-/// transitions. It fetches the necessary inputs for the [`ClStfProver`] by:
+/// transitions. It fetches the necessary inputs for the [`ClStfProgram`] by:
 ///
 /// - Utilizing the [`EvmEeOperator`] to create and manage proving tasks for EVM Execution
 ///   Environment (EE) STF proofs. The resulting EVM EE STF proof is incorporated as part of the
@@ -122,7 +122,7 @@ pub struct ClStfRange {
 }
 
 impl ProvingOp for ClStfOperator {
-    type Prover = ClStfProver;
+    type Program = ClStfProgram;
     type Params = ClStfRange;
 
     fn construct_proof_ctx(&self, range: &Self::Params) -> Result<ProofContext, ProvingTaskError> {

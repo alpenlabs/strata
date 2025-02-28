@@ -40,8 +40,8 @@ pub use operator::ProofOperator;
 /// creating tasks, fetching inputs for the prover, and executing the proof computation using
 /// supported ZKVMs.
 pub trait ProvingOp {
-    /// The prover type associated with this operation, implementing the [`ZkVmProgram`] trait.
-    type Prover: ZkVmProgram;
+    /// The program type associated with this operation, implementing the [`ZkVmProgram`] trait.
+    type Program: ZkVmProgram;
 
     /// Parameters required for this operation.
     ///
@@ -137,7 +137,7 @@ pub trait ProvingOp {
         &self,
         task_id: &ProofKey,
         db: &ProofDb,
-    ) -> Result<<Self::Prover as ZkVmProgram>::Input, ProvingTaskError>;
+    ) -> Result<<Self::Program as ZkVmProgram>::Input, ProvingTaskError>;
 
     /// Executes the proof computation for the specified task.
     ///
@@ -163,7 +163,7 @@ pub trait ProvingOp {
             .await
             .inspect_err(|e| error!(?e, "Failed to fetch input"))?;
 
-        let proof_res = <Self::Prover as ZkVmProgram>::prove(&input, host);
+        let proof_res = <Self::Program as ZkVmProgram>::prove(&input, host);
 
         match &proof_res {
             Ok(_) => {

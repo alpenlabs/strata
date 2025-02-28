@@ -2,9 +2,9 @@ use zkaleido::{ProofType, PublicValues, ZkVmInputResult, ZkVmProgram, ZkVmResult
 
 use crate::primitives::{EvmEeProofInput, EvmEeProofOutput};
 
-pub struct EvmEeProver;
+pub struct EvmEeProgram;
 
-impl ZkVmProgram for EvmEeProver {
+impl ZkVmProgram for EvmEeProgram {
     type Input = EvmEeProofInput;
     type Output = EvmEeProofOutput;
 

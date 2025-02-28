@@ -20,9 +20,9 @@ pub struct ClStfOutput {
     pub final_chainstate_root: Buf32,
 }
 
-pub struct ClStfProver;
+pub struct ClStfProgram;
 
-impl ZkVmProgram for ClStfProver {
+impl ZkVmProgram for ClStfProgram {
     type Input = ClStfInput;
     type Output = ClStfOutput;
 

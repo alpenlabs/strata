@@ -9,9 +9,9 @@ use crate::{
     logic::{BlockScanProofInput, BlockscanProofOutput},
 };
 
-pub struct BtcBlockspaceProver;
+pub struct BtcBlockspaceProgram;
 
-impl ZkVmProgram for BtcBlockspaceProver {
+impl ZkVmProgram for BtcBlockspaceProgram {
     type Input = BlockScanProofInput;
     type Output = BlockscanProofOutput;
 

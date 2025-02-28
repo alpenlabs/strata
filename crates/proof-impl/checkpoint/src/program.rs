@@ -9,9 +9,9 @@ pub struct CheckpointProverInput {
     pub cl_stf_vk: VerifyingKey,
 }
 
-pub struct CheckpointProver;
+pub struct CheckpointProgram;
 
-impl ZkVmProgram for CheckpointProver {
+impl ZkVmProgram for CheckpointProgram {
     type Input = CheckpointProverInput;
     type Output = (Buf32, Buf32);
 

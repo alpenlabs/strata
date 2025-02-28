@@ -1,5 +1,5 @@
 use strata_l1tx::filter::TxFilterConfig;
-use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
+use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, program::BtcBlockspaceProgram};
 use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
 use zkaleido::{ZkVmHost, ZkVmResult};
 
@@ -18,7 +18,7 @@ impl<H: ZkVmHost> BtcBlockProofGenerator<H> {
 
 impl<H: ZkVmHost> ProofGenerator for BtcBlockProofGenerator<H> {
     type Input = Option<(u64, u64)>;
-    type P = BtcBlockspaceProver;
+    type P = BtcBlockspaceProgram;
     type H = H;
 
     fn get_input(&self, btc_range: &Option<(u64, u64)>) -> ZkVmResult<BlockScanProofInput> {

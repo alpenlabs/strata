@@ -1,4 +1,4 @@
-use strata_proofimpl_evm_ee_stf::{primitives::EvmEeProofInput, prover::EvmEeProver};
+use strata_proofimpl_evm_ee_stf::{primitives::EvmEeProofInput, program::EvmEeProgram};
 use strata_test_utils::evm_ee::EvmSegment;
 use zkaleido::{ZkVmHost, ZkVmResult};
 
@@ -17,7 +17,7 @@ impl<H: ZkVmHost> ElProofGenerator<H> {
 
 impl<H: ZkVmHost> ProofGenerator for ElProofGenerator<H> {
     type Input = (u64, u64);
-    type P = EvmEeProver;
+    type P = EvmEeProgram;
     type H = H;
 
     fn get_input(&self, block_range: &(u64, u64)) -> ZkVmResult<EvmEeProofInput> {
