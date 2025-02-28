@@ -6,6 +6,8 @@ use strata_db::{
 };
 use strata_state::{block::L2BlockBundle, header::L2Header, id::L2BlockId};
 use threadpool::ThreadPool;
+use tokio::sync::broadcast;
+use tracing::warn;
 
 use crate::{cache, ops};
 
@@ -13,13 +15,20 @@ use crate::{cache, ops};
 pub struct L2BlockManager {
     ops: ops::l2::L2DataOps,
     block_cache: cache::CacheTable<L2BlockId, Option<L2BlockBundle>>,
+    /// Broadcaster which broadcasts about new l2_block update in db.
+    l2_blk_tx: broadcast::Sender<L2BlockId>,
 }
 
 impl L2BlockManager {
     pub fn new<D: Database + Sync + Send + 'static>(pool: ThreadPool, db: Arc<D>) -> Self {
         let ops = ops::l2::Context::new(db.l2_db().clone()).into_ops(pool);
         let block_cache = cache::CacheTable::new(64.try_into().unwrap());
-        Self { ops, block_cache }
+        let (l2_blk_tx, _) = broadcast::channel::<L2BlockId>(1024);
+        Self {
+            ops,
+            block_cache,
+            l2_blk_tx,
+        }
     }
 
     /// Puts a block in the database, purging cache entry.
@@ -27,6 +36,11 @@ impl L2BlockManager {
         let id = bundle.block().header().get_blockid();
         self.ops.put_block_data_async(bundle).await?;
         self.block_cache.purge(&id);
+
+        // Broadcast
+        if let Err(e) = self.l2_blk_tx.send(id) {
+            warn!(?e, "Failed to broadcast l2 tx update");
+        }
         Ok(())
     }
 
@@ -35,7 +49,17 @@ impl L2BlockManager {
         let id = bundle.block().header().get_blockid();
         self.ops.put_block_data_blocking(bundle)?;
         self.block_cache.purge(&id);
+
+        // Broadcast
+        if let Err(e) = self.l2_blk_tx.send(id) {
+            warn!(?e, "Failed to broadcast l2 tx update");
+        }
         Ok(())
+    }
+
+    /// Subscribe to block updates
+    pub fn subscribe_to_block_updates(&self) -> broadcast::Receiver<L2BlockId> {
+        self.l2_blk_tx.subscribe()
     }
 
     /// Gets a block either in the cache or from the underlying database.

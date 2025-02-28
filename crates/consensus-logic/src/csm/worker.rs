@@ -12,7 +12,7 @@ use strata_state::{
     sync_event::SyncEvent,
 };
 use strata_status::StatusChannel;
-use strata_storage::{CheckpointDbManager, NodeStorage};
+use strata_storage::{CheckpointDbManager, L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::{
     sync::{broadcast, mpsc},
@@ -345,6 +345,11 @@ fn apply_action(
 
             strata_common::check_bail_trigger("sync_event_finalize_epoch");
 
+            // Check for finalized block in db, if not present in db, wait until that is found.
+            check_and_wait_for_finalized_block_in_db(
+                state.storage.l2(),
+                epoch_comm.to_block_commitment(),
+            )?;
             // TODO error checking here
             engine.update_finalized_block(*epoch_comm.last_blkid())?;
 
@@ -403,5 +408,28 @@ fn apply_action(
         }
     }
 
+    Ok(())
+}
+
+fn check_and_wait_for_finalized_block_in_db(
+    l2: &L2BlockManager,
+    l2blk_comm: L2BlockCommitment,
+) -> anyhow::Result<()> {
+    let blkid = l2blk_comm.blkid();
+    if l2.get_block_data_blocking(blkid)?.is_none() {
+        let mut rx = l2.subscribe_to_block_updates();
+
+        // FIXME: Ideally we would wait for the block until some timeout because that will never be
+        // seen if L2 reorgs. Or we need a mechanism to see if canonical block at expected height is
+        // different from the one we expected.
+        // Or, Instead for waiting on particular block id, ideally we would wait for canonical block
+        // at given height and see if we get different blockid than we expect. That would
+        // handle for reorgs as well.
+        loop {
+            if rx.blocking_recv()? == *blkid {
+                return Ok(());
+            }
+        }
+    }
     Ok(())
 }
