@@ -7,7 +7,7 @@ use strata_primitives::{
     l2::L2BlockCommitment,
     proof::{ProofContext, ProofKey},
 };
-use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
+use strata_proofimpl_checkpoint::program::{CheckpointProgram, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::{RpcCheckpointConfStatus, RpcCheckpointInfo};
@@ -23,7 +23,7 @@ use crate::{
 /// A struct that implements the [`ProvingOp`] for Checkpoint Proof.
 ///
 /// It is responsible for managing the data and tasks required to generate Checkpoint Proof. It
-/// fetches the necessary inputs for the [`CheckpointProver`] by:
+/// fetches the necessary inputs for the [`CheckpointProgram`] by:
 // TODO: update docstring here
 #[derive(Debug, Clone)]
 pub struct CheckpointOperator {
@@ -186,7 +186,7 @@ impl CheckpointOperator {
 }
 
 impl ProvingOp for CheckpointOperator {
-    type Prover = CheckpointProver;
+    type Program = CheckpointProgram;
     type Params = u64;
 
     fn construct_proof_ctx(

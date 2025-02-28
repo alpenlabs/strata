@@ -3,6 +3,6 @@
 pub mod block;
 pub mod logic;
 pub mod merkle;
-pub mod prover;
+pub mod program;
 pub mod tx;
 mod tx_indexer;

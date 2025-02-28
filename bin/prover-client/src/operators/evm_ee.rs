@@ -5,7 +5,7 @@ use strata_primitives::{
     proof::{ProofContext, ProofKey},
 };
 use strata_proofimpl_evm_ee_stf::{
-    primitives::EvmEeProofInput, prover::EvmEeProver, EvmBlockStfInput,
+    primitives::EvmEeProofInput, program::EvmEeProgram, EvmBlockStfInput,
 };
 use strata_rocksdb::prover::db::ProofDb;
 use tracing::error;
@@ -17,7 +17,7 @@ use crate::errors::ProvingTaskError;
 /// Transition Function (STF) proofs.
 ///
 /// It is responsible for interfacing with the `Reth` client and fetching necessary data required by
-/// the [`EvmEeProver`] for the proof generation.
+/// the [`EvmEeProgram`] for the proof generation.
 #[derive(Debug, Clone)]
 pub struct EvmEeOperator {
     el_client: HttpClient,
@@ -54,7 +54,7 @@ impl EvmEeOperator {
 }
 
 impl ProvingOp for EvmEeOperator {
-    type Prover = EvmEeProver;
+    type Program = EvmEeProgram;
     type Params = (Buf32, Buf32);
 
     fn construct_proof_ctx(

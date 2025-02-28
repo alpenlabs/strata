@@ -2,10 +2,10 @@
 //! Proof. It ensures that the previous batch proof was correctly settled on the L1
 //! chain and that all L1-L2 transactions were processed.
 
-use strata_proofimpl_cl_stf::prover::ClStfOutput;
+use strata_proofimpl_cl_stf::program::ClStfOutput;
 use zkaleido::ZkVmEnv;
 
-pub mod prover;
+pub mod program;
 
 pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
     let batches_count: usize = zkvm.read_serde();

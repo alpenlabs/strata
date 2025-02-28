@@ -1,4 +1,4 @@
-use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
+use strata_proofimpl_checkpoint::program::{CheckpointProgram, CheckpointProverInput};
 use zkaleido::{ZkVmHost, ZkVmResult};
 
 use super::ProofGenerator;
@@ -21,7 +21,7 @@ impl<H: ZkVmHost> CheckpointProofGenerator<H> {
 
 impl<H: ZkVmHost> ProofGenerator for CheckpointProofGenerator<H> {
     type Input = (u64, u64); // L2 Range
-    type P = CheckpointProver;
+    type P = CheckpointProgram;
     type H = H;
 
     fn get_input(&self, l2_range: &(u64, u64)) -> ZkVmResult<CheckpointProverInput> {

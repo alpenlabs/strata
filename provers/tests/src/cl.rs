@@ -1,4 +1,4 @@
-use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
+use strata_proofimpl_cl_stf::program::{ClStfInput, ClStfProgram};
 use strata_test_utils::{evm_ee::L2Segment, l2::gen_params};
 use zkaleido::{ZkVmHost, ZkVmResult};
 
@@ -28,7 +28,7 @@ impl<H: ZkVmHost> ClProofGenerator<H> {
 
 impl<H: ZkVmHost> ProofGenerator for ClProofGenerator<H> {
     type Input = (u64, u64);
-    type P = ClStfProver;
+    type P = ClStfProgram;
     type H = H;
 
     fn get_input(&self, block_range: &(u64, u64)) -> ZkVmResult<ClStfInput> {

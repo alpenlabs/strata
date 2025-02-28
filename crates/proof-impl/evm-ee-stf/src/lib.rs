@@ -19,7 +19,7 @@ pub mod db;
 pub mod mpt;
 pub mod primitives;
 pub mod processor;
-pub mod prover;
+pub mod program;
 pub mod utils;
 use db::InMemoryDBHelper;
 use mpt::keccak;
