@@ -47,7 +47,7 @@ RUN apt-get update && \
 # Copy the built binaries from the builder stage
 COPY --from=builder /app/strata-reth /usr/local/bin/strata-reth
 
-COPY ./docker/reth/entrypoint.sh entrypoint.sh
+COPY ./docker/strata-reth/entrypoint.sh entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
 

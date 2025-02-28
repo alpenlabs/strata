@@ -47,7 +47,7 @@ RUN apt-get update && \
 
 # Copy the built binaries and the entrypoint script from the builder stage
 COPY --from=builder /app/strata-sequencer-client /usr/local/bin/strata-sequencer-client
-COPY ./docker/sequencer-signer/entrypoint.sh entrypoint.sh
+COPY ./docker/strata-sequencer-client/entrypoint.sh entrypoint.sh
 
 # Make the entrypoint script executable
 RUN chmod +x entrypoint.sh

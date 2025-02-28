@@ -45,7 +45,7 @@ RUN apt-get update && \
 
 # Copy the built binaries and the entrypoint script from the builder stage
 COPY --from=builder /app/strata-client /usr/local/bin/strata-client
-COPY ./docker/client/entrypoint.sh entrypoint.sh
+COPY ./docker/strata-client/entrypoint.sh entrypoint.sh
 
 EXPOSE 8432
 

@@ -43,6 +43,7 @@ jobs:
           [strata-client, strata-sequencer-client, strata-reth, prover-client]
     outputs:
       program: ${{ matrix.program }}
+      sp1_value: ${{ steps.extract-sp1-value.outputs.sp1_value }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,9 +74,39 @@ jobs:
           DOCKERFILE_PATH="docker/${PROGRAM}/Dockerfile"
           ECR_REPOSITORY="${ECR_REPOSITORY_PREFIX}/${PROGRAM}"
 
-          docker build -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_TAG}" -f "${DOCKERFILE_PATH}" .
-          docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_TAG}"
+          if [ "$PROGRAM" == "prover-client" ]; then
+            # Build datatool with sp1 features
+            cargo build --bin strata-datatool -F "sp1-builder" --release
 
+            # Generate parameters and capture the output
+            PARAMS_OUTPUT=$(./target/release/strata-datatool genparams --elf-dir docker/prover-client/elfs/sp1)
+
+            # Extract sp1 value using jq
+            SP1_VALUE=$(echo "$PARAMS_OUTPUT" | jq -r '.rollup_vk.sp1')
+            echo "sp1_value=\"$SP1_VALUE\"" >> "$GITHUB_OUTPUT"
+            echo "SP1 verification key: $SP1_VALUE"
+
+            # Build prover with sp1 features
+            docker build \
+              --build-arg PROVER_FEATURES="sp1" \
+              -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_TAG}" \
+              -f "${DOCKERFILE_PATH}" .
+          else
+            docker build -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_TAG}" \
+              -f "${DOCKERFILE_PATH}" .
+          fi
+
+          # Push the image to ECR
+          docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_TAG}"
+      - name: Extract SP1 Value
+        id: extract-sp1-value
+        run: |
+          if [ -n "$SP1_VALUE" ]; then
+            echo "sp1_value=$SP1_VALUE" >> "$GITHUB_OUTPUT"
+          else
+            echo "Error: Failed to extract SP1 value from parameters"
+            exit 1
+          fi
   update-helm-values:
     name: Update Helm Values
     needs: [build-and-push]
@@ -103,6 +134,7 @@ jobs:
         env:
           SHORT_TAG: ${{ github.sha }}
           CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
+          SP1_VALUE: ${{ needs.build-and-push.outputs.sp1_value || 'default_value' }}
         run: |
           # Sanitize SHORT_TAG
           SHORT_TAG="${COMMIT//[^a-zA-Z0-9._-]/}"
@@ -112,12 +144,16 @@ jobs:
           VALUES_FILE_PROVER="deployments/clusters/${CLUSTER_NAME}/values/strata-prover-values.yaml"
 
           # update sequencer tags
-          yq eval -i --arg tag "$SHORT_TAG" ".client.image.tag = $tag" "$VALUES_FILE_NODES"
-          yq eval -i --arg tag "$SHORT_TAG" ".reth.image.tag = $tag" "$VALUES_FILE_NODES"
-          yq eval -i --arg tag "$SHORT_TAG" ".sequencerSigner.image.tag = $tag" "$VALUES_FILE_NODES"
+          yq eval -i ".client.image.tag = \"$SHORT_TAG\"" "$VALUES_FILE_NODES"
+          yq eval -i ".reth.image.tag = \"$SHORT_TAG\"" "$VALUES_FILE_NODES"
+          yq eval -i ".sequencerSigner.image.tag = \"$SHORT_TAG\"" "$VALUES_FILE_NODES"
 
           # update prover tags
-          yq eval -i --arg tag "$SHORT_TAG" ".proverClient.image.tag = $tag" "$VALUES_FILE_PROVER"
+          yq eval -i ".proverClient.image.tag = \"$SHORT_TAG\"" "$VALUES_FILE_PROVER"
+
+          # update sp1 value in prover's and node's params.json
+          sed -i "s|\"sp1\": \"[a-f0-9]*\"|\"sp1\": \"${SP1_VALUE}\"|g" "$VALUES_FILE_NODES"
+          sed -i "s|\"sp1\": \"[a-f0-9]*\"|\"sp1\": \"${SP1_VALUE}\"|g" "$VALUES_FILE_PROVER"
 
       - name: Commit and push changes
         env:
