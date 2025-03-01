@@ -1,3 +1,6 @@
+#![no_main]
+sp1_zkvm::entrypoint!(main);
+
 use strata_proofimpl_cl_stf::process_cl_stf;
 use zkaleido_sp1_adapter::Sp1ZkVmEnv;
 

@@ -41,10 +41,18 @@ pub fn run_sp1_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
     programs
         .iter()
         .map(|program| match program {
-            GuestProgram::BtcBlockscan => btc_blockscan::sp1::perf_report(),
-            GuestProgram::EvmEeStf => evm_ee::sp1::perf_report(),
-            GuestProgram::ClStf => cl_stf::sp1::perf_report(),
-            GuestProgram::Checkpoint => checkpoint::sp1::perf_report(),
+            GuestProgram::BtcBlockscan => {
+                btc_blockscan::gen_perf_report(&btc_blockscan::sp1::host())
+            }
+            GuestProgram::EvmEeStf => evm_ee::gen_perf_report(&evm_ee::sp1::host()),
+            GuestProgram::ClStf => cl_stf::gen_perf_report(
+                &cl_stf::sp1::host(),
+                evm_ee::proof_with_vk(&evm_ee::sp1::host()),
+            ),
+            GuestProgram::Checkpoint => checkpoint::gen_perf_report(
+                &checkpoint::sp1::host(),
+                cl_stf::proof_with_vk(&cl_stf::sp1::host(), &evm_ee::sp1::host()),
+            ),
         })
         .collect()
 }
@@ -57,10 +65,18 @@ pub fn run_risc0_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
     programs
         .iter()
         .map(|program| match program {
-            GuestProgram::BtcBlockscan => btc_blockscan::risc0::perf_report(),
-            GuestProgram::EvmEeStf => evm_ee::risc0::perf_report(),
-            GuestProgram::ClStf => cl_stf::risc0::perf_report(),
-            GuestProgram::Checkpoint => checkpoint::risc0::perf_report(),
+            GuestProgram::BtcBlockscan => {
+                btc_blockscan::gen_perf_report(&btc_blockscan::risc0::host())
+            }
+            GuestProgram::EvmEeStf => evm_ee::gen_perf_report(&evm_ee::risc0::host()),
+            GuestProgram::ClStf => cl_stf::gen_perf_report(
+                &cl_stf::risc0::host(),
+                evm_ee::proof_with_vk(&evm_ee::risc0::host()),
+            ),
+            GuestProgram::Checkpoint => checkpoint::gen_perf_report(
+                &checkpoint::risc0::host(),
+                cl_stf::proof_with_vk(&cl_stf::risc0::host(), &evm_ee::risc0::host()),
+            ),
         })
         .collect()
 }
