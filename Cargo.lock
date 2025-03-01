@@ -13750,6 +13750,7 @@ dependencies = [
  "strata-test-utils",
  "time",
  "tokio",
+ "tracing",
  "zkaleido",
  "zkaleido-risc0-adapter",
  "zkaleido-sp1-adapter",
