@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{block::L2Block, chain_state::Chainstate};
@@ -5,6 +7,9 @@ use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
     ZkVmProgramPerf, ZkVmResult,
 };
+use zkaleido_native_adapter::{NativeHost, NativeMachine};
+
+use crate::process_cl_stf;
 
 pub struct ClStfInput {
     pub rollup_params: RollupParams,
@@ -68,3 +73,24 @@ impl ZkVmProgram for ClStfProgram {
 }
 
 impl ZkVmProgramPerf for ClStfProgram {}
+
+impl ClStfProgram {
+    pub fn native_host() -> NativeHost {
+        const MOCK_VK: [u32; 8] = [0u32; 8];
+        NativeHost {
+            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+                process_cl_stf(zkvm, &MOCK_VK, &MOCK_VK);
+                Ok(())
+            })),
+        }
+    }
+
+    // Add this new convenience method
+    pub fn execute(
+        input: &<Self as ZkVmProgram>::Input,
+    ) -> ZkVmResult<<Self as ZkVmProgram>::Output> {
+        // Get the native host and delegate to the trait's execute method
+        let host = Self::native_host();
+        <Self as ZkVmProgram>::execute(input, &host)
+    }
+}

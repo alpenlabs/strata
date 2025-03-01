@@ -13622,6 +13622,7 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -13637,6 +13638,7 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -13669,6 +13671,7 @@ dependencies = [
  "strata-state",
  "thiserror 2.0.11",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
