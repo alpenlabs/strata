@@ -12,7 +12,7 @@ bitcoinlib = "^0.7.1"
 websockets = "^13.1"
 web3 = "^7.7.0"
 py-solc-x = "^2.0.3"
-locust = "^2.32.6"
+locust = "^2.33.0"
 toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
