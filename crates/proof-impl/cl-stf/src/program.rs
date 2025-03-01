@@ -3,7 +3,7 @@ use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{block::L2Block, chain_state::Chainstate};
 use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
-    ZkVmResult,
+    ZkVmProgramPerf, ZkVmResult,
 };
 
 pub struct ClStfInput {
@@ -66,3 +66,5 @@ impl ZkVmProgram for ClStfProgram {
         H::extract_borsh_public_output(public_values)
     }
 }
+
+impl ZkVmProgramPerf for ClStfProgram {}

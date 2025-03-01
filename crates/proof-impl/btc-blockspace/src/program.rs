@@ -1,7 +1,8 @@
 use bitcoin::consensus::serialize;
 use strata_primitives::l1::L1TxProof;
 use zkaleido::{
-    ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProgram, ZkVmResult,
+    ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProgram,
+    ZkVmProgramPerf, ZkVmResult,
 };
 
 use crate::{
@@ -53,3 +54,5 @@ impl ZkVmProgram for BtcBlockspaceProgram {
         H::extract_borsh_public_output(public_values)
     }
 }
+
+impl ZkVmProgramPerf for BtcBlockspaceProgram {}
