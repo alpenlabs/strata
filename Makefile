@@ -11,7 +11,7 @@ DOCKER_DIR = docker
 DOCKER_DATADIR = .data
 PROVER_PERF_EVAL_DIR  = provers/perf
 PROVER_PROOFS_CACHE_DIR  = provers/tests/proofs
-PROVER_PROGRAMS = "btc-blockscan"
+PROVER_PROGRAMS = "cl-stf"
 
 # Cargo profile for builds. Default is for local builds, CI uses an override.
 PROFILE ?= release
