@@ -1,7 +1,7 @@
 use strata_primitives::buf::Buf32;
 use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
-    ZkVmResult,
+    ZkVmProgramPerf, ZkVmResult,
 };
 
 pub struct CheckpointProverInput {
@@ -47,3 +47,5 @@ impl ZkVmProgram for CheckpointProgram {
         H::extract_borsh_public_output(public_values)
     }
 }
+
+impl ZkVmProgramPerf for CheckpointProgram {}

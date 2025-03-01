@@ -3,9 +3,9 @@ use std::str::FromStr;
 use clap::ValueEnum;
 
 mod btc_blockscan;
-mod checkpoint;
-mod checkpoint;
-mod cl_stf;
+// mod checkpoint;
+// mod cl_stf;
+mod evm_ee;
 
 use crate::PerformanceReport;
 
@@ -14,8 +14,8 @@ use crate::PerformanceReport;
 pub enum GuestProgram {
     BtcBlockscan,
     EvmEeStf,
-    ClStf,
-    Checkpoint,
+    // ClStf,
+    // Checkpoint,
 }
 
 impl FromStr for GuestProgram {
@@ -25,8 +25,8 @@ impl FromStr for GuestProgram {
         match s.to_lowercase().as_str() {
             "btc-blockscan" => Ok(GuestProgram::BtcBlockscan),
             "evm-ee-stf" => Ok(GuestProgram::EvmEeStf),
-            "cl-stf" => Ok(GuestProgram::ClStf),
-            "checkpoint" => Ok(GuestProgram::Checkpoint),
+            // "cl-stf" => Ok(GuestProgram::ClStf),
+            // "checkpoint" => Ok(GuestProgram::Checkpoint),
             // Add more matches
             _ => Err(format!("unknown program: {}", s)),
         }
@@ -41,12 +41,10 @@ pub fn run_sp1_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
     programs
         .iter()
         .map(|program| match program {
-            GuestProgram::Fibonacci => fibonacci::sp1_fib_report(),
-            GuestProgram::FibonacciComposition => {
-                fibonacci_composition::sp1_fib_composition_report()
-            }
-            GuestProgram::Sha2Chain => sha2::sp1_sha_report(),
-            GuestProgram::SchnorrSigVerify => schnorr::sp1_schnorr_sig_verify_report(),
+            GuestProgram::BtcBlockscan => btc_blockscan::sp1_btc_blockscan_report(),
+            GuestProgram::EvmEeStf => evm_ee::sp1_evm_ee_report(),
+            // GuestProgram::ClStf => cl_stf::sp1_cl_stf_report(),
+            // GuestProgram::Checkpoint => checkpoint::sp1_checkpoint_report(),
         })
         .map(Into::into)
         .collect()
@@ -55,17 +53,15 @@ pub fn run_sp1_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
 /// Runs Risc0 programs to generate reports.
 ///
 /// Generates [`PerformanceReport`] for each invocation.
-// #[cfg(feature = "risc0")]
+#[cfg(feature = "risc0")]
 pub fn run_risc0_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
     programs
         .iter()
         .map(|program| match program {
-            GuestProgram::Fibonacci => fibonacci::risc0_fib_report(),
-            GuestProgram::FibonacciComposition => {
-                fibonacci_composition::risc0_fib_composition_report()
-            }
-            GuestProgram::Sha2Chain => sha2::risc0_sha_report(),
-            GuestProgram::SchnorrSigVerify => schnorr::risc0_schnorr_sig_verify_report(),
+            GuestProgram::BtcBlockscan => btc_blockscan::risc0_btc_blockscan_report(),
+            GuestProgram::EvmEeStf => evm_ee::risc0_evm_ee_report(),
+            // GuestProgram::ClStf => cl_stf::risc0_cl_stf_report(),
+            // GuestProgram::Checkpoint => checkpoint::risc0_checkpoint_report(),
         })
         .map(Into::into)
         .collect()

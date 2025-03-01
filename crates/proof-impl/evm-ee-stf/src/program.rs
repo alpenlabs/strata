@@ -1,4 +1,6 @@
-use zkaleido::{ProofType, PublicValues, ZkVmInputResult, ZkVmProgram, ZkVmResult};
+use zkaleido::{
+    ProofType, PublicValues, ZkVmInputResult, ZkVmProgram, ZkVmProgramPerf, ZkVmResult,
+};
 
 use crate::primitives::{EvmEeProofInput, EvmEeProofOutput};
 
@@ -37,3 +39,5 @@ impl ZkVmProgram for EvmEeProgram {
         H::extract_borsh_public_output(public_values)
     }
 }
+
+impl ZkVmProgramPerf for EvmEeProgram {}
