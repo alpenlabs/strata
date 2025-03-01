@@ -1,8 +1,14 @@
+use std::sync::Arc;
+
 use zkaleido::{
     ProofType, PublicValues, ZkVmInputResult, ZkVmProgram, ZkVmProgramPerf, ZkVmResult,
 };
+use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
-use crate::primitives::{EvmEeProofInput, EvmEeProofOutput};
+use crate::{
+    primitives::{EvmEeProofInput, EvmEeProofOutput},
+    process_block_transaction_outer,
+};
 
 pub struct EvmEeProgram;
 
@@ -41,3 +47,23 @@ impl ZkVmProgram for EvmEeProgram {
 }
 
 impl ZkVmProgramPerf for EvmEeProgram {}
+
+impl EvmEeProgram {
+    pub fn native_host() -> NativeHost {
+        NativeHost {
+            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+                process_block_transaction_outer(zkvm);
+                Ok(())
+            })),
+        }
+    }
+
+    // Add this new convenience method
+    pub fn execute(
+        input: &<Self as ZkVmProgram>::Input,
+    ) -> ZkVmResult<<Self as ZkVmProgram>::Output> {
+        // Get the native host and delegate to the trait's execute method
+        let host = Self::native_host();
+        <Self as ZkVmProgram>::execute(input, &host)
+    }
+}
