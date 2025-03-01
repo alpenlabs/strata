@@ -2820,6 +2820,7 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -2836,6 +2837,7 @@ dependencies = [
  "strata-proofimpl-cl-stf",
  "strata-state",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -2850,6 +2852,7 @@ dependencies = [
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -2879,6 +2882,7 @@ dependencies = [
  "strata-state",
  "thiserror 2.0.11",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -3469,6 +3473,17 @@ dependencies = [
  "borsh",
  "serde",
  "thiserror 1.0.68",
+]
+
+[[package]]
+name = "zkaleido-native-adapter"
+version = "0.1.0"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
+dependencies = [
+ "bincode",
+ "borsh",
+ "serde",
+ "zkaleido",
 ]
 
 [[package]]

@@ -4,92 +4,71 @@ use zkaleido::{
     ZkVmProgramPerf,
 };
 
-fn prepare_input(
-    cl_stf_proofs_with_vk: (Vec<ProofReceipt>, VerifyingKey),
+pub(super) fn prepare_input(
+    cl_stf_proof_with_vk: (ProofReceipt, VerifyingKey),
 ) -> CheckpointProverInput {
-    let (cl_stf_proofs, cl_stf_vk) = cl_stf_proofs_with_vk;
+    let (cl_stf_proof, cl_stf_vk) = cl_stf_proof_with_vk;
+    let cl_stf_proofs = vec![cl_stf_proof];
     CheckpointProverInput {
         cl_stf_proofs,
         cl_stf_vk,
     }
 }
 
-fn gen_perf_report(
+pub fn gen_perf_report(
     host: &impl ZkVmHostPerf,
-    cl_stf_proofs_with_vk: (Vec<ProofReceipt>, VerifyingKey),
+    cl_stf_proof_with_vk: (ProofReceipt, VerifyingKey),
 ) -> PerformanceReport {
-    let input = prepare_input(cl_stf_proofs_with_vk);
+    let input = prepare_input(cl_stf_proof_with_vk);
     CheckpointProgram::perf_report(&input, host).unwrap()
 }
 
 fn gen_proof(
     host: &impl ZkVmHost,
-    cl_stf_proofs_with_vk: (Vec<ProofReceipt>, VerifyingKey),
+    cl_stf_proof_with_vk: (ProofReceipt, VerifyingKey),
 ) -> ProofReceipt {
-    let input = prepare_input(cl_stf_proofs_with_vk);
+    let input = prepare_input(cl_stf_proof_with_vk);
     CheckpointProgram::prove(&input, host).unwrap()
 }
 
 #[cfg(feature = "sp1")]
 pub mod sp1 {
     use strata_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
-    use zkaleido::{VerifyingKey, ZkVmVerifier};
     use zkaleido_sp1_adapter::SP1Host;
 
     use super::*;
-    use crate::programs::cl_stf;
 
-    fn host() -> impl ZkVmHostPerf {
+    pub fn host() -> impl ZkVmHostPerf {
         SP1Host::init(&GUEST_EVM_EE_STF_ELF)
-    }
-
-    fn cl_stf_proofs_with_vk() -> (Vec<ProofReceipt>, VerifyingKey) {
-        let evm_ee_proof = cl_stf::sp1::proof();
-        let vk = cl_stf::sp1::vk();
-        (vec![evm_ee_proof], vk)
-    }
-
-    pub fn perf_report() -> PerformanceReport {
-        gen_perf_report(&host(), cl_stf_proofs_with_vk())
-    }
-
-    pub fn proof() -> ProofReceipt {
-        gen_proof(&host(), cl_stf_proofs_with_vk())
-    }
-
-    pub fn vk() -> VerifyingKey {
-        host().vk()
     }
 }
 
 #[cfg(feature = "risc0")]
 pub mod risc0 {
     use strata_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
-    use zkaleido::{VerifyingKey, ZkVmVerifier};
     use zkaleido_risc0_adapter::Risc0Host;
+
+    use super::*;
+
+    pub fn host() -> impl ZkVmHostPerf {
+        Risc0Host::init(GUEST_RISC0_EVM_EE_STF_ELF)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use strata_proofimpl_cl_stf::program::ClStfProgram;
+    use strata_proofimpl_evm_ee_stf::program::EvmEeProgram;
 
     use super::*;
     use crate::programs::cl_stf;
 
-    fn host() -> impl ZkVmHostPerf {
-        Risc0Host::init(GUEST_RISC0_EVM_EE_STF_ELF)
-    }
-
-    fn cl_stf_proofs_with_vk() -> (Vec<ProofReceipt>, VerifyingKey) {
-        let evm_ee_proof = cl_stf::risc0::proof();
-        let vk = cl_stf::risc0::vk();
-        (vec![evm_ee_proof], vk)
-    }
-
-    pub fn perf_report() -> PerformanceReport {
-        gen_perf_report(&host(), cl_stf_proofs_with_vk())
-    }
-
-    pub fn proof() -> ProofReceipt {
-        gen_proof(&host(), cl_stf_proofs_with_vk())
-    }
-
-    pub fn vk() -> VerifyingKey {
-        host().vk()
+    #[test]
+    fn test_checkpoint() {
+        let (cl_stf_proof, cl_stf_vk) =
+            cl_stf::proof_with_vk(&ClStfProgram::native_host(), &EvmEeProgram::native_host());
+        let input = prepare_input((cl_stf_proof, cl_stf_vk));
+        let output = CheckpointProgram::execute(&input).unwrap();
+        dbg!(output);
     }
 }
