@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use strata_chaintsn::transition::process_block;
+use strata_chaintsn::transition::{self as chain_transition};
 use strata_db::{errors::DbError, traits::BlockStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::{
@@ -25,8 +25,8 @@ use crate::{
     csm::{ctl::CsmController, message::ForkChoiceMessage},
     errors::*,
     tip_update::{compute_tip_update, TipUpdate},
-    unfinalized_tracker,
-    unfinalized_tracker::UnfinalizedBlockTracker,
+    txfilter::{parse_l1blocktxops, DbTxFilterconfigProvider},
+    unfinalized_tracker::{self, UnfinalizedBlockTracker},
 };
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
@@ -717,10 +717,15 @@ fn apply_blocks(
     blkids: impl Iterator<Item = L2BlockId>,
     fcm_state: &mut ForkChoiceManager,
 ) -> anyhow::Result<()> {
-    let rparams = fcm_state.params.rollup().clone();
+    let storage = fcm_state.storage.clone();
+    let params = fcm_state.params.clone();
+    let rparams = params.rollup();
 
     let mut cur_state = fcm_state.cur_chainstate.as_ref().clone();
     let mut updates = Vec::new();
+
+    let filterconfig_provider =
+        DbTxFilterconfigProvider::new(storage.chainstate().as_ref(), params.as_ref());
 
     for blkid in blkids {
         // Load the previous block and its post-state.
@@ -738,11 +743,18 @@ fn apply_blocks(
         let pre_state_epoch = cur_state.cur_epoch();
         let prev_epoch_terminal = cur_state.prev_epoch().to_block_commitment();
 
+        let checkpoint_epoch = cur_state.finalized_epoch();
+        let l1blocks = parse_l1blocktxops(
+            body.l1_segment().new_manifests(),
+            checkpoint_epoch,
+            &filterconfig_provider,
+        );
+
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
         let mut prestate_cache = StateCache::new(cur_state);
         debug!(%slot, %blkid, "processing block");
-        process_block(&mut prestate_cache, header, body, &rparams)
+        chain_transition::process_block(&mut prestate_cache, header, body, &l1blocks, &rparams)
             .map_err(|e| Error::InvalidStateTsn(blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();
 

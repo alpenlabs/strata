@@ -1,10 +1,11 @@
 //! Core state transition function.
 #![allow(unused)] // still under development
 
-use std::cmp::min;
+use std::{cmp::min, os::macos::raw::stat};
 
 use bitcoin::{block::Header, Transaction};
 use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
+use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
 use strata_primitives::{
     batch::{verify_signed_checkpoint_sig, BatchInfo, Checkpoint},
     l1::{get_btc_params, HeaderVerificationState, L1BlockCommitment, L1BlockId},
@@ -23,7 +24,10 @@ use strata_storage::NodeStorage;
 use tracing::*;
 use zkaleido::ProofReceipt;
 
-use crate::{checkpoint_verification::verify_checkpoint, errors::*, genesis::make_genesis_block};
+use crate::{
+    checkpoint_verification::verify_checkpoint, errors::*, genesis::make_genesis_block,
+    tx_indexer::ReaderTxVisitorImpl,
+};
 
 /// Interface for external context necessary specifically for event validation.
 pub trait EventContext {
@@ -149,6 +153,18 @@ fn handle_block(
             .get_internal_state(height - 1)
             .expect("clientstate: missing expected block state");
 
+        let last_chainstate = if let Some(prev_chainstate) = state
+            .state()
+            .get_last_checkpoint()
+            .map(|ckpt| ckpt.batch_info.final_l2_block())
+        {
+            // TODO: retry on db error
+            let chainstate = context.get_toplevel_chainstate(prev_chainstate.slot())?;
+            Some(chainstate)
+        } else {
+            None
+        };
+
         let (new_istate, sync_actions) =
             process_l1_block(prev_istate, height, block_mf, params.rollup())?;
         state.accept_l1_block_state(block, new_istate);
@@ -226,10 +242,15 @@ fn process_l1_block(
     let mut checkpoint = state.last_checkpoint().cloned();
     let mut sync_actions = Vec::new();
 
+    let block = block_mf.get_block();
+    let config = TxFilterConfig::derive_from(params).expect("derive filterconfig params");
+
+    let relevant_txs = index_block(&block, ReaderTxVisitorImpl::new, &config);
+
     // Iterate through all of the protocol operations in all of the txs.
     // TODO split out each proto op handling into a separate function
-    for tx in block_mf.txs() {
-        for op in tx.protocol_ops() {
+    for txentry in relevant_txs.iter() {
+        for op in txentry.contents().protocol_ops() {
             match op {
                 ProtocolOperation::Checkpoint(signed_ckpt) => {
                     // Before we do anything, check its signature.
@@ -246,6 +267,8 @@ fn process_l1_block(
                         warn!(%height, "ignoring invalid checkpoint in L1 block");
                         continue;
                     }
+
+                    let tx = &block.txdata[txentry.index() as usize];
 
                     let ckpt_ref = get_l1_reference(tx, height)?;
 
@@ -277,15 +300,15 @@ fn process_l1_block(
     Ok((istate, sync_actions))
 }
 
-fn get_l1_reference(tx: &L1Tx, height: u64) -> Result<CheckpointL1Ref, Error> {
-    let btx: Transaction = tx.tx_data().try_into().map_err(|e| {
-        warn!(%height, "Invalid bitcoin transaction data in L1Tx");
-        let msg = format!(
-            "Invalid bitcoin transaction data in L1Tx at height {}",
-            height
-        );
-        Error::Other(msg)
-    })?;
+fn get_l1_reference(btx: &Transaction, height: u64) -> Result<CheckpointL1Ref, Error> {
+    // let btx: Transaction = tx.tx_data().try_into().map_err(|e| {
+    //     warn!(%height, "Invalid bitcoin transaction data in L1Tx");
+    //     let msg = format!(
+    //         "Invalid bitcoin transaction data in L1Tx at height {}",
+    //         height
+    //     );
+    //     Error::Other(msg)
+    // })?;
 
     let txid = btx.compute_txid().into();
     let wtxid = btx.compute_wtxid().into();
@@ -335,7 +358,7 @@ mod tests {
 
         fn get_l1_block_manifest_at_height(&self, height: u64) -> Result<L1BlockManifest, Error> {
             let rec = self.chainseg.get_header_record(height).unwrap();
-            Ok(L1BlockManifest::new(rec, None, Vec::new(), 0, height))
+            Ok(L1BlockManifest::new(rec, None, Vec::new(), height))
         }
 
         fn get_l2_block_data(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {

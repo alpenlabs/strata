@@ -12,7 +12,11 @@ pub enum L1Event {
     /// rules are applied to. In most cases, the [`HeaderVerificationState`] is `None`, with a
     /// meaningful state provided only under during genesis
     // TODO: handle this properly: https://alpenlabs.atlassian.net/browse/STR-1104
-    BlockData(BlockData, u64, Option<HeaderVerificationState>),
+    BlockData(
+        BlockData,
+        // u64,
+        Option<HeaderVerificationState>,
+    ),
 
     /// Revert to the provided block height
     RevertTo(L1BlockCommitment),
@@ -167,17 +171,20 @@ pub struct BlockData {
     /// Raw block data.
     // TODO remove?
     block: Block,
-
-    /// Transactions in the block that contain protocol operations
-    relevant_txs: Vec<RelevantTxEntry>,
+    // /// Transactions in the block that contain protocol operations
+    // relevant_txs: Vec<RelevantTxEntry>,
 }
 
 impl BlockData {
-    pub fn new(block_num: u64, block: Block, relevant_txs: Vec<RelevantTxEntry>) -> Self {
+    pub fn new(
+        block_num: u64,
+        block: Block,
+        // relevant_txs: Vec<RelevantTxEntry>
+    ) -> Self {
         Self {
             block_num,
             block,
-            relevant_txs,
+            // relevant_txs,
         }
     }
 
@@ -189,11 +196,11 @@ impl BlockData {
         &self.block
     }
 
-    pub fn relevant_txs(&self) -> &[RelevantTxEntry] {
-        &self.relevant_txs
-    }
+    // pub fn relevant_txs(&self) -> &[RelevantTxEntry] {
+    //     &self.relevant_txs
+    // }
 
-    pub fn tx_idxs_iter(&self) -> impl Iterator<Item = u32> + '_ {
-        self.relevant_txs.iter().map(|v| v.index)
-    }
+    // pub fn tx_idxs_iter(&self) -> impl Iterator<Item = u32> + '_ {
+    //     self.relevant_txs.iter().map(|v| v.index)
+    // }
 }

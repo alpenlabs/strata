@@ -422,14 +422,14 @@ fn fetch_l1_block_manifest(height: u64, l1man: &L1BlockManager) -> anyhow::Resul
 // TODO maybe convert this fn to use epoch commitments?
 fn fetch_block_manifest_at_epoch(
     height: u64,
-    epoch: u64,
+    _epoch: u64,
     l1man: &L1BlockManager,
 ) -> anyhow::Result<L1BlockManifest> {
     let mf = fetch_l1_block_manifest(height, l1man)?;
 
-    if mf.epoch() != epoch {
-        return Err(Error::L1ManifestEpochMismatch(*mf.blkid(), mf.epoch(), epoch).into());
-    }
+    // if mf.epoch() != epoch {
+    //     return Err(Error::L1ManifestEpochMismatch(*mf.blkid(), mf.epoch(), epoch).into());
+    // }
 
     Ok(mf)
 }

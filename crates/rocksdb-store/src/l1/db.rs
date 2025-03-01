@@ -46,7 +46,7 @@ impl L1Database for L1Db {
                 blocks_at_height.push(*blockid);
 
                 txn.put::<L1BlockSchema>(blockid, &mf)?;
-                txn.put::<TxnSchema>(blockid, mf.txs_vec())?;
+                // txn.put::<TxnSchema>(blockid, mf.txs_vec())?;
                 txn.put::<L1BlocksByHeightSchema>(&height, &blocks_at_height)?;
 
                 Ok::<(), DbError>(())
@@ -216,7 +216,7 @@ mod tests {
         let mf = L1BlockManifest::new(
             arb.generate(),
             arb.generate(),
-            txs.clone(),
+            // txs.clone(),
             arb.generate(),
             arb.generate(),
         );
@@ -262,7 +262,7 @@ mod tests {
             let mf = L1BlockManifest::new(
                 arb.generate(),
                 arb.generate(),
-                txs,
+                // txs,
                 arb.generate(),
                 arb.generate(),
             );

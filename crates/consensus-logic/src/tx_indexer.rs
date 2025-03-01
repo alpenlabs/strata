@@ -72,6 +72,7 @@ mod test {
         hashes::Hash,
         Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode,
     };
+    use strata_btcio::test_utils::create_checkpoint_envelope_tx;
     use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
     use strata_primitives::{
         batch::SignedCheckpoint,
@@ -87,9 +88,7 @@ mod test {
         ArbitraryGenerator,
     };
 
-    use crate::{
-        reader::tx_indexer::ReaderTxVisitorImpl, test_utils::create_checkpoint_envelope_tx,
-    };
+    use super::ReaderTxVisitorImpl;
 
     const TEST_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
 

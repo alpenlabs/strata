@@ -2,32 +2,23 @@
 //! we'll replace components with real implementations as we go along.
 #![allow(unused)]
 
-use std::{cmp::max, collections::HashMap};
-
-use bitcoin::{block::Header, consensus, params::Params, OutPoint, Transaction};
+use bitcoin::{block::Header, consensus, params::Params};
 use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
     batch::SignedCheckpoint,
     epoch::EpochCommitment,
-    l1::{BitcoinAmount, DepositInfo, L1BlockManifest, L1TxRef, OutputRef, ProtocolOperation},
+    l1::{DepositInfo, L1BlockManifest, L1BlockTxOps, L1HeaderRecord, ProtocolOperation},
     params::RollupParams,
 };
 use strata_state::{
-    block::L1Segment,
     bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
-    exec_env::ExecEnvState,
-    exec_update::{self, construct_ops_from_deposit_intents, ELDepositData, Op},
+    exec_update::{self, Op},
     prelude::*,
     state_op::StateCache,
-    state_queue,
 };
 
-use crate::{
-    errors::TsnError,
-    macros::*,
-    slot_rng::{self, SlotRng},
-};
+use crate::{errors::TsnError, macros::*, slot_rng::SlotRng};
 
 /// Processes a block, making writes into the provided state cache.
 ///
@@ -44,6 +35,7 @@ pub fn process_block(
     state: &mut StateCache,
     header: &impl L2Header,
     body: &L2BlockBody,
+    l1blockops: &[L1BlockTxOps],
     params: &RollupParams,
 ) -> Result<(), TsnError> {
     // We want to fail quickly here because otherwise we don't know what's
@@ -58,7 +50,7 @@ pub fn process_block(
     state.set_cur_header(header);
 
     // Go through each stage and play out the operations it has.
-    let has_new_epoch = process_l1_view_update(state, body.l1_segment(), params)?;
+    let has_new_epoch = process_l1_view_update(state, l1blockops, params)?;
     let ready_withdrawals = process_execution_update(state, body.exec_segment().update())?;
     process_deposit_updates(state, ready_withdrawals, &mut rng, params)?;
 
@@ -86,32 +78,32 @@ fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
 /// Returns if there was an update processed.
 fn process_l1_view_update(
     state: &mut StateCache,
-    l1seg: &L1Segment,
+    l1blockops: &[L1BlockTxOps],
     params: &RollupParams,
 ) -> Result<bool, TsnError> {
     let l1v = state.state().l1_view();
 
     // Accept new blocks.
-    if !l1seg.new_manifests().is_empty() {
+    if !l1blockops.is_empty() {
         let cur_safe_height = l1v.safe_height();
 
         // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
         // more complicated to check the PoW.
-        let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
+        let new_tip_height = cur_safe_height + l1blockops.len() as u64;
         // FIXME: This check is just redundant.
         if new_tip_height <= l1v.safe_height() {
             return Err(TsnError::L1SegNotExtend);
         }
 
         // Go through each manifest and process it.
-        for (off, b) in l1seg.new_manifests().iter().enumerate() {
+        for (off, b) in l1blockops.iter().enumerate() {
             // PoW checks are done when we try to update the HeaderVerificationState
             let header: Header =
                 consensus::deserialize(b.header()).expect("invalid bitcoin header");
             state.update_header_vs(&header, &Params::new(params.network))?;
 
             let height = cur_safe_height + off as u64 + 1;
-            process_l1_block(state, b)?;
+            process_l1_block(state, b.protocol_ops())?;
             state.update_safe_block(height, b.record().clone());
         }
 
@@ -121,22 +113,23 @@ fn process_l1_view_update(
     }
 }
 
-fn process_l1_block(state: &mut StateCache, block_mf: &L1BlockManifest) -> Result<(), TsnError> {
+fn process_l1_block(
+    state: &mut StateCache,
+    protocol_ops: &[ProtocolOperation],
+) -> Result<(), TsnError> {
     // Just iterate through every tx's operation and call out to the handlers for that.
-    for tx in block_mf.txs() {
-        for op in tx.protocol_ops() {
-            match &op {
-                ProtocolOperation::Checkpoint(ckpt) => {
-                    process_l1_checkpoint(state, block_mf, ckpt)?;
-                }
-
-                ProtocolOperation::Deposit(info) => {
-                    process_l1_deposit(state, block_mf, info)?;
-                }
-
-                // Other operations we don't do anything with for now.
-                _ => {}
+    for op in protocol_ops {
+        match op {
+            ProtocolOperation::Checkpoint(ckpt) => {
+                process_l1_checkpoint(state, ckpt)?;
             }
+
+            ProtocolOperation::Deposit(info) => {
+                process_l1_deposit(state, info)?;
+            }
+
+            // Other operations we don't do anything with for now.
+            _ => {}
         }
     }
 
@@ -145,7 +138,6 @@ fn process_l1_block(state: &mut StateCache, block_mf: &L1BlockManifest) -> Resul
 
 fn process_l1_checkpoint(
     state: &mut StateCache,
-    src_block_mf: &L1BlockManifest,
     signed_ckpt: &SignedCheckpoint,
 ) -> Result<(), TsnError> {
     // TODO verify signature?  it should already have been validated but it
@@ -168,11 +160,7 @@ fn process_l1_checkpoint(
     Ok(())
 }
 
-fn process_l1_deposit(
-    state: &mut StateCache,
-    src_block_mf: &L1BlockManifest,
-    info: &DepositInfo,
-) -> Result<(), TsnError> {
+fn process_l1_deposit(state: &mut StateCache, info: &DepositInfo) -> Result<(), TsnError> {
     let outpoint = info.outpoint;
 
     // Create the deposit entry to track it on the bridge side.
@@ -470,11 +458,11 @@ mod tests {
         let mut state_cache = StateCache::new(chs.clone());
 
         // Empty L1Segment payloads
-        let l1_segment = L1Segment::new_empty(chs.l1_view().safe_height());
+        let _l1_segment = L1Segment::new_empty(chs.l1_view().safe_height());
 
         // let previous_maturation_queue =
         // Process the empty payload
-        let result = process_l1_view_update(&mut state_cache, &l1_segment, params.rollup());
+        let result = process_l1_view_update(&mut state_cache, &Vec::new(), params.rollup());
         assert_eq!(state_cache.state(), &chs);
         assert!(result.is_ok());
     }

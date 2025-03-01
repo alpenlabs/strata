@@ -25,6 +25,9 @@ pub enum DbError {
     #[error("missing L1 block (height {0})")]
     MissingL1Block(u64),
 
+    #[error("missing L1 block transactions (id {0})")]
+    MissingL1BlockTransactions(L1BlockId),
+
     #[error("L1 canonical chain is empty")]
     L1CanonicalChainEmpty,
 

@@ -10,11 +10,20 @@
 // FIXME ^which pattern is this talking about?
 
 use bitcoin::{
-    hashes::Hash, params::Params, Address, Amount, Network, OutPoint, TapNodeHash, Transaction,
+    hashes::Hash, params::Params, Address, Amount, Block, Network, OutPoint, TapNodeHash,
+    Transaction,
 };
 use jsonrpsee::core::RpcResult;
 use strata_bridge_tx_builder::prelude::{CooperativeWithdrawalInfo, DepositInfo};
-use strata_primitives::l1::{BitcoinAddress, L1Tx, ProtocolOperation};
+use strata_consensus_logic::tx_indexer::ReaderTxVisitorImpl;
+use strata_l1tx::{
+    filter::{indexer::index_block, TxFilterConfig},
+    messages::{IndexedTxEntry, L1TxMessages},
+};
+use strata_primitives::{
+    l1::{generate_l1_tx, BitcoinAddress, L1BlockManifest, L1Tx, ProtocolOperation},
+    params::RollupParams,
+};
 use strata_rpc_types::RpcServerError;
 use strata_state::bridge_state::{DepositState, DepositsTable};
 use strata_storage::L1BlockManager;
@@ -45,8 +54,9 @@ pub(super) async fn extract_deposit_requests(
     l1man: &L1BlockManager,
     block_height: u64,
     network: Network,
+    rollup_params: &RollupParams,
 ) -> RpcResult<(impl Iterator<Item = DepositInfo>, u64)> {
-    let (l1_txs, latest_idx) = get_txs_from_height(l1man, block_height).await?;
+    let (l1_txs, latest_idx) = get_txs_from_height(l1man, block_height, rollup_params).await?;
 
     let deposit_info_iter = l1_txs.into_iter().filter_map(move |l1_tx| {
         let tx: Transaction = match l1_tx.tx_data().try_into() {
@@ -138,6 +148,7 @@ pub(super) async fn extract_deposit_requests(
 async fn get_txs_from_height(
     l1man: &L1BlockManager,
     start_height: u64,
+    rollup_params: &RollupParams,
 ) -> RpcResult<(Vec<L1Tx>, u64)> {
     let tip_height = l1man
         .get_chain_tip_height_async()
@@ -145,13 +156,15 @@ async fn get_txs_from_height(
         .map_err(RpcServerError::Db)?
         .ok_or(RpcServerError::BeforeGenesis)?;
 
+    let filter_config = TxFilterConfig::derive_from(rollup_params).expect("filter config");
+
     let mut txs = Vec::new();
     if start_height <= tip_height {
         for height in start_height..=tip_height {
             // We don't actually care if we don't have txs at a particular
             // height, we can continue unconditionally.
-            let Some(tx_refs) = l1man
-                .get_block_txs_at_height_async(height)
+            let Some(manifest) = l1man
+                .get_block_manifest_at_height_async(height)
                 .await
                 .map_err(RpcServerError::Db)?
             else {
@@ -159,18 +172,33 @@ async fn get_txs_from_height(
                 continue;
             };
 
-            for tx_ref in tx_refs {
-                let tx = l1man
-                    .get_tx_async(tx_ref)
-                    .await
-                    .map_err(RpcServerError::Db)?
-                    .expect("extractor: database inconsistent, missing expected tx");
-                txs.push(tx);
-            }
+            let mut block_txs = parse_l1tx(&manifest, &filter_config);
+
+            txs.append(&mut block_txs);
         }
     }
 
     Ok((txs, tip_height))
+}
+
+pub fn parse_l1tx(manifest: &L1BlockManifest, filter_config: &TxFilterConfig) -> Vec<L1Tx> {
+    let block = manifest.get_block();
+
+    let txns = index_block(&block, ReaderTxVisitorImpl::new, filter_config);
+
+    generate_l1txs(&block, &txns)
+}
+
+fn generate_l1txs(block: &Block, txns: &[IndexedTxEntry<L1TxMessages>]) -> Vec<L1Tx> {
+    txns.iter()
+        .map(|tx_entry| {
+            generate_l1_tx(
+                block,
+                tx_entry.index(),
+                tx_entry.contents().protocol_ops().to_vec(),
+            )
+        })
+        .collect()
 }
 
 /// Extract the withdrawal duties from the chain state.
@@ -252,7 +280,9 @@ mod tests {
         genesis::GenesisStateData,
         l1::L1ViewState,
     };
-    use strata_test_utils::{bridge::generate_mock_unsigned_tx, ArbitraryGenerator};
+    use strata_test_utils::{
+        bridge::generate_mock_unsigned_tx, l2::gen_params, ArbitraryGenerator,
+    };
     use threadpool::ThreadPool;
 
     use super::*;
@@ -281,10 +311,12 @@ mod tests {
         .await;
 
         let l1man = L1BlockManager::new(ThreadPool::new(1), l1_db);
+        let params = gen_params();
 
-        let (deposit_infos, latest_idx) = extract_deposit_requests(&l1man, 0, Network::Regtest)
-            .await
-            .expect("should be able to extract deposit requests");
+        let (deposit_infos, latest_idx) =
+            extract_deposit_requests(&l1man, 0, Network::Regtest, params.rollup())
+                .await
+                .expect("should be able to extract deposit requests");
 
         assert_eq!(
             latest_idx,
@@ -397,7 +429,7 @@ mod tests {
                 None
             };
 
-            let txs: Vec<L1Tx> = (0..num_txs)
+            let _txs: Vec<L1Tx> = (0..num_txs)
                 .map(|i| {
                     let proof = L1TxProof::new(i as u32, arb.generate());
 
@@ -422,7 +454,6 @@ mod tests {
             let mf = L1BlockManifest::new(
                 arb.generate(),
                 arb.generate(),
-                txs,
                 arb.generate(),
                 arb.generate(),
             );

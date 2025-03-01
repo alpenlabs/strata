@@ -135,7 +135,7 @@ impl BtcChainSegment {
     pub fn get_block_manifest(&self, height: u32) -> L1BlockManifest {
         let rec = self.get_header_record(height.into()).unwrap();
         let header_vs = self.get_verification_state(height as u64, 0).unwrap();
-        L1BlockManifest::new(rec, Some(header_vs), Vec::new(), 1, height as u64)
+        L1BlockManifest::new(rec, Some(header_vs), Vec::new(), height as u64)
     }
 }
 
@@ -257,7 +257,6 @@ impl BtcChainSegment {
             header_record,
             Some(header_vs),
             Vec::new(),
-            0,
             height,
         ))
     }

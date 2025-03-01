@@ -1,11 +1,16 @@
 use std::{thread, time};
 
-use strata_consensus_logic::checkpoint_verification;
+use strata_consensus_logic::{
+    checkpoint_verification,
+    tx_indexer::ReaderTxVisitorImpl,
+    txfilter::{parse_l1blocktxops, DbTxFilterconfigProvider},
+};
 use strata_eectl::{
     engine::{ExecEngineCtl, PayloadStatus},
     errors::EngineError,
     messages::{ExecPayloadData, PayloadEnv},
 };
+use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
 use strata_primitives::{
     buf::Buf32,
     l1::{L1BlockManifest, ProtocolOperation},
@@ -85,7 +90,7 @@ pub fn prepare_block(
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
-    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
+    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params, storage)?;
 
     // FIXME: invalid stateroot. Remove l2blockid from ChainState or stateroot from L2Block header.
     let new_state_root = post_state.compute_state_root();
@@ -157,7 +162,7 @@ fn prepare_l1_segment(
             break;
         };
 
-        if has_expected_checkpoint(&rec, prev_checkpoint.as_ref(), params) {
+        if has_expected_checkpoint(&rec, Some(prev_chstate), prev_checkpoint.as_ref(), params) {
             // Found valid checkpoint for previous epoch. Should end current epoch.
             is_epoch_final_block = true;
         }
@@ -186,10 +191,24 @@ fn prepare_l1_segment(
 /// Check if block has the checkpoint we are expecting and checkpoint is valid.
 fn has_expected_checkpoint(
     rec: &L1BlockManifest,
+    last_chainstate: Option<&Chainstate>,
     expected_checkpoint: Option<&Checkpoint>,
     params: &RollupParams,
 ) -> bool {
-    for op in rec.txs().iter().flat_map(|tx| tx.protocol_ops()) {
+    let block = rec.get_block();
+    let config = if let Some(last_chainstate) = last_chainstate {
+        TxFilterConfig::derive_from_chainstate(params, last_chainstate)
+    } else {
+        TxFilterConfig::derive_from(params)
+    }
+    .expect("derive filterconfig params");
+
+    let relevant_txs = index_block(&block, ReaderTxVisitorImpl::new, &config);
+
+    for op in relevant_txs
+        .iter()
+        .flat_map(|tx| tx.contents().protocol_ops())
+    {
         let ProtocolOperation::Checkpoint(signed_checkpoint) = op else {
             continue;
         };
@@ -314,9 +333,25 @@ fn compute_post_state(
     header: &impl L2Header,
     body: &L2BlockBody,
     params: &Params,
+    storage: &NodeStorage,
 ) -> Result<(Chainstate, WriteBatch), Error> {
+    let filterconfig_provider =
+        DbTxFilterconfigProvider::new(storage.chainstate().as_ref(), params);
+    let checkpoint_epoch = prev_chstate.finalized_epoch();
+    let l1blocks = parse_l1blocktxops(
+        body.l1_segment().new_manifests(),
+        checkpoint_epoch,
+        &filterconfig_provider,
+    );
+
     let mut state_cache = StateCache::new(prev_chstate);
-    strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
+    strata_chaintsn::transition::process_block(
+        &mut state_cache,
+        header,
+        body,
+        &l1blocks,
+        params.rollup(),
+    )?;
     let (post_state, wb) = state_cache.finalize();
     Ok((post_state, wb))
 }

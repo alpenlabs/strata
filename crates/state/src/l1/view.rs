@@ -23,6 +23,7 @@ pub struct L1ViewState {
 
     /// State against which the new L1 block header are verified
     pub(crate) header_vs: HeaderVerificationState,
+    // pub(crate) last_checkpoint: L1CommittedCheckpoint,
 }
 
 impl L1ViewState {

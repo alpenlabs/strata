@@ -6,6 +6,7 @@ use strata_primitives::{
     params::{DepositTxParams, RollupParams},
     sorted_vec::SortedVec,
 };
+use strata_state::chain_state::Chainstate;
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 
@@ -68,5 +69,13 @@ impl TxFilterConfig {
             expected_outpoints,
             deposit_config,
         })
+    }
+
+    pub fn derive_from_chainstate(
+        rollup_params: &RollupParams,
+        _chainstate: &Chainstate,
+    ) -> anyhow::Result<Self> {
+        // TODO: get addrs and outpoints from chainstate
+        Self::derive_from(rollup_params)
     }
 }

@@ -4,8 +4,8 @@
 pub mod prover;
 
 use prover::ClStfOutput;
-use strata_chaintsn::transition::process_block;
-use strata_primitives::{l1::ProtocolOperation, params::RollupParams};
+// use strata_chaintsn::transition::process_block;
+use strata_primitives::params::RollupParams;
 use strata_proofimpl_btc_blockspace::logic::BlockscanProofOutput;
 use strata_state::{
     block::{ExecSegment, L2Block},
@@ -64,37 +64,38 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
             l2_block.header().blockidx()
         );
 
+        //FIXME:
         // 7. Verify that the L1 manifests are consistent with the one that was proven
         // Since only some information of the L1BlockManifest is verified by the Blockspace Proof,
         // verify only those parts
-        let new_l1_manifests = l2_block.l1_segment().new_manifests();
+        // let new_l1_manifests = l2_block.l1_segment().new_manifests();
 
-        for manifest in new_l1_manifests {
-            assert_eq!(
-                &l1_updates[blockscan_result_idx].raw_header,
-                manifest.header(),
-                "mismatch headers at idx: {:?}",
-                blockscan_result_idx
-            );
+        // for manifest in new_l1_manifests {
+        //     assert_eq!(
+        //         &l1_updates[blockscan_result_idx].raw_header,
+        //         manifest.header(),
+        //         "mismatch headers at idx: {:?}",
+        //         blockscan_result_idx
+        //     );
 
-            // OPTIMIZE: if there's a way to compare things without additional cloned
-            let protocol_ops: Vec<ProtocolOperation> = manifest
-                .txs()
-                .iter()
-                .flat_map(|tx| tx.protocol_ops().iter().cloned())
-                .collect();
+        //     // OPTIMIZE: if there's a way to compare things without additional cloned
+        //     let protocol_ops: Vec<ProtocolOperation> = manifest
+        //         .txs()
+        //         .iter()
+        //         .flat_map(|tx| tx.protocol_ops().iter().cloned())
+        //         .collect();
 
-            // 7b. Verify that the protocol ops matches
-            assert_eq!(
-                &l1_updates[blockscan_result_idx].protocol_ops,
-                &protocol_ops,
-                "mismatch between protocol ops for {}",
-                manifest.blkid()
-            );
+        //     // 7b. Verify that the protocol ops matches
+        //     assert_eq!(
+        //         &l1_updates[blockscan_result_idx].protocol_ops,
+        //         &protocol_ops,
+        //         "mismatch between protocol ops for {}",
+        //         manifest.blkid()
+        //     );
 
-            // Increase the blockscan result idx
-            blockscan_result_idx += 1;
-        }
+        //     // Increase the blockscan result idx
+        //     blockscan_result_idx += 1;
+        // }
 
         // 8. Now that the L2 Block body is verified, check that the L2 Block header is consistent
         //    with the body
@@ -106,14 +107,15 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
             "Block credential verification failed"
         );
 
+        // FIXME:
         // 10. Apply the state transition
-        process_block(
-            &mut state_cache,
-            l2_block.header(),
-            l2_block.body(),
-            &rollup_params,
-        )
-        .expect("failed to process L2 Block");
+        // process_block(
+        //     &mut state_cache,
+        //     l2_block.header(),
+        //     l2_block.body(),
+        //     &rollup_params,
+        // )
+        // .expect("failed to process L2 Block");
     }
 
     // 11. Get the final chainstate and construct the output

@@ -32,7 +32,7 @@ pub struct Chainstate {
     /// The immediately preceding epoch.
     pub(crate) prev_epoch: EpochCommitment,
 
-    /// The epoch that we have observed in a checkpoint in L1.
+    /// The last epoch that we have observed in a checkpoint in L1.
     pub(crate) finalized_epoch: EpochCommitment,
 
     /// Rollup's view of L1 state.

@@ -179,7 +179,7 @@ impl StateCache {
         self.state_mut().prev_epoch = epoch;
     }
 
-    /// Sets the previous epoch.
+    /// Sets the epoch of last seen checkpoint.
     pub fn set_finalized_epoch(&mut self, epoch: EpochCommitment) {
         self.state_mut().finalized_epoch = epoch;
     }

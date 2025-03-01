@@ -119,6 +119,7 @@ impl L2Segment {
                 &mut state_cache,
                 &fake_header,
                 &body,
+                &Vec::new(), // FIXME: extract correctly
                 params.rollup(),
             )
             .unwrap();
@@ -135,6 +136,7 @@ impl L2Segment {
                 &mut state_cache,
                 block.header(),
                 block.body(),
+                &Vec::new(), // FIXME: extract correctly
                 params.rollup(),
             )
             .unwrap();

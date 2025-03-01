@@ -2,10 +2,7 @@ use bitcoin::{consensus::serialize, hashes::Hash, Block};
 use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
     buf::Buf32,
-    l1::{
-        generate_l1_tx, HeaderVerificationState, L1BlockCommitment, L1BlockManifest,
-        L1HeaderRecord, L1Tx,
-    },
+    l1::{HeaderVerificationState, L1BlockCommitment, L1BlockManifest, L1HeaderRecord},
 };
 use strata_state::sync_event::{EventSubmitter, SyncEvent};
 use tracing::*;
@@ -28,9 +25,7 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
             vec![SyncEvent::L1Revert(block)]
         }
 
-        L1Event::BlockData(blockdata, epoch, hvs) => {
-            handle_blockdata(ctx, blockdata, hvs, epoch).await?
-        }
+        L1Event::BlockData(blockdata, hvs) => handle_blockdata(ctx, blockdata, hvs).await?,
     };
 
     // Write to sync event db.
@@ -44,7 +39,7 @@ async fn handle_blockdata<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
     blockdata: BlockData,
     hvs: Option<HeaderVerificationState>,
-    epoch: u64,
+    // epoch: u64,
 ) -> anyhow::Result<Vec<SyncEvent>> {
     let ReaderContext {
         params, l1_manager, ..
@@ -60,14 +55,20 @@ async fn handle_blockdata<R: ReaderRpc>(
         return Ok(sync_evs);
     }
 
-    let txs: Vec<_> = generate_l1txs(&blockdata);
-    let num_txs = txs.len();
-    let manifest = generate_block_manifest(blockdata.block(), hvs, txs, epoch, height);
+    // let txs: Vec<_> = generate_l1txs(&blockdata);
+    // let num_txs = txs.len();
+    let manifest = generate_block_manifest(
+        blockdata.block(),
+        hvs,
+        // txs,
+        //  epoch,
+        height,
+    );
     let l1blockid = *manifest.blkid();
 
     l1_manager.put_block_data_async(manifest).await?;
     l1_manager.extend_canonical_chain_async(&l1blockid).await?;
-    info!(%height, %l1blockid, txs = %num_txs, "wrote L1 block manifest");
+    info!(%height, %l1blockid, "wrote L1 block manifest");
 
     // Create a sync event if it's something we care about.
     let blkid: Buf32 = blockdata.block().block_hash().into();
@@ -82,8 +83,8 @@ async fn handle_blockdata<R: ReaderRpc>(
 fn generate_block_manifest(
     block: &Block,
     hvs: Option<HeaderVerificationState>,
-    txs: Vec<L1Tx>,
-    epoch: u64,
+    // txs: Vec<L1Tx>,
+    // epoch: u64,
     height: u64,
 ) -> L1BlockManifest {
     let blockid = block.block_hash().into();
@@ -94,19 +95,19 @@ fn generate_block_manifest(
     let header = serialize(&block.header);
 
     let rec = L1HeaderRecord::new(blockid, header, Buf32::from(root));
-    L1BlockManifest::new(rec, hvs, txs, epoch, height)
+    L1BlockManifest::new(rec, hvs, bitcoin::consensus::serialize(block), height)
 }
 
-fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
-    blockdata
-        .relevant_txs()
-        .iter()
-        .map(|tx_entry| {
-            generate_l1_tx(
-                blockdata.block(),
-                tx_entry.index(),
-                tx_entry.contents().protocol_ops().to_vec(),
-            )
-        })
-        .collect()
-}
+// fn generate_l1txs(blockdata: &BlockData) -> Vec<L1Tx> {
+//     blockdata
+//         .relevant_txs()
+//         .iter()
+//         .map(|tx_entry| {
+//             generate_l1_tx(
+//                 blockdata.block(),
+//                 tx_entry.index(),
+//                 tx_entry.contents().protocol_ops().to_vec(),
+//             )
+//         })
+//         .collect()
+// }

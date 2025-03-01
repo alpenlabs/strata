@@ -538,8 +538,13 @@ impl StrataApiServer for StrataRpcImpl {
 
         let network = self.sync_manager.params().rollup().network;
 
-        let (deposit_duties, latest_index) =
-            extract_deposit_requests(self.storage.l1().as_ref(), start_index, network).await?;
+        let (deposit_duties, latest_index) = extract_deposit_requests(
+            self.storage.l1().as_ref(),
+            start_index,
+            network,
+            self.sync_manager.params().rollup(),
+        )
+        .await?;
 
         let deposit_duties = deposit_duties.map(BridgeDuty::from);
 
