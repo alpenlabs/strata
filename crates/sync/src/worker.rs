@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
-use strata_common::worker_pause_manager::{check_and_pause_if_needed_async, WorkerType};
+use strata_common::{check_and_pause_if_needed_async, WorkerType};
 use strata_consensus_logic::{
     csm::message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,

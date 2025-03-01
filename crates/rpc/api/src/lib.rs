@@ -1,7 +1,7 @@
 //! Macro trait def for the `strata_` RPC namespace using jsonrpsee.
 use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use strata_common::worker_pause_manager::{Action, WorkerType};
+use strata_common::{Action, WorkerType};
 use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::{
     batch::EpochSummary,

@@ -1,19 +1,19 @@
 //! Crate includes reusable utils for services that handle common behavior.
 //! Such as initializing the tracing framework and whatever else.
 
+use serde::{Deserialize, Serialize};
+
 pub mod logging;
 
 #[cfg(feature = "debug-utils")]
-pub mod bail_manager;
+mod bail_manager;
 #[cfg(feature = "debug-utils")]
-pub mod worker_pause_manager;
+pub use bail_manager::*;
+#[cfg(feature = "debug-utils")]
+mod worker_pause_manager;
+#[cfg(feature = "debug-utils")]
+pub use worker_pause_manager::*;
 pub mod ws_client;
-
-/// Checks to see if we should bail out.
-#[cfg(feature = "debug-utils")]
-pub fn check_bail_trigger(s: &str) {
-    bail_manager::check_bail_trigger(s);
-}
 
 /// Checks to see if we should bail out.
 // Stub for when we don't actually want to do anything.
@@ -21,4 +21,37 @@ pub fn check_bail_trigger(s: &str) {
 #[inline(always)]
 pub fn check_bail_trigger(_s: &str) {
     // nothing
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum WorkerType {
+    SyncWorker,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Action {
+    // Pause for seconds
+    Pause(u64),
+    // Pause until asked to resume
+    PauseUntilResume,
+    Resume,
+}
+
+#[cfg(not(feature = "debug-utils"))]
+#[inline(always)]
+pub async fn send_action_to_worker(_wtype: WorkerType, _action: Action) -> bool {
+    // Noop
+    true
+}
+
+#[cfg(not(feature = "debug-utils"))]
+#[inline(always)]
+pub async fn check_and_pause_if_needed_async(_wtype: WorkerType) {
+    // Noop
+}
+
+#[cfg(not(feature = "debug-utils"))]
+#[inline(always)]
+pub fn check_and_pause_if_needed(_wtype: WorkerType) {
+    // Noop
 }

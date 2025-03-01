@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "debug-utils")]
-use strata_common::bail_manager::{check_bail_trigger, BAIL_DUTY_SIGN_BLOCK};
+use strata_common::{check_bail_trigger, BAIL_DUTY_SIGN_BLOCK};
 use strata_primitives::{buf::Buf64, l2::L2BlockId};
 use strata_state::{
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},

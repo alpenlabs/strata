@@ -1,8 +1,9 @@
 use std::{collections::HashMap, sync::LazyLock, thread::sleep, time::Duration};
 
-use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
+
+use crate::{Action, WorkerType};
 
 /// Channel that receives signals from admin rpc to pause some of the internal workers.
 struct PauseChannel {
@@ -25,27 +26,12 @@ pub struct WorkerMessage {
     pub action: Action,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum WorkerType {
-    SyncWorker,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Action {
-    // Pause for seconds
-    Pause(u64),
-    // Pause until asked to resume
-    PauseUntilResume,
-    Resume,
-}
-
 static PAUSE_CHANNELS: LazyLock<HashMap<WorkerType, PauseChannel>> = LazyLock::new(|| {
     let mut m = HashMap::new();
     m.insert(WorkerType::SyncWorker, PauseChannel::new());
     m
 });
 
-#[cfg(feature = "debug-utils")]
 /// Ask an worker to pause or resume it's work.
 pub async fn send_action_to_worker(wtype: WorkerType, action: Action) -> bool {
     debug!(?wtype, ?action, "Received action for worker");
@@ -56,13 +42,7 @@ pub async fn send_action_to_worker(wtype: WorkerType, action: Action) -> bool {
     }
     true
 }
-#[cfg(not(feature = "debug-utils"))]
-#[inline(always)]
-pub async fn send_action_to_worker(wtype: WorkerType, action: Action) -> bool {
-    // Noop
-}
 
-#[cfg(feature = "debug-utils")]
 /// For the given worker type, checks if it has a Pause message, if so pauses it.
 pub async fn check_and_pause_if_needed_async(wtype: WorkerType) {
     let channel = PAUSE_CHANNELS.get(&wtype).unwrap();
@@ -79,19 +59,7 @@ pub async fn check_and_pause_if_needed_async(wtype: WorkerType) {
         }
     }
 }
-#[cfg(not(feature = "debug-utils"))]
-#[inline(always)]
-pub async fn check_and_pause_if_needed_async(wtype: WorkerType) {
-    // Noop
-}
 
-#[cfg(not(feature = "debug-utils"))]
-#[inline(always)]
-pub fn check_and_pause_if_needed(wtype: WorkerType) {
-    // Noop
-}
-
-#[cfg(feature = "debug-utils")]
 /// For the given worker type, checks if it has a Pause message, if so pauses it.
 pub fn check_and_pause_if_needed(wtype: WorkerType) {
     let channel = PAUSE_CHANNELS.get(&wtype).unwrap();

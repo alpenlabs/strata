@@ -13,8 +13,8 @@ use jsonrpsee::core::RpcResult;
 use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
-use strata_common::bail_manager::BAIL_SENDER;
-use strata_common::worker_pause_manager::{send_action_to_worker, Action, WorkerType};
+use strata_common::BAIL_SENDER;
+use strata_common::{send_action_to_worker, Action, WorkerType};
 use strata_consensus_logic::{checkpoint_verification::verify_proof, sync_manager::SyncManager};
 use strata_db::types::{CheckpointConfStatus, CheckpointProvingStatus, L1TxEntry, L1TxStatus};
 use strata_primitives::{
