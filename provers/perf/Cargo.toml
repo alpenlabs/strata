@@ -4,12 +4,22 @@ name = "strata-provers-perf"
 version = "0.1.0"
 
 [dependencies]
-strata-test-utils.workspace = true
-strata-zkvm-tests = { path = "../tests/", features = ["mock", "sp1"] }
 zkaleido.workspace = true
-zkaleido-sp1-adapter = { workspace = true, features = ["mock", "prover"] }
 
-sp1-sdk = "4.0.0"
+# proof programs
+strata-proofimpl-btc-blockspace.workspace = true
+strata-proofimpl-checkpoint.workspace = true
+strata-proofimpl-cl-stf.workspace = true
+strata-proofimpl-evm-ee-stf.workspace = true
+
+# sp1
+sp1-sdk = "4.1.0"
+strata-sp1-guest-builder = { path = "../sp1", optional = true }
+zkaleido-sp1-adapter = { workspace = true, optional = true }
+
+# risc0
+strata-risc0-guest-builder = { path = "../risc0", optional = true }
+zkaleido-risc0-adapter = { workspace = true, optional = true }
 
 anyhow = "1.0.83"
 bincode = "1.3.3"
@@ -19,9 +29,19 @@ reqwest = { version = "0.12.4", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.94"
 time = "0.3.26"
-
 tokio = { version = "1.39.0", features = ["full"] }
 
 [features]
-default = []
-profiling = ["sp1-sdk/profiling"]
+default = ["sp1-mock", "risc0-mock"]
+sp1 = [
+    "zkaleido-sp1-adapter/prover",
+    "strata-sp1-guest-builder",
+    "zkaleido-sp1-adapter/perf",
+]
+sp1-mock = ["sp1", "zkaleido-sp1-adapter/mock", "strata-sp1-guest-builder/mock"]
+risc0 = [
+    "zkaleido-risc0-adapter/prover",
+    "strata-risc0-guest-builder",
+    "zkaleido-risc0-adapter/perf",
+]
+risc0-mock = ["risc0", "zkaleido-risc0-adapter/mock"]
