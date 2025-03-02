@@ -8,10 +8,10 @@ use tracing::warn;
 
 pub mod indexer;
 pub mod types;
-mod withdrawal_fulfilment;
+mod withdrawal_fulfillment;
 
 pub use types::TxFilterConfig;
-use withdrawal_fulfilment::parse_withdrawal_fulfilment_transactions;
+use withdrawal_fulfillment::parse_withdrawal_fulfillment_transactions;
 
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},

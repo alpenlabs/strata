@@ -6,7 +6,7 @@ use strata_primitives::{
     batch::SignedCheckpoint,
     l1::{
         DepositInfo, DepositRequestInfo, DepositSpendInfo, ProtocolOperation,
-        WithdrawalFulfilmentInfo,
+        WithdrawalFulfillmentInfo,
     },
 };
 
@@ -55,8 +55,9 @@ impl TxVisitor for ReaderTxVisitorImpl {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
-    fn visit_withdrawal_fulfilment(&mut self, info: WithdrawalFulfilmentInfo) {
-        self.ops.push(ProtocolOperation::WithdrawalFulfilment(info));
+    fn visit_withdrawal_fulfillment(&mut self, info: WithdrawalFulfillmentInfo) {
+        self.ops
+            .push(ProtocolOperation::WithdrawalFulfillment(info));
     }
 
     fn visit_deposit_spend(&mut self, info: DepositSpendInfo) {

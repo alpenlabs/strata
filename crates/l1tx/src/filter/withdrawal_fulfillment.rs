@@ -1,5 +1,5 @@
 use bitcoin::{ScriptBuf, Transaction};
-use strata_primitives::l1::{BitcoinAmount, WithdrawalFulfilmentInfo};
+use strata_primitives::l1::{BitcoinAmount, WithdrawalFulfillmentInfo};
 
 use super::TxFilterConfig;
 use crate::utils::op_return_nonce;
@@ -13,11 +13,11 @@ fn create_opreturn_metadata(operator_idx: u32, deposit_idx: u32) -> ScriptBuf {
     op_return_nonce(&metadata)
 }
 
-/// Parse transaction and search for a Withdrawal Fulfilment transaction to an expected address.
-pub fn parse_withdrawal_fulfilment_transactions<'a>(
+/// Parse transaction and search for a Withdrawal Fulfillment transaction to an expected address.
+pub fn parse_withdrawal_fulfillment_transactions<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
-) -> Option<WithdrawalFulfilmentInfo> {
+) -> Option<WithdrawalFulfillmentInfo> {
     // 1. Check this is of correct structure
     let frontpayment_txout = tx.output.first()?;
     let metadata_txout = tx.output.get(1)?;
@@ -27,7 +27,7 @@ pub fn parse_withdrawal_fulfilment_transactions<'a>(
 
     // 2. Check withdrawal is to an address we expect
     let withdrawal = filter_conf
-        .expected_withdrawal_fulfilments
+        .expected_withdrawal_fulfillments
         .binary_search_by_key(&frontpayment_txout.script_pubkey, |expected| {
             expected.destination.inner()
         })?;
@@ -45,7 +45,7 @@ pub fn parse_withdrawal_fulfilment_transactions<'a>(
         return None;
     }
 
-    Some(WithdrawalFulfilmentInfo {
+    Some(WithdrawalFulfillmentInfo {
         deposit_idx: withdrawal.deposit_idx,
         amt: BitcoinAmount::from_sat(actual_amount_sats),
     })
@@ -61,7 +61,7 @@ mod test {
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::*;
-    use crate::filter::types::{derive_expected_withdrawal_fulfilments, OPERATOR_FEE};
+    use crate::filter::types::{derive_expected_withdrawal_fulfillments, OPERATOR_FEE};
 
     const DEPOSIT_AMT: Amount = Amount::from_int_btc(10);
 
@@ -113,14 +113,14 @@ mod test {
                 .with_state(DepositState::Accepted),
         ];
 
-        filterconfig.expected_withdrawal_fulfilments =
-            derive_expected_withdrawal_fulfilments(deposits.iter());
+        filterconfig.expected_withdrawal_fulfillments =
+            derive_expected_withdrawal_fulfillments(deposits.iter());
 
         (addresses, filterconfig)
     }
 
     #[test]
-    fn test_parse_withdrawal_fulfilment_transactions_ok() {
+    fn test_parse_withdrawal_fulfillment_transactions_ok() {
         let (addresses, filterconfig) = generate_data();
         let txn = Transaction {
             version: Version(1),
@@ -145,13 +145,13 @@ mod test {
             ],
         };
 
-        let withdrawal_fulfilment_info =
-            parse_withdrawal_fulfilment_transactions(&txn, &filterconfig);
-        assert!(withdrawal_fulfilment_info.is_some());
+        let withdrawal_fulfillment_info =
+            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+        assert!(withdrawal_fulfillment_info.is_some());
 
         assert_eq!(
-            withdrawal_fulfilment_info.unwrap(),
-            WithdrawalFulfilmentInfo {
+            withdrawal_fulfillment_info.unwrap(),
+            WithdrawalFulfillmentInfo {
                 deposit_idx: 2,
                 amt: withdraw_amt_after_fees().into()
             }
@@ -159,7 +159,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse_withdrawal_fulfilment_transactions_fail_wrong_order() {
+    fn test_parse_withdrawal_fulfillment_transactions_fail_wrong_order() {
         // TESTCASE: valid withdrawal, but different order of txout
         let (addresses, filterconfig) = generate_data();
 
@@ -186,13 +186,13 @@ mod test {
             ],
         };
 
-        let withdrawal_fulfilment_info =
-            parse_withdrawal_fulfilment_transactions(&txn, &filterconfig);
-        assert!(withdrawal_fulfilment_info.is_none());
+        let withdrawal_fulfillment_info =
+            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+        assert!(withdrawal_fulfillment_info.is_none());
     }
 
     #[test]
-    fn test_parse_withdrawal_fulfilment_transactions_fail_wrong_operator() {
+    fn test_parse_withdrawal_fulfillment_transactions_fail_wrong_operator() {
         // TESTCASE: correct amount but wrong operator idx for deposit
         let (addresses, filterconfig) = generate_data();
 
@@ -219,13 +219,13 @@ mod test {
             ],
         };
 
-        let withdrawal_fulfilment_info =
-            parse_withdrawal_fulfilment_transactions(&txn, &filterconfig);
-        assert!(withdrawal_fulfilment_info.is_none());
+        let withdrawal_fulfillment_info =
+            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+        assert!(withdrawal_fulfillment_info.is_none());
     }
 
     #[test]
-    fn test_parse_withdrawal_fulfilment_transactions_fail_missing_op_return() {
+    fn test_parse_withdrawal_fulfillment_transactions_fail_missing_op_return() {
         let (addresses, filterconfig) = generate_data();
 
         let txn = Transaction {
@@ -245,8 +245,8 @@ mod test {
             ],
         };
 
-        let withdrawal_fulfilment_info =
-            parse_withdrawal_fulfilment_transactions(&txn, &filterconfig);
-        assert!(withdrawal_fulfilment_info.is_none())
+        let withdrawal_fulfillment_info =
+            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+        assert!(withdrawal_fulfillment_info.is_none())
     }
 }
