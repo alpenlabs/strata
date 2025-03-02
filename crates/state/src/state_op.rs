@@ -16,7 +16,7 @@ use strata_primitives::{
 
 use crate::{
     bridge_ops::DepositIntent,
-    bridge_state::{DepositState, DispatchCommand, DispatchedState},
+    bridge_state::{DepositState, DispatchCommand, DispatchedState, ExecutionState},
     chain_state::Chainstate,
     header::L2Header,
 };
@@ -287,6 +287,30 @@ impl StateCache {
         } else {
             panic!("stateop: unexpected deposit state");
         };
+    }
+
+    /// Updates the deposit state to executing.
+    pub fn mark_deposit_executing(
+        &mut self,
+        deposit_idx: u32,
+        operator_idx: OperatorIdx,
+        amt: BitcoinAmount,
+    ) {
+        let deposit_ent = self
+            .state_mut()
+            .deposits_table_mut()
+            .get_deposit_mut(deposit_idx)
+            .expect("stateop: missing deposit idx");
+
+        if !matches!(deposit_ent.deposit_state(), DepositState::Dispatched(state) if state.assignee() == operator_idx)
+        {
+            panic!("stateop: unexpected deposit state");
+        }
+
+        deposit_ent.set_state(DepositState::Executing(ExecutionState::new(
+            operator_idx,
+            amt,
+        )));
     }
 
     // These are all irrelevant now.

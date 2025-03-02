@@ -367,6 +367,9 @@ pub enum DepositState {
     /// Order to send out withdrawal dispatched.
     Dispatched(DispatchedState),
 
+    /// Withdrawal is being processed by the assigned operator.
+    Executing(ExecutionState),
+
     /// Executed state, will be cleaned up.
     Executed,
 }
@@ -472,6 +475,30 @@ impl WithdrawOutput {
 
     pub fn destination(&self) -> &Descriptor {
         &self.destination
+    }
+
+    pub fn amt(&self) -> BitcoinAmount {
+        self.amt
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+pub struct ExecutionState {
+    /// The index of the operator that has fronted the funds for the withdrawal,
+    /// and who will be reimbursed by the bridge notaries.
+    assignee: OperatorIdx,
+
+    /// Actual amount sent in withdrawal
+    amt: BitcoinAmount,
+}
+
+impl ExecutionState {
+    pub fn new(assignee: OperatorIdx, amt: BitcoinAmount) -> Self {
+        Self { assignee, amt }
+    }
+
+    pub fn assignee(&self) -> OperatorIdx {
+        self.assignee
     }
 
     pub fn amt(&self) -> BitcoinAmount {
