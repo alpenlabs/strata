@@ -187,7 +187,7 @@ impl L1Database for L1Db {
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod tests {
-    use strata_primitives::l1::{L1TxProof, ProtocolOperation};
+    use bitcoin::{absolute::LockTime, transaction::Version, Block, Transaction};
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -202,22 +202,26 @@ mod tests {
         height: u64,
         db: &L1Db,
         num_txs: usize,
-    ) -> (L1BlockManifest, Vec<L1Tx>, CompactMmr) {
+    ) -> (L1BlockManifest, Block, CompactMmr) {
         let mut arb = ArbitraryGenerator::new_with_size(1 << 12);
 
-        // TODO maybe tweak this to make it a bit more realistic?
-        let txs: Vec<L1Tx> = (0..num_txs)
-            .map(|i| {
-                let proof = L1TxProof::new(i as u32, arb.generate());
-                let parsed_tx: ProtocolOperation = arb.generate();
-                L1Tx::new(proof, arb.generate(), vec![parsed_tx])
+        let transactions: Vec<_> = (0..num_txs)
+            .map(|i| Transaction {
+                version: Version(1),
+                lock_time: LockTime::from_height(1).unwrap(),
+                input: vec![],
+                output: vec![],
             })
             .collect();
+        let header: [u8; 80] = arb.generate();
+        let block = Block {
+            header: bitcoin::consensus::deserialize(&header).unwrap(),
+            txdata: transactions,
+        };
         let mf = L1BlockManifest::new(
             arb.generate(),
             arb.generate(),
-            // txs.clone(),
-            arb.generate(),
+            bitcoin::consensus::serialize(&block),
             arb.generate(),
         );
 
@@ -232,7 +236,7 @@ mod tests {
         // Insert mmr data
         db.put_mmr_checkpoint(*mf.blkid(), mmr.clone()).unwrap();
 
-        (mf, txs, mmr)
+        (mf, block, mmr)
     }
 
     // TEST STORE METHODS
@@ -342,42 +346,34 @@ mod tests {
             .get_block_manifest(blockid)
             .expect("Could not fetch from db");
         assert_eq!(observed_mf, Some(mf));
-
-        // Fetch txs
-        for (i, tx) in txs.iter().enumerate() {
-            let tx_from_db = db
-                .get_tx((blockid, i as u32).into())
-                .expect("Can't fetch from db")
-                .unwrap();
-            assert_eq!(*tx, tx_from_db, "Txns should match at index {}", i);
-        }
     }
 
-    #[test]
-    fn test_get_tx() {
-        let db = setup_db();
-        let idx = 1; // block number
-                     // Insert a block
-        let (mf, txns, _) = insert_block_data(idx, &db, 10);
-        let blockid = mf.blkid();
-        let txidx: u32 = 3; // some tx index
-        assert!(txns.len() > txidx as usize);
-        let tx_ref: L1TxRef = (*blockid, txidx).into();
-        let tx = db.get_tx(tx_ref);
-        assert!(tx.as_ref().unwrap().is_some());
-        let tx = tx.unwrap().unwrap().clone();
-        assert_eq!(
-            tx,
-            *txns.get(txidx as usize).unwrap(),
-            "Should fetch correct transaction"
-        );
-        // Check txn at different index. It should not match
-        assert_ne!(
-            tx,
-            *txns.get(txidx as usize + 1).unwrap(),
-            "Txn at different index should not match"
-        );
-    }
+    // #[test]
+    // #[ignore = "not longer storing txns"]
+    // fn test_get_tx() {
+    //     let db = setup_db();
+    //     let idx = 1; // block number
+    //                  // Insert a block
+    //     let (mf, txns, _) = insert_block_data(idx, &db, 10);
+    //     let blockid = mf.blkid();
+    //     let txidx: u32 = 3; // some tx index
+    //     assert!(txns.len() > txidx as usize);
+    //     let tx_ref: L1TxRef = (*blockid, txidx).into();
+    //     let tx = db.get_tx(tx_ref);
+    //     assert!(tx.as_ref().unwrap().is_some());
+    //     let tx = tx.unwrap().unwrap().clone();
+    //     assert_eq!(
+    //         tx,
+    //         *txns.get(txidx as usize).unwrap(),
+    //         "Should fetch correct transaction"
+    //     );
+    //     // Check txn at different index. It should not match
+    //     assert_ne!(
+    //         tx,
+    //         *txns.get(txidx as usize + 1).unwrap(),
+    //         "Txn at different index should not match"
+    //     );
+    // }
 
     #[test]
     fn test_get_chain_tip() {
@@ -403,6 +399,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "no longer saving txns"]
     fn test_get_block_txs() {
         let db = setup_db();
 
@@ -455,54 +452,54 @@ mod tests {
         assert_eq!(Some(mmr), observed_mmr);
     }
 
-    #[test]
-    fn test_get_txs_fancy() {
-        let db = setup_db();
+    // #[test]
+    // fn test_get_txs_fancy() {
+    //     let db = setup_db();
 
-        let num_txs = 3;
-        let total_num_blocks = 4;
+    //     let num_txs = 3;
+    //     let total_num_blocks = 4;
 
-        let mut l1_txs = Vec::with_capacity(total_num_blocks);
-        for i in 0..total_num_blocks {
-            let (mf, block_txs, _) = insert_block_data(i as u64, &db, num_txs);
-            l1_txs.push((*mf.blkid(), block_txs));
-        }
+    //     let mut l1_txs = Vec::with_capacity(total_num_blocks);
+    //     for i in 0..total_num_blocks {
+    //         let (mf, block_txs, _) = insert_block_data(i as u64, &db, num_txs);
+    //         l1_txs.push((*mf.blkid(), block_txs));
+    //     }
 
-        let (latest_idx, _) = db
-            .get_latest_block()
-            .expect("should not error")
-            .expect("should have latest");
+    //     let (latest_idx, _) = db
+    //         .get_latest_block()
+    //         .expect("should not error")
+    //         .expect("should have latest");
 
-        assert_eq!(
-            latest_idx,
-            (total_num_blocks - 1) as u64,
-            "the latest index must match the total number of blocks inserted"
-        );
+    //     assert_eq!(
+    //         latest_idx,
+    //         (total_num_blocks - 1) as u64,
+    //         "the latest index must match the total number of blocks inserted"
+    //     );
 
-        for (blockid, block_txs) in l1_txs.iter() {
-            for (i, exp_tx) in block_txs.iter().enumerate() {
-                let real_tx = db
-                    .get_tx(L1TxRef::from((*blockid, i as u32)))
-                    .expect("test: database failed")
-                    .expect("test: missing expected tx");
+    //     for (blockid, block_txs) in l1_txs.iter() {
+    //         for (i, exp_tx) in block_txs.iter().enumerate() {
+    //             let real_tx = db
+    //                 .get_tx(L1TxRef::from((*blockid, i as u32)))
+    //                 .expect("test: database failed")
+    //                 .expect("test: missing expected tx");
 
-                assert_eq!(
-                    &real_tx, exp_tx,
-                    "tx mismatch in block {blockid} at idx {i}"
-                );
-            }
-        }
+    //             assert_eq!(
+    //                 &real_tx, exp_tx,
+    //                 "tx mismatch in block {blockid} at idx {i}"
+    //             );
+    //         }
+    //     }
 
-        // get past the final index.
-        let (latest_idx, _) = db
-            .get_latest_block()
-            .expect("should not error")
-            .expect("should have latest");
-        let expected_latest = (total_num_blocks - 1) as u64;
+    //     // get past the final index.
+    //     let (latest_idx, _) = db
+    //         .get_latest_block()
+    //         .expect("should not error")
+    //         .expect("should have latest");
+    //     let expected_latest = (total_num_blocks - 1) as u64;
 
-        assert_eq!(
-            latest_idx, expected_latest,
-            "test: wrong latest block number",
-        );
-    }
+    //     assert_eq!(
+    //         latest_idx, expected_latest,
+    //         "test: wrong latest block number",
+    //     );
+    // }
 }
