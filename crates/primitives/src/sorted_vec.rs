@@ -41,12 +41,15 @@ impl<T: Ord + Clone> SortedVec<T> {
 
     /// Checks if the [`SortedVec`] contains the given value.
     pub fn contains(&self, value: &T) -> bool {
-        self.binary_search(value).is_ok()
+        self.binary_search(value).is_some()
     }
 
     /// Perform binary search on the vector
-    pub fn binary_search(&self, value: &T) -> Result<usize, usize> {
-        self.inner.binary_search(value)
+    pub fn binary_search(&self, value: &T) -> Option<&T> {
+        self.inner
+            .binary_search(value)
+            .ok()
+            .map(|idx| &self.inner[idx])
     }
 
     /// Returns the number of elements in the [`SortedVec`].
