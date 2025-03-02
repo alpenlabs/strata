@@ -1,45 +1,52 @@
-use bitcoin::Transaction;
+use bitcoin::{ScriptBuf, Transaction};
 use strata_primitives::l1::{BitcoinAmount, WithdrawalFulfilmentInfo};
 
 use super::TxFilterConfig;
 use crate::utils::op_return_nonce;
+
+fn create_opreturn_metadata(operator_idx: u32, deposit_idx: u32) -> ScriptBuf {
+    let mut metadata = [0u8; 8];
+    // first 4 bytes = operator idx
+    metadata[..4].copy_from_slice(&operator_idx.to_be_bytes());
+    // next 4 bytes = deposit idx
+    metadata[4..].copy_from_slice(&deposit_idx.to_be_bytes());
+    op_return_nonce(&metadata)
+}
 
 /// Parse transaction and search for a Withdrawal Fulfilment transaction to an expected address.
 pub fn parse_withdrawal_fulfilment_transactions<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> Option<WithdrawalFulfilmentInfo> {
-    // 1. Check this is a txn to a watched address
-    let (actual_amount_sats, info) = tx.output.iter().find_map(|txout| {
-        filter_conf
-            .expected_withdrawal_fulfilments
-            .binary_search_by_key(&txout.script_pubkey, |expected| {
-                expected.destination.inner()
-            })
-            .and_then(|info| {
-                // 2. Ensure amount is greater than or equal to the expected amount
-                let actual_amount_sats = txout.value.to_sat();
-                if actual_amount_sats < info.amount {
-                    return None;
-                }
+    // 1. Check this is of correct structure
+    let frontpayment_txout = tx.output.first()?;
+    let metadata_txout = tx.output.get(1)?;
+    if !metadata_txout.script_pubkey.is_op_return() {
+        return None;
+    }
 
-                // 3. Ensure it has correct metadata of the assigned operator.
-                let mut metadata = [0u8; 8];
-                // first 4 bytes = operator idx
-                metadata[..4].copy_from_slice(&info.operator_idx.to_be_bytes());
-                // next 4 bytes = deposit idx
-                metadata[4..].copy_from_slice(&info.deposit_idx.to_be_bytes());
-                let op_return_script = op_return_nonce(&metadata[..]);
-                tx.output
-                    .iter()
-                    .find(|tx| tx.script_pubkey == op_return_script)?;
+    // 2. Check withdrawal is to an address we expect
+    let withdrawal = filter_conf
+        .expected_withdrawal_fulfilments
+        .binary_search_by_key(&frontpayment_txout.script_pubkey, |expected| {
+            expected.destination.inner()
+        })?;
 
-                Some((actual_amount_sats, info))
-            })
-    })?;
+    // 3. Ensure amount is equal to the expected amount
+    let actual_amount_sats = frontpayment_txout.value.to_sat();
+    if actual_amount_sats < withdrawal.amount {
+        return None;
+    }
+
+    // 4. Ensure it has correct metadata of the assigned operator.
+    let expected_metadata_script =
+        create_opreturn_metadata(withdrawal.operator_idx, withdrawal.deposit_idx);
+    if metadata_txout.script_pubkey != expected_metadata_script {
+        return None;
+    }
 
     Some(WithdrawalFulfilmentInfo {
-        deposit_idx: info.deposit_idx,
+        deposit_idx: withdrawal.deposit_idx,
         amt: BitcoinAmount::from_sat(actual_amount_sats),
     })
 }
@@ -127,8 +134,7 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    /* {operatoridx: 1u32, depositidx: 2u32} */
-                    script_pubkey: op_return_nonce(&[0, 0, 0, 1, 0, 0, 0, 2]),
+                    script_pubkey: create_opreturn_metadata(1, 2),
                     value: Amount::from_sat(0),
                 },
                 // change
@@ -153,7 +159,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse_withdrawal_fulfilment_transactions_ok_random_order() {
+    fn test_parse_withdrawal_fulfilment_transactions_fail_wrong_order() {
         // TESTCASE: valid withdrawal, but different order of txout
         let (addresses, filterconfig) = generate_data();
 
@@ -167,21 +173,10 @@ mod test {
                     script_pubkey: addresses[4].to_script(),
                     value: Amount::from_btc(0.12345).unwrap(),
                 },
-                // another change
-                TxOut {
-                    script_pubkey: addresses[5].to_script(),
-                    value: Amount::from_btc(1.12345).unwrap(),
-                },
                 // metadata with operator index
                 TxOut {
-                    /* {operatoridx: 1u32, depositidx: 2u32} */
-                    script_pubkey: op_return_nonce(&[0, 0, 0, 1, 0, 0, 0, 2]),
+                    script_pubkey: create_opreturn_metadata(1, 2),
                     value: Amount::from_sat(0),
-                },
-                // another change
-                TxOut {
-                    script_pubkey: addresses[6].to_script(),
-                    value: Amount::from_btc(1.12345).unwrap(),
                 },
                 // front payment
                 TxOut {
@@ -193,20 +188,12 @@ mod test {
 
         let withdrawal_fulfilment_info =
             parse_withdrawal_fulfilment_transactions(&txn, &filterconfig);
-        assert!(withdrawal_fulfilment_info.is_some());
-
-        assert_eq!(
-            withdrawal_fulfilment_info.unwrap(),
-            WithdrawalFulfilmentInfo {
-                deposit_idx: 2,
-                amt: withdraw_amt_after_fees().into()
-            }
-        );
+        assert!(withdrawal_fulfilment_info.is_none());
     }
 
     #[test]
-    fn test_parse_withdrawal_fulfilment_transactions_ok_double_withdrawal_output() {
-        // TESTCASE: valid withdrawal, but there another utxo to a valid withdrawal address
+    fn test_parse_withdrawal_fulfilment_transactions_fail_wrong_operator() {
+        // TESTCASE: correct amount but wrong operator idx for deposit
         let (addresses, filterconfig) = generate_data();
 
         let txn = Transaction {
@@ -214,43 +201,33 @@ mod test {
             lock_time: LockTime::from_height(0).unwrap(),
             input: vec![], // dont care
             output: vec![
-                // another txout with a withdrawal address
+                // front payment
                 TxOut {
-                    script_pubkey: addresses[1].to_script(),
+                    script_pubkey: addresses[0].to_script(),
                     value: withdraw_amt_after_fees(),
                 },
                 // metadata with operator index
                 TxOut {
-                    /* {operatoridx: 1u32, depositidx: 2u32} */
-                    script_pubkey: op_return_nonce(&[0, 0, 0, 1, 0, 0, 0, 2]),
+                    script_pubkey: create_opreturn_metadata(2, 2),
                     value: Amount::from_sat(0),
                 },
-                // correct front payment
+                // change
                 TxOut {
-                    script_pubkey: addresses[0].to_script(),
-                    value: withdraw_amt_after_fees(),
+                    script_pubkey: addresses[4].to_script(),
+                    value: Amount::from_btc(0.12345).unwrap(),
                 },
             ],
         };
 
         let withdrawal_fulfilment_info =
             parse_withdrawal_fulfilment_transactions(&txn, &filterconfig);
-        assert!(withdrawal_fulfilment_info.is_some());
-
-        assert_eq!(
-            withdrawal_fulfilment_info.unwrap(),
-            WithdrawalFulfilmentInfo {
-                deposit_idx: 2,
-                amt: withdraw_amt_after_fees().into()
-            }
-        );
+        assert!(withdrawal_fulfilment_info.is_none());
     }
 
     #[test]
-    fn test_parse_withdrawal_fulfilment_transactions_missing_op_return() {
+    fn test_parse_withdrawal_fulfilment_transactions_fail_missing_op_return() {
         let (addresses, filterconfig) = generate_data();
 
-        // TESTCASE: missing op return metadata
         let txn = Transaction {
             version: Version(1),
             lock_time: LockTime::from_height(0).unwrap(),
@@ -270,6 +247,6 @@ mod test {
 
         let withdrawal_fulfilment_info =
             parse_withdrawal_fulfilment_transactions(&txn, &filterconfig);
-        assert!(withdrawal_fulfilment_info.is_none());
+        assert!(withdrawal_fulfilment_info.is_none())
     }
 }
