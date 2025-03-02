@@ -7,6 +7,8 @@ pub mod fork_choice_manager;
 pub mod genesis;
 pub mod sync_manager;
 pub mod tip_update;
+pub mod tx_indexer;
+pub mod txfilter;
 pub mod unfinalized_tracker;
 
 pub mod errors;

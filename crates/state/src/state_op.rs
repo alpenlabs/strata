@@ -13,10 +13,11 @@ use strata_primitives::{
     l1::{BitcoinAmount, L1HeaderRecord, L1VerificationError, OutputRef},
     l2::L2BlockCommitment,
 };
+use tracing::warn;
 
 use crate::{
     bridge_ops::DepositIntent,
-    bridge_state::{DepositState, DispatchCommand, DispatchedState},
+    bridge_state::{DepositState, DispatchCommand, DispatchedState, ExecutionState},
     chain_state::Chainstate,
     header::L2Header,
 };
@@ -179,7 +180,7 @@ impl StateCache {
         self.state_mut().prev_epoch = epoch;
     }
 
-    /// Sets the previous epoch.
+    /// Sets the epoch of last seen checkpoint.
     pub fn set_finalized_epoch(&mut self, epoch: EpochCommitment) {
         self.state_mut().finalized_epoch = epoch;
     }
@@ -287,6 +288,46 @@ impl StateCache {
         } else {
             panic!("stateop: unexpected deposit state");
         };
+    }
+
+    /// Updates the deposit state to executing.
+    pub fn mark_deposit_executing(
+        &mut self,
+        deposit_idx: u32,
+        operator_idx: OperatorIdx,
+        amt: BitcoinAmount,
+    ) {
+        let deposit_ent = self
+            .state_mut()
+            .deposits_table_mut()
+            .get_deposit_mut(deposit_idx)
+            .expect("stateop: missing deposit idx");
+
+        if !matches!(deposit_ent.deposit_state(), DepositState::Dispatched(state) if state.assignee() == operator_idx)
+        {
+            panic!("stateop: unexpected deposit state");
+        }
+
+        deposit_ent.set_state(DepositState::Executing(ExecutionState::new(
+            operator_idx,
+            amt,
+        )));
+    }
+
+    // Updates the deposit state as Executed.
+    pub fn mark_deposit_spent(&mut self, deposit_idx: u32) {
+        let deposit_ent = self
+            .state_mut()
+            .deposits_table_mut()
+            .get_deposit_mut(deposit_idx)
+            .expect("stateop: missing deposit idx");
+
+        if !matches!(deposit_ent.deposit_state(), DepositState::Executing(_)) {
+            // TODO: handle this better after TN1 bridge is integrated
+            warn!("stateop: deposit spent at unexpected state");
+        }
+
+        deposit_ent.set_state(DepositState::Executed);
     }
 
     // These are all irrelevant now.

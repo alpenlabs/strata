@@ -1,9 +1,9 @@
 use arbitrary::Arbitrary;
-use bitcoin::{hashes::Hash, BlockHash};
+use bitcoin::{hashes::Hash, Block, BlockHash};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-use super::{header_verification::HeaderVerificationState, L1HeaderRecord, L1Tx};
+use super::{header_verification::HeaderVerificationState, L1HeaderRecord, ProtocolOperation};
 use crate::{buf::Buf32, hash::sha256d, impl_buf_wrapper};
 
 /// ID of an L1 block, usually the hash of its header.
@@ -136,6 +136,9 @@ pub struct L1BlockManifest {
     /// The actual l1 record
     record: L1HeaderRecord,
 
+    /// Serialized Block.
+    buf: Vec<u8>,
+
     /// Optional header verification state
     ///
     /// For the genesis block, this field is set to `Some` containing a
@@ -146,12 +149,11 @@ pub struct L1BlockManifest {
     // TODO: handle this properly: https://alpenlabs.atlassian.net/browse/STR-1104
     verif_state: Option<HeaderVerificationState>,
 
-    /// List of interesting transactions we took out.
-    txs: Vec<L1Tx>,
+    // /// List of interesting transactions we took out.
+    // txs: Vec<L1Tx>,
 
-    /// Epoch, which was used to generate this manifest.
-    epoch: u64,
-
+    // /// Epoch, which was used to generate this manifest.
+    // epoch: u64,
     /// Block height.
     height: u64,
 }
@@ -160,15 +162,17 @@ impl L1BlockManifest {
     pub fn new(
         record: L1HeaderRecord,
         verif_state: Option<HeaderVerificationState>,
-        txs: Vec<L1Tx>,
-        epoch: u64,
+        buf: Vec<u8>,
+        // txs: Vec<L1Tx>,
+        // epoch: u64,
         height: u64,
     ) -> Self {
         Self {
             record,
             verif_state,
-            txs,
-            epoch,
+            buf,
+            // txs,
+            // epoch,
             height,
         }
     }
@@ -181,17 +185,17 @@ impl L1BlockManifest {
         &self.verif_state
     }
 
-    pub fn txs(&self) -> &[L1Tx] {
-        &self.txs
-    }
+    // pub fn txs(&self) -> &[L1Tx] {
+    //     &self.txs
+    // }
 
-    pub fn txs_vec(&self) -> &Vec<L1Tx> {
-        &self.txs
-    }
+    // pub fn txs_vec(&self) -> &Vec<L1Tx> {
+    //     &self.txs
+    // }
 
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
+    // pub fn epoch(&self) -> u64 {
+    //     self.epoch
+    // }
 
     pub fn blkid(&self) -> &L1BlockId {
         &self.record.blkid
@@ -220,5 +224,62 @@ impl L1BlockManifest {
 
     pub fn into_record(self) -> L1HeaderRecord {
         self.record
+    }
+
+    pub fn get_block(&self) -> Block {
+        bitcoin::consensus::deserialize(&self.buf).expect("block should be valid")
+    }
+
+    pub fn from_block(
+        block: &Block,
+        height: u64,
+        verif_state: Option<HeaderVerificationState>,
+    ) -> Self {
+        let witness_root = block
+            .witness_root()
+            .map(|root| *root.as_byte_array())
+            .unwrap_or_default();
+        Self {
+            height,
+            verif_state,
+            record: L1HeaderRecord::new(
+                block.block_hash().into(),
+                bitcoin::consensus::serialize(&block.header),
+                witness_root.into(),
+            ),
+            buf: bitcoin::consensus::serialize(block),
+        }
+    }
+}
+
+pub struct L1BlockTxOps {
+    epoch: u64,
+    record: L1HeaderRecord,
+    protocol_ops: Vec<ProtocolOperation>,
+}
+
+impl L1BlockTxOps {
+    pub fn new(epoch: u64, record: L1HeaderRecord, protocol_ops: Vec<ProtocolOperation>) -> Self {
+        Self {
+            epoch,
+            record,
+            protocol_ops,
+        }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn header(&self) -> &[u8] {
+        self.record.buf()
+    }
+
+    pub fn record(&self) -> &L1HeaderRecord {
+        &self.record
+    }
+
+    pub fn protocol_ops(&self) -> &[ProtocolOperation] {
+        &self.protocol_ops
     }
 }

@@ -4,7 +4,10 @@ use strata_l1tx::{
 };
 use strata_primitives::{
     batch::SignedCheckpoint,
-    l1::{DepositInfo, DepositRequestInfo, ProtocolOperation},
+    l1::{
+        DepositInfo, DepositRequestInfo, DepositSpendInfo, ProtocolOperation,
+        WithdrawalFulfillmentInfo,
+    },
 };
 
 /// Ops indexer for rollup client. Collects extra info like da blobs and deposit requests
@@ -15,6 +18,7 @@ pub struct ReaderTxVisitorImpl {
     da_entries: Vec<DaEntry>,
 }
 
+#[allow(clippy::new_without_default)]
 impl ReaderTxVisitorImpl {
     pub fn new() -> Self {
         Self {
@@ -52,6 +56,15 @@ impl TxVisitor for ReaderTxVisitorImpl {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
+    fn visit_withdrawal_fulfillment(&mut self, info: WithdrawalFulfillmentInfo) {
+        self.ops
+            .push(ProtocolOperation::WithdrawalFulfillment(info));
+    }
+
+    fn visit_deposit_spend(&mut self, info: DepositSpendInfo) {
+        self.ops.push(ProtocolOperation::DepositSpent(info));
+    }
+
     fn finalize(self) -> Option<L1TxMessages> {
         if self.ops.is_empty() && self.deposit_requests.is_empty() && self.da_entries.is_empty() {
             None
@@ -72,6 +85,7 @@ mod test {
         hashes::Hash,
         Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode,
     };
+    use strata_btcio::test_utils::create_checkpoint_envelope_tx;
     use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
     use strata_primitives::{
         batch::SignedCheckpoint,
@@ -87,9 +101,7 @@ mod test {
         ArbitraryGenerator,
     };
 
-    use crate::{
-        reader::tx_indexer::ReaderTxVisitorImpl, test_utils::create_checkpoint_envelope_tx,
-    };
+    use super::ReaderTxVisitorImpl;
 
     const TEST_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
 
