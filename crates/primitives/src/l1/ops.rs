@@ -80,6 +80,9 @@ pub enum ProtocolOperation {
 
     /// Withdrawal fulfiled by bridge operator front-payment.
     WithdrawalFulfilment(WithdrawalFulfilmentInfo),
+
+    /// Deposit utxo is spent.
+    DepositSpent(DepositSpendInfo),
 }
 
 #[derive(
@@ -119,4 +122,12 @@ pub struct WithdrawalFulfilmentInfo {
     /// amount that was actually sent on bitcoin.
     /// should equal withdrawal_amount - operator fee
     pub amt: BitcoinAmount,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
+pub struct DepositSpendInfo {
+    /// index of the deposit whose utxo is spent.
+    pub deposit_idx: u32,
 }

@@ -4,7 +4,7 @@ use bitcoin::Transaction;
 use strata_primitives::{
     batch::SignedCheckpoint,
     l1::{
-        payload::L1PayloadType, BitcoinAmount, DepositInfo, DepositRequestInfo,
+        payload::L1PayloadType, BitcoinAmount, DepositInfo, DepositRequestInfo, DepositSpendInfo,
         WithdrawalFulfilmentInfo,
     },
 };
@@ -14,6 +14,7 @@ use tracing::warn;
 pub mod indexer;
 pub mod types;
 
+use types::DepositSpendConfig;
 pub use types::TxFilterConfig;
 
 use crate::{
@@ -85,6 +86,7 @@ fn parse_checkpoint_envelopes<'a>(
     })
 }
 
+/// Parse transaction and search for a Withdrawal Fulfilment transaction to an expected address.
 fn parse_withdrawal_fulfilment_transactions<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
@@ -120,6 +122,21 @@ fn parse_withdrawal_fulfilment_transactions<'a>(
     Some(WithdrawalFulfilmentInfo {
         deposit_idx: info.deposit_idx,
         amt: BitcoinAmount::from_sat(actual_amount_sats),
+    })
+}
+
+/// Parse transaction and filter out any deposits that have been spent.
+fn parse_deposit_spends<'a>(
+    tx: &'a Transaction,
+    filter_conf: &'a TxFilterConfig,
+) -> impl Iterator<Item = DepositSpendInfo> + 'a {
+    tx.input.iter().filter_map(|txin| {
+        filter_conf
+            .expected_outpoints
+            .binary_search(&DepositSpendConfig::from_outpoint(txin.previous_output))
+            .map(|config| DepositSpendInfo {
+                deposit_idx: config.deposit_idx,
+            })
     })
 }
 

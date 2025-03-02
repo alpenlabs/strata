@@ -1,4 +1,6 @@
-use bitcoin::Amount;
+use std::cmp::Ordering;
+
+use bitcoin::{Amount, OutPoint};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     block_credential::CredRule,
@@ -36,6 +38,36 @@ pub struct ExpectedWithdrawalFulfilment {
     pub deposit_idx: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct DepositSpendConfig {
+    /// index of deposit entry
+    pub deposit_idx: u32,
+    /// utxo for this deposit
+    pub output: OutputRef,
+}
+
+impl DepositSpendConfig {
+    pub fn from_outpoint(outpoint: OutPoint) -> Self {
+        Self {
+            deposit_idx: 0,
+            output: OutputRef::from(outpoint),
+        }
+    }
+}
+
+// sorted based on output field.
+impl Ord for DepositSpendConfig {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.output.cmp(&other.output)
+    }
+}
+
+impl PartialOrd for DepositSpendConfig {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct TxFilterConfig {
@@ -52,7 +84,7 @@ pub struct TxFilterConfig {
     pub expected_blobs: SortedVec<Buf32>,
 
     /// For deposits that might be spent from.
-    pub expected_outpoints: Vec<OutputRef>,
+    pub expected_outpoints: SortedVec<DepositSpendConfig>,
 
     /// For withdrawal fulfilment transactions sent by bridge operator.
     pub expected_withdrawal_fulfilments: Vec<ExpectedWithdrawalFulfilment>,
@@ -88,7 +120,7 @@ impl TxFilterConfig {
             sequencer_cred_rule,
             expected_addrs,
             expected_blobs: SortedVec::new(),
-            expected_outpoints: Vec::new(),
+            expected_outpoints: SortedVec::new(),
             expected_withdrawal_fulfilments: Vec::new(),
             deposit_config,
         })
@@ -109,8 +141,12 @@ impl TxFilterConfig {
         filterconfig.expected_outpoints = chainstate
             .deposits_table()
             .deposits()
-            .map(|deposit| *deposit.output())
-            .collect();
+            .map(|deposit| DepositSpendConfig {
+                deposit_idx: deposit.idx(),
+                output: *deposit.output(),
+            })
+            .collect::<Vec<_>>()
+            .into();
 
         Ok(filterconfig)
     }

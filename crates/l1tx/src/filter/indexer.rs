@@ -1,12 +1,12 @@
 use bitcoin::{Block, Transaction};
 use strata_primitives::{
     batch::SignedCheckpoint,
-    l1::{DepositInfo, DepositRequestInfo, WithdrawalFulfilmentInfo},
+    l1::{DepositInfo, DepositRequestInfo, DepositSpendInfo, WithdrawalFulfilmentInfo},
 };
 
 use super::{
-    parse_checkpoint_envelopes, parse_da_blobs, parse_deposit_requests, parse_deposits,
-    parse_withdrawal_fulfilment_transactions, TxFilterConfig,
+    parse_checkpoint_envelopes, parse_da_blobs, parse_deposit_requests, parse_deposit_spends,
+    parse_deposits, parse_withdrawal_fulfilment_transactions, TxFilterConfig,
 };
 use crate::messages::IndexedTxEntry;
 
@@ -28,7 +28,10 @@ pub trait TxVisitor {
     fn visit_da<'a>(&mut self, _d: impl Iterator<Item = &'a [u8]>) {}
 
     /// Do stuffs with withdrawal fulfulment transactions
-    fn visit_withdrawal_fulfilment<'a>(&mut self, _info: WithdrawalFulfilmentInfo) {}
+    fn visit_withdrawal_fulfilment(&mut self, _info: WithdrawalFulfilmentInfo) {}
+
+    /// Do stuff with spent deposits
+    fn visit_deposit_spend(&mut self, _info: DepositSpendInfo) {}
 
     /// Export the indexed data, if it rose to the level of being useful.
     fn finalize(self) -> Option<Self::Output>;
@@ -75,6 +78,10 @@ fn index_tx<V: TxVisitor>(
 
     if let Some(info) = parse_withdrawal_fulfilment_transactions(tx, filter_config) {
         visitor.visit_withdrawal_fulfilment(info);
+    }
+
+    for spend_info in parse_deposit_spends(tx, filter_config) {
+        visitor.visit_deposit_spend(spend_info);
     }
 
     visitor.finalize()
