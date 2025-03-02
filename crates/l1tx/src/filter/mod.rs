@@ -1,23 +1,21 @@
 use bitcoin::Transaction;
 use strata_primitives::{
     batch::SignedCheckpoint,
-    l1::{
-        payload::L1PayloadType, BitcoinAmount, DepositInfo, DepositRequestInfo, DepositSpendInfo,
-        WithdrawalFulfilmentInfo,
-    },
+    l1::{payload::L1PayloadType, DepositInfo, DepositRequestInfo, DepositSpendInfo},
 };
 use strata_state::batch::verify_signed_checkpoint_sig;
 use tracing::warn;
 
 pub mod indexer;
 pub mod types;
+mod withdrawal_fulfilment;
 
 pub use types::TxFilterConfig;
+use withdrawal_fulfilment::parse_withdrawal_fulfilment_transactions;
 
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
     envelope::parser::parse_envelope_payloads,
-    utils::op_return_nonce,
 };
 
 fn parse_deposit_requests(
@@ -80,45 +78,6 @@ fn parse_checkpoint_envelopes<'a>(
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default()
-    })
-}
-
-/// Parse transaction and search for a Withdrawal Fulfilment transaction to an expected address.
-fn parse_withdrawal_fulfilment_transactions<'a>(
-    tx: &'a Transaction,
-    filter_conf: &'a TxFilterConfig,
-) -> Option<WithdrawalFulfilmentInfo> {
-    // 1. Check this is a txn to a watched address
-    let (actual_amount_sats, info) = tx.output.iter().find_map(|txout| {
-        filter_conf
-            .expected_withdrawal_fulfilments
-            .binary_search_by_key(&txout.script_pubkey, |expected| {
-                expected.destination.inner()
-            })
-            .and_then(|info| {
-                // 2. Ensure amount is greater than or equal to the expected amount
-                let actual_amount_sats = txout.value.to_sat();
-                if actual_amount_sats < info.amount {
-                    return None;
-                }
-                Some((actual_amount_sats, info))
-            })
-    })?;
-
-    // 3. Ensure it has correct metadata of the assigned operator.
-    let mut metadata = [0u8; 8];
-    // first 4 bytes = operator idx
-    metadata[..4].copy_from_slice(&info.operator_idx.to_be_bytes());
-    // next 4 bytes = deposit idx
-    metadata[4..].copy_from_slice(&info.deposit_idx.to_be_bytes());
-    let op_return_script = op_return_nonce(&metadata[..]);
-    tx.output
-        .iter()
-        .find(|tx| tx.script_pubkey == op_return_script)?;
-
-    Some(WithdrawalFulfilmentInfo {
-        deposit_idx: info.deposit_idx,
-        amt: BitcoinAmount::from_sat(actual_amount_sats),
     })
 }
 
