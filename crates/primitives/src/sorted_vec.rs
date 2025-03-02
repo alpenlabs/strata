@@ -52,6 +52,17 @@ impl<T: Ord + Clone> SortedVec<T> {
             .map(|idx| &self.inner[idx])
     }
 
+    pub fn binary_search_by_key<F, B>(&self, b: &B, mut f: F) -> Option<&T>
+    where
+        F: FnMut(&T) -> &B,
+        B: Ord,
+    {
+        self.inner
+            .binary_search_by(|k| f(k).cmp(b))
+            .ok()
+            .map(|idx| &self.inner[idx])
+    }
+
     /// Returns the number of elements in the [`SortedVec`].
     pub fn len(&self) -> usize {
         self.inner.len()

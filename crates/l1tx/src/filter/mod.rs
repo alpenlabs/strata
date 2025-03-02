@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bitcoin::Transaction;
 use strata_primitives::{
     batch::SignedCheckpoint,
@@ -91,17 +89,13 @@ fn parse_withdrawal_fulfilment_transactions<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> Option<WithdrawalFulfilmentInfo> {
-    // TODO: move move this to filter config so we dont need to do this every tx
-    let watched_addresses = filter_conf
-        .expected_withdrawal_fulfilments
-        .iter()
-        .map(|info| (info.destination.address().script_pubkey(), info))
-        .collect::<HashMap<_, _>>();
-
     // 1. Check this is a txn to a watched address
     let (actual_amount_sats, info) = tx.output.iter().find_map(|txout| {
-        watched_addresses
-            .get(&txout.script_pubkey)
+        filter_conf
+            .expected_withdrawal_fulfilments
+            .binary_search_by_key(&txout.script_pubkey, |expected| {
+                expected.destination.inner()
+            })
             .and_then(|info| {
                 // 2. Ensure amount is greater than or equal to the expected amount
                 let actual_amount_sats = txout.value.to_sat();
@@ -133,7 +127,7 @@ fn parse_deposit_spends<'a>(
     tx.input.iter().filter_map(|txin| {
         filter_conf
             .expected_outpoints
-            .binary_search(&DepositSpendConfig::from_outpoint(txin.previous_output))
+            .binary_search_by_key(&txin.previous_output, |config| config.output.outpoint())
             .map(|config| DepositSpendInfo {
                 deposit_idx: config.deposit_idx,
             })
