@@ -39,14 +39,14 @@ tracing.workspace = true
 [features]
 default = ["sp1-mock"]
 sp1 = [
-    "zkaleido-sp1-adapter/prover",
-    "strata-sp1-guest-builder/sp1-dev",
-    "zkaleido-sp1-adapter/perf",
+  "zkaleido-sp1-adapter/prover",
+  "strata-sp1-guest-builder/sp1-dev",
+  "zkaleido-sp1-adapter/perf",
 ]
 sp1-mock = ["sp1", "zkaleido-sp1-adapter/mock", "strata-sp1-guest-builder/mock"]
 risc0 = [
-    "zkaleido-risc0-adapter/prover",
-    "strata-risc0-guest-builder",
-    "zkaleido-risc0-adapter/perf",
+  "zkaleido-risc0-adapter/prover",
+  "strata-risc0-guest-builder",
+  "zkaleido-risc0-adapter/perf",
 ]
 risc0-mock = ["risc0", "zkaleido-risc0-adapter/mock"]

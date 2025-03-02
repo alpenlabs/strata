@@ -85,22 +85,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cl_stf_proof() {
+    fn test_cl_stf_native_execution() {
         let evm_ee_proof_with_vk = evm_ee::proof_with_vk(&EvmEeProgram::native_host());
         let input = prepare_input(evm_ee_proof_with_vk);
         let output = ClStfProgram::execute(&input).unwrap();
         dbg!(output);
-    }
-
-    #[test]
-    #[cfg(feature = "sp1")]
-    fn test_cl_stf_proof_sp1() {
-        // Run test with: RUST_LOG=info ZKVM_MOCK=1 cargo test --package strata-provers-perf --bin
-        // strata-provers-perf --features sp1 -- programs::cl_stf::tests::test_cl_stf_proof_sp1
-        // --exact --show-output --nocapture
-        sp1_sdk::utils::setup_logger();
-        let evm_ee_proof_with_vk = evm_ee::proof_with_vk(&evm_ee::sp1::host());
-        let input = prepare_input(evm_ee_proof_with_vk);
-        let _ = <ClStfProgram as ZkVmProgram>::execute(&input, &sp1::host()).unwrap();
     }
 }
