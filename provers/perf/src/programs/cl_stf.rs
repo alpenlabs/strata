@@ -56,13 +56,13 @@ pub fn proof_with_vk(
 
 #[cfg(feature = "sp1")]
 pub mod sp1 {
-    use strata_sp1_guest_builder::GUEST_EVM_EE_STF_ELF;
+    use strata_sp1_guest_builder::GUEST_CL_STF_ELF;
     use zkaleido_sp1_adapter::SP1Host;
 
     use super::*;
 
     pub fn host() -> impl ZkVmHostPerf {
-        SP1Host::init(&GUEST_EVM_EE_STF_ELF)
+        SP1Host::init(&GUEST_CL_STF_ELF)
     }
 }
 
@@ -90,5 +90,17 @@ mod tests {
         let input = prepare_input(evm_ee_proof_with_vk);
         let output = ClStfProgram::execute(&input).unwrap();
         dbg!(output);
+    }
+
+    #[test]
+    #[cfg(feature = "sp1")]
+    fn test_cl_stf_proof_sp1() {
+        // Run test with: RUST_LOG=info ZKVM_MOCK=1 cargo test --package strata-provers-perf --bin
+        // strata-provers-perf --features sp1 -- programs::cl_stf::tests::test_cl_stf_proof_sp1
+        // --exact --show-output --nocapture
+        sp1_sdk::utils::setup_logger();
+        let evm_ee_proof_with_vk = evm_ee::proof_with_vk(&evm_ee::sp1::host());
+        let input = prepare_input(evm_ee_proof_with_vk);
+        let _ = <ClStfProgram as ZkVmProgram>::execute(&input, &sp1::host()).unwrap();
     }
 }

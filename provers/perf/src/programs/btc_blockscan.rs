@@ -2,7 +2,7 @@ use strata_l1tx::filter::TxFilterConfig;
 use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, program::BtcBlockspaceProgram};
 use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
 use tracing::info;
-use zkaleido::{PerformanceReport, ProofReceipt, ZkVmHostPerf, ZkVmProgram, ZkVmProgramPerf};
+use zkaleido::{PerformanceReport, ZkVmHostPerf, ZkVmProgramPerf};
 
 fn prepare_input() -> BlockScanProofInput {
     info!("Preparing input for BTC Blockcan");
@@ -21,12 +21,6 @@ pub fn gen_perf_report(host: &impl ZkVmHostPerf) -> PerformanceReport {
     info!("Generating performance report for BTC Blockcan");
     let input = prepare_input();
     BtcBlockspaceProgram::perf_report(&input, host).unwrap()
-}
-
-fn gen_proof(host: &impl ZkVmHostPerf) -> ProofReceipt {
-    info!("Generating proof for BTC Blockcan");
-    let input = prepare_input();
-    BtcBlockspaceProgram::prove(&input, host).unwrap()
 }
 
 #[cfg(feature = "sp1")]
