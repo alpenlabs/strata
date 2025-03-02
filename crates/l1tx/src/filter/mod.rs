@@ -12,7 +12,6 @@ use tracing::warn;
 pub mod indexer;
 pub mod types;
 
-use types::DepositSpendConfig;
 pub use types::TxFilterConfig;
 
 use crate::{

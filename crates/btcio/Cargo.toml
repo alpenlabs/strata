@@ -16,8 +16,8 @@ anyhow.workspace = true
 async-trait.workspace = true
 base64.workspace = true
 bitcoin.workspace = true
-hex.workspace = true
-musig2 = { workspace = true, features = ["serde"] }
+hex = { workspace = true, optional = true }
+musig2 = { workspace = true, features = ["serde"], optional = true }
 rand.workspace = true
 reqwest.workspace = true
 secp256k1 = { workspace = true, features = ["rand-std"] }
@@ -39,7 +39,7 @@ strata-test-utils.workspace = true
 corepc-node = { version = "0.4.0", features = ["28_0"] }
 
 [features]
-test_utils = []
+test_utils = ["musig2", "hex"]
 
 [lints]
 rust.unused_crate_dependencies = "deny"

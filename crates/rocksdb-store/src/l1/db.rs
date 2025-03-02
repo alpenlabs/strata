@@ -258,7 +258,7 @@ mod tests {
         let mut blockids = Vec::new();
         for height in &heights {
             let mut arb = ArbitraryGenerator::new();
-            let txs: Vec<L1Tx> = (0..10).map(|_| arb.generate()).collect();
+            let _txs: Vec<L1Tx> = (0..10).map(|_| arb.generate()).collect();
             let mf = L1BlockManifest::new(
                 arb.generate(),
                 arb.generate(),
