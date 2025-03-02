@@ -53,7 +53,7 @@ mod tests {
     use crate::programs::cl_stf;
 
     #[test]
-    fn test_checkpoint() {
+    fn test_checkpoint_native_execution() {
         let (cl_stf_proof, cl_stf_vk) =
             cl_stf::proof_with_vk(&ClStfProgram::native_host(), &EvmEeProgram::native_host());
         let input = prepare_input((cl_stf_proof, cl_stf_vk));

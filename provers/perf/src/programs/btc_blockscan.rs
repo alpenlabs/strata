@@ -52,7 +52,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_btc_blockscan_execution() {
+    fn test_btc_blockscan_native_execution() {
         let input = prepare_input();
         let output = BtcBlockspaceProgram::execute(&input).unwrap();
         dbg!(output);
