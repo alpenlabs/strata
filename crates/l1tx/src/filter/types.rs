@@ -26,10 +26,10 @@ pub struct EnvelopeTags {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct ExpectedWithdrawalFulfilment {
+pub struct ExpectedWithdrawalFulfillment {
     /// withdrawal address scriptbuf
     pub destination: BitcoinScriptBuf,
-    /// Expected mininum withdrawal amount in sats
+    /// Expected minimum withdrawal amount in sats
     pub amount: u64,
     /// index of assigned operator
     pub operator_idx: u32,
@@ -38,13 +38,13 @@ pub struct ExpectedWithdrawalFulfilment {
 }
 
 // ordering based on destination for binary search.
-impl Ord for ExpectedWithdrawalFulfilment {
+impl Ord for ExpectedWithdrawalFulfillment {
     fn cmp(&self, other: &Self) -> Ordering {
         self.destination.cmp(&other.destination)
     }
 }
 
-impl PartialOrd for ExpectedWithdrawalFulfilment {
+impl PartialOrd for ExpectedWithdrawalFulfillment {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -98,8 +98,8 @@ pub struct TxFilterConfig {
     /// For deposits that might be spent from.
     pub expected_outpoints: SortedVec<DepositSpendConfig>,
 
-    /// For withdrawal fulfilment transactions sent by bridge operator.
-    pub expected_withdrawal_fulfilments: SortedVec<ExpectedWithdrawalFulfilment>,
+    /// For withdrawal fulfillment transactions sent by bridge operator.
+    pub expected_withdrawal_fulfillments: SortedVec<ExpectedWithdrawalFulfillment>,
 
     /// Deposit config that determines how a deposit transaction can be parsed.
     pub deposit_config: DepositTxParams,
@@ -133,7 +133,7 @@ impl TxFilterConfig {
             expected_addrs,
             expected_blobs: SortedVec::new(),
             expected_outpoints: SortedVec::new(),
-            expected_withdrawal_fulfilments: SortedVec::new(),
+            expected_withdrawal_fulfillments: SortedVec::new(),
             deposit_config,
         })
     }
@@ -144,8 +144,8 @@ impl TxFilterConfig {
     ) -> anyhow::Result<Self> {
         let mut filterconfig = Self::derive_from(rollup_params)?;
 
-        filterconfig.expected_withdrawal_fulfilments =
-            derive_expected_withdrawal_fulfilments(chainstate.deposits_table().deposits());
+        filterconfig.expected_withdrawal_fulfillments =
+            derive_expected_withdrawal_fulfillments(chainstate.deposits_table().deposits());
 
         // Watch all utxos we have in our deposit table.
         filterconfig.expected_outpoints = chainstate
@@ -162,9 +162,9 @@ impl TxFilterConfig {
     }
 }
 
-pub(crate) fn derive_expected_withdrawal_fulfilments<'a, I>(
+pub(crate) fn derive_expected_withdrawal_fulfillments<'a, I>(
     deposits: I,
-) -> SortedVec<ExpectedWithdrawalFulfilment>
+) -> SortedVec<ExpectedWithdrawalFulfillment>
 where
     I: Iterator<Item = &'a DepositEntry>,
 {
@@ -177,7 +177,7 @@ where
                     .withdraw_outputs()
                     .iter()
                     .map(|output| {
-                        ExpectedWithdrawalFulfilment {
+                        ExpectedWithdrawalFulfillment {
                             destination: output.destination().to_script().into(),
                             // TODO: This uses FIXED OPERATOR FEE for TN1
                             amount: output.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat()),
