@@ -465,4 +465,8 @@ impl WithdrawOutput {
     pub fn destination(&self) -> &Descriptor {
         &self.destination
     }
+
+    pub fn amt(&self) -> BitcoinAmount {
+        self.amt
+    }
 }
