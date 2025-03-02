@@ -13,6 +13,7 @@ use strata_primitives::{
     l1::{BitcoinAmount, L1HeaderRecord, L1VerificationError, OutputRef},
     l2::L2BlockCommitment,
 };
+use tracing::warn;
 
 use crate::{
     bridge_ops::DepositIntent,
@@ -311,6 +312,22 @@ impl StateCache {
             operator_idx,
             amt,
         )));
+    }
+
+    // Updates the deposit state as Executed.
+    pub fn mark_deposit_spent(&mut self, deposit_idx: u32) {
+        let deposit_ent = self
+            .state_mut()
+            .deposits_table_mut()
+            .get_deposit_mut(deposit_idx)
+            .expect("stateop: missing deposit idx");
+
+        if !matches!(deposit_ent.deposit_state(), DepositState::Executing(_)) {
+            // TODO: handle this better after TN1 bridge is integrated
+            warn!("stateop: deposit spent at unexpected state");
+        }
+
+        deposit_ent.set_state(DepositState::Executed);
     }
 
     // These are all irrelevant now.

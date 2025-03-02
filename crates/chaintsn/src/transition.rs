@@ -8,8 +8,8 @@ use strata_primitives::{
     batch::SignedCheckpoint,
     epoch::EpochCommitment,
     l1::{
-        DepositInfo, L1BlockManifest, L1BlockTxOps, L1HeaderRecord, ProtocolOperation,
-        WithdrawalFulfillmentInfo,
+        DepositInfo, DepositSpendInfo, L1BlockManifest, L1BlockTxOps, L1HeaderRecord,
+        ProtocolOperation, WithdrawalFulfillmentInfo,
     },
     params::RollupParams,
 };
@@ -135,6 +135,10 @@ fn process_l1_block(
                 process_withdrawal_fulfillment(state, info)?;
             }
 
+            ProtocolOperation::DepositSpent(info) => {
+                process_deposit_spent(state, info)?;
+            }
+
             // Other operations we don't do anything with for now.
             _ => {}
         }
@@ -186,11 +190,21 @@ fn process_l1_deposit(state: &mut StateCache, info: &DepositInfo) -> Result<(), 
     Ok(())
 }
 
+/// Withdrawal Fulfillment with correct metadata is seen.
+/// Mark the withthdrawal as being executed and prevent reassignment to another operator.
 fn process_withdrawal_fulfillment(
     state: &mut StateCache,
     info: &WithdrawalFulfillmentInfo,
 ) -> Result<(), TsnError> {
     state.mark_deposit_executing(info.deposit_idx, info.operator_idx, info.amt);
+    Ok(())
+}
+
+/// Locked deposit on L1 has been spent.
+fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Result<(), TsnError> {
+    // Currently, we are not tracking how this was spent, only that it was.
+
+    state.mark_deposit_spent(info.deposit_idx);
     Ok(())
 }
 
