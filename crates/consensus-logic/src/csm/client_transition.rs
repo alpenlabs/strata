@@ -190,19 +190,23 @@ fn handle_block(
     // If there's a new epoch finalized that's better than the old one, update
     // the declared one.
     let new_final_epoch = state.state().get_apparent_finalized_epoch();
-    match (old_final_epoch, new_final_epoch) {
+    let new_declared = match (old_final_epoch, new_final_epoch) {
         (None, Some(new)) => {
             state.set_decl_final_epoch(new);
+            true
         }
         (Some(old), Some(new)) if new.epoch() > old.epoch() => {
             state.set_decl_final_epoch(new);
+            true
         }
-        _ => {}
-    }
+        _ => false,
+    };
 
-    // Emit the action to submit the finalized block.
-    if let Some(decl_epoch) = state.state().get_declared_final_epoch() {
-        state.push_action(SyncAction::FinalizeEpoch(*decl_epoch));
+    // Emit the action to submit the finalized block, if we have new declared epoch
+    if new_declared {
+        if let Some(decl_epoch) = state.state().get_declared_final_epoch() {
+            state.push_action(SyncAction::FinalizeEpoch(*decl_epoch));
+        }
     }
 
     Ok(())
@@ -232,6 +236,7 @@ fn process_l1_block(
         for op in tx.protocol_ops() {
             match op {
                 ProtocolOperation::Checkpoint(signed_ckpt) => {
+                    debug!(%height, "Obtained checkpoint in l1_block");
                     // Before we do anything, check its signature.
                     if !verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule) {
                         warn!(%height, "ignoring checkpointing with invalid signature");
