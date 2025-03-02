@@ -106,8 +106,12 @@ fn parse_withdrawal_fulfilment_transactions<'a>(
     })?;
 
     // 3. Ensure it has correct metadata of the assigned operator.
-    let prefix: [u8; 4] = info.operator_idx.to_be_bytes();
-    let op_return_script = op_return_nonce(&prefix[..]);
+    let mut metadata = [0u8; 8];
+    // first 4 bytes = operator idx
+    metadata[..4].copy_from_slice(&info.operator_idx.to_be_bytes());
+    // next 4 bytes = deposit idx
+    metadata[4..].copy_from_slice(&info.deposit_idx.to_be_bytes());
+    let op_return_script = op_return_nonce(&metadata[..]);
     tx.output
         .iter()
         .find(|tx| tx.script_pubkey == op_return_script)?;
