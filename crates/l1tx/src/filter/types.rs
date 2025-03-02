@@ -5,7 +5,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{BitcoinAddress, OutputRef},
+    l1::{BitcoinAddress, BitcoinScriptBuf, OutputRef},
     params::{DepositTxParams, RollupParams},
     sorted_vec::SortedVec,
 };
@@ -28,14 +28,27 @@ pub struct EnvelopeTags {
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct ExpectedWithdrawalFulfilment {
-    /// withdrawal address
-    pub destination: BitcoinAddress,
+    /// withdrawal address scriptbuf
+    pub destination: BitcoinScriptBuf,
     /// Expected mininum withdrawal amount in sats
     pub amount: u64,
     /// index of assigned operator
     pub operator_idx: u32,
     /// index of assigned deposit entry for this withdrawal
     pub deposit_idx: u32,
+}
+
+// ordering based on destination for binary search.
+impl Ord for ExpectedWithdrawalFulfilment {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.destination.cmp(&other.destination)
+    }
+}
+
+impl PartialOrd for ExpectedWithdrawalFulfilment {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -55,7 +68,7 @@ impl DepositSpendConfig {
     }
 }
 
-// sorted based on output field.
+// sort based on output field for binary search.
 impl Ord for DepositSpendConfig {
     fn cmp(&self, other: &Self) -> Ordering {
         self.output.cmp(&other.output)
@@ -87,7 +100,7 @@ pub struct TxFilterConfig {
     pub expected_outpoints: SortedVec<DepositSpendConfig>,
 
     /// For withdrawal fulfilment transactions sent by bridge operator.
-    pub expected_withdrawal_fulfilments: Vec<ExpectedWithdrawalFulfilment>,
+    pub expected_withdrawal_fulfilments: SortedVec<ExpectedWithdrawalFulfilment>,
 
     /// Deposit config that determines how a deposit transaction can be parsed.
     pub deposit_config: DepositTxParams,
@@ -121,7 +134,7 @@ impl TxFilterConfig {
             expected_addrs,
             expected_blobs: SortedVec::new(),
             expected_outpoints: SortedVec::new(),
-            expected_withdrawal_fulfilments: Vec::new(),
+            expected_withdrawal_fulfilments: SortedVec::new(),
             deposit_config,
         })
     }
@@ -155,7 +168,7 @@ impl TxFilterConfig {
 fn derive_expected_withdrawal_fulfilments<'a, I>(
     deposits: I,
     rollup_params: &RollupParams,
-) -> Vec<ExpectedWithdrawalFulfilment>
+) -> SortedVec<ExpectedWithdrawalFulfilment>
 where
     I: Iterator<Item = &'a DepositEntry>,
 {
@@ -173,7 +186,7 @@ where
                                 output.destination(),
                                 rollup_params.network,
                             ) {
-                                Ok(address) => address,
+                                Ok(address) => address.address().script_pubkey().into(),
                                 Err(err) => {
                                     warn!(?output, ?err, "invalid withdrawal destination address");
                                     return None;
@@ -192,5 +205,6 @@ where
             _ => None,
         })
         .flatten()
-        .collect()
+        .collect::<Vec<_>>()
+        .into()
 }
