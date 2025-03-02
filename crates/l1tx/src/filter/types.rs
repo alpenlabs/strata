@@ -1,15 +1,22 @@
+use bitcoin::Amount;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
-    bitcoin_bosd::Descriptor,
     block_credential::CredRule,
     buf::Buf32,
-    l1::{BitcoinAddress, BitcoinAmount, OutputRef},
+    l1::{BitcoinAddress, OutputRef},
     params::{DepositTxParams, RollupParams},
     sorted_vec::SortedVec,
 };
-use strata_state::{bridge_state::DepositState, chain_state::Chainstate};
+use strata_state::{
+    bridge_state::{DepositEntry, DepositState},
+    chain_state::Chainstate,
+};
+use tracing::warn;
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
+
+// TODO: This is FIXED OPERATOR FEE for TN1
+pub const OPERATOR_FEE: Amount = Amount::from_int_btc(2);
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct EnvelopeTags {
@@ -19,9 +26,14 @@ pub struct EnvelopeTags {
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct ExpectedWithdrawalFulfilment {
-    pub destination: Descriptor,
-    pub amount: BitcoinAmount,
+    /// withdrawal address
+    pub destination: BitcoinAddress,
+    /// Expected mininum withdrawal amount in sats
+    pub amount: u64,
+    /// index of assigned operator
     pub operator_idx: u32,
+    /// index of assigned deposit entry for this withdrawal
+    pub deposit_idx: u32,
 }
 
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
@@ -88,27 +100,10 @@ impl TxFilterConfig {
     ) -> anyhow::Result<Self> {
         let mut filterconfig = Self::derive_from(rollup_params)?;
 
-        filterconfig.expected_withdrawal_fulfilments = chainstate
-            .deposits_table()
-            .deposits()
-            .filter_map(|deposit| match deposit.deposit_state() {
-                // withdrawal has been assigned to an operator
-                DepositState::Dispatched(dispatched_state) => {
-                    let expected = dispatched_state
-                        .cmd()
-                        .withdraw_outputs()
-                        .iter()
-                        .map(|output| ExpectedWithdrawalFulfilment {
-                            destination: output.destination().clone(),
-                            amount: output.amt(),
-                            operator_idx: dispatched_state.assignee(),
-                        });
-                    Some(expected)
-                }
-                _ => None,
-            })
-            .flatten()
-            .collect();
+        filterconfig.expected_withdrawal_fulfilments = derive_expected_withdrawal_fulfilments(
+            chainstate.deposits_table().deposits(),
+            rollup_params,
+        );
 
         // Watch all utxos we have in our deposit table.
         filterconfig.expected_outpoints = chainstate
@@ -119,4 +114,47 @@ impl TxFilterConfig {
 
         Ok(filterconfig)
     }
+}
+
+fn derive_expected_withdrawal_fulfilments<'a, I>(
+    deposits: I,
+    rollup_params: &RollupParams,
+) -> Vec<ExpectedWithdrawalFulfilment>
+where
+    I: Iterator<Item = &'a DepositEntry>,
+{
+    deposits
+        .filter_map(|deposit| match deposit.deposit_state() {
+            // withdrawal has been assigned to an operator
+            DepositState::Dispatched(dispatched_state) => {
+                let expected =
+                    dispatched_state
+                        .cmd()
+                        .withdraw_outputs()
+                        .iter()
+                        .filter_map(|output| {
+                            let destination = match BitcoinAddress::from_descriptor(
+                                output.destination(),
+                                rollup_params.network,
+                            ) {
+                                Ok(address) => address,
+                                Err(err) => {
+                                    warn!(?output, ?err, "invalid withdrawal destination address");
+                                    return None;
+                                }
+                            };
+                            Some(ExpectedWithdrawalFulfilment {
+                                destination,
+                                // TODO: This uses FIXED OPERATOR FEE for TN1
+                                amount: output.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat()),
+                                operator_idx: dispatched_state.assignee(),
+                                deposit_idx: deposit.idx(),
+                            })
+                        });
+                Some(expected)
+            }
+            _ => None,
+        })
+        .flatten()
+        .collect()
 }

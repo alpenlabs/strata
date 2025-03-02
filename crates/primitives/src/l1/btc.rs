@@ -127,6 +127,13 @@ impl BitcoinAddress {
         let address = Address::from_script(&script_buf, network)?;
         Ok(Self { network, address })
     }
+
+    pub fn from_descriptor(descriptor: &Descriptor, network: Network) -> Result<Self, ParseError> {
+        let address = descriptor
+            .to_address(network)
+            .map_err(|err| ParseError::Descriptor(err.to_string()))?;
+        Ok(Self { network, address })
+    }
 }
 
 impl BitcoinAddress {
