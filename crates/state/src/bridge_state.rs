@@ -347,6 +347,14 @@ impl DepositEntry {
     }
 }
 
+#[cfg(feature = "test_utils")]
+impl DepositEntry {
+    pub fn with_state(mut self, state: DepositState) -> Self {
+        self.state = state;
+        self
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DepositState {

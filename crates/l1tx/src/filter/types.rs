@@ -13,7 +13,6 @@ use strata_state::{
     bridge_state::{DepositEntry, DepositState},
     chain_state::Chainstate,
 };
-use tracing::warn;
 
 use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 
@@ -145,10 +144,8 @@ impl TxFilterConfig {
     ) -> anyhow::Result<Self> {
         let mut filterconfig = Self::derive_from(rollup_params)?;
 
-        filterconfig.expected_withdrawal_fulfilments = derive_expected_withdrawal_fulfilments(
-            chainstate.deposits_table().deposits(),
-            rollup_params,
-        );
+        filterconfig.expected_withdrawal_fulfilments =
+            derive_expected_withdrawal_fulfilments(chainstate.deposits_table().deposits());
 
         // Watch all utxos we have in our deposit table.
         filterconfig.expected_outpoints = chainstate
@@ -165,9 +162,8 @@ impl TxFilterConfig {
     }
 }
 
-fn derive_expected_withdrawal_fulfilments<'a, I>(
+pub(crate) fn derive_expected_withdrawal_fulfilments<'a, I>(
     deposits: I,
-    rollup_params: &RollupParams,
 ) -> SortedVec<ExpectedWithdrawalFulfilment>
 where
     I: Iterator<Item = &'a DepositEntry>,
@@ -176,30 +172,19 @@ where
         .filter_map(|deposit| match deposit.deposit_state() {
             // withdrawal has been assigned to an operator
             DepositState::Dispatched(dispatched_state) => {
-                let expected =
-                    dispatched_state
-                        .cmd()
-                        .withdraw_outputs()
-                        .iter()
-                        .filter_map(|output| {
-                            let destination = match BitcoinAddress::from_descriptor(
-                                output.destination(),
-                                rollup_params.network,
-                            ) {
-                                Ok(address) => address.address().script_pubkey().into(),
-                                Err(err) => {
-                                    warn!(?output, ?err, "invalid withdrawal destination address");
-                                    return None;
-                                }
-                            };
-                            Some(ExpectedWithdrawalFulfilment {
-                                destination,
-                                // TODO: This uses FIXED OPERATOR FEE for TN1
-                                amount: output.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat()),
-                                operator_idx: dispatched_state.assignee(),
-                                deposit_idx: deposit.idx(),
-                            })
-                        });
+                let expected = dispatched_state
+                    .cmd()
+                    .withdraw_outputs()
+                    .iter()
+                    .map(|output| {
+                        ExpectedWithdrawalFulfilment {
+                            destination: output.destination().to_script().into(),
+                            // TODO: This uses FIXED OPERATOR FEE for TN1
+                            amount: output.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat()),
+                            operator_idx: dispatched_state.assignee(),
+                            deposit_idx: deposit.idx(),
+                        }
+                    });
                 Some(expected)
             }
             _ => None,
