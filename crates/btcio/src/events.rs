@@ -1,0 +1,48 @@
+use bitcoin::Block;
+use strata_primitives::l1::{HeaderVerificationState, L1BlockCommitment};
+
+/// L1 events that we observe and want the persistence task to work on.
+#[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
+pub enum L1Event {
+    /// Data that contains block number, block and relevant transactions, and also the epoch whose
+    /// rules are applied to. In most cases, the [`HeaderVerificationState`] is `None`, with a
+    /// meaningful state provided only under during genesis
+    // TODO: handle this properly: https://alpenlabs.atlassian.net/browse/STR-1104
+    BlockData(
+        BlockData,
+        // u64,
+        Option<HeaderVerificationState>,
+    ),
+
+    /// Revert to the provided block height
+    RevertTo(L1BlockCommitment),
+}
+
+/// Stores the bitcoin block and interpretations of relevant transactions within
+/// the block.
+#[derive(Clone, Debug)]
+pub struct BlockData {
+    /// Block number.
+    block_num: u64,
+
+    /// Raw block data.
+    // TODO remove?
+    block: Block,
+    // /// Transactions in the block that contain protocol operations
+    // relevant_txs: Vec<RelevantTxEntry>,
+}
+
+impl BlockData {
+    pub fn new(block_num: u64, block: Block) -> Self {
+        Self { block_num, block }
+    }
+
+    pub fn block_num(&self) -> u64 {
+        self.block_num
+    }
+
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+}

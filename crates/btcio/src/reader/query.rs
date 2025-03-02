@@ -8,7 +8,6 @@ use anyhow::bail;
 use bitcoin::{params::Params as BtcParams, Block, BlockHash, CompactTarget};
 use secp256k1::XOnlyPublicKey;
 use strata_config::btcio::ReaderConfig;
-use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
     block_credential::CredRule,
     l1::{
@@ -23,6 +22,7 @@ use strata_storage::L1BlockManager;
 use tracing::*;
 
 use crate::{
+    events::{BlockData, L1Event},
     reader::{handler::handle_bitcoin_event, state::ReaderState},
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},

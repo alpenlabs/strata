@@ -4,11 +4,9 @@ name = "strata-btcio"
 version = "0.1.0"
 
 [dependencies]
-strata-bridge-tx-builder.workspace = true
 strata-config.workspace = true
 strata-db.workspace = true
 strata-primitives.workspace = true
-strata-rpc-types.workspace = true
 strata-state.workspace = true
 strata-status.workspace = true
 strata-storage.workspace = true
@@ -18,8 +16,6 @@ anyhow.workspace = true
 async-trait.workspace = true
 base64.workspace = true
 bitcoin.workspace = true
-bytes.workspace = true
-digest.workspace = true
 hex.workspace = true
 musig2 = { workspace = true, features = ["serde"] }
 rand.workspace = true
@@ -27,7 +23,6 @@ reqwest.workspace = true
 secp256k1 = { workspace = true, features = ["rand-std"] }
 serde.workspace = true
 serde_json.workspace = true
-sha2.workspace = true
 strata-l1tx.workspace = true
 thiserror.workspace = true
 threadpool.workspace = true
@@ -35,16 +30,16 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-borsh.workspace = true
 strata-common.workspace = true
 strata-rocksdb = { workspace = true, features = ["test_utils"] }
 strata-state = { workspace = true, features = ["test_utils"] }
 strata-status.workspace = true
 strata-test-utils.workspace = true
 
-arbitrary.workspace = true
 corepc-node = { version = "0.4.0", features = ["28_0"] }
-mockall.workspace = true
 
 [features]
 test_utils = []
+
+[lints]
+rust.unused_crate_dependencies = "deny"

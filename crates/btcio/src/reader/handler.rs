@@ -1,5 +1,4 @@
 use bitcoin::{consensus::serialize, hashes::Hash, Block};
-use strata_l1tx::messages::{BlockData, L1Event};
 use strata_primitives::{
     buf::Buf32,
     l1::{HeaderVerificationState, L1BlockCommitment, L1BlockManifest, L1HeaderRecord},
@@ -8,7 +7,10 @@ use strata_state::sync_event::{EventSubmitter, SyncEvent};
 use tracing::*;
 
 use super::query::ReaderContext;
-use crate::rpc::traits::ReaderRpc;
+use crate::{
+    events::{BlockData, L1Event},
+    rpc::traits::ReaderRpc,
+};
 
 pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
     event: L1Event,

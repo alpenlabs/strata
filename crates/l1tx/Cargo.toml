@@ -9,15 +9,15 @@ strata-primitives.workspace = true
 strata-state.workspace = true
 
 anyhow.workspace = true
-arbitrary.workspace = true
 bitcoin.workspace = true
 borsh.workspace = true
-hex.workspace = true
 musig2.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-rand.workspace = true
 strata-btcio = { workspace = true, features = ["test_utils"] }
 strata-test-utils.workspace = true
+
+[lints]
+rust.unused_crate_dependencies = "deny"
