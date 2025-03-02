@@ -1,28 +1,18 @@
 //! Core state transition function.
-#![allow(unused)] // still under development
 
-use std::{cmp::min, os::macos::raw::stat};
-
-use bitcoin::{block::Header, Transaction};
-use strata_db::traits::{ChainstateDatabase, Database, L1Database, L2BlockDatabase};
+use bitcoin::Transaction;
 use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
 use strata_primitives::{
-    batch::{verify_signed_checkpoint_sig, BatchInfo, Checkpoint},
-    l1::{get_btc_params, HeaderVerificationState, L1BlockCommitment, L1BlockId},
+    batch::verify_signed_checkpoint_sig,
+    l1::{L1BlockCommitment, L1BlockId},
     prelude::*,
 };
 use strata_state::{
-    block::{self, L2BlockBundle},
-    chain_state::Chainstate,
-    client_state::*,
-    header::L2Header,
-    id::L2BlockId,
-    operation::*,
-    sync_event::SyncEvent,
+    block::L2BlockBundle, chain_state::Chainstate, client_state::*, header::L2Header,
+    id::L2BlockId, operation::*, sync_event::SyncEvent,
 };
 use strata_storage::NodeStorage;
 use tracing::*;
-use zkaleido::ProofReceipt;
 
 use crate::{
     checkpoint_verification::verify_checkpoint, errors::*, genesis::make_genesis_block,
@@ -122,7 +112,7 @@ fn handle_block(
     state: &mut ClientStateMut,
     block: &L1BlockCommitment,
     block_mf: &L1BlockManifest,
-    context: &impl EventContext,
+    _context: &impl EventContext,
     params: &Params,
 ) -> Result<(), Error> {
     let height = block.height();
@@ -152,18 +142,6 @@ fn handle_block(
             .state()
             .get_internal_state(height - 1)
             .expect("clientstate: missing expected block state");
-
-        let last_chainstate = if let Some(prev_chainstate) = state
-            .state()
-            .get_last_checkpoint()
-            .map(|ckpt| ckpt.batch_info.final_l2_block())
-        {
-            // TODO: retry on db error
-            let chainstate = context.get_toplevel_chainstate(prev_chainstate.slot())?;
-            Some(chainstate)
-        } else {
-            None
-        };
 
         let (new_istate, sync_actions) =
             process_l1_block(prev_istate, height, block_mf, params.rollup())?;
@@ -226,7 +204,7 @@ fn handle_block(
 
 fn process_genesis_trigger_block(
     block_mf: &L1BlockManifest,
-    params: &RollupParams,
+    _params: &RollupParams,
 ) -> Result<InternalState, Error> {
     // TODO maybe more bookkeeping?
     Ok(InternalState::new(*block_mf.blkid(), None))
@@ -317,23 +295,15 @@ fn get_l1_reference(btx: &Transaction, height: u64) -> Result<CheckpointL1Ref, E
 
 #[cfg(test)]
 mod tests {
-    use bitcoin::{params::MAINNET, BlockHash};
-    use strata_db::traits::L1Database;
-    use strata_primitives::{
-        block_credential,
-        l1::{L1BlockManifest, L1HeaderRecord},
-    };
-    use strata_rocksdb::test_utils::get_common_db;
-    use strata_state::{l1::L1BlockId, operation};
+    use bitcoin::BlockHash;
+    use strata_primitives::l1::L1BlockManifest;
+    use strata_state::l1::L1BlockId;
     use strata_test_utils::{
-        bitcoin::gen_l1_chain,
         bitcoin_mainnet_segment::BtcChainSegment,
         l2::{gen_client_state, gen_params},
-        ArbitraryGenerator,
     };
 
     use super::*;
-    use crate::genesis;
 
     pub struct DummyEventContext {
         chainseg: BtcChainSegment,
@@ -419,15 +389,9 @@ mod tests {
 
         let horizon = params.rollup().horizon_l1_height as u64;
         let genesis = params.rollup().genesis_l1_height as u64;
-        let reorg_safe_depth = params.rollup().l1_reorg_safe_depth;
 
         let chain = BtcChainSegment::load();
-        let l1_verification_state = chain
-            .get_verification_state(genesis + 1, reorg_safe_depth)
-            .unwrap();
 
-        let genesis_block = genesis::make_genesis_block(&params);
-        let genesis_blockid = genesis_block.header().get_blockid();
         let l1_chain = chain.get_header_records(horizon, 10).unwrap();
 
         let l1_blocks = l1_chain
@@ -435,8 +399,6 @@ mod tests {
             .enumerate()
             .map(|(i, block)| L1BlockCommitment::new(horizon + i as u64, *block.blkid()))
             .collect::<Vec<_>>();
-
-        let blkids: Vec<L1BlockId> = l1_chain.iter().map(|b| *b.blkid()).collect();
 
         let test_cases = [
             // These are kinda weird out because we got rid of pre-genesis
@@ -449,7 +411,6 @@ mod tests {
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
-                    let l1_chain = l1_chain.clone();
                     move |state| {
                         assert!(!state.is_chain_active());
                     }
@@ -462,7 +423,6 @@ mod tests {
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
-                    let l1_chain = l1_chain.clone();
                     move |state| {
                         assert!(!state.is_chain_active());
                         /*assert_eq!(
@@ -494,7 +454,6 @@ mod tests {
                 }],
                 state_assertions: Box::new({
                     let l1_chain = l1_chain.clone();
-                    let blkids = blkids.clone();
                     move |state| {
                         assert!(state.is_chain_active());
                         assert_eq!(
@@ -513,7 +472,6 @@ mod tests {
                 }],
                 state_assertions: Box::new({
                     let l1_chain = l1_chain.clone();
-                    let blkids = blkids.clone();
                     move |state| {
                         assert!(state.is_chain_active());
                         assert_eq!(
@@ -531,7 +489,6 @@ mod tests {
                     expected_actions: &[],
                 }],
                 state_assertions: Box::new({
-                    let l1_chain = &l1_chain;
                     move |state| {
                         assert!(state.is_chain_active());
                         assert_eq!(state.next_exp_l1_block(), genesis + 4);
@@ -544,7 +501,7 @@ mod tests {
                     event: SyncEvent::L1Revert(l1_blocks[4]),
                     expected_actions: &[],
                 }],
-                state_assertions: Box::new({ move |state| {} }),
+                state_assertions: Box::new(move |_state| {}),
             },
         ];
 

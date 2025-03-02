@@ -754,7 +754,7 @@ fn apply_blocks(
         // locally and update our going state.
         let mut prestate_cache = StateCache::new(cur_state);
         debug!(%slot, %blkid, "processing block");
-        chain_transition::process_block(&mut prestate_cache, header, body, &l1blocks, &rparams)
+        chain_transition::process_block(&mut prestate_cache, header, body, &l1blocks, rparams)
             .map_err(|e| Error::InvalidStateTsn(blkid, e))?;
         let (post_state, wb) = prestate_cache.finalize();
 

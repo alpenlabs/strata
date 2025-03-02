@@ -15,6 +15,7 @@ pub struct ReaderTxVisitorImpl {
     da_entries: Vec<DaEntry>,
 }
 
+#[allow(clippy::new_without_default)]
 impl ReaderTxVisitorImpl {
     pub fn new() -> Self {
         Self {
