@@ -1,7 +1,12 @@
+use std::collections::HashMap;
+
 use bitcoin::Transaction;
 use strata_primitives::{
     batch::SignedCheckpoint,
-    l1::{payload::L1PayloadType, DepositInfo, DepositRequestInfo},
+    l1::{
+        payload::L1PayloadType, BitcoinAmount, DepositInfo, DepositRequestInfo,
+        WithdrawalFulfilmentInfo,
+    },
 };
 use strata_state::batch::verify_signed_checkpoint_sig;
 use tracing::warn;
@@ -14,6 +19,7 @@ pub use types::TxFilterConfig;
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
     envelope::parser::parse_envelope_payloads,
+    utils::op_return_nonce,
 };
 
 fn parse_deposit_requests(
@@ -76,6 +82,44 @@ fn parse_checkpoint_envelopes<'a>(
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default()
+    })
+}
+
+fn parse_withdrawal_fulfilment_transactions<'a>(
+    tx: &'a Transaction,
+    filter_conf: &'a TxFilterConfig,
+) -> Option<WithdrawalFulfilmentInfo> {
+    // TODO: move move this to filter config so we dont need to do this every tx
+    let watched_addresses = filter_conf
+        .expected_withdrawal_fulfilments
+        .iter()
+        .map(|info| (info.destination.address().script_pubkey(), info))
+        .collect::<HashMap<_, _>>();
+
+    // 1. Check this is a txn to a watched address
+    let (actual_amount_sats, info) = tx.output.iter().find_map(|txout| {
+        watched_addresses
+            .get(&txout.script_pubkey)
+            .and_then(|info| {
+                // 2. Ensure amount is greater than or equal to the expected amount
+                let actual_amount_sats = txout.value.to_sat();
+                if actual_amount_sats < info.amount {
+                    return None;
+                }
+                Some((actual_amount_sats, info))
+            })
+    })?;
+
+    // 3. Ensure it has correct metadata of the assigned operator.
+    let prefix: [u8; 4] = info.operator_idx.to_be_bytes();
+    let op_return_script = op_return_nonce(&prefix[..]);
+    tx.output
+        .iter()
+        .find(|tx| tx.script_pubkey == op_return_script)?;
+
+    Some(WithdrawalFulfilmentInfo {
+        deposit_idx: info.deposit_idx,
+        amt: BitcoinAmount::from_sat(actual_amount_sats),
     })
 }
 

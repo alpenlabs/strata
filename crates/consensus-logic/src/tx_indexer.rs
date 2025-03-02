@@ -53,6 +53,13 @@ impl TxVisitor for ReaderTxVisitorImpl {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
+    fn visit_withdrawal_fulfilment(
+        &mut self,
+        info: strata_primitives::prelude::WithdrawalFulfilmentInfo,
+    ) {
+        self.ops.push(ProtocolOperation::WithdrawalFulfilment(info));
+    }
+
     fn finalize(self) -> Option<L1TxMessages> {
         if self.ops.is_empty() && self.deposit_requests.is_empty() && self.da_entries.is_empty() {
             None
