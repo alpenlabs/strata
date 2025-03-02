@@ -92,6 +92,9 @@ pub fn parse_l1blocktxops(
                 .epoch();
         }
 
+        // FIXME: deposit utxos should be added to filterconfig as soon as they are seen, even in
+        // the middle of an epoch so as to not miss any transactions that spend them.
+
         let block = L1BlockTxOps::new(epoch, manifest.record().clone(), protocol_ops);
         l1blocks.push(block);
     }
