@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, thread};
 
-use strata_db::types::CheckpointConfStatus;
+use strata_db::types::{CheckpointConfStatus, CheckpointEntry};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{
@@ -203,7 +203,7 @@ fn process_msg(
                 if ev_idx < *idx {
                     warn!(%ev_idx, "Applying missed sync event.");
                 }
-                handle_sync_event_with_retry(state, engine, ev_idx, status_channel, shutdown)?;
+                handle_sync_event(state, engine, ev_idx, status_channel)?;
                 // Broadcast notifications and other stuffs
                 post_handle_sync_event_hook(
                     ev_idx,
@@ -211,6 +211,10 @@ fn process_msg(
                     state,
                     status_channel,
                 )?;
+                if shutdown.should_shutdown() {
+                    warn!("received shutdown signal");
+                    break;
+                }
             }
 
             Ok(())
@@ -342,14 +346,12 @@ fn apply_action(
             // For the fork choice manager this gets picked up later.  We don't have
             // to do anything here *necessarily*.
             info!(?epoch_comm, "finalizing epoch");
+            let blk_comm = epoch_comm.to_block_commitment();
 
             strata_common::check_bail_trigger("sync_event_finalize_epoch");
 
-            // Check for finalized block in db, if not present in db, wait until that is found.
-            check_and_wait_for_finalized_block_in_db(
-                state.storage.l2(),
-                epoch_comm.to_block_commitment(),
-            )?;
+            check_and_wait_for_finalized_block_in_db(state.storage.l2(), blk_comm)?;
+
             // TODO error checking here
             engine.update_finalized_block(*epoch_comm.last_blkid())?;
 
@@ -358,7 +360,7 @@ fn apply_action(
             // TODO In the future we should just be able to determine this on the fly.
             let epoch = epoch_comm.epoch();
             let Some(mut ckpt_entry) = ckpt_db.get_checkpoint_blocking(epoch)? else {
-                warn!(%epoch, "missing checkpoint we wanted to update the state of, ignoring");
+                warn!(%epoch, "missing checkpoint we wanted to mark confirmed, ignoring");
                 return Ok(());
             };
 
@@ -371,6 +373,7 @@ fn apply_action(
                 return Ok(());
             };
 
+            debug!(%epoch, "Marking checkpoint as finalized");
             // Mark it as finalized.
             ckpt_entry.confirmation_status = CheckpointConfStatus::Finalized(l1ref);
 
@@ -415,19 +418,32 @@ fn check_and_wait_for_finalized_block_in_db(
     l2: &L2BlockManager,
     l2blk_comm: L2BlockCommitment,
 ) -> anyhow::Result<()> {
-    let blkid = l2blk_comm.blkid();
-    if l2.get_block_data_blocking(blkid)?.is_none() {
+    let exp_blkid = l2blk_comm.blkid();
+    let exp_height = l2blk_comm.slot();
+    if l2.get_block_data_blocking(exp_blkid)?.is_none() {
+        debug!(
+            ?exp_height,
+            ?exp_blkid,
+            "Expected finalized block not found in db, waiting for it to be present"
+        );
         let mut rx = l2.subscribe_to_block_updates();
 
         // FIXME: Ideally we would wait for the block until some timeout because that will never be
-        // seen if L2 reorgs. Or we need a mechanism to see if canonical block at expected height is
-        // different from the one we expected.
+        // seen if L2 reorgs.
         // Or, Instead for waiting on particular block id, ideally we would wait for canonical block
         // at given height and see if we get different blockid than we expect. That would
-        // handle for reorgs as well.
+        // handle for reorgs too.
         loop {
-            if rx.blocking_recv()? == *blkid {
-                return Ok(());
+            match rx.blocking_recv()? {
+                (h, blkid) if h == exp_height || blkid == *exp_blkid => {
+                    debug!(
+                        ?h,
+                        ?blkid,
+                        "Found a block at given height in db, continuing..."
+                    );
+                    return Ok(());
+                }
+                _ => {}
             }
         }
     }
