@@ -47,6 +47,7 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
 
     Some(WithdrawalFulfillmentInfo {
         deposit_idx: withdrawal.deposit_idx,
+        operator_idx: withdrawal.operator_idx,
         amt: BitcoinAmount::from_sat(actual_amount_sats),
     })
 }
@@ -153,6 +154,7 @@ mod test {
             withdrawal_fulfillment_info.unwrap(),
             WithdrawalFulfillmentInfo {
                 deposit_idx: 2,
+                operator_idx: 1,
                 amt: withdraw_amt_after_fees().into()
             }
         );

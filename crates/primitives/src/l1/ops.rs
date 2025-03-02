@@ -119,6 +119,11 @@ pub struct DepositRequestInfo {
 pub struct WithdrawalFulfillmentInfo {
     /// index of deposit this fulfillment is for
     pub deposit_idx: u32,
+
+    /// assigned operator
+    /// TODO: maybe this is not needed
+    pub operator_idx: u32,
+
     /// amount that was actually sent on bitcoin.
     /// should equal withdrawal_amount - operator fee
     pub amt: BitcoinAmount,

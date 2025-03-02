@@ -7,7 +7,10 @@ use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
     batch::SignedCheckpoint,
     epoch::EpochCommitment,
-    l1::{DepositInfo, L1BlockManifest, L1BlockTxOps, L1HeaderRecord, ProtocolOperation},
+    l1::{
+        DepositInfo, L1BlockManifest, L1BlockTxOps, L1HeaderRecord, ProtocolOperation,
+        WithdrawalFulfillmentInfo,
+    },
     params::RollupParams,
 };
 use strata_state::{
@@ -128,6 +131,10 @@ fn process_l1_block(
                 process_l1_deposit(state, info)?;
             }
 
+            ProtocolOperation::WithdrawalFulfillment(info) => {
+                process_withdrawal_fulfillment(state, info)?;
+            }
+
             // Other operations we don't do anything with for now.
             _ => {}
         }
@@ -176,6 +183,14 @@ fn process_l1_deposit(state: &mut StateCache, info: &DepositInfo) -> Result<(), 
     // Logging so we know if it got there.
     trace!(?outpoint, "handled deposit");
 
+    Ok(())
+}
+
+fn process_withdrawal_fulfillment(
+    state: &mut StateCache,
+    info: &WithdrawalFulfillmentInfo,
+) -> Result<(), TsnError> {
+    state.mark_deposit_executing(info.deposit_idx, info.operator_idx, info.amt);
     Ok(())
 }
 
@@ -381,6 +396,11 @@ fn process_deposit_updates(
 
                     state.reset_deposit_assignee(deposit_idx, op_idx, new_exec_height as u64);
                 }
+            }
+
+            DepositState::Executing(_) => {
+                // dont reassign executing withdrawals as front payment has been done.
+                // nothing else to do here for now
             }
 
             DepositState::Executed => {
