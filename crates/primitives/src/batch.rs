@@ -156,16 +156,25 @@ pub struct Checkpoint {
 
     /// Proof for this checkpoint obtained from prover manager.
     proof: Proof,
+
+    /// Additional data we post along with the checkpoint for usability.
+    sidecar: CheckpointSidecar,
 }
 
 impl Checkpoint {
-    pub fn new(batch_info: BatchInfo, transition: (Buf32, Buf32), proof: Proof) -> Self {
+    pub fn new(
+        batch_info: BatchInfo,
+        transition: (Buf32, Buf32),
+        proof: Proof,
+        sidecar: CheckpointSidecar,
+    ) -> Self {
         Self {
             commitment: CheckpointCommitment {
                 batch_info,
                 transition,
             },
             proof,
+            sidecar,
         }
     }
 
@@ -209,6 +218,29 @@ impl Checkpoint {
         buf.extend(self.proof.as_bytes());
 
         hash::raw(&buf)
+    }
+
+    pub fn get_sidecar(&self) -> &CheckpointSidecar {
+        &self.sidecar
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
+)]
+pub struct CheckpointSidecar {
+    /// Chainstate at the end of this checkpoint's epoch.
+    /// Note: using Vec<u8> instead of Chainstate to avoid circular dependency with strata_state
+    chainstate: Vec<u8>,
+}
+
+impl CheckpointSidecar {
+    pub fn new(chainstate: Vec<u8>) -> Self {
+        Self { chainstate }
+    }
+
+    pub fn chainstate(&self) -> &[u8] {
+        &self.chainstate
     }
 }
 
