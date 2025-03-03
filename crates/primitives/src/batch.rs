@@ -220,7 +220,7 @@ impl Checkpoint {
         hash::raw(&buf)
     }
 
-    pub fn get_sidecar(&self) -> &CheckpointSidecar {
+    pub fn sidecar(&self) -> &CheckpointSidecar {
         &self.sidecar
     }
 }

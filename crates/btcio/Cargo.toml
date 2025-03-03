@@ -18,6 +18,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 base64.workspace = true
 bitcoin.workspace = true
+borsh.workspace = true
 bytes.workspace = true
 digest.workspace = true
 hex.workspace = true

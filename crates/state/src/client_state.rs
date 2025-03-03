@@ -348,14 +348,16 @@ impl InternalState {
 )]
 pub struct CheckpointL1Ref {
     pub block_height: u64,
+    pub blockid: L1BlockId,
     pub txid: Buf32,
     pub wtxid: Buf32,
 }
 
 impl CheckpointL1Ref {
-    pub fn new(block_height: u64, txid: Buf32, wtxid: Buf32) -> Self {
+    pub fn new(block_height: u64, blockid: L1BlockId, txid: Buf32, wtxid: Buf32) -> Self {
         Self {
             block_height,
+            blockid,
             txid,
             wtxid,
         }

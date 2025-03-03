@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 
 use bitcoin::BlockHash;
 use strata_l1tx::filter::TxFilterConfig;
-use strata_state::batch::SignedCheckpoint;
 
 /// State we use in various parts of the reader.
 #[derive(Debug)]
@@ -21,9 +20,6 @@ pub struct ReaderState {
 
     /// Current epoch.
     epoch: u64,
-
-    /// Checkpoint to wait until the corresponding l2 block is present in db.
-    last_seen_checkpoint: Option<SignedCheckpoint>,
 }
 
 impl ReaderState {
@@ -35,7 +31,6 @@ impl ReaderState {
         recent_blocks: VecDeque<BlockHash>,
         filter_config: TxFilterConfig,
         epoch: u64,
-        last_seen_checkpoint: Option<SignedCheckpoint>,
     ) -> Self {
         assert!(!recent_blocks.is_empty());
         Self {
@@ -44,7 +39,6 @@ impl ReaderState {
             recent_blocks,
             filter_config,
             epoch,
-            last_seen_checkpoint,
         }
     }
 
@@ -82,14 +76,6 @@ impl ReaderState {
 
     pub(crate) fn set_filter_config(&mut self, filter_config: TxFilterConfig) {
         self.filter_config = filter_config;
-    }
-
-    pub fn last_seen_checkpoint(&self) -> Option<&SignedCheckpoint> {
-        self.last_seen_checkpoint.as_ref()
-    }
-
-    pub(crate) fn set_last_seen_checkpoint(&mut self, ckpt: Option<SignedCheckpoint>) {
-        self.last_seen_checkpoint = ckpt;
     }
 
     /// Returns the idx of the deepest block in the reader state.

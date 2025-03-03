@@ -33,8 +33,7 @@ use crate::{
         state::ReaderState,
         tx_indexer::ReaderTxVisitorImpl,
         utils::{
-            find_checkpoint_in_events, find_initial_checkpoint_to_wait_for,
-            get_or_wait_for_chainstate,
+            find_checkpoint_in_events, find_last_checkpoint_chainstate, get_or_wait_for_chainstate,
         },
     },
     rpc::traits::ReaderRpc,
@@ -199,10 +198,13 @@ async fn init_reader_state<R: ReaderRpc>(
     }
 
     let params = ctx.params.clone();
-    let filter_config = TxFilterConfig::derive_from(params.rollup())?;
+    let mut filter_config = TxFilterConfig::derive_from(params.rollup())?;
     let epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
-    let checkpoint_to_wait_for =
-        find_initial_checkpoint_to_wait_for(ctx.storage.l1(), target_next_block - 1)?;
+
+    // update filterconfig based on chainstate of last seen checkpoint
+    if let Some(chainstate) = find_last_checkpoint_chainstate(&ctx.storage).await? {
+        filter_config.update_from_chainstate(&chainstate);
+    }
 
     let state = ReaderState::new(
         real_cur_height + 1,
@@ -210,7 +212,6 @@ async fn init_reader_state<R: ReaderRpc>(
         init_queue,
         filter_config,
         epoch,
-        checkpoint_to_wait_for,
     );
     Ok(state)
 }
@@ -261,11 +262,14 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
             Ok((blkid, evs)) => {
                 events.extend_from_slice(&evs);
 
-                // If any of the events have checkpoint, break here
                 if let Some(checkpt) = find_checkpoint_in_events(&evs) {
-                    // We need to wait for l2 block corresponding to this checkpoint.
-                    state.set_last_seen_checkpoint(Some(checkpt.clone()));
-                    return Ok(events);
+                    // if we have a checkpoint in this block, update filterconfig based on this
+                    let chainstate = borsh::from_slice(checkpt.checkpoint().sidecar().chainstate())
+                        .expect("deserialize chainstate");
+
+                    state
+                        .filter_config_mut()
+                        .update_from_chainstate(&chainstate);
                 }
 
                 info!(%fetch_height, %blkid, "accepted new block");
@@ -342,24 +346,6 @@ async fn process_block<R: ReaderRpc>(
     block: Block,
 ) -> anyhow::Result<(Vec<L1Event>, BlockHash)> {
     let txs = block.txdata.len();
-
-    if let Some(last_checkpoint) = state.last_seen_checkpoint() {
-        let epoch_commitment = last_checkpoint
-            .checkpoint()
-            .batch_info()
-            .get_epoch_commitment();
-
-        let chainstate = wait_for_chainstate_or_timeout(
-            ctx.storage.as_ref(),
-            epoch_commitment,
-            Duration::from_secs(5),
-        )
-        .await?;
-
-        state
-            .filter_config_mut()
-            .update_from_chainstate(&chainstate);
-    }
 
     // Index all the stuff in the block.
     let entries: Vec<RelevantTxEntry> =
@@ -575,7 +561,6 @@ mod test {
             recent_blocks,
             filter_config,
             ctx.status_channel.get_cur_chain_epoch().unwrap(),
-            None,
         )
     }
 
