@@ -138,17 +138,12 @@ impl TxFilterConfig {
         })
     }
 
-    pub fn derive_from_chainstate(
-        rollup_params: &RollupParams,
-        chainstate: &Chainstate,
-    ) -> anyhow::Result<Self> {
-        let mut filterconfig = Self::derive_from(rollup_params)?;
-
-        filterconfig.expected_withdrawal_fulfillments =
+    pub fn update_from_chainstate(&mut self, chainstate: &Chainstate) {
+        self.expected_withdrawal_fulfillments =
             derive_expected_withdrawal_fulfillments(chainstate.deposits_table().deposits());
 
         // Watch all utxos we have in our deposit table.
-        filterconfig.expected_outpoints = chainstate
+        self.expected_outpoints = chainstate
             .deposits_table()
             .deposits()
             .map(|deposit| DepositSpendConfig {
@@ -157,8 +152,6 @@ impl TxFilterConfig {
             })
             .collect::<Vec<_>>()
             .into();
-
-        Ok(filterconfig)
     }
 }
 

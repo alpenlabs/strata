@@ -14,15 +14,17 @@ use strata_l1tx::{
 };
 use strata_primitives::{
     block_credential::CredRule,
+    epoch::EpochCommitment,
     l1::{
         get_relative_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState,
         L1BlockCommitment, L1BlockId, TimestampStore, TIMESTAMPS_FOR_MEDIAN,
     },
     params::Params,
 };
-use strata_state::sync_event::EventSubmitter;
+use strata_state::{chain_state::Chainstate, sync_event::EventSubmitter};
 use strata_status::StatusChannel;
 use strata_storage::{L1BlockManager, NodeStorage};
+use tokio::select;
 use tracing::*;
 
 use crate::{
@@ -32,7 +34,7 @@ use crate::{
         tx_indexer::ReaderTxVisitorImpl,
         utils::{
             find_checkpoint_in_events, find_initial_checkpoint_to_wait_for,
-            wait_for_terminal_block_in_db,
+            get_or_wait_for_chainstate,
         },
     },
     rpc::traits::ReaderRpc,
@@ -120,20 +122,6 @@ async fn do_reader_task<R: ReaderRpc>(
 
     loop {
         let mut status_updates: Vec<L1StatusUpdate> = Vec::new();
-
-        // Check if we need to wait for some l2 block corresponding to a checkpoint.
-        if let Some(chkpt) = state.checkpoint_to_wait_for() {
-            // Wait for the checkpoint
-            wait_for_terminal_block_in_db(ctx.storage.as_ref(), chkpt).await?;
-
-            // Reset checkpoint to wait for, which will be populated when we find checkpoint in some
-            // other block. Maybe no need to reset?
-            state.set_checkpoint_to_wait_for(None);
-        }
-        // See if epoch/filter rules have changed
-        if let Some(l1ev) = check_epoch_change(&ctx, &mut state)? {
-            handle_bitcoin_event(l1ev, &ctx, event_submitter).await?;
-        };
 
         match poll_for_new_blocks(&ctx, &mut state, &mut status_updates).await {
             Err(err) => {
@@ -316,7 +304,7 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
                 // If any of the events have checkpoint, break here
                 if let Some(checkpt) = find_checkpoint_in_events(&evs) {
                     // We need to wait for l2 block corresponding to this checkpoint.
-                    state.set_checkpoint_to_wait_for(Some(checkpt.clone()));
+                    state.set_last_seen_checkpoint(Some(checkpt.clone()));
                     return Ok(events);
                 }
 
@@ -370,6 +358,21 @@ async fn fetch_and_process_block<R: ReaderRpc>(
     Ok((l1blkid, evs))
 }
 
+async fn wait_for_chainstate_or_timeout(
+    storage: &NodeStorage,
+    epoch: EpochCommitment,
+    timeout: Duration,
+) -> anyhow::Result<Chainstate> {
+    select! {
+        chainstate_res = get_or_wait_for_chainstate(storage, epoch) => {
+            chainstate_res
+        }
+        _ = tokio::time::sleep(timeout) => {
+            bail!("Timed out waiting for chainstate")
+        }
+    }
+}
+
 /// Processes a bitcoin Block to return corresponding `L1Event` and `BlockHash`.
 async fn process_block<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
@@ -379,6 +382,24 @@ async fn process_block<R: ReaderRpc>(
     block: Block,
 ) -> anyhow::Result<(Vec<L1Event>, BlockHash)> {
     let txs = block.txdata.len();
+
+    if let Some(last_checkpoint) = state.last_seen_checkpoint() {
+        let epoch_commitment = last_checkpoint
+            .checkpoint()
+            .batch_info()
+            .get_epoch_commitment();
+
+        let chainstate = wait_for_chainstate_or_timeout(
+            ctx.storage.as_ref(),
+            epoch_commitment,
+            Duration::from_secs(5),
+        )
+        .await?;
+
+        state
+            .filter_config_mut()
+            .update_from_chainstate(&chainstate);
+    }
 
     // Index all the stuff in the block.
     let entries: Vec<RelevantTxEntry> =

@@ -1,7 +1,6 @@
-use strata_db::traits::BlockStatus;
 use strata_l1tx::messages::{L1Event, RelevantTxEntry};
-use strata_primitives::l1::ProtocolOperation;
-use strata_state::batch::SignedCheckpoint;
+use strata_primitives::{epoch::EpochCommitment, l1::ProtocolOperation};
+use strata_state::{batch::SignedCheckpoint, chain_state::Chainstate};
 use strata_storage::{L1BlockManager, NodeStorage};
 use tracing::*;
 
@@ -23,46 +22,40 @@ pub(crate) fn find_checkpoint(entries: &[RelevantTxEntry]) -> Option<&SignedChec
     checkpts.last().map(|v| &**v)
 }
 
-pub(crate) async fn wait_for_terminal_block_in_db(
+pub(crate) async fn get_or_wait_for_chainstate(
     storage: &NodeStorage,
-    chkpt: &SignedCheckpoint,
-) -> anyhow::Result<()> {
-    let l2blk_comm = chkpt.checkpoint().batch_info().final_l2_block();
-    let exp_blkid = l2blk_comm.blkid();
-    let exp_height = l2blk_comm.slot();
-    let l2mgr = storage.l2();
+    epoch: EpochCommitment,
+) -> anyhow::Result<Chainstate> {
+    let chainstate_manager = storage.chainstate();
+    let slot = epoch.last_slot();
 
-    if l2mgr.get_block_data_async(exp_blkid).await?.is_some() {
-        // Return if valid, else wait for valid block or some other block at the height is valid.
-        if let Some(BlockStatus::Valid) = l2mgr.get_block_status_async(exp_blkid).await? {
-            return Ok(());
-        }
+    if let Some(chainstate) = chainstate_manager
+        .get_toplevel_chainstate_async(slot)
+        .await?
+    {
+        return Ok(chainstate);
     }
-    debug!(
-        ?l2blk_comm,
-        "Found checkpoint in L1 block, waiting for corresponding processed terminal L2 block"
-    );
 
-    let mut rx = l2mgr.subscribe_to_valid_block_updates();
+    debug!(?epoch, "epoch chainstate not found, waiting");
 
-    // FIXME: Ideally we would wait for the valid block until some timeout because that will
-    // never be seen if L2 reorgs.
-    // Or, Instead for waiting on particular block id, ideally we would wait for canonical block
-    // at given height and see if we get different blockid than we expect. That would
-    // handle for reorgs too.
+    let mut rx = chainstate_manager.subscribe_chainstate_updates();
+
     loop {
         match rx.recv().await? {
-            (h, blkid) if h >= exp_height || blkid == *exp_blkid => {
+            idx if idx >= slot => {
                 debug!(
-                    ?h,
-                    ?blkid,
-                    "Found a block at given height in db, continuing..."
+                    %idx,
+                    %slot,
+                    "Found a chainstate at or above required slot"
                 );
-                return Ok(());
+                let chainstate = chainstate_manager
+                    .get_toplevel_chainstate_async(slot)
+                    .await?
+                    .expect("chainstate should be found in db");
+
+                return Ok(chainstate);
             }
-            (h, blkid) => {
-                debug!(%h, %blkid, "Received valid block update");
-            }
+            _ => {}
         }
     }
 }
