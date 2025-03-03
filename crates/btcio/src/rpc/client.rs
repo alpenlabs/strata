@@ -34,7 +34,8 @@ use crate::rpc::{
     traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
     types::{
         CreateRawTransaction, CreateWallet, GetBlockVerbosityOne, GetBlockVerbosityZero,
-        GetBlockchainInfo, GetNewAddress, GetTransaction, GetTxOut, ImportDescriptor,
+        GetBlockchainInfo, GetNewAddress, GetRawTransactionVerbosityOne,
+        GetRawTransactionVerbosityZero, GetTransaction, GetTxOut, ImportDescriptor,
         ImportDescriptorResult, ListDescriptors, ListTransactions, ListUnspent,
         PreviousTransactionOutput, SignRawTransactionWithWallet, SubmitPackage, TestMempoolAccept,
     },
@@ -311,6 +312,28 @@ impl ReaderRpc for BitcoinClient {
         self.call::<Vec<Txid>>("getrawmempool", &[]).await
     }
 
+    async fn get_raw_transaction_verbosity_zero(
+        &self,
+        txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityZero> {
+        self.call::<GetRawTransactionVerbosityZero>(
+            "getrawtransaction",
+            &[to_value(txid.to_string())?, to_value(0)?],
+        )
+        .await
+    }
+
+    async fn get_raw_transaction_verbosity_one(
+        &self,
+        txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityOne> {
+        self.call::<GetRawTransactionVerbosityOne>(
+            "getrawtransaction",
+            &[to_value(txid.to_string())?, to_value(1)?],
+        )
+        .await
+    }
+
     async fn get_tx_out(
         &self,
         txid: &Txid,
@@ -505,7 +528,11 @@ impl SignerRpc for BitcoinClient {
 #[cfg(test)]
 mod test {
 
-    use bitcoin::{consensus, hashes::Hash, transaction, Amount, NetworkKind};
+    use bitcoin::{
+        consensus::{self, encode::deserialize_hex},
+        hashes::Hash,
+        transaction, Amount, NetworkKind,
+    };
     use strata_common::logging;
 
     use super::*;
@@ -581,7 +608,25 @@ mod test {
         // get_transaction
         let tx = client.get_transaction(&txid).await.unwrap().hex;
         let got = client.send_raw_transaction(&tx).await.unwrap();
-        let expected = txid;
+        let expected = txid; // Don't touch this!
+        assert_eq!(expected, got);
+
+        // get_raw_transaction_verbosity_zero
+        let got = client
+            .get_raw_transaction_verbosity_zero(&txid)
+            .await
+            .unwrap()
+            .0;
+        let got = deserialize_hex::<Transaction>(&got).unwrap().compute_txid();
+        assert_eq!(expected, got);
+
+        // get_raw_transaction_verbosity_one
+        let got = client
+            .get_raw_transaction_verbosity_one(&txid)
+            .await
+            .unwrap()
+            .transaction
+            .compute_txid();
         assert_eq!(expected, got);
 
         // get_raw_mempool

@@ -22,7 +22,8 @@ use crate::{
     rpc::{
         traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
         types::{
-            CreateRawTransaction, GetBlockchainInfo, GetTransaction, GetTxOut, ImportDescriptor,
+            CreateRawTransaction, GetBlockchainInfo, GetRawTransactionVerbosityOne,
+            GetRawTransactionVerbosityZero, GetTransaction, GetTxOut, ImportDescriptor,
             ImportDescriptorResult, ListTransactions, ListUnspent, PreviousTransactionOutput,
             ScriptPubkey, SignRawTransactionWithWallet, SubmitPackage, SubmitPackageTxResult,
             TestMempoolAccept,
@@ -126,6 +127,36 @@ impl ReaderRpc for TestBitcoinClient {
 
     async fn get_raw_mempool(&self) -> ClientResult<Vec<Txid>> {
         Ok(vec![])
+    }
+
+    /// Gets a raw transaction by its [`Txid`].
+    async fn get_raw_transaction_verbosity_zero(
+        &self,
+        _txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityZero> {
+        Ok(GetRawTransactionVerbosityZero(SOME_TX.to_string()))
+    }
+
+    /// Gets a raw transaction by its [`Txid`].
+    async fn get_raw_transaction_verbosity_one(
+        &self,
+        _txid: &Txid,
+    ) -> ClientResult<GetRawTransactionVerbosityOne> {
+        let some_tx: Transaction = consensus::encode::deserialize_hex(SOME_TX).unwrap();
+        Ok(GetRawTransactionVerbosityOne {
+            in_active_chain: Some(true),
+            transaction: some_tx.clone(),
+            txid: some_tx.compute_txid(),
+            hash: some_tx.compute_wtxid(),
+            size: some_tx.base_size(),
+            vsize: some_tx.vsize(),
+            version: some_tx.version.0 as u32,
+            locktime: 0,
+            blockhash: Some(BlockHash::all_zeros()),
+            confirmations: Some(3),
+            time: Some(1_000),
+            blocktime: Some(1_000),
+        })
     }
 
     async fn get_tx_out(

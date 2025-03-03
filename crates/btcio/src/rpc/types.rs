@@ -5,7 +5,7 @@ use bitcoin::{
     address::{self, NetworkUnchecked},
     block::Header,
     consensus::{self, encode},
-    Address, Amount, Block, BlockHash, SignedAmount, Transaction, Txid,
+    Address, Amount, Block, BlockHash, SignedAmount, Transaction, Txid, Wtxid,
 };
 use serde::{
     de::{self, IntoDeserializer, Visitor},
@@ -163,6 +163,43 @@ pub struct GetBlockVerbosityOne {
     /// The hash of the next block (if available).
     #[serde(rename = "nextblockhash")]
     pub next_block_hash: Option<String>,
+}
+
+/// Result of JSON-RPC method `getrawtransaction` with verbosity set to 0.
+///
+/// A string that is serialized, hex-encoded data for transaction.
+///
+/// Method call: `getrawtransaction "txid" ( verbosity )`
+#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+pub struct GetRawTransactionVerbosityZero(pub String);
+
+impl GetRawTransactionVerbosityZero {
+    /// Converts json straight to a [`Transaction`].
+    pub fn transaction(self) -> Result<Transaction, encode::FromHexError> {
+        let transaction: Transaction = encode::deserialize_hex(&self.0)?;
+        Ok(transaction)
+    }
+}
+
+/// Result of JSON-RPC method `getrawtransaction` with verbosity set to 1.
+///
+/// Method call: `getrawtransaction "txid" ( verbosity )`
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
+pub struct GetRawTransactionVerbosityOne {
+    pub in_active_chain: Option<bool>,
+    #[serde(deserialize_with = "deserialize_tx")]
+    #[serde(rename = "hex")]
+    pub transaction: Transaction,
+    pub txid: Txid,
+    pub hash: Wtxid,
+    pub size: usize,
+    pub vsize: usize,
+    pub version: u32,
+    pub locktime: u32,
+    pub blockhash: Option<BlockHash>,
+    pub confirmations: Option<u32>,
+    pub time: Option<usize>,
+    pub blocktime: Option<usize>,
 }
 
 /// Result of JSON-RPC method `gettxout`.
