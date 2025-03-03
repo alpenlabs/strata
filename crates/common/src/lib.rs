@@ -43,15 +43,3 @@ pub async fn send_action_to_worker(_wtype: WorkerType, _action: Action) -> bool 
     // Noop
     true
 }
-
-#[cfg(not(feature = "debug-utils"))]
-#[inline(always)]
-pub async fn check_and_pause_if_needed_async(_wtype: WorkerType) {
-    // Noop
-}
-
-#[cfg(not(feature = "debug-utils"))]
-#[inline(always)]
-pub fn check_and_pause_if_needed(_wtype: WorkerType) {
-    // Noop
-}

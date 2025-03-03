@@ -44,7 +44,7 @@ pub async fn send_action_to_worker(wtype: WorkerType, action: Action) -> bool {
 }
 
 /// For the given worker type, checks if it has a Pause message, if so pauses it.
-pub async fn check_and_pause_if_needed_async(wtype: WorkerType) {
+pub async fn check_and_pause_debug_async(wtype: WorkerType) {
     let channel = PAUSE_CHANNELS.get(&wtype).unwrap();
     let mut receiver = channel.receiver.write().await;
 
@@ -61,7 +61,7 @@ pub async fn check_and_pause_if_needed_async(wtype: WorkerType) {
 }
 
 /// For the given worker type, checks if it has a Pause message, if so pauses it.
-pub fn check_and_pause_if_needed(wtype: WorkerType) {
+pub fn check_and_pause_debug(wtype: WorkerType) {
     let channel = PAUSE_CHANNELS.get(&wtype).unwrap();
     let mut receiver = channel.receiver.blocking_write();
 
@@ -84,7 +84,7 @@ fn check_and_handle_action(wtype: &WorkerType, act: Option<Action>) -> bool {
             true
         }
         None => {
-            debug!(?wtype, "Error receiveing msg for worker");
+            debug!(?wtype, "Error receiving msg for worker");
             true
         }
         Some(m) => {

@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, thread};
 
-use strata_db::types::{CheckpointConfStatus, CheckpointEntry};
+use strata_db::types::CheckpointConfStatus;
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{
@@ -311,7 +311,7 @@ fn handle_sync_event(
     Ok(())
 }
 
-/// Apply send Update notificaiton to listeners.
+/// Apply send Update notification to listeners.
 fn post_handle_sync_event_hook(
     ev_idx: u64,
     new_state: Arc<ClientState>,
@@ -425,14 +425,14 @@ fn check_and_wait_for_valid_finalized_block_in_db(
         );
         let mut rx = l2.subscribe_to_valid_block_updates();
 
-        // FIXME: Ideally we would wait for the block until some timeout because that will never be
-        // seen if L2 reorgs.
+        // FIXME: Ideally we would wait for the valid block until some timeout because that will
+        // never be seen if L2 reorgs.
         // Or, Instead for waiting on particular block id, ideally we would wait for canonical block
         // at given height and see if we get different blockid than we expect. That would
         // handle for reorgs too.
         loop {
             match rx.blocking_recv()? {
-                (h, blkid) if h == exp_height || blkid == *exp_blkid => {
+                (h, blkid) if h >= exp_height || blkid == *exp_blkid => {
                     debug!(
                         ?h,
                         ?blkid,

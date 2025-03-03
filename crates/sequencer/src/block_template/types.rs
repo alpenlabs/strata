@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "debug-utils")]
 use strata_common::{check_bail_trigger, BAIL_DUTY_SIGN_BLOCK};
 use strata_primitives::{buf::Buf64, l2::L2BlockId};
 use strata_state::{

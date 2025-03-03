@@ -66,4 +66,5 @@ debug-utils = [
   "strata-common/debug-utils",
   "strata-consensus-logic/debug-utils",
   "strata-sequencer/debug-utils",
+  "strata-sync/debug-utils",
 ]

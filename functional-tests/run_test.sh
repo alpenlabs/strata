@@ -15,7 +15,7 @@ if [ ! -z $PROVER_TEST ]; then
     cargo build --release -F sp1-mock-builder
 	export PATH=$(realpath ../target/release/):$PATH
 else
-    echo "Running on seq mode"
+    echo "Running strata client"
     cargo build -F debug-utils
 fi
 
