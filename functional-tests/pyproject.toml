@@ -16,7 +16,7 @@ locust = "^2.33.0"
 toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "0.9.4"
+ruff = "0.9.9"
 maturin = "1.8.1"
 
 [tool.ruff]
