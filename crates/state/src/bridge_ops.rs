@@ -14,7 +14,7 @@ pub struct WithdrawalIntent {
     amt: BitcoinAmount,
 
     /// Destination [`Descriptor`] for the withdrawal
-    pub destination: Descriptor,
+    destination: Descriptor,
 }
 
 impl WithdrawalIntent {
