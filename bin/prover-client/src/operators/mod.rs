@@ -284,9 +284,8 @@ mod tests {
         {
             let mut batch = Buf32::default();
             batch.0[0] = *params;
-            Ok(strata_primitives::proof::ProofContext::L1Batch(
-                batch.into(),
-                batch.into(),
+            Ok(strata_primitives::proof::ProofContext::EvmEeStf(
+                batch, batch,
             ))
         }
 
@@ -328,6 +327,7 @@ mod tests {
             let mut batch = Buf32::default();
             batch.0[0] = *params;
             Ok(strata_primitives::proof::ProofContext::BtcBlockspace(
+                batch.into(),
                 batch.into(),
             ))
         }
