@@ -357,7 +357,7 @@ fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
             FcmEvent::NewFcmMsg(m) => {
                 process_fc_message(m, &mut fcm_state, engine, &status_channel)
             }
-            FcmEvent::NewStateUpdate(st) => handle_new_client_state(&mut fcm_state, st),
+            FcmEvent::NewStateUpdate(st) => handle_new_client_state(&mut fcm_state, st, engine),
             FcmEvent::Abort => break,
         }?;
     }
@@ -856,6 +856,7 @@ fn handle_finish_epoch(
 fn handle_new_client_state(
     fcm_state: &mut ForkChoiceManager,
     cs: ClientState,
+    engine: &impl ExecEngineCtl,
 ) -> anyhow::Result<()> {
     let cur_fin_epoch = fcm_state.chain_tracker.finalized_epoch();
     let Some(new_fin_epoch) = cs.get_declared_final_epoch().copied() else {
@@ -872,6 +873,9 @@ fn handle_new_client_state(
         ?new_fin_epoch,
         "got new CSM state, updating finalized block"
     );
+
+    // TODO error checking here ?
+    engine.update_finalized_block(*new_fin_epoch.last_blkid())?;
 
     // Update the new state.
     fcm_state.cur_csm_state = Arc::new(cs);

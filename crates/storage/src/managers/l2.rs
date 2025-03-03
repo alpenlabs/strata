@@ -37,11 +37,6 @@ impl L2BlockManager {
         let id = header.get_blockid();
         self.ops.put_block_data_async(bundle).await?;
         self.block_cache.purge(&id);
-
-        // Broadcast
-        if let Err(e) = self.l2_blk_tx.send((header.blockidx(), id)) {
-            warn!(?e, "No active listeners for l2 tx update");
-        }
         Ok(())
     }
 
@@ -51,16 +46,11 @@ impl L2BlockManager {
         let id = header.get_blockid();
         self.ops.put_block_data_blocking(bundle)?;
         self.block_cache.purge(&id);
-
-        // Broadcast
-        if let Err(e) = self.l2_blk_tx.send((header.blockidx(), id)) {
-            warn!(?e, "No active listeners for l2 tx update");
-        }
         Ok(())
     }
 
     /// Subscribe to block updates
-    pub fn subscribe_to_block_updates(&self) -> broadcast::Receiver<(u64, L2BlockId)> {
+    pub fn subscribe_to_valid_block_updates(&self) -> broadcast::Receiver<(u64, L2BlockId)> {
         self.l2_blk_tx.subscribe()
     }
 
@@ -103,11 +93,36 @@ impl L2BlockManager {
         id: &L2BlockId,
         status: BlockStatus,
     ) -> DbResult<()> {
-        self.ops.set_block_status_async(*id, status).await
+        self.ops.set_block_status_async(*id, status).await?;
+
+        // Broadcast, if there are any subscribers and is a valid block
+        if self.l2_blk_tx.receiver_count() > 0 && status == BlockStatus::Valid {
+            let blk = self
+                .get_block_data_async(id)
+                .await?
+                .expect("Block should be present if its status is changed");
+
+            if let Err(e) = self.l2_blk_tx.send((blk.header().blockidx(), *id)) {
+                warn!(?e, "No active listeners for l2 tx update");
+            }
+        }
+        Ok(())
     }
 
     /// Sets the block's verification status.  Blocking.
     pub fn set_block_status_blocking(&self, id: &L2BlockId, status: BlockStatus) -> DbResult<()> {
-        self.ops.set_block_status_blocking(*id, status)
+        self.ops.set_block_status_blocking(*id, status)?;
+
+        // Broadcast, if there are any subscribers and is a valid block
+        if self.l2_blk_tx.receiver_count() > 0 && status == BlockStatus::Valid {
+            let blk = self
+                .get_block_data_blocking(id)?
+                .expect("Block should be present if its status is changed");
+
+            if let Err(e) = self.l2_blk_tx.send((blk.header().blockidx(), *id)) {
+                warn!(?e, "No active listeners for l2 tx update");
+            }
+        }
+        Ok(())
     }
 }

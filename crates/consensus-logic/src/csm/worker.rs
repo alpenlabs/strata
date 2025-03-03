@@ -203,7 +203,11 @@ fn process_msg(
                 if ev_idx < *idx {
                     warn!(%ev_idx, "Applying missed sync event.");
                 }
-                handle_sync_event(state, engine, ev_idx, status_channel)?;
+
+                // FIXME: We should be explicit about what errors to retry instead of just
+                // retrying whenever this fails.
+                handle_sync_event_with_retry(state, engine, ev_idx, status_channel, shutdown)?;
+
                 // Broadcast notifications and other stuffs
                 post_handle_sync_event_hook(
                     ev_idx,
@@ -211,10 +215,6 @@ fn process_msg(
                     state,
                     status_channel,
                 )?;
-                if shutdown.should_shutdown() {
-                    warn!("received shutdown signal");
-                    break;
-                }
             }
 
             Ok(())
@@ -337,7 +337,7 @@ fn post_handle_sync_event_hook(
 fn apply_action(
     action: SyncAction,
     state: &WorkerState,
-    engine: &impl ExecEngineCtl,
+    _engine: &impl ExecEngineCtl,
     _status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     let ckpt_db = state.storage.checkpoint();
@@ -350,10 +350,7 @@ fn apply_action(
 
             strata_common::check_bail_trigger("sync_event_finalize_epoch");
 
-            check_and_wait_for_finalized_block_in_db(state.storage.l2(), blk_comm)?;
-
-            // TODO error checking here
-            engine.update_finalized_block(*epoch_comm.last_blkid())?;
+            check_and_wait_for_valid_finalized_block_in_db(state.storage.l2(), blk_comm)?;
 
             // Write that the checkpoint is finalized.
             //
@@ -414,7 +411,7 @@ fn apply_action(
     Ok(())
 }
 
-fn check_and_wait_for_finalized_block_in_db(
+fn check_and_wait_for_valid_finalized_block_in_db(
     l2: &L2BlockManager,
     l2blk_comm: L2BlockCommitment,
 ) -> anyhow::Result<()> {
@@ -426,7 +423,7 @@ fn check_and_wait_for_finalized_block_in_db(
             ?exp_blkid,
             "Expected finalized block not found in db, waiting for it to be present"
         );
-        let mut rx = l2.subscribe_to_block_updates();
+        let mut rx = l2.subscribe_to_valid_block_updates();
 
         // FIXME: Ideally we would wait for the block until some timeout because that will never be
         // seen if L2 reorgs.
