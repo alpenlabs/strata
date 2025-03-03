@@ -49,13 +49,13 @@ class SyncFullNodeL2LagTest(testenv.StrataTester):
         checkpt_info = seqrpc.strata_getCheckpointInfo(cur_epoch)
         checkpt_l1_blk_height = checkpt_info["l1_reference"]["block_height"]
 
-        # Wait until full node's CSM reads the buried checkpoint height - 1. At this
+        # Wait until full node's CSM reads upto checkpoint height - 1. At this
         # point it won't have fully processed L1 block at checkpoint height
         # because corresponding finalized l2 block is not present in db yet.
         wait_until_with_value(
             lambda: (
-                fnrpc.strata_clientStatus()["buried_l1_block"]["height"],
-                seqrpc.strata_clientStatus()["buried_l1_block"]["height"],
+                fnrpc.strata_clientStatus()["tip_l1_block"]["height"],
+                seqrpc.strata_clientStatus()["tip_l1_block"]["height"],
             ),
             lambda v: v[0] >= checkpt_l1_blk_height - 1,
             error_with="Fullnode L1 sync did not catch upto buried checkpoint height - 1",
@@ -76,8 +76,8 @@ class SyncFullNodeL2LagTest(testenv.StrataTester):
         # Now check the epoch finalization, it should finalize since full node has resumed l2 sync
         wait_until_with_value(
             lambda: (
-                fnrpc.strata_clientStatus()["buried_l1_block"]["height"],
-                seqrpc.strata_clientStatus()["buried_l1_block"]["height"],
+                fnrpc.strata_clientStatus()["tip_l1_block"]["height"],
+                seqrpc.strata_clientStatus()["tip_l1_block"]["height"],
             ),
             lambda v: v[0] >= checkpt_l1_blk_height,
             error_with="Fullnode L1 sync did not catch upto buried checkpoint",

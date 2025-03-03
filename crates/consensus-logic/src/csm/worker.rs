@@ -12,7 +12,7 @@ use strata_state::{
     sync_event::SyncEvent,
 };
 use strata_status::StatusChannel;
-use strata_storage::{CheckpointDbManager, L2BlockManager, NodeStorage};
+use strata_storage::{CheckpointDbManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::{
     sync::{broadcast, mpsc},
@@ -346,11 +346,8 @@ fn apply_action(
             // For the fork choice manager this gets picked up later.  We don't have
             // to do anything here *necessarily*.
             info!(?epoch_comm, "finalizing epoch");
-            let blk_comm = epoch_comm.to_block_commitment();
 
             strata_common::check_bail_trigger("sync_event_finalize_epoch");
-
-            check_and_wait_for_valid_finalized_block_in_db(state.storage.l2(), blk_comm)?;
 
             // Write that the checkpoint is finalized.
             //
@@ -408,41 +405,5 @@ fn apply_action(
         }
     }
 
-    Ok(())
-}
-
-fn check_and_wait_for_valid_finalized_block_in_db(
-    l2: &L2BlockManager,
-    l2blk_comm: L2BlockCommitment,
-) -> anyhow::Result<()> {
-    let exp_blkid = l2blk_comm.blkid();
-    let exp_height = l2blk_comm.slot();
-    if l2.get_block_data_blocking(exp_blkid)?.is_none() {
-        debug!(
-            ?exp_height,
-            ?exp_blkid,
-            "Expected finalized block not found in db, waiting for it to be present"
-        );
-        let mut rx = l2.subscribe_to_valid_block_updates();
-
-        // FIXME: Ideally we would wait for the valid block until some timeout because that will
-        // never be seen if L2 reorgs.
-        // Or, Instead for waiting on particular block id, ideally we would wait for canonical block
-        // at given height and see if we get different blockid than we expect. That would
-        // handle for reorgs too.
-        loop {
-            match rx.blocking_recv()? {
-                (h, blkid) if h >= exp_height || blkid == *exp_blkid => {
-                    debug!(
-                        ?h,
-                        ?blkid,
-                        "Found a block at given height in db, continuing..."
-                    );
-                    return Ok(());
-                }
-                _ => {}
-            }
-        }
-    }
     Ok(())
 }

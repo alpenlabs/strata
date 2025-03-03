@@ -345,7 +345,7 @@ fn start_core_tasks(
         "bitcoin_data_reader_task",
         bitcoin_data_reader_task(
             bitcoin_client.clone(),
-            storage.l1().clone(),
+            storage.clone(),
             Arc::new(config.btcio.reader.clone()),
             sync_manager.get_params(),
             status_channel.clone(),
