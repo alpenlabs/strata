@@ -129,7 +129,7 @@ impl ChainstateManager {
             .map(|wb| wb.into_toplevel()))
     }
 
-    /// Subscribtion for chainstate updates. Notifies subscribers with chainstate idx whenever a new
+    /// Subscription for chainstate updates. Notifies subscribers with chainstate idx whenever a new
     /// chainstate is written.
     pub fn subscribe_chainstate_updates(&self) -> broadcast::Receiver<u64> {
         self.bcast_tx.subscribe()

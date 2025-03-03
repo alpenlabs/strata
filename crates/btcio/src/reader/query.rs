@@ -518,10 +518,7 @@ mod test {
     use bitcoin::{hashes::Hash, params::REGTEST};
     use strata_primitives::{buf::Buf32, l1::L1Status};
     use strata_rocksdb::{init_core_dbs, test_utils::get_rocksdb_tmp_instance};
-    use strata_state::{
-        chain_state::Chainstate,
-        client_state::{CheckpointL1Ref, ClientState, L1Checkpoint},
-    };
+    use strata_state::{chain_state::Chainstate, client_state::ClientState};
     use strata_status::ChainSyncStatusUpdate;
     use strata_storage::create_node_storage;
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
