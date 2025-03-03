@@ -13840,6 +13840,7 @@ dependencies = [
  "borsh",
  "futures",
  "futures-util",
+ "strata-common",
  "strata-consensus-logic",
  "strata-db",
  "strata-primitives",

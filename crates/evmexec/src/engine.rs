@@ -51,6 +51,8 @@ const fn gwei_to_sats(gwei: u64) -> u64 {
 
 struct StateCache {
     head_block_hash: B256,
+    safe_block_hash: B256,
+    finalized_block_hash: B256,
 }
 
 struct RpcExecEngineInner<T: EngineRpc> {
@@ -62,7 +64,11 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
     fn new(client: T, head_block_hash: B256) -> Self {
         Self {
             client,
-            state_cache: Mutex::new(StateCache { head_block_hash }),
+            state_cache: Mutex::new(StateCache {
+                head_block_hash,
+                safe_block_hash: head_block_hash,
+                finalized_block_hash: B256::ZERO,
+            }),
         }
     }
 
@@ -71,11 +77,14 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
         fcs_partial: ForkchoiceStatePartial,
     ) -> EngineResult<BlockStatus> {
         let fork_choice_state = {
-            let existing_head = self.state_cache.lock().await.head_block_hash;
+            // FIXME: Possibly this cache lock must be hold throughout the function call?
+            let cache = self.state_cache.lock().await;
             ForkchoiceState {
-                head_block_hash: fcs_partial.head_block_hash.unwrap_or(existing_head),
-                safe_block_hash: fcs_partial.safe_block_hash.unwrap_or(existing_head),
-                finalized_block_hash: fcs_partial.finalized_block_hash.unwrap_or(B256::ZERO),
+                head_block_hash: fcs_partial.head_block_hash.unwrap_or(cache.head_block_hash),
+                safe_block_hash: fcs_partial.safe_block_hash.unwrap_or(cache.safe_block_hash),
+                finalized_block_hash: fcs_partial
+                    .finalized_block_hash
+                    .unwrap_or(cache.finalized_block_hash),
             }
         };
 
@@ -91,6 +100,8 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             PayloadStatusEnum::Valid => {
                 let mut cache = self.state_cache.lock().await;
                 cache.head_block_hash = fork_choice_state.head_block_hash;
+                cache.safe_block_hash = fork_choice_state.safe_block_hash;
+                cache.finalized_block_hash = fork_choice_state.finalized_block_hash;
                 EngineResult::Ok(BlockStatus::Valid)
             }
             PayloadStatusEnum::Syncing => EngineResult::Ok(BlockStatus::Syncing),
@@ -346,8 +357,6 @@ impl<T: EngineRpc> ExecEngineCtl for RpcExecEngineCtl<T> {
         let block_hash = self
             .get_evm_block_hash(&id)
             .map_err(|err| EngineError::Other(err.to_string()))?;
-
-        // Send forkchoiceupdate { headBlockHash: h, safeBlockHash: h, finalizedBlockHash: 0 }
 
         self.tokio_handle.block_on(async {
             let fork_choice_state = ForkchoiceStatePartial {

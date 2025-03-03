@@ -23,7 +23,10 @@ pub(crate) async fn handle_bitcoin_event<R: ReaderRpc>(
             // L1 reorgs will be handled in L2 STF, we just have to reflect
             // what the client is telling us in the database.
             let height = block.height();
-            ctx.l1_manager.revert_canonical_chain_async(height).await?;
+            ctx.storage
+                .l1()
+                .revert_canonical_chain_async(height)
+                .await?;
             debug!(%height, "reverted L1 block database");
             vec![SyncEvent::L1Revert(block)]
         }
@@ -47,7 +50,7 @@ async fn handle_blockdata<R: ReaderRpc>(
     epoch: u64,
 ) -> anyhow::Result<Vec<SyncEvent>> {
     let ReaderContext {
-        params, l1_manager, ..
+        params, storage, ..
     } = ctx;
 
     let height = blockdata.block_num();
@@ -65,8 +68,11 @@ async fn handle_blockdata<R: ReaderRpc>(
     let manifest = generate_block_manifest(blockdata.block(), hvs, txs, epoch, height);
     let l1blockid = *manifest.blkid();
 
-    l1_manager.put_block_data_async(manifest).await?;
-    l1_manager.extend_canonical_chain_async(&l1blockid).await?;
+    storage.l1().put_block_data_async(manifest).await?;
+    storage
+        .l1()
+        .extend_canonical_chain_async(&l1blockid)
+        .await?;
     info!(%height, %l1blockid, txs = %num_txs, "wrote L1 block manifest");
 
     // Create a sync event if it's something we care about.

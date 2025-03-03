@@ -263,7 +263,7 @@ def wait_until_csm_l1_tip_observed(rpc, **kwargs):
     wait_until_l1_observed(init_l1_height, **kwargs)
 
 
-def wait_until_cur_l1_tip_observed(btcrpc, seqrpc, **kwargs) -> int:
+def wait_until_cur_l1_tip_observed(btcrpc, seqrpc, **kwargs):
     """
     Waits until the current L1 tip block as requested from the L1 RPC has been
     observed by the CSM.

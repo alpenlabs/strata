@@ -121,10 +121,7 @@ impl WorkerState {
     /// This is copied from the old `StateTracker` type which we removed to
     /// simplify things.
     // TODO maybe remove output return value
-    pub fn advance_consensus_state(
-        &mut self,
-        ev_idx: u64,
-    ) -> anyhow::Result<(ClientUpdateOutput, Arc<ClientState>)> {
+    pub fn advance_consensus_state(&mut self, ev_idx: u64) -> anyhow::Result<ClientUpdateOutput> {
         let prev_ev_idx = ev_idx - 1;
         if prev_ev_idx != self.cur_state_idx {
             return Err(Error::SkippedEventIdx(prev_ev_idx, self.cur_state_idx).into());
@@ -143,18 +140,13 @@ impl WorkerState {
         // Clone the state and apply the operations to it.
         let outp = state_mut.into_update();
 
-        // Store the outputs.
-        let state = self
-            .storage
-            .client_state()
-            .put_update_blocking(ev_idx, outp.clone())?;
+        Ok(outp)
+    }
 
-        // Update bookkeeping.
+    fn update_bookeeping(&mut self, ev_idx: u64, state: Arc<ClientState>) {
         debug!(%ev_idx, ?state, "computed new consensus state");
         self.cur_state = state;
         self.cur_state_idx = ev_idx;
-
-        Ok((outp, self.cur_state.clone()))
     }
 }
 
@@ -211,7 +203,18 @@ fn process_msg(
                 if ev_idx < *idx {
                     warn!(%ev_idx, "Applying missed sync event.");
                 }
+
+                // FIXME: We should be explicit about what errors to retry instead of just
+                // retrying whenever this fails.
                 handle_sync_event_with_retry(state, engine, ev_idx, status_channel, shutdown)?;
+
+                // Broadcast notifications and other stuffs
+                post_handle_sync_event_hook(
+                    ev_idx,
+                    state.cur_state().clone(),
+                    state,
+                    status_channel,
+                )?;
             }
 
             Ok(())
@@ -246,10 +249,13 @@ fn handle_sync_event_with_retry(
         // TODO demote to trace after we figure out the current issues
         debug!("trying sync event");
 
-        let Err(e) = handle_sync_event(state, engine, ev_idx, status_channel) else {
-            // Happy case, we want this to happen.
-            trace!("completed sync event");
-            break;
+        let e = match handle_sync_event(state, engine, ev_idx, status_channel) {
+            Err(e) => e,
+            Ok(v) => {
+                // Happy case, we want this to happen.
+                trace!("completed sync event");
+                return Ok(v);
+            }
         };
 
         // If we hit the try limit, abort.
@@ -281,11 +287,7 @@ fn handle_sync_event(
     status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     // Perform the main step of deciding what the output we're operating on.
-    let (outp, new_state) = state.advance_consensus_state(ev_idx)?;
-    let outp = Arc::new(outp);
-
-    // Make sure that the new state index is set as expected.
-    assert_eq!(state.cur_event_idx(), ev_idx);
+    let outp = state.advance_consensus_state(ev_idx)?;
 
     // Apply the actions produced from the state transition before we publish
     // the new state, so that any database changes from them are available when
@@ -294,6 +296,28 @@ fn handle_sync_event(
         apply_action(action.clone(), state, engine, status_channel)?;
     }
 
+    // Store the outputs.
+    let clstate = state
+        .storage
+        .client_state()
+        .put_update_blocking(ev_idx, outp.clone())?;
+
+    // Now update worker state bookkeeping
+    state.update_bookeeping(ev_idx, clstate);
+
+    // Make sure that the new state index is set as expected.
+    assert_eq!(state.cur_event_idx(), ev_idx);
+
+    Ok(())
+}
+
+/// Apply send Update notification to listeners.
+fn post_handle_sync_event_hook(
+    ev_idx: u64,
+    new_state: Arc<ClientState>,
+    state: &WorkerState,
+    status_channel: &StatusChannel,
+) -> anyhow::Result<()> {
     // FIXME clean this up and make them take Arcs
     let mut status = CsmStatus::default();
     status.set_last_sync_ev_idx(ev_idx);
@@ -307,14 +331,13 @@ fn handle_sync_event(
         // listeners?
         warn!("failed to send broadcast for new CSM update");
     }
-
     Ok(())
 }
 
 fn apply_action(
     action: SyncAction,
-    state: &mut WorkerState,
-    engine: &impl ExecEngineCtl,
+    state: &WorkerState,
+    _engine: &impl ExecEngineCtl,
     _status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     let ckpt_db = state.storage.checkpoint();
@@ -326,15 +349,12 @@ fn apply_action(
 
             strata_common::check_bail_trigger("sync_event_finalize_epoch");
 
-            // TODO error checking here
-            engine.update_finalized_block(*epoch_comm.last_blkid())?;
-
             // Write that the checkpoint is finalized.
             //
             // TODO In the future we should just be able to determine this on the fly.
             let epoch = epoch_comm.epoch();
             let Some(mut ckpt_entry) = ckpt_db.get_checkpoint_blocking(epoch)? else {
-                warn!(%epoch, "missing checkpoint we wanted to update the state of, ignoring");
+                warn!(%epoch, "missing checkpoint we wanted to mark confirmed, ignoring");
                 return Ok(());
             };
 
@@ -347,6 +367,7 @@ fn apply_action(
                 return Ok(());
             };
 
+            debug!(%epoch, "Marking checkpoint as finalized");
             // Mark it as finalized.
             ckpt_entry.confirmation_status = CheckpointConfStatus::Finalized(l1ref);
 

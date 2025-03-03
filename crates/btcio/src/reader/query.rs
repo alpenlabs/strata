@@ -22,11 +22,19 @@ use strata_primitives::{
 };
 use strata_state::sync_event::EventSubmitter;
 use strata_status::StatusChannel;
-use strata_storage::L1BlockManager;
+use strata_storage::{L1BlockManager, NodeStorage};
 use tracing::*;
 
 use crate::{
-    reader::{handler::handle_bitcoin_event, state::ReaderState, tx_indexer::ReaderTxVisitorImpl},
+    reader::{
+        handler::handle_bitcoin_event,
+        state::ReaderState,
+        tx_indexer::ReaderTxVisitorImpl,
+        utils::{
+            find_checkpoint_in_events, find_initial_checkpoint_to_wait_for,
+            wait_for_terminal_block_in_db,
+        },
+    },
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
 };
@@ -36,8 +44,8 @@ pub(crate) struct ReaderContext<R: ReaderRpc> {
     /// Bitcoin reader client
     pub client: Arc<R>,
 
-    /// L1db manager
-    pub l1_manager: Arc<L1BlockManager>,
+    /// Storage
+    pub storage: Arc<NodeStorage>,
 
     /// Config
     pub config: Arc<ReaderConfig>,
@@ -55,14 +63,14 @@ pub(crate) struct ReaderContext<R: ReaderRpc> {
 /// The main task that initializes the reader state and starts reading from bitcoin.
 pub async fn bitcoin_data_reader_task<E: EventSubmitter>(
     client: Arc<impl ReaderRpc>,
-    l1_manager: Arc<L1BlockManager>,
+    storage: Arc<NodeStorage>,
     config: Arc<ReaderConfig>,
     params: Arc<Params>,
     status_channel: StatusChannel,
     event_submitter: Arc<E>,
 ) -> anyhow::Result<()> {
     let target_next_block =
-        calculate_target_next_block(l1_manager.as_ref(), params.rollup().horizon_l1_height)?;
+        calculate_target_next_block(storage.l1().as_ref(), params.rollup().horizon_l1_height)?;
 
     let seq_pubkey = match params.rollup.cred_rule {
         CredRule::Unchecked => None,
@@ -74,7 +82,7 @@ pub async fn bitcoin_data_reader_task<E: EventSubmitter>(
 
     let ctx = ReaderContext {
         client,
-        l1_manager,
+        storage,
         config,
         params,
         status_channel,
@@ -113,6 +121,15 @@ async fn do_reader_task<R: ReaderRpc>(
     loop {
         let mut status_updates: Vec<L1StatusUpdate> = Vec::new();
 
+        // Check if we need to wait for some l2 block corresponding to a checkpoint.
+        if let Some(chkpt) = state.checkpoint_to_wait_for() {
+            // Wait for the checkpoint
+            wait_for_terminal_block_in_db(ctx.storage.as_ref(), chkpt).await?;
+
+            // Reset checkpoint to wait for, which will be populated when we find checkpoint in some
+            // other block. Maybe no need to reset?
+            state.set_checkpoint_to_wait_for(None);
+        }
         // See if epoch/filter rules have changed
         if let Some(l1ev) = check_epoch_change(&ctx, &mut state)? {
             handle_bitcoin_event(l1ev, &ctx, event_submitter).await?;
@@ -236,12 +253,16 @@ async fn init_reader_state<R: ReaderRpc>(
     let params = ctx.params.clone();
     let filter_config = TxFilterConfig::derive_from(params.rollup())?;
     let epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
+    let checkpoint_to_wait_for =
+        find_initial_checkpoint_to_wait_for(ctx.storage.l1(), target_next_block - 1)?;
+
     let state = ReaderState::new(
         real_cur_height + 1,
         lookback,
         init_queue,
         filter_config,
         epoch,
+        checkpoint_to_wait_for,
     );
     Ok(state)
 }
@@ -291,6 +312,14 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
         match fetch_and_process_block(ctx, fetch_height, state, status_updates).await {
             Ok((blkid, evs)) => {
                 events.extend_from_slice(&evs);
+
+                // If any of the events have checkpoint, break here
+                if let Some(checkpt) = find_checkpoint_in_events(&evs) {
+                    // We need to wait for l2 block corresponding to this checkpoint.
+                    state.set_checkpoint_to_wait_for(Some(checkpt.clone()));
+                    return Ok(events);
+                }
+
                 info!(%fetch_height, %blkid, "accepted new block");
             }
             Err(e) => {
@@ -501,17 +530,19 @@ pub async fn fetch_verification_state(
 
     Ok(header_verification_state)
 }
+
 #[cfg(feature = "test_utils")]
 #[cfg(test)]
 mod test {
     use bitcoin::{hashes::Hash, params::REGTEST};
     use strata_primitives::{buf::Buf32, l1::L1Status};
-    use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
+    use strata_rocksdb::{init_core_dbs, test_utils::get_rocksdb_tmp_instance};
     use strata_state::{
         chain_state::Chainstate,
         client_state::{CheckpointL1Ref, ClientState, L1Checkpoint},
     };
     use strata_status::ChainSyncStatusUpdate;
+    use strata_storage::create_node_storage;
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
     use threadpool::ThreadPool;
 
@@ -534,11 +565,11 @@ mod test {
         let client = Arc::new(TestBitcoinClient::new(1));
 
         let (rbdb, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let l1_db = Arc::new(L1Db::new(rbdb.clone(), db_ops));
+        let db = init_core_dbs(rbdb, db_ops);
         let pool = ThreadPool::new(1);
-        let l1_manager = Arc::new(L1BlockManager::new(pool, l1_db));
+        let storage = Arc::new(create_node_storage(db, pool).unwrap());
         ReaderContext {
-            l1_manager,
+            storage,
             config,
             status_channel,
             params,
@@ -566,6 +597,7 @@ mod test {
             recent_blocks,
             filter_config,
             ctx.status_channel.get_cur_chain_epoch().unwrap(),
+            None,
         )
     }
 

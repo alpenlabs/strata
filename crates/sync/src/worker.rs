@@ -3,6 +3,8 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
+#[cfg(feature = "debug-utils")]
+use strata_common::{check_and_pause_debug_async, WorkerType};
 use strata_consensus_logic::{
     csm::message::{ClientUpdateNotif, ForkChoiceMessage},
     sync_manager::SyncManager,
@@ -129,12 +131,6 @@ async fn do_tick<T: SyncClient>(
 
     let span = debug_span!("sync", %start_slot, %end_slot);
 
-    /*debug!(
-        current_height = state.tip_height(),
-        target_height = status.tip_height,
-        "syncing to target height"
-    );*/
-
     if let Err(e) = sync_blocks_by_range(start_slot, end_slot, state, context)
         .instrument(span)
         .await
@@ -157,6 +153,10 @@ async fn sync_blocks_by_range<T: SyncClient>(
     let mut block_stream = Box::pin(block_stream);
 
     while let Some(block) = block_stream.next().await {
+        // NOTE: This is a noop if "debug-utils" flag is not turned on.
+        #[cfg(feature = "debug-utils")]
+        check_and_pause_debug_async(WorkerType::SyncWorker).await;
+
         handle_new_block(state, context, block).await?;
     }
 

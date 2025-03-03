@@ -1,6 +1,7 @@
 //! Macro trait def for the `strata_` RPC namespace using jsonrpsee.
 use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use strata_common::{Action, WorkerType};
 use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::{
     batch::EpochSummary,
@@ -229,7 +230,12 @@ pub trait StrataDebugApi {
     /// Get the ClientState at a certain index
     #[method(name = "debug_getClientStateAtIdx")]
     async fn get_clientstate_at_idx(&self, idx: u64) -> RpcResult<Option<ClientState>>;
+
     /// for exiting the client based on context
     #[method(name = "debug_bail")]
     async fn set_bail_context(&self, ctx: String) -> RpcResult<()>;
+
+    /// Instructs a worker to pause or resume its working
+    #[method(name = "debug_pause_resume")]
+    async fn pause_resume_worker(&self, wtype: WorkerType, action: Action) -> RpcResult<bool>;
 }
