@@ -1,10 +1,6 @@
 import flexitest
 
-from envs import testenv
 from envs import net_settings, testenv
-
-from strata_utils import extract_p2tr_pubkey, xonlypk_to_descriptor
-from utils.constants import SATS_TO_WEI
 from mixins.bridge_out_precompile_contract_mixin import BridgePrecompileMixin
 
 
@@ -20,10 +16,13 @@ class ContractBridgeOutWithNoValueTest(BridgePrecompileMixin):
         # no need to deposit as we are just calling the contract with no value
 
         # Call the contract function
-        contract_instance = self.web3.eth.contract(abi=self.abi, address=self.deployed_contract_receipt.contractAddress)
-        tx_hash = contract_instance.functions.bridgeOutContractNoValue(self.bosd).transact({ 'gas': 5_000_000 })
+        contract_instance = self.web3.eth.contract(
+            abi=self.abi, address=self.deployed_contract_receipt.contractAddress
+        )
+        tx_hash = contract_instance.functions.bridgeOutContractNoValue(self.bosd).transact(
+            {"gas": 5_000_000}
+        )
 
         tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
         # should fail because we are calling without values
         assert tx_receipt.status == 0
-

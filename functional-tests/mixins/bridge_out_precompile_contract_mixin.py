@@ -1,15 +1,11 @@
 import flexitest
-from mixins import bridge_mixin
 from solcx import install_solc, set_solc_version
-from web3 import Web3
-
-from envs import testenv
-from load.reth.transaction import SmartContracts
-from envs import net_settings
-
-from utils import get_bridge_pubkey
 from strata_utils import extract_p2tr_pubkey, xonlypk_to_descriptor
-from utils.constants import SATS_TO_WEI
+
+from load.reth.transaction import SmartContracts
+from mixins import bridge_mixin
+from utils import get_bridge_pubkey
+
 
 class BridgePrecompileMixin(bridge_mixin.BridgeMixin):
     def premain(self, ctx: flexitest.InitContext):
@@ -36,8 +32,9 @@ class BridgePrecompileMixin(bridge_mixin.BridgeMixin):
         contract = self.web3.eth.contract(abi=self.abi, bytecode=bytecode)
         tx_hash = contract.constructor().transact()
 
-        self.deployed_contract_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
-        return self.web3.eth.contract(abi=self.abi, address=self.deployed_contract_receipt.contractAddress)
-
-
-
+        self.deployed_contract_receipt = self.web3.eth.wait_for_transaction_receipt(
+            tx_hash, timeout=30
+        )
+        return self.web3.eth.contract(
+            abi=self.abi, address=self.deployed_contract_receipt.contractAddress
+        )

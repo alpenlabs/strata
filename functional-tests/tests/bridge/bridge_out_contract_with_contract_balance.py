@@ -1,10 +1,6 @@
 import flexitest
 
-from envs import testenv
 from envs import net_settings, testenv
-
-from strata_utils import extract_p2tr_pubkey, xonlypk_to_descriptor
-from utils.constants import SATS_TO_WEI
 from mixins.bridge_out_precompile_contract_mixin import BridgePrecompileMixin
 
 
@@ -21,11 +17,14 @@ class ContractBridgeOutWithContractBalanceTest(BridgePrecompileMixin):
         self.deposit(ctx, self.deployed_contract_receipt.contractAddress, self.bridge_pk)
 
         # withdraw
-        contract_instance = self.web3.eth.contract(abi=self.abi, address=self.deployed_contract_receipt.contractAddress)
-        tx_hash = contract_instance.functions.bridgeOutContractValue(self.bosd).transact({ 'gas': 5_000_000 })
+        contract_instance = self.web3.eth.contract(
+            abi=self.abi, address=self.deployed_contract_receipt.contractAddress
+        )
+        tx_hash = contract_instance.functions.bridgeOutContractValue(self.bosd).transact(
+            {"gas": 5_000_000}
+        )
 
         tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
         # shouldn't fail but it fails. TODO:  create a ticket to fix this
         # assert tx_receipt.status == 1
         assert tx_receipt.status == 0
-

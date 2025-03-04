@@ -1,11 +1,9 @@
 import flexitest
 
-from envs import testenv
 from envs import net_settings, testenv
-
-from strata_utils import extract_p2tr_pubkey, xonlypk_to_descriptor
-from utils.constants import SATS_TO_WEI
+from envs.rollup_params_cfg import RollupConfig
 from mixins.bridge_out_precompile_contract_mixin import BridgePrecompileMixin
+from utils.constants import SATS_TO_WEI
 
 
 @flexitest.register
@@ -24,9 +22,12 @@ class ContractBridgeOutWithSenderValueTest(BridgePrecompileMixin):
         deposit_amount = cfg.deposit_amount
 
         # Call the contract function
-        contract_instance = self.web3.eth.contract(abi=self.abi, address=self.deployed_contract_receipt.contractAddress)
-        tx_hash = contract_instance.functions.bridgeOut(self.bosd).transact({ 'gas': 5_000_000 , 'value' : deposit_amount * SATS_TO_WEI})
+        contract_instance = self.web3.eth.contract(
+            abi=self.abi, address=self.deployed_contract_receipt.contractAddress
+        )
+        tx_hash = contract_instance.functions.bridgeOut(self.bosd).transact(
+            {"gas": 5_000_000, "value": deposit_amount * SATS_TO_WEI}
+        )
 
         tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
         assert tx_receipt.status == 1
-
