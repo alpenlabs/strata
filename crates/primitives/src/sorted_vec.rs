@@ -1,37 +1,131 @@
-use std::cmp::Ordering;
+use std::{
+    cmp::Ordering,
+    marker::PhantomData,
+    ops::{Deref, DerefMut, Index},
+};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// A vector wrapper that ensures the elements are sorted
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct SortedVec<T> {
-    inner: Vec<T>,
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct SortedVec<T: Ord + Clone> {
+    inner: SortedVecWithKey<T, T>,
 }
 
-impl<T: Ord + Clone> SortedVec<T> {
-    /// Creates a new, empty [`SortedVec`].
+impl<T: Clone + Ord> SortedVec<T> {
     pub fn new() -> Self {
-        Self { inner: Vec::new() }
+        Self {
+            inner: SortedVecWithKey::new(),
+        }
+    }
+    pub fn with_capacity(c: usize) -> Self {
+        Self {
+            inner: SortedVecWithKey::with_capacity(c),
+        }
+    }
+}
+impl<T: Clone + Ord> Default for SortedVec<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K: Ord, T: HasKey<K> + Clone> Default for SortedVecWithKey<K, T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Ord + Clone> Deref for SortedVec<T> {
+    type Target = SortedVecWithKey<T, T>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T: Ord + Clone> DerefMut for SortedVec<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<T: Ord + Clone> From<Vec<T>> for SortedVec<T> {
+    fn from(vec: Vec<T>) -> Self {
+        Self { inner: vec.into() }
+    }
+}
+
+impl<K: Ord, T: HasKey<K>> From<Vec<T>> for SortedVecWithKey<K, T> {
+    /// Creates a [`SortedVecWithKey`] from a [`Vec`], sorting the elements.
+    fn from(mut vec: Vec<T>) -> Self {
+        vec.sort_by_key(HasKey::get_key);
+        Self {
+            inner: vec,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<K: Ord, T: HasKey<K> + Clone> Index<usize> for SortedVecWithKey<K, T> {
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.inner[index]
+    }
+}
+
+pub trait HasKey<K: Ord> {
+    fn get_key(&self) -> K;
+}
+
+impl<T: Ord + Clone> HasKey<T> for T {
+    fn get_key(&self) -> T {
+        self.clone()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct SortedVecWithKey<K: Ord, T: HasKey<K>> {
+    inner: Vec<T>,
+    _phantom: PhantomData<K>,
+}
+
+impl<K: Ord, T: HasKey<K> + Clone> SortedVecWithKey<K, T> {
+    pub fn new() -> Self {
+        Self {
+            inner: Vec::new(),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<T> {
+        self.inner.clone()
     }
 
     /// Creates a new, empty [`SortedVec`] with given capacity
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             inner: Vec::with_capacity(capacity),
+            _phantom: PhantomData,
         }
     }
 
     /// Inserts an element into the [`SortedVec`], maintaining sorted order. This runs in O(n)
     /// because of shifting of elements.
     pub fn insert(&mut self, value: T) {
-        let pos = self.inner.binary_search(&value).unwrap_or_else(|e| e);
+        let pos = self
+            .inner
+            .binary_search_by_key(&value.get_key(), HasKey::get_key)
+            .unwrap_or_else(|e| e);
         self.inner.insert(pos, value);
     }
 
     /// Removes an element from the [`SortedVec`]. Returns `true` if the element was found and
     /// removed. This runs in O(n) due to shifting of elements.
     pub fn remove(&mut self, value: &T) -> bool {
-        if let Ok(pos) = self.inner.binary_search(value) {
+        if let Ok(pos) = self
+            .inner
+            .binary_search_by_key(&value.get_key(), HasKey::get_key)
+        {
             self.inner.remove(pos);
             true
         } else {
@@ -41,28 +135,25 @@ impl<T: Ord + Clone> SortedVec<T> {
 
     /// Checks if the [`SortedVec`] contains the given value.
     pub fn contains(&self, value: &T) -> bool {
-        self.binary_search(value).is_some()
+        self.inner
+            .binary_search_by_key(&value.get_key(), HasKey::get_key)
+            .is_ok()
     }
 
     /// Perform binary search on the vector
-    pub fn binary_search(&self, value: &T) -> Option<&T> {
+    pub fn binary_search(&self, value: &T) -> Result<usize, usize> {
         self.inner
-            .binary_search(value)
-            .ok()
-            .map(|idx| &self.inner[idx])
+            .binary_search_by_key(&value.get_key(), HasKey::get_key)
     }
 
-    pub fn binary_search_by_key<F, B>(&self, b: &B, mut f: F) -> Option<&T>
+    /// Perform binary search by key on the vector
+    pub fn binary_search_by_key<B, F>(&self, value: &B, f: F) -> Result<usize, usize>
     where
-        F: FnMut(&T) -> &B,
+        F: FnMut(&T) -> B,
         B: Ord,
     {
-        self.inner
-            .binary_search_by(|k| f(k).cmp(b))
-            .ok()
-            .map(|idx| &self.inner[idx])
+        self.inner.binary_search_by_key(value, f)
     }
-
     /// Returns the number of elements in the [`SortedVec`].
     pub fn len(&self) -> usize {
         self.inner.len()
@@ -99,7 +190,7 @@ impl<T: Ord + Clone> SortedVec<T> {
         let mut i = 0;
         let mut j = 0;
         while i < self.len() && j < other.len() {
-            match self.inner[i].cmp(&other.inner[j]) {
+            match self.inner[i].get_key().cmp(&other.inner[j].get_key()) {
                 Ordering::Greater => {
                     merged.push(other.inner[j].clone());
                     j += 1;
@@ -116,27 +207,6 @@ impl<T: Ord + Clone> SortedVec<T> {
         merged.extend_from_slice(&other.inner[j..]);
 
         self.inner = merged;
-    }
-}
-
-impl<T: Clone> SortedVec<T> {
-    /// Converts to vec
-    pub fn to_vec(&self) -> Vec<T> {
-        self.inner.clone()
-    }
-}
-
-impl<T: Ord + Clone> Default for SortedVec<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T: Ord + Clone> From<Vec<T>> for SortedVec<T> {
-    /// Creates a [`SortedVec`] from a [`Vec`], sorting the elements.
-    fn from(mut vec: Vec<T>) -> Self {
-        vec.sort();
-        Self { inner: vec }
     }
 }
 
