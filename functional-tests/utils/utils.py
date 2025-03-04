@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, Callable, Optional, Self, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from bitcoinlib.services.bitcoind import BitcoindClient
 from strata_utils import convert_to_xonly_pk, get_balance, musig_aggregate_pks
@@ -293,7 +293,7 @@ class RollupParamsSettings:
     proof_timeout: Optional[int] = None
 
     @classmethod
-    def new_default(cls) -> Self:
+    def new_default(cls):
         return cls(
             block_time_sec=DEFAULT_BLOCK_TIME_SEC,
             epoch_slots=DEFAULT_EPOCH_SLOTS,

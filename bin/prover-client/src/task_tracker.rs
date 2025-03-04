@@ -253,6 +253,14 @@ impl TaskTracker {
 
         report
     }
+
+    /// Clears the internal state of the [`TaskTracker`], should be used only in testing.
+    #[cfg(test)]
+    pub fn clear_state(&mut self) {
+        self.tasks.clear();
+        self.in_progress_tasks.clear();
+        self.pending_dependencies.clear();
+    }
 }
 
 #[cfg(test)]
