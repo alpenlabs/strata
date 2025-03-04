@@ -5,7 +5,6 @@ use strata_db::traits::ProofDatabase;
 use strata_primitives::{
     buf::Buf32,
     evm_exec::EvmEeBlockCommitment,
-    l1::L1BlockCommitment,
     l2::L2BlockCommitment,
     params::RollupParams,
     proof::{ProofContext, ProofKey},
@@ -19,7 +18,9 @@ use tokio::sync::Mutex;
 use tracing::error;
 
 use super::{btc::BtcBlockspaceOperator, evm_ee::EvmEeOperator, ProvingOp};
-use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
+use crate::{
+    errors::ProvingTaskError, hosts, rpc_server::derive_l1_range, task_tracker::TaskTracker,
+};
 
 /// A struct that implements the [`ProvingOp`] trait for Consensus Layer (CL) State Transition
 /// Function (STF) proof generation.
@@ -116,28 +117,21 @@ impl ClStfOperator {
     }
 }
 
-pub struct ClStfRange {
-    pub l2_range: (L2BlockCommitment, L2BlockCommitment),
-    pub l1_range: Option<(L1BlockCommitment, L1BlockCommitment)>,
-}
-
 impl ProvingOp for ClStfOperator {
     type Prover = ClStfProver;
-    type Params = ClStfRange;
+    type Params = (L2BlockCommitment, L2BlockCommitment);
 
     fn construct_proof_ctx(&self, range: &Self::Params) -> Result<ProofContext, ProvingTaskError> {
-        let ClStfRange { l2_range, .. } = range;
-
-        let (start, end) = l2_range;
+        let (start_block, end_block) = range;
         // Do some sanity checks
         assert!(
-            start.slot() <= end.slot(),
+            start_block.slot() <= end_block.slot(),
             "failed to construct CL STF proof context. start_slot: {} > end_slot {}",
-            start.slot(),
-            end.slot()
+            start_block.slot(),
+            end_block.slot()
         );
 
-        Ok(ProofContext::ClStf(*start, *end))
+        Ok(ProofContext::ClStf(*start.blkid(), *end.blkid()))
     }
 
     async fn fetch_input(
@@ -219,10 +213,15 @@ impl ProvingOp for ClStfOperator {
         db: &ProofDb,
         task_tracker: Arc<Mutex<TaskTracker>>,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let ClStfRange { l1_range, l2_range } = range;
+        let l1_range = derive_l1_range(
+            &self.cl_client,
+            &self.btc_blockspace_operator.btc_client,
+            range,
+        )
+        .await;
 
-        let el_start_block = self.get_exec_commitment(*l2_range.0.blkid()).await?;
-        let el_end_block = self.get_exec_commitment(*l2_range.1.blkid()).await?;
+        let el_start_block_id = self.get_exec_id(*l2_range.0.blkid()).await?;
+        let el_end_block_id = self.get_exec_id(*l2_range.1.blkid()).await?;
 
         let mut tasks = self
             .evm_ee_operator

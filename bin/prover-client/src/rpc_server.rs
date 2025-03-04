@@ -21,7 +21,7 @@ use tracing::{info, warn};
 use zkaleido::ProofReceipt;
 
 use crate::{
-    operators::{cl_stf::ClStfRange, ProofOperator, ProvingOp},
+    operators::{ProofOperator, ProvingOp},
     status::ProvingTaskStatus,
     task_tracker::TaskTracker,
 };
@@ -114,16 +114,9 @@ impl StrataProverClientApiServer for ProverClientRpc {
         &self,
         cl_block_range: (L2BlockCommitment, L2BlockCommitment),
     ) -> RpcResult<Vec<ProofKey>> {
-        let cl_client = &self.operator.cl_stf_operator().cl_client;
-        let btc_client = &self.operator.btc_operator().btc_client;
-        let l1_range = derive_l1_range(cl_client, btc_client, cl_block_range).await;
-        let cl_params = ClStfRange {
-            l2_range: cl_block_range,
-            l1_range,
-        };
         self.operator
             .cl_stf_operator()
-            .create_task(cl_params, self.task_tracker.clone(), &self.db)
+            .create_task(cl_block_range, self.task_tracker.clone(), &self.db)
             .await
             .map_err(to_jsonrpsee_error("failed to create task for cl block"))
     }
@@ -213,7 +206,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
     }
 }
 
-async fn derive_l1_range(
+pub async fn derive_l1_range(
     cl_client: &HttpClient,
     btc_client: &BitcoinClient,
     l2_range: (L2BlockCommitment, L2BlockCommitment),
