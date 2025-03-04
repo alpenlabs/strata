@@ -23,7 +23,7 @@ pub fn gen_perf_report(
 #[cfg(feature = "sp1")]
 pub mod sp1 {
     use strata_sp1_guest_builder::GUEST_CHECKPOINT_ELF;
-    use zkaleido_sp1_adapter::SP1Host;
+    use zkaleido_sp1_host::SP1Host;
 
     use super::*;
 
@@ -35,7 +35,7 @@ pub mod sp1 {
 #[cfg(feature = "risc0")]
 pub mod risc0 {
     use strata_risc0_guest_builder::GUEST_RISC0_CHECKPOINT_ELF;
-    use zkaleido_risc0_adapter::Risc0Host;
+    use zkaleido_risc0_host::Risc0Host;
 
     use super::*;
 

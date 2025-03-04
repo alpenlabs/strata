@@ -229,15 +229,23 @@ fn generate_elf_contents_and_vk_hash(program: &str) -> ([u32; 8], String) {
         ..Default::default()
     };
 
-    build_args.features = {
-        #[cfg(feature = "mock")]
-        {
-            vec!["mock".to_string()]
-        }
-        #[cfg(not(feature = "mock"))]
-        {
-            vec!["zkvm-verify".to_string()]
-        }
+    // Tell Cargo to re-run the build script if ZKVM_MOCK changes.
+    println!("cargo:rerun-if-env-changed=ZKVM_MOCK");
+
+    // If the environment variable "ZKVM_MOCK" is set to "1" or "true" (case-insensitive),
+    // then do not activate SP1 proof recursive verification. Instead make the recursive
+    // verification a no-op
+    build_args.features = if std::env::var("ZKVM_MOCK")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false)
+    {
+        println!("cargo:warning=ZKVM_MOCK is set. ----------------------------------------");
+        println!("cargo:warning=ZKVM_MOCK is set. This should never be used in production.");
+        println!("cargo:warning=ZKVM_MOCK is set. ----------------------------------------");
+        vec!["mock-verify".to_string()]
+    } else {
+        println!("cargo:warning=ZKVM_MOCK is not set. Good for production");
+        vec!["zkvm-verify".to_string()]
     };
 
     // In the Docker build, override the guest program’s Cargo workspace root with the Strata
