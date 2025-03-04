@@ -141,7 +141,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
     let bridge_tx_db = BridgeTxRocksDb::new(rbdb, ops_config);
     let bridge_tx_db_ctx = TxContext::new(Arc::new(bridge_tx_db));
     let bridge_tx_db_ops = Arc::new(bridge_tx_db_ctx.into_ops(bridge_db_pool));
-    let sig_manager = SignatureManager::new(bridge_tx_db_ops, own_index, keypair);
+    let sig_manager = SignatureManager::new(bridge_tx_db_ops, own_index, keypair.into());
 
     // Set up the TxBuildContext.
     let network = retry!(l1_rpc_client.network().await)?;
@@ -175,7 +175,7 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         tx_build_ctx: tx_context,
         sig_manager,
         l2_rpc_client_pool,
-        keypair,
+        keypair: keypair.into(),
         own_index,
         msg_polling_interval,
     };

@@ -3,7 +3,6 @@
 use bitcoin::bip32::{ChildNumber, Xpriv, Xpub};
 use secp256k1::SECP256K1;
 use strata_primitives::constants::STRATA_SEQUENCER_DERIVATION_PATH;
-#[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::KeyError;
@@ -56,15 +55,6 @@ impl SequencerKeys {
     }
 }
 
-// Manual Drop implementation to zeroize keys on drop.
-impl Drop for SequencerKeys {
-    fn drop(&mut self) {
-        #[cfg(feature = "zeroize")]
-        self.zeroize();
-    }
-}
-
-#[cfg(feature = "zeroize")]
 impl Zeroize for SequencerKeys {
     #[inline]
     fn zeroize(&mut self) {
@@ -136,18 +126,22 @@ impl Zeroize for SequencerKeys {
     }
 }
 
-#[cfg(feature = "zeroize")]
 impl ZeroizeOnDrop for SequencerKeys {}
+
+// Manual Drop implementation to zeroize keys on drop.
+impl Drop for SequencerKeys {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
 
 #[cfg(test)]
 mod tests {
-
     use bitcoin::Network;
 
     use super::*;
 
     #[test]
-    #[cfg(feature = "zeroize")]
     fn test_zeroize() {
         let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
         let mut keys = SequencerKeys::new(&master).unwrap();

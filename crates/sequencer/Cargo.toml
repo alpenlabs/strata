@@ -21,6 +21,11 @@ serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+bitcoin.workspace = true
+strata-key-derivation.workspace = true
 
 [lints]
 rust.missing_docs = "warn"

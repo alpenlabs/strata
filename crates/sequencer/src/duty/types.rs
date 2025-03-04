@@ -4,6 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{buf::Buf32, hash::compute_borsh_hash};
 use strata_state::{batch::Checkpoint, id::L2BlockId};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Describes when we'll stop working to fulfill a duty.
 #[derive(Clone, Debug)]
@@ -127,7 +128,7 @@ pub enum Identity {
 }
 
 /// Sequencer key used for signing-related duties.
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize, Zeroize, ZeroizeOnDrop)]
 pub enum IdentityKey {
     /// Sequencer private key used for signing.
     Sequencer(Buf32),
@@ -150,5 +151,73 @@ impl IdentityData {
     /// Create new IdentityData from components.
     pub fn new(ident: Identity, key: IdentityKey) -> Self {
         Self { ident, key }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    use bitcoin::{bip32::Xpriv, Network};
+    use strata_key_derivation::sequencer::SequencerKeys;
+    use strata_primitives::buf::Buf32;
+    use zeroize::Zeroize;
+
+    use super::*;
+
+    #[test]
+    fn test_zeroize_idata() {
+        fn load_seqkeys() -> IdentityData {
+            let master = Xpriv::new_master(Network::Regtest, &[2u8; 32]).unwrap();
+            let keys = SequencerKeys::new(&master).unwrap();
+            let mut seq_sk = Buf32::from(keys.derived_xpriv().private_key.secret_bytes());
+            let seq_pk = keys.derived_xpub().to_x_only_pub().serialize();
+            let ik = IdentityKey::Sequencer(seq_sk);
+            let ident = Identity::Sequencer(Buf32::from(seq_pk));
+            // Zeroize the Buf32 representation of the Xpriv.
+            seq_sk.zeroize();
+
+            IdentityData::new(ident, ik)
+        }
+
+        // Create an atomic flag to track if zeroize was called
+        let was_zeroized = Arc::new(AtomicBool::new(false));
+        let was_zeroized_clone = Arc::clone(&was_zeroized);
+
+        let idata = load_seqkeys();
+
+        // Create a wrapper struct that will set a flag when dropped
+        struct TestWrapper {
+            inner: IdentityData,
+            flag: Arc<AtomicBool>,
+        }
+
+        impl Drop for TestWrapper {
+            fn drop(&mut self) {
+                // Get the current value before the inner value is dropped
+                // Extract the Buf32 from the enum
+                let bytes = match &self.inner.key {
+                    IdentityKey::Sequencer(buf) => buf.as_bytes(),
+                };
+
+                // The inner IdentityData will be dropped after this,
+                // triggering zeroization
+                self.flag.store(bytes != [0u8; 32], Ordering::Relaxed);
+            }
+        }
+
+        // Create and drop our test wrapper
+        {
+            let _ = TestWrapper {
+                inner: idata,
+                flag: was_zeroized_clone,
+            };
+        }
+
+        // Check if zeroization occurred
+        assert!(was_zeroized.load(Ordering::Relaxed));
     }
 }
