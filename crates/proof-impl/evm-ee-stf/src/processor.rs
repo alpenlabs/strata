@@ -29,6 +29,7 @@ use reth_primitives_traits::{constants::MINIMUM_GAS_LIMIT, SignedTransaction};
 use revm::{
     db::{AccountState, InMemoryDB},
     interpreter::Host,
+    precompile::{PrecompileSpecId, Precompiles},
     primitives::{SpecId, TransactTo, TxEnv},
     Database, DatabaseCommit, Evm,
 };
@@ -43,7 +44,7 @@ use strata_reth_evm::{
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},
-    EvmBlockStfInput,
+    EvmBlockStfInput, EVM_CONFIG,
 };
 
 /// The divisor for the gas limit bound.
@@ -272,12 +273,18 @@ where
 impl EvmProcessor<InMemoryDB> {
     /// Process all state changes and finalize the header's state root.
     pub fn finalize(&mut self) {
-        let db = self.db.take().expect("DB not initialized");
+        let db = self.db.take().expect("DB not initiaed");
+        let precompiles = Precompiles::new(PrecompileSpecId::from_spec_id(EVM_CONFIG.spec_id));
 
         let mut state_trie = mem::take(&mut self.input.pre_state_trie);
         for (address, account) in &db.accounts {
             // Ignore untouched accounts.
             if account.account_state == AccountState::None {
+                continue;
+            }
+
+            // Ignore Ethereum stateless precompiles
+            if precompiles.contains(address) {
                 continue;
             }
 
