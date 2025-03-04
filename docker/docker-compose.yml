@@ -96,7 +96,6 @@ services:
       - ./.data/data-sequencer:/app/data
       - ./configs:/app/configs
       - ./configs/sequencer.key:/app/sequencer.key
-    command: ["--reth-jwtsecret", "configs/jwt.hex"]
     depends_on:
       - bitcoind
       - reth
