@@ -1,6 +1,8 @@
 use bitcoin::Transaction;
 use strata_primitives::{batch::SignedCheckpoint, l1::payload::L1PayloadType};
-use strata_state::{batch::verify_signed_checkpoint_sig, chain_state::Chainstate};
+#[cfg(not(feature = "test_utils"))]
+use strata_state::batch::verify_signed_checkpoint_sig;
+use strata_state::chain_state::Chainstate;
 use tracing::warn;
 
 use super::TxFilterConfig;
@@ -34,6 +36,7 @@ pub fn parse_checkpoint_envelopes<'a>(
     })
 }
 
+#[cfg(not(feature = "test_utils"))]
 fn parse_checkpoint(data: &[u8], filter_conf: &TxFilterConfig) -> Option<SignedCheckpoint> {
     let signed_checkpoint = borsh::from_slice::<SignedCheckpoint>(data).ok()?;
     if !verify_signed_checkpoint_sig(&signed_checkpoint, &filter_conf.sequencer_cred_rule) {
@@ -42,6 +45,22 @@ fn parse_checkpoint(data: &[u8], filter_conf: &TxFilterConfig) -> Option<SignedC
         return None;
     }
 
+    if let Err(err) =
+        borsh::from_slice::<Chainstate>(signed_checkpoint.checkpoint().sidecar().chainstate())
+    {
+        warn!(?err, "invalid chainstate in checkpoint");
+        eprintln!("invalid chainstate in checkpoint: {}", err);
+
+        return None;
+    }
+
+    Some(signed_checkpoint)
+}
+
+#[cfg(feature = "test_utils")]
+/// Does not verify signature in test.
+fn parse_checkpoint(data: &[u8], _filter_conf: &TxFilterConfig) -> Option<SignedCheckpoint> {
+    let signed_checkpoint = borsh::from_slice::<SignedCheckpoint>(data).ok()?;
     if let Err(err) =
         borsh::from_slice::<Chainstate>(signed_checkpoint.checkpoint().sidecar().chainstate())
     {

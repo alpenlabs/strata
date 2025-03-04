@@ -86,7 +86,6 @@ mod test {
     };
     use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
     use strata_primitives::{
-        batch::SignedCheckpoint,
         l1::{payload::L1Payload, BitcoinAmount, ProtocolOperation},
         params::Params,
     };
@@ -95,8 +94,7 @@ mod test {
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
             test_taproot_addr,
         },
-        l2::gen_params,
-        ArbitraryGenerator,
+        l2::{gen_params, get_test_signed_checkpoint},
     };
 
     use crate::{
@@ -302,7 +300,7 @@ mod test {
         let num_envelopes = 1;
         let l1_payloads: Vec<_> = (0..num_envelopes)
             .map(|_| {
-                let signed_checkpoint: SignedCheckpoint = ArbitraryGenerator::new().generate();
+                let signed_checkpoint = get_test_signed_checkpoint();
                 L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
             })
             .collect();
@@ -313,6 +311,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let tx_entries = index_block(&block, ReaderTxVisitorImpl::new, &filter_config);
+        println!("tx_entries: {:?}", tx_entries);
 
         assert_eq!(
             tx_entries.len(),

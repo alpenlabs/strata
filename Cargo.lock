@@ -13870,6 +13870,7 @@ dependencies = [
  "arbitrary",
  "async-trait",
  "bitcoin",
+ "borsh",
  "hex",
  "musig2",
  "rand 0.8.5",

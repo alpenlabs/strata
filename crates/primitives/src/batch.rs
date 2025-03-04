@@ -230,7 +230,7 @@ impl Checkpoint {
 )]
 pub struct CheckpointSidecar {
     /// Chainstate at the end of this checkpoint's epoch.
-    /// Note: using Vec<u8> instead of Chainstate to avoid circular dependency with strata_state
+    /// Note: using `Vec<u8>` instead of Chainstate to avoid circular dependency with strata_state
     chainstate: Vec<u8>,
 }
 

@@ -61,6 +61,7 @@ mod tests {
 
     use super::*;
 
+    // #[ignore]
     #[test]
     #[cfg(feature = "native")]
     fn test_native() {

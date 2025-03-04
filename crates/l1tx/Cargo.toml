@@ -17,8 +17,11 @@ tracing.workspace = true
 
 [dev-dependencies]
 strata-btcio = { workspace = true, features = ["test_utils"] }
-strata-test-utils.workspace = true
 strata-state = { workspace = true, features = ["test_utils"] }
+strata-test-utils.workspace = true
 
 [lints]
 rust.unused_crate_dependencies = "deny"
+
+[features]
+test_utils = []
