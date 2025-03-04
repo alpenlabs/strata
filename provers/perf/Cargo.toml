@@ -18,11 +18,11 @@ strata-test-utils.workspace = true
 # sp1
 sp1-sdk = "4.1.0"
 strata-sp1-guest-builder = { path = "../sp1", optional = true }
-zkaleido-sp1-adapter = { workspace = true, optional = true }
+zkaleido-sp1-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5", optional = true }
 
 # risc0
 strata-risc0-guest-builder = { path = "../risc0", optional = true }
-zkaleido-risc0-adapter = { workspace = true, optional = true }
+zkaleido-risc0-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5", optional = true }
 
 anyhow.workspace = true
 bincode.workspace = true
@@ -37,16 +37,6 @@ tokio.workspace = true
 tracing.workspace = true
 
 [features]
-default = ["sp1-mock"]
-sp1 = [
-  "zkaleido-sp1-adapter/prover",
-  "strata-sp1-guest-builder/sp1-dev",
-  "zkaleido-sp1-adapter/perf",
-]
-sp1-mock = ["sp1", "zkaleido-sp1-adapter/mock", "strata-sp1-guest-builder/mock"]
-risc0 = [
-  "zkaleido-risc0-adapter/prover",
-  "strata-risc0-guest-builder",
-  "zkaleido-risc0-adapter/perf",
-]
-risc0-mock = ["risc0", "zkaleido-risc0-adapter/mock"]
+default = ["sp1"]
+sp1 = ["zkaleido-sp1-host/perf", "strata-sp1-guest-builder/sp1-dev"]
+risc0 = ["zkaleido-risc0-host/perf", "strata-risc0-guest-builder"]
