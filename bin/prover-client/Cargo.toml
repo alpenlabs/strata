@@ -61,5 +61,6 @@ strata-test-utils.workspace = true
 
 [features]
 default = []
-sp1 = ["zkaleido-sp1-host", "strata-sp1-guest-builder"]
+sp1 = ["zkaleido-sp1-host"]
+sp1-builder = ["sp1", "strata-sp1-guest-builder"]
 risc0 = ["zkaleido-risc0-host", "strata-risc0-guest-builder"]
