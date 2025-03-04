@@ -61,20 +61,20 @@ pub enum ZkVmHostInstance {
 
     /// Represents the SP1 ZKVM host implementation.
     ///
-    /// This variant uses the [`zkaleido_sp1_adapter::SP1Host`] implementation and is only
+    /// This variant uses the [`zkaleido_sp1_host::SP1Host`] implementation and is only
     /// available when the `sp1` feature flag is enabled. Attempting to use this variant
     /// without enabling the `sp1` feature will result in a compile-time error or a runtime panic.
     #[cfg(feature = "sp1")]
-    SP1(&'static zkaleido_sp1_adapter::SP1Host),
+    SP1(&'static zkaleido_sp1_host::SP1Host),
 
     /// Represents the Risc0 ZKVM host implementation.
     ///
-    /// This variant uses the [`zkaleido_risc0_adapter::Risc0Host`] implementation and is only
+    /// This variant uses the [`zkaleido_risc0_host::Risc0Host`] implementation and is only
     /// available when the `risc0` feature flag is enabled. Attempting to use this variant
     /// without enabling the `risc0` feature will result in a compile-time error or a runtime
     /// panic.
     #[cfg(feature = "risc0")]
-    Risc0(&'static zkaleido_risc0_adapter::Risc0Host),
+    Risc0(&'static zkaleido_risc0_host::Risc0Host),
 }
 
 /// Resolves the appropriate ZKVM host instance based on the provided [`ProofKey`].

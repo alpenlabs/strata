@@ -1,8 +1,12 @@
+// These two lines are necessary for the program to properly compile.
+//
+// Under the hood, we wrap your main function with some extra code so that it behaves properly
+// inside the zkVM.
 #![no_main]
-sp1_zkvm::entrypoint!(main);
+zkaleido_sp1_guest_env::entrypoint!(main);
 
 use strata_proofimpl_cl_stf::process_cl_stf;
-use zkaleido_sp1_adapter::Sp1ZkVmEnv;
+use zkaleido_sp1_guest_env::Sp1ZkVmEnv;
 
 mod vks;
 

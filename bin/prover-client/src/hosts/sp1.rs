@@ -4,7 +4,7 @@ use cfg_if::cfg_if;
 use strata_primitives::proof::ProofContext;
 #[cfg(feature = "sp1-builder")]
 use strata_sp1_guest_builder::*;
-use zkaleido_sp1_adapter::SP1Host;
+use zkaleido_sp1_host::SP1Host;
 
 cfg_if! {
     if #[cfg(not(feature = "sp1-builder"))] {
