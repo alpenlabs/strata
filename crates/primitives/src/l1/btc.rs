@@ -925,6 +925,7 @@ impl<'a> Arbitrary<'a> for BitcoinScriptBuf {
         Ok(Self(script))
     }
 }
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;

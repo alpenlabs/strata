@@ -208,7 +208,7 @@ fn process_withdrawal_fulfillment(
     state: &mut StateCache,
     info: &WithdrawalFulfillmentInfo,
 ) -> Result<(), TsnError> {
-    state.mark_deposit_executing(info.deposit_idx, info.operator_idx, info.amt);
+    state.mark_deposit_executing(info);
     Ok(())
 }
 
@@ -424,12 +424,12 @@ fn process_deposit_updates(
                 }
             }
 
-            DepositState::Executing(_) => {
+            DepositState::Fulfilled(_) => {
                 // dont reassign executing withdrawals as front payment has been done.
                 // nothing else to do here for now
             }
 
-            DepositState::Executed => {
+            DepositState::Reimbursed => {
                 deposit_idxs_to_remove.push(deposit_idx);
             }
         }

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use bitcoin::{Amount, OutPoint};
+use bitcoin::Amount;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     block_credential::CredRule,
@@ -56,15 +56,6 @@ pub struct DepositSpendConfig {
     pub deposit_idx: u32,
     /// utxo for this deposit
     pub output: OutputRef,
-}
-
-impl DepositSpendConfig {
-    pub fn from_outpoint(outpoint: OutPoint) -> Self {
-        Self {
-            deposit_idx: 0,
-            output: OutputRef::from(outpoint),
-        }
-    }
 }
 
 // sort based on output field for binary search.

@@ -127,6 +127,9 @@ pub struct WithdrawalFulfillmentInfo {
     /// amount that was actually sent on bitcoin.
     /// should equal withdrawal_amount - operator fee
     pub amt: BitcoinAmount,
+
+    /// corresponding bitcoin transaction id.
+    pub txid: Buf32,
 }
 
 #[derive(

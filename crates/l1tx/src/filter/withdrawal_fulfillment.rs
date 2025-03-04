@@ -1,5 +1,6 @@
 use bitcoin::{ScriptBuf, Transaction};
 use strata_primitives::l1::{BitcoinAmount, WithdrawalFulfillmentInfo};
+use tracing::debug;
 
 use super::TxFilterConfig;
 use crate::utils::op_return_nonce;
@@ -21,9 +22,7 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
     // 1. Check this is of correct structure
     let frontpayment_txout = tx.output.first()?;
     let metadata_txout = tx.output.get(1)?;
-    if !metadata_txout.script_pubkey.is_op_return() {
-        return None;
-    }
+    metadata_txout.script_pubkey.is_op_return().then_some(())?;
 
     // 2. Check withdrawal is to an address we expect
     let withdrawal = filter_conf
@@ -35,6 +34,11 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
     // 3. Ensure amount is equal to the expected amount
     let actual_amount_sats = frontpayment_txout.value.to_sat();
     if actual_amount_sats < withdrawal.amount {
+        debug!(
+            ?withdrawal,
+            ?actual_amount_sats,
+            "Transaction with expected withdrawal scriptpubkey found, but amount does not match"
+        );
         return None;
     }
 
@@ -42,6 +46,11 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
     let expected_metadata_script =
         create_opreturn_metadata(withdrawal.operator_idx, withdrawal.deposit_idx);
     if metadata_txout.script_pubkey != expected_metadata_script {
+        debug!(
+            ?withdrawal,
+            ?metadata_txout.script_pubkey,
+            "Transaction with expected withdrawal scriptpubkey and amount found, but metadata does not match"
+        );
         return None;
     }
 
@@ -49,6 +58,7 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
         deposit_idx: withdrawal.deposit_idx,
         operator_idx: withdrawal.operator_idx,
         amt: BitcoinAmount::from_sat(actual_amount_sats),
+        txid: tx.compute_txid().into(),
     })
 }
 
@@ -155,7 +165,8 @@ mod test {
             WithdrawalFulfillmentInfo {
                 deposit_idx: 2,
                 operator_idx: 1,
-                amt: withdraw_amt_after_fees().into()
+                amt: withdraw_amt_after_fees().into(),
+                txid: txn.compute_txid().into()
             }
         );
     }

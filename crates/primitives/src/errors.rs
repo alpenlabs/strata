@@ -31,6 +31,6 @@ pub enum ParseError {
 
     /// Could not get a network address from descriptor
     /// Using String error as [`bitcoin_bosd::DescriptorError`] does not impl Clone
-    #[error("descriptor error: {0}")]
+    #[error("descriptor: {0}")]
     Descriptor(String),
 }
