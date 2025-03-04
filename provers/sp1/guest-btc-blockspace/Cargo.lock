@@ -1115,8 +1115,10 @@ name = "strata-l1tx"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "bitcoin",
  "borsh",
+ "hex",
  "musig2",
  "strata-bridge-tx-builder",
  "strata-primitives",

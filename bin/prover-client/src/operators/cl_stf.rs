@@ -131,7 +131,7 @@ impl ProvingOp for ClStfOperator {
             end_block.slot()
         );
 
-        Ok(ProofContext::ClStf(*start.blkid(), *end.blkid()))
+        Ok(ProofContext::ClStf(*start_block, *end_block))
     }
 
     async fn fetch_input(
@@ -218,14 +218,19 @@ impl ProvingOp for ClStfOperator {
             &self.btc_blockspace_operator.btc_client,
             range,
         )
-        .await;
+        .await
+        .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
 
-        let el_start_block_id = self.get_exec_id(*l2_range.0.blkid()).await?;
-        let el_end_block_id = self.get_exec_id(*l2_range.1.blkid()).await?;
+        let el_start_block_id = self.get_exec_commitment(*range.0.blkid()).await?;
+        let el_end_block_id = self.get_exec_commitment(*range.1.blkid()).await?;
 
         let mut tasks = self
             .evm_ee_operator
-            .create_task((el_start_block, el_end_block), task_tracker.clone(), db)
+            .create_task(
+                (el_start_block_id, el_end_block_id),
+                task_tracker.clone(),
+                db,
+            )
             .await?;
 
         if let Some(l1_range) = l1_range {

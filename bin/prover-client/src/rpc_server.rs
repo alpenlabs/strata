@@ -210,30 +210,39 @@ pub async fn derive_l1_range(
     cl_client: &HttpClient,
     btc_client: &BitcoinClient,
     l2_range: (L2BlockCommitment, L2BlockCommitment),
-) -> Option<(L1BlockCommitment, L1BlockCommitment)> {
+) -> RpcResult<Option<(L1BlockCommitment, L1BlockCommitment)>> {
     // sanity check
     assert!(l2_range.1.slot() >= l2_range.0.slot(), "");
 
     let start_block_hash = *l2_range.0.blkid();
     let mut current_block_hash = *l2_range.1.blkid();
     loop {
-        let l2_block = cl_client
+        let l2_block = match cl_client
             .get_block_by_id(current_block_hash)
             .await
-            .expect("cannot find L2 block")
-            .expect("cannot find L2 block");
+            .map_err(to_jsonrpsee_error("failed to fetch l2 block"))?
+        {
+            Some(block) => block,
+            None => return Ok(None),
+        };
 
         let new_l1_manifests = l2_block.l1_segment().new_manifests();
         if !new_l1_manifests.is_empty() {
             let blkid = *new_l1_manifests.first().unwrap().blkid();
-            let height = btc_client.get_block_height(&blkid.into()).await.unwrap();
+            let height = btc_client
+                .get_block_height(&blkid.into())
+                .await
+                .map_err(to_jsonrpsee_error("failed to fetch l1 block"))?;
             let first_commitment = L1BlockCommitment::new(height, blkid);
 
             let blkid = *new_l1_manifests.last().unwrap().blkid();
-            let height = btc_client.get_block_height(&blkid.into()).await.unwrap();
+            let height = btc_client
+                .get_block_height(&blkid.into())
+                .await
+                .map_err(to_jsonrpsee_error("failed to fetch l1 block"))?;
             let last_commitment = L1BlockCommitment::new(height, blkid);
 
-            return Some((first_commitment, last_commitment));
+            return Ok(Some((first_commitment, last_commitment)));
         }
 
         let prev_l2_blkid = *l2_block.header().parent();
@@ -244,5 +253,6 @@ pub async fn derive_l1_range(
             current_block_hash = prev_l2_blkid;
         }
     }
-    None
+
+    Ok(None)
 }
