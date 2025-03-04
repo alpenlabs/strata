@@ -3883,6 +3883,7 @@ dependencies = [
  "ff 0.13.0",
  "generic-array 0.14.7",
  "group 0.13.0",
+ "hkdf",
  "pem-rfc7468",
  "pkcs8",
  "rand_core 0.6.4",
@@ -12553,21 +12554,9 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "4.0.1"
-source = "git+https://github.com/succinctlabs/sp1.git?rev=6c5a7f2846cd3610ecd38b1641f0e370fd07ee83#6c5a7f2846cd3610ecd38b1641f0e370fd07ee83"
-dependencies = [
- "anyhow",
- "cargo_metadata 0.18.1",
- "chrono",
- "clap",
- "dirs",
-]
-
-[[package]]
-name = "sp1-build"
-version = "4.1.1"
+version = "4.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb3ab2b8e8bad6d5ab1235ac31f777a0d4487a3d79b275af61008e58cec40391"
+checksum = "13f816a774ef3f60556c011c236a2a58407fe6748291b44bbd51e89d287562e9"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.18.1",
@@ -12727,19 +12716,21 @@ dependencies = [
 
 [[package]]
 name = "sp1-helper"
-version = "4.0.1"
-source = "git+https://github.com/succinctlabs/sp1.git?rev=6c5a7f2846cd3610ecd38b1641f0e370fd07ee83#6c5a7f2846cd3610ecd38b1641f0e370fd07ee83"
+version = "4.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a434c0e259fa8189537d6c3b9c31d5dc06446f77cb5b81190747351ca8b7a88b"
 dependencies = [
- "sp1-build 4.0.1",
+ "sp1-build",
 ]
 
 [[package]]
 name = "sp1-lib"
-version = "4.0.1"
+version = "4.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aac3d3deeed25e9cad80e4275faf5954aa63f213ed3422f0e098dd2d0c1b0c0e"
+checksum = "fab1b5989a446f294724cebab0e759ffd7034ba93d2aa7b97045303f7c50bf74"
 dependencies = [
  "bincode",
+ "elliptic-curve",
  "serde",
  "sp1-primitives",
 ]
@@ -12971,7 +12962,7 @@ dependencies = [
  "reqwest-middleware",
  "serde",
  "serde_json",
- "sp1-build 4.1.1",
+ "sp1-build",
  "sp1-core-executor",
  "sp1-core-machine",
  "sp1-cuda",
@@ -13034,6 +13025,22 @@ dependencies = [
  "sha2 0.10.8",
  "substrate-bn-succinct",
  "thiserror 2.0.11",
+]
+
+[[package]]
+name = "sp1-zkvm"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f0acfbdacfeaad17367dd81e0019d7789fde3b5a9af94f0f20aed2d9dc9e4e2"
+dependencies = [
+ "cfg-if",
+ "getrandom 0.2.15",
+ "lazy_static",
+ "libm",
+ "rand 0.8.5",
+ "sha2 0.10.8",
+ "sp1-lib",
+ "sp1-primitives",
 ]
 
 [[package]]
@@ -13398,8 +13405,8 @@ dependencies = [
  "tokio",
  "tracing",
  "zkaleido",
- "zkaleido-risc0-adapter",
- "zkaleido-sp1-adapter",
+ "zkaleido-risc0-groth16-verifier",
+ "zkaleido-sp1-groth16-verifier",
 ]
 
 [[package]]
@@ -13716,8 +13723,8 @@ dependencies = [
  "uuid",
  "zkaleido",
  "zkaleido-native-adapter",
- "zkaleido-risc0-adapter",
- "zkaleido-sp1-adapter",
+ "zkaleido-risc0-host",
+ "zkaleido-sp1-host",
 ]
 
 [[package]]
@@ -13755,8 +13762,8 @@ dependencies = [
  "tokio",
  "tracing",
  "zkaleido",
- "zkaleido-risc0-adapter",
- "zkaleido-sp1-adapter",
+ "zkaleido-risc0-host",
+ "zkaleido-sp1-host",
 ]
 
 [[package]]
@@ -13986,7 +13993,7 @@ dependencies = [
  "strata-state",
  "strata-test-utils",
  "zkaleido",
- "zkaleido-risc0-adapter",
+ "zkaleido-risc0-host",
 ]
 
 [[package]]
@@ -14115,7 +14122,7 @@ dependencies = [
  "sha2 0.10.8",
  "sp1-helper",
  "sp1-sdk",
- "zkaleido-sp1-adapter",
+ "zkaleido-sp1-guest-env",
 ]
 
 [[package]]
@@ -14235,27 +14242,6 @@ dependencies = [
  "strata-storage",
  "threadpool",
  "tokio",
-]
-
-[[package]]
-name = "strata-zkvm-hosts"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "borsh",
- "cfg-if",
- "serde",
- "strata-primitives",
- "strata-proofimpl-btc-blockspace",
- "strata-proofimpl-checkpoint",
- "strata-proofimpl-cl-stf",
- "strata-proofimpl-evm-ee-stf",
- "strata-risc0-guest-builder",
- "strata-sp1-guest-builder",
- "thiserror 2.0.11",
- "zkaleido-native-adapter",
- "zkaleido-risc0-adapter",
- "zkaleido-sp1-adapter",
 ]
 
 [[package]]
@@ -16249,7 +16235,7 @@ dependencies = [
 [[package]]
 name = "zkaleido"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
 dependencies = [
  "arbitrary",
  "async-trait",
@@ -16262,7 +16248,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-native-adapter"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
 dependencies = [
  "bincode",
  "borsh",
@@ -16271,32 +16257,61 @@ dependencies = [
 ]
 
 [[package]]
-name = "zkaleido-risc0-adapter"
+name = "zkaleido-risc0-groth16-verifier"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
+dependencies = [
+ "risc0-zkvm",
+ "sha2 0.10.8",
+ "zkaleido",
+]
+
+[[package]]
+name = "zkaleido-risc0-host"
+version = "0.1.0"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
 dependencies = [
  "bincode",
  "borsh",
  "hex",
  "risc0-zkvm",
  "serde",
- "sha2 0.10.8",
  "zkaleido",
 ]
 
 [[package]]
-name = "zkaleido-sp1-adapter"
+name = "zkaleido-sp1-groth16-verifier"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc4#b92938cc00c2a644c15889204ac021a7eb37239f"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
+dependencies = [
+ "hex",
+ "sp1-verifier",
+ "zkaleido",
+]
+
+[[package]]
+name = "zkaleido-sp1-guest-env"
+version = "0.1.0"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
+dependencies = [
+ "bincode",
+ "cfg-if",
+ "serde",
+ "sp1-zkvm",
+ "zkaleido",
+]
+
+[[package]]
+name = "zkaleido-sp1-host"
+version = "0.1.0"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
 dependencies = [
  "bincode",
  "borsh",
- "hex",
  "serde",
  "sp1-prover",
  "sp1-sdk",
  "sp1-stark",
- "sp1-verifier",
  "zkaleido",
 ]
 

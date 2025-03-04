@@ -7,14 +7,12 @@ version = "0.1.0"
 
 [dependencies]
 strata-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
-zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc4", features = [
-  "zkvm",
-] }
+zkaleido-sp1-guest-env = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5" }
 
 [patch.crates-io]
 secp256k1 = { git = "https://github.com/sp1-patches/rust-secp256k1", branch = "patch-secp256k1-v0.29.1" }
 sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-v0.10.8" }
 
 [features]
-mock = ["zkaleido-sp1-adapter/mock"]
-zkvm-verify = ["zkaleido-sp1-adapter/zkvm-verify"]
+mock-verify = ["zkaleido-sp1-guest-env/mock-verify"]
+zkvm-verify = ["zkaleido-sp1-guest-env/zkvm-verify"]
