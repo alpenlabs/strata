@@ -15,6 +15,9 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
 
 COPY . .
 
+# Install rust toolchain
+RUN rustup toolchain install
+
 # Build dependencies in release mode
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \

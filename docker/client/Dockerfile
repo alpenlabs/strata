@@ -12,11 +12,12 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
     build-essential \
     libclang-dev
 
-# Create a new empty shell project to cache dependencies
-
 COPY . .
-# Build dependencies in release mode
 
+# Install rust toolchain
+RUN rustup toolchain install
+
+# Build dependencies in release mode
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \

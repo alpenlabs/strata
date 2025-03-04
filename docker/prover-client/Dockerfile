@@ -19,14 +19,10 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
     libclang-dev \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# setup sp1up
-RUN curl -fsSL --proto https --tlsv1.2 https://sp1.succinct.xyz | bash && ~/.sp1/bin/sp1up --c-toolchain
-ENV PATH="/root/.sp1/bin:$PATH"
-
-# check sp1 is setup properly
-RUN cargo prove --version
-
 COPY . .
+
+# Install rust toolchain
+RUN rustup toolchain install
 
 # Accept an argument for Cargo features
 ARG PROVER_FEATURES=""
