@@ -25,7 +25,6 @@ ENV PATH="/root/.sp1/bin:$PATH"
 
 # check sp1 is setup properly
 RUN cargo prove --version
-RUN RUSTUP_TOOLCHAIN=succinct cargo --version
 
 COPY . .
 
