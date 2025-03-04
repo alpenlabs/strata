@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use bitcoin::Amount;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
@@ -7,7 +5,7 @@ use strata_primitives::{
     buf::Buf32,
     l1::{BitcoinAddress, BitcoinScriptBuf, OutputRef},
     params::{DepositTxParams, RollupParams},
-    sorted_vec::SortedVec,
+    sorted_vec::{HasKey, SortedVec, SortedVecWithKey},
 };
 use strata_state::{
     bridge_state::{DepositEntry, DepositState},
@@ -37,16 +35,9 @@ pub struct ExpectedWithdrawalFulfillment {
     pub deposit_idx: u32,
 }
 
-// ordering based on destination for binary search.
-impl Ord for ExpectedWithdrawalFulfillment {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.destination.cmp(&other.destination)
-    }
-}
-
-impl PartialOrd for ExpectedWithdrawalFulfillment {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl HasKey<BitcoinScriptBuf> for ExpectedWithdrawalFulfillment {
+    fn get_key(&self) -> BitcoinScriptBuf {
+        self.destination.clone()
     }
 }
 
@@ -58,16 +49,9 @@ pub struct DepositSpendConfig {
     pub output: OutputRef,
 }
 
-// sort based on output field for binary search.
-impl Ord for DepositSpendConfig {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.output.cmp(&other.output)
-    }
-}
-
-impl PartialOrd for DepositSpendConfig {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl HasKey<OutputRef> for DepositSpendConfig {
+    fn get_key(&self) -> OutputRef {
+        self.output
     }
 }
 
@@ -87,10 +71,11 @@ pub struct TxFilterConfig {
     pub expected_blobs: SortedVec<Buf32>,
 
     /// For deposits that might be spent from.
-    pub expected_outpoints: SortedVec<DepositSpendConfig>,
+    pub expected_outpoints: SortedVecWithKey<OutputRef, DepositSpendConfig>,
 
     /// For withdrawal fulfillment transactions sent by bridge operator.
-    pub expected_withdrawal_fulfillments: SortedVec<ExpectedWithdrawalFulfillment>,
+    pub expected_withdrawal_fulfillments:
+        SortedVecWithKey<BitcoinScriptBuf, ExpectedWithdrawalFulfillment>,
 
     /// Deposit config that determines how a deposit transaction can be parsed.
     pub deposit_config: DepositTxParams,
@@ -123,15 +108,15 @@ impl TxFilterConfig {
             sequencer_cred_rule,
             expected_addrs,
             expected_blobs: SortedVec::new(),
-            expected_outpoints: SortedVec::new(),
-            expected_withdrawal_fulfillments: SortedVec::new(),
+            expected_outpoints: Vec::new().into(),
+            expected_withdrawal_fulfillments: Vec::new().into(),
             deposit_config,
         })
     }
 
     pub fn update_from_chainstate(&mut self, chainstate: &Chainstate) {
         self.expected_withdrawal_fulfillments =
-            derive_expected_withdrawal_fulfillments(chainstate.deposits_table().deposits());
+            derive_expected_withdrawal_fulfillments(chainstate.deposits_table().deposits()).into();
 
         // Watch all utxos we have in our deposit table.
         self.expected_outpoints = chainstate
@@ -148,7 +133,7 @@ impl TxFilterConfig {
 
 pub(crate) fn derive_expected_withdrawal_fulfillments<'a, I>(
     deposits: I,
-) -> SortedVec<ExpectedWithdrawalFulfillment>
+) -> Vec<ExpectedWithdrawalFulfillment>
 where
     I: Iterator<Item = &'a DepositEntry>,
 {
@@ -175,5 +160,4 @@ where
         })
         .flatten()
         .collect::<Vec<_>>()
-        .into()
 }

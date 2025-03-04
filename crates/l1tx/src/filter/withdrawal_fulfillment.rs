@@ -1,5 +1,8 @@
 use bitcoin::{ScriptBuf, Transaction};
-use strata_primitives::l1::{BitcoinAmount, WithdrawalFulfillmentInfo};
+use strata_primitives::{
+    l1::{BitcoinAmount, WithdrawalFulfillmentInfo},
+    sorted_vec::HasKey,
+};
 use tracing::debug;
 
 use super::TxFilterConfig;
@@ -27,9 +30,12 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
     // 2. Check withdrawal is to an address we expect
     let withdrawal = filter_conf
         .expected_withdrawal_fulfillments
-        .binary_search_by_key(&frontpayment_txout.script_pubkey, |expected| {
-            expected.destination.inner()
-        })?;
+        .binary_search_by_key(
+            &frontpayment_txout.script_pubkey.clone().into(),
+            HasKey::get_key,
+        )
+        .ok()
+        .map(|x| filter_conf.expected_withdrawal_fulfillments[x].clone())?;
 
     // 3. Ensure amount is equal to the expected amount
     let actual_amount_sats = frontpayment_txout.value.to_sat();
@@ -125,7 +131,7 @@ mod test {
         ];
 
         filterconfig.expected_withdrawal_fulfillments =
-            derive_expected_withdrawal_fulfillments(deposits.iter());
+            derive_expected_withdrawal_fulfillments(deposits.iter()).into();
 
         (addresses, filterconfig)
     }

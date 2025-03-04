@@ -48,9 +48,10 @@ fn parse_deposit_spends<'a>(
     tx.input.iter().filter_map(|txin| {
         filter_conf
             .expected_outpoints
-            .binary_search_by_key(&txin.previous_output, |config| config.output.outpoint())
-            .map(|config| DepositSpendInfo {
-                deposit_idx: config.deposit_idx,
+            .binary_search_by_key(&txin.previous_output, |config| *config.output.outpoint())
+            .ok()
+            .map(|p| DepositSpendInfo {
+                deposit_idx: filter_conf.expected_outpoints[p].deposit_idx,
             })
     })
 }

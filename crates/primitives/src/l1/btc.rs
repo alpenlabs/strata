@@ -897,7 +897,7 @@ impl From<ScriptBuf> for BitcoinScriptBuf {
 impl BorshSerialize for BitcoinScriptBuf {
     fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let script_bytes = self.0.to_bytes();
-        BorshSerialize::serialize(&(script_bytes.len() as u64), writer)?;
+        BorshSerialize::serialize(&(script_bytes.len() as u32), writer)?;
         writer.write_all(&script_bytes)?;
         Ok(())
     }
@@ -906,7 +906,7 @@ impl BorshSerialize for BitcoinScriptBuf {
 // Implement BorshDeserialize for BitcoinScriptBuf
 impl BorshDeserialize for BitcoinScriptBuf {
     fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
-        let script_len = u64::deserialize_reader(reader)? as usize;
+        let script_len = u32::deserialize_reader(reader)? as usize;
         let mut script_bytes = vec![0u8; script_len];
         reader.read_exact(&mut script_bytes)?;
         let script_pubkey = ScriptBuf::from(script_bytes);
