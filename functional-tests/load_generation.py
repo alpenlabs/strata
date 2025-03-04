@@ -9,9 +9,8 @@ from load.service import LoadGeneratorService
 
 os.mkdir("logs")
 loadgen = LoadGeneratorService(
-    "logs", LoadConfig([BasicRethBlockJob, BasicRethTxJob], "http://localhost:8545", 30)
+    "logs", LoadConfig([BasicRethBlockJob, BasicRethTxJob], "http://localhost:8545", 1)
 )
-
 
 loadgen.start()
 print("sleeping 3000 secs")
