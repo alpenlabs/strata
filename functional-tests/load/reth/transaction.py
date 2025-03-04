@@ -174,13 +174,15 @@ class SmartContracts(TransactionSender):
 
     _smart_contracts_storage = dict()
 
-    def _extract_compiled_contract(self, compiled_sol, contract_name: str):
+    @staticmethod
+    def extract_compiled_contract(compiled_sol, contract_name: str):
         for ct_id, ct_interface in compiled_sol.items():
             if ct_id.endswith(contract_name):
                 return ct_interface["abi"], ct_interface["bin"]
         return None
 
-    def _compile_contract(self, filename, contract_name=None):
+    @staticmethod
+    def compile_contract(filename, contract_name=None):
         if contract_name is None:
             contract_name = filename.split(".")[0]
 
@@ -191,11 +193,11 @@ class SmartContracts(TransactionSender):
             output_values=["abi", "bin"],
             solc_version=SmartContracts.SOL_VERSION,
         )
-        return self._extract_compiled_contract(compiled_sol, contract_name)
+        return SmartContracts.extract_compiled_contract(compiled_sol, contract_name)
 
     @tx_caller("DEPLOYING CONTRACT [3]")
     def deploy_contract(self, contract_path, contract_name, contract_id, *args):
-        abi, bytecode = self._compile_contract(contract_path, contract_name)
+        abi, bytecode = SmartContracts.compile_contract(contract_path, contract_name)
         contract = self.w3.eth.contract(abi=abi, bytecode=bytecode)
 
         tx: Tx = TransactionBuilder.new_with_gas(5_000_000)

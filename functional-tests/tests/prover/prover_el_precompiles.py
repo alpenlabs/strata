@@ -1,15 +1,14 @@
-import time
-
 import flexitest
-from solcx import compile_source, install_solc, set_solc_version
+from solcx import install_solc, set_solc_version
 from web3 import Web3
 
+from envs import testenv
+from load.reth.transaction import SmartContracts
 from utils import (
-    wait_until_with_value,
     el_slot_to_block_id,
     wait_for_proof_with_time_out,
+    wait_until_with_value,
 )
-from envs import testenv
 
 
 @flexitest.register
@@ -30,14 +29,16 @@ class ElShaPrecompileTest(testenv.StrataTester):
         web3.eth.default_account = web3.address
 
         # Deploy the contract
-        abi, bytecode = get_contract()
+        abi, bytecode = SmartContracts.compile_contract(
+            "PrecompileTestContract.sol", "PrecompileTestContract"
+        )
         contract = web3.eth.contract(abi=abi, bytecode=bytecode)
         tx_hash = contract.constructor().transact()
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
 
-        # Call the updateHash contract method
+        # Call the contract function
         contract_instance = web3.eth.contract(abi=abi, address=tx_receipt.contractAddress)
-        tx_hash = contract_instance.functions.updateHash().transact()
+        tx_hash = contract_instance.functions.testPrecompiles().transact()
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
 
         # Prove the corresponding EE block
@@ -66,24 +67,3 @@ class ElShaPrecompileTest(testenv.StrataTester):
         self.debug(f"Using task ID: {task_id}")
 
         wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)
-
-
-def get_contract():
-    compiled_sol = compile_source(
-        """
-        pragma solidity ^0.8.0;
-
-        contract MessageHasher {
-            function testShaPrecompile() external {
-                string memory message = "Hello, World!";
-                bytes32 hash = sha256(abi.encodePacked(message));
-            }
-        }
-        """,
-        output_values=["abi", "bin"],
-    )
-
-    _, contract_interface = compiled_sol.popitem()
-    bytecode = contract_interface["bin"]
-    abi = contract_interface["abi"]
-    return abi, bytecode

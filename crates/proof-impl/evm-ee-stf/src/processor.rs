@@ -273,7 +273,7 @@ where
 impl EvmProcessor<InMemoryDB> {
     /// Process all state changes and finalize the header's state root.
     pub fn finalize(&mut self) {
-        let db = self.db.take().expect("DB not initiaed");
+        let db = self.db.take().expect("DB not initialized");
         let precompiles = Precompiles::new(PrecompileSpecId::from_spec_id(EVM_CONFIG.spec_id));
 
         let mut state_trie = mem::take(&mut self.input.pre_state_trie);
