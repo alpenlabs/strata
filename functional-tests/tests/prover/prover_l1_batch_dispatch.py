@@ -4,7 +4,7 @@ import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
-from utils import bytes_to_big_endian, wait_for_proof_with_time_out
+from utils import bytes_to_big_endian, wait_for_proof_with_time_out, wait_until
 
 # Parameters defining therange of L1 blocks to be proven.
 L1_PROVER_PARAMS = {
@@ -25,8 +25,11 @@ class ProverClientTest(testenv.StrataTester):
         btcrpc: BitcoindClient = btc.create_rpc()
         prover_client_rpc = prover_client.create_rpc()
 
-        # Allow time for blocks to build
-        time.sleep(5)
+        # Wait until the prover client reports readiness
+        wait_until(
+            lambda: prover_client_rpc.dev_strata_getReport() is not None,
+            error_with="Prover did not start on time",
+        )
 
         start_block_height = L1_PROVER_PARAMS["START_BLOCK_HEIGHT"]
         start_block_hash = bytes_to_big_endian(btcrpc.proxy.getblockhash(start_block_height))
