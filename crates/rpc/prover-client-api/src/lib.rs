@@ -3,7 +3,9 @@
 use std::collections::HashMap;
 
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use strata_primitives::{buf::Buf32, l1::L1BlockCommitment, l2::L2BlockCommitment};
+use strata_primitives::{
+    evm_exec::EvmEeBlockCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment,
+};
 use strata_rpc_types::ProofKey;
 use zkaleido::ProofReceipt;
 
@@ -20,7 +22,10 @@ pub trait StrataProverClientApi {
 
     /// Start proving the given el block
     #[method(name = "proveElBlocks")]
-    async fn prove_el_blocks(&self, el_block_range: (Buf32, Buf32)) -> RpcResult<Vec<ProofKey>>;
+    async fn prove_el_blocks(
+        &self,
+        el_block_range: (EvmEeBlockCommitment, EvmEeBlockCommitment),
+    ) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given cl block
     #[method(name = "proveClBlocks")]

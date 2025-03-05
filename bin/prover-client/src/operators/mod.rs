@@ -187,7 +187,7 @@ pub trait ProvingOp {
 mod tests {
     use std::sync::Arc;
 
-    use strata_primitives::{buf::Buf32, l1::L1BlockCommitment};
+    use strata_primitives::{buf::Buf32, evm_exec::EvmEeBlockCommitment, l1::L1BlockCommitment};
     use strata_rocksdb::{prover::db::ProofDb, test_utils::get_rocksdb_tmp_instance_for_prover};
     use strata_rpc_types::ProofKey;
     use tokio::sync::Mutex;
@@ -285,7 +285,8 @@ mod tests {
             let mut batch = Buf32::default();
             batch.0[0] = *params as u8;
             Ok(strata_primitives::proof::ProofContext::EvmEeStf(
-                batch, batch,
+                EvmEeBlockCommitment::new(*params, Buf32::default()),
+                EvmEeBlockCommitment::new(*params, Buf32::default()),
             ))
         }
 

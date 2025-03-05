@@ -1,4 +1,6 @@
+use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 use crate::buf::Buf32;
 
@@ -24,4 +26,46 @@ pub fn create_evm_extra_payload(block_hash: Buf32) -> Vec<u8> {
         block_hash: *block_hash.as_ref(),
     };
     borsh::to_vec(&extra_payload).expect("extra_payload vec")
+}
+
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+    Deserialize,
+    Serialize,
+)]
+pub struct EvmEeBlockCommitment {
+    slot: u64,
+    blkid: Buf32,
+}
+
+impl EvmEeBlockCommitment {
+    pub fn new(slot: u64, blkid: Buf32) -> Self {
+        Self { slot, blkid }
+    }
+
+    pub fn null() -> Self {
+        Self::new(0, Buf32::zero())
+    }
+
+    pub fn slot(&self) -> u64 {
+        self.slot
+    }
+
+    pub fn blkid(&self) -> &Buf32 {
+        &self.blkid
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.slot == 0 && self.blkid().is_zero()
+    }
 }

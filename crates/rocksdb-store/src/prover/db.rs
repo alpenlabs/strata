@@ -88,6 +88,7 @@ impl ProofDatabase for ProofDb {
 mod tests {
     use strata_primitives::{
         buf::Buf32,
+        evm_exec::EvmEeBlockCommitment,
         l1::L1BlockCommitment,
         l2::L2BlockCommitment,
         proof::{ProofContext, ProofZkVm},
@@ -114,14 +115,26 @@ mod tests {
     }
 
     fn generate_proof_context_with_deps() -> (ProofContext, Vec<ProofContext>) {
-        let evm_blkid_1 = Buf32::from([1u8; 32]);
-        let evm_blkid_2 = Buf32::from([2u8; 32]);
+        // Constants for test block IDs
+        const BLOCK_1_ID: [u8; 32] = [1u8; 32];
+        const BLOCK_2_ID: [u8; 32] = [2u8; 32];
 
-        let cl_blkid_1 = L2BlockCommitment::null();
-        let cl_blkid_2 = L2BlockCommitment::null();
-        let proof_context = ProofContext::ClStf(cl_blkid_1, cl_blkid_2);
-        let deps = vec![ProofContext::EvmEeStf(evm_blkid_1, evm_blkid_2)];
-        (proof_context, deps)
+        // Create block IDs
+        let evm_block_1 = Buf32::from(BLOCK_1_ID);
+        let evm_block_2 = Buf32::from(BLOCK_2_ID);
+
+        // Create L2 block commitments
+        let evm_commitment_1 = EvmEeBlockCommitment::new(1, evm_block_1);
+        let evm_commitment_2 = EvmEeBlockCommitment::new(2, evm_block_2);
+
+        // Create main proof context
+        let main_context =
+            ProofContext::ClStf(L2BlockCommitment::null(), L2BlockCommitment::null());
+
+        // Create dependency proof contexts
+        let deps = vec![ProofContext::EvmEeStf(evm_commitment_1, evm_commitment_2)];
+
+        (main_context, deps)
     }
 
     #[test]

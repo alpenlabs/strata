@@ -266,7 +266,6 @@ impl TaskTracker {
 #[cfg(test)]
 mod tests {
     use strata_primitives::{
-        buf::Buf32,
         l2::L2BlockCommitment,
         proof::{ProofContext, ProofZkVm},
     };
@@ -284,8 +283,8 @@ mod tests {
         let start: L2BlockCommitment = gen.generate();
         let end: L2BlockCommitment = gen.generate();
         for _ in 0..n {
-            let start: Buf32 = gen.generate();
-            let end: Buf32 = gen.generate();
+            let start = gen.generate();
+            let end = gen.generate();
             let id = ProofContext::EvmEeStf(start, end);
             let key = ProofKey::new(id, host);
             deps.push(key);

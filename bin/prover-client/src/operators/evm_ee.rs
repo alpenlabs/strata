@@ -2,6 +2,7 @@ use alloy_rpc_types::{Block, Header};
 use jsonrpsee::{core::client::ClientT, http_client::HttpClient, rpc_params};
 use strata_primitives::{
     buf::Buf32,
+    evm_exec::EvmEeBlockCommitment,
     proof::{ProofContext, ProofKey},
 };
 use strata_proofimpl_evm_ee_stf::{
@@ -55,14 +56,14 @@ impl EvmEeOperator {
 
 impl ProvingOp for EvmEeOperator {
     type Prover = EvmEeProver;
-    type Params = (Buf32, Buf32);
+    type Params = (EvmEeBlockCommitment, EvmEeBlockCommitment);
 
     fn construct_proof_ctx(
         &self,
         block_range: &Self::Params,
     ) -> Result<ProofContext, ProvingTaskError> {
-        let (start_blkid, end_blkid) = *block_range;
-        Ok(ProofContext::EvmEeStf(start_blkid, end_blkid))
+        let (start_blk, end_blk) = *block_range;
+        Ok(ProofContext::EvmEeStf(start_blk, end_blk))
     }
 
     async fn fetch_input(
@@ -70,14 +71,14 @@ impl ProvingOp for EvmEeOperator {
         task_id: &ProofKey,
         _db: &ProofDb,
     ) -> Result<EvmEeProofInput, ProvingTaskError> {
-        let (start_block_hash, end_block_hash) = match task_id.context() {
+        let (start_block, end_block) = match task_id.context() {
             ProofContext::EvmEeStf(start, end) => (*start, *end),
             _ => return Err(ProvingTaskError::InvalidInput("EvmEe".to_string())),
         };
 
         let mut mini_batch = Vec::new();
 
-        let mut blkid = end_block_hash;
+        let mut blkid = *end_block.blkid();
         loop {
             let witness: EvmBlockStfInput = self
                 .el_client
@@ -87,11 +88,11 @@ impl ProvingOp for EvmEeOperator {
 
             mini_batch.push(witness);
 
-            if blkid == start_block_hash {
+            if start_block.blkid() == &blkid {
                 break;
             } else {
                 blkid = Buf32(
-                    self.get_block_header(blkid)
+                    self.get_block_header(blkid.as_ref().into())
                         .await
                         .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?
                         .parent_hash

@@ -2,7 +2,7 @@ import flexitest
 from web3 import Web3
 
 from envs import testenv
-from utils import el_slot_to_block_id, wait_for_proof_with_time_out, wait_until_with_value
+from utils import el_slot_to_block_commitment, wait_for_proof_with_time_out, wait_until_with_value
 from utils.schnorr import (
     get_precompile_input,
     get_test_schnnor_secret_key,
@@ -52,10 +52,10 @@ class ProverClientTest(testenv.StrataTester):
         )
 
         # Dispatch the prover task
-        start_block_id = el_slot_to_block_id(rethrpc, ee_prover_params["start_block"])
-        end_block_id = el_slot_to_block_id(rethrpc, ee_prover_params["end_block"])
+        start_block = el_slot_to_block_commitment(rethrpc, ee_prover_params["start_block"])
+        end_block = el_slot_to_block_commitment(rethrpc, ee_prover_params["end_block"])
 
-        task_ids = prover_client_rpc.dev_strata_proveElBlocks((start_block_id, end_block_id))
+        task_ids = prover_client_rpc.dev_strata_proveElBlocks((start_block, end_block))
         self.debug(f"got task ids: {task_ids}")
         task_id = task_ids[0]
         self.debug(f"using task id: {task_id}")
