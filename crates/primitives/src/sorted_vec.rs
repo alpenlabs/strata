@@ -203,7 +203,7 @@ enum TableState {
 /// Checks the "safety" of a slice that we'd want to convert into a
 /// [`FlatTable`].
 fn check_table_vec<T: TableEntry>(v: &[T]) -> TableState {
-    let mut dups = true;
+    let mut dups = false;
 
     for pair in v.windows(2) {
         match Ord::cmp(pair[0].get_key(), pair[1].get_key()) {
@@ -482,5 +482,33 @@ mod tests {
         sv1.merge(&sv2);
 
         assert_eq!(sv1.as_slice(), &[1, 3, 3, 4, 4, 5, 5, 7, 8]);
+    }
+
+    #[allow(unused)]
+    struct Pair(u32, u32);
+
+    impl TableEntry for Pair {
+        type Key = u32;
+        fn get_key(&self) -> &Self::Key {
+            &self.0
+        }
+    }
+
+    #[test]
+    fn test_ft_check_table_vec_safe() {
+        let vec = vec![Pair(0, 2), Pair(10, 3), Pair(20, 4)];
+        assert_eq!(check_table_vec(&vec), TableState::Safe);
+    }
+
+    #[test]
+    fn test_ft_check_table_vec_duplicates() {
+        let vec = vec![Pair(0, 2), Pair(0, 3), Pair(20, 4)];
+        assert_eq!(check_table_vec(&vec), TableState::Duplicates);
+    }
+
+    #[test]
+    fn test_ft_check_table_vec_unsorted() {
+        let vec = vec![Pair(10, 2), Pair(0, 3), Pair(20, 4)];
+        assert_eq!(check_table_vec(&vec), TableState::Unsorted);
     }
 }

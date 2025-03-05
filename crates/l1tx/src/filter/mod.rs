@@ -1,5 +1,5 @@
 use bitcoin::Transaction;
-use strata_primitives::l1::{DepositInfo, DepositRequestInfo, DepositSpendInfo};
+use strata_primitives::l1::{DepositInfo, DepositRequestInfo, DepositSpendInfo, OutputRef};
 
 mod checkpoint;
 pub mod indexer;
@@ -8,13 +8,15 @@ mod withdrawal_fulfillment;
 
 use checkpoint::parse_valid_checkpoint_envelopes;
 pub use types::TxFilterConfig;
-use withdrawal_fulfillment::parse_withdrawal_fulfillment_transactions;
+use withdrawal_fulfillment::try_parse_tx_as_withdrawal_fulfillment;
 
 use crate::deposit::{
     deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
 };
 
-fn parse_deposit_requests(
+// TODO move all these functions to other modules
+
+fn extract_deposit_requests(
     tx: &Transaction,
     filter_conf: &TxFilterConfig,
 ) -> impl Iterator<Item = DepositRequestInfo> {
@@ -23,7 +25,7 @@ fn parse_deposit_requests(
 }
 
 /// Parse deposits from [`Transaction`].
-fn parse_deposits(
+fn try_parse_tx_deposit(
     tx: &Transaction,
     filter_conf: &TxFilterConfig,
 ) -> impl Iterator<Item = DepositInfo> {
@@ -32,7 +34,7 @@ fn parse_deposits(
 }
 
 /// Parse da blobs from [`Transaction`].
-fn parse_da_blobs<'a>(
+fn extract_da_blobs<'a>(
     _tx: &'a Transaction,
     _filter_conf: &TxFilterConfig,
 ) -> impl Iterator<Item = impl Iterator<Item = &'a [u8]> + 'a> {
@@ -40,13 +42,11 @@ fn parse_da_blobs<'a>(
     std::iter::empty::<std::slice::Iter<'a, &'a [u8]>>().map(|inner| inner.copied())
 }
 
-use strata_primitives::l1::OutputRef;
-
 /// Parse transaction and filter out any deposits that have been spent.
-fn parse_deposit_spends<'a>(
-    tx: &'a Transaction,
-    filter_conf: &'a TxFilterConfig,
-) -> impl Iterator<Item = DepositSpendInfo> + 'a {
+fn find_deposit_spends<'tx>(
+    tx: &'tx Transaction,
+    filter_conf: &'tx TxFilterConfig,
+) -> impl Iterator<Item = DepositSpendInfo> + 'tx {
     tx.input.iter().filter_map(|txin| {
         let prevout = OutputRef::new(txin.previous_output.txid, txin.previous_output.vout);
         filter_conf
@@ -71,7 +71,7 @@ mod test {
     };
 
     use super::TxFilterConfig;
-    use crate::filter::{parse_deposit_requests, parse_deposits};
+    use crate::filter::{extract_deposit_requests, try_parse_tx_deposit};
 
     /// Helper function to create filter config
     fn create_tx_filter_config(params: &Params) -> TxFilterConfig {
@@ -92,7 +92,7 @@ mod test {
             &deposit_config.address.address().script_pubkey(),
             &deposit_script,
         );
-        let deposits: Vec<_> = parse_deposits(&tx, &filter_conf).collect();
+        let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
         assert_eq!(deposits.len(), 1, "Should find one deposit transaction");
         assert_eq!(deposits[0].address, ee_addr, "EE address should match");
         assert_eq!(
@@ -124,7 +124,7 @@ mod test {
             &deposit_request_script,
         );
 
-        let deposit_reqs: Vec<_> = parse_deposit_requests(&tx, &filter_conf).collect();
+        let deposit_reqs: Vec<_> = extract_deposit_requests(&tx, &filter_conf).collect();
         assert_eq!(deposit_reqs.len(), 1, "Should find one deposit request");
 
         assert_eq!(
@@ -150,7 +150,7 @@ mod test {
             &ScriptBuf::new(),
         );
 
-        let deposits: Vec<_> = parse_deposits(&tx, &filter_conf).collect();
+        let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
         assert!(deposits.is_empty(), "Should find no deposit request");
     }
 }

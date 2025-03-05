@@ -8,9 +8,9 @@ use tracing::debug;
 use super::TxFilterConfig;
 
 /// Parse transaction and search for a Withdrawal Fulfillment transaction to an expected address.
-pub fn parse_withdrawal_fulfillment_transactions<'a>(
-    tx: &'a Transaction,
-    filter_conf: &'a TxFilterConfig,
+pub fn try_parse_tx_as_withdrawal_fulfillment(
+    tx: &Transaction,
+    filter_conf: &TxFilterConfig,
 ) -> Option<WithdrawalFulfillmentInfo> {
     // 1. Check this is of correct structure
     let frontpayment_txout = tx.output.first()?;
@@ -24,14 +24,17 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
         parse_opreturn_metadata(&metadata_txout.script_pubkey)?;
 
     let exp_ful = filter_conf.expected_withdrawal_fulfillments.get(&dep_idx)?;
+    //eprintln!("exp ful {exp_ful:?}");
 
     if exp_ful.operator_idx != op_idx {
+        //eprintln!("wrong operator");
         debug!(?txid, "Deposit index matches but operator_idx does not");
         return None;
     }
 
     // 3. Ensure deposit txid in metadata is correct
     if exp_ful.deposit_txid != deposit_txid_bytes {
+        //eprintln!("wrong deposit txid");
         debug!(
             ?txid,
             "Deposit index and operator index matches but deposit txid does not"
@@ -41,6 +44,7 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
 
     // 4. Check if it is spent to expected destination.
     if frontpayment_txout.script_pubkey != *exp_ful.destination.inner() {
+        //eprintln!("wrong spk");
         debug!(
             ?txid,
             "Deposit index and operator index matches but script_pubkey does not"
@@ -50,7 +54,8 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
 
     // 5. Ensure amount is equal to the expected amount
     let actual_amount_sats = frontpayment_txout.value.to_sat();
-    if actual_amount_sats < exp_ful.amount {
+    if actual_amount_sats < exp_ful.min_amount.to_sat() {
+        //eprintln!("wrong amt {actual_amount_sats} {}", exp_ful.min_amount);
         debug!(
             ?txid,
             "Deposit index and script_pubkey match but the amount does not"
@@ -94,14 +99,16 @@ mod test {
     use bitcoin::{
         absolute::LockTime, consensus, transaction::Version, Amount, OutPoint, Transaction, TxOut,
     };
-    use strata_primitives::{bitcoin_bosd::Descriptor, l1::OutputRef, params::Params};
+    use strata_primitives::{
+        bitcoin_bosd::Descriptor, l1::OutputRef, params::Params, sorted_vec::FlatTable,
+    };
     use strata_state::bridge_state::{
         DepositEntry, DepositState, DispatchCommand, DispatchedState, WithdrawOutput,
     };
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::*;
-    use crate::filter::types::{derive_expected_withdrawal_fulfillments, OPERATOR_FEE};
+    use crate::filter::types::{conv_deposit_to_fulfillment, OPERATOR_FEE};
 
     const DEPOSIT_AMT: Amount = Amount::from_int_btc(10);
 
@@ -187,8 +194,14 @@ mod test {
             .with_state(DepositState::Accepted),
         ];
 
+        // Watch all withdrawals that have been ordered.
+        let exp_fulfillments = deposits
+            .iter()
+            .flat_map(|entry| conv_deposit_to_fulfillment(entry))
+            .collect::<Vec<_>>();
+
         filterconfig.expected_withdrawal_fulfillments =
-            derive_expected_withdrawal_fulfillments(deposits.iter());
+            FlatTable::try_from_unsorted(exp_fulfillments).expect("types: malformed deposits");
 
         (addresses, txids, filterconfig)
     }
@@ -220,7 +233,7 @@ mod test {
         };
 
         let withdrawal_fulfillment_info =
-            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+            try_parse_tx_as_withdrawal_fulfillment(&txn, &filterconfig);
         assert!(withdrawal_fulfillment_info.is_some());
 
         assert_eq!(
@@ -263,7 +276,7 @@ mod test {
         };
 
         let withdrawal_fulfillment_info =
-            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+            try_parse_tx_as_withdrawal_fulfillment(&txn, &filterconfig);
         assert!(withdrawal_fulfillment_info.is_none());
     }
 
@@ -296,7 +309,7 @@ mod test {
         };
 
         let withdrawal_fulfillment_info =
-            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+            try_parse_tx_as_withdrawal_fulfillment(&txn, &filterconfig);
         assert!(withdrawal_fulfillment_info.is_none());
     }
 
@@ -329,7 +342,7 @@ mod test {
         };
 
         let withdrawal_fulfillment_info =
-            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+            try_parse_tx_as_withdrawal_fulfillment(&txn, &filterconfig);
         assert!(withdrawal_fulfillment_info.is_none());
     }
 
@@ -355,7 +368,7 @@ mod test {
         };
 
         let withdrawal_fulfillment_info =
-            parse_withdrawal_fulfillment_transactions(&txn, &filterconfig);
+            try_parse_tx_as_withdrawal_fulfillment(&txn, &filterconfig);
         assert!(withdrawal_fulfillment_info.is_none())
     }
 }

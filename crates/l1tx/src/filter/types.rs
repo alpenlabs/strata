@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     block_credential::CredRule,
     buf::Buf32,
-    l1::{BitcoinAddress, BitcoinScriptBuf, OutputRef},
+    l1::{BitcoinAddress, BitcoinAmount, BitcoinScriptBuf, OutputRef},
     params::{DepositTxParams, RollupParams},
     sorted_vec::{FlatTable, SortedVec, TableEntry},
 };
@@ -40,7 +40,7 @@ pub struct TxFilterConfig {
     /// For withdrawal fulfillment transactions sent by bridge operators.
     ///
     /// Maps deposit idx to fulfillment data.
-    pub expected_withdrawal_fulfillments: FlatTable<WithdrawalFulfillmentInfo>,
+    pub expected_withdrawal_fulfillments: FlatTable<WithdrawalCommandInfo>,
 
     /// Deposit config that determines how a deposit transaction can be parsed.
     pub deposit_config: DepositTxParams,
@@ -114,34 +114,6 @@ pub struct EnvelopeTags {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct WithdrawalFulfillmentInfo {
-    /// Index of the deposit in the deposits table.  This is also the key in the
-    /// expected withdrawals table that we perform filtering with.
-    pub deposit_idx: u32,
-
-    /// The operator ordered to fulfill the withdrawal.
-    pub operator_idx: u32,
-
-    // TODO make this a vec of outputs along with amt
-    /// Expected destination script buf.
-    pub destination: BitcoinScriptBuf,
-
-    /// Expected minimum withdrawal amount in sats.
-    pub amount: u64,
-
-    /// Txid of the locked deposit utxo, which will ultimately be claimed by
-    /// the operator.
-    pub deposit_txid: [u8; 32],
-}
-
-impl TableEntry for WithdrawalFulfillmentInfo {
-    type Key = u32;
-    fn get_key(&self) -> &Self::Key {
-        &self.deposit_idx
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct DepositUtxoInfo {
     /// The utxo's outpoint.
     ///
@@ -159,7 +131,39 @@ impl TableEntry for DepositUtxoInfo {
     }
 }
 
-fn conv_deposit_to_fulfillment(entry: &DepositEntry) -> Option<WithdrawalFulfillmentInfo> {
+/// Describes information we expect to see about a withdrawal fulfillment.
+///
+/// This is extracted directly from the deposit state, if it's in the dispatched
+/// state.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct WithdrawalCommandInfo {
+    /// Index of the deposit in the deposits table.  This is also the key in the
+    /// expected withdrawals table that we perform filtering with.
+    pub deposit_idx: u32,
+
+    /// The operator ordered to fulfill the withdrawal.
+    pub operator_idx: u32,
+
+    // TODO make this a vec of outputs along with amt
+    /// Expected destination script buf.
+    pub destination: BitcoinScriptBuf,
+
+    /// Expected minimum withdrawal amount in sats.
+    pub min_amount: BitcoinAmount,
+
+    /// Txid of the locked deposit utxo, which will ultimately be claimed by
+    /// the operator.
+    pub deposit_txid: [u8; 32],
+}
+
+impl TableEntry for WithdrawalCommandInfo {
+    type Key = u32;
+    fn get_key(&self) -> &Self::Key {
+        &self.deposit_idx
+    }
+}
+
+pub fn conv_deposit_to_fulfillment(entry: &DepositEntry) -> Option<WithdrawalCommandInfo> {
     let DepositState::Dispatched(state) = entry.deposit_state() else {
         return None;
     };
@@ -172,13 +176,15 @@ fn conv_deposit_to_fulfillment(entry: &DepositEntry) -> Option<WithdrawalFulfill
 
     let outp = &state.cmd().withdraw_outputs()[0];
 
+    // TODO move this fee calculation somewhere else more intelligent
+    let amount = outp.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat());
     let deposit_txid = entry.output().outpoint().txid.as_raw_hash().to_byte_array();
 
-    Some(WithdrawalFulfillmentInfo {
+    Some(WithdrawalCommandInfo {
         deposit_idx: entry.idx(),
         operator_idx: state.assignee(),
         destination: outp.destination().to_script().into(),
-        amount: outp.amt().to_sat(),
+        min_amount: BitcoinAmount::from_sat(amount),
         deposit_txid,
     })
 }
