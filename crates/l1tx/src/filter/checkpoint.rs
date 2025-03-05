@@ -1,5 +1,6 @@
 use bitcoin::Transaction;
 use strata_primitives::{batch::SignedCheckpoint, l1::payload::L1PayloadType};
+use strata_state::{batch::verify_signed_checkpoint_sig, chain_state::Chainstate};
 use tracing::warn;
 
 use super::TxFilterConfig;
@@ -9,7 +10,7 @@ use crate::envelope::parser::parse_envelope_payloads;
 /// the checkpoint envelope.
 // TODO: we need to change envelope structure and possibly have envelopes for checkpoints and
 // DA separately
-pub fn parse_checkpoint_envelopes<'a>(
+pub fn parse_valid_checkpoint_envelopes<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> impl Iterator<Item = SignedCheckpoint> + 'a {
@@ -21,9 +22,7 @@ pub fn parse_checkpoint_envelopes<'a>(
                 items
                     .into_iter()
                     .filter_map(|item| match *item.payload_type() {
-                        L1PayloadType::Checkpoint => {
-                            borsh::from_slice::<SignedCheckpoint>(item.data()).ok()
-                        }
+                        L1PayloadType::Checkpoint => parse_checkpoint(item.data(), filter_conf),
                         L1PayloadType::Da => {
                             warn!("Da parsing is not supported yet");
                             None
@@ -33,6 +32,27 @@ pub fn parse_checkpoint_envelopes<'a>(
             })
             .unwrap_or_default()
     })
+}
+
+fn parse_checkpoint(data: &[u8], filter_conf: &TxFilterConfig) -> Option<SignedCheckpoint> {
+    let signed_checkpoint = borsh::from_slice::<SignedCheckpoint>(data).ok()?;
+
+    if cfg!(not(feature = "test_utils"))
+        && !verify_signed_checkpoint_sig(&signed_checkpoint, &filter_conf.sequencer_cred_rule)
+    {
+        warn!("invalid checkpoint signature");
+
+        return None;
+    }
+
+    if let Err(err) =
+        borsh::from_slice::<Chainstate>(signed_checkpoint.checkpoint().sidecar().chainstate())
+    {
+        warn!(?err, "invalid chainstate in checkpoint");
+        return None;
+    }
+
+    Some(signed_checkpoint)
 }
 
 #[cfg(test)]
@@ -46,7 +66,7 @@ mod test {
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
 
     use super::TxFilterConfig;
-    use crate::filter::parse_checkpoint_envelopes;
+    use crate::filter::parse_valid_checkpoint_envelopes;
 
     const TEST_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
 
@@ -80,7 +100,7 @@ mod test {
             })
             .collect();
         let tx = create_checkpoint_envelope_tx(&params, TEST_ADDR, l1_payloads.clone());
-        let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
+        let checkpoints: Vec<_> = parse_valid_checkpoint_envelopes(&tx, &filter_config).collect();
 
         assert_eq!(checkpoints.len(), 2, "Should filter relevant envelopes");
 
@@ -88,7 +108,7 @@ mod test {
         params.rollup.checkpoint_tag = "invalid_checkpoint_tag".to_string();
 
         let tx = create_checkpoint_envelope_tx(&params, TEST_ADDR, l1_payloads);
-        let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
+        let checkpoints: Vec<_> = parse_valid_checkpoint_envelopes(&tx, &filter_config).collect();
         assert!(checkpoints.is_empty(), "There should be no envelopes");
     }
 
@@ -117,7 +137,7 @@ mod test {
             })
             .collect();
         let tx = create_checkpoint_envelope_tx(&params, TEST_ADDR, l1_payloads.clone());
-        let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
+        let checkpoints: Vec<_> = parse_valid_checkpoint_envelopes(&tx, &filter_config).collect();
 
         assert!(checkpoints.is_empty(), "There should be no envelopes");
     }

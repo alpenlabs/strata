@@ -85,11 +85,11 @@ mod test {
     }
 
     fn create_opreturn_metadata(operator_idx: u32, deposit_idx: u32) -> ScriptBuf {
-        let mut metadata = [0u8; 8];
+        let mut metadata = [0u8; 40];
         // first 4 bytes = operator idx
         metadata[..4].copy_from_slice(&operator_idx.to_be_bytes());
         // next 4 bytes = deposit idx
-        metadata[4..].copy_from_slice(&deposit_idx.to_be_bytes());
+        metadata[4..8].copy_from_slice(&deposit_idx.to_be_bytes());
         Descriptor::new_op_return(&metadata).unwrap().to_script()
     }
 

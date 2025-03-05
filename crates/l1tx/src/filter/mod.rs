@@ -6,7 +6,7 @@ pub mod indexer;
 pub mod types;
 mod withdrawal_fulfillment;
 
-use checkpoint::parse_checkpoint_envelopes;
+use checkpoint::parse_valid_checkpoint_envelopes;
 pub use types::TxFilterConfig;
 use withdrawal_fulfillment::parse_withdrawal_fulfillment_transactions;
 

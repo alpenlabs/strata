@@ -5,8 +5,8 @@ use strata_primitives::{
 };
 
 use super::{
-    parse_checkpoint_envelopes, parse_da_blobs, parse_deposit_requests, parse_deposit_spends,
-    parse_deposits, parse_withdrawal_fulfillment_transactions, TxFilterConfig,
+    parse_da_blobs, parse_deposit_requests, parse_deposit_spends, parse_deposits,
+    parse_valid_checkpoint_envelopes, parse_withdrawal_fulfillment_transactions, TxFilterConfig,
 };
 use crate::messages::IndexedTxEntry;
 
@@ -59,7 +59,7 @@ fn index_tx<V: TxVisitor>(
     mut visitor: V,
     filter_config: &TxFilterConfig,
 ) -> Option<V::Output> {
-    for ckpt in parse_checkpoint_envelopes(tx, filter_config) {
+    for ckpt in parse_valid_checkpoint_envelopes(tx, filter_config) {
         visitor.visit_checkpoint(ckpt);
     }
 
