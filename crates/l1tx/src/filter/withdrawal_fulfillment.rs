@@ -197,7 +197,7 @@ mod test {
         // Watch all withdrawals that have been ordered.
         let exp_fulfillments = deposits
             .iter()
-            .flat_map(|entry| conv_deposit_to_fulfillment(entry))
+            .flat_map(conv_deposit_to_fulfillment)
             .collect::<Vec<_>>();
 
         filterconfig.expected_withdrawal_fulfillments =
