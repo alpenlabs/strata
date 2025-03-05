@@ -1,4 +1,4 @@
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use strata_primitives::proof::ProofContext;
 use strata_proofimpl_btc_blockspace::logic::process_blockscan_proof;
@@ -13,48 +13,36 @@ use zkaleido_native_adapter::{NativeHost, NativeMachine};
 /// required by a function signature, but actual verification is skipped.
 const MOCK_VK: [u32; 8] = [0u32; 8];
 
-/// A native host for [`ProofVm::BtcProving`] prover.
-static BTC_BLOCKSPACE_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
-    process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_blockscan_proof(zkvm);
-        Ok(())
-    })),
-});
-
-/// A native host for [`ProofVm::ELProving`] prover.
-static EVM_EE_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
-    process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_block_transaction_outer(zkvm);
-        Ok(())
-    })),
-});
-
-/// A native host for [`ProofVm::CLProving`] prover.
-static CL_STF_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
-    process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_cl_stf(zkvm, &MOCK_VK, &MOCK_VK);
-        Ok(())
-    })),
-});
-
-/// A native host for [`ProofVm::Checkpoint`] prover.
-static CHECKPOINT_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| NativeHost {
-    process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-        process_checkpoint_proof_outer(zkvm, &MOCK_VK);
-        Ok(())
-    })),
-});
-
 /// Returns a reference to the appropriate [`NativeHost`] instance based on the given
 /// [`ProofContext`].
 ///
 /// This function maps the `ProofContext` variant to its corresponding [`NativeHost`] instance,
 /// allowing for efficient host selection for different proof types.
-pub fn get_host(id: &ProofContext) -> &'static NativeHost {
+pub fn get_host(id: &ProofContext) -> NativeHost {
     match id {
-        ProofContext::BtcBlockspace(..) => &BTC_BLOCKSPACE_HOST,
-        ProofContext::EvmEeStf(..) => &EVM_EE_STF_HOST,
-        ProofContext::ClStf(..) => &CL_STF_HOST,
-        ProofContext::Checkpoint(..) => &CHECKPOINT_HOST,
+        ProofContext::BtcBlockspace(..) => NativeHost {
+            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+                process_blockscan_proof(zkvm);
+                Ok(())
+            })),
+        },
+        ProofContext::EvmEeStf(..) => NativeHost {
+            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+                process_block_transaction_outer(zkvm);
+                Ok(())
+            })),
+        },
+        ProofContext::ClStf(..) => NativeHost {
+            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+                process_cl_stf(zkvm, &MOCK_VK, &MOCK_VK);
+                Ok(())
+            })),
+        },
+        ProofContext::Checkpoint(..) => NativeHost {
+            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+                process_checkpoint_proof_outer(zkvm, &MOCK_VK);
+                Ok(())
+            })),
+        },
     }
 }
