@@ -1,6 +1,16 @@
 use std::{cmp::Ordering, mem};
 
 use borsh::{BorshDeserialize, BorshSerialize};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("provided vec was unsorted")]
+    Unsorted,
+
+    #[error("provided vec had duplicates")]
+    Duplicates,
+}
 
 /// A vector wrapper that ensures the elements are sorted.
 ///
@@ -142,14 +152,14 @@ impl<T> Default for SortedVec<T> {
 }
 
 impl<T: Ord> TryFrom<Vec<T>> for SortedVec<T> {
-    type Error = ();
+    type Error = Error;
 
     /// If the value provided is not sorted, returns an error.
     fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
         if value.is_sorted() {
             Ok(Self::new_unchecked(value))
         } else {
-            Err(())
+            Err(Error::Unsorted)
         }
     }
 }
@@ -188,6 +198,8 @@ fn check_duplicate_keys<T: TableEntry>(v: &[T]) -> bool {
         .any(|pair| pair[0].get_key() == pair[1].get_key())
 }
 
+/// Describes the ordering status of some slice that we're interpreting as a
+/// sorted table.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum TableState {
     /// Sorted and no duplicates.
@@ -250,12 +262,12 @@ impl<T: TableEntry> FlatTable<T> {
     /// Creates a new instance from an existing vec, sorting it unconditionally.
     ///
     /// If there duplicates after sorting, returns error.
-    pub fn try_from_unsorted(mut vec: Vec<T>) -> Result<Self, ()> {
+    pub fn try_from_unsorted(mut vec: Vec<T>) -> Result<Self, Error> {
         sort_entry_vec(&mut vec);
         if !check_duplicate_keys(&vec) {
             Ok(Self::new_unchecked(vec))
         } else {
-            Err(())
+            Err(Error::Duplicates)
         }
     }
 
@@ -318,11 +330,7 @@ impl<T: TableEntry> FlatTable<T> {
 
     /// Removes an entry if it exists.
     pub fn remove(&mut self, k: &T::Key) -> Option<T> {
-        // This logic feels kinda sloppy?
-        let Some(i) = self.find_index(k).ok() else {
-            return None;
-        };
-        Some(self.inner.remove(i))
+        Some(self.inner.remove(self.find_index(k).ok()?))
     }
 
     /// Iterates over the entries in order from first to last.
@@ -348,17 +356,18 @@ impl<T: TableEntry> FlatTable<T> {
         let merged = &mut self.inner; // this is the real target
         while iter_self.peek().is_some() || iter_other.peek().is_some() {
             match (iter_self.peek(), iter_other.peek()) {
-                (Some(a), Some(b)) => {
-                    if a.get_key() < b.get_key() {
-                        merged.push(iter_self.next().unwrap());
-                    } else if a.get_key() > b.get_key() {
-                        merged.push(iter_other.next().unwrap());
-                    } else {
-                        // Replace entry from `self` with the one from `other`
-                        iter_self.next(); // Discard old entry
+                // In the usual case, we compare the two front elements and take
+                // just the "lesser" one.  Unless they're equal, then we take
+                // the new one and discard the old one.
+                (Some(a), Some(b)) => match Ord::cmp(a.get_key(), b.get_key()) {
+                    Ordering::Less => merged.push(iter_self.next().unwrap()),
+                    Ordering::Greater => merged.push(iter_other.next().unwrap()),
+                    Ordering::Equal => {
+                        // Discard "self", accept "other".
+                        iter_self.next();
                         merged.push(iter_other.next().unwrap());
                     }
-                }
+                },
 
                 // In this case, there's no more "other" elements so we can just
                 // extend from what's left here.
@@ -383,16 +392,16 @@ impl<T: TableEntry> FlatTable<T> {
 
 impl<T: TableEntry> TryFrom<Vec<T>> for FlatTable<T> {
     /// Error returned if there are duplicate entries.
-    type Error = ();
+    type Error = Error;
 
     /// Tries to construct an instance of [`FlatTable`] from a vec of entries.
     ///
     /// Fails if there are any duplicate entries in the vec.
     fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
-        if check_table_vec(&value) == TableState::Safe {
-            Ok(Self::new_unchecked(value))
-        } else {
-            Err(())
+        match check_table_vec(&value) {
+            TableState::Duplicates => Err(Error::Duplicates),
+            TableState::Unsorted => Err(Error::Unsorted),
+            _ => Ok(Self::new_unchecked(value)),
         }
     }
 }
