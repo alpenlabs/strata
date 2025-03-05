@@ -13642,6 +13642,7 @@ dependencies = [
  "strata-risc0-guest-builder",
  "strata-sp1-guest-builder",
  "strata-test-utils",
+ "strata-zkvm-hosts",
  "time",
  "tokio",
  "tracing",

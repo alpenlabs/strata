@@ -14,6 +14,7 @@ strata-proofimpl-evm-ee-stf.workspace = true
 
 strata-l1tx.workspace = true
 strata-test-utils.workspace = true
+strata-zkvm-hosts.workspace = true
 
 # sp1
 sp1-sdk = "4.1.0"
@@ -38,5 +39,5 @@ tracing.workspace = true
 
 [features]
 default = ["sp1"]
-sp1 = ["zkaleido-sp1-host/perf", "strata-sp1-guest-builder/sp1-dev"]
-risc0 = ["zkaleido-risc0-host/perf", "strata-risc0-guest-builder"]
+sp1 = ["zkaleido-sp1-host/perf", "strata-zkvm-hosts/sp1"]
+risc0 = ["zkaleido-risc0-host/perf", "strata-zkvm-hosts/risc0"]
