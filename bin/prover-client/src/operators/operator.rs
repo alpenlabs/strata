@@ -5,15 +5,13 @@ use strata_btcio::rpc::BitcoinClient;
 use strata_primitives::{params::RollupParams, proof::ProofContext};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
+use strata_zkvm_hosts::{resolve_host, ZkVmHostInstance};
 
 use super::{
     btc::BtcBlockspaceOperator, checkpoint::CheckpointOperator, cl_stf::ClStfOperator,
     evm_ee::EvmEeOperator, ProvingOp,
 };
-use crate::{
-    errors::ProvingTaskError,
-    hosts::{resolve_host, ZkVmHostInstance},
-};
+use crate::errors::ProvingTaskError;
 
 /// A struct that manages various proof operators, each corresponding to a distinct proof type.
 ///
