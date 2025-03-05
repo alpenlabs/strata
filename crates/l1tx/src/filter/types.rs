@@ -85,7 +85,7 @@ impl TxFilterConfig {
         let exp_fulfillments = chainstate
             .deposits_table()
             .deposits()
-            .flat_map(|entry| conv_deposit_to_fulfillment(entry))
+            .flat_map(conv_deposit_to_fulfillment)
             .collect::<Vec<_>>();
 
         self.expected_withdrawal_fulfillments =
