@@ -37,31 +37,23 @@ class SyncFullNodeL2LagTest(testenv.StrataTester):
         assert paused, "Should pause the fullnode sync worker"
 
         cur_epoch = seqss["cur_epoch"]
+        print(dict(cur_epoch=cur_epoch))
 
-        # Wait until current epoch is finalized. By this time some blocks will
-        # have been produced in l2 as well as the checkpoint will be posted to L1.
-        wait_until_epoch_finalized(seqrpc, cur_epoch, timeout=10)
+        # wait for fn to sync up to end of current sequencer epoch
+        # L1 reader and csm should still be running and syncing with L2 sync paused/
+        wait_until_epoch_confirmed(fnrpc, cur_epoch, timeout=20)
+
+        # Wait until some more epochs are finalized in sequencer so we have plenty of blocks
+        # to sync up when we resume fn
+        wait_until_epoch_finalized(seqrpc, cur_epoch + 3, timeout=20)
 
         # Full node tip after sync is paused
-        fn_tip = fnrpc.strata_syncStatus()["tip_height"]
+        fn_ss = fnrpc.strata_syncStatus()
+        fn_tip = fn_ss["tip_height"]
 
         # Get corresponding checkpoint block
-        checkpt_info = seqrpc.strata_getCheckpointInfo(cur_epoch)
+        checkpt_info = seqrpc.strata_getCheckpointInfo(cur_epoch + 3)
         checkpt_l1_blk_height = checkpt_info["l1_reference"]["block_height"]
-
-        # Wait until full node's CSM reads upto checkpoint height - 1. At this
-        # point it won't have fully processed L1 block at checkpoint height
-        # because corresponding finalized l2 block is not present in db yet.
-        wait_until_with_value(
-            lambda: (
-                fnrpc.strata_clientStatus()["tip_l1_block"]["height"],
-                seqrpc.strata_clientStatus()["tip_l1_block"]["height"],
-            ),
-            lambda v: v[0] >= checkpt_l1_blk_height - 1,
-            error_with="Fullnode L1 sync did not catch upto buried checkpoint height - 1",
-            timeout=10,
-            debug=True,
-        )
 
         # FN tip after fn catches upto the buried checkpoint, should be the same as before
         new_fn_tip = fnrpc.strata_syncStatus()["tip_height"]

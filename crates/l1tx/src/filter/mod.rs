@@ -1,15 +1,17 @@
 use bitcoin::Transaction;
 use strata_primitives::{
     batch::SignedCheckpoint,
-    l1::{payload::L1PayloadType, DepositInfo, DepositRequestInfo},
+    l1::{payload::L1PayloadType, DepositInfo, DepositRequestInfo, DepositSpendInfo},
 };
 use strata_state::batch::verify_signed_checkpoint_sig;
 use tracing::warn;
 
 pub mod indexer;
 pub mod types;
+mod withdrawal_fulfillment;
 
 pub use types::TxFilterConfig;
+use withdrawal_fulfillment::parse_withdrawal_fulfillment_transactions;
 
 use crate::{
     deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
@@ -76,6 +78,21 @@ fn parse_checkpoint_envelopes<'a>(
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default()
+    })
+}
+
+/// Parse transaction and filter out any deposits that have been spent.
+fn parse_deposit_spends<'a>(
+    tx: &'a Transaction,
+    filter_conf: &'a TxFilterConfig,
+) -> impl Iterator<Item = DepositSpendInfo> + 'a {
+    tx.input.iter().filter_map(|txin| {
+        filter_conf
+            .expected_outpoints
+            .binary_search_by_key(&txin.previous_output, |config| config.output.outpoint())
+            .map(|config| DepositSpendInfo {
+                deposit_idx: config.deposit_idx,
+            })
     })
 }
 

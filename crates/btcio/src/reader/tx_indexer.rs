@@ -4,7 +4,10 @@ use strata_l1tx::{
 };
 use strata_primitives::{
     batch::SignedCheckpoint,
-    l1::{DepositInfo, DepositRequestInfo, ProtocolOperation},
+    l1::{
+        DepositInfo, DepositRequestInfo, DepositSpendInfo, ProtocolOperation,
+        WithdrawalFulfillmentInfo,
+    },
 };
 
 /// Ops indexer for rollup client. Collects extra info like da blobs and deposit requests
@@ -50,6 +53,15 @@ impl TxVisitor for ReaderTxVisitorImpl {
 
     fn visit_checkpoint(&mut self, chkpt: SignedCheckpoint) {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
+    }
+
+    fn visit_withdrawal_fulfillment(&mut self, info: WithdrawalFulfillmentInfo) {
+        self.ops
+            .push(ProtocolOperation::WithdrawalFulfillment(info));
+    }
+
+    fn visit_deposit_spend(&mut self, info: DepositSpendInfo) {
+        self.ops.push(ProtocolOperation::DepositSpent(info));
     }
 
     fn finalize(self) -> Option<L1TxMessages> {

@@ -23,7 +23,7 @@ pub struct ReaderState {
     epoch: u64,
 
     /// Checkpoint to wait until the corresponding l2 block is present in db.
-    checkpoint_to_wait_for: Option<SignedCheckpoint>,
+    last_seen_checkpoint: Option<SignedCheckpoint>,
 }
 
 impl ReaderState {
@@ -35,7 +35,7 @@ impl ReaderState {
         recent_blocks: VecDeque<BlockHash>,
         filter_config: TxFilterConfig,
         epoch: u64,
-        checkpoint_to_wait_for: Option<SignedCheckpoint>,
+        last_seen_checkpoint: Option<SignedCheckpoint>,
     ) -> Self {
         assert!(!recent_blocks.is_empty());
         Self {
@@ -44,7 +44,7 @@ impl ReaderState {
             recent_blocks,
             filter_config,
             epoch,
-            checkpoint_to_wait_for,
+            last_seen_checkpoint,
         }
     }
 
@@ -76,16 +76,20 @@ impl ReaderState {
         &self.filter_config
     }
 
+    pub fn filter_config_mut(&mut self) -> &mut TxFilterConfig {
+        &mut self.filter_config
+    }
+
     pub(crate) fn set_filter_config(&mut self, filter_config: TxFilterConfig) {
         self.filter_config = filter_config;
     }
 
-    pub fn checkpoint_to_wait_for(&self) -> Option<&SignedCheckpoint> {
-        self.checkpoint_to_wait_for.as_ref()
+    pub fn last_seen_checkpoint(&self) -> Option<&SignedCheckpoint> {
+        self.last_seen_checkpoint.as_ref()
     }
 
-    pub(crate) fn set_checkpoint_to_wait_for(&mut self, ckpt: Option<SignedCheckpoint>) {
-        self.checkpoint_to_wait_for = ckpt;
+    pub(crate) fn set_last_seen_checkpoint(&mut self, ckpt: Option<SignedCheckpoint>) {
+        self.last_seen_checkpoint = ckpt;
     }
 
     /// Returns the idx of the deepest block in the reader state.
