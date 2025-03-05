@@ -88,9 +88,10 @@ impl ProofDatabase for ProofDb {
 mod tests {
     use strata_primitives::{
         buf::Buf32,
+        l2::L2BlockCommitment,
         proof::{ProofContext, ProofZkVm},
     };
-    use strata_state::{id::L2BlockId, l1::L1BlockId};
+    use strata_state::l1::L1BlockId;
     use zkaleido::{Proof, PublicValues};
 
     use super::*;
@@ -115,8 +116,8 @@ mod tests {
         let evm_blkid_1 = Buf32::from([1u8; 32]);
         let evm_blkid_2 = Buf32::from([2u8; 32]);
 
-        let cl_blkid_1: L2BlockId = Buf32::from([1u8; 32]).into();
-        let cl_blkid_2: L2BlockId = Buf32::from([2u8; 32]).into();
+        let cl_blkid_1 = L2BlockCommitment::null();
+        let cl_blkid_2 = L2BlockCommitment::null();
         let proof_context = ProofContext::ClStf(cl_blkid_1, cl_blkid_2);
         let deps = vec![ProofContext::EvmEeStf(evm_blkid_1, evm_blkid_2)];
         (proof_context, deps)

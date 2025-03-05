@@ -96,10 +96,10 @@ impl ClStfOperator {
     }
 
     /// Retrieves the [`L2Block`] for the given id
-    pub async fn get_block(&self, blkid: L2BlockId) -> Result<L2Block, ProvingTaskError> {
+    pub async fn get_block(&self, blkid: &L2BlockId) -> Result<L2Block, ProvingTaskError> {
         let raw_witness: Vec<u8> = self
             .cl_client
-            .get_cl_block_witness_raw(blkid)
+            .get_cl_block_witness_raw(*blkid)
             .await
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
         let (_, blk): (Chainstate, L2Block) =
@@ -129,7 +129,7 @@ impl ProvingOp for ClStfOperator {
             end.slot()
         );
 
-        Ok(ProofContext::ClStf(*start.blkid(), *end.blkid()))
+        Ok(ProofContext::ClStf(*start, *end))
     }
 
     async fn fetch_input(
@@ -137,7 +137,7 @@ impl ProvingOp for ClStfOperator {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<ClStfInput, ProvingTaskError> {
-        let (start_block_hash, end_block_hash) = match task_id.context() {
+        let (start_block, end_block) = match task_id.context() {
             ProofContext::ClStf(start, end) => (*start, *end),
             _ => return Err(ProvingTaskError::InvalidInput("CL_STF".to_string())),
         };
@@ -178,18 +178,16 @@ impl ProvingOp for ClStfOperator {
             })
             .transpose()?;
 
-        let chainstate = self.get_chainstate_before(start_block_hash).await?;
+        let chainstate = self.get_chainstate_before(*start_block.blkid()).await?;
         let mut l2_blocks = vec![];
-        let mut current_block_hash = end_block_hash;
+        let mut current_block_hash = *end_block.blkid();
 
         loop {
-            let l2_block = self.get_block(current_block_hash).await?;
-
+            let l2_block = self.get_block(&current_block_hash).await?;
             let prev_l2_blkid = *l2_block.header().parent();
-
             l2_blocks.push(l2_block);
 
-            if current_block_hash == start_block_hash {
+            if start_block.blkid() == &current_block_hash {
                 break;
             } else {
                 current_block_hash = prev_l2_blkid;

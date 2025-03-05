@@ -267,10 +267,10 @@ impl TaskTracker {
 mod tests {
     use strata_primitives::{
         buf::Buf32,
+        l2::L2BlockCommitment,
         proof::{ProofContext, ProofZkVm},
     };
     use strata_rocksdb::test_utils::get_rocksdb_tmp_instance_for_prover;
-    use strata_state::id::L2BlockId;
     use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
@@ -281,8 +281,8 @@ mod tests {
         let host = ProofZkVm::Native;
         let mut gen = ArbitraryGenerator::new();
 
-        let start: L2BlockId = gen.generate();
-        let end: L2BlockId = gen.generate();
+        let start: L2BlockCommitment = gen.generate();
+        let end: L2BlockCommitment = gen.generate();
         for _ in 0..n {
             let start: Buf32 = gen.generate();
             let end: Buf32 = gen.generate();

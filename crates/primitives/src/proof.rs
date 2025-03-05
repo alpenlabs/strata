@@ -3,7 +3,7 @@ use std::fmt::Display;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-use crate::{buf::Buf32, l1::L1BlockId, l2::L2BlockId};
+use crate::{buf::Buf32, l1::L1BlockId, l2::L2BlockCommitment};
 
 /// Represents the verifying key used for verifying ZK proofs in a rollup context.
 ///
@@ -69,7 +69,7 @@ pub enum ProofContext {
 
     /// Identifier for the Consensus Layer (CL) blocks used in generating the State Transition
     /// Function (STF) proof.
-    ClStf(L2BlockId, L2BlockId),
+    ClStf(L2BlockCommitment, L2BlockCommitment),
 
     /// Identifier for a specific checkpoint being proven.
     Checkpoint(u64),
