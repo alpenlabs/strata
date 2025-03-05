@@ -20,7 +20,7 @@ alloy-rpc-types-eth.workspace = true
 alloy-trie.workspace = true
 
 anyhow.workspace = true
-k256 = { version = "=0.13.3", features = [
+k256 = { version = "0.13.4", features = [
   "std",
   "ecdsa",
 ], default-features = false }

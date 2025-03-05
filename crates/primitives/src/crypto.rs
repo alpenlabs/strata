@@ -1,5 +1,4 @@
 //! Logic to check block credentials.
-
 use secp256k1::{schnorr::Signature, Message, XOnlyPublicKey};
 #[cfg(feature = "rand")]
 use secp256k1::{Keypair, SecretKey, SECP256K1};
@@ -15,6 +14,7 @@ pub fn sign_schnorr_sig(msg: &Buf32, sk: &Buf32) -> Buf64 {
     Buf64::from(sig.serialize())
 }
 
+#[cfg(not(target_os = "zkvm"))]
 pub fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
     let msg = match Message::from_digest_slice(msg.as_ref()) {
         Ok(msg) => msg,
@@ -32,6 +32,22 @@ pub fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
     };
 
     sig.verify(&msg, &pk).is_ok()
+}
+
+#[cfg(target_os = "zkvm")]
+pub fn verify_schnorr_sig(sig: &Buf64, msg: &Buf32, pk: &Buf32) -> bool {
+    use k256::schnorr::{signature::hazmat::PrehashVerifier, Signature, VerifyingKey};
+    let sig = match Signature::try_from(sig.as_slice()) {
+        Ok(sig) => sig,
+        Err(_) => return false,
+    };
+
+    let vk = match VerifyingKey::from_bytes(pk.as_slice()) {
+        Ok(vk) => vk,
+        Err(_) => return false,
+    };
+
+    vk.verify_prehash(msg.as_slice(), &sig).is_ok()
 }
 
 #[cfg(test)]

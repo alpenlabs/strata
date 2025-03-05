@@ -1140,6 +1140,7 @@ dependencies = [
  "const-hex",
  "digest",
  "hex",
+ "k256",
  "musig2",
  "num_enum",
  "rand",
