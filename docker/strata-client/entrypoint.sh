@@ -22,9 +22,9 @@ fi
 
 ARGS=""
 
-if [ ! -z "$BITCOIND_PASSWORD" ]; then
-    ARGS="$ARGS --bitcoind-password $BITCOIND_PASSWORD"
-fi
+# if [ ! -z "$BITCOIND_PASSWORD" ]; then
+#     ARGS="$ARGS --bitcoind-password $BITCOIND_PASSWORD"
+# fi
 
 export RUST_LOG=${RUST_LOG:-info}
 

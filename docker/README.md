@@ -57,7 +57,7 @@ docker start bridge-client-2
     ```
 2. Export the generated ELF
     ```bash
-    target/release/strata-datatool genparams --elf-dir elfs/sp1 
+    target/release/strata-datatool genparams --elf-dir docker/prover-client/elfs/sp1 
     ```
 
 3. Generate configs

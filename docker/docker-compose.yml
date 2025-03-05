@@ -124,7 +124,7 @@ services:
     volumes:
       - ./configs/params.json:/app/params.json
       - ./.data/prover-client:/app/.data
-      - ../elfs:/app/elfs
+      - ./prover-client/elfs:/app/elfs
     env_file:
       - prover-client/prover-client.env
 

@@ -21,14 +21,12 @@ RUN rustup toolchain install
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cargo build --release --bin strata-sequencer-client
+    cargo build --release --bin strata-client
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cp /app/target/release/strata-sequencer-client /app/strata-sequencer-client
-
-RUN ls /app/strata-sequencer-client
+    cp /app/target/release/strata-client /app/strata-client
 
 FROM ubuntu:24.04 AS runtime
 WORKDIR /app
@@ -46,8 +44,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the built binaries and the entrypoint script from the builder stage
-COPY --from=builder /app/strata-sequencer-client /usr/local/bin/strata-sequencer-client
-COPY ./docker/sequencer-signer/entrypoint.sh entrypoint.sh
+COPY --from=builder /app/strata-client /usr/local/bin/strata-client
+COPY ./docker/strata-client/entrypoint.sh entrypoint.sh
+
+EXPOSE 8432
 
 # Make the entrypoint script executable
 RUN chmod +x entrypoint.sh
