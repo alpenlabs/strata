@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use strata_primitives::proof::ProofContext;
 use strata_proofimpl_btc_blockspace::logic::process_blockscan_proof;
-use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
+use strata_proofimpl_checkpoint::process_checkpoint_proof;
 use strata_proofimpl_cl_stf::process_cl_stf;
 use strata_proofimpl_evm_ee_stf::process_block_transaction_outer;
 use zkaleido_native_adapter::{NativeHost, NativeMachine};
@@ -40,7 +40,7 @@ pub fn get_host(id: &ProofContext) -> NativeHost {
         },
         ProofContext::Checkpoint(..) => NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_checkpoint_proof_outer(zkvm, &MOCK_VK);
+                process_checkpoint_proof(zkvm, &MOCK_VK);
                 Ok(())
             })),
         },

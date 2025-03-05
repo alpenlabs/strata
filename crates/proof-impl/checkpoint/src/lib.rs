@@ -8,7 +8,7 @@ use zkaleido::ZkVmEnv;
 
 pub mod program;
 
-pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
+pub fn process_checkpoint_proof(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8]) {
     let batches_count: usize = zkvm.read_serde();
     assert!(batches_count > 0);
 
