@@ -1,9 +1,12 @@
-use std::sync::Arc;
+use std::{
+    panic::{catch_unwind, AssertUnwindSafe},
+    sync::Arc,
+};
 
 use bitcoin::consensus::serialize;
 use strata_primitives::l1::L1TxProof;
 use zkaleido::{
-    ProofType, PublicValues, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProgram,
+    ProofType, PublicValues, ZkVmError, ZkVmHost, ZkVmInputBuilder, ZkVmInputResult, ZkVmProgram,
     ZkVmProgramPerf, ZkVmResult,
 };
 use zkaleido_native_adapter::{NativeHost, NativeMachine};
@@ -64,7 +67,10 @@ impl BtcBlockspaceProgram {
     pub fn native_host() -> NativeHost {
         NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_blockscan_proof(zkvm);
+                catch_unwind(AssertUnwindSafe(|| {
+                    process_blockscan_proof(zkvm);
+                }))
+                .map_err(|_| ZkVmError::ExecutionError(Self::name()))?;
                 Ok(())
             })),
         }
