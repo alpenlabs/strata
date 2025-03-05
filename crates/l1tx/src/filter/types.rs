@@ -7,7 +7,7 @@ use strata_primitives::{
     buf::Buf32,
     l1::{BitcoinAddress, BitcoinScriptBuf, OutputRef},
     params::{DepositTxParams, RollupParams},
-    sorted_vec::{HasKey, KeyedSortedVec, SortedVec},
+    sorted_vec::{FlatTable, SortedVec, TableEntry},
 };
 use strata_state::{
     bridge_state::{DepositEntry, DepositState},
@@ -39,9 +39,10 @@ pub struct ExpectedWithdrawalFulfillment {
     pub deposit_txid: [u8; 32],
 }
 
-impl HasKey<BitcoinScriptBuf> for ExpectedWithdrawalFulfillment {
-    fn get_key(&self) -> BitcoinScriptBuf {
-        self.destination.clone()
+impl TableEntry for ExpectedWithdrawalFulfillment {
+    type Key = BitcoinScriptBuf;
+    fn get_key(&self) -> &Self::Key {
+        &self.destination
     }
 }
 
@@ -53,9 +54,10 @@ pub struct DepositSpendConfig {
     pub output: OutputRef,
 }
 
-impl HasKey<OutputRef> for DepositSpendConfig {
-    fn get_key(&self) -> OutputRef {
-        self.output
+impl TableEntry for DepositSpendConfig {
+    type Key = OutputRef;
+    fn get_key(&self) -> &Self::Key {
+        &self.output
     }
 }
 
@@ -75,7 +77,7 @@ pub struct TxFilterConfig {
     pub expected_blobs: SortedVec<Buf32>,
 
     /// For deposits that might be spent from.
-    pub expected_outpoints: KeyedSortedVec<OutputRef, DepositSpendConfig>,
+    pub expected_outpoints: FlatTable<DepositSpendConfig>,
 
     /// For withdrawal fulfillment transactions sent by bridge operator. Maps deposit idx to
     /// fulfillment details.
@@ -93,7 +95,7 @@ impl TxFilterConfig {
         let address = generate_taproot_address(&operator_wallet_pks, rollup_params.network)?;
 
         let rollup_name = rollup_params.rollup_name.clone();
-        let expected_addrs = SortedVec::from(vec![address.clone()]);
+        let expected_addrs = SortedVec::new_unchecked(vec![address.clone()]);
         let sequencer_cred_rule = rollup_params.cred_rule.clone();
 
         let envelope_tags = EnvelopeTags {
@@ -107,12 +109,13 @@ impl TxFilterConfig {
             deposit_amount: rollup_params.deposit_amount,
             address,
         };
+
         Ok(Self {
             envelope_tags,
             sequencer_cred_rule,
             expected_addrs,
-            expected_blobs: SortedVec::new(),
-            expected_outpoints: Vec::new().into(),
+            expected_blobs: SortedVec::new_empty(),
+            expected_outpoints: FlatTable::new_empty(),
             expected_withdrawal_fulfillments: HashMap::new(),
             deposit_config,
         })
@@ -123,15 +126,17 @@ impl TxFilterConfig {
             derive_expected_withdrawal_fulfillments(chainstate.deposits_table().deposits());
 
         // Watch all utxos we have in our deposit table.
-        self.expected_outpoints = chainstate
+        let exp_outpoints = chainstate
             .deposits_table()
             .deposits()
             .map(|deposit| DepositSpendConfig {
                 deposit_idx: deposit.idx(),
                 output: *deposit.output(),
             })
-            .collect::<Vec<_>>()
-            .into();
+            .collect::<Vec<_>>();
+
+        self.expected_outpoints =
+            FlatTable::try_from(exp_outpoints).expect("types: duplicate deposit indexes?");
     }
 }
 

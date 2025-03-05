@@ -40,18 +40,20 @@ fn parse_da_blobs<'a>(
     std::iter::empty::<std::slice::Iter<'a, &'a [u8]>>().map(|inner| inner.copied())
 }
 
+use strata_primitives::l1::OutputRef;
+
 /// Parse transaction and filter out any deposits that have been spent.
 fn parse_deposit_spends<'a>(
     tx: &'a Transaction,
     filter_conf: &'a TxFilterConfig,
 ) -> impl Iterator<Item = DepositSpendInfo> + 'a {
     tx.input.iter().filter_map(|txin| {
+        let prevout = OutputRef::new(txin.previous_output.txid, txin.previous_output.vout);
         filter_conf
             .expected_outpoints
-            .binary_search_by_key(&txin.previous_output, |config| *config.output.outpoint())
-            .ok()
-            .map(|p| DepositSpendInfo {
-                deposit_idx: filter_conf.expected_outpoints[p].deposit_idx,
+            .get(&prevout)
+            .map(|config| DepositSpendInfo {
+                deposit_idx: config.deposit_idx,
             })
     })
 }
