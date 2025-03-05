@@ -14142,6 +14142,7 @@ dependencies = [
  "strata-risc0-guest-builder",
  "strata-sp1-guest-builder",
  "thiserror 2.0.11",
+ "zkaleido",
  "zkaleido-native-adapter",
  "zkaleido-risc0-host",
  "zkaleido-sp1-host",
