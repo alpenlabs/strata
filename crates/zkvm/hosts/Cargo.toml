@@ -28,7 +28,7 @@ serde.workspace = true
 thiserror.workspace = true
 
 [features]
-default = []
+default = ["native"]
 native = ["zkaleido-native-adapter"]
 risc0 = ["zkaleido-risc0-host", "strata-risc0-guest-builder"]
 sp1 = ["zkaleido-sp1-host", "strata-sp1-guest-builder"]
