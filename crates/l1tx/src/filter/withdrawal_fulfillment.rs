@@ -1,5 +1,8 @@
 use bitcoin::{ScriptBuf, Transaction};
-use strata_primitives::l1::{BitcoinAmount, WithdrawalFulfillmentInfo};
+use strata_primitives::{
+    buf::Buf32,
+    l1::{BitcoinAmount, WithdrawalFulfillmentInfo},
+};
 use tracing::debug;
 
 use super::TxFilterConfig;
@@ -12,24 +15,36 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
     // 1. Check this is of correct structure
     let frontpayment_txout = tx.output.first()?;
     let metadata_txout = tx.output.get(1)?;
+    let txid: Buf32 = tx.compute_txid().into();
 
     metadata_txout.script_pubkey.is_op_return().then_some(())?;
 
     // 2. Ensure correct OP_RETURN data and check it has expected deposit index.
-    let (_op_idx, dep_idx) = parse_opreturn_metadata(&metadata_txout.script_pubkey)?;
+    let (op_idx, dep_idx) = parse_opreturn_metadata(&metadata_txout.script_pubkey)?;
 
     let exp_ful = filter_conf.expected_withdrawal_fulfillments.get(&dep_idx)?;
 
+    if exp_ful.operator_idx != op_idx {
+        debug!(?txid, "Deposit index matches but operator_idx does not");
+        return None;
+    }
+
     // 3. Check if it is spent to expected destination.
     if frontpayment_txout.script_pubkey != *exp_ful.destination.inner() {
-        debug!("Deposit index matches but script_pubkey does not");
+        debug!(
+            ?txid,
+            "Deposit index and operator index matches but script_pubkey does not"
+        );
         return None;
     }
 
     // 4. Ensure amount is equal to the expected amount
     let actual_amount_sats = frontpayment_txout.value.to_sat();
     if actual_amount_sats < exp_ful.amount {
-        debug!("Deposit index and script_pubkey match but the amount does not");
+        debug!(
+            ?txid,
+            "Deposit index and script_pubkey match but the amount does not"
+        );
         return None;
     }
 
