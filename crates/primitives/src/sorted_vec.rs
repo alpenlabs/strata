@@ -184,9 +184,9 @@ pub trait TableEntry {
     fn get_key(&self) -> &Self::Key;
 }
 
-/// Sorts a vec of [`TableEntry`]s according to their natural sorting.  Does not
+/// Sorts a slice of [`TableEntry`]s according to their natural sorting.  Does not
 /// check for duplicates, but preserves the order of equally keyed elements.
-fn sort_entry_vec<T: TableEntry>(vec: &mut Vec<T>) {
+fn sort_entry_slice<T: TableEntry>(vec: &mut [T]) {
     vec.sort_by(|l, r| Ord::cmp(l.get_key(), r.get_key()));
 }
 
@@ -263,7 +263,7 @@ impl<T: TableEntry> FlatTable<T> {
     ///
     /// If there duplicates after sorting, returns error.
     pub fn try_from_unsorted(mut vec: Vec<T>) -> Result<Self, Error> {
-        sort_entry_vec(&mut vec);
+        sort_entry_slice(&mut vec);
         if !check_duplicate_keys(&vec) {
             Ok(Self::new_unchecked(vec))
         } else {
