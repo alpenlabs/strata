@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 zkaleido.workspace = true
-zkaleido-native-adapter = { workspace = true, optional = true }
+zkaleido-native-adapter.workspace = true
 
 # sp1
 strata-sp1-guest-builder = { path = "../../../provers/sp1", optional = true }

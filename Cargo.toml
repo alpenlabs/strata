@@ -46,7 +46,7 @@ members = [
   "bin/strata-reth",
   "bin/strata-sequencer-client",
   "bin/prover-client",
-  "provers/perf",
+  "bin/prover-perf",
 
   # integration tests
   "tests",
