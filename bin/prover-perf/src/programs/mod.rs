@@ -65,7 +65,7 @@ pub fn run_sp1_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
 /// Runs Risc0 programs to generate reports.
 ///
 /// Generates [`PerformanceReport`] for each invocation.
-// #[cfg(feature = "risc0")]
+#[cfg(feature = "risc0")]
 pub fn run_risc0_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
     use strata_zkvm_hosts::risc0::{
         BTC_BLOCKSPACE_HOST, CHECKPOINT_HOST, CL_STF_HOST, EVM_EE_STF_HOST,
