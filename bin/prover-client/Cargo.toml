@@ -23,6 +23,7 @@ strata-rpc-api = { workspace = true, features = ["client"] }
 strata-rpc-types.workspace = true
 strata-rpc-utils.workspace = true
 strata-state.workspace = true
+strata-zkvm-hosts.workspace = true
 zkaleido.workspace = true
 zkaleido-native-adapter.workspace = true
 
@@ -48,19 +49,12 @@ tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid.workspace = true
 
-# sp1
-strata-sp1-guest-builder = { path = "../../provers/sp1", optional = true }
-zkaleido-sp1-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5", optional = true }
-
-# risc0
-strata-risc0-guest-builder = { path = "../../provers/risc0", optional = true }
-zkaleido-risc0-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5", optional = true }
-
 [dev-dependencies]
 strata-test-utils.workspace = true
 
 [features]
 default = []
-sp1 = ["zkaleido-sp1-host"]
-sp1-builder = ["sp1", "strata-sp1-guest-builder"]
-risc0 = ["zkaleido-risc0-host", "strata-risc0-guest-builder"]
+sp1 = ["strata-zkvm-hosts/sp1"]
+sp1-builder = ["strata-zkvm-hosts/sp1-builder"]
+risc0 = ["strata-zkvm-hosts/risc0"]
+risc0-builder = ["strata-zkvm-hosts/risc0-builder"]
