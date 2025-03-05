@@ -111,12 +111,18 @@ jobs:
       - name: Extract SP1 Value
         id: extract-sp1-value
         run: |
-          if [ -n "$SP1_VALUE" ]; then
-            echo "sp1_value=$SP1_VALUE" >> "$GITHUB_OUTPUT"
-          else
-            echo "Error: Failed to extract SP1 value from parameters"
-            exit 1
+          # store sp1 value only if the matrix program is prover-client
+          if [ "${{ matrix.program }}" == "prover-client" ]; then
+            SP1_VALUE="${{ steps.build-and-push.outputs.sp1_value }}"
+            if [ -n "$SP1_VALUE" ]; then
+              echo "sp1_value=$SP1_VALUE" >> "$GITHUB_OUTPUT"
+            else
+              # the process must exit if we do not have the verification key when prover is built
+              echo "Error: Failed to extract SP1 value from parameters"
+              exit 1
+            fi
           fi
+
   update-helm-values:
     name: Update Helm Values
     needs: [build-and-push]
