@@ -1,21 +1,8 @@
 use bitcoin::{ScriptBuf, Transaction};
-use strata_primitives::{
-    bitcoin_bosd::Descriptor,
-    l1::{BitcoinAmount, WithdrawalFulfillmentInfo},
-    sorted_vec::HasKey,
-};
+use strata_primitives::l1::{BitcoinAmount, WithdrawalFulfillmentInfo};
 use tracing::debug;
 
 use super::TxFilterConfig;
-
-fn create_opreturn_metadata(operator_idx: u32, deposit_idx: u32) -> ScriptBuf {
-    let mut metadata = [0u8; 8];
-    // first 4 bytes = operator idx
-    metadata[..4].copy_from_slice(&operator_idx.to_be_bytes());
-    // next 4 bytes = deposit idx
-    metadata[4..].copy_from_slice(&deposit_idx.to_be_bytes());
-    Descriptor::new_op_return(&metadata).unwrap().to_script()
-}
 
 /// Parse transaction and search for a Withdrawal Fulfillment transaction to an expected address.
 pub fn parse_withdrawal_fulfillment_transactions<'a>(
@@ -25,47 +12,54 @@ pub fn parse_withdrawal_fulfillment_transactions<'a>(
     // 1. Check this is of correct structure
     let frontpayment_txout = tx.output.first()?;
     let metadata_txout = tx.output.get(1)?;
+
     metadata_txout.script_pubkey.is_op_return().then_some(())?;
 
-    // 2. Check withdrawal is to an address we expect
-    let withdrawal = filter_conf
-        .expected_withdrawal_fulfillments
-        .binary_search_by_key(
-            &frontpayment_txout.script_pubkey.clone().into(),
-            HasKey::get_key,
-        )
-        .ok()
-        .map(|x| filter_conf.expected_withdrawal_fulfillments[x].clone())?;
+    // 2. Ensure correct OP_RETURN data and check it has expected deposit index.
+    let (_op_idx, dep_idx) = parse_opreturn_metadata(&metadata_txout.script_pubkey)?;
 
-    // 3. Ensure amount is equal to the expected amount
-    let actual_amount_sats = frontpayment_txout.value.to_sat();
-    if actual_amount_sats < withdrawal.amount {
-        debug!(
-            ?withdrawal,
-            ?actual_amount_sats,
-            "Transaction with expected withdrawal scriptpubkey found, but amount does not match"
-        );
+    let exp_ful = filter_conf.expected_withdrawal_fulfillments.get(&dep_idx)?;
+
+    // 3. Check if it is spent to expected destination.
+    if frontpayment_txout.script_pubkey != *exp_ful.destination.inner() {
+        debug!("Deposit index matches but script_pubkey does not");
         return None;
     }
 
-    // 4. Ensure it has correct metadata of the assigned operator.
-    let expected_metadata_script =
-        create_opreturn_metadata(withdrawal.operator_idx, withdrawal.deposit_idx);
-    if metadata_txout.script_pubkey != expected_metadata_script {
-        debug!(
-            ?withdrawal,
-            ?metadata_txout.script_pubkey,
-            "Transaction with expected withdrawal scriptpubkey and amount found, but metadata does not match"
-        );
+    // 4. Ensure amount is equal to the expected amount
+    let actual_amount_sats = frontpayment_txout.value.to_sat();
+    if actual_amount_sats < exp_ful.amount {
+        debug!("Deposit index and script_pubkey match but the amount does not");
         return None;
     }
 
     Some(WithdrawalFulfillmentInfo {
-        deposit_idx: withdrawal.deposit_idx,
-        operator_idx: withdrawal.operator_idx,
+        deposit_idx: exp_ful.deposit_idx,
+        operator_idx: exp_ful.operator_idx,
         amt: BitcoinAmount::from_sat(actual_amount_sats),
         txid: tx.compute_txid().into(),
     })
+}
+
+fn parse_opreturn_metadata(script_buf: &ScriptBuf) -> Option<(u32, u32)> {
+    let opreturn_data = match script_buf.as_bytes() {
+        [_, _, data @ ..] => data,
+        _ => return None,
+    };
+
+    // 4 bytes op idx + 4 bytes dep idx + 32 bytes txid
+    if opreturn_data.len() != 40 {
+        return None;
+    }
+    let mut idx_bytes = [0u8; 4];
+
+    idx_bytes.copy_from_slice(&opreturn_data[0..4]);
+    let opidx: u32 = u32::from_be_bytes(idx_bytes);
+
+    idx_bytes.copy_from_slice(&opreturn_data[4..8]);
+    let depidx: u32 = u32::from_be_bytes(idx_bytes);
+
+    Some((opidx, depidx))
 }
 
 #[cfg(test)]
@@ -88,6 +82,15 @@ mod test {
 
     fn withdraw_amt_after_fees() -> Amount {
         DEPOSIT_AMT - OPERATOR_FEE
+    }
+
+    fn create_opreturn_metadata(operator_idx: u32, deposit_idx: u32) -> ScriptBuf {
+        let mut metadata = [0u8; 8];
+        // first 4 bytes = operator idx
+        metadata[..4].copy_from_slice(&operator_idx.to_be_bytes());
+        // next 4 bytes = deposit idx
+        metadata[4..].copy_from_slice(&deposit_idx.to_be_bytes());
+        Descriptor::new_op_return(&metadata).unwrap().to_script()
     }
 
     fn generate_data() -> (Vec<Descriptor>, TxFilterConfig) {
@@ -131,7 +134,7 @@ mod test {
         ];
 
         filterconfig.expected_withdrawal_fulfillments =
-            derive_expected_withdrawal_fulfillments(deposits.iter()).into();
+            derive_expected_withdrawal_fulfillments(deposits.iter());
 
         (addresses, filterconfig)
     }

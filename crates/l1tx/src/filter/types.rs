@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bitcoin::Amount;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
@@ -73,9 +75,9 @@ pub struct TxFilterConfig {
     /// For deposits that might be spent from.
     pub expected_outpoints: SortedVecWithKey<OutputRef, DepositSpendConfig>,
 
-    /// For withdrawal fulfillment transactions sent by bridge operator.
-    pub expected_withdrawal_fulfillments:
-        SortedVecWithKey<BitcoinScriptBuf, ExpectedWithdrawalFulfillment>,
+    /// For withdrawal fulfillment transactions sent by bridge operator. Maps deposit idx to
+    /// fulfillment details.
+    pub expected_withdrawal_fulfillments: HashMap<u32, ExpectedWithdrawalFulfillment>,
 
     /// Deposit config that determines how a deposit transaction can be parsed.
     pub deposit_config: DepositTxParams,
@@ -109,14 +111,14 @@ impl TxFilterConfig {
             expected_addrs,
             expected_blobs: SortedVec::new(),
             expected_outpoints: Vec::new().into(),
-            expected_withdrawal_fulfillments: Vec::new().into(),
+            expected_withdrawal_fulfillments: HashMap::new(),
             deposit_config,
         })
     }
 
     pub fn update_from_chainstate(&mut self, chainstate: &Chainstate) {
         self.expected_withdrawal_fulfillments =
-            derive_expected_withdrawal_fulfillments(chainstate.deposits_table().deposits()).into();
+            derive_expected_withdrawal_fulfillments(chainstate.deposits_table().deposits());
 
         // Watch all utxos we have in our deposit table.
         self.expected_outpoints = chainstate
@@ -133,11 +135,11 @@ impl TxFilterConfig {
 
 pub(crate) fn derive_expected_withdrawal_fulfillments<'a, I>(
     deposits: I,
-) -> Vec<ExpectedWithdrawalFulfillment>
+) -> HashMap<u32, ExpectedWithdrawalFulfillment>
 where
     I: Iterator<Item = &'a DepositEntry>,
 {
-    deposits
+    let fulfillments = deposits
         .filter_map(|deposit| match deposit.deposit_state() {
             // withdrawal has been assigned to an operator
             DepositState::Dispatched(dispatched_state) => {
@@ -146,18 +148,21 @@ where
                     .withdraw_outputs()
                     .iter()
                     .map(|output| {
-                        ExpectedWithdrawalFulfillment {
-                            destination: output.destination().to_script().into(),
-                            // TODO: This uses FIXED OPERATOR FEE for TN1
-                            amount: output.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat()),
-                            operator_idx: dispatched_state.assignee(),
-                            deposit_idx: deposit.idx(),
-                        }
+                        (
+                            deposit.idx(),
+                            ExpectedWithdrawalFulfillment {
+                                destination: output.destination().to_script().into(),
+                                // TODO: This uses FIXED OPERATOR FEE for TN1
+                                amount: output.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat()),
+                                operator_idx: dispatched_state.assignee(),
+                                deposit_idx: deposit.idx(),
+                            },
+                        )
                     });
                 Some(expected)
             }
             _ => None,
         })
-        .flatten()
-        .collect::<Vec<_>>()
+        .flatten();
+    HashMap::from_iter(fulfillments)
 }
