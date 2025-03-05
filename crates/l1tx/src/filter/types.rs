@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bitcoin::{hashes::Hash, Amount};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
@@ -19,48 +17,6 @@ use crate::utils::{generate_taproot_address, get_operator_wallet_pks};
 // TODO: This is FIXED OPERATOR FEE for TN1
 pub const OPERATOR_FEE: Amount = Amount::from_int_btc(2);
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct EnvelopeTags {
-    pub checkpoint_tag: String,
-    pub da_tag: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct ExpectedWithdrawalFulfillment {
-    /// withdrawal address scriptbuf
-    pub destination: BitcoinScriptBuf,
-    /// Expected minimum withdrawal amount in sats
-    pub amount: u64,
-    /// index of assigned operator
-    pub operator_idx: u32,
-    /// index of assigned deposit entry for this withdrawal
-    pub deposit_idx: u32,
-    /// Txid of the locked utxo of assigned deposit.
-    pub deposit_txid: [u8; 32],
-}
-
-impl TableEntry for ExpectedWithdrawalFulfillment {
-    type Key = BitcoinScriptBuf;
-    fn get_key(&self) -> &Self::Key {
-        &self.destination
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct DepositSpendConfig {
-    /// index of deposit entry
-    pub deposit_idx: u32,
-    /// utxo for this deposit
-    pub output: OutputRef,
-}
-
-impl TableEntry for DepositSpendConfig {
-    type Key = OutputRef;
-    fn get_key(&self) -> &Self::Key {
-        &self.output
-    }
-}
-
 /// A configuration that determines how relevant transactions in a bitcoin block are filtered.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct TxFilterConfig {
@@ -74,14 +30,17 @@ pub struct TxFilterConfig {
     pub expected_addrs: SortedVec<BitcoinAddress>,
 
     /// For blobs that are expected to be written to bitcoin.
+    ///
+    /// This might be removed soon.
     pub expected_blobs: SortedVec<Buf32>,
 
     /// For deposits that might be spent from.
-    pub expected_outpoints: FlatTable<DepositSpendConfig>,
+    pub expected_outpoints: FlatTable<DepositUtxoInfo>,
 
-    /// For withdrawal fulfillment transactions sent by bridge operator. Maps deposit idx to
-    /// fulfillment details.
-    pub expected_withdrawal_fulfillments: HashMap<u32, ExpectedWithdrawalFulfillment>,
+    /// For withdrawal fulfillment transactions sent by bridge operators.
+    ///
+    /// Maps deposit idx to fulfillment data.
+    pub expected_withdrawal_fulfillments: FlatTable<WithdrawalFulfillmentInfo>,
 
     /// Deposit config that determines how a deposit transaction can be parsed.
     pub deposit_config: DepositTxParams,
@@ -116,20 +75,27 @@ impl TxFilterConfig {
             expected_addrs,
             expected_blobs: SortedVec::new_empty(),
             expected_outpoints: FlatTable::new_empty(),
-            expected_withdrawal_fulfillments: HashMap::new(),
+            expected_withdrawal_fulfillments: FlatTable::new_empty(),
             deposit_config,
         })
     }
 
     pub fn update_from_chainstate(&mut self, chainstate: &Chainstate) {
+        // Watch all withdrawals that have been ordered.
+        let exp_fulfillments = chainstate
+            .deposits_table()
+            .deposits()
+            .flat_map(|entry| conv_deposit_to_fulfillment(entry))
+            .collect::<Vec<_>>();
+
         self.expected_withdrawal_fulfillments =
-            derive_expected_withdrawal_fulfillments(chainstate.deposits_table().deposits());
+            FlatTable::try_from(exp_fulfillments).expect("types: duplicate deposit indexes?");
 
         // Watch all utxos we have in our deposit table.
         let exp_outpoints = chainstate
             .deposits_table()
             .deposits()
-            .map(|deposit| DepositSpendConfig {
+            .map(|deposit| DepositUtxoInfo {
                 deposit_idx: deposit.idx(),
                 output: *deposit.output(),
             })
@@ -140,42 +106,79 @@ impl TxFilterConfig {
     }
 }
 
-pub(crate) fn derive_expected_withdrawal_fulfillments<'a, I>(
-    deposits: I,
-) -> HashMap<u32, ExpectedWithdrawalFulfillment>
-where
-    I: Iterator<Item = &'a DepositEntry>,
-{
-    let fulfillments = deposits
-        .filter_map(|deposit| match deposit.deposit_state() {
-            // withdrawal has been assigned to an operator
-            DepositState::Dispatched(dispatched_state) => {
-                let expected = dispatched_state
-                    .cmd()
-                    .withdraw_outputs()
-                    .iter()
-                    .map(|output| {
-                        (
-                            deposit.idx(),
-                            ExpectedWithdrawalFulfillment {
-                                destination: output.destination().to_script().into(),
-                                // TODO: This uses FIXED OPERATOR FEE for TN1
-                                amount: output.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat()),
-                                operator_idx: dispatched_state.assignee(),
-                                deposit_idx: deposit.idx(),
-                                deposit_txid: deposit
-                                    .output()
-                                    .outpoint()
-                                    .txid
-                                    .as_raw_hash()
-                                    .to_byte_array(),
-                            },
-                        )
-                    });
-                Some(expected)
-            }
-            _ => None,
-        })
-        .flatten();
-    HashMap::from_iter(fulfillments)
+/// The tags used for the two envelope kinds we recognize.
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct EnvelopeTags {
+    pub checkpoint_tag: String,
+    pub da_tag: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct WithdrawalFulfillmentInfo {
+    /// Index of the deposit in the deposits table.  This is also the key in the
+    /// expected withdrawals table that we perform filtering with.
+    pub deposit_idx: u32,
+
+    /// The operator ordered to fulfill the withdrawal.
+    pub operator_idx: u32,
+
+    // TODO make this a vec of outputs along with amt
+    /// Expected destination script buf.
+    pub destination: BitcoinScriptBuf,
+
+    /// Expected minimum withdrawal amount in sats.
+    pub amount: u64,
+
+    /// Txid of the locked deposit utxo, which will ultimately be claimed by
+    /// the operator.
+    pub deposit_txid: [u8; 32],
+}
+
+impl TableEntry for WithdrawalFulfillmentInfo {
+    type Key = u32;
+    fn get_key(&self) -> &Self::Key {
+        &self.deposit_idx
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct DepositUtxoInfo {
+    /// The utxo's outpoint.
+    ///
+    /// This is used as the key in the expected outpoints table.
+    pub output: OutputRef,
+
+    /// Deposit index that this utxo corresponds to.
+    pub deposit_idx: u32,
+}
+
+impl TableEntry for DepositUtxoInfo {
+    type Key = OutputRef;
+    fn get_key(&self) -> &Self::Key {
+        &self.output
+    }
+}
+
+fn conv_deposit_to_fulfillment(entry: &DepositEntry) -> Option<WithdrawalFulfillmentInfo> {
+    let DepositState::Dispatched(state) = entry.deposit_state() else {
+        return None;
+    };
+
+    // Sanity check until we actually support multiple outputs.
+    let noutputs = state.cmd().withdraw_outputs().len();
+    if noutputs != 1 {
+        panic!("l1txfilter: withdrawal dispatch with {noutputs} (exp 1)");
+    }
+
+    let outp = &state.cmd().withdraw_outputs()[0];
+
+    let deposit_txid = entry.output().outpoint().txid.as_raw_hash().to_byte_array();
+
+    Some(WithdrawalFulfillmentInfo {
+        deposit_idx: entry.idx(),
+        operator_idx: state.assignee(),
+        destination: outp.destination().to_script().into(),
+        amount: outp.amt().to_sat(),
+        deposit_txid,
+    })
 }
