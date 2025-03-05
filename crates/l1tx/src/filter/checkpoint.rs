@@ -50,9 +50,7 @@ fn validate_checkpoint(
     signed_checkpoint: SignedCheckpoint,
     filter_conf: &TxFilterConfig,
 ) -> Option<SignedCheckpoint> {
-    if cfg!(not(feature = "test_utils"))
-        && !verify_signed_checkpoint_sig(&signed_checkpoint, &filter_conf.sequencer_cred_rule)
-    {
+    if !verify_signed_checkpoint_sig(&signed_checkpoint, &filter_conf.sequencer_cred_rule) {
         warn!("invalid checkpoint signature");
         return None;
     }
