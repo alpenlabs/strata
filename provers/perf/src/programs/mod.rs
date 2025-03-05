@@ -36,25 +36,25 @@ impl FromStr for GuestProgram {
 /// Runs SP1 programs to generate reports.
 ///
 /// Generates [`PerformanceReport`] for each invocation.
-// #[cfg(feature = "sp1")]
+#[cfg(feature = "sp1")]
 pub fn run_sp1_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
+    use strata_zkvm_hosts::sp1::{
+        BTC_BLOCKSPACE_HOST, CHECKPOINT_HOST, CL_STF_HOST, EVM_EE_STF_HOST,
+    };
     programs
         .iter()
         .map(|program| match program {
-            GuestProgram::BtcBlockscan => {
-                btc_blockscan::gen_perf_report(&btc_blockscan::sp1::host())
-            }
-            GuestProgram::EvmEeStf => evm_ee::gen_perf_report(&evm_ee::sp1::host()),
-            GuestProgram::ClStf => cl_stf::gen_perf_report(
-                &cl_stf::sp1::host(),
-                evm_ee::proof_with_vk(&evm_ee::sp1::host()),
+            GuestProgram::BtcBlockscan => btc_blockscan::gen_perf_report(&*BTC_BLOCKSPACE_HOST),
+            GuestProgram::EvmEeStf => evm_ee::gen_perf_report(&*EVM_EE_STF_HOST),
+            GuestProgram::ClStf => {
+                cl_stf::gen_perf_report(&*CL_STF_HOST, evm_ee::proof_with_vk(&*EVM_EE_STF_HOST))
                 Some(btc_blockscan::proof_with_vk(&btc_blockscan::sp1::host())),
-            ),
+            }
             GuestProgram::Checkpoint => checkpoint::gen_perf_report(
-                &checkpoint::sp1::host(),
+                &*CHECKPOINT_HOST,
                 cl_stf::proof_with_vk(
-                    &cl_stf::sp1::host(),
-                    &evm_ee::sp1::host(),
+                    &*CL_STF_HOST,
+                    &*EVM_EE_STF_HOST,
                     &btc_blockscan::sp1::host(),
                 ),
             ),
@@ -65,25 +65,25 @@ pub fn run_sp1_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
 /// Runs Risc0 programs to generate reports.
 ///
 /// Generates [`PerformanceReport`] for each invocation.
-#[cfg(feature = "risc0")]
+// #[cfg(feature = "risc0")]
 pub fn run_risc0_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
+    use strata_zkvm_hosts::risc0::{
+        BTC_BLOCKSPACE_HOST, CHECKPOINT_HOST, CL_STF_HOST, EVM_EE_STF_HOST,
+    };
     programs
         .iter()
         .map(|program| match program {
-            GuestProgram::BtcBlockscan => {
-                btc_blockscan::gen_perf_report(&btc_blockscan::risc0::host())
-            }
-            GuestProgram::EvmEeStf => evm_ee::gen_perf_report(&evm_ee::risc0::host()),
-            GuestProgram::ClStf => cl_stf::gen_perf_report(
-                &cl_stf::risc0::host(),
-                evm_ee::proof_with_vk(&evm_ee::risc0::host()),
+            GuestProgram::BtcBlockscan => btc_blockscan::gen_perf_report(&*BTC_BLOCKSPACE_HOST),
+            GuestProgram::EvmEeStf => evm_ee::gen_perf_report(&*EVM_EE_STF_HOST),
+            GuestProgram::ClStf => {
+                cl_stf::gen_perf_report(&*CL_STF_HOST, evm_ee::proof_with_vk(&*EVM_EE_STF_HOST))
                 Some(btc_blockscan::proof_with_vk(&btc_blockscan::risc0::host())),
-            ),
+            }
             GuestProgram::Checkpoint => checkpoint::gen_perf_report(
-                &checkpoint::risc0::host(),
+                &*CHECKPOINT_HOST,
                 cl_stf::proof_with_vk(
-                    &cl_stf::risc0::host(),
-                    &evm_ee::risc0::host(),
+                    &*CL_STF_HOST,
+                    &*EVM_EE_STF_HOST,
                     &btc_blockscan::risc0::host(),
                 ),
             ),
