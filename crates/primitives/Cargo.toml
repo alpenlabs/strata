@@ -18,6 +18,7 @@ borsh.workspace = true
 const-hex = "1.14"
 digest.workspace = true
 hex.workspace = true
+k256 = { version = "0.13.4", features = ["schnorr"] }
 musig2 = { workspace = true, features = ["serde"] }
 num_enum.workspace = true
 rand = { workspace = true, optional = true }
