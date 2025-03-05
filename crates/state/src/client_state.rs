@@ -158,7 +158,7 @@ impl ClientState {
     pub fn get_verified_l1_height(&self, slot: u64) -> Option<u64> {
         self.get_last_checkpoint().and_then(|ckpt| {
             if ckpt.batch_info.includes_l2_block(slot) {
-                Some(ckpt.l1_reference.block_height)
+                Some(ckpt.l1_reference.block_height())
             } else {
                 None
             }
@@ -347,18 +347,26 @@ impl InternalState {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct CheckpointL1Ref {
-    pub block_height: u64,
+    pub l1_commitment: L1BlockCommitment,
     pub txid: Buf32,
     pub wtxid: Buf32,
 }
 
 impl CheckpointL1Ref {
-    pub fn new(block_height: u64, txid: Buf32, wtxid: Buf32) -> Self {
+    pub fn new(l1_commitment: L1BlockCommitment, txid: Buf32, wtxid: Buf32) -> Self {
         Self {
-            block_height,
+            l1_commitment,
             txid,
             wtxid,
         }
+    }
+
+    pub fn block_height(&self) -> u64 {
+        self.l1_commitment.height()
+    }
+
+    pub fn block_id(&self) -> &L1BlockId {
+        self.l1_commitment.blkid()
     }
 }
 

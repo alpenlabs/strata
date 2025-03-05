@@ -347,6 +347,14 @@ impl DepositEntry {
     }
 }
 
+#[cfg(feature = "test_utils")]
+impl DepositEntry {
+    pub fn with_state(mut self, state: DepositState) -> Self {
+        self.state = state;
+        self
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DepositState {
@@ -359,8 +367,17 @@ pub enum DepositState {
     /// Order to send out withdrawal dispatched.
     Dispatched(DispatchedState),
 
+    /// Withdrawal is being processed by the assigned operator.
+    Fulfilled(FulfilledState),
+
     /// Executed state, will be cleaned up.
-    Executed,
+    Reimbursed,
+}
+
+impl DepositState {
+    pub fn is_dispatched_to(&self, operator_idx: u32) -> bool {
+        matches!(self, DepositState::Dispatched(s) if s.assignee() == operator_idx)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
@@ -464,5 +481,40 @@ impl WithdrawOutput {
 
     pub fn destination(&self) -> &Descriptor {
         &self.destination
+    }
+
+    pub fn amt(&self) -> BitcoinAmount {
+        self.amt
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+pub struct FulfilledState {
+    /// The index of the operator that has fronted the funds for the withdrawal,
+    /// and who will be reimbursed by the bridge notaries.
+    assignee: OperatorIdx,
+
+    /// Actual amount sent in withdrawal
+    amt: BitcoinAmount,
+
+    /// Corresponding bitcoin transaction id
+    txid: Buf32,
+}
+
+impl FulfilledState {
+    pub fn new(assignee: OperatorIdx, amt: BitcoinAmount, txid: Buf32) -> Self {
+        Self {
+            assignee,
+            amt,
+            txid,
+        }
+    }
+
+    pub fn assignee(&self) -> OperatorIdx {
+        self.assignee
+    }
+
+    pub fn amt(&self) -> BitcoinAmount {
+        self.amt
     }
 }

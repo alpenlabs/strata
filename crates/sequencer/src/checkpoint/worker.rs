@@ -195,7 +195,7 @@ fn handle_ready_epoch(
 
     // else save a pending proof checkpoint entry
     debug!(%epoch, "saving unproven checkpoint");
-    let entry = CheckpointEntry::new_pending_proof(cpd.info, cpd.tsn);
+    let entry = CheckpointEntry::new_pending_proof(cpd.info, cpd.tsn, &cpd.chainstate);
     if let Err(e) = ckhandle.put_checkpoint_and_notify_blocking(epoch, entry) {
         warn!(%epoch, err = %e, "failed to save checkpoint");
     }
@@ -207,11 +207,16 @@ fn handle_ready_epoch(
 struct CheckpointPrepData {
     info: BatchInfo,
     tsn: (Buf32, Buf32),
+    chainstate: Chainstate,
 }
 
 impl CheckpointPrepData {
-    fn new(info: BatchInfo, tsn: (Buf32, Buf32)) -> Self {
-        Self { info, tsn }
+    fn new(info: BatchInfo, tsn: (Buf32, Buf32), chainstate: Chainstate) -> Self {
+        Self {
+            info,
+            tsn,
+            chainstate,
+        }
     }
 }
 
@@ -292,7 +297,11 @@ fn create_checkpoint_prep_data_from_summary(
     let new_transition = (l2_initial_state, l2_final_state);
     let new_batch_info = BatchInfo::new(summary.epoch(), l1_range, l2_range);
 
-    Ok(CheckpointPrepData::new(new_batch_info, new_transition))
+    Ok(CheckpointPrepData::new(
+        new_batch_info,
+        new_transition,
+        final_state,
+    ))
 }
 
 fn fetch_epoch_l2_headers(

@@ -10,13 +10,16 @@ use strata_primitives::{
     bridge::{BitcoinBlockHeight, OperatorIdx},
     buf::Buf32,
     epoch::EpochCommitment,
-    l1::{BitcoinAmount, L1HeaderRecord, L1VerificationError, OutputRef},
+    l1::{
+        BitcoinAmount, L1HeaderRecord, L1VerificationError, OutputRef, WithdrawalFulfillmentInfo,
+    },
     l2::L2BlockCommitment,
 };
+use tracing::warn;
 
 use crate::{
     bridge_ops::DepositIntent,
-    bridge_state::{DepositState, DispatchCommand, DispatchedState},
+    bridge_state::{DepositEntry, DepositState, DispatchCommand, DispatchedState, FulfilledState},
     chain_state::Chainstate,
     header::L2Header,
 };
@@ -289,45 +292,40 @@ impl StateCache {
         };
     }
 
-    // These are all irrelevant now.
-    /*
-            /// add l1 block to maturation entry
-            pub fn apply_l1_block_entry(&mut self, ent: L1MaturationEntry) {
-                let mqueue = &mut self.state_mut().l1_state.maturation_queue;
-                mqueue.push_back(ent);
-            }
+    /// Updates the deposit state to Fulfilled.
+    pub fn mark_deposit_fulfilled(&mut self, winfo: &WithdrawalFulfillmentInfo) {
+        let deposit_ent = self.deposit_entry_mut_expect(winfo.deposit_idx);
 
-            /// remove matured block from maturation entry
-            pub fn mature_l1_block(&mut self, idx: u64) {
-                let operators: Vec<_> = self.state().operator_table().indices().collect();
-                let deposits = self.new_state.exec_env_state.pending_deposits_mut();
-                let mqueue = &mut self.new_state.l1_state.maturation_queue;
+        let oidx = winfo.operator_idx;
+        let is_valid = deposit_ent.deposit_state().is_dispatched_to(oidx);
 
-                // Checks.
-                assert!(mqueue.len() > 1); // make sure we'll still have blocks in the queue
-                let front_idx = mqueue.front_idx().unwrap();
-                assert_eq!(front_idx, idx);
+        assert!(is_valid, "stateop: incorrect deposit state dispatch");
 
-                // Actually take the block out so we can do something with it.
-                let matured_block = mqueue.pop_front().unwrap();
+        deposit_ent.set_state(DepositState::Fulfilled(FulfilledState::new(
+            winfo.operator_idx,
+            winfo.amt,
+            winfo.txid,
+        )));
+    }
 
-                // TODO add it to the MMR so we can reference it in the future
-                let (header_record, deposit_txs, _) = matured_block.into_parts();
-                for op in deposit_txs.iter().flat_map(|tx| tx.tx().protocol_ops()) {
-                    if let ProtocolOperation::Deposit(deposit_info) = op {
-                        trace!("we got some deposit_txs");
-                        let amt = deposit_info.amt;
-                        let deposit_intent = DepositIntent::new(amt, &deposit_info.address);
-                        deposits.push_back(deposit_intent);
-                        self.new_state
-                            .deposits_table
-                            .add_deposits(&deposit_info.outpoint, &operators, amt)
-                    }
-                }
+    // Updates the deposit state as Reimbursed.
+    pub fn mark_deposit_reimbursed(&mut self, deposit_idx: u32) {
+        let deposit_ent = self.deposit_entry_mut_expect(deposit_idx);
 
-                self.state_mut().l1_state.safe_block = header_record;
-            }
-    */
+        if !matches!(deposit_ent.deposit_state(), DepositState::Fulfilled(_)) {
+            // TODO: handle this better after TN1 bridge is integrated
+            warn!("stateop: deposit spent at unexpected state");
+        }
+
+        deposit_ent.set_state(DepositState::Reimbursed);
+    }
+
+    fn deposit_entry_mut_expect(&mut self, deposit_idx: u32) -> &mut DepositEntry {
+        self.state_mut()
+            .deposits_table_mut()
+            .get_deposit_mut(deposit_idx)
+            .expect("stateop: missing deposit idx")
+    }
 
     // TODO add more manipulator functions
 }

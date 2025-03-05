@@ -4,7 +4,10 @@ use strata_l1tx::{
 };
 use strata_primitives::{
     batch::SignedCheckpoint,
-    l1::{DepositInfo, DepositRequestInfo, ProtocolOperation},
+    l1::{
+        DepositInfo, DepositRequestInfo, DepositSpendInfo, ProtocolOperation,
+        WithdrawalFulfillmentInfo,
+    },
 };
 
 /// Ops indexer for rollup client. Collects extra info like da blobs and deposit requests
@@ -52,6 +55,15 @@ impl TxVisitor for ReaderTxVisitorImpl {
         self.ops.push(ProtocolOperation::Checkpoint(chkpt));
     }
 
+    fn visit_withdrawal_fulfillment(&mut self, info: WithdrawalFulfillmentInfo) {
+        self.ops
+            .push(ProtocolOperation::WithdrawalFulfillment(info));
+    }
+
+    fn visit_deposit_spend(&mut self, info: DepositSpendInfo) {
+        self.ops.push(ProtocolOperation::DepositSpent(info));
+    }
+
     fn finalize(self) -> Option<L1TxMessages> {
         if self.ops.is_empty() && self.deposit_requests.is_empty() && self.da_entries.is_empty() {
             None
@@ -74,7 +86,6 @@ mod test {
     };
     use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
     use strata_primitives::{
-        batch::SignedCheckpoint,
         l1::{payload::L1Payload, BitcoinAmount, ProtocolOperation},
         params::Params,
     };
@@ -83,8 +94,7 @@ mod test {
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
             test_taproot_addr,
         },
-        l2::gen_params,
-        ArbitraryGenerator,
+        l2::{gen_params, get_test_signed_checkpoint},
     };
 
     use crate::{
@@ -290,7 +300,7 @@ mod test {
         let num_envelopes = 1;
         let l1_payloads: Vec<_> = (0..num_envelopes)
             .map(|_| {
-                let signed_checkpoint: SignedCheckpoint = ArbitraryGenerator::new().generate();
+                let signed_checkpoint = get_test_signed_checkpoint();
                 L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
             })
             .collect();
@@ -301,6 +311,7 @@ mod test {
         let block = create_test_block(vec![tx]);
 
         let tx_entries = index_block(&block, ReaderTxVisitorImpl::new, &filter_config);
+        println!("tx_entries: {:?}", tx_entries);
 
         assert_eq!(
             tx_entries.len(),

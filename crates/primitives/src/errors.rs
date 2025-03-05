@@ -28,4 +28,9 @@ pub enum ParseError {
     /// Converting from an unsupported [`Address`](bitcoin::Address) type for a [`Buf32`].
     #[error("only taproot addresses are supported but found {0:?}")]
     UnsupportedAddress(Option<AddressType>),
+
+    /// Could not get a network address from descriptor
+    /// Using String error as [`bitcoin_bosd::DescriptorError`] does not impl Clone
+    #[error("descriptor: {0}")]
+    Descriptor(String),
 }

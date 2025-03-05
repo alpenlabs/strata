@@ -1,22 +1,22 @@
 use bitcoin::Transaction;
-use strata_primitives::{
-    batch::SignedCheckpoint,
-    l1::{payload::L1PayloadType, DepositInfo, DepositRequestInfo},
-};
-use strata_state::batch::verify_signed_checkpoint_sig;
-use tracing::warn;
+use strata_primitives::l1::{DepositInfo, DepositRequestInfo, DepositSpendInfo, OutputRef};
 
+mod checkpoint;
 pub mod indexer;
 pub mod types;
+mod withdrawal_fulfillment;
 
+use checkpoint::parse_valid_checkpoint_envelopes;
 pub use types::TxFilterConfig;
+use withdrawal_fulfillment::try_parse_tx_as_withdrawal_fulfillment;
 
-use crate::{
-    deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
-    envelope::parser::parse_envelope_payloads,
+use crate::deposit::{
+    deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
 };
 
-fn parse_deposit_requests(
+// TODO move all these functions to other modules
+
+fn extract_deposit_requests(
     tx: &Transaction,
     filter_conf: &TxFilterConfig,
 ) -> impl Iterator<Item = DepositRequestInfo> {
@@ -25,7 +25,7 @@ fn parse_deposit_requests(
 }
 
 /// Parse deposits from [`Transaction`].
-fn parse_deposits(
+fn try_parse_tx_deposit(
     tx: &Transaction,
     filter_conf: &TxFilterConfig,
 ) -> impl Iterator<Item = DepositInfo> {
@@ -34,7 +34,7 @@ fn parse_deposits(
 }
 
 /// Parse da blobs from [`Transaction`].
-fn parse_da_blobs<'a>(
+fn extract_da_blobs<'a>(
     _tx: &'a Transaction,
     _filter_conf: &TxFilterConfig,
 ) -> impl Iterator<Item = impl Iterator<Item = &'a [u8]> + 'a> {
@@ -42,96 +42,40 @@ fn parse_da_blobs<'a>(
     std::iter::empty::<std::slice::Iter<'a, &'a [u8]>>().map(|inner| inner.copied())
 }
 
-/// Parses envelope from the given transaction. Currently, the only envelope recognizable is
-/// the checkpoint envelope.
-// TODO: we need to change envelope structure and possibly have envelopes for checkpoints and
-// DA separately
-fn parse_checkpoint_envelopes<'a>(
-    tx: &'a Transaction,
-    filter_conf: &'a TxFilterConfig,
-) -> impl Iterator<Item = SignedCheckpoint> + 'a {
-    tx.input.iter().flat_map(move |inp| {
-        inp.witness
-            .tapscript()
-            .and_then(|scr| parse_envelope_payloads(&scr.into(), filter_conf).ok())
-            .map(|items| {
-                items
-                    .into_iter()
-                    .filter_map(|item| match *item.payload_type() {
-                        L1PayloadType::Checkpoint => {
-                            borsh::from_slice::<SignedCheckpoint>(item.data())
-                                .ok()
-                                .filter(|signed_checkpoint| {
-                                    verify_signed_checkpoint_sig(
-                                        signed_checkpoint,
-                                        &filter_conf.sequencer_cred_rule,
-                                    )
-                                })
-                        }
-                        L1PayloadType::Da => {
-                            warn!("Da parsing is not supported yet");
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>()
+/// Parse transaction and filter out any deposits that have been spent.
+fn find_deposit_spends<'tx>(
+    tx: &'tx Transaction,
+    filter_conf: &'tx TxFilterConfig,
+) -> impl Iterator<Item = DepositSpendInfo> + 'tx {
+    tx.input.iter().filter_map(|txin| {
+        let prevout = OutputRef::new(txin.previous_output.txid, txin.previous_output.vout);
+        filter_conf
+            .expected_outpoints
+            .get(&prevout)
+            .map(|config| DepositSpendInfo {
+                deposit_idx: config.deposit_idx,
             })
-            .unwrap_or_default()
     })
 }
 
 #[cfg(test)]
 mod test {
     use bitcoin::{Amount, ScriptBuf};
-    use strata_btcio::test_utils::create_checkpoint_envelope_tx;
-    use strata_primitives::{
-        l1::{payload::L1Payload, BitcoinAmount},
-        params::Params,
-    };
-    use strata_state::batch::SignedCheckpoint;
+    use strata_primitives::{l1::BitcoinAmount, params::Params};
     use strata_test_utils::{
         bitcoin::{
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
             test_taproot_addr,
         },
         l2::gen_params,
-        ArbitraryGenerator,
     };
 
     use super::TxFilterConfig;
-    use crate::filter::{parse_checkpoint_envelopes, parse_deposit_requests, parse_deposits};
-
-    const TEST_ADDR: &str = "bcrt1q6u6qyya3sryhh42lahtnz2m7zuufe7dlt8j0j5";
+    use crate::filter::{extract_deposit_requests, try_parse_tx_deposit};
 
     /// Helper function to create filter config
     fn create_tx_filter_config(params: &Params) -> TxFilterConfig {
         TxFilterConfig::derive_from(params.rollup()).expect("can't get filter config")
-    }
-
-    #[test]
-    fn test_parse_envelopes() {
-        // Test with valid name
-        let mut params: Params = gen_params();
-        let filter_config = create_tx_filter_config(&params);
-
-        // Testing multiple envelopes are parsed
-        let num_envelopes = 2;
-        let l1_payloads: Vec<_> = (0..num_envelopes)
-            .map(|_| {
-                let signed_checkpoint: SignedCheckpoint = ArbitraryGenerator::new().generate();
-                L1Payload::new_checkpoint(borsh::to_vec(&signed_checkpoint).unwrap())
-            })
-            .collect();
-        let tx = create_checkpoint_envelope_tx(&params, TEST_ADDR, l1_payloads.clone());
-        let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
-
-        assert_eq!(checkpoints.len(), 2, "Should filter relevant envelopes");
-
-        // Test with invalid checkpoint tag
-        params.rollup.checkpoint_tag = "invalid_checkpoint_tag".to_string();
-
-        let tx = create_checkpoint_envelope_tx(&params, TEST_ADDR, l1_payloads);
-        let checkpoints: Vec<_> = parse_checkpoint_envelopes(&tx, &filter_config).collect();
-        assert!(checkpoints.is_empty(), "There should be no envelopes");
     }
 
     #[test]
@@ -148,7 +92,7 @@ mod test {
             &deposit_config.address.address().script_pubkey(),
             &deposit_script,
         );
-        let deposits: Vec<_> = parse_deposits(&tx, &filter_conf).collect();
+        let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
         assert_eq!(deposits.len(), 1, "Should find one deposit transaction");
         assert_eq!(deposits[0].address, ee_addr, "EE address should match");
         assert_eq!(
@@ -180,7 +124,7 @@ mod test {
             &deposit_request_script,
         );
 
-        let deposit_reqs: Vec<_> = parse_deposit_requests(&tx, &filter_conf).collect();
+        let deposit_reqs: Vec<_> = extract_deposit_requests(&tx, &filter_conf).collect();
         assert_eq!(deposit_reqs.len(), 1, "Should find one deposit request");
 
         assert_eq!(
@@ -206,7 +150,7 @@ mod test {
             &ScriptBuf::new(),
         );
 
-        let deposits: Vec<_> = parse_deposits(&tx, &filter_conf).collect();
+        let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
         assert!(deposits.is_empty(), "Should find no deposit request");
     }
 }

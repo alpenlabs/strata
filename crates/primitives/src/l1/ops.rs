@@ -77,6 +77,12 @@ pub enum ProtocolOperation {
     ///
     /// This is being removed soon as it's not really a consensus change.
     DepositRequest(DepositRequestInfo),
+
+    /// Withdrawal fulfilled by bridge operator front-payment.
+    WithdrawalFulfillment(WithdrawalFulfillmentInfo),
+
+    /// Deposit utxo is spent.
+    DepositSpent(DepositSpendInfo),
 }
 
 #[derive(
@@ -105,4 +111,31 @@ pub struct DepositRequestInfo {
 
     /// EE address
     pub address: Vec<u8>,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
+pub struct WithdrawalFulfillmentInfo {
+    /// index of deposit this fulfillment is for
+    pub deposit_idx: u32,
+
+    /// assigned operator
+    /// TODO: maybe this is not needed
+    pub operator_idx: u32,
+
+    /// amount that was actually sent on bitcoin.
+    /// should equal withdrawal_amount - operator fee
+    pub amt: BitcoinAmount,
+
+    /// corresponding bitcoin transaction id.
+    pub txid: Buf32,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
+)]
+pub struct DepositSpendInfo {
+    /// index of the deposit whose utxo is spent.
+    pub deposit_idx: u32,
 }
