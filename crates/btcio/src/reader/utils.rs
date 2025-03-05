@@ -1,8 +1,7 @@
 use strata_l1tx::messages::{L1Event, RelevantTxEntry};
-use strata_primitives::{epoch::EpochCommitment, l1::ProtocolOperation};
+use strata_primitives::l1::ProtocolOperation;
 use strata_state::{batch::SignedCheckpoint, chain_state::Chainstate};
 use strata_storage::NodeStorage;
-use tracing::*;
 
 /// Looks for checkpoints in given `RelevantTxEntry`s.
 pub(crate) fn find_checkpoint(entries: &[RelevantTxEntry]) -> Option<&SignedCheckpoint> {
@@ -20,42 +19,6 @@ pub(crate) fn find_checkpoint(entries: &[RelevantTxEntry]) -> Option<&SignedChec
         })
         .collect();
     checkpts.last().map(|v| &**v)
-}
-
-pub(crate) async fn get_or_wait_for_chainstate(
-    storage: &NodeStorage,
-    epoch: EpochCommitment,
-) -> anyhow::Result<Chainstate> {
-    let chainstate_manager = storage.chainstate();
-    let slot = epoch.last_slot();
-
-    if let Some(chainstate) = chainstate_manager
-        .get_toplevel_chainstate_async(slot)
-        .await?
-    {
-        return Ok(chainstate);
-    }
-
-    debug!(?epoch, "epoch chainstate not found, waiting");
-
-    let mut rx = chainstate_manager.subscribe_chainstate_updates();
-
-    loop {
-        let idx = rx.recv().await?;
-        if idx >= slot {
-            debug!(
-                %idx,
-                %slot,
-                "Found a chainstate at or above required slot"
-            );
-            let chainstate = chainstate_manager
-                .get_toplevel_chainstate_async(slot)
-                .await?
-                .expect("chainstate should be found in db");
-
-            return Ok(chainstate);
-        }
-    }
 }
 
 /// Looks for checkpoints in given L1 events

@@ -14,17 +14,15 @@ use strata_l1tx::{
 };
 use strata_primitives::{
     block_credential::CredRule,
-    epoch::EpochCommitment,
     l1::{
         get_relative_difficulty_adjustment_height, EpochTimestamps, HeaderVerificationState,
         L1BlockCommitment, L1BlockId, TimestampStore, TIMESTAMPS_FOR_MEDIAN,
     },
     params::Params,
 };
-use strata_state::{chain_state::Chainstate, sync_event::EventSubmitter};
+use strata_state::sync_event::EventSubmitter;
 use strata_status::StatusChannel;
 use strata_storage::{L1BlockManager, NodeStorage};
-use tokio::select;
 use tracing::*;
 
 use crate::{
@@ -32,9 +30,7 @@ use crate::{
         handler::handle_bitcoin_event,
         state::ReaderState,
         tx_indexer::ReaderTxVisitorImpl,
-        utils::{
-            find_checkpoint_in_events, find_last_checkpoint_chainstate, get_or_wait_for_chainstate,
-        },
+        utils::{find_checkpoint_in_events, find_last_checkpoint_chainstate},
     },
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
@@ -320,21 +316,6 @@ async fn fetch_and_process_block<R: ReaderRpc>(
     let _deep = state.accept_new_block(l1blkid);
 
     Ok((l1blkid, evs))
-}
-
-async fn wait_for_chainstate_or_timeout(
-    storage: &NodeStorage,
-    epoch: EpochCommitment,
-    timeout: Duration,
-) -> anyhow::Result<Chainstate> {
-    select! {
-        chainstate_res = get_or_wait_for_chainstate(storage, epoch) => {
-            chainstate_res
-        }
-        _ = tokio::time::sleep(timeout) => {
-            bail!("Timed out waiting for chainstate")
-        }
-    }
 }
 
 /// Processes a bitcoin Block to return corresponding `L1Event` and `BlockHash`.

@@ -5,26 +5,19 @@ use std::sync::Arc;
 use strata_db::{traits::*, DbResult};
 use strata_state::{chain_state::Chainstate, state_op::WriteBatch};
 use threadpool::ThreadPool;
-use tokio::sync::broadcast;
 
 use crate::{cache, ops};
 
 pub struct ChainstateManager {
     ops: ops::chainstate::ChainstateOps,
     wb_cache: cache::CacheTable<u64, Option<WriteBatch>>,
-    bcast_tx: broadcast::Sender<u64>,
 }
 
 impl ChainstateManager {
     pub fn new<D: Database + Sync + Send + 'static>(pool: ThreadPool, db: Arc<D>) -> Self {
         let ops = ops::chainstate::Context::new(db.chain_state_db().clone()).into_ops(pool);
         let wb_cache = cache::CacheTable::new(64.try_into().unwrap());
-        let (bcast_tx, _) = broadcast::channel(1024);
-        Self {
-            ops,
-            wb_cache,
-            bcast_tx,
-        }
+        Self { ops, wb_cache }
     }
 
     // Basic functions that map directly onto database operations.
@@ -39,7 +32,6 @@ impl ChainstateManager {
     pub async fn put_write_batch_async(&self, idx: u64, wb: WriteBatch) -> DbResult<()> {
         self.ops.put_write_batch_async(idx, wb).await?;
         self.wb_cache.purge(&idx);
-        let _ = self.bcast_tx.send(idx);
         Ok(())
     }
 
@@ -47,7 +39,6 @@ impl ChainstateManager {
     pub fn put_write_batch_blocking(&self, idx: u64, wb: WriteBatch) -> DbResult<()> {
         self.ops.put_write_batch_blocking(idx, wb)?;
         self.wb_cache.purge(&idx);
-        let _ = self.bcast_tx.send(idx);
         Ok(())
     }
 
@@ -127,11 +118,5 @@ impl ChainstateManager {
         Ok(self
             .get_write_batch_blocking(idx)?
             .map(|wb| wb.into_toplevel()))
-    }
-
-    /// Subscription for chainstate updates. Notifies subscribers with chainstate idx whenever a new
-    /// chainstate is written.
-    pub fn subscribe_chainstate_updates(&self) -> broadcast::Receiver<u64> {
-        self.bcast_tx.subscribe()
     }
 }
