@@ -9,18 +9,18 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// A vector wrapper that ensures the elements are sorted
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SortedVec<T: Ord + Clone> {
-    inner: SortedVecWithKey<T, T>,
+    inner: KeyedSortedVec<T, T>,
 }
 
 impl<T: Clone + Ord> SortedVec<T> {
     pub fn new() -> Self {
         Self {
-            inner: SortedVecWithKey::new(),
+            inner: KeyedSortedVec::new(),
         }
     }
     pub fn with_capacity(c: usize) -> Self {
         Self {
-            inner: SortedVecWithKey::with_capacity(c),
+            inner: KeyedSortedVec::with_capacity(c),
         }
     }
 }
@@ -32,7 +32,7 @@ impl<T: Clone + Ord> Default for SortedVec<T> {
 }
 
 impl<T: Ord + Clone> Deref for SortedVec<T> {
-    type Target = SortedVecWithKey<T, T>;
+    type Target = KeyedSortedVec<T, T>;
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
@@ -61,19 +61,19 @@ impl<T: Ord + Clone> HasKey<T> for T {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct SortedVecWithKey<K: Ord, T: HasKey<K>> {
+pub struct KeyedSortedVec<K: Ord, T: HasKey<K>> {
     inner: Vec<T>,
     _phantom: PhantomData<K>,
 }
 
-impl<K: Ord, T: HasKey<K> + Clone> Default for SortedVecWithKey<K, T> {
+impl<K: Ord, T: HasKey<K> + Clone> Default for KeyedSortedVec<K, T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<K: Ord, T: HasKey<K>> From<Vec<T>> for SortedVecWithKey<K, T> {
-    /// Creates a [`SortedVecWithKey`] from a [`Vec`], sorting the elements.
+impl<K: Ord, T: HasKey<K>> From<Vec<T>> for KeyedSortedVec<K, T> {
+    /// Creates a [`KeyedSortedVec`] from a [`Vec`], sorting the elements.
     fn from(mut vec: Vec<T>) -> Self {
         vec.sort_by_key(HasKey::get_key);
         Self {
@@ -83,14 +83,14 @@ impl<K: Ord, T: HasKey<K>> From<Vec<T>> for SortedVecWithKey<K, T> {
     }
 }
 
-impl<K: Ord, T: HasKey<K> + Clone> Index<usize> for SortedVecWithKey<K, T> {
+impl<K: Ord, T: HasKey<K> + Clone> Index<usize> for KeyedSortedVec<K, T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
         &self.inner[index]
     }
 }
 
-impl<K: Ord, T: HasKey<K> + Clone> SortedVecWithKey<K, T> {
+impl<K: Ord, T: HasKey<K> + Clone> KeyedSortedVec<K, T> {
     pub fn new() -> Self {
         Self {
             inner: Vec::new(),

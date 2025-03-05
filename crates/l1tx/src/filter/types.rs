@@ -7,7 +7,7 @@ use strata_primitives::{
     buf::Buf32,
     l1::{BitcoinAddress, BitcoinScriptBuf, OutputRef},
     params::{DepositTxParams, RollupParams},
-    sorted_vec::{HasKey, SortedVec, SortedVecWithKey},
+    sorted_vec::{HasKey, KeyedSortedVec, SortedVec},
 };
 use strata_state::{
     bridge_state::{DepositEntry, DepositState},
@@ -73,7 +73,7 @@ pub struct TxFilterConfig {
     pub expected_blobs: SortedVec<Buf32>,
 
     /// For deposits that might be spent from.
-    pub expected_outpoints: SortedVecWithKey<OutputRef, DepositSpendConfig>,
+    pub expected_outpoints: KeyedSortedVec<OutputRef, DepositSpendConfig>,
 
     /// For withdrawal fulfillment transactions sent by bridge operator. Maps deposit idx to
     /// fulfillment details.

@@ -22,7 +22,9 @@ pub fn parse_valid_checkpoint_envelopes<'a>(
                 items
                     .into_iter()
                     .filter_map(|item| match *item.payload_type() {
-                        L1PayloadType::Checkpoint => parse_checkpoint(item.data(), filter_conf),
+                        L1PayloadType::Checkpoint => {
+                            parse_and_validate_checkpoint(item.data(), filter_conf)
+                        }
                         L1PayloadType::Da => {
                             warn!("Da parsing is not supported yet");
                             None
@@ -34,14 +36,24 @@ pub fn parse_valid_checkpoint_envelopes<'a>(
     })
 }
 
-fn parse_checkpoint(data: &[u8], filter_conf: &TxFilterConfig) -> Option<SignedCheckpoint> {
+fn parse_and_validate_checkpoint(
+    data: &[u8],
+    filter_conf: &TxFilterConfig,
+) -> Option<SignedCheckpoint> {
+    // Parse
     let signed_checkpoint = borsh::from_slice::<SignedCheckpoint>(data).ok()?;
 
+    validate_checkpoint(signed_checkpoint, filter_conf)
+}
+
+fn validate_checkpoint(
+    signed_checkpoint: SignedCheckpoint,
+    filter_conf: &TxFilterConfig,
+) -> Option<SignedCheckpoint> {
     if cfg!(not(feature = "test_utils"))
         && !verify_signed_checkpoint_sig(&signed_checkpoint, &filter_conf.sequencer_cred_rule)
     {
         warn!("invalid checkpoint signature");
-
         return None;
     }
 
