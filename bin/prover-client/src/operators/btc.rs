@@ -51,7 +51,7 @@ impl ProvingOp for BtcBlockspaceOperator {
             start.height(),
             end.height()
         );
-        Ok(ProofContext::BtcBlockspace(*start.blkid(), *end.blkid()))
+        Ok(ProofContext::BtcBlockspace(*start, *end))
     }
 
     async fn fetch_input(
@@ -65,7 +65,7 @@ impl ProvingOp for BtcBlockspaceOperator {
         };
 
         let mut btc_blocks = vec![];
-        let mut current_block_id = end;
+        let mut current_block_id = *end.blkid();
         loop {
             let btc_block = self
                 .btc_client
@@ -78,7 +78,7 @@ impl ProvingOp for BtcBlockspaceOperator {
 
             btc_blocks.push(btc_block);
 
-            if current_block_id == start {
+            if start.blkid() == &current_block_id {
                 break;
             } else {
                 current_block_id = prev_block_hash.into();

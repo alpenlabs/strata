@@ -88,10 +88,10 @@ impl ProofDatabase for ProofDb {
 mod tests {
     use strata_primitives::{
         buf::Buf32,
+        l1::L1BlockCommitment,
         l2::L2BlockCommitment,
         proof::{ProofContext, ProofZkVm},
     };
-    use strata_state::l1::L1BlockId;
     use zkaleido::{Proof, PublicValues};
 
     use super::*;
@@ -103,7 +103,8 @@ mod tests {
     }
 
     fn generate_proof() -> (ProofKey, ProofReceipt) {
-        let proof_context = ProofContext::BtcBlockspace(L1BlockId::default(), L1BlockId::default());
+        let proof_context =
+            ProofContext::BtcBlockspace(L1BlockCommitment::default(), L1BlockCommitment::default());
         let host = ProofZkVm::Native;
         let proof_key = ProofKey::new(proof_context, host);
         let proof = Proof::default();
