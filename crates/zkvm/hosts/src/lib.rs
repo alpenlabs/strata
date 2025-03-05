@@ -1,3 +1,5 @@
+use strata_primitives::proof::ProofContext;
+
 #[macro_use]
 extern crate cfg_if;
 
@@ -6,8 +8,8 @@ cfg_if! {
         pub mod native;
         use zkaleido_native_adapter::NativeHost;
 
-        pub fn get_native_host(vm: ProofVm) -> &'static NativeHost {
-            native::get_host(vm)
+        pub fn get_native_host(ctx: &ProofContext) -> &'static NativeHost {
+            native::get_host(ctx)
         }
     }
 }
@@ -17,8 +19,8 @@ cfg_if! {
         pub mod risc0;
         use zkaleido_risc0_host::Risc0Host;
 
-        pub fn get_risc0_host(vm: ProofVm) -> &'static Risc0Host {
-            risc0::get_host(vm)
+        pub fn get_risc0_host(ctx: &ProofContext) -> &'static Risc0Host {
+            risc0::get_host(ctx)
         }
     }
 }
@@ -28,17 +30,8 @@ cfg_if! {
         pub mod sp1;
         use zkaleido_sp1_host::SP1Host;
 
-        pub fn get_sp1_host(vm: ProofVm) -> &'static SP1Host {
-            sp1::get_host(vm)
+        pub fn get_sp1_host(ctx: &ProofContext) -> &'static SP1Host {
+            sp1::get_host(ctx)
         }
     }
-}
-
-/// An identifier of different prover types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ProofVm {
-    BtcProving,
-    ELProving,
-    CLProving,
-    Checkpoint,
 }

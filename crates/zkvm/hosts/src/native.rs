@@ -1,12 +1,11 @@
 use std::sync::{Arc, LazyLock};
 
+use strata_primitives::proof::ProofContext;
 use strata_proofimpl_btc_blockspace::logic::process_blockscan_proof;
 use strata_proofimpl_checkpoint::process_checkpoint_proof_outer;
 use strata_proofimpl_cl_stf::process_cl_stf;
 use strata_proofimpl_evm_ee_stf::process_block_transaction_outer;
 use zkaleido_native_adapter::{NativeHost, NativeMachine};
-
-use crate::ProofVm;
 
 /// A mock verification key used in native mode when proof verification is not performed.
 ///
@@ -46,12 +45,16 @@ static CHECKPOINT_HOST: LazyLock<NativeHost> = std::sync::LazyLock::new(|| Nativ
     })),
 });
 
-/// Maps the [`ProofVm`] onto the corresponding Native Host.
-pub fn get_host(vm: ProofVm) -> &'static NativeHost {
-    match vm {
-        ProofVm::BtcProving => &BTC_BLOCKSPACE_HOST,
-        ProofVm::ELProving => &EVM_EE_STF_HOST,
-        ProofVm::CLProving => &CL_STF_HOST,
-        ProofVm::Checkpoint => &CHECKPOINT_HOST,
+/// Returns a reference to the appropriate [`NativeHost`] instance based on the given
+/// [`ProofContext`].
+///
+/// This function maps the `ProofContext` variant to its corresponding [`NativeHost`] instance,
+/// allowing for efficient host selection for different proof types.
+pub fn get_host(id: &ProofContext) -> &'static NativeHost {
+    match id {
+        ProofContext::BtcBlockspace(..) => &BTC_BLOCKSPACE_HOST,
+        ProofContext::EvmEeStf(..) => &EVM_EE_STF_HOST,
+        ProofContext::ClStf(..) => &CL_STF_HOST,
+        ProofContext::Checkpoint(..) => &CHECKPOINT_HOST,
     }
 }
