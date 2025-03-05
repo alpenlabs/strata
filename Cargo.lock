@@ -14127,6 +14127,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "strata-zkvm-hosts"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "borsh",
+ "cfg-if",
+ "serde",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-checkpoint",
+ "strata-proofimpl-cl-stf",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-risc0-guest-builder",
+ "strata-sp1-guest-builder",
+ "thiserror 2.0.11",
+ "zkaleido-native-adapter",
+ "zkaleido-risc0-host",
+ "zkaleido-sp1-host",
+]
+
+[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use strata_sp1_guest_builder::*;
-use zkaleido_sp1_adapter::SP1Host;
+use zkaleido_sp1_host::SP1Host;
 
 use crate::ProofVm;
 
