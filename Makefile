@@ -9,7 +9,7 @@ FUNCTIONAL_TESTS_DIR  = functional-tests
 FUNCTIONAL_TESTS_DATADIR = _dd
 DOCKER_DIR = docker
 DOCKER_DATADIR = .data
-PROVER_PERF_EVAL_DIR  = provers/perf
+PROVER_PERF_EVAL_DIR  = bin/prover-perf
 PROVER_PROOFS_CACHE_DIR  = provers/tests/proofs
 PROVER_PROGRAMS = "btc-blockscan,evm-ee-stf,cl-stf,checkpoint"
 
