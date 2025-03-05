@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bitcoin::Amount;
+use bitcoin::{hashes::Hash, Amount};
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     block_credential::CredRule,
@@ -35,6 +35,8 @@ pub struct ExpectedWithdrawalFulfillment {
     pub operator_idx: u32,
     /// index of assigned deposit entry for this withdrawal
     pub deposit_idx: u32,
+    /// Txid of the locked utxo of assigned deposit.
+    pub deposit_txid: [u8; 32],
 }
 
 impl HasKey<BitcoinScriptBuf> for ExpectedWithdrawalFulfillment {
@@ -156,6 +158,12 @@ where
                                 amount: output.amt().to_sat().saturating_sub(OPERATOR_FEE.to_sat()),
                                 operator_idx: dispatched_state.assignee(),
                                 deposit_idx: deposit.idx(),
+                                deposit_txid: deposit
+                                    .output()
+                                    .outpoint()
+                                    .txid
+                                    .as_raw_hash()
+                                    .to_byte_array(),
                             },
                         )
                     });
