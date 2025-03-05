@@ -46,4 +46,5 @@ class ProverClientTest(testenv.StrataTester):
         assert task_id is not None
 
         proof_timeout_seconds = 30
-        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=proof_timeout_seconds)
+        is_proof_generation_completed = wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=proof_timeout_seconds)
+        assert(is_proof_generation_completed)

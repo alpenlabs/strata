@@ -64,4 +64,5 @@ class ProverClientTest(testenv.StrataTester):
         task_id = task_ids[0]
         self.debug(f"Using task ID: {task_id}")
 
-        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)
+        is_proof_generation_completed = wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)
+        assert(is_proof_generation_completed)

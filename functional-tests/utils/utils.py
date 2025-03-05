@@ -457,13 +457,14 @@ def check_already_sent_proof(seqrpc, sent_batch: int):
         raise AssertionError("Expected rpc error")
 
 
-def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
+def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600) -> bool :
     """
-    Waits for a proof task to complete within a specified timeout period.
+    Waits for a proof task to complete/fail within a specified timeout period.
 
     This function continuously polls the status of a proof task identified by `task_id` using
     the `prover_client_rpc` client. It checks the status every 2 seconds and waits until the
-    proof task status is "Completed" or the specified `time_out` (in seconds) is reached.
+    proof task status is either "Completed" where it returns True, or "Failed" where it return False.
+    If the specified `time_out` (in seconds) is reached, it throws TimeoutError.
     """
 
     start_time = time.time()
@@ -474,7 +475,10 @@ def wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=3600):
         logging.info(f"Got the proof status {proof_status}")
         if proof_status == "Completed":
             logging.info(f"Completed the proof generation for {task_id}")
-            break
+            return True
+        elif proof_status == "Failed":
+            logging.info(f"Proof generatoin failed for {task_id}")
+            return False
 
         time.sleep(2)
         elapsed_time = time.time() - start_time  # Calculate elapsed time
