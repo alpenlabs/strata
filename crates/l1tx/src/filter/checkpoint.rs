@@ -1,8 +1,5 @@
 use bitcoin::Transaction;
 use strata_primitives::{batch::SignedCheckpoint, l1::payload::L1PayloadType};
-#[cfg(not(feature = "test_utils"))]
-use strata_state::batch::verify_signed_checkpoint_sig;
-use strata_state::chain_state::Chainstate;
 use tracing::warn;
 
 use super::TxFilterConfig;
@@ -37,7 +34,6 @@ pub fn parse_checkpoint_envelopes<'a>(
             .unwrap_or_default()
     })
 }
-
 
 #[cfg(test)]
 mod test {

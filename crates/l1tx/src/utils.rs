@@ -1,10 +1,10 @@
 use anyhow::anyhow;
 use bitcoin::{
-    opcodes::all::{OP_PUSHNUM_1, OP_RETURN},
-    script::{Builder, Instruction, Instructions, PushBytesBuf},
+    opcodes::all::OP_PUSHNUM_1,
+    script::{Instruction, Instructions},
     secp256k1::{PublicKey, SECP256K1},
     taproot::TaprootBuilder,
-    Address, Network, Opcode, ScriptBuf, XOnlyPublicKey,
+    Address, Network, Opcode, XOnlyPublicKey,
 };
 use musig2::KeyAggContext;
 use strata_primitives::{

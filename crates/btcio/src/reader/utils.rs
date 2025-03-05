@@ -41,7 +41,8 @@ pub(crate) async fn get_or_wait_for_chainstate(
     let mut rx = chainstate_manager.subscribe_chainstate_updates();
 
     loop {
-        if rx.recv().await? >= slot {
+        let idx = rx.recv().await?;
+        if idx >= slot {
             debug!(
                 %idx,
                 %slot,
@@ -83,7 +84,7 @@ pub(crate) async fn find_last_checkpoint_chainstate(
     };
     let Some(last_checkpoint_block) = storage
         .l1()
-        .get_block_manifest_async(&last_checkpoint.l1_reference.blockid)
+        .get_block_manifest_async(last_checkpoint.l1_reference.block_id())
         .await?
     else {
         return Ok(None);

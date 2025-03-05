@@ -19,7 +19,7 @@ use tracing::warn;
 
 use crate::{
     bridge_ops::DepositIntent,
-    bridge_state::{DepositState, DispatchCommand, DispatchedState, FulfilledState},
+    bridge_state::{DepositEntry, DepositState, DispatchCommand, DispatchedState, FulfilledState},
     chain_state::Chainstate,
     header::L2Header,
 };
@@ -292,18 +292,14 @@ impl StateCache {
         };
     }
 
-    /// Updates the deposit state to executing.
-    pub fn mark_deposit_executing(&mut self, winfo: &WithdrawalFulfillmentInfo) {
-        let deposit_ent = self
-            .state_mut()
-            .deposits_table_mut()
-            .get_deposit_mut(winfo.deposit_idx)
-            .expect("stateop: missing deposit idx");
+    /// Updates the deposit state to Fulfilled.
+    pub fn mark_deposit_fulfilled(&mut self, winfo: &WithdrawalFulfillmentInfo) {
+        let deposit_ent = self.deposit_entry_mut_expect(winfo.deposit_idx);
 
-        if !matches!(deposit_ent.deposit_state(), DepositState::Dispatched(state) if state.assignee() == winfo.operator_idx)
-        {
-            panic!("stateop: unexpected deposit state");
-        }
+        let oidx = winfo.operator_idx;
+        let is_valid = deposit_ent.deposit_state().is_dispatched_to(oidx);
+
+        assert!(is_valid, "stateop: incorrect deposit state dispatch");
 
         deposit_ent.set_state(DepositState::Fulfilled(FulfilledState::new(
             winfo.operator_idx,
@@ -312,13 +308,9 @@ impl StateCache {
         )));
     }
 
-    // Updates the deposit state as Executed.
-    pub fn mark_deposit_spent(&mut self, deposit_idx: u32) {
-        let deposit_ent = self
-            .state_mut()
-            .deposits_table_mut()
-            .get_deposit_mut(deposit_idx)
-            .expect("stateop: missing deposit idx");
+    // Updates the deposit state as Reimbursed.
+    pub fn mark_deposit_reimbursed(&mut self, deposit_idx: u32) {
+        let deposit_ent = self.deposit_entry_mut_expect(deposit_idx);
 
         if !matches!(deposit_ent.deposit_state(), DepositState::Fulfilled(_)) {
             // TODO: handle this better after TN1 bridge is integrated
@@ -326,6 +318,13 @@ impl StateCache {
         }
 
         deposit_ent.set_state(DepositState::Reimbursed);
+    }
+
+    fn deposit_entry_mut_expect(&mut self, deposit_idx: u32) -> &mut DepositEntry {
+        self.state_mut()
+            .deposits_table_mut()
+            .get_deposit_mut(deposit_idx)
+            .expect("stateop: missing deposit idx")
     }
 
     // TODO add more manipulator functions

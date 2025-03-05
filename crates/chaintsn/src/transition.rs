@@ -208,7 +208,7 @@ fn process_withdrawal_fulfillment(
     state: &mut StateCache,
     info: &WithdrawalFulfillmentInfo,
 ) -> Result<(), TsnError> {
-    state.mark_deposit_executing(info);
+    state.mark_deposit_fulfilled(info);
     Ok(())
 }
 
@@ -216,7 +216,7 @@ fn process_withdrawal_fulfillment(
 fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Result<(), TsnError> {
     // Currently, we are not tracking how this was spent, only that it was.
 
-    state.mark_deposit_spent(info.deposit_idx);
+    state.mark_deposit_reimbursed(info.deposit_idx);
     Ok(())
 }
 

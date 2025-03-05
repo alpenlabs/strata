@@ -650,7 +650,7 @@ impl StrataApiServer for StrataRpcImpl {
         if let Some(last_checkpoint) = cstate.get_last_checkpoint() {
             if last_checkpoint.batch_info.includes_l2_block(block_slot) {
                 return Ok(L2BlockStatus::Finalized(
-                    last_checkpoint.l1_reference.block_height,
+                    last_checkpoint.l1_reference.block_height(),
                 ));
             }
         }

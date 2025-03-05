@@ -294,7 +294,8 @@ fn get_l1_reference(tx: &L1Tx, blockid: L1BlockId, height: u64) -> Result<Checkp
 
     let txid = btx.compute_txid().into();
     let wtxid = btx.compute_wtxid().into();
-    Ok(CheckpointL1Ref::new(height, blockid, txid, wtxid))
+    let l1_comm = L1BlockCommitment::new(height, blockid);
+    Ok(CheckpointL1Ref::new(l1_comm, txid, wtxid))
 }
 
 #[cfg(test)]

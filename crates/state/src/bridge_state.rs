@@ -374,6 +374,12 @@ pub enum DepositState {
     Reimbursed,
 }
 
+impl DepositState {
+    pub fn is_dispatched_to(&self, operator_idx: u32) -> bool {
+        matches!(self, DepositState::Dispatched(s) if s.assignee() == operator_idx)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct CreatedState {
     /// Destination identifier in EL, probably an encoded address.
