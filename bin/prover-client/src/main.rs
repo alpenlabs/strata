@@ -21,7 +21,6 @@ mod args;
 mod checkpoint_runner;
 mod db;
 mod errors;
-mod hosts;
 mod operators;
 mod prover_manager;
 mod retry_policy;
