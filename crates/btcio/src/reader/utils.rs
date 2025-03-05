@@ -41,21 +41,18 @@ pub(crate) async fn get_or_wait_for_chainstate(
     let mut rx = chainstate_manager.subscribe_chainstate_updates();
 
     loop {
-        match rx.recv().await? {
-            idx if idx >= slot => {
-                debug!(
-                    %idx,
-                    %slot,
-                    "Found a chainstate at or above required slot"
-                );
-                let chainstate = chainstate_manager
-                    .get_toplevel_chainstate_async(slot)
-                    .await?
-                    .expect("chainstate should be found in db");
+        if rx.recv().await? >= slot {
+            debug!(
+                %idx,
+                %slot,
+                "Found a chainstate at or above required slot"
+            );
+            let chainstate = chainstate_manager
+                .get_toplevel_chainstate_async(slot)
+                .await?
+                .expect("chainstate should be found in db");
 
-                return Ok(chainstate);
-            }
-            _ => {}
+            return Ok(chainstate);
         }
     }
 }

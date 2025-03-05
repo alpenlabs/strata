@@ -1,12 +1,12 @@
 use bitcoin::{ScriptBuf, Transaction};
 use strata_primitives::{
+    bitcoin_bosd::Descriptor,
     l1::{BitcoinAmount, WithdrawalFulfillmentInfo},
     sorted_vec::HasKey,
 };
 use tracing::debug;
 
 use super::TxFilterConfig;
-use crate::utils::op_return_nonce;
 
 fn create_opreturn_metadata(operator_idx: u32, deposit_idx: u32) -> ScriptBuf {
     let mut metadata = [0u8; 8];
@@ -14,7 +14,7 @@ fn create_opreturn_metadata(operator_idx: u32, deposit_idx: u32) -> ScriptBuf {
     metadata[..4].copy_from_slice(&operator_idx.to_be_bytes());
     // next 4 bytes = deposit idx
     metadata[4..].copy_from_slice(&deposit_idx.to_be_bytes());
-    op_return_nonce(&metadata)
+    Descriptor::new_op_return(&metadata).unwrap().to_script()
 }
 
 /// Parse transaction and search for a Withdrawal Fulfillment transaction to an expected address.

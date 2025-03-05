@@ -24,13 +24,8 @@ impl<T: Clone + Ord> SortedVec<T> {
         }
     }
 }
-impl<T: Clone + Ord> Default for SortedVec<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
-impl<K: Ord, T: HasKey<K> + Clone> Default for SortedVecWithKey<K, T> {
+impl<T: Clone + Ord> Default for SortedVec<T> {
     fn default() -> Self {
         Self::new()
     }
@@ -55,6 +50,28 @@ impl<T: Ord + Clone> From<Vec<T>> for SortedVec<T> {
     }
 }
 
+pub trait HasKey<K: Ord> {
+    fn get_key(&self) -> K;
+}
+
+impl<T: Ord + Clone> HasKey<T> for T {
+    fn get_key(&self) -> T {
+        self.clone()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct SortedVecWithKey<K: Ord, T: HasKey<K>> {
+    inner: Vec<T>,
+    _phantom: PhantomData<K>,
+}
+
+impl<K: Ord, T: HasKey<K> + Clone> Default for SortedVecWithKey<K, T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<K: Ord, T: HasKey<K>> From<Vec<T>> for SortedVecWithKey<K, T> {
     /// Creates a [`SortedVecWithKey`] from a [`Vec`], sorting the elements.
     fn from(mut vec: Vec<T>) -> Self {
@@ -73,22 +90,6 @@ impl<K: Ord, T: HasKey<K> + Clone> Index<usize> for SortedVecWithKey<K, T> {
     }
 }
 
-pub trait HasKey<K: Ord> {
-    fn get_key(&self) -> K;
-}
-
-impl<T: Ord + Clone> HasKey<T> for T {
-    fn get_key(&self) -> T {
-        self.clone()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct SortedVecWithKey<K: Ord, T: HasKey<K>> {
-    inner: Vec<T>,
-    _phantom: PhantomData<K>,
-}
-
 impl<K: Ord, T: HasKey<K> + Clone> SortedVecWithKey<K, T> {
     pub fn new() -> Self {
         Self {
@@ -99,6 +100,10 @@ impl<K: Ord, T: HasKey<K> + Clone> SortedVecWithKey<K, T> {
 
     pub fn to_vec(&self) -> Vec<T> {
         self.inner.clone()
+    }
+
+    pub fn into_vec(self) -> Vec<T> {
+        self.inner
     }
 
     /// Creates a new, empty [`SortedVec`] with given capacity
@@ -154,6 +159,7 @@ impl<K: Ord, T: HasKey<K> + Clone> SortedVecWithKey<K, T> {
     {
         self.inner.binary_search_by_key(value, f)
     }
+
     /// Returns the number of elements in the [`SortedVec`].
     pub fn len(&self) -> usize {
         self.inner.len()

@@ -94,16 +94,3 @@ pub fn get_operator_wallet_pks(params: &RollupParams) -> Vec<Buf32> {
 
     operator_table.iter().map(|op| *op.wallet_pk()).collect()
 }
-
-// import from strata-bridge-primitives ?
-pub fn op_return_nonce(data: &[u8]) -> ScriptBuf {
-    let mut push_data = PushBytesBuf::new();
-    push_data
-        .extend_from_slice(data)
-        .expect("data should be within limit");
-
-    Builder::new()
-        .push_opcode(OP_RETURN)
-        .push_slice(push_data)
-        .into_script()
-}
