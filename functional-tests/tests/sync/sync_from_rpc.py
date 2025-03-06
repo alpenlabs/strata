@@ -4,7 +4,7 @@ import time
 import flexitest
 
 from envs import testenv
-from utils.utils import wait_until
+from utils.utils import wait_until_epoch_confirmed
 
 FOLLOW_DIST = 1
 
@@ -66,11 +66,8 @@ class SyncFromRpcTest(testenv.StrataTester):
 
         # Check fullnode sees same checkpoint reference as sequencer
         epoch = 1
-        wait_until(
-            lambda: seqrpc.strata_getCheckpointInfo(epoch)["confirmation_status"] != "pending",
-            error_with="Did not see checkpoint in l1",
-            timeout=15,
-        )
+        wait_until_epoch_confirmed(seqrpc, epoch)
+
         fn_checkpt_info = fnrpc.strata_getCheckpointInfo(epoch)
         sq_checkpt_info = seqrpc.strata_getCheckpointInfo(epoch)
 

@@ -384,7 +384,7 @@ fn apply_action(
             let mut ckpt_entry = match ckpt_db.get_checkpoint_blocking(epoch)? {
                 Some(c) => c,
                 None => {
-                    warn!(%epoch, "missing checkpoint we wanted to set the state of, creating new entry");
+                    info!(%epoch, "creating new checkpoint entry since the database does not have one");
 
                     CheckpointEntry::new(
                         checkpoint,
