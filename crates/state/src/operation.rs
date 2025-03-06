@@ -4,7 +4,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use strata_primitives::epoch::EpochCommitment;
+use strata_primitives::{batch::Checkpoint, epoch::EpochCommitment};
 
 use crate::{
     client_state::{CheckpointL1Ref, ClientState},
@@ -49,6 +49,7 @@ impl ClientUpdateOutput {
 
 /// Actions the client state machine directs the node to take to update its own
 /// database bookkeeping.
+#[allow(clippy::large_enum_variant)]
 #[derive(
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
@@ -65,7 +66,7 @@ pub enum SyncAction {
 
     /// Checkpoint is included in L1 at given L1 reference.
     UpdateCheckpointInclusion {
-        epoch: u64,
+        checkpoint: Checkpoint,
         l1_reference: CheckpointL1Ref,
     },
 }
