@@ -5,7 +5,7 @@ use tokio::{
     sync::Mutex,
     time::{interval, Duration},
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::{
     checkpoint_runner::fetch::fetch_latest_checkpoint_index,
@@ -47,17 +47,25 @@ async fn process_checkpoint(
     db: &Arc<ProofDb>,
     runner_state: &mut CheckpointRunnerState,
 ) -> anyhow::Result<()> {
-    let new_checkpoint = fetch_latest_checkpoint_index(operator.cl_client()).await?;
+    let latest_checkpoint = fetch_latest_checkpoint_index(operator.cl_client()).await;
 
-    if !should_update_checkpoint(runner_state.current_checkpoint_idx, new_checkpoint) {
-        info!("Fetched checkpoint {new_checkpoint} is not newer than current checkpoint");
+    let checkpoint_idx = match latest_checkpoint {
+        Ok(idx) => idx,
+        Err(e) => {
+            warn!(error = ?e, "Unable to fetch latest checkpoint index");
+            return Ok(());
+        }
+    };
+
+    if !should_update_checkpoint(runner_state.current_checkpoint_idx, checkpoint_idx) {
+        warn!("Fetched checkpoint {checkpoint_idx} is not newer than current checkpoint");
         return Ok(());
     }
 
     operator
-        .create_task(new_checkpoint, task_tracker.clone(), db)
+        .create_task(checkpoint_idx, task_tracker.clone(), db)
         .await?;
-    runner_state.current_checkpoint_idx = Some(new_checkpoint);
+    runner_state.current_checkpoint_idx = Some(checkpoint_idx);
 
     Ok(())
 }
