@@ -4,6 +4,7 @@ import time
 import flexitest
 
 from envs import testenv
+from utils.utils import wait_until
 
 FOLLOW_DIST = 1
 
@@ -62,3 +63,14 @@ class SyncFromRpcTest(testenv.StrataTester):
             \tseq {block_from_sequencer},\n\tfn {block_from_fullnode}"
         )
         assert seq_el_hash == fn_el_hash, "EL blocks don't match"
+
+        # Check fullnode sees same checkpoint reference as sequencer
+        wait_until(
+            lambda: seqrpc.strata_getCheckpointInfo(0)["confirmation_status"] != "pending",
+            error_with="Did not see checkpoint in l1",
+        )
+        fn_checkpt_info = fnrpc.strata_getCheckpointInfo(0)
+        sq_checkpt_info = seqrpc.strata_getCheckpointInfo(0)
+
+        assert fn_checkpt_info["l1_reference"] == sq_checkpt_info["l1_reference"]
+        assert fn_checkpt_info["confirmation_status"] == sq_checkpt_info["confirmation_status"]
