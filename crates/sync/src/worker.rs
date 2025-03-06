@@ -11,7 +11,7 @@ use strata_consensus_logic::{
 };
 use strata_primitives::epoch::EpochCommitment;
 use strata_state::{block::L2BlockBundle, client_state::ClientState, header::L2Header};
-use strata_storage::L2BlockManager;
+use strata_storage::NodeStorage;
 use tracing::*;
 
 use crate::{
@@ -21,39 +21,35 @@ use crate::{
 
 pub struct L2SyncContext<T: SyncClient> {
     client: T,
-    l2_block_manager: Arc<L2BlockManager>,
+    storage: Arc<NodeStorage>,
     sync_manager: Arc<SyncManager>,
 }
 
 impl<T: SyncClient> L2SyncContext<T> {
-    pub fn new(
-        client: T,
-        l2_block_manager: Arc<L2BlockManager>,
-        sync_manager: Arc<SyncManager>,
-    ) -> Self {
+    pub fn new(client: T, storage: Arc<NodeStorage>, sync_manager: Arc<SyncManager>) -> Self {
         Self {
             client,
-            l2_block_manager,
+            storage,
             sync_manager,
         }
     }
 }
 
 /// Initialize the sync state from the database and wait for the CSM to become ready.
-pub fn block_until_csm_ready_and_init_sync_state<T: SyncClient>(
+async fn block_until_csm_ready_and_init_sync_state<T: SyncClient>(
     context: &L2SyncContext<T>,
 ) -> Result<L2SyncState, L2SyncError> {
     debug!("waiting for CSM to become ready");
-    let cstate = wait_for_csm_ready(&context.sync_manager);
+    let cstate = wait_for_csm_ready(&context.sync_manager).await;
     debug!("CSM is ready");
-    state::initialize_from_db(&cstate, &context.l2_block_manager)
+    state::initialize_from_db(&cstate, context.storage.as_ref()).await
 }
 
-fn wait_for_csm_ready(sync_man: &SyncManager) -> ClientState {
+async fn wait_for_csm_ready(sync_man: &SyncManager) -> ClientState {
     let mut client_update_notif = sync_man.create_cstate_subscription();
 
     loop {
-        let Ok(update) = client_update_notif.blocking_recv() else {
+        let Ok(update) = client_update_notif.recv().await else {
             continue;
         };
         let state = update.new_state();
@@ -63,10 +59,9 @@ fn wait_for_csm_ready(sync_man: &SyncManager) -> ClientState {
     }
 }
 
-pub async fn sync_worker<T: SyncClient>(
-    state: &mut L2SyncState,
-    context: &L2SyncContext<T>,
-) -> Result<(), L2SyncError> {
+pub async fn sync_worker<T: SyncClient>(context: &L2SyncContext<T>) -> Result<(), L2SyncError> {
+    let mut state = block_until_csm_ready_and_init_sync_state(context).await?;
+
     let mut client_update_notif = context.sync_manager.create_cstate_subscription();
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -78,11 +73,11 @@ pub async fn sync_worker<T: SyncClient>(
                     continue;
                 };
 
-                handle_new_client_update(update.as_ref(), state, context).await?;
+                handle_new_client_update(update.as_ref(), &mut state, context).await?;
             }
 
             _ = interval.tick() => {
-                do_tick(state, context).await?;
+                do_tick(&mut state, context).await?;
             }
             // maybe subscribe to new blocks on client instead of polling?
         }
@@ -218,7 +213,8 @@ async fn handle_new_block<T: SyncClient>(
     while let Some(block) = fetched_blocks.pop() {
         state.attach_block(block.header())?;
         context
-            .l2_block_manager
+            .storage
+            .l2()
             .put_block_data_async(block.clone())
             .await?;
         let block_idx = block.header().blockidx();

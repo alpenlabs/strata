@@ -5,7 +5,7 @@ use strata_state::{
     header::{L2Header, SignedL2BlockHeader},
     id::L2BlockId,
 };
-use strata_storage::L2BlockManager;
+use strata_storage::NodeStorage;
 use tracing::{debug, warn};
 
 use crate::L2SyncError;
@@ -63,10 +63,11 @@ impl L2SyncState {
     }
 }
 
-pub fn initialize_from_db(
+pub(crate) async fn initialize_from_db(
     cstate: &ClientState,
-    l2man: &L2BlockManager,
+    storage: &NodeStorage,
 ) -> Result<L2SyncState, L2SyncError> {
+    let l2man = storage.l2().as_ref();
     let finalized_epoch = match cstate.get_apparent_finalized_epoch() {
         Some(epoch) => epoch,
         None => {
