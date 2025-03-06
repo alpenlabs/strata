@@ -1,7 +1,5 @@
 //! worker to monitor chainstate and create checkpoint entries.
 
-#![allow(unused)] // TODO clean this up once we're sure we don't need these fns
-
 use std::sync::Arc;
 
 use strata_db::{types::CheckpointEntry, DbError};
@@ -19,9 +17,7 @@ use strata_state::{
     header::*,
 };
 use strata_status::*;
-use strata_storage::{
-    ChainstateManager, CheckpointDbManager, L1BlockManager, L2BlockManager, NodeStorage,
-};
+use strata_storage::{CheckpointDbManager, L1BlockManager, L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::runtime::Handle;
 use tracing::*;
@@ -229,21 +225,9 @@ fn create_checkpoint_prep_data_from_summary(
     let l1man = storage.l1();
     let l2man = storage.l2();
     let chsman = storage.chainstate();
-    let rollup_params_hash = params.compute_hash();
 
     let epoch = summary.epoch();
     let is_genesis_epoch = epoch == 0;
-
-    let prev_checkpoint = if !is_genesis_epoch {
-        let prev_epoch = epoch - 1;
-        let prev = storage.checkpoint().get_checkpoint_blocking(prev_epoch)?;
-        if prev.is_none() {
-            warn!(%epoch, %prev_epoch, "missing expected checkpoint for previous epoch, continuing with none, this might produce an invalid checkpoint proof");
-        }
-        prev
-    } else {
-        None
-    };
 
     // There's some special handling we have to do if we're the genesis epoch.
     let prev_summary = if !is_genesis_epoch {
@@ -308,8 +292,6 @@ fn fetch_epoch_l2_headers(
     summary: &EpochSummary,
     l2man: &L2BlockManager,
 ) -> anyhow::Result<Vec<L2BlockHeader>> {
-    let limit = 5000; // TODO make a const
-
     let mut headers = Vec::new();
 
     let terminal = fetch_l2_block(summary.terminal().blkid(), l2man)?;
@@ -320,6 +302,7 @@ fn fetch_epoch_l2_headers(
     //
     // The break conditions are a little weird so we use a bare `loop`.
     loop {
+        // let limit = 5000; // TODO make a const
         // TODO: we need some way to limit L2 blocks in an epoch, we can't just error like this
         // if headers.len() >= limit {
         //     return Err(Error::MalformedEpoch(summary.get_epoch_commitment()).into());
@@ -357,31 +340,8 @@ fn fetch_l2_block(blkid: &L2BlockId, l2man: &L2BlockManager) -> anyhow::Result<L
         .ok_or(Error::MissingL2Block(*blkid))?)
 }
 
-fn fetch_chainstate(slot: u64, chsman: &ChainstateManager) -> anyhow::Result<Chainstate> {
-    Ok(chsman
-        .get_toplevel_chainstate_blocking(slot)?
-        .ok_or(Error::MissingIdxChainstate(slot))?)
-}
-
 fn fetch_l1_block_manifest(height: u64, l1man: &L1BlockManager) -> anyhow::Result<L1BlockManifest> {
     Ok(l1man
         .get_block_manifest_at_height(height)?
         .ok_or(DbError::MissingL1Block(height))?)
-}
-
-/// Fetches and L1 block manifest, checking that the manifest that we found
-/// reported as specific epoch index.
-// TODO maybe convert this fn to use epoch commitments?
-fn fetch_block_manifest_at_epoch(
-    height: u64,
-    epoch: u64,
-    l1man: &L1BlockManager,
-) -> anyhow::Result<L1BlockManifest> {
-    let mf = fetch_l1_block_manifest(height, l1man)?;
-
-    if mf.epoch() != epoch {
-        return Err(Error::L1ManifestEpochMismatch(*mf.blkid(), mf.epoch(), epoch).into());
-    }
-
-    Ok(mf)
 }

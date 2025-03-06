@@ -282,7 +282,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
 
         # set up network params
         initdir = ctx.make_service_dir("_init")
-        settings = self.rollup_settings or RollupParamsSettings.new_default()
+        settings = self.rollup_settings or RollupParamsSettings.new_default().fast_batch()
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
         # Instantiaze the generated rollup config so it's convenient to work with.
