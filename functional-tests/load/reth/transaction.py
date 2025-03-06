@@ -208,11 +208,13 @@ class SmartContracts(TransactionSender):
         self._smart_contracts_storage[contract_id] = (receipt.contractAddress, abi)
         return receipt.contractAddress, abi
 
-    def _contract_abi(self, contract_id):
-        return self._smart_contracts_storage.get(contract_id, (None, None))[1]
+    @classmethod
+    def _contract_abi(cls, contract_id):
+        return cls._smart_contracts_storage.get(contract_id, (None, None))[1]
 
-    def _contract_address(self, contract_id):
-        return self._smart_contracts_storage.get(contract_id, (None, None))[0]
+    @classmethod
+    def _contract_address(cls, contract_id):
+        return cls._smart_contracts_storage.get(contract_id, (None, None))[0]
 
     @tx_caller("CALLING CONTRACT [1]")
     def call_contract(
