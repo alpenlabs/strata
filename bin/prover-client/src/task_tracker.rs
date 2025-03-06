@@ -70,6 +70,12 @@ impl TaskTracker {
         retriable_tasks
     }
 
+    pub fn get_waiting_for_dependencies_tasks(&self) -> Vec<ProofKey> {
+        self.get_tasks_by_status(|status| {
+            matches!(status, ProvingTaskStatus::WaitingForDependencies)
+        })
+    }
+
     pub fn create_tasks(
         &mut self,
         proof_id: ProofContext,
