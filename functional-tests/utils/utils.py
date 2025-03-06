@@ -749,9 +749,10 @@ def cl_slot_to_block_id(seqrpc, slot):
     return l2_blocks[0]["block_id"]
 
 
-def el_slot_to_block_id(rethrpc, block_num):
-    """Get EL block hash from block number using Ethereum RPC."""
-    return rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]
+def el_slot_to_block_commitment(rethrpc, block_num):
+    """Get EL block commitment from block number using Ethereum RPC."""
+    blk_id = rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]
+    return (block_num, blk_id)
 
 
 def bytes_to_big_endian(hash):

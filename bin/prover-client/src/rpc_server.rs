@@ -7,7 +7,9 @@ use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, http_client::HttpClient, RpcModule};
 use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
 use strata_db::traits::ProofDatabase;
-use strata_primitives::{buf::Buf32, l1::L1BlockCommitment, l2::L2BlockCommitment};
+use strata_primitives::{
+    evm_exec::EvmEeBlockCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment,
+};
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataDebugApiClient;
@@ -97,7 +99,10 @@ impl StrataProverClientApiServer for ProverClientRpc {
             .map_err(to_jsonrpsee_error("failed to create task for btc block"))
     }
 
-    async fn prove_el_blocks(&self, el_block_range: (Buf32, Buf32)) -> RpcResult<Vec<ProofKey>> {
+    async fn prove_el_blocks(
+        &self,
+        el_block_range: (EvmEeBlockCommitment, EvmEeBlockCommitment),
+    ) -> RpcResult<Vec<ProofKey>> {
         self.operator
             .evm_ee_operator()
             .create_task(el_block_range, self.task_tracker.clone(), &self.db)

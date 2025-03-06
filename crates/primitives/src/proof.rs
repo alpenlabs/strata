@@ -3,7 +3,9 @@ use std::fmt::Display;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-use crate::{buf::Buf32, l1::L1BlockId, l2::L2BlockId};
+use crate::{
+    buf::Buf32, evm_exec::EvmEeBlockCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment,
+};
 
 /// Represents the verifying key used for verifying ZK proofs in a rollup context.
 ///
@@ -61,15 +63,15 @@ impl RollupVerifyingKey {
 )]
 pub enum ProofContext {
     /// Identifier representing a Bitcoin L1 block for blockscan proof
-    BtcBlockspace(L1BlockId, L1BlockId),
+    BtcBlockspace(L1BlockCommitment, L1BlockCommitment),
 
     /// Identifier for the EVM Execution Environment (EE) blocks used in generating the State
     /// Transition Function (STF) proof.
-    EvmEeStf(Buf32, Buf32),
+    EvmEeStf(EvmEeBlockCommitment, EvmEeBlockCommitment),
 
     /// Identifier for the Consensus Layer (CL) blocks used in generating the State Transition
     /// Function (STF) proof.
-    ClStf(L2BlockId, L2BlockId),
+    ClStf(L2BlockCommitment, L2BlockCommitment),
 
     /// Identifier for a specific checkpoint being proven.
     Checkpoint(u64),

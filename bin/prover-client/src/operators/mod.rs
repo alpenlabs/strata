@@ -102,7 +102,7 @@ pub trait ProvingOp {
     /// # Important
     ///
     /// The default impl defines no dependencies, so certain [`ProvingOp`] with dependencies
-    /// should "override" it.  
+    /// should "override" it.
     ///
     /// # Arguments
     ///
@@ -187,7 +187,7 @@ pub trait ProvingOp {
 mod tests {
     use std::sync::Arc;
 
-    use strata_primitives::buf::Buf32;
+    use strata_primitives::{buf::Buf32, evm_exec::EvmEeBlockCommitment, l1::L1BlockCommitment};
     use strata_rocksdb::{prover::db::ProofDb, test_utils::get_rocksdb_tmp_instance_for_prover};
     use strata_rpc_types::ProofKey;
     use tokio::sync::Mutex;
@@ -263,7 +263,7 @@ mod tests {
             task_tracker: Arc<Mutex<TaskTracker>>,
         ) -> Result<Vec<ProofKey>, ProvingTaskError> {
             let child = ParentOps;
-            child.create_task(params as u8, task_tracker, db).await
+            child.create_task(params, task_tracker, db).await
         }
     }
 
@@ -275,7 +275,7 @@ mod tests {
     impl ProvingOp for ParentOps {
         type Prover = TestProver;
 
-        type Params = u8;
+        type Params = u64;
 
         fn construct_proof_ctx(
             &self,
@@ -283,9 +283,10 @@ mod tests {
         ) -> Result<strata_primitives::proof::ProofContext, crate::errors::ProvingTaskError>
         {
             let mut batch = Buf32::default();
-            batch.0[0] = *params;
+            batch.0[0] = *params as u8;
             Ok(strata_primitives::proof::ProofContext::EvmEeStf(
-                batch, batch,
+                EvmEeBlockCommitment::new(*params, Buf32::default()),
+                EvmEeBlockCommitment::new(*params, Buf32::default()),
             ))
         }
 
@@ -317,18 +318,16 @@ mod tests {
     impl ProvingOp for ChildOps {
         type Prover = TestProver;
 
-        type Params = u8;
+        type Params = u64;
 
         fn construct_proof_ctx(
             &self,
             params: &Self::Params,
         ) -> Result<strata_primitives::proof::ProofContext, crate::errors::ProvingTaskError>
         {
-            let mut batch = Buf32::default();
-            batch.0[0] = *params;
             Ok(strata_primitives::proof::ProofContext::BtcBlockspace(
-                batch.into(),
-                batch.into(),
+                L1BlockCommitment::new(*params, Buf32::default().into()),
+                L1BlockCommitment::new(*params, Buf32::default().into()),
             ))
         }
 
