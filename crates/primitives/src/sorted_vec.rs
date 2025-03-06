@@ -24,6 +24,8 @@ pub struct SortedVec<T> {
 
 impl<T> SortedVec<T> {
     /// Constructs a new instance without validating the contents.
+    ///
+    /// NOTE: You _must_ ensure that the contents are already sorted.
     pub fn new_unchecked(inner: Vec<T>) -> Self {
         Self { inner }
     }
@@ -76,6 +78,9 @@ impl<T: Ord + Clone> SortedVec<T> {
     /// if not present, returns `Err` of the index it would be present.
     ///
     /// This is implemented by doing a binary search.
+    ///
+    /// NOTE: If there are multiple matches, there is no guarantee which will be used,
+    /// and this may not be consistent.
     pub fn find_index(&self, value: &T) -> Result<usize, usize> {
         self.inner.binary_search(value)
     }
@@ -96,6 +101,8 @@ impl<T: Ord + Clone> SortedVec<T> {
 
     /// Removes an element from the [`SortedVec`]. Returns `true` if the element was found and
     /// removed. This runs in O(n) due to shifting of elements.
+    ///
+    /// NOTE: If multiple matches exist, only one will be removed.
     pub fn remove(&mut self, value: &T) -> bool {
         if let Ok(pos) = self.find_index(value) {
             self.inner.remove(pos);
