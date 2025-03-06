@@ -320,9 +320,10 @@ fn fetch_epoch_l2_headers(
     //
     // The break conditions are a little weird so we use a bare `loop`.
     loop {
-        if headers.len() >= limit {
-            return Err(Error::MalformedEpoch(summary.get_epoch_commitment()).into());
-        }
+        // TODO: we need some way to limit L2 blocks in an epoch, we can't just error like this
+        // if headers.len() >= limit {
+        //     return Err(Error::MalformedEpoch(summary.get_epoch_commitment()).into());
+        // }
 
         let cur = headers.last().unwrap();
         let cur_parent = cur.parent();
