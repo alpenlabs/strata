@@ -1,7 +1,9 @@
-use strata_l1tx::messages::{L1Event, RelevantTxEntry};
+use strata_l1tx::messages::RelevantTxEntry;
 use strata_primitives::l1::ProtocolOperation;
 use strata_state::{batch::SignedCheckpoint, chain_state::Chainstate};
 use strata_storage::NodeStorage;
+
+use super::event::L1Event;
 
 /// Looks for checkpoints in given `RelevantTxEntry`s.
 pub(crate) fn find_checkpoint(entries: &[RelevantTxEntry]) -> Option<&SignedCheckpoint> {

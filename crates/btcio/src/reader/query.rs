@@ -10,7 +10,7 @@ use secp256k1::XOnlyPublicKey;
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
-    messages::{BlockData, L1Event, RelevantTxEntry},
+    messages::RelevantTxEntry,
 };
 use strata_primitives::{
     block_credential::CredRule,
@@ -25,8 +25,10 @@ use strata_status::StatusChannel;
 use strata_storage::{L1BlockManager, NodeStorage};
 use tracing::*;
 
+use super::event::L1Event;
 use crate::{
     reader::{
+        event::BlockData,
         handler::handle_bitcoin_event,
         state::ReaderState,
         tx_indexer::ReaderTxVisitorImpl,
