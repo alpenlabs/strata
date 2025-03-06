@@ -85,10 +85,10 @@ pub fn prepare_block(
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
-    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
+    let wb = compute_post_state(prev_chstate, &fake_header, &body, params)?;
 
     // FIXME: invalid stateroot. Remove l2blockid from ChainState or stateroot from L2Block header.
-    let new_state_root = post_state.compute_state_root();
+    let new_state_root = wb.new_toplevel_state().compute_state_root();
 
     let header = L2BlockHeader::new(slot, ts, prev_blkid, &body, new_state_root);
 
@@ -314,9 +314,9 @@ fn compute_post_state(
     header: &impl L2Header,
     body: &L2BlockBody,
     params: &Params,
-) -> Result<(Chainstate, WriteBatch), Error> {
+) -> Result<WriteBatch, Error> {
     let mut state_cache = StateCache::new(prev_chstate);
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
-    let (post_state, wb) = state_cache.finalize();
-    Ok((post_state, wb))
+    let wb = state_cache.finalize();
+    Ok(wb)
 }

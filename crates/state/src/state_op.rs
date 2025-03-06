@@ -132,14 +132,11 @@ impl StateCache {
         self.write_ops.is_empty()
     }
 
-    /// Finalizes the changes made to the state, exporting it and a write batch
+    /// Finalizes the changes made to the state, exporting it as a write batch
     /// that can be applied to the previous state to produce it.
     // TODO remove extra `Chainstate` return value
-    pub fn finalize(self) -> (Chainstate, WriteBatch) {
-        (
-            self.new_state.clone(),
-            WriteBatch::new(self.new_state, self.write_ops),
-        )
+    pub fn finalize(self) -> WriteBatch {
+        WriteBatch::new(self.new_state, self.write_ops)
     }
 
     // Primitive manipulation functions.
