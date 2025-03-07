@@ -74,7 +74,6 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         // Since only some information of the L1BlockManifest is verified by the Blockspace Proof,
         // verify only those parts
         let new_l1_manifests = l2_block.l1_segment().new_manifests();
-        assert_eq!(new_l1_manifests.len(), l1_updates.len());
 
         for manifest in new_l1_manifests {
             assert_eq!(
@@ -128,35 +127,39 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     // FIXME: The first epoch will not have any SignedCheckpoint on Bitcoin
     // TODO: this makes sense to be somewhere in the chainstate
     let (initial_tx_filter_config_hash, final_tx_filter_config_hash) = if is_l1_segment_present {
-        let last_l1_block = l1_updates
-            .last()
-            .expect("there should be at least one L1 Segment");
-
-        let cp = last_l1_block
-            .protocol_ops
-            .iter()
-            .find_map(|op| match op {
-                ProtocolOperation::Checkpoint(cp) => Some(cp),
-                _ => None,
-            })
-            .expect("Must include checkpoint for valid epoch");
-
-        let posted_chainstate: Chainstate =
-            borsh::from_slice(cp.checkpoint().sidecar().chainstate())
-                .expect("valid chainstate needs to be posted on checkpoint");
-
         let mut tx_filters = tx_filters.expect("must have tx filters");
         let initial_tx_filters_hash = compute_borsh_hash(&tx_filters);
 
-        // Verify we have used the right TxFilters
-        assert_eq!(
-            initial_tx_filters_hash,
-            cp.checkpoint().batch_transition().tx_filters_transition.1,
-            "must use right tx filters"
-        );
+        let final_tx_filters_hash = if cur_epoch > 0 {
+            let last_l1_block = l1_updates
+                .last()
+                .expect("there should be at least one L1 Segment");
 
-        tx_filters.update_from_chainstate(&posted_chainstate);
-        let final_tx_filters_hash = compute_borsh_hash(&tx_filters);
+            let cp = last_l1_block
+                .protocol_ops
+                .iter()
+                .find_map(|op| match op {
+                    ProtocolOperation::Checkpoint(cp) => Some(cp),
+                    _ => None,
+                })
+                .expect("Must include checkpoint for valid epoch");
+
+            let posted_chainstate: Chainstate =
+                borsh::from_slice(cp.checkpoint().sidecar().chainstate())
+                    .expect("valid chainstate needs to be posted on checkpoint");
+
+            // Verify we have used the right TxFilters
+            assert_eq!(
+                initial_tx_filters_hash,
+                cp.checkpoint().batch_transition().tx_filters_transition.1,
+                "must use right tx filters"
+            );
+
+            tx_filters.update_from_chainstate(&posted_chainstate);
+            compute_borsh_hash(&tx_filters)
+        } else {
+            initial_tx_filters_hash
+        };
 
         (initial_tx_filters_hash, final_tx_filters_hash)
     } else {

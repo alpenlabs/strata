@@ -14076,6 +14076,7 @@ dependencies = [
  "strata-db",
  "strata-eectl",
  "strata-key-derivation",
+ "strata-l1tx",
  "strata-primitives",
  "strata-state",
  "strata-status",
