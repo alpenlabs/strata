@@ -5,7 +5,9 @@ pub mod program;
 
 use program::ClStfOutput;
 use strata_chaintsn::transition::process_block;
-use strata_primitives::{l1::ProtocolOperation, params::RollupParams};
+use strata_primitives::{
+    buf::Buf32, hash::compute_borsh_hash, l1::ProtocolOperation, params::RollupParams,
+};
 use strata_proofimpl_btc_blockspace::logic::BlockscanProofOutput;
 use strata_state::{
     block::{ExecSegment, L2Block},
@@ -31,12 +33,15 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
 
     // 4. Read the verified blockscan proof outputs if any
     let is_l1_segment_present: bool = zkvm.read_serde();
-    let l1_updates = if is_l1_segment_present {
+    let (l1_updates, tx_filters) = if is_l1_segment_present {
         let btc_blockspace_proof_output: BlockscanProofOutput =
             zkvm.read_verified_borsh(btc_blockscan_vkey);
-        btc_blockspace_proof_output.blockscan_results
+        (
+            btc_blockspace_proof_output.blockscan_results,
+            Some(btc_blockspace_proof_output.tx_filters),
+        )
     } else {
-        vec![]
+        (vec![], None)
     };
 
     // 5. Read the verified exec segments
@@ -68,6 +73,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         // Since only some information of the L1BlockManifest is verified by the Blockspace Proof,
         // verify only those parts
         let new_l1_manifests = l2_block.l1_segment().new_manifests();
+        assert_eq!(new_l1_manifests.len(), l1_updates.len());
 
         for manifest in new_l1_manifests {
             assert_eq!(
@@ -116,12 +122,44 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         .expect("failed to process L2 Block");
     }
 
+    // 11. Get the checkpoint that was posted to Bitcoin (if any) and update the TxFilterConfig
+    let (initial_tx_filter_config_hash, final_tx_filter_config_hash) = if is_l1_segment_present {
+        let last_l1_block = l1_updates
+            .last()
+            .expect("there should be at least one L1 Segment");
+
+        let cp = last_l1_block
+            .protocol_ops
+            .iter()
+            .find_map(|op| match op {
+                ProtocolOperation::Checkpoint(cp) => Some(cp),
+                _ => None,
+            })
+            .expect("Must include checkpoint for valid epoch");
+
+        let posted_chainstate: Chainstate =
+            borsh::from_slice(cp.checkpoint().sidecar().chainstate())
+                .expect("valid chainstate needs to be posted on checkpoint");
+
+        let mut tx_filters = tx_filters.expect("must have tx filters");
+        let initial_tx_filters_hash = compute_borsh_hash(&tx_filters);
+
+        tx_filters.update_from_chainstate(&posted_chainstate);
+        let final_tx_filters_hash = compute_borsh_hash(&tx_filters);
+
+        (initial_tx_filters_hash, final_tx_filters_hash)
+    } else {
+        (Buf32::zero(), Buf32::zero())
+    };
+
     // 11. Get the final chainstate and construct the output
     let (final_chain_state, _) = state_cache.finalize();
 
     let output = ClStfOutput {
         initial_chainstate_root,
         final_chainstate_root: final_chain_state.compute_state_root(),
+        initial_tx_filter_config_hash,
+        final_tx_filter_config_hash,
     };
 
     zkvm.commit_borsh(&output);
