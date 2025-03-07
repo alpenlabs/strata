@@ -139,13 +139,13 @@ async fn do_tick<T: SyncClient>(
         return Ok(());
     };
 
-    if state.has_block(&status.tip_block_id) {
+    if state.has_block(status.tip_block_id()) {
         // in sync with client
         return Ok(());
     }
 
     let start_slot = state.tip_height() + 1;
-    let end_slot = status.tip_height; // remote tip height
+    let end_slot = status.tip_height(); // remote tip height
 
     let span = debug_span!("sync", %start_slot, %end_slot);
 
