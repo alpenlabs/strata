@@ -986,7 +986,16 @@ fn handle_new_client_state(
     Ok(())
 }
 
-/// Tries to finalize pending epochs
+/// Check if any pending epochs can be finalized.
+/// If multiple are available, finalize the latest epoch that can be finalized.
+/// Remove the finalized epoch and all earlier epochs from pending queue.
+///
+/// Note: Finalization in this context:
+///     1. Update chaintip tracker's base block
+///     2. Message execution engine to mark block corresponding to last block of this epoch as
+///        finalized in the EE.
+///
+/// Return commitment to epoch that was finalized, if any.
 fn handle_epoch_finalization(
     fcm_state: &mut ForkChoiceManager,
     engine: &impl ExecEngineCtl,
