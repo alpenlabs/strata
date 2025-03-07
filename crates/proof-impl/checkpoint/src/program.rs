@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strata_primitives::buf::Buf32;
+use strata_state::batch::BatchTransition;
 use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
     ZkVmProgramPerf, ZkVmResult,
@@ -18,7 +18,7 @@ pub struct CheckpointProgram;
 
 impl ZkVmProgram for CheckpointProgram {
     type Input = CheckpointProverInput;
-    type Output = (Buf32, Buf32);
+    type Output = BatchTransition;
 
     fn name() -> String {
         "Checkpoint".to_string()

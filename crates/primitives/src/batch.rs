@@ -137,11 +137,8 @@ pub struct CheckpointCommitment {
     /// Information regarding the current batches of l1 and l2 blocks along with epoch.
     batch_info: BatchInfo,
 
-    /// Transition data for `Chainstate`, which is verified by the proof.
-    ///
-    /// Represents a transition from the starting chainstate to the ending chainstate.
-    /// The state root is computed via `Chainstate::compute_state_root`.
-    transition: (Buf32, Buf32),
+    /// Transition information verifiable by the proof
+    transition: BatchTransition,
 }
 
 /// Consolidates all information required to describe and verify a batch checkpoint.
@@ -164,7 +161,7 @@ pub struct Checkpoint {
 impl Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
-        transition: (Buf32, Buf32),
+        transition: BatchTransition,
         proof: Proof,
         sidecar: CheckpointSidecar,
     ) -> Self {
@@ -182,7 +179,7 @@ impl Checkpoint {
         &self.commitment.batch_info
     }
 
-    pub fn batch_transition(&self) -> &(Buf32, Buf32) {
+    pub fn batch_transition(&self) -> &BatchTransition {
         &self.commitment.transition
     }
 
@@ -343,6 +340,33 @@ impl BatchInfo {
         }
         false
     }
+}
+
+/// Contains transition information in a batch checkpoint, verified by the proof
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    PartialEq,
+    Arbitrary,
+    BorshDeserialize,
+    BorshSerialize,
+    Deserialize,
+    Serialize,
+)]
+pub struct BatchTransition {
+    /// Transition commitment for `Chainstate`
+    ///
+    /// Represents a transition from the starting chainstate to the ending chainstate.
+    /// The commitment of chainstate is computed via `Chainstate::compute_state_root`.
+    pub chainstate_transition: (Buf32, Buf32),
+
+    /// Transition commitment of `TxFilterConfig`
+    ///
+    /// Represents a transition from the starting TxFilterConfig to the ending TxFilterConfig.
+    /// The commitment of TxFilterConfig is computed via `compute_borsh_hash`.
+    pub tx_filters_transition: (Buf32, Buf32),
 }
 
 #[derive(

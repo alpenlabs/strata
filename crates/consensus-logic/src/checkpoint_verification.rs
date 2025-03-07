@@ -1,6 +1,6 @@
 //! General handling around checkpoint verification.
 
-use strata_primitives::{buf::Buf32, params::*, proof::RollupVerifyingKey};
+use strata_primitives::{params::*, proof::RollupVerifyingKey};
 use strata_state::{batch::*, client_state::L1Checkpoint};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
@@ -81,7 +81,7 @@ fn verify_checkpoint_extends(
         return Err(CheckpointError::Sequencing(epoch, prev_epoch));
     }
 
-    if last_tsn.1 != tsn.0 {
+    if last_tsn.chainstate_transition.1 != tsn.chainstate_transition.0 {
         warn!("checkpoint mismatch on L2 state!");
         return Err(CheckpointError::MismatchL2State);
     }
@@ -123,7 +123,7 @@ pub fn verify_proof(
     }
 
     let expected_public_output = *checkpoint.batch_transition();
-    let actual_public_output: (Buf32, Buf32) =
+    let actual_public_output: BatchTransition =
         borsh::from_slice(proof_receipt.public_values().as_bytes())
             .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
 

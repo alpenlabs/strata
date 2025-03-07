@@ -25,6 +25,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     // 2. Read the initial chainstate from which we start the transition and create the state cache
     let initial_chainstate: Chainstate = zkvm.read_borsh();
     let initial_chainstate_root = initial_chainstate.compute_state_root();
+    let cur_epoch = initial_chainstate.cur_epoch();
     let mut state_cache = StateCache::new(initial_chainstate);
 
     // 3. Read L2 blocks
@@ -122,7 +123,10 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         .expect("failed to process L2 Block");
     }
 
-    // 11. Get the checkpoint that was posted to Bitcoin (if any) and update the TxFilterConfig
+    // 11. Get the checkpoint that was posted to Bitcoin (if any) and check if we have used the
+    //     right TxFilters and udpate it
+    // FIXME: The first epoch will not have any SignedCheckpoint on Bitcoin
+    // TODO: this makes sense to be somewhere in the chainstate
     let (initial_tx_filter_config_hash, final_tx_filter_config_hash) = if is_l1_segment_present {
         let last_l1_block = l1_updates
             .last()
@@ -144,6 +148,13 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         let mut tx_filters = tx_filters.expect("must have tx filters");
         let initial_tx_filters_hash = compute_borsh_hash(&tx_filters);
 
+        // Verify we have used the right TxFilters
+        assert_eq!(
+            initial_tx_filters_hash,
+            cp.checkpoint().batch_transition().tx_filters_transition.1,
+            "must use right tx filters"
+        );
+
         tx_filters.update_from_chainstate(&posted_chainstate);
         let final_tx_filters_hash = compute_borsh_hash(&tx_filters);
 
@@ -152,7 +163,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         (Buf32::zero(), Buf32::zero())
     };
 
-    // 11. Get the final chainstate and construct the output
+    // 12. Get the final chainstate and construct the output
     let (final_chain_state, _) = state_cache.finalize();
 
     let output = ClStfOutput {
