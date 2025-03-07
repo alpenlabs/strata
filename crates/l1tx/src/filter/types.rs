@@ -88,8 +88,10 @@ impl TxFilterConfig {
             .flat_map(conv_deposit_to_fulfillment)
             .collect::<Vec<_>>();
 
-        self.expected_withdrawal_fulfillments =
-            FlatTable::try_from(exp_fulfillments).expect("types: duplicate deposit indexes?");
+        self.expected_withdrawal_fulfillments = FlatTable::try_from_unsorted(exp_fulfillments)
+            .expect(
+                "types: duplicate/unsorted deposit indexes? (expected_withdrawal_fulfillments)?",
+            );
 
         // Watch all utxos we have in our deposit table.
         let exp_outpoints = chainstate
@@ -101,8 +103,8 @@ impl TxFilterConfig {
             })
             .collect::<Vec<_>>();
 
-        self.expected_outpoints =
-            FlatTable::try_from(exp_outpoints).expect("types: duplicate deposit indexes?");
+        self.expected_outpoints = FlatTable::try_from_unsorted(exp_outpoints)
+            .expect("types: duplicate/unsorted deposit indexes? (expected_outpoints)");
     }
 }
 
