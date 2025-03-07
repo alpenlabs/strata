@@ -8,7 +8,9 @@ use strata_common::{check_and_pause_debug_async, WorkerType};
 use strata_consensus_logic::{csm::message::ForkChoiceMessage, sync_manager::SyncManager};
 use strata_primitives::epoch::EpochCommitment;
 use strata_state::{block::L2BlockBundle, header::L2Header};
+use strata_status::ChainSyncStatusUpdate;
 use strata_storage::NodeStorage;
+use tokio::sync::watch;
 use tracing::*;
 
 use crate::{
@@ -36,18 +38,18 @@ impl<T: SyncClient> L2SyncContext<T> {
 async fn wait_until_ready_and_init_sync_state<T: SyncClient>(
     context: &L2SyncContext<T>,
 ) -> Result<L2SyncState, L2SyncError> {
-    let finalized_epoch = wait_for_chainstate_finalized_epoch(&context.sync_manager).await?;
+    let mut chainsync_rx = context.sync_manager.status_channel().subscribe_chain_sync();
+    let finalized_epoch = wait_for_finalized_epoch(&mut chainsync_rx).await?;
 
     state::initialize_from_db(finalized_epoch, context.storage.as_ref()).await
 }
 
-async fn wait_for_chainstate_finalized_epoch(
-    sync_man: &SyncManager,
+async fn wait_for_chainstate_finalized_epoch_inner(
+    chainstatus_rx: &mut watch::Receiver<Option<ChainSyncStatusUpdate>>,
+    wait_for_fn: impl FnMut(&Option<ChainSyncStatusUpdate>) -> bool,
 ) -> Result<EpochCommitment, L2SyncError> {
-    let mut chainstatus_rx = sync_man.status_channel().subscribe_chain_sync();
-
     let finalized_epoch = chainstatus_rx
-        .wait_for(Option::is_some)
+        .wait_for(wait_for_fn)
         .await
         .map_err(|_| L2SyncError::ChannelClosed)?
         .as_ref()
@@ -56,6 +58,28 @@ async fn wait_for_chainstate_finalized_epoch(
         .finalized_epoch;
 
     Ok(finalized_epoch)
+}
+
+async fn wait_for_finalized_epoch(
+    chainstatus_rx: &mut watch::Receiver<Option<ChainSyncStatusUpdate>>,
+) -> Result<EpochCommitment, L2SyncError> {
+    wait_for_chainstate_finalized_epoch_inner(chainstatus_rx, Option::is_some).await
+}
+
+async fn wait_for_finalized_epoch_changed(
+    chainstatus_rx: &mut watch::Receiver<Option<ChainSyncStatusUpdate>>,
+    last_finalized: EpochCommitment,
+) -> Result<EpochCommitment, L2SyncError> {
+    wait_for_chainstate_finalized_epoch_inner(chainstatus_rx, |update| {
+        let Some(update) = update else {
+            // dont care until we have an update
+            return false;
+        };
+
+        // else only if last finalized epoch has changed
+        update.new_status().finalized_epoch != last_finalized
+    })
+    .await
 }
 
 pub async fn sync_worker<T: SyncClient>(context: &L2SyncContext<T>) -> Result<(), L2SyncError> {
@@ -67,14 +91,15 @@ pub async fn sync_worker<T: SyncClient>(context: &L2SyncContext<T>) -> Result<()
 
     loop {
         tokio::select! {
-            _ = chainsync_rx.changed() => {
-                let chainsync = chainsync_rx.borrow_and_update().clone();
-
-                let Some(chainsync) = chainsync else {
-                    continue;
+            finalized_epoch = wait_for_finalized_epoch_changed(&mut chainsync_rx, *state.finalized_epoch()) => {
+                let finalized_epoch = match finalized_epoch {
+                    Ok(epoch) => epoch,
+                    Err(err) => {
+                        warn!(?err, "failed to wait for finalized epoch change");
+                        continue;
+                    }
                 };
-                let finalized_epoch = chainsync.new_status().finalized_epoch;
-                handle_finalized_epoch(finalized_epoch, &mut state, context).await?;
+                handle_finalized_epoch(finalized_epoch, &mut state, context).await;
             }
 
             _ = interval.tick() => {
@@ -89,14 +114,10 @@ async fn handle_finalized_epoch<T: SyncClient>(
     fin_epoch: EpochCommitment,
     state: &mut L2SyncState,
     _context: &L2SyncContext<T>,
-) -> Result<(), L2SyncError> {
-    // on receiving new client update, update own finalized state
-
+) {
     if let Err(e) = handle_block_finalized(state, fin_epoch).await {
         error!(?fin_epoch, err = %e, "failed to handle newly finalized block");
     }
-
-    Ok(())
 }
 
 async fn do_tick<T: SyncClient>(

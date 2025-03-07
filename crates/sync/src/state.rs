@@ -61,6 +61,10 @@ impl L2SyncState {
     pub(crate) fn tip_height(&self) -> u64 {
         self.tip_block.slot()
     }
+
+    pub(crate) fn finalized_epoch(&self) -> &EpochCommitment {
+        self.tracker.finalized_epoch()
+    }
 }
 
 pub(crate) async fn initialize_from_db(
