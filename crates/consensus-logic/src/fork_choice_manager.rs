@@ -504,7 +504,7 @@ fn process_fc_message(
             let status = if ok {
                 // check if any pending blocks can be finalized
                 if let Err(err) = handle_epoch_finalization(fcm_state, engine) {
-                    error!(?err, "failed to finalize epoch");
+                    error!(%err, "failed to finalize epoch");
                 }
 
                 // Update status.
@@ -950,7 +950,7 @@ fn handle_new_client_state(
 
     let finalized_epoch_changed = match handle_epoch_finalization(fcm_state, engine) {
         Err(err) => {
-            error!(?err, "failed to finalize epoch");
+            error!(%err, "failed to finalize epoch");
             false
         }
         Ok(Some(finalized_epoch)) if finalized_epoch == new_fin_epoch => {
