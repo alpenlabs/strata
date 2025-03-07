@@ -1,9 +1,9 @@
 //! Fork choice manager. Used to talk to the EL and pick the new fork choice.
 
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 use strata_chaintsn::transition::process_block;
-use strata_db::{errors::DbError, traits::BlockStatus};
+use strata_db::{errors::DbError, traits::BlockStatus, types::CheckpointConfStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::{
     epoch::EpochCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment, params::Params,
@@ -25,8 +25,7 @@ use crate::{
     csm::{ctl::CsmController, message::ForkChoiceMessage},
     errors::*,
     tip_update::{compute_tip_update, TipUpdate},
-    unfinalized_tracker,
-    unfinalized_tracker::UnfinalizedBlockTracker,
+    unfinalized_tracker::{self, UnfinalizedBlockTracker},
 };
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
@@ -50,6 +49,10 @@ pub struct ForkChoiceManager {
     /// Current toplevel chainstate we can do quick validity checks of new
     /// blocks against.
     cur_chainstate: Arc<Chainstate>,
+
+    /// Epochs we know to be finalized from L1 checkpoints but whose corresponding
+    /// L2 blocks we have not seen.
+    epochs_pending_finalization: VecDeque<EpochCommitment>,
 }
 
 impl ForkChoiceManager {
@@ -69,6 +72,7 @@ impl ForkChoiceManager {
             chain_tracker,
             cur_best_block,
             cur_chainstate,
+            epochs_pending_finalization: VecDeque::new(),
         }
     }
 
@@ -146,6 +150,43 @@ impl ForkChoiceManager {
     fn get_chainstate_finalized_epoch(&self) -> &EpochCommitment {
         self.cur_chainstate.finalized_epoch()
     }
+
+    fn attach_epoch_pending_finalization(&mut self, epoch: EpochCommitment) -> bool {
+        let last_finalized_epoch = self
+            .epochs_pending_finalization
+            .back()
+            .unwrap_or(self.chain_tracker.finalized_epoch());
+
+        if epoch.is_null() {
+            warn!("tried to finalize null epoch");
+            return false;
+        }
+
+        if epoch.epoch() <= last_finalized_epoch.epoch()
+            || epoch.last_slot() <= last_finalized_epoch.last_slot()
+        {
+            warn!(?last_finalized_epoch, received = ?epoch, "received invalid or out of order epoch");
+            return false;
+        }
+
+        self.epochs_pending_finalization.push_back(epoch);
+
+        true
+    }
+
+    fn find_latest_finalizable_epoch(&self) -> Option<(usize, &EpochCommitment)> {
+        // the latest epoch which we have processed and is safe to finalize
+        let prev_epoch = self.cur_chainstate.prev_epoch().epoch();
+        self.epochs_pending_finalization
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, epoch)| epoch.epoch() <= prev_epoch)
+    }
+
+    fn drain_pending_finalizable_epochs(&mut self, until: usize) {
+        self.epochs_pending_finalization.drain(..until);
+    }
 }
 
 /// Creates the forkchoice manager state from a database and rollup params.
@@ -164,10 +205,27 @@ pub fn init_forkchoice_manager(
 
     // XXX right now we have to do some special casing for if we don't have an
     // initial checkpoint for the genesis epoch
-    let finalized_epoch = init_csm_state
+
+    let latest_chainstate_idx = storage.chainstate().get_last_write_idx_blocking()?;
+    let latest_chainstate = storage
+        .chainstate()
+        .get_toplevel_chainstate_blocking(latest_chainstate_idx)?
+        .ok_or(DbError::MissingL2State(latest_chainstate_idx))?;
+
+    let chainstate_last_epoch = latest_chainstate.prev_epoch();
+
+    let csm_finalized_epoch = init_csm_state
         .get_declared_final_epoch()
         .cloned()
         .unwrap_or_else(|| EpochCommitment::new(0, 0, *sync_state.genesis_blkid()));
+
+    // pick whatever is the earliest
+    let finalized_epoch = if chainstate_last_epoch.epoch() < csm_finalized_epoch.epoch() {
+        *chainstate_last_epoch
+    } else {
+        csm_finalized_epoch
+    };
+
     debug!(?finalized_epoch, "loading from finalized block...");
 
     // Populate the unfinalized block tracker.
@@ -184,7 +242,7 @@ pub fn init_forkchoice_manager(
         .ok_or(DbError::MissingL2State(cur_tip_block.slot()))?;
 
     // Actually assemble the forkchoice manager state.
-    let fcm = ForkChoiceManager::new(
+    let mut fcm = ForkChoiceManager::new(
         params.clone(),
         storage.clone(),
         init_csm_state,
@@ -192,6 +250,25 @@ pub fn init_forkchoice_manager(
         cur_tip_block,
         Arc::new(chainstate),
     );
+
+    if finalized_epoch != csm_finalized_epoch {
+        // csm is ahead of chainstate
+        // search for all pending checkpoints
+        for epoch in finalized_epoch.epoch()..=csm_finalized_epoch.epoch() {
+            let Some(checkpoint_entry) = storage.checkpoint().get_checkpoint_blocking(epoch)?
+            else {
+                warn!(%epoch, "missing expected checkpoint entry");
+                continue;
+            };
+            if let CheckpointConfStatus::Finalized(_) = checkpoint_entry.confirmation_status {
+                let commitment = checkpoint_entry
+                    .checkpoint
+                    .batch_info()
+                    .get_epoch_commitment();
+                fcm.attach_epoch_pending_finalization(commitment);
+            }
+        }
+    }
 
     Ok(fcm)
 }
@@ -260,12 +337,6 @@ pub fn tracker_task<E: ExecEngineCtl>(
     };
 
     handle_unprocessed_blocks(&mut fcm, &storage, engine.as_ref(), &status_channel)?;
-
-    // FIXME: engine api errors our here sometimes. Need to figure out why.
-    // Do we really need to do this ?
-    // // Before we get going we also want to load the finalized block from disk.
-    // let init_fin_tip = fcm.finalized_tip();
-    // engine.as_ref().update_finalized_block(*init_fin_tip)?;
 
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
@@ -429,6 +500,11 @@ fn process_fc_message(
             };
 
             let status = if ok {
+                // check if any pending blocks can be finalized
+                if let Err(err) = handle_epoch_finalization(fcm_state, engine) {
+                    error!(%err, "failed to finalize epoch");
+                }
+
                 // Update status.
                 let status = ChainSyncStatus {
                     tip: fcm_state.cur_best_block,
@@ -858,34 +934,77 @@ fn handle_new_client_state(
     cs: ClientState,
     engine: &impl ExecEngineCtl,
 ) -> anyhow::Result<()> {
-    let cur_fin_epoch = fcm_state.chain_tracker.finalized_epoch();
     let Some(new_fin_epoch) = cs.get_declared_final_epoch().copied() else {
         debug!("got new CSM state, but finalized epoch still unset, ignoring");
         return Ok(());
     };
 
-    if new_fin_epoch.last_blkid() == cur_fin_epoch.last_blkid() {
-        trace!("got new CSM state, but finalized epoch not different, ignoring");
-        return Ok(());
-    }
-
-    debug!(
-        ?new_fin_epoch,
-        "got new CSM state, updating finalized block"
-    );
-
-    // TODO error checking here ?
-    engine.update_finalized_block(*new_fin_epoch.last_blkid())?;
+    info!(?new_fin_epoch, "got new finalized block");
+    fcm_state.attach_epoch_pending_finalization(new_fin_epoch);
 
     // Update the new state.
     fcm_state.cur_csm_state = Arc::new(cs);
 
+    match handle_epoch_finalization(fcm_state, engine) {
+        Err(err) => {
+            error!(%err, "failed to finalize epoch");
+        }
+        Ok(Some(finalized_epoch)) if finalized_epoch == new_fin_epoch => {
+            debug!(?finalized_epoch, "finalized latest epoch");
+        }
+        Ok(Some(finalized_epoch)) => {
+            debug!(?finalized_epoch, "finalized earlier epoch");
+        }
+        Ok(None) => {
+            // there were no epochs that could be finalized
+            warn!("did not finalize epoch");
+        }
+    };
+
+    Ok(())
+}
+
+/// Check if any pending epochs can be finalized.
+/// If multiple are available, finalize the latest epoch that can be finalized.
+/// Remove the finalized epoch and all earlier epochs from pending queue.
+///
+/// Note: Finalization in this context:
+///     1. Update chaintip tracker's base block
+///     2. Message execution engine to mark block corresponding to last block of this epoch as
+///        finalized in the EE.
+///
+/// Return commitment to epoch that was finalized, if any.
+fn handle_epoch_finalization(
+    fcm_state: &mut ForkChoiceManager,
+    engine: &impl ExecEngineCtl,
+) -> anyhow::Result<Option<EpochCommitment>> {
+    let Some((idx, next_finalizable_epoch)) = fcm_state
+        .find_latest_finalizable_epoch()
+        .map(|(idx, epoch)| (idx, *epoch))
+    else {
+        // no new blocks to finalize
+        return Ok(None);
+    };
+
+    debug!(
+        ?next_finalizable_epoch,
+        ?idx,
+        last_epoch = ?fcm_state.cur_chainstate.prev_epoch(),
+        "got new CSM state, updating finalized block"
+    );
+
+    // TODO error checking here ?
+    engine.update_finalized_block(*next_finalizable_epoch.last_blkid())?;
+
     let fin_report = fcm_state
         .chain_tracker
-        .update_finalized_epoch(&new_fin_epoch)?;
-    info!(?new_fin_epoch, "updated finalized tip");
+        .update_finalized_epoch(&next_finalizable_epoch)?;
+
+    fcm_state.drain_pending_finalizable_epochs(idx);
+
+    info!(?next_finalizable_epoch, "updated finalized tip");
     trace!(?fin_report, "finalization report");
     // TODO do something with the finalization report?
 
-    Ok(())
+    Ok(Some(next_finalizable_epoch))
 }

@@ -9,7 +9,7 @@ use super::{
     parse_valid_checkpoint_envelopes, try_parse_tx_as_withdrawal_fulfillment, try_parse_tx_deposit,
     TxFilterConfig,
 };
-use crate::messages::IndexedTxEntry;
+use crate::messages::Indexed;
 
 /// Interface to handle storage of extracted information from a transaction.
 pub trait TxVisitor {
@@ -44,13 +44,13 @@ pub fn index_block<V: TxVisitor>(
     block: &Block,
     visitor_fn: impl Fn() -> V,
     config: &TxFilterConfig,
-) -> Vec<IndexedTxEntry<V::Output>> {
+) -> Vec<Indexed<V::Output>> {
     block
         .txdata
         .iter()
         .enumerate()
         .filter_map(|(i, tx)| {
-            index_tx(tx, visitor_fn(), config).map(|outp| IndexedTxEntry::new(i as u32, outp))
+            index_tx(tx, visitor_fn(), config).map(|outp| Indexed::new(i as u32, outp))
         })
         .collect::<Vec<_>>()
 }

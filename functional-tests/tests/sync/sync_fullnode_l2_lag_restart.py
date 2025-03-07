@@ -9,7 +9,7 @@ FOLLOW_DIST = 1
 
 
 @flexitest.register
-class SyncFullNodeL2LagTest(testenv.StrataTester):
+class SyncFullNodeL2LagRestartTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         env = testenv.HubNetworkEnvConfig(
             110, rollup_settings=RollupParamsSettings.new_default().fast_batch()
@@ -61,9 +61,11 @@ class SyncFullNodeL2LagTest(testenv.StrataTester):
         seq_tip = seqrpc.strata_syncStatus()["tip_height"]
         assert new_fn_tip < seq_tip, "Fn tip should be less than sequencer tip"
 
-        # Now resume
-        resumed = fnrpc.debug_pause_resume("SyncWorker", "Resume")
-        assert resumed, "Should resume the fullnode sync worker"
+        # stop and restart fullnode
+
+        fullnode.stop()
+
+        fullnode.start()
 
         # Now check the epoch finalization, it should finalize since full node has resumed l2 sync
         wait_until_with_value(

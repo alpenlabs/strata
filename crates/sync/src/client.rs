@@ -1,8 +1,8 @@
 use std::cmp::min;
 
 use futures::stream::{self, Stream, StreamExt};
+use strata_primitives::l2::L2BlockCommitment;
 use strata_rpc_api::StrataApiClient;
-use strata_rpc_types::RpcSyncStatus;
 use strata_state::{block::L2BlockBundle, id::L2BlockId};
 use tracing::error;
 
@@ -16,10 +16,27 @@ pub enum ClientError {
     Network(String),
 }
 
+pub struct PeerSyncStatus {
+    tip_block: L2BlockCommitment,
+}
+
+impl PeerSyncStatus {
+    pub fn tip_block(&self) -> &L2BlockCommitment {
+        &self.tip_block
+    }
+
+    pub fn tip_block_id(&self) -> &L2BlockId {
+        self.tip_block.blkid()
+    }
+
+    pub fn tip_height(&self) -> u64 {
+        self.tip_block.slot()
+    }
+}
+
 #[async_trait::async_trait]
 pub trait SyncClient {
-    // FIXME this should not be using RPC types
-    async fn get_sync_status(&self) -> Result<RpcSyncStatus, ClientError>;
+    async fn get_sync_status(&self) -> Result<PeerSyncStatus, ClientError>;
 
     fn get_blocks_range(
         &self,
@@ -63,13 +80,15 @@ impl<RPC: StrataApiClient + Send + Sync> RpcSyncPeer<RPC> {
 
 #[async_trait::async_trait]
 impl<RPC: StrataApiClient + Send + Sync> SyncClient for RpcSyncPeer<RPC> {
-    async fn get_sync_status(&self) -> Result<RpcSyncStatus, ClientError> {
+    async fn get_sync_status(&self) -> Result<PeerSyncStatus, ClientError> {
         let status = self
             .rpc_client
             .sync_status()
             .await
             .map_err(|e| ClientError::Network(e.to_string()))?;
-        Ok(status)
+        Ok(PeerSyncStatus {
+            tip_block: L2BlockCommitment::new(status.tip_height, status.tip_block_id),
+        })
     }
 
     fn get_blocks_range(

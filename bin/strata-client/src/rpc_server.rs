@@ -486,7 +486,7 @@ impl StrataApiServer for StrataRpcImpl {
             .l2()
             .get_block_data_async(&block_id)
             .await
-            .map_err(|e| Error::Other(e.to_string()))?
+            .map_err(Error::Db)?
             .map(|block| {
                 borsh::to_vec(&block)
                     .map(HexBytes)
