@@ -266,7 +266,7 @@ fn process_l1_block(
 
                     // Emit a sync action to update checkpoint entry in db
                     sync_actions.push(SyncAction::UpdateCheckpointInclusion {
-                        epoch: ckpt.batch_info().epoch(),
+                        checkpoint: signed_ckpt.clone().into(),
                         l1_reference: ckpt_ref,
                     });
                 }
