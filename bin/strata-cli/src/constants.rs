@@ -37,3 +37,23 @@ pub const SIGNET_BLOCK_TIME: Duration = Duration::from_secs(30);
 
 pub const BRIDGE_MUSIG2_PUBKEY: &str =
     "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
+
+/// BIP44 purpose index for HD wallets.
+///
+/// These should be _hardened_ [`ChildNumber`].
+pub const BIP44_HD_WALLET_IDX: u32 = 44;
+
+/// BIP44 coin type index to indicate Testnet.
+///
+/// These should be _hardened_ [`ChildNumber`].
+pub const BIP44_TESTNET_IDX: u32 = 1;
+
+/// BIP44 account index for user wallets.
+///
+/// These should be _hardened_ [`ChildNumber`].
+pub const BIP44_USER_WALLET_IDX: u32 = 0;
+
+/// BIP44 change index for receiving (external) addresses.
+///
+/// These should be _hardened_ [`ChildNumber`].
+pub const BIP44_RECEIVING_ADDRESS_IDX: u32 = 0;

@@ -5,7 +5,11 @@ use std::str::FromStr;
 use aes_gcm_siv::{aead::AeadMutInPlace, Aes256GcmSiv, KeyInit, Nonce, Tag};
 use alloy::{network::EthereumWallet, signers::local::PrivateKeySigner};
 use bdk_wallet::{
-    bitcoin::{bip32::Xpriv, Network},
+    bitcoin::{
+        bip32::{ChildNumber, DerivationPath, Xpriv},
+        secp256k1::SECP256K1,
+        Network,
+    },
     CreateParams, KeychainKind, LoadParams, Wallet,
 };
 use bip39::{Language, Mnemonic};
@@ -16,7 +20,10 @@ use sha2::{Digest, Sha256};
 use terrors::OneOf;
 use zeroize::Zeroizing;
 
-use crate::constants::{AES_NONCE_LEN, AES_TAG_LEN, PW_SALT_LEN, SEED_LEN};
+use crate::constants::{
+    AES_NONCE_LEN, AES_TAG_LEN, BIP44_HD_WALLET_IDX, BIP44_RECEIVING_ADDRESS_IDX,
+    BIP44_TESTNET_IDX, BIP44_USER_WALLET_IDX, PW_SALT_LEN, SEED_LEN,
+};
 
 pub struct BaseWallet(LoadParams, CreateParams);
 
@@ -92,14 +99,28 @@ impl Seed {
     }
 
     pub fn strata_wallet(&self) -> EthereumWallet {
-        let l2_private_bytes = {
-            let mut hasher = <Sha256 as Digest>::new(); // this is to appease the analyzer
-            hasher.update(b"alpen labs strata l2 wallet 2024");
-            hasher.update(self.0.as_slice());
-            hasher.finalize()
-        };
+        // Strata CLI [`DerivationPath`] for Strata EVM wallet address.
+        //
+        // This corresponds to the path: `m/44'/1'/0'/0/<index>`.
+        let derivation_path = DerivationPath::master().extend([
+            ChildNumber::from_hardened_idx(BIP44_HD_WALLET_IDX)
+                .expect("valid hardened child number"),
+            ChildNumber::from_hardened_idx(BIP44_TESTNET_IDX).expect("valid hardened child number"),
+            ChildNumber::from_hardened_idx(BIP44_USER_WALLET_IDX)
+                .expect("valid hardened child number"),
+            ChildNumber::from_normal_idx(BIP44_RECEIVING_ADDRESS_IDX)
+                .expect("valid normal child number"),
+            ChildNumber::from_str("*").expect("valid normal child number"),
+        ]);
 
-        let signer = PrivateKeySigner::from_field_bytes(&l2_private_bytes).expect("valid slice");
+        // Create the master key from the existing seed
+        let master_key = Xpriv::new_master(Network::Testnet, self.0.as_ref()).unwrap();
+
+        // Derive the child key for the given path
+        let derived_key = master_key.derive_priv(SECP256K1, &derivation_path).unwrap();
+        let signer =
+            PrivateKeySigner::from_slice(derived_key.private_key.secret_bytes().as_slice())
+                .expect("valid slice");
 
         EthereumWallet::from(signer)
     }
