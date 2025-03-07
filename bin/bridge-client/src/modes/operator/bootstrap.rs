@@ -1,6 +1,6 @@
 //! Module to bootstrap the operator node by hooking up all the required services.
 
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
 use bitcoin::{
     key::{Keypair, Parity},
@@ -36,7 +36,7 @@ use crate::{
     },
     db::open_rocksdb_database,
     rpc_server::{self, BridgeRpc},
-    xpriv::resolve_xpriv,
+    xpriv::{resolve_xpriv, OPXPRIV_ENVVAR},
 };
 
 // TODO: move this to some common util and make this usable outside tokio
@@ -112,13 +112,23 @@ pub(crate) async fn bootstrap(args: Cli) -> anyhow::Result<()> {
         .expect("cannot get RPC client from pool");
 
     // Get the keypair after deriving the wallet xpriv.
-    let operator_keys = resolve_xpriv(args.master_xpriv, args.master_xpriv_path)?;
+    let env_key = match env::var(OPXPRIV_ENVVAR) {
+        Ok(k) => Some(k),
+        Err(env::VarError::NotPresent) => None,
+        Err(env::VarError::NotUnicode(_)) => {
+            error!("operator master xpriv envvar not unicode, ignoring");
+            None
+        }
+    };
+
+    let operator_keys = resolve_xpriv(args.master_xpriv, args.master_xpriv_path, env_key)?;
     let wallet_xpriv = operator_keys.wallet_xpriv();
 
     let mut keypair = wallet_xpriv.to_keypair(SECP256K1);
     let mut sk = SecretKey::from_keypair(&keypair);
 
     // adjust for parity, which should always be even
+    // FIXME bake this into the key derivation fn!
     let (_, parity) = XOnlyPublicKey::from_keypair(&keypair);
     if matches!(parity, Parity::Odd) {
         sk = sk.negate();
