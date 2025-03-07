@@ -338,8 +338,6 @@ pub fn tracker_task<E: ExecEngineCtl>(
 
     handle_unprocessed_blocks(&mut fcm, &storage, engine.as_ref(), &status_channel)?;
 
-    status_channel.set_fcm_initialized();
-
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
         handle,
@@ -430,7 +428,9 @@ fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
             FcmEvent::NewFcmMsg(m) => {
                 process_fc_message(m, &mut fcm_state, engine, &status_channel)
             }
-            FcmEvent::NewStateUpdate(st) => handle_new_client_state(&mut fcm_state, st, engine),
+            FcmEvent::NewStateUpdate(st) => {
+                handle_new_client_state(&mut fcm_state, st, engine, &status_channel)
+            }
             FcmEvent::Abort => break,
         }?;
     }
@@ -502,6 +502,11 @@ fn process_fc_message(
             };
 
             let status = if ok {
+                // check if any pending blocks can be finalized
+                if let Err(err) = handle_epoch_finalization(fcm_state, engine) {
+                    error!(?err, "failed to finalize epoch");
+                }
+
                 // Update status.
                 let status = ChainSyncStatus {
                     tip: fcm_state.cur_best_block,
@@ -523,10 +528,6 @@ fn process_fc_message(
             };
 
             fcm_state.set_block_status(&blkid, status)?;
-            // check if any pending blocks can be finalized
-            if let Err(err) = handle_epoch_finalization(fcm_state, engine) {
-                error!(?err, "failed to finalize epoch");
-            }
         }
     }
 
@@ -934,6 +935,7 @@ fn handle_new_client_state(
     fcm_state: &mut ForkChoiceManager,
     cs: ClientState,
     engine: &impl ExecEngineCtl,
+    status_channel: &StatusChannel,
 ) -> anyhow::Result<()> {
     let Some(new_fin_epoch) = cs.get_declared_final_epoch().copied() else {
         debug!("got new CSM state, but finalized epoch still unset, ignoring");
@@ -946,18 +948,39 @@ fn handle_new_client_state(
     // Update the new state.
     fcm_state.cur_csm_state = Arc::new(cs);
 
-    match handle_epoch_finalization(fcm_state, engine) {
-        Err(err) => error!(?err, "failed to finalize epoch"),
+    let finalized_epoch_changed = match handle_epoch_finalization(fcm_state, engine) {
+        Err(err) => {
+            error!(?err, "failed to finalize epoch");
+            false
+        }
         Ok(Some(finalized_epoch)) if finalized_epoch == new_fin_epoch => {
             debug!(?finalized_epoch, "finalized latest epoch");
+            true
         }
         Ok(Some(finalized_epoch)) => {
             debug!(?finalized_epoch, "finalized earlier epoch");
+            true
         }
         Ok(None) => {
             // there were no epochs that could be finalized
             warn!("did not finalize epoch");
+            false
         }
+    };
+
+    if finalized_epoch_changed {
+        // Update status.
+        let status = ChainSyncStatus {
+            tip: fcm_state.cur_best_block,
+            prev_epoch: *fcm_state.get_chainstate_prev_epoch(),
+            finalized_epoch: *fcm_state.chain_tracker.finalized_epoch(),
+            // FIXME this is a bit convoluted, could this be simpler?
+            safe_l1: fcm_state.cur_chainstate.l1_view().get_safe_block(),
+        };
+
+        let update = ChainSyncStatusUpdate::new(status, fcm_state.cur_chainstate.clone());
+        trace!("publishing new chainstate");
+        status_channel.update_chain_sync_status(update);
     }
 
     Ok(())

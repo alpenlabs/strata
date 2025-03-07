@@ -102,24 +102,3 @@ impl ChainSyncStatusUpdate {
         self.new_status().cur_epoch()
     }
 }
-
-/// Status of different services
-/// Currently only fcm, others can be added as per need.
-#[derive(Clone)]
-pub struct ServiceInitStatus {
-    fcm: bool,
-}
-
-impl ServiceInitStatus {
-    pub fn new_uninitialized() -> Self {
-        Self { fcm: false }
-    }
-
-    pub fn is_fcm_initialized(&self) -> bool {
-        self.fcm
-    }
-
-    pub fn set_fcm_initialized(&mut self) {
-        self.fcm = true;
-    }
-}

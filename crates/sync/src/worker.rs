@@ -60,18 +60,6 @@ async fn wait_for_clientsate(sync_man: &SyncManager) -> Result<ClientState, L2Sy
 }
 
 async fn wait_for_chainstate(sync_man: &SyncManager) -> Result<Chainstate, L2SyncError> {
-    let mut service_init_rx = sync_man.status_channel().subscribe_service_init();
-
-    // wait for FCM to be initialized. Dont want to start syncing from network while FCM is syncing
-    // up from db.
-    if service_init_rx
-        .wait_for(|s| s.is_fcm_initialized())
-        .await
-        .is_err()
-    {
-        return Err(L2SyncError::ChannelClosed);
-    }
-
     let mut chainstatus_rx = sync_man.status_channel().subscribe_chain_sync();
 
     let chainstate = chainstatus_rx

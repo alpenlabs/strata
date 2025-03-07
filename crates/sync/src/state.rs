@@ -75,13 +75,8 @@ pub(crate) async fn initialize_from_db(
     let csm_finalized_epoch = match cstate.get_declared_final_epoch() {
         Some(epoch) => *epoch,
         None => {
-            let genesis_blockid = *storage
-                .l2()
-                .get_blocks_at_height_async(0)
-                .await?
-                .first()
-                .expect("genesis block should exist");
-            EpochCommitment::new(0, 0, genesis_blockid)
+            let sync_state = cstate.sync().expect("csm state should be init");
+            EpochCommitment::new(0, 0, *sync_state.genesis_blkid())
         }
     };
 
