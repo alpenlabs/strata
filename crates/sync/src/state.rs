@@ -1,8 +1,6 @@
 use strata_consensus_logic::unfinalized_tracker::UnfinalizedBlockTracker;
 use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment};
 use strata_state::{
-    chain_state::Chainstate,
-    client_state::ClientState,
     header::{L2Header, SignedL2BlockHeader},
     id::L2BlockId,
 };
@@ -66,27 +64,9 @@ impl L2SyncState {
 }
 
 pub(crate) async fn initialize_from_db(
-    cstate: &ClientState,
-    chainstate: &Chainstate,
+    finalized_epoch: EpochCommitment,
     storage: &NodeStorage,
 ) -> Result<L2SyncState, L2SyncError> {
-    let chainstate_last_epoch = chainstate.prev_epoch();
-
-    let csm_finalized_epoch = match cstate.get_declared_final_epoch() {
-        Some(epoch) => *epoch,
-        None => {
-            let sync_state = cstate.sync().expect("csm state should be init");
-            EpochCommitment::new(0, 0, *sync_state.genesis_blkid())
-        }
-    };
-
-    // pick whatever is the earliest
-    let finalized_epoch = if chainstate_last_epoch.epoch() < csm_finalized_epoch.epoch() {
-        *chainstate_last_epoch
-    } else {
-        csm_finalized_epoch
-    };
-
     debug!(?finalized_epoch, "loading unfinalized blocks");
 
     let l2man_tracker = storage.l2().clone();

@@ -7,9 +7,7 @@ use futures::StreamExt;
 use strata_common::{check_and_pause_debug_async, WorkerType};
 use strata_consensus_logic::{csm::message::ForkChoiceMessage, sync_manager::SyncManager};
 use strata_primitives::epoch::EpochCommitment;
-use strata_state::{
-    block::L2BlockBundle, chain_state::Chainstate, client_state::ClientState, header::L2Header,
-};
+use strata_state::{block::L2BlockBundle, header::L2Header};
 use strata_storage::NodeStorage;
 use tracing::*;
 
@@ -38,41 +36,26 @@ impl<T: SyncClient> L2SyncContext<T> {
 async fn wait_until_ready_and_init_sync_state<T: SyncClient>(
     context: &L2SyncContext<T>,
 ) -> Result<L2SyncState, L2SyncError> {
-    let (cstate_res, chainstate_res) = tokio::join!(
-        wait_for_clientsate(&context.sync_manager),
-        wait_for_chainstate(&context.sync_manager)
-    );
+    let finalized_epoch = wait_for_chainstate_finalized_epoch(&context.sync_manager).await?;
 
-    let cstate = cstate_res?;
-    let chainstate = chainstate_res?;
-
-    state::initialize_from_db(&cstate, &chainstate, context.storage.as_ref()).await
+    state::initialize_from_db(finalized_epoch, context.storage.as_ref()).await
 }
 
-async fn wait_for_clientsate(sync_man: &SyncManager) -> Result<ClientState, L2SyncError> {
-    let cstate = sync_man
-        .status_channel()
-        .wait_until_genesis()
-        .await
-        .map_err(|_| L2SyncError::ChannelClosed)?;
-
-    Ok(cstate)
-}
-
-async fn wait_for_chainstate(sync_man: &SyncManager) -> Result<Chainstate, L2SyncError> {
+async fn wait_for_chainstate_finalized_epoch(
+    sync_man: &SyncManager,
+) -> Result<EpochCommitment, L2SyncError> {
     let mut chainstatus_rx = sync_man.status_channel().subscribe_chain_sync();
 
-    let chainstate = chainstatus_rx
+    let finalized_epoch = chainstatus_rx
         .wait_for(Option::is_some)
         .await
         .map_err(|_| L2SyncError::ChannelClosed)?
         .as_ref()
         .expect("chainstate update should be present")
-        .new_tl_chainstate()
-        .as_ref()
-        .clone();
+        .new_status()
+        .finalized_epoch;
 
-    Ok(chainstate)
+    Ok(finalized_epoch)
 }
 
 pub async fn sync_worker<T: SyncClient>(context: &L2SyncContext<T>) -> Result<(), L2SyncError> {
