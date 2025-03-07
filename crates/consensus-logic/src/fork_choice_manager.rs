@@ -820,7 +820,8 @@ fn apply_blocks(
         debug!(%slot, %blkid, "processing block");
         process_block(&mut prestate_cache, header, body, &rparams)
             .map_err(|e| Error::InvalidStateTsn(blkid, e))?;
-        let (post_state, wb) = prestate_cache.finalize();
+        let wb = prestate_cache.finalize();
+        let post_state = wb.new_toplevel_state();
 
         let post_state_epoch = post_state.cur_epoch();
 
@@ -836,7 +837,7 @@ fn apply_blocks(
             handle_finish_epoch(&blkid, &bundle, prev_epoch_terminal, &post_state, fcm_state)?;
         }
 
-        cur_state = post_state;
+        cur_state = post_state.clone();
 
         // After each application we update the fork choice tip data in case we fail
         // to apply an update.
