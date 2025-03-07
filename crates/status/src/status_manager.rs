@@ -57,11 +57,13 @@ impl StatusChannel {
         let (cl_tx, cl_rx) = watch::channel(cl_state);
         let (l1_tx, l1_rx) = watch::channel(l1_status);
         let (chs_tx, chs_rx) = watch::channel(ch_state);
+        let (init_tx, _) = watch::channel(ServiceInitStatus::new_uninitialized());
 
         let sender = Arc::new(StatusSender {
             cl: cl_tx,
             l1: l1_tx,
             chs: chs_tx,
+            init_status: init_tx,
         });
         let receiver = Arc::new(StatusReceiver {
             cl: cl_rx,
@@ -170,7 +172,7 @@ impl StatusChannel {
 
     /// Waits until genesis and returns the client state where genesis was triggered.
     pub async fn wait_until_genesis(&self) -> Result<ClientState, RecvError> {
-        let mut rx = self.receiver.cl.clone();
+        let mut rx = self.subscribe_client_state();
         let state = rx.wait_for(|state| state.has_genesis_occurred()).await?;
         Ok(state.clone())
     }
@@ -200,6 +202,21 @@ impl StatusChannel {
             warn!("l1 status receiver dropped");
         }
     }
+
+    pub fn subscribe_service_init(&self) -> watch::Receiver<ServiceInitStatus> {
+        self.sender.init_status.subscribe()
+    }
+
+    pub fn set_fcm_initialized(&self) {
+        self.sender.init_status.send_if_modified(|value| {
+            if value.is_fcm_initialized() {
+                false
+            } else {
+                value.set_fcm_initialized();
+                true
+            }
+        });
+    }
 }
 
 /// Wrapper for watch status receivers
@@ -216,4 +233,5 @@ struct StatusSender {
     cl: watch::Sender<ClientState>,
     l1: watch::Sender<L1Status>,
     chs: watch::Sender<Option<ChainSyncStatusUpdate>>,
+    init_status: watch::Sender<ServiceInitStatus>,
 }

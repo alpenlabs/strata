@@ -338,6 +338,8 @@ pub fn tracker_task<E: ExecEngineCtl>(
 
     handle_unprocessed_blocks(&mut fcm, &storage, engine.as_ref(), &status_channel)?;
 
+    status_channel.set_fcm_initialized();
+
     if let Err(e) = forkchoice_manager_task_inner(
         &shutdown,
         handle,
