@@ -5,9 +5,7 @@ pub mod program;
 
 use program::ClStfOutput;
 use strata_chaintsn::transition::process_block;
-use strata_primitives::{
-    buf::Buf32, hash::compute_borsh_hash, l1::ProtocolOperation, params::RollupParams,
-};
+use strata_primitives::{hash::compute_borsh_hash, l1::ProtocolOperation, params::RollupParams};
 use strata_proofimpl_btc_blockspace::logic::BlockscanProofOutput;
 use strata_state::{
     block::{ExecSegment, L2Block},
@@ -124,12 +122,15 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
 
     // 11. Get the checkpoint that was posted to Bitcoin (if any) and check if we have used the
     //     right TxFilters and udpate it
-    // FIXME: The first epoch will not have any SignedCheckpoint on Bitcoin
     // TODO: this makes sense to be somewhere in the chainstate
-    let (initial_tx_filter_config_hash, final_tx_filter_config_hash) = if is_l1_segment_present {
+    let tx_filters_transition = if is_l1_segment_present {
         let mut tx_filters = tx_filters.expect("must have tx filters");
         let initial_tx_filters_hash = compute_borsh_hash(&tx_filters);
 
+        // Since the first epoch (0th epoch) doesn't have any ProtocolOp::Checkpoint, the tx filter
+        // rule will not change i.e. the final_tx_filters_hash = initial_tx_filters_hash
+        // In case of other epoch, the transaction filters will change based on the chainstate
+        // posted to Bitcoin
         let final_tx_filters_hash = if cur_epoch > 0 {
             let last_l1_block = l1_updates
                 .last()
@@ -161,19 +162,19 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
             initial_tx_filters_hash
         };
 
-        (initial_tx_filters_hash, final_tx_filters_hash)
+        Some((initial_tx_filters_hash, final_tx_filters_hash))
     } else {
-        (Buf32::zero(), Buf32::zero())
+        None
     };
 
     // 12. Get the final chainstate and construct the output
     let (final_chain_state, _) = state_cache.finalize();
+    let final_chainstate_root = final_chain_state.compute_state_root();
 
     let output = ClStfOutput {
         initial_chainstate_root,
-        final_chainstate_root: final_chain_state.compute_state_root(),
-        initial_tx_filter_config_hash,
-        final_tx_filter_config_hash,
+        final_chainstate_root,
+        tx_filters_transition,
     };
 
     zkvm.commit_borsh(&output);

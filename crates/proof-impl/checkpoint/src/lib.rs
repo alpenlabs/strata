@@ -15,12 +15,11 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
     let ClStfOutput {
         initial_chainstate_root,
         mut final_chainstate_root,
-        mut initial_tx_filter_config_hash,
-        mut final_tx_filter_config_hash,
+        mut tx_filters_transition,
     } = zkvm.read_verified_borsh(cl_stf_vk);
 
     // Starting with 1 since we have already read the first CL STF output
-    for i in 1..batches_count {
+    for _ in 1..batches_count {
         let cl_stf_output: ClStfOutput = zkvm.read_verified_borsh(cl_stf_vk);
 
         assert_eq!(
@@ -30,16 +29,14 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
 
         final_chainstate_root = cl_stf_output.final_chainstate_root;
 
-        // TxFilterConfig is updated in the terminal block of an epoch
-        if i == batches_count - 1 {
-            initial_tx_filter_config_hash = cl_stf_output.initial_tx_filter_config_hash;
-            final_tx_filter_config_hash = cl_stf_output.final_tx_filter_config_hash;
-        }
+        // If there was some update to TxFiltersConfig update it, else leave as is
+        tx_filters_transition = tx_filters_transition.or(cl_stf_output.tx_filters_transition);
     }
 
     let output = BatchTransition {
         chainstate_transition: (initial_chainstate_root, final_chainstate_root),
-        tx_filters_transition: (initial_tx_filter_config_hash, final_tx_filter_config_hash),
+        tx_filters_transition: tx_filters_transition
+            .expect("checkpoint must include a valid tx filters transition"),
     };
 
     zkvm.commit_borsh(&output);

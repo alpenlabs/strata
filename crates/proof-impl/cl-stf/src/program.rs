@@ -23,8 +23,7 @@ pub struct ClStfInput {
 pub struct ClStfOutput {
     pub initial_chainstate_root: Buf32,
     pub final_chainstate_root: Buf32,
-    pub initial_tx_filter_config_hash: Buf32,
-    pub final_tx_filter_config_hash: Buf32,
+    pub tx_filters_transition: Option<(Buf32, Buf32)>,
 }
 
 pub struct ClStfProgram;
