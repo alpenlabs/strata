@@ -21,7 +21,7 @@ use tracing::{info, warn};
 use zkaleido::ProofReceipt;
 
 use crate::{
-    operators::{cl_stf::ClStfRange, ProofOperator, ProvingOp},
+    operators::{ProofOperator, ProvingOp},
     status::ProvingTaskStatus,
     task_tracker::TaskTracker,
 };
@@ -114,16 +114,9 @@ impl StrataProverClientApiServer for ProverClientRpc {
         &self,
         cl_block_range: (L2BlockCommitment, L2BlockCommitment),
     ) -> RpcResult<Vec<ProofKey>> {
-        let cl_client = &self.operator.cl_stf_operator().cl_client;
-        let btc_client = &self.operator.btc_operator().btc_client;
-        let l1_range = derive_l1_range(cl_client, btc_client, cl_block_range).await;
-        let cl_params = ClStfRange {
-            l2_range: cl_block_range,
-            l1_range,
-        };
         self.operator
             .cl_stf_operator()
-            .create_task(cl_params, self.task_tracker.clone(), &self.db)
+            .create_task(cl_block_range, self.task_tracker.clone(), &self.db)
             .await
             .map_err(to_jsonrpsee_error("failed to create task for cl block"))
     }
@@ -213,34 +206,43 @@ impl StrataProverClientApiServer for ProverClientRpc {
     }
 }
 
-async fn derive_l1_range(
+pub async fn derive_l1_range(
     cl_client: &HttpClient,
     btc_client: &BitcoinClient,
     l2_range: (L2BlockCommitment, L2BlockCommitment),
-) -> Option<(L1BlockCommitment, L1BlockCommitment)> {
+) -> RpcResult<Option<(L1BlockCommitment, L1BlockCommitment)>> {
     // sanity check
     assert!(l2_range.1.slot() >= l2_range.0.slot(), "");
 
     let start_block_hash = *l2_range.0.blkid();
     let mut current_block_hash = *l2_range.1.blkid();
     loop {
-        let l2_block = cl_client
+        let l2_block = match cl_client
             .get_block_by_id(current_block_hash)
             .await
-            .expect("cannot find L2 block")
-            .expect("cannot find L2 block");
+            .map_err(to_jsonrpsee_error("failed to fetch l2 block"))?
+        {
+            Some(block) => block,
+            None => return Ok(None),
+        };
 
         let new_l1_manifests = l2_block.l1_segment().new_manifests();
         if !new_l1_manifests.is_empty() {
             let blkid = *new_l1_manifests.first().unwrap().blkid();
-            let height = btc_client.get_block_height(&blkid.into()).await.unwrap();
+            let height = btc_client
+                .get_block_height(&blkid.into())
+                .await
+                .map_err(to_jsonrpsee_error("failed to fetch l1 block"))?;
             let first_commitment = L1BlockCommitment::new(height, blkid);
 
             let blkid = *new_l1_manifests.last().unwrap().blkid();
-            let height = btc_client.get_block_height(&blkid.into()).await.unwrap();
+            let height = btc_client
+                .get_block_height(&blkid.into())
+                .await
+                .map_err(to_jsonrpsee_error("failed to fetch l1 block"))?;
             let last_commitment = L1BlockCommitment::new(height, blkid);
 
-            return Some((first_commitment, last_commitment));
+            return Ok(Some((first_commitment, last_commitment)));
         }
 
         let prev_l2_blkid = *l2_block.header().parent();
@@ -251,5 +253,6 @@ async fn derive_l1_range(
             current_block_hash = prev_l2_blkid;
         }
     }
-    None
+
+    Ok(None)
 }
