@@ -46,14 +46,19 @@ pub const BIP44_HD_WALLET_IDX: u32 = 44;
 /// BIP44 coin type index to indicate Testnet.
 ///
 /// These should be _hardened_ [`ChildNumber`].
-pub const BIP44_TESTNET_IDX: u32 = 1;
+pub const BIP44_ETHEREUM_MAINNET_IDX: u32 = 60;
 
 /// BIP44 account index for user wallets.
 ///
 /// These should be _hardened_ [`ChildNumber`].
-pub const BIP44_USER_WALLET_IDX: u32 = 0;
+pub const BIP44_USER_ACCOUNT_IDX: u32 = 0;
 
 /// BIP44 change index for receiving (external) addresses.
 ///
-/// These should be _hardened_ [`ChildNumber`].
+/// These should be a normal [`ChildNumber`].
 pub const BIP44_RECEIVING_ADDRESS_IDX: u32 = 0;
+
+/// BIP44 address index.
+///
+/// These should be a normal [`ChildNumber`].
+pub const BIP44_ADDRESS_IDX: u32 = 0;

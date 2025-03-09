@@ -21,8 +21,8 @@ use terrors::OneOf;
 use zeroize::Zeroizing;
 
 use crate::constants::{
-    AES_NONCE_LEN, AES_TAG_LEN, BIP44_HD_WALLET_IDX, BIP44_RECEIVING_ADDRESS_IDX,
-    BIP44_TESTNET_IDX, BIP44_USER_WALLET_IDX, PW_SALT_LEN, SEED_LEN,
+    AES_NONCE_LEN, AES_TAG_LEN, BIP44_ADDRESS_IDX, BIP44_ETHEREUM_MAINNET_IDX, BIP44_HD_WALLET_IDX,
+    BIP44_RECEIVING_ADDRESS_IDX, BIP44_USER_ACCOUNT_IDX, PW_SALT_LEN, SEED_LEN,
 };
 
 pub struct BaseWallet(LoadParams, CreateParams);
@@ -98,19 +98,20 @@ impl Seed {
         )
     }
 
-    pub fn strata_wallet(&self) -> EthereumWallet {
+    pub fn get_strata_wallet(&self) -> EthereumWallet {
         // Strata CLI [`DerivationPath`] for Strata EVM wallet address.
         //
-        // This corresponds to the path: `m/44'/1'/0'/0/<index>`.
+        // This corresponds to the path: `m/44'/60'/0'/0/0`.
         let derivation_path = DerivationPath::master().extend([
             ChildNumber::from_hardened_idx(BIP44_HD_WALLET_IDX)
                 .expect("valid hardened child number"),
-            ChildNumber::from_hardened_idx(BIP44_TESTNET_IDX).expect("valid hardened child number"),
-            ChildNumber::from_hardened_idx(BIP44_USER_WALLET_IDX)
+            ChildNumber::from_hardened_idx(BIP44_ETHEREUM_MAINNET_IDX)
+                .expect("valid hardened child number"),
+            ChildNumber::from_hardened_idx(BIP44_USER_ACCOUNT_IDX)
                 .expect("valid hardened child number"),
             ChildNumber::from_normal_idx(BIP44_RECEIVING_ADDRESS_IDX)
                 .expect("valid normal child number"),
-            ChildNumber::from_str("*").expect("valid normal child number"),
+            ChildNumber::from_normal_idx(BIP44_ADDRESS_IDX).expect("valid normal child number"),
         ]);
 
         // Create the master key from the existing seed
