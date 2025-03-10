@@ -18,7 +18,11 @@ use strata_state::{block::L2Block, chain_state::Chainstate, header::L2Header, id
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{btc::BtcBlockspaceOperator, evm_ee::EvmEeOperator, ProvingOp};
+use super::{
+    btc::{BtcBlockscanParams, BtcBlockspaceOperator},
+    evm_ee::EvmEeOperator,
+    ProvingOp,
+};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] trait for Consensus Layer (CL) State Transition
@@ -235,9 +239,13 @@ impl ProvingOp for ClStfOperator {
             .await?;
 
         if let Some(l1_range) = l1_range {
+            let btc_params = BtcBlockscanParams {
+                epoch,
+                range: l1_range,
+            };
             let btc_tasks = self
                 .btc_blockspace_operator
-                .create_task((epoch, l1_range.0, l1_range.1), task_tracker, db)
+                .create_task(btc_params, task_tracker, db)
                 .await?;
             tasks.extend(btc_tasks);
         }

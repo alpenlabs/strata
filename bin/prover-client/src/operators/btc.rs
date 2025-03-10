@@ -83,16 +83,22 @@ impl BtcBlockspaceOperator {
     }
 }
 
+pub struct BtcBlockscanParams {
+    pub range: (L1BlockCommitment, L1BlockCommitment),
+    pub epoch: Epoch,
+}
+
 impl ProvingOp for BtcBlockspaceOperator {
     type Program = BtcBlockspaceProgram;
 
-    type Params = (Epoch, L1BlockCommitment, L1BlockCommitment);
+    type Params = BtcBlockscanParams;
 
     fn construct_proof_ctx(
         &self,
-        btc_range: &Self::Params,
+        btc_params: &Self::Params,
     ) -> Result<ProofContext, ProvingTaskError> {
-        let (epoch, start, end) = btc_range;
+        let BtcBlockscanParams { epoch, range } = btc_params;
+        let (start, end) = range;
         // Do some sanity checks
         assert!(
             end.height() >= start.height(),

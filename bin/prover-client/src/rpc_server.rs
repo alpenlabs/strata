@@ -8,7 +8,7 @@ use jsonrpsee::{core::RpcResult, http_client::HttpClient, RpcModule};
 use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
 use strata_db::traits::ProofDatabase;
 use strata_primitives::{
-    evm_exec::EvmEeBlockCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment,
+    evm_exec::EvmEeBlockCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment, proof::Epoch,
 };
 use strata_prover_client_rpc_api::StrataProverClientApiServer;
 use strata_rocksdb::prover::db::ProofDb;
@@ -21,7 +21,7 @@ use tracing::{info, warn};
 use zkaleido::ProofReceipt;
 
 use crate::{
-    operators::{cl_stf::ClStfParams, ProofOperator, ProvingOp},
+    operators::{btc::BtcBlockscanParams, cl_stf::ClStfParams, ProofOperator, ProvingOp},
     status::ProvingTaskStatus,
     task_tracker::TaskTracker,
 };
@@ -93,13 +93,13 @@ impl StrataProverClientApiServer for ProverClientRpc {
         btc_range: (L1BlockCommitment, L1BlockCommitment),
         epoch: u64,
     ) -> RpcResult<Vec<ProofKey>> {
+        let btc_params = BtcBlockscanParams {
+            range: btc_range,
+            epoch,
+        };
         self.operator
             .btc_operator()
-            .create_task(
-                (epoch, btc_range.0, btc_range.1),
-                self.task_tracker.clone(),
-                &self.db,
-            )
+            .create_task(btc_params, self.task_tracker.clone(), &self.db)
             .await
             .map_err(to_jsonrpsee_error("failed to create task for btc block"))
     }
@@ -121,9 +121,11 @@ impl StrataProverClientApiServer for ProverClientRpc {
     ) -> RpcResult<Vec<ProofKey>> {
         let cl_client = &self.operator.cl_stf_operator().cl_client;
         let btc_client = &self.operator.btc_operator().btc_client;
+
         let l1_range = derive_l1_range(cl_client, btc_client, cl_block_range).await;
+        let epoch = fetch_epoch(cl_client, cl_block_range.0).await;
         let cl_params = ClStfParams {
-            epoch: 0, // FIXME: fix this
+            epoch,
             l2_range: cl_block_range,
             l1_range,
         };
@@ -227,8 +229,7 @@ impl StrataProverClientApiServer for ProverClientRpc {
 ///
 /// - If none of the blocks within the given range are CL terminal blocks, the function returns
 ///   `None`.
-/// - Returns an error instead of panicking if fetching a block or its height fails.
-/// - Also returns an error if the traversal exceeds the allowed depth limit.
+/// - Panics if fetching a block or its height fails
 async fn derive_l1_range(
     cl_client: &HttpClient,
     btc_client: &BitcoinClient,
@@ -269,4 +270,13 @@ async fn derive_l1_range(
         }
     }
     None
+}
+
+async fn fetch_epoch(cl_client: &HttpClient, l2_block: L2BlockCommitment) -> Epoch {
+    cl_client
+        .get_chainstate_at_idx(l2_block.slot())
+        .await
+        .expect("expect a chainstate")
+        .expect("expect a chainstate")
+        .cur_epoch
 }
