@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use alloy::consensus::constants::ETH_TO_WEI;
+#[allow(unused_imports)]
 use bdk_wallet::bitcoin::{
     bip32::{ChildNumber, DerivationPath},
     Amount, Network,
