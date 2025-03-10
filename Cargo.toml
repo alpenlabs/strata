@@ -143,6 +143,10 @@ reth-errors = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" 
 reth-ethereum = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-ethereum-forks = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-ethereum-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
+reth-ethereum-primitives = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0", default-features = false, features = [
+  "std",
+  "serde-bincode-compat",
+] }
 reth-evm = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }

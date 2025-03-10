@@ -13376,6 +13376,7 @@ dependencies = [
  "bincode",
  "hex-literal",
  "k256",
+ "reth-ethereum-primitives",
  "reth-primitives",
  "reth-primitives-traits",
  "revm",

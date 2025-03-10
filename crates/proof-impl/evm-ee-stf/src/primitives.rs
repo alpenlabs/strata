@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use alloy_consensus::{serde_bincode_compat as serde_bincode_compat_header, Header};
 use alloy_eips::eip4895::Withdrawal;
-use reth_primitives::{
-    transaction::serde_bincode_compat as serde_bincode_compat_tx, TransactionSigned,
-};
+use reth_ethereum_primitives::{serde_bincode_compat, TransactionSigned};
 use revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -75,7 +73,7 @@ pub struct EvmBlockStfInput {
     pub ancestor_headers: Vec<Header>,
 
     /// A list of transactions to process.
-    #[serde_as(as = "Vec<serde_bincode_compat_tx::TransactionSigned>")]
+    #[serde_as(as = "Vec<serde_bincode_compat::TransactionSigned>")]
     pub transactions: Vec<TransactionSigned>,
 
     /// A list of withdrawals to process.

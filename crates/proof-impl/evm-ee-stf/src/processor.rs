@@ -27,7 +27,8 @@ use alloy_rlp::BufMut;
 use alloy_rpc_types_eth::TransactionTrait;
 use alloy_trie::root::ordered_trie_root_with_encoder;
 use anyhow::anyhow;
-use reth_primitives::{Header, Receipt, Transaction, TransactionSigned};
+use reth_ethereum_primitives::{Receipt, Transaction, TransactionSigned};
+use reth_primitives::Header;
 use reth_primitives_traits::{constants::MINIMUM_GAS_LIMIT, SignedTransaction};
 use revm::{
     db::{AccountState, InMemoryDB},
@@ -262,7 +263,7 @@ where
             .into_iter()
             .collect::<Vec<TransactionSigned>>();
         h.transactions_root = ordered_trie_root_with_encoder(&txs_signed, |tx, buf| {
-            tx.eip2718_encode(&tx.signature(), buf);
+            tx.encode_2718(buf);
         });
         h.receipts_root = ordered_trie_root_with_encoder(&receipts, |receipt, buf| {
             receipt.with_bloom_ref().encode_2718(buf);
