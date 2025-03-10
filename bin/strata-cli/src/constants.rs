@@ -1,7 +1,10 @@
 use std::time::Duration;
 
 use alloy::consensus::constants::ETH_TO_WEI;
-use bdk_wallet::bitcoin::{bip32::ChildNumber, Amount, Network};
+use bdk_wallet::bitcoin::{
+    bip32::{ChildNumber, DerivationPath},
+    Amount, Network,
+};
 
 /// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
 pub const RECOVER_DELAY: u32 = 1008;
