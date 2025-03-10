@@ -286,9 +286,9 @@ fn create_checkpoint_prep_data_from_summary(
     let mut tx_filters = TxFilterConfig::derive_from(params)
         .expect("tx filter derivation from rollup params should not fail");
 
-    // In the first and second (epoch 0 and epoch 1), there's no changes to the TxFilterConfig
-    // It is only at the end of epoch 1, that the TxFilterConfig will be changed starting on epoch 2
-    let tx_filters_transition = if epoch < 2 {
+    // In the first (epoch 0), there's no changes to the TxFilterConfig
+    // It is only at the end of epoch 1, that the TxFilterConfig will be changed
+    let tx_filters_transition = if epoch < 1 {
         let tx_filters_hash = compute_borsh_hash(&tx_filters);
         TxFilterConfigTransition {
             pre_config_hash: tx_filters_hash,
@@ -312,12 +312,17 @@ fn create_checkpoint_prep_data_from_summary(
             "Chain state must continue from the last epoch"
         );
 
+        // The TxFilterConfig for this epoch must be based on the TxFilterConfig derived at the end
+        // of previous epoch
         let initial_tx_filters_config_hash = prev_checkpoint
             .checkpoint
             .batch_transition()
             .tx_filters_transition
             .post_config_hash;
 
+        // The TxFilterConfig for the next epoch is derived at the end of this epoch. This is based
+        // on the Chainstate that was posted on previous epoch, and included in L1Segment in this
+        // epoch.
         let prev_chainstate: Chainstate =
             borsh::from_slice(prev_checkpoint.checkpoint.sidecar().chainstate())
                 .expect("valid chainstate must be posted");
