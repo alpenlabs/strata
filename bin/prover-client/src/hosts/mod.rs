@@ -1,6 +1,6 @@
 use strata_primitives::proof::ProofZkVm;
 use strata_rpc_types::ProofKey;
-use zkaleido::{VerificationKey, ZkVmHost};
+use zkaleido::{VerifyingKey, ZkVmVerifier};
 
 pub mod native;
 #[cfg(feature = "risc0")]
@@ -8,7 +8,7 @@ pub mod risc0;
 #[cfg(feature = "sp1")]
 pub mod sp1;
 
-/// Retrieves the [`VerificationKey`] for the specified proof key.
+/// Retrieves the [`VerifyingKey`] for the specified proof key.
 ///
 /// This function determines the appropriate ZkVm host based on the provided [`ProofKey`]
 /// and retrieves the corresponding verification key.
@@ -18,12 +18,12 @@ pub mod sp1;
 /// * If the `sp1` feature is not enabled and an SP1 host is requested.
 /// * If the `risc0` feature is not enabled and a Risc0 host is requested.
 /// * If the host type is unsupported or not recognized.
-pub fn get_verification_key(key: &ProofKey) -> VerificationKey {
+pub fn get_verification_key(key: &ProofKey) -> VerifyingKey {
     match key.host() {
         ProofZkVm::SP1 => {
             #[cfg(feature = "sp1")]
             {
-                sp1::get_host(key.context()).get_verification_key()
+                sp1::get_host(key.context()).vk()
             }
             #[cfg(not(feature = "sp1"))]
             {
@@ -33,24 +33,25 @@ pub fn get_verification_key(key: &ProofKey) -> VerificationKey {
         ProofZkVm::Risc0 => {
             #[cfg(feature = "risc0")]
             {
-                risc0::get_host(key.context()).get_verification_key()
+                risc0::get_host(key.context()).vk()
             }
             #[cfg(not(feature = "risc0"))]
             {
                 panic!("The `risc0` feature is not enabled. Enable the feature to use Risc0 functionality.");
             }
         }
-        ProofZkVm::Native => native::get_host(key.context()).get_verification_key(),
+        ProofZkVm::Native => native::get_host(key.context()).vk(),
         _ => panic!("Unsupported ZkVm"),
     }
 }
 
 /// Represents a host instance for a ZKVM, wrapping different host implementations that adhere to
-/// the [`ZkVmHost`] trait.
+/// the [`ZkVmHost`](zkaleido::ZkVmHost) trait.
 ///
 /// This enum provides a type-safe abstraction over various host implementations, such as native,
-/// SP1, and Risc0, which each implement the [`ZkVmHost`] trait. The [`ZkVmHost`] trait is not
-/// object-safe, so this enum is used to encapsulate the different implementations.
+/// SP1, and Risc0, which each implement the [`ZkVmHost`](zkaleido::ZkVmHost) trait. The
+/// [`ZkVmHost`](zkaleido::ZkVmHost) trait is not object-safe, so this enum is used to encapsulate
+/// the different implementations.
 pub enum ZkVmHostInstance {
     /// Represents the native ZKVM host implementation.
     ///
@@ -60,20 +61,20 @@ pub enum ZkVmHostInstance {
 
     /// Represents the SP1 ZKVM host implementation.
     ///
-    /// This variant uses the [`zkaleido_sp1_adapter::SP1Host`] implementation and is only
+    /// This variant uses the [`zkaleido_sp1_host::SP1Host`] implementation and is only
     /// available when the `sp1` feature flag is enabled. Attempting to use this variant
     /// without enabling the `sp1` feature will result in a compile-time error or a runtime panic.
     #[cfg(feature = "sp1")]
-    SP1(&'static zkaleido_sp1_adapter::SP1Host),
+    SP1(&'static zkaleido_sp1_host::SP1Host),
 
     /// Represents the Risc0 ZKVM host implementation.
     ///
-    /// This variant uses the [`zkaleido_risc0_adapter::Risc0Host`] implementation and is only
+    /// This variant uses the [`zkaleido_risc0_host::Risc0Host`] implementation and is only
     /// available when the `risc0` feature flag is enabled. Attempting to use this variant
     /// without enabling the `risc0` feature will result in a compile-time error or a runtime
     /// panic.
     #[cfg(feature = "risc0")]
-    Risc0(&'static zkaleido_risc0_adapter::Risc0Host),
+    Risc0(&'static zkaleido_risc0_host::Risc0Host),
 }
 
 /// Resolves the appropriate ZKVM host instance based on the provided [`ProofKey`].

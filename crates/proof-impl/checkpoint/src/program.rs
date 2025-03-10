@@ -1,17 +1,22 @@
+use std::sync::Arc;
+
 use strata_primitives::buf::Buf32;
 use zkaleido::{
-    AggregationInput, ProofReceipt, PublicValues, VerificationKey, ZkVmInputResult, ZkVmProver,
-    ZkVmResult,
+    AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
+    ZkVmProgramPerf, ZkVmResult,
 };
+use zkaleido_native_adapter::{NativeHost, NativeMachine};
+
+use crate::process_checkpoint_proof_outer;
 
 pub struct CheckpointProverInput {
     pub cl_stf_proofs: Vec<ProofReceipt>,
-    pub cl_stf_vk: VerificationKey,
+    pub cl_stf_vk: VerifyingKey,
 }
 
-pub struct CheckpointProver;
+pub struct CheckpointProgram;
 
-impl ZkVmProver for CheckpointProver {
+impl ZkVmProgram for CheckpointProgram {
     type Input = CheckpointProverInput;
     type Output = (Buf32, Buf32);
 
@@ -45,5 +50,28 @@ impl ZkVmProver for CheckpointProver {
         H: zkaleido::ZkVmHost,
     {
         H::extract_borsh_public_output(public_values)
+    }
+}
+
+impl ZkVmProgramPerf for CheckpointProgram {}
+
+impl CheckpointProgram {
+    pub fn native_host() -> NativeHost {
+        const MOCK_VK: [u32; 8] = [0u32; 8];
+        NativeHost {
+            process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
+                process_checkpoint_proof_outer(zkvm, &MOCK_VK);
+                Ok(())
+            })),
+        }
+    }
+
+    // Add this new convenience method
+    pub fn execute(
+        input: &<Self as ZkVmProgram>::Input,
+    ) -> ZkVmResult<<Self as ZkVmProgram>::Output> {
+        // Get the native host and delegate to the trait's execute method
+        let host = Self::native_host();
+        <Self as ZkVmProgram>::execute(input, &host)
     }
 }

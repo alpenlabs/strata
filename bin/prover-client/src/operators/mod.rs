@@ -22,7 +22,7 @@ use strata_primitives::proof::{ProofContext, ProofKey};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument};
-use zkaleido::{ZkVmHost, ZkVmProver};
+use zkaleido::{ZkVmHost, ZkVmProgram};
 
 use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
@@ -40,8 +40,8 @@ pub use operator::ProofOperator;
 /// creating tasks, fetching inputs for the prover, and executing the proof computation using
 /// supported ZKVMs.
 pub trait ProvingOp {
-    /// The prover type associated with this operation, implementing the [`ZkVmProver`] trait.
-    type Prover: ZkVmProver;
+    /// The program type associated with this operation, implementing the [`ZkVmProgram`] trait.
+    type Program: ZkVmProgram;
 
     /// Parameters required for this operation.
     ///
@@ -137,7 +137,7 @@ pub trait ProvingOp {
         &self,
         task_id: &ProofKey,
         db: &ProofDb,
-    ) -> Result<<Self::Prover as ZkVmProver>::Input, ProvingTaskError>;
+    ) -> Result<<Self::Program as ZkVmProgram>::Input, ProvingTaskError>;
 
     /// Executes the proof computation for the specified task.
     ///
@@ -163,7 +163,7 @@ pub trait ProvingOp {
             .await
             .inspect_err(|e| error!(?e, "Failed to fetch input"))?;
 
-        let proof_res = <Self::Prover as ZkVmProver>::prove(&input, host);
+        let proof_res = <Self::Program as ZkVmProgram>::prove(&input, host);
 
         match &proof_res {
             Ok(_) => {
@@ -191,15 +191,15 @@ mod tests {
     use strata_rocksdb::{prover::db::ProofDb, test_utils::get_rocksdb_tmp_instance_for_prover};
     use strata_rpc_types::ProofKey;
     use tokio::sync::Mutex;
-    use zkaleido::ZkVmProver;
+    use zkaleido::ZkVmProgram;
 
     use super::ProvingOp;
     use crate::{errors::ProvingTaskError, status::ProvingTaskStatus, task_tracker::TaskTracker};
 
     // Test stub of zkaleido::ZkVmProver.
-    struct TestProver;
+    struct TestProgram;
 
-    impl ZkVmProver for TestProver {
+    impl ZkVmProgram for TestProgram {
         type Input = u64;
 
         type Output = String;
@@ -235,7 +235,7 @@ mod tests {
     struct GrandparentOps;
 
     impl ProvingOp for GrandparentOps {
-        type Prover = TestProver;
+        type Program = TestProgram;
 
         type Params = u64;
 
@@ -251,7 +251,7 @@ mod tests {
             &self,
             _task_id: &strata_rpc_types::ProofKey,
             _db: &strata_rocksdb::prover::db::ProofDb,
-        ) -> Result<<Self::Prover as zkaleido::ZkVmProver>::Input, crate::errors::ProvingTaskError>
+        ) -> Result<<Self::Program as zkaleido::ZkVmProgram>::Input, crate::errors::ProvingTaskError>
         {
             todo!()
         }
@@ -273,7 +273,7 @@ mod tests {
     struct ParentOps;
 
     impl ProvingOp for ParentOps {
-        type Prover = TestProver;
+        type Program = TestProgram;
 
         type Params = u64;
 
@@ -294,7 +294,7 @@ mod tests {
             &self,
             _task_id: &strata_rpc_types::ProofKey,
             _db: &strata_rocksdb::prover::db::ProofDb,
-        ) -> Result<<Self::Prover as zkaleido::ZkVmProver>::Input, crate::errors::ProvingTaskError>
+        ) -> Result<<Self::Program as zkaleido::ZkVmProgram>::Input, crate::errors::ProvingTaskError>
         {
             todo!()
         }
@@ -316,7 +316,7 @@ mod tests {
     struct ChildOps;
 
     impl ProvingOp for ChildOps {
-        type Prover = TestProver;
+        type Program = TestProgram;
 
         type Params = u64;
 
@@ -335,7 +335,7 @@ mod tests {
             &self,
             _task_id: &strata_rpc_types::ProofKey,
             _db: &strata_rocksdb::prover::db::ProofDb,
-        ) -> Result<<Self::Prover as zkaleido::ZkVmProver>::Input, crate::errors::ProvingTaskError>
+        ) -> Result<<Self::Program as zkaleido::ZkVmProgram>::Input, crate::errors::ProvingTaskError>
         {
             todo!()
         }

@@ -4,8 +4,8 @@ use strata_primitives::{buf::Buf32, params::*, proof::RollupVerifyingKey};
 use strata_state::{batch::*, client_state::L1Checkpoint};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
-use zkaleido_risc0_adapter;
-use zkaleido_sp1_adapter;
+use zkaleido_risc0_groth16_verifier;
+use zkaleido_sp1_groth16_verifier;
 
 use crate::errors::CheckpointError;
 
@@ -22,10 +22,10 @@ impl VerifyingKeyExt for RollupVerifyingKey {
         // checkpoint
         match self {
             RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-                zkaleido_risc0_adapter::verify_groth16(proof_receipt, vk.as_ref())
+                zkaleido_risc0_groth16_verifier::verify_groth16(proof_receipt, vk.as_ref())
             }
             RollupVerifyingKey::SP1VerifyingKey(vk) => {
-                zkaleido_sp1_adapter::verify_groth16(proof_receipt, vk.as_ref())
+                zkaleido_sp1_groth16_verifier::verify_groth16(proof_receipt, vk.as_ref())
             }
             // In Native Execution mode, we do not actually generate the proof to verify. Checking
             // public parameters is sufficient.

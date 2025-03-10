@@ -90,11 +90,11 @@ mod tests {
     use std::sync::Arc;
 
     use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
-    use zkaleido::ZkVmProver;
+    use zkaleido::ZkVmProgram;
     use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
     use super::*;
-    use crate::prover::BtcBlockspaceProver;
+    use crate::program::BtcBlockspaceProgram;
 
     fn get_native_host() -> NativeHost {
         NativeHost {
@@ -119,7 +119,7 @@ mod tests {
             btc_blocks,
             tx_filters,
         };
-        BtcBlockspaceProver::prove(&input, &get_native_host()).unwrap();
+        BtcBlockspaceProgram::prove(&input, &get_native_host()).unwrap();
     }
 
     #[test]
@@ -132,7 +132,7 @@ mod tests {
             btc_blocks: vec![],
             tx_filters,
         };
-        BtcBlockspaceProver::prove(&input, &get_native_host()).unwrap();
+        BtcBlockspaceProgram::prove(&input, &get_native_host()).unwrap();
     }
 
     #[test]
@@ -146,6 +146,6 @@ mod tests {
             btc_blocks,
             tx_filters,
         };
-        BtcBlockspaceProver::prove(&input, &get_native_host()).unwrap();
+        BtcBlockspaceProgram::prove(&input, &get_native_host()).unwrap();
     }
 }

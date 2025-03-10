@@ -5,10 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 risc0-zkvm = "1.2.3"
-zkaleido-risc0-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc2", features = [
-  "prover",
-], optional = true }
-
+zkaleido-risc0-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5" }
 
 [dev-dependencies]
 bincode.workspace = true
@@ -38,7 +35,3 @@ methods = [
   "guest-l1-batch",
   "guest-checkpoint",
 ]
-
-[features]
-default = ["prover"]
-prover = ["dep:zkaleido-risc0-adapter"]

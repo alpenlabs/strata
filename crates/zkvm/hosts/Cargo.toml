@@ -6,11 +6,11 @@ version = "0.1.0"
 [dependencies]
 # sp1
 strata-sp1-guest-builder = { path = "../../../provers/sp1", optional = true }
-zkaleido-sp1-adapter = { workspace = true, optional = true }
+zkaleido-sp1-host = { workspace = true, optional = true }
 
 # risc0
 strata-risc0-guest-builder = { path = "../../../provers/risc0", optional = true }
-zkaleido-risc0-adapter = { workspace = true, optional = true }
+zkaleido-risc0-host = { workspace = true, optional = true }
 
 # native
 zkaleido-native-adapter = { workspace = true, optional = true }
@@ -30,5 +30,5 @@ thiserror.workspace = true
 [features]
 default = []
 native = ["zkaleido-native-adapter"]
-risc0 = ["zkaleido-risc0-adapter/prover", "strata-risc0-guest-builder/prover"]
-sp1 = ["zkaleido-sp1-adapter/prover", "strata-sp1-guest-builder/prover"]
+risc0 = ["zkaleido-risc0-host", "strata-risc0-guest-builder/prover"]
+sp1 = ["zkaleido-sp1-host", "strata-sp1-guest-builder/prover"]

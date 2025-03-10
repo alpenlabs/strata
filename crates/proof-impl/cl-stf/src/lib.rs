@@ -1,9 +1,9 @@
 //! This crate implements the proof of the chain state transition function (STF) for L2 blocks,
 //! verifying the correct state transitions as new L2 blocks are processed.
 
-pub mod prover;
+pub mod program;
 
-use prover::ClStfOutput;
+use program::ClStfOutput;
 use strata_chaintsn::transition::process_block;
 use strata_primitives::{l1::ProtocolOperation, params::RollupParams};
 use strata_proofimpl_btc_blockspace::logic::BlockscanProofOutput;
