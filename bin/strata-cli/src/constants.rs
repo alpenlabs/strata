@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use alloy::consensus::constants::ETH_TO_WEI;
-use bdk_wallet::bitcoin::{Amount, Network};
+use bdk_wallet::bitcoin::{bip32::ChildNumber, Amount, Network};
 
 /// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
 pub const RECOVER_DELAY: u32 = 1008;
@@ -38,27 +38,18 @@ pub const SIGNET_BLOCK_TIME: Duration = Duration::from_secs(30);
 pub const BRIDGE_MUSIG2_PUBKEY: &str =
     "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
 
-/// BIP44 purpose index for HD wallets.
+/// Strata CLI [`DerivationPath`] for Strata EVM wallet
 ///
-/// These should be _hardened_ [`ChildNumber`].
-pub const BIP44_HD_WALLET_IDX: u32 = 44;
-
-/// BIP44 coin type index to indicate Testnet.
-///
-/// These should be _hardened_ [`ChildNumber`].
-pub const BIP44_ETHEREUM_MAINNET_IDX: u32 = 60;
-
-/// BIP44 account index for user wallets.
-///
-/// These should be _hardened_ [`ChildNumber`].
-pub const BIP44_USER_ACCOUNT_IDX: u32 = 0;
-
-/// BIP44 change index for receiving (external) addresses.
-///
-/// These should be a normal [`ChildNumber`].
-pub const BIP44_RECEIVING_ADDRESS_IDX: u32 = 0;
-
-/// BIP44 address index.
-///
-/// These should be a normal [`ChildNumber`].
-pub const BIP44_ADDRESS_IDX: u32 = 0;
+/// This corresponds to the path: `m/44'/60'/0'/0/0`.
+pub const BIP44_STRATA_EVM_WALLET_PATH: &[ChildNumber] = &[
+    // Purpose index for HD wallets based on BIP44.
+    ChildNumber::Hardened { index: 44 },
+    // Coin type index for Ethereum mainnet
+    ChildNumber::Hardened { index: 60 },
+    // account index for user wallets.
+    ChildNumber::Hardened { index: 0 },
+    // Change index for receiving (external) addresses.
+    ChildNumber::Normal { index: 0 },
+    // Address index.
+    ChildNumber::Normal { index: 0 },
+];
