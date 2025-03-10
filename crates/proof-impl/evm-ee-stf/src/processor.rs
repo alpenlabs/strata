@@ -288,7 +288,7 @@ impl EvmProcessor<InMemoryDB> {
                 continue;
             }
 
-            // Ignore strata statless precompiles
+            // Ignore strata stateless precompiles
             if address == &BRIDGEOUT_ADDRESS || address == &SCHNORR_ADDRESS {
                 continue;
             }
