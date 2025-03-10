@@ -18,6 +18,7 @@ pub trait StrataProverClientApi {
     async fn prove_btc_blocks(
         &self,
         btc_range: (L1BlockCommitment, L1BlockCommitment),
+        epoch: u64,
     ) -> RpcResult<Vec<ProofKey>>;
 
     /// Start proving the given el block

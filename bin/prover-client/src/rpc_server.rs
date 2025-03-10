@@ -21,7 +21,7 @@ use tracing::{info, warn};
 use zkaleido::ProofReceipt;
 
 use crate::{
-    operators::{cl_stf::ClStfRange, ProofOperator, ProvingOp},
+    operators::{cl_stf::ClStfParams, ProofOperator, ProvingOp},
     status::ProvingTaskStatus,
     task_tracker::TaskTracker,
 };
@@ -91,10 +91,15 @@ impl StrataProverClientApiServer for ProverClientRpc {
     async fn prove_btc_blocks(
         &self,
         btc_range: (L1BlockCommitment, L1BlockCommitment),
+        epoch: u64,
     ) -> RpcResult<Vec<ProofKey>> {
         self.operator
             .btc_operator()
-            .create_task(btc_range, self.task_tracker.clone(), &self.db)
+            .create_task(
+                (epoch, btc_range.0, btc_range.1),
+                self.task_tracker.clone(),
+                &self.db,
+            )
             .await
             .map_err(to_jsonrpsee_error("failed to create task for btc block"))
     }
@@ -117,7 +122,8 @@ impl StrataProverClientApiServer for ProverClientRpc {
         let cl_client = &self.operator.cl_stf_operator().cl_client;
         let btc_client = &self.operator.btc_operator().btc_client;
         let l1_range = derive_l1_range(cl_client, btc_client, cl_block_range).await;
-        let cl_params = ClStfRange {
+        let cl_params = ClStfParams {
+            epoch: 0, // FIXME: fix this
             l2_range: cl_block_range,
             l1_range,
         };
@@ -213,16 +219,27 @@ impl StrataProverClientApiServer for ProverClientRpc {
     }
 }
 
+/// Derives the L1 range corresponding to the provided L2 block range.
+///
+/// This function asynchronously traverses backward from the end slot to find the most recent epoch
+/// containing a (CL) terminal block. If the provided range spans multiple epochs, it returns the L1
+/// range for the most recent epoch only.
+///
+/// - If none of the blocks within the given range are CL terminal blocks, the function returns
+///   `None`.
+/// - Returns an error instead of panicking if fetching a block or its height fails.
+/// - Also returns an error if the traversal exceeds the allowed depth limit.
 async fn derive_l1_range(
     cl_client: &HttpClient,
     btc_client: &BitcoinClient,
     l2_range: (L2BlockCommitment, L2BlockCommitment),
 ) -> Option<(L1BlockCommitment, L1BlockCommitment)> {
     // sanity check
-    assert!(l2_range.1.slot() >= l2_range.0.slot(), "");
+    assert!(l2_range.1.slot() >= l2_range.0.slot(), "invalid range");
 
     let start_block_hash = *l2_range.0.blkid();
     let mut current_block_hash = *l2_range.1.blkid();
+
     loop {
         let l2_block = cl_client
             .get_block_by_id(current_block_hash)

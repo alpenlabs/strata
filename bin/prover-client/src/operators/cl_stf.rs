@@ -116,17 +116,18 @@ impl ClStfOperator {
     }
 }
 
-pub struct ClStfRange {
+pub struct ClStfParams {
+    pub epoch: u64,
     pub l2_range: (L2BlockCommitment, L2BlockCommitment),
     pub l1_range: Option<(L1BlockCommitment, L1BlockCommitment)>,
 }
 
 impl ProvingOp for ClStfOperator {
     type Program = ClStfProgram;
-    type Params = ClStfRange;
+    type Params = ClStfParams;
 
     fn construct_proof_ctx(&self, range: &Self::Params) -> Result<ProofContext, ProvingTaskError> {
-        let ClStfRange { l2_range, .. } = range;
+        let ClStfParams { l2_range, .. } = range;
 
         let (start, end) = l2_range;
         // Do some sanity checks
@@ -215,11 +216,15 @@ impl ProvingOp for ClStfOperator {
 
     async fn create_deps_tasks(
         &self,
-        range: Self::Params,
+        params: Self::Params,
         db: &ProofDb,
         task_tracker: Arc<Mutex<TaskTracker>>,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let ClStfRange { l1_range, l2_range } = range;
+        let ClStfParams {
+            epoch,
+            l1_range,
+            l2_range,
+        } = params;
 
         let el_start_block = self.get_exec_commitment(*l2_range.0.blkid()).await?;
         let el_end_block = self.get_exec_commitment(*l2_range.1.blkid()).await?;
@@ -232,7 +237,7 @@ impl ProvingOp for ClStfOperator {
         if let Some(l1_range) = l1_range {
             let btc_tasks = self
                 .btc_blockspace_operator
-                .create_task(l1_range, task_tracker, db)
+                .create_task((epoch, l1_range.0, l1_range.1), task_tracker, db)
                 .await?;
             tasks.extend(btc_tasks);
         }

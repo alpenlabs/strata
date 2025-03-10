@@ -7,6 +7,8 @@ use crate::{
     buf::Buf32, evm_exec::EvmEeBlockCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment,
 };
 
+pub type Epoch = u64;
+
 /// Represents the verifying key used for verifying ZK proofs in a rollup context.
 ///
 /// This enum encapsulates verifying keys for different ZKVMs:
@@ -62,8 +64,8 @@ impl RollupVerifyingKey {
     Deserialize,
 )]
 pub enum ProofContext {
-    /// Identifier representing a Bitcoin L1 block for blockscan proof
-    BtcBlockspace(L1BlockCommitment, L1BlockCommitment),
+    /// Identifier representing a Bitcoin L1 blocks for blockscan proof
+    BtcBlockspace(Epoch, L1BlockCommitment, L1BlockCommitment),
 
     /// Identifier for the EVM Execution Environment (EE) blocks used in generating the State
     /// Transition Function (STF) proof.
