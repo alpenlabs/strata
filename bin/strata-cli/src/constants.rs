@@ -12,7 +12,7 @@ pub const RECOVER_DELAY: u32 = 144;
 /// reorgs that might happen.
 pub const FINALITY_DEPTH: u32 = 6;
 
-/// Number of blocks after which the wallet actually attempts recovery. This is mostly to account
+/// Number of blocks after which the wallet actually enables recovery. This is mostly to account
 /// for any reorgs that may happen at the recovery height.
 pub const RECOVER_AT_DELAY: u32 = RECOVER_DELAY + FINALITY_DEPTH;
 
