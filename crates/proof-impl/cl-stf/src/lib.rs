@@ -121,7 +121,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     }
 
     // 11. Get the checkpoint that was posted to Bitcoin (if any) and check if we have used the
-    //     right TxFilters and udpate it
+    //     right TxFilters and update it
     // TODO: this makes sense to be somewhere in the chainstate
     let tx_filters_transition = if is_l1_segment_present {
         let mut tx_filters = tx_filters.expect("must have tx filters");

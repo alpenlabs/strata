@@ -63,7 +63,7 @@ impl BtcBlockspaceOperator {
 
         // Sanity check that there is only one epoch commitment for a given epoch
         // TODO: if there are multiple epoch commitments we need a way to handle that to determine
-        // cannonical commitment
+        // canonical commitment
         assert_eq!(epoch_commitments.len(), 1);
 
         let slot = epoch_commitments[0].last_slot();
