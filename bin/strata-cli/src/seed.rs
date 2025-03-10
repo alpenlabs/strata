@@ -101,7 +101,7 @@ impl Seed {
         let derivation_path = DerivationPath::master().extend(BIP44_STRATA_EVM_WALLET_PATH);
 
         // Create the master key from the existing seed
-        let master_key = Xpriv::new_master(Network::Testnet, self.0.as_ref()).unwrap();
+        let master_key = Xpriv::new_master(Network::Testnet, self.0.as_ref()).expect("valid xpriv");
 
         // Derive the child key for the given path
         let derived_key = master_key.derive_priv(SECP256K1, &derivation_path).unwrap();
