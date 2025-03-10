@@ -8,11 +8,12 @@ use bdk_wallet::bitcoin::{Amount, Network};
 /// 144 is the number of blocks in a day.
 pub const RECOVER_DELAY: u32 = 144;
 
-/// Number of block that we consider a transaction "buried" or final.
+/// Number of blocks that the wallet considers a transaction "buried" or final taking into account
+/// reorgs that might happen.
 pub const FINALITY_DEPTH: u32 = 6;
 
-/// Number of blocks after which we'll actually attempt recovery. This is mostly to account for any
-/// reorgs that may happen at the recovery height.
+/// Number of blocks after which the wallet actually attempts recovery. This is mostly to account
+/// for any reorgs that may happen at the recovery height.
 pub const RECOVER_AT_DELAY: u32 = RECOVER_DELAY + FINALITY_DEPTH;
 
 pub const RECOVERY_DESC_CLEANUP_DELAY: u32 = 100;
