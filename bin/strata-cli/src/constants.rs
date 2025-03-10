@@ -14,9 +14,9 @@ pub const RECOVER_AT_DELAY: u32 = RECOVER_DELAY + 10;
 
 pub const RECOVERY_DESC_CLEANUP_DELAY: u32 = 100;
 
-/// 10 BTC + 0.01 to cover fees in the following transaction where the operator spends it into the
-/// federation.
-pub const BRIDGE_IN_AMOUNT: Amount = Amount::from_sat(1_001_000_000);
+/// 10 BTC + 1,000 satoshi to cover fees in the following transaction where the bridge spends it
+/// into the federation.
+pub const BRIDGE_IN_AMOUNT: Amount = Amount::from_sat(1_000_001_000);
 
 /// Bridge outs are enforced to be exactly 10 BTC
 pub const BRIDGE_OUT_AMOUNT: Amount = Amount::from_int_btc(10);
