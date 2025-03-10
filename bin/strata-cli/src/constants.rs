@@ -42,11 +42,11 @@ pub const BRIDGE_MUSIG2_PUBKEY: &str =
 ///
 /// This corresponds to the path: `m/44'/60'/0'/0/0`.
 pub const BIP44_STRATA_EVM_WALLET_PATH: &[ChildNumber] = &[
-    // Purpose index for HD wallets based on BIP44.
+    // Purpose index for HD wallets.
     ChildNumber::Hardened { index: 44 },
     // Coin type index for Ethereum mainnet
     ChildNumber::Hardened { index: 60 },
-    // account index for user wallets.
+    // Account index for user wallets.
     ChildNumber::Hardened { index: 0 },
     // Change index for receiving (external) addresses.
     ChildNumber::Normal { index: 0 },
