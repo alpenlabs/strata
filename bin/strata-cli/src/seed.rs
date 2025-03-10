@@ -6,7 +6,7 @@ use aes_gcm_siv::{aead::AeadMutInPlace, Aes256GcmSiv, KeyInit, Nonce, Tag};
 use alloy::{network::EthereumWallet, signers::local::PrivateKeySigner};
 use bdk_wallet::{
     bitcoin::{
-        bip32::{ChildNumber, DerivationPath, Xpriv},
+        bip32::{DerivationPath, Xpriv},
         secp256k1::SECP256K1,
         Network,
     },
