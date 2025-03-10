@@ -100,8 +100,11 @@ impl Seed {
     pub fn get_strata_wallet(&self) -> EthereumWallet {
         let derivation_path = DerivationPath::master().extend(BIP44_STRATA_EVM_WALLET_PATH);
 
-        // Create the master key from the existing seed
-        let master_key = Xpriv::new_master(Network::Testnet, self.0.as_ref()).expect("valid xpriv");
+        // Network choice affects how extended public and private keys are serialized. See
+        // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#serialization-format.
+        // Given the popularity of MetaMask, we their example (they always hardcode mainnet) and
+        // hardcode Network::Bitcoin (mainnet) for EVM-based wallet.
+        let master_key = Xpriv::new_master(Network::Bitcoin, self.0.as_ref()).expect("valid xpriv");
 
         // Derive the child key for the given path
         let derived_key = master_key.derive_priv(SECP256K1, &derivation_path).unwrap();
