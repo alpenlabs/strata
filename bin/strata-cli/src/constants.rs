@@ -1,11 +1,7 @@
 use std::time::Duration;
 
 use alloy::consensus::constants::ETH_TO_WEI;
-#[allow(unused_imports)]
-use bdk_wallet::bitcoin::{
-    bip32::{ChildNumber, DerivationPath},
-    Amount, Network,
-};
+use bdk_wallet::bitcoin::{bip32::ChildNumber, Amount, Network};
 
 /// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
 pub const RECOVER_DELAY: u32 = 1008;
@@ -42,7 +38,7 @@ pub const SIGNET_BLOCK_TIME: Duration = Duration::from_secs(30);
 pub const BRIDGE_MUSIG2_PUBKEY: &str =
     "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
 
-/// Strata CLI [`DerivationPath`] for Strata EVM wallet
+/// Strata CLI [`DerivationPath`](bdk_wallet::bitcoin::bip32::DerivationPath) for Strata EVM wallet
 ///
 /// This corresponds to the path: `m/44'/60'/0'/0/0`.
 pub const BIP44_STRATA_EVM_WALLET_PATH: &[ChildNumber] = &[
