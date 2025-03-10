@@ -71,6 +71,6 @@ pub enum PayloadStatus {
     /// Still building the payload.
     Working,
 
-    /// Completed, with short commitment payload data.
-    Ready(ExecPayloadData),
+    /// Completed, with short commitment payload data and gas used by the block.
+    Ready(ExecPayloadData, u64),
 }

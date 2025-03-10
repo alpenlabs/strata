@@ -132,14 +132,17 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             })
             .collect::<Result<_, _>>()?;
 
-        let payload_attributes = StrataPayloadAttributes::new_from_eth(PayloadAttributes {
-            // evm expects timestamp in seconds
-            timestamp: payload_env.timestamp() / 1000,
-            prev_randao: B256::ZERO,
-            withdrawals: Some(withdrawals),
-            parent_beacon_block_root: None,
-            suggested_fee_recipient: COINBASE_ADDRESS,
-        });
+        let payload_attributes = StrataPayloadAttributes::new(
+            PayloadAttributes {
+                // evm expects timestamp in seconds
+                timestamp: payload_env.timestamp() / 1000,
+                prev_randao: B256::ZERO,
+                withdrawals: Some(withdrawals),
+                parent_beacon_block_root: None,
+                suggested_fee_recipient: COINBASE_ADDRESS,
+            },
+            payload_env.batch_gas_limit(),
+        );
 
         let fcs = ForkchoiceState {
             head_block_hash: prev_block.block_hash(),
@@ -204,6 +207,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
 
         let el_state_root = el_payload.state_root;
         let accessory_data = borsh::to_vec(&el_payload).unwrap();
+        let gas_used = el_payload.gas_used;
         let update_input = make_update_input_from_payload_and_ops(el_payload, &ops)
             .map_err(|err| EngineError::Other(err.to_string()))?;
 
@@ -221,7 +225,7 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
             ops,
         );
 
-        Ok(PayloadStatus::Ready(execution_payload_data))
+        Ok(PayloadStatus::Ready(execution_payload_data, gas_used))
     }
 
     async fn submit_new_payload(&self, payload: ExecPayloadData) -> EngineResult<BlockStatus> {
@@ -535,7 +539,7 @@ mod tests {
 
         let mut arb = strata_test_utils::ArbitraryGenerator::new();
         let l2block: L2Block = arb.generate();
-        let accessory = L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap());
+        let accessory = L2BlockAccessory::new(borsh::to_vec(&el_payload).unwrap(), 0);
         let l2block_bundle = L2BlockBundle::new(l2block, accessory);
 
         let evm_l2_block = EVML2Block::try_extract(&l2block_bundle).unwrap();
@@ -547,7 +551,7 @@ mod tests {
         let safe_l1_block = Buf32(FixedBytes::<32>::random().into());
         let prev_l2_block = Buf32(FixedBytes::<32>::random().into()).into();
 
-        let payload_env = PayloadEnv::new(timestamp, prev_l2_block, safe_l1_block, el_ops);
+        let payload_env = PayloadEnv::new(timestamp, prev_l2_block, safe_l1_block, el_ops, None);
 
         let result = rpc_exec_engine_inner
             .build_block_from_mempool(payload_env, evm_l2_block)

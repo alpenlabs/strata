@@ -53,7 +53,8 @@ impl<'a> Arbitrary<'a> for L2Block {
         let ts = u64::arbitrary(u)?;
         let prev = L2BlockId::from(Buf32::zero());
         let sr = Buf32::arbitrary(u)?;
-        let header = L2BlockHeader::new(idx, ts, prev, &body, sr);
+        let epoch = u64::arbitrary(u)?;
+        let header = L2BlockHeader::new(idx, ts, epoch, prev, &body, sr);
         let signed_header = SignedL2BlockHeader::new(header, Buf64::arbitrary(u)?);
         Ok(Self::new(signed_header, body))
     }
@@ -167,15 +168,23 @@ impl ExecSegment {
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L2BlockAccessory {
     exec_payload: Vec<u8>,
+    remaining_gas_limit: Option<u64>,
 }
 
 impl L2BlockAccessory {
-    pub fn new(exec_payload: Vec<u8>) -> Self {
-        Self { exec_payload }
+    pub fn new(exec_payload: Vec<u8>, remaining_gas_limit: Option<u64>) -> Self {
+        Self {
+            exec_payload,
+            remaining_gas_limit,
+        }
     }
 
     pub fn exec_payload(&self) -> &[u8] {
         &self.exec_payload
+    }
+
+    pub fn remaining_gas_limit(&self) -> Option<u64> {
+        self.remaining_gas_limit
     }
 }
 

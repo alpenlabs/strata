@@ -32,6 +32,7 @@ pub fn prepare_block(
     slot: u64,
     prev_block: L2BlockBundle,
     ts: u64,
+    epoch_gas_limit: Option<u64>,
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
     params: &Params,
@@ -51,6 +52,8 @@ pub fn prepare_block(
     let prev_chstate = chsman
         .get_toplevel_chainstate_blocking(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_blkid))?;
+    let epoch = prev_chstate.cur_epoch();
+    let first_block_of_epoch = prev_chstate.prev_epoch().last_slot() + 1 == slot;
 
     // Figure out the safe L1 blkid.
     // FIXME this is somewhat janky, should get it from the MMR
@@ -66,6 +69,12 @@ pub fn prepare_block(
         params.rollup(),
     )?;
 
+    let remaining_gas_limit = if first_block_of_epoch {
+        epoch_gas_limit
+    } else {
+        prev_block.accessory().remaining_gas_limit()
+    };
+
     // Prepare the execution segment, which right now is just talking to the EVM
     // but will be more advanced later.
     let (exec_seg, block_acc) = prepare_exec_data(
@@ -77,11 +86,12 @@ pub fn prepare_block(
         safe_l1_blkid,
         engine,
         params.rollup(),
+        remaining_gas_limit,
     )?;
 
     // Assemble the body and fake header.
     let body = L2BlockBody::new(l1_seg, exec_seg);
-    let fake_header = L2BlockHeader::new(slot, ts, prev_blkid, &body, Buf32::zero());
+    let fake_header = L2BlockHeader::new(slot, ts, epoch, prev_blkid, &body, Buf32::zero());
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
@@ -90,7 +100,7 @@ pub fn prepare_block(
     // FIXME: invalid stateroot. Remove l2blockid from ChainState or stateroot from L2Block header.
     let new_state_root = post_state.compute_state_root();
 
-    let header = L2BlockHeader::new(slot, ts, prev_blkid, &body, new_state_root);
+    let header = L2BlockHeader::new(slot, ts, epoch, prev_blkid, &body, new_state_root);
 
     Ok((header, body, block_acc))
 }
@@ -245,6 +255,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     safe_l1_block: Buf32,
     engine: &E,
     params: &RollupParams,
+    remaining_gas_limit: Option<u64>,
 ) -> Result<(ExecSegment, L2BlockAccessory), Error> {
     trace!("preparing exec payload");
 
@@ -253,7 +264,13 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     // construct el_ops by looking at chainstate
     let pending_deposits = prev_chstate.exec_env_state().pending_deposits();
     let el_ops = construct_ops_from_deposit_intents(pending_deposits, params.max_deposits_in_block);
-    let payload_env = PayloadEnv::new(timestamp, prev_l2_blkid, safe_l1_block, el_ops);
+    let payload_env = PayloadEnv::new(
+        timestamp,
+        prev_l2_blkid,
+        safe_l1_block,
+        el_ops,
+        remaining_gas_limit,
+    );
 
     let key = engine.prepare_payload(payload_env)?;
     trace!("submitted EL payload job, waiting for completion");
@@ -263,7 +280,7 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     // etc. to assemble the payload env for this block.
     let wait = time::Duration::from_millis(100);
     let timeout = time::Duration::from_millis(3000);
-    let Some(payload_data) = poll_status_loop(key, engine, wait, timeout)? else {
+    let Some((payload_data, gas_used)) = poll_status_loop(key, engine, wait, timeout)? else {
         return Err(Error::BlockAssemblyTimedOut);
     };
     trace!("finished EL payload job");
@@ -274,7 +291,10 @@ fn prepare_exec_data<E: ExecEngineCtl>(
     let exec_seg = ExecSegment::new(exec_update);
 
     // And the accessory.
-    let acc = L2BlockAccessory::new(payload_data.accessory_data().to_vec());
+    let acc = L2BlockAccessory::new(
+        payload_data.accessory_data().to_vec(),
+        remaining_gas_limit.map(|limit| limit.saturating_sub(gas_used)),
+    );
 
     Ok((exec_seg, acc))
 }
@@ -284,7 +304,7 @@ fn poll_status_loop<E: ExecEngineCtl>(
     engine: &E,
     wait: time::Duration,
     timeout: time::Duration,
-) -> Result<Option<ExecPayloadData>, EngineError> {
+) -> Result<Option<(ExecPayloadData, u64)>, EngineError> {
     let start = time::Instant::now();
     loop {
         // Sleep at the beginning since the first iter isn't likely to have it
@@ -294,8 +314,8 @@ fn poll_status_loop<E: ExecEngineCtl>(
         // Check the payload for the result.
         trace!(%job, "polling engine for completed payload");
         let payload = engine.get_payload_status(job)?;
-        if let PayloadStatus::Ready(pl) = payload {
-            return Ok(Some(pl));
+        if let PayloadStatus::Ready(pl, gas_used) = payload {
+            return Ok(Some((pl, gas_used)));
         }
 
         // If we've waited too long now.

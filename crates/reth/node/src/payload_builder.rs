@@ -128,7 +128,7 @@ where
                 client,
                 PayloadConfig {
                     parent_header,
-                    attributes: attributes.0,
+                    attributes: attributes.inner,
                 },
             )?;
         Ok(StrataBuiltPayload::new(eth_build_payload, Vec::new()))
@@ -260,7 +260,11 @@ where
 
     let mut cumulative_gas_used = 0;
     let mut sum_blob_gas_used = 0;
-    let block_gas_limit: u64 = initialized_block_env.gas_limit.to::<u64>();
+    let env_block_gas_limit: u64 = initialized_block_env.gas_limit.to::<u64>();
+    let block_gas_limit = attributes
+        .batch_gas_limit()
+        .map(|batch_gas_limit| batch_gas_limit.min(env_block_gas_limit))
+        .unwrap_or(env_block_gas_limit);
     let base_fee = initialized_block_env.basefee.to::<u64>();
 
     let mut executed_senders = Vec::new();
@@ -585,7 +589,7 @@ where
         nonce: BEACON_NONCE.into(),
         base_fee_per_gas: Some(base_fee),
         number: parent_header.number + 1,
-        gas_limit: block_gas_limit,
+        gas_limit: env_block_gas_limit,
         difficulty: U256::ZERO,
         gas_used: cumulative_gas_used,
         extra_data: builder_config.extra_data,

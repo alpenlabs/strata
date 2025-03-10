@@ -18,6 +18,7 @@ pub trait L2Header {
     fn exec_payload_hash(&self) -> &Buf32;
     fn state_root(&self) -> &Buf32;
     fn get_blockid(&self) -> L2BlockId;
+    fn epoch(&self) -> u64;
 }
 
 /// Block header that forms the chain we use to reach consensus.
@@ -45,6 +46,9 @@ pub struct L2BlockHeader {
     /// both the CL state and EL state.
     // TODO figure out the structure of this
     pub(crate) state_root: Buf32,
+
+    /// Epoch that this block is part of.
+    pub(crate) epoch: u64,
 }
 
 impl L2BlockHeader {
@@ -52,6 +56,7 @@ impl L2BlockHeader {
     pub fn new(
         block_idx: u64,
         timestamp: u64,
+        epoch: u64,
         prev_block: L2BlockId,
         body: &L2BlockBody,
         state_root: Buf32,
@@ -67,12 +72,13 @@ impl L2BlockHeader {
             l1_segment_hash,
             exec_segment_hash,
             state_root,
+            epoch,
         }
     }
     /// Compute the sighash for this block header.
     pub fn get_sighash(&self) -> Buf32 {
-        // 8 + 8 + 32 + 32 + 32 + 32 = 144
-        let mut buf = [0; 144];
+        // 8 + 8 + 8 + 32 + 32 + 32 + 32 = 152
+        let mut buf = [0; 152];
         fill_sighash_buf(self, &mut buf).expect("blockasm: compute sighash");
         strata_primitives::hash::raw(&buf)
     }
@@ -112,6 +118,10 @@ impl L2Header for L2BlockHeader {
     fn get_blockid(&self) -> L2BlockId {
         self.get_sighash().into()
     }
+
+    fn epoch(&self) -> u64 {
+        self.epoch
+    }
 }
 
 fn fill_sighash_buf(tmplt: &L2BlockHeader, buf: &mut [u8]) -> Result<(), io::Error> {
@@ -120,6 +130,7 @@ fn fill_sighash_buf(tmplt: &L2BlockHeader, buf: &mut [u8]) -> Result<(), io::Err
     let mut cur = Cursor::new(&mut buf[..]);
     cur.write_all(&tmplt.block_idx.to_be_bytes())?;
     cur.write_all(&tmplt.timestamp.to_be_bytes())?;
+    cur.write_all(&tmplt.epoch.to_be_bytes())?;
     cur.write_all(Buf32::from(tmplt.prev_block).as_ref())?;
     cur.write_all(tmplt.l1_segment_hash.as_ref())?;
     cur.write_all(tmplt.exec_segment_hash.as_ref())?;
@@ -188,5 +199,9 @@ impl L2Header for SignedL2BlockHeader {
 
     fn get_blockid(&self) -> L2BlockId {
         self.header.get_blockid()
+    }
+
+    fn epoch(&self) -> u64 {
+        self.header.epoch
     }
 }
