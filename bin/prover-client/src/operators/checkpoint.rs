@@ -17,7 +17,7 @@ use tracing::{error, info};
 use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{
     checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError, hosts,
-    operators::cl_stf::ClStfRange, task_tracker::TaskTracker,
+    operators::cl_stf::ClStfParams, task_tracker::TaskTracker,
 };
 
 /// A struct that implements the [`ProvingOp`] for Checkpoint Proof.
@@ -75,7 +75,8 @@ impl CheckpointOperator {
         // Since the EVM EE STF will be the heaviest, the splitting can be done based on that
         //
         // For now, do everything on a single chunk
-        let cl_stf_params = ClStfRange {
+        let cl_stf_params = ClStfParams {
+            epoch: checkpoint_info.idx,
             l1_range: Some(checkpoint_info.l1_range),
             l2_range: checkpoint_info.l2_range,
         };

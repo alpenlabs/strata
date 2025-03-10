@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, params::RollupParams};
-use strata_state::{block::L2Block, chain_state::Chainstate};
+use strata_state::{batch::TxFilterConfigTransition, block::L2Block, chain_state::Chainstate};
 use zkaleido::{
     AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
     ZkVmProgramPerf, ZkVmResult,
@@ -23,6 +23,7 @@ pub struct ClStfInput {
 pub struct ClStfOutput {
     pub initial_chainstate_root: Buf32,
     pub final_chainstate_root: Buf32,
+    pub tx_filters_transition: Option<TxFilterConfigTransition>,
 }
 
 pub struct ClStfProgram;

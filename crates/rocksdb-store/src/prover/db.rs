@@ -104,8 +104,11 @@ mod tests {
     }
 
     fn generate_proof() -> (ProofKey, ProofReceipt) {
-        let proof_context =
-            ProofContext::BtcBlockspace(L1BlockCommitment::default(), L1BlockCommitment::default());
+        let proof_context = ProofContext::BtcBlockspace(
+            0,
+            L1BlockCommitment::default(),
+            L1BlockCommitment::default(),
+        );
         let host = ProofZkVm::Native;
         let proof_key = ProofKey::new(proof_context, host);
         let proof = Proof::default();

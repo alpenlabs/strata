@@ -326,6 +326,7 @@ mod tests {
         ) -> Result<strata_primitives::proof::ProofContext, crate::errors::ProvingTaskError>
         {
             Ok(strata_primitives::proof::ProofContext::BtcBlockspace(
+                0,
                 L1BlockCommitment::new(*params, Buf32::default().into()),
                 L1BlockCommitment::new(*params, Buf32::default().into()),
             ))
