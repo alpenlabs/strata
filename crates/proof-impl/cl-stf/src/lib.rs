@@ -5,8 +5,10 @@ pub mod program;
 
 use program::ClStfOutput;
 use strata_chaintsn::transition::process_block;
-use strata_primitives::{hash::compute_borsh_hash, l1::ProtocolOperation, params::RollupParams};
-use strata_proofimpl_btc_blockspace::logic::BlockscanProofOutput;
+use strata_primitives::{
+    buf::Buf32, hash::compute_borsh_hash, l1::ProtocolOperation, params::RollupParams,
+};
+use strata_proofimpl_btc_blockspace::logic::{BlockScanResult, BlockscanProofOutput};
 use strata_state::{
     batch::TxFilterConfigTransition,
     block::{ExecSegment, L2Block},
@@ -133,30 +135,12 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         // In case of other epoch, the transaction filters will change based on the chainstate
         // posted to Bitcoin
         let final_tx_filters_hash = if cur_epoch > 0 {
-            let last_l1_block = l1_updates
-                .last()
-                .expect("there should be at least one L1 Segment");
-
-            let cp = last_l1_block
-                .protocol_ops
-                .iter()
-                .find_map(|op| match op {
-                    ProtocolOperation::Checkpoint(cp) => Some(cp),
-                    _ => None,
-                })
-                .expect("Must include checkpoint for valid epoch");
-
-            let posted_chainstate: Chainstate =
-                borsh::from_slice(cp.checkpoint().sidecar().chainstate())
-                    .expect("valid chainstate needs to be posted on checkpoint");
+            let (posted_chainstate, prev_post_config_hash) =
+                get_posted_chainstate_and_post_tx_filter_config(&l1_updates);
 
             // Verify we have used the right TxFilters
             assert_eq!(
-                initial_tx_filters_hash,
-                cp.checkpoint()
-                    .batch_transition()
-                    .tx_filters_transition
-                    .post_config_hash,
+                initial_tx_filters_hash, prev_post_config_hash,
                 "must use right tx filters"
             );
 
@@ -187,4 +171,32 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     };
 
     zkvm.commit_borsh(&output);
+}
+
+fn get_posted_chainstate_and_post_tx_filter_config(
+    l1_updates: &[BlockScanResult],
+) -> (Chainstate, Buf32) {
+    let last_l1_block = l1_updates
+        .last()
+        .expect("there should be at least one L1 Segment");
+
+    let cp = last_l1_block
+        .protocol_ops
+        .iter()
+        .find_map(|op| match op {
+            ProtocolOperation::Checkpoint(cp) => Some(cp),
+            _ => None,
+        })
+        .expect("Must include checkpoint for valid epoch");
+
+    let cs: Chainstate = borsh::from_slice(cp.checkpoint().sidecar().chainstate())
+        .expect("valid chainstate needs to be posted on checkpoint");
+
+    (
+        cs,
+        cp.checkpoint()
+            .batch_transition()
+            .tx_filters_transition
+            .post_config_hash,
+    )
 }
