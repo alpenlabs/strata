@@ -4,7 +4,9 @@ use alloy::consensus::constants::ETH_TO_WEI;
 use bdk_wallet::bitcoin::{Amount, Network};
 
 /// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
-pub const RECOVER_DELAY: u32 = 1008;
+///
+/// 144 is the number of blocks in a day.
+pub const RECOVER_DELAY: u32 = 144;
 
 /// Number of blocks after which we'll actually attempt recovery. This is mostly to account for any
 /// reorgs that may happen at the recovery height.
