@@ -3,7 +3,7 @@
 //! chain and that all L1-L2 transactions were processed.
 
 use strata_proofimpl_cl_stf::program::ClStfOutput;
-use strata_state::batch::BatchTransition;
+use strata_state::batch::{BatchTransition, ChainstateRootTransition};
 use zkaleido::ZkVmEnv;
 
 pub mod program;
@@ -33,8 +33,13 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
         tx_filters_transition = tx_filters_transition.or(cl_stf_output.tx_filters_transition);
     }
 
+    let chainstate_transition = ChainstateRootTransition {
+        pre_state_root: initial_chainstate_root,
+        post_state_root: final_chainstate_root,
+    };
+
     let output = BatchTransition {
-        chainstate_transition: (initial_chainstate_root, final_chainstate_root),
+        chainstate_transition,
         tx_filters_transition: tx_filters_transition
             .expect("checkpoint must include a valid tx filters transition"),
     };

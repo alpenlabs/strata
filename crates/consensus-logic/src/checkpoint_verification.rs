@@ -81,7 +81,7 @@ fn verify_checkpoint_extends(
         return Err(CheckpointError::Sequencing(epoch, prev_epoch));
     }
 
-    if last_tsn.chainstate_transition.1 != tsn.chainstate_transition.0 {
+    if last_tsn.chainstate_transition.post_state_root != tsn.chainstate_transition.pre_state_root {
         warn!("checkpoint mismatch on L2 state!");
         return Err(CheckpointError::MismatchL2State);
     }

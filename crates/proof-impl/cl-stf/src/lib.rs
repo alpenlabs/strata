@@ -8,6 +8,7 @@ use strata_chaintsn::transition::process_block;
 use strata_primitives::{hash::compute_borsh_hash, l1::ProtocolOperation, params::RollupParams};
 use strata_proofimpl_btc_blockspace::logic::BlockscanProofOutput;
 use strata_state::{
+    batch::TxFilterConfigTransition,
     block::{ExecSegment, L2Block},
     block_validation::{check_block_credential, validate_block_segments},
     chain_state::Chainstate,
@@ -152,7 +153,10 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
             // Verify we have used the right TxFilters
             assert_eq!(
                 initial_tx_filters_hash,
-                cp.checkpoint().batch_transition().tx_filters_transition.1,
+                cp.checkpoint()
+                    .batch_transition()
+                    .tx_filters_transition
+                    .post_config_hash,
                 "must use right tx filters"
             );
 
@@ -162,7 +166,12 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
             initial_tx_filters_hash
         };
 
-        Some((initial_tx_filters_hash, final_tx_filters_hash))
+        let tx_filter_transition = TxFilterConfigTransition {
+            pre_config_hash: initial_tx_filters_hash,
+            post_config_hash: final_tx_filters_hash,
+        };
+
+        Some(tx_filter_transition)
     } else {
         None
     };
