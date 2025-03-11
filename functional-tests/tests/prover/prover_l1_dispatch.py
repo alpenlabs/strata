@@ -1,5 +1,3 @@
-import time
-
 import flexitest
 from bitcoinlib.services.bitcoind import BitcoindClient
 
@@ -39,5 +37,7 @@ class ProverClientTest(testenv.StrataTester):
         assert task_id is not None
 
         time_out = 30
-        is_proof_generation_completed = wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=time_out)
-        assert(is_proof_generation_completed)
+        is_proof_generation_completed = wait_for_proof_with_time_out(
+            prover_client_rpc, task_id, time_out=time_out
+        )
+        assert is_proof_generation_completed
