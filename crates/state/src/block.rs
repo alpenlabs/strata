@@ -168,14 +168,14 @@ impl ExecSegment {
 #[derive(Clone, Debug, Eq, PartialEq, Arbitrary, BorshSerialize, BorshDeserialize)]
 pub struct L2BlockAccessory {
     exec_payload: Vec<u8>,
-    remaining_gas_limit: Option<u64>,
+    gas_used: u64,
 }
 
 impl L2BlockAccessory {
-    pub fn new(exec_payload: Vec<u8>, remaining_gas_limit: Option<u64>) -> Self {
+    pub fn new(exec_payload: Vec<u8>, gas_used: u64) -> Self {
         Self {
             exec_payload,
-            remaining_gas_limit,
+            gas_used,
         }
     }
 
@@ -183,8 +183,8 @@ impl L2BlockAccessory {
         &self.exec_payload
     }
 
-    pub fn remaining_gas_limit(&self) -> Option<u64> {
-        self.remaining_gas_limit
+    pub fn gas_used(&self) -> u64 {
+        self.gas_used
     }
 }
 

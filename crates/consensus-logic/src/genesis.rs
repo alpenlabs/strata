@@ -122,7 +122,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
 
     // TODO stub
     let exec_payload = vec![];
-    let accessory = L2BlockAccessory::new(exec_payload, None);
+    let accessory = L2BlockAccessory::new(exec_payload, 0);
 
     // Assemble the genesis header template, pulling in data from whatever
     // sources we need.
