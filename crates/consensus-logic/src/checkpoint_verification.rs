@@ -1,38 +1,12 @@
 //! General handling around checkpoint verification.
 
-use strata_primitives::{params::*, proof::RollupVerifyingKey};
+use strata_crypto::groth16_verifier::verify_rollup_groth16_proof_receipt;
+use strata_primitives::params::*;
 use strata_state::{batch::*, client_state::L1Checkpoint};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
-use zkaleido_risc0_groth16_verifier;
-use zkaleido_sp1_groth16_verifier;
 
 use crate::errors::CheckpointError;
-
-// FIXME this isn't really an extension trait since it's not being used to
-// blanket impl over another trait
-/// Extends [`RollupVerifyingKey`] with verification logic.
-pub trait VerifyingKeyExt {
-    fn verify_groth16(&self, proof_receipt: &ProofReceipt) -> ZkVmResult<()>;
-}
-
-impl VerifyingKeyExt for RollupVerifyingKey {
-    fn verify_groth16(&self, proof_receipt: &ProofReceipt) -> ZkVmResult<()> {
-        // NOTE/TODO: this should also verify that this checkpoint is based on top of some previous
-        // checkpoint
-        match self {
-            RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-                zkaleido_risc0_groth16_verifier::verify_groth16(proof_receipt, vk.as_ref())
-            }
-            RollupVerifyingKey::SP1VerifyingKey(vk) => {
-                zkaleido_sp1_groth16_verifier::verify_groth16(proof_receipt, vk.as_ref())
-            }
-            // In Native Execution mode, we do not actually generate the proof to verify. Checking
-            // public parameters is sufficient.
-            RollupVerifyingKey::NativeVerifyingKey(_) => Ok(()),
-        }
-    }
-}
 
 /// Verifies if a checkpoint if valid, given the context of a previous checkpoint.
 ///
@@ -134,5 +108,5 @@ pub fn verify_proof(
         ));
     }
 
-    rollup_vk.verify_groth16(proof_receipt)
+    verify_rollup_groth16_proof_receipt(proof_receipt, &rollup_vk)
 }

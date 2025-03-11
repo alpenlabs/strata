@@ -18,8 +18,6 @@ strata-status.workspace = true
 strata-storage.workspace = true
 strata-tasks.workspace = true
 zkaleido.workspace = true
-zkaleido-risc0-groth16-verifier.workspace = true
-zkaleido-sp1-groth16-verifier.workspace = true
 
 anyhow.workspace = true
 async-trait.workspace = true

@@ -13399,8 +13399,6 @@ dependencies = [
  "tokio",
  "tracing",
  "zkaleido",
- "zkaleido-risc0-groth16-verifier",
- "zkaleido-sp1-groth16-verifier",
 ]
 
 [[package]]
