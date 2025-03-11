@@ -184,7 +184,7 @@ fn process_l1_checkpoint(
     );
     let ckpt = signed_ckpt.checkpoint(); // inner data
 
-    let receipt = ckpt.get_proof_receipt();
+    let receipt = ckpt.construct_receipt();
     if !params.proof_publish_mode.allow_empty() {
         assert!(
             verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk).is_ok(),

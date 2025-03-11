@@ -195,8 +195,10 @@ impl Checkpoint {
         self.proof = proof
     }
 
-    #[deprecated(note = "use `checkpoint_verification::construct_receipt`")]
-    pub fn get_proof_receipt(&self) -> ProofReceipt {
+    // #[deprecated(note = "use `checkpoint_verification::construct_receipt`")]
+    // TODO: commented for now
+    // understand the rationale for making it deprecated
+    pub fn construct_receipt(&self) -> ProofReceipt {
         let proof = self.proof().clone();
         let output = self.batch_transition();
         let public_values =

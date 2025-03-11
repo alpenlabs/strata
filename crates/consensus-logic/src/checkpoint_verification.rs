@@ -95,7 +95,7 @@ fn verify_checkpoint_extends(
 /// checkpoint type itself soon.
 pub fn construct_receipt(checkpoint: &Checkpoint) -> ProofReceipt {
     #[allow(deprecated)]
-    checkpoint.get_proof_receipt()
+    checkpoint.construct_receipt()
 }
 
 /// Verify that the provided checkpoint proof is valid for the verifier key.
