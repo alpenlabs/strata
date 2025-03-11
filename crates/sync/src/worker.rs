@@ -190,14 +190,14 @@ async fn handle_new_block<T: SyncClient>(
 
     loop {
         let block_id = block.header().get_blockid();
-        debug!(block_id = ?block_id, height = block.header().blockidx(), "received new block");
+        debug!(block_id = ?block_id, height = block.header().slot(), "received new block");
 
         if state.has_block(&block_id) {
             warn!(block_id = ?block_id, "block already known");
             return Ok(());
         }
 
-        let height = block.header().blockidx();
+        let height = block.header().slot();
         if height <= state.finalized_height() {
             // got block on different fork than one we're finalized on
             // log error and ignore received blocks
@@ -232,7 +232,7 @@ async fn handle_new_block<T: SyncClient>(
             .l2()
             .put_block_data_async(block.clone())
             .await?;
-        let block_idx = block.header().blockidx();
+        let block_idx = block.header().slot();
         debug!(%block_idx, "l2 sync: sending chain tip msg");
         context
             .sync_manager

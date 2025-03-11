@@ -24,6 +24,18 @@ pub struct L2BlockId(Buf32);
 
 impl_buf_wrapper!(L2BlockId, Buf32, 32);
 
+impl L2BlockId {
+    /// Returns a dummy blkid that is all zeroes.
+    pub fn null() -> Self {
+        Self::from(Buf32::zero())
+    }
+
+    /// Checks to see if this is the dummy "zero" blkid.
+    pub fn is_null(&self) -> bool {
+        self.0.is_zero()
+    }
+}
+
 /// Commits to a specific block at some slot.
 #[derive(
     Copy,

@@ -27,7 +27,7 @@ impl L2BlockDatabase for L2Db {
         let block_id = bundle.block().header().get_blockid();
 
         // append to previous block height data
-        let block_height = bundle.block().header().blockidx();
+        let block_height = bundle.block().header().slot();
 
         self.db
             .with_optimistic_txn(
@@ -57,7 +57,7 @@ impl L2BlockDatabase for L2Db {
         };
 
         // update to previous block height data
-        let block_height = bundle.block().header().blockidx();
+        let block_height = bundle.block().header().slot();
         let mut block_height_data = self.get_blocks_at_height(block_height)?;
         block_height_data.retain(|&block_id| block_id != id);
 
@@ -131,7 +131,7 @@ mod tests {
 
         let bundle = get_mock_data();
         let block_hash = bundle.block().header().get_blockid();
-        let block_height = bundle.block().header().blockidx();
+        let block_height = bundle.block().header().slot();
 
         l2_db
             .put_block_data(bundle.clone())
@@ -163,7 +163,7 @@ mod tests {
         let l2_db = setup_db();
         let bundle = get_mock_data();
         let block_hash = bundle.block().header().get_blockid();
-        let block_height = bundle.block().header().blockidx();
+        let block_height = bundle.block().header().slot();
 
         // deleting non existing block should return false
         let res = l2_db

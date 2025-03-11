@@ -53,18 +53,6 @@ impl ChainSyncStatus {
             safe_l1,
         }
     }
-
-    /// Transitional function for as long as we can construct an instance of this
-    /// type from a chainstate.
-    pub fn from_transitional(chs: &Chainstate) -> Self {
-        let tip = L2BlockCommitment::new(chs.chain_tip_slot(), *chs.chain_tip_blkid());
-        Self::new(
-            tip,
-            *chs.prev_epoch(),
-            *chs.finalized_epoch(),
-            chs.l1_view().get_safe_block(),
-        )
-    }
 }
 
 /// Published to the FCM status including chainstate.
@@ -80,13 +68,6 @@ impl ChainSyncStatusUpdate {
             new_status,
             new_tl_chainstate,
         }
-    }
-
-    /// Transitional function for directly constructing the status update from
-    /// the full chainstate.
-    pub fn new_transitional(new_tl_chainstate: Arc<Chainstate>) -> Self {
-        let css = ChainSyncStatus::from_transitional(new_tl_chainstate.as_ref());
-        Self::new(css, new_tl_chainstate)
     }
 
     pub fn new_status(&self) -> ChainSyncStatus {

@@ -146,7 +146,7 @@ impl StrataRpcImpl {
 
 fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> RpcBlockHeader {
     RpcBlockHeader {
-        block_idx: blk_header.blockidx(),
+        block_idx: blk_header.slot(),
         timestamp: blk_header.timestamp(),
         block_id: *blk_header.get_blockid().as_ref(),
         prev_block: *blk_header.parent().as_ref(),
@@ -281,7 +281,7 @@ impl StrataApiServer for StrataRpcImpl {
             let l2_blk = self.fetch_l2_block_ok(&cur_blkid).await?;
             output.push(conv_blk_header_to_rpc(l2_blk.header()));
             cur_blkid = *l2_blk.header().parent();
-            if l2_blk.header().blockidx() == 0 || Buf32::from(cur_blkid).is_zero() {
+            if l2_blk.header().slot() == 0 || Buf32::from(cur_blkid).is_zero() {
                 break;
             }
         }
@@ -298,7 +298,7 @@ impl StrataApiServer for StrataRpcImpl {
 
         // check the tip idx
         let tip_block = self.fetch_l2_block_ok(tip_blkid).await?;
-        let tip_idx = tip_block.header().blockidx();
+        let tip_idx = tip_block.header().slot();
 
         if idx > tip_idx {
             return Ok(None);
@@ -410,7 +410,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
         let l2_blk_bundle = self.fetch_l2_block_ok(&blkid).await?;
 
-        let prev_slot = l2_blk_bundle.block().header().header().blockidx() - 1;
+        let prev_slot = l2_blk_bundle.block().header().header().slot() - 1;
 
         let chain_state = self
             .storage

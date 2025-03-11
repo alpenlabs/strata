@@ -68,7 +68,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
             l2_block.exec_segment(),
             &exec_segment,
             "mismatch between exec segment at height {:?}",
-            l2_block.header().blockidx()
+            l2_block.header().slot()
         );
 
         // 7. Verify that the L1 manifests are consistent with the one that was proven

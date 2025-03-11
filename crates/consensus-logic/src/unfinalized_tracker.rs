@@ -133,9 +133,9 @@ impl UnfinalizedBlockTracker {
         let parent_blkid = header.parent();
 
         if let Some(parent_ent) = self.pending_table.get_mut(parent_blkid) {
-            if header.blockidx() <= parent_ent.slot {
+            if header.slot() <= parent_ent.slot {
                 return Err(ChainTipError::ChildBeforeParent(
-                    header.blockidx(),
+                    header.slot(),
                     parent_ent.slot,
                 ));
             }
@@ -146,7 +146,7 @@ impl UnfinalizedBlockTracker {
         }
 
         let ent = BlockEntry {
-            slot: header.blockidx(),
+            slot: header.slot(),
             parent: *header.parent(),
             children: HashSet::new(),
         };
@@ -472,7 +472,7 @@ mod tests {
             .get_block_data_blocking(&prev_finalized_tip)
             .expect("test: load block")
             .expect("test: missing block");
-        let prev_tip_slot = prev_tip.header().blockidx();
+        let prev_tip_slot = prev_tip.header().slot();
 
         let epoch = EpochCommitment::new(0, prev_tip_slot, prev_finalized_tip);
         let mut chain_tracker = unfinalized_tracker::UnfinalizedBlockTracker::new_empty(epoch);
@@ -483,7 +483,7 @@ mod tests {
             .get_block_data_blocking(&new_finalized_tip)
             .expect("test: load block")
             .expect("test: missing block");
-        let new_tip_slot = new_tip.header().blockidx();
+        let new_tip_slot = new_tip.header().slot();
 
         let new_epoch = EpochCommitment::new(1, new_tip_slot, new_finalized_tip);
         let report = chain_tracker.update_finalized_epoch(&new_epoch).unwrap();

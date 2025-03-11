@@ -47,7 +47,7 @@ pub fn prepare_block(
     // Get the previous block's state
     // TODO make this get the prev block slot from somewhere more reliable in
     // case we skip slots
-    let prev_slot = prev_block.header().blockidx();
+    let prev_slot = prev_block.header().slot();
     let prev_chstate = chsman
         .get_toplevel_chainstate_blocking(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_blkid))?;
@@ -80,8 +80,9 @@ pub fn prepare_block(
     )?;
 
     // Assemble the body and fake header.
+    let block_epoch = prev_chstate.cur_epoch(); // FIXME make this consistent
     let body = L2BlockBody::new(l1_seg, exec_seg);
-    let fake_header = L2BlockHeader::new(slot, ts, prev_blkid, &body, Buf32::zero());
+    let fake_header = L2BlockHeader::new(slot, block_epoch, ts, prev_blkid, &body, Buf32::zero());
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
@@ -90,7 +91,7 @@ pub fn prepare_block(
     // FIXME: invalid stateroot. Remove l2blockid from ChainState or stateroot from L2Block header.
     let new_state_root = wb.new_toplevel_state().compute_state_root();
 
-    let header = L2BlockHeader::new(slot, ts, prev_blkid, &body, new_state_root);
+    let header = L2BlockHeader::new(slot, block_epoch, ts, prev_blkid, &body, new_state_root);
 
     Ok((header, body, block_acc))
 }

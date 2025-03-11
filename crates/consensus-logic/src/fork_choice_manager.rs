@@ -105,7 +105,7 @@ impl ForkChoiceManager {
         let block = self
             .get_block_data(blkid)?
             .ok_or(Error::MissingL2Block(*blkid))?;
-        Ok(block.header().blockidx())
+        Ok(block.header().slot())
     }
 
     fn get_block_chainstate(
@@ -286,7 +286,7 @@ fn determine_start_tip(
         .get_block_data_blocking(best)?
         .ok_or(Error::MissingL2Block(*best))?
         .header()
-        .blockidx();
+        .slot();
 
     // Iterate through the remaining elements and choose.
     for blkid in iter {
@@ -294,7 +294,7 @@ fn determine_start_tip(
             .get_block_data_blocking(blkid)?
             .ok_or(Error::MissingL2Block(*best))?
             .header()
-            .blockidx();
+            .slot();
 
         if blkid_slot == best_slot && blkid < best {
             best = blkid;
@@ -484,7 +484,7 @@ fn process_fc_message(
                 .get_block_data(&blkid)?
                 .ok_or(Error::MissingL2Block(blkid))?;
 
-            let slot = block_bundle.header().blockidx();
+            let slot = block_bundle.header().slot();
             info!(%slot, %blkid, "processing new block");
 
             let ok = match handle_new_block(fcm_state, &blkid, &block_bundle, engine) {
@@ -538,7 +538,7 @@ fn handle_new_block(
     bundle: &L2BlockBundle,
     engine: &impl ExecEngineCtl,
 ) -> anyhow::Result<bool> {
-    let slot = bundle.header().blockidx();
+    let slot = bundle.header().slot();
 
     // First, decide if the block seems correctly signed and we haven't
     // already marked it as invalid.
@@ -644,7 +644,7 @@ fn check_new_block(
     let params = state.params.as_ref();
 
     // If it's not the genesis block, check that the block is correctly signed.
-    if block.header().blockidx() > 0 {
+    if block.header().slot() > 0 {
         let cred_ok =
             strata_state::block_validation::check_block_credential(block.header(), params.rollup());
         if !cred_ok {
@@ -696,7 +696,7 @@ fn pick_best_block<'t>(
         let best_header = best_block.header();
         let other_header = other_block.header();
 
-        if other_header.blockidx() > best_header.blockidx() {
+        if other_header.slot() > best_header.slot() {
             best_tip = other_tip;
             best_block = other_block;
         }
@@ -804,7 +804,7 @@ fn apply_blocks(
             .get_block_data(&blkid)?
             .ok_or(Error::MissingL2Block(blkid))?;
 
-        let slot = bundle.header().blockidx();
+        let slot = bundle.header().slot();
         let header = bundle.header();
         let body = bundle.body();
         let block = L2BlockCommitment::new(slot, blkid);
@@ -885,7 +885,7 @@ fn handle_finish_epoch(
     let new_epoch = post_state.cur_epoch();
     let prev_epoch_idx = new_epoch - 1;
 
-    let slot = bundle.header().blockidx();
+    let slot = bundle.header().slot();
     let terminal = L2BlockCommitment::new(slot, *blkid);
 
     // Sanity checks.

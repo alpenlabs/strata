@@ -131,7 +131,7 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     let genesis_ts = params.rollup().horizon_l1_height;
     let zero_blkid = L2BlockId::from(Buf32::zero());
     let genesis_sr = Buf32::zero();
-    let header = L2BlockHeader::new(0, genesis_ts, zero_blkid, &body, genesis_sr);
+    let header = L2BlockHeader::new(0, 0, genesis_ts, zero_blkid, &body, genesis_sr);
     let signed_genesis_header = SignedL2BlockHeader::new(header, Buf64::zero());
     let block = L2Block::new(signed_genesis_header, body);
     L2BlockBundle::new(block, accessory)
