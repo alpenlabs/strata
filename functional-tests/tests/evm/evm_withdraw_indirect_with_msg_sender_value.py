@@ -25,7 +25,7 @@ class ContractBridgeOutWithSenderValueTest(BridgePrecompileMixin):
         contract_instance = self.web3.eth.contract(
             abi=self.abi, address=self.deployed_contract_receipt.contractAddress
         )
-        tx_hash = contract_instance.functions.bridgeOut(self.bosd).transact(
+        tx_hash = contract_instance.functions.withdraw(self.bosd).transact(
             {"gas": 5_000_000, "value": deposit_amount * SATS_TO_WEI}
         )
 

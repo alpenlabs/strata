@@ -1,6 +1,6 @@
 from load.job import StrataLoadJob
 
-from .account import FundedAccount, GenesisAccount
+from utils.evm_account import FundedAccount, GenesisAccount
 
 
 class BaseRethLoadJob(StrataLoadJob):

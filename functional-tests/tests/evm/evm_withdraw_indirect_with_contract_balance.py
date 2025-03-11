@@ -20,7 +20,7 @@ class ContractBridgeOutWithContractBalanceTest(BridgePrecompileMixin):
         contract_instance = self.web3.eth.contract(
             abi=self.abi, address=self.deployed_contract_receipt.contractAddress
         )
-        tx_hash = contract_instance.functions.bridgeOutContractValue(self.bosd).transact(
+        tx_hash = contract_instance.functions.withdrawWithOwnBalance(self.bosd).transact(
             {"gas": 5_000_000}
         )
 
