@@ -13242,6 +13242,7 @@ dependencies = [
  "bitcoin",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
+ "strata-crypto",
  "strata-eectl",
  "strata-primitives",
  "strata-state",
@@ -13410,6 +13411,9 @@ dependencies = [
  "secp256k1",
  "sha2 0.10.8",
  "strata-primitives",
+ "zkaleido",
+ "zkaleido-risc0-groth16-verifier",
+ "zkaleido-sp1-groth16-verifier",
 ]
 
 [[package]]

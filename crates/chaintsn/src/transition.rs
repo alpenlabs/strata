@@ -6,6 +6,7 @@ use std::{cmp::max, collections::HashMap};
 
 use bitcoin::{block::Header, consensus, params::Params, OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
+use strata_crypto::groth16_verifier::verify_rollup_groth16_proof_receipt;
 use strata_primitives::{
     batch::SignedCheckpoint,
     epoch::EpochCommitment,
@@ -16,6 +17,7 @@ use strata_primitives::{
     params::RollupParams,
 };
 use strata_state::{
+    batch::verify_signed_checkpoint_sig,
     block::L1Segment,
     bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
@@ -86,7 +88,7 @@ fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
 
 /// Update our view of the L1 state, playing out downstream changes from that.
 ///
-/// Returns if there was an update processed.
+/// Returns true if there epoch needs to be updated.
 fn process_l1_view_update(
     state: &mut StateCache,
     l1seg: &L1Segment,
@@ -94,43 +96,53 @@ fn process_l1_view_update(
 ) -> Result<bool, TsnError> {
     let l1v = state.state().l1_view();
 
-    // Accept new blocks.
-    if !l1seg.new_manifests().is_empty() {
-        let cur_safe_height = l1v.safe_height();
+    if l1seg.new_manifests().is_empty() {
+        return Ok(false);
+    }
 
-        // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
-        // more complicated to check the PoW.
-        let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
-        // FIXME: This check is just redundant.
-        if new_tip_height <= l1v.safe_height() {
-            return Err(TsnError::L1SegNotExtend);
-        }
+    let cur_safe_height = l1v.safe_height();
 
-        // Go through each manifest and process it.
-        for (off, b) in l1seg.new_manifests().iter().enumerate() {
-            // PoW checks are done when we try to update the HeaderVerificationState
-            let header: Header =
-                consensus::deserialize(b.header()).expect("invalid bitcoin header");
-            state.update_header_vs(&header, &Params::new(params.network))?;
+    // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
+    // more complicated to check the PoW.
+    let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
+    // FIXME: This check is just redundant.
+    if new_tip_height <= l1v.safe_height() {
+        return Err(TsnError::L1SegNotExtend);
+    }
 
-            let height = cur_safe_height + off as u64 + 1;
-            process_l1_block(state, b)?;
-            state.update_safe_block(height, b.record().clone());
-        }
+    let prev_finalized_epoch = state.state().finalized_epoch().epoch();
 
+    // Go through each manifest and process it.
+    for (off, b) in l1seg.new_manifests().iter().enumerate() {
+        // PoW checks are done when we try to update the HeaderVerificationState
+        let header: Header = consensus::deserialize(b.header()).expect("invalid bitcoin header");
+        state.update_header_vs(&header, &Params::new(params.network))?;
+
+        let height = cur_safe_height + off as u64 + 1;
+        process_l1_block(state, b, params)?;
+        state.update_safe_block(height, b.record().clone());
+    }
+
+    let new_finalized_epoch = state.state().finalized_epoch().epoch();
+
+    if new_finalized_epoch > prev_finalized_epoch {
         Ok(true)
     } else {
         Ok(false)
     }
 }
 
-fn process_l1_block(state: &mut StateCache, block_mf: &L1BlockManifest) -> Result<(), TsnError> {
+fn process_l1_block(
+    state: &mut StateCache,
+    block_mf: &L1BlockManifest,
+    params: &RollupParams,
+) -> Result<(), TsnError> {
     // Just iterate through every tx's operation and call out to the handlers for that.
     for tx in block_mf.txs() {
         for op in tx.protocol_ops() {
             match &op {
                 ProtocolOperation::Checkpoint(ckpt) => {
-                    process_l1_checkpoint(state, block_mf, ckpt)?;
+                    process_l1_checkpoint(state, block_mf, ckpt, params)?;
                 }
 
                 ProtocolOperation::Deposit(info) => {
@@ -158,6 +170,7 @@ fn process_l1_checkpoint(
     state: &mut StateCache,
     src_block_mf: &L1BlockManifest,
     signed_ckpt: &SignedCheckpoint,
+    params: &RollupParams,
 ) -> Result<(), TsnError> {
     // TODO verify signature?  it should already have been validated but it
     // doesn't hurt to do it again (just costs)
@@ -165,7 +178,19 @@ fn process_l1_checkpoint(
     // should have done it, but it wouldn't be excessively complicated to
     // re-verify it, we should formally define the answers to these questions
 
+    assert!(
+        verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule),
+        "Failed to verify signature"
+    );
     let ckpt = signed_ckpt.checkpoint(); // inner data
+
+    let receipt = ckpt.get_proof_receipt();
+    if !params.proof_publish_mode.allow_empty() {
+        assert!(
+            verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk).is_ok(),
+            "posted checkpoint proof verification failed"
+        )
+    }
 
     // Copy the epoch commitment and make it finalized.
     let old_fin_epoch = state.state().finalized_epoch();
