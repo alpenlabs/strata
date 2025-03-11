@@ -32,14 +32,16 @@ pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
         .unwrap()
         .as_millis() as u64;
 
-    let block_idx = parent.map(|h| h.slot() + 1).unwrap_or(0);
+    let slot = parent.map(|h| h.slot() + 1).unwrap_or(0);
+    let epoch = parent.map(|h| h.header().epoch()).unwrap_or(0);
     let prev_block = parent.map(|h| h.get_blockid()).unwrap_or_default();
     let timestamp = parent
         .map(|h| h.timestamp() + 100)
         .unwrap_or(current_timestamp);
 
     let header = L2BlockHeader::new(
-        block_idx,
+        slot,
+        epoch,
         timestamp,
         prev_block,
         &body,

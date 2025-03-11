@@ -124,11 +124,13 @@ impl L2Segment {
             };
             let body = L2BlockBody::new(l1_segment, el_proof_out.clone());
 
+            let epoch = 1;
             let slot = prev_block.header().slot() + 1;
             let ts = el_proof_in.timestamp;
             let prev_block_id = prev_block.header().get_blockid();
 
-            let fake_header = L2BlockHeader::new(slot, ts, prev_block_id, &body, Buf32::zero());
+            let fake_header =
+                L2BlockHeader::new(slot, epoch, ts, prev_block_id, &body, Buf32::zero());
 
             let pre_state = prev_chainstate.clone();
             let mut state_cache = StateCache::new(pre_state.clone());
@@ -139,10 +141,10 @@ impl L2Segment {
                 params.rollup(),
             )
             .unwrap();
-            let (post_state, _) = state_cache.finalize();
-            let new_state_root = post_state.compute_state_root();
+            let wb = state_cache.finalize();
+            let new_state_root = wb.new_toplevel_state().compute_state_root();
 
-            let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
+            let header = L2BlockHeader::new(slot, epoch, ts, prev_block_id, &body, new_state_root);
             let signed_header = SignedL2BlockHeader::new(header, Buf64::zero()); // TODO: fix this
             let block = L2Block::new(signed_header, body);
 
@@ -155,7 +157,8 @@ impl L2Segment {
                 params.rollup(),
             )
             .unwrap();
-            let (post_state, _) = state_cache.finalize();
+            let wb = state_cache.finalize();
+            let post_state = wb.into_toplevel();
 
             blocks.push(block.clone());
             pre_states.push(pre_state);
