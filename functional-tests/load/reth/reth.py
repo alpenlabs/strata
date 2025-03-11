@@ -1,5 +1,4 @@
 from load.job import StrataLoadJob
-
 from utils.evm_account import FundedAccount, GenesisAccount
 
 

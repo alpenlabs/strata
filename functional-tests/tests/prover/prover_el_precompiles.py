@@ -3,12 +3,12 @@ from solcx import install_solc, set_solc_version
 from web3 import Web3
 
 from envs import testenv
-from utils.transaction import SmartContracts
 from utils import (
     el_slot_to_block_id,
     wait_for_proof_with_time_out,
     wait_until_with_value,
 )
+from utils.transaction import SmartContracts
 
 
 @flexitest.register
