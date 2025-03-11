@@ -18,11 +18,11 @@ strata-zkvm-hosts.workspace = true
 
 # sp1
 sp1-sdk = "4.1.0"
-strata-sp1-guest-builder = { path = "../sp1", optional = true }
+strata-sp1-guest-builder = { path = "../../provers/sp1", optional = true }
 zkaleido-sp1-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6", optional = true }
 
 # risc0
-strata-risc0-guest-builder = { path = "../risc0", optional = true }
+strata-risc0-guest-builder = { path = "../../provers/risc0", optional = true }
 zkaleido-risc0-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6", optional = true }
 
 anyhow.workspace = true

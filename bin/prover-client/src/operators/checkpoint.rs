@@ -19,7 +19,6 @@ use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{
     checkpoint_runner::{errors::CheckpointResult, submit::submit_checkpoint_proof},
     errors::ProvingTaskError,
-   
     operators::cl_stf::ClStfParams,
     task_tracker::TaskTracker,
 };
