@@ -48,10 +48,15 @@ pub fn run_sp1_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
             GuestProgram::ClStf => cl_stf::gen_perf_report(
                 &cl_stf::sp1::host(),
                 evm_ee::proof_with_vk(&evm_ee::sp1::host()),
+                Some(btc_blockscan::proof_with_vk(&btc_blockscan::sp1::host())),
             ),
             GuestProgram::Checkpoint => checkpoint::gen_perf_report(
                 &checkpoint::sp1::host(),
-                cl_stf::proof_with_vk(&cl_stf::sp1::host(), &evm_ee::sp1::host()),
+                cl_stf::proof_with_vk(
+                    &cl_stf::sp1::host(),
+                    &evm_ee::sp1::host(),
+                    &btc_blockscan::sp1::host(),
+                ),
             ),
         })
         .collect()
@@ -72,10 +77,15 @@ pub fn run_risc0_programs(programs: &[GuestProgram]) -> Vec<PerformanceReport> {
             GuestProgram::ClStf => cl_stf::gen_perf_report(
                 &cl_stf::risc0::host(),
                 evm_ee::proof_with_vk(&evm_ee::risc0::host()),
+                Some(btc_blockscan::proof_with_vk(&btc_blockscan::risc0::host())),
             ),
             GuestProgram::Checkpoint => checkpoint::gen_perf_report(
                 &checkpoint::risc0::host(),
-                cl_stf::proof_with_vk(&cl_stf::risc0::host(), &evm_ee::risc0::host()),
+                cl_stf::proof_with_vk(
+                    &cl_stf::risc0::host(),
+                    &evm_ee::risc0::host(),
+                    &btc_blockscan::risc0::host(),
+                ),
             ),
         })
         .collect()
