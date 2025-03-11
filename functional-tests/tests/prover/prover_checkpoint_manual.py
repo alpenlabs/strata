@@ -1,15 +1,13 @@
-import time
-
-from bitcoinlib.services.bitcoind import BitcoindClient
 import flexitest
+from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
-from utils import wait_for_proof_with_time_out, wait_until, bytes_to_big_endian, cl_slot_to_block_id
+from utils import bytes_to_big_endian, cl_slot_to_block_id, wait_for_proof_with_time_out, wait_until
 
 CHECKPOINT_PROVER_PARAMS = {
     "checkpoint_idx": 1,
-    "l1_range": (1, 2),
-    "l2_range": (1, 2),
+    "l1_range": (1, 1),
+    "l2_range": (1, 1),
 }
 
 
@@ -54,14 +52,18 @@ class ProverClientTest(testenv.StrataTester):
         l2_end_block_commitment = {"slot": slot, "blkid": block_id}
 
         task_ids = prover_client_rpc.dev_strata_proveCheckpointRaw(
-            CHECKPOINT_PROVER_PARAMS["checkpoint_idx"], (l1_start_block_commitment, l1_end_block_commitment), (l2_start_block_commitment, l2_end_block_commitment)
+            CHECKPOINT_PROVER_PARAMS["checkpoint_idx"],
+            (l1_start_block_commitment, l1_end_block_commitment),
+            (l2_start_block_commitment, l2_end_block_commitment),
         )
         self.debug(f"got the task ids: {task_ids}")
         assert task_ids is not None
 
         time_out = 30
-        is_proof_generation_completed = wait_for_proof_with_time_out(prover_client_rpc, task_ids[0], time_out=time_out)
+        is_proof_generation_completed = wait_for_proof_with_time_out(
+            prover_client_rpc, task_ids[0], time_out=time_out
+        )
 
         # Proof generation is expected to fail because the range will not match
         # CL STF Proof will fail, which in turns fails the checkpoint proof
-        assert(not is_proof_generation_completed)
+        assert not is_proof_generation_completed
