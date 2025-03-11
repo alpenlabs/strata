@@ -49,7 +49,7 @@ pub struct L2EndpointParseError;
 
 impl StrataWallet {
     pub fn new(seed: &Seed, l2_http_endpoint: &str) -> Result<Self, L2EndpointParseError> {
-        let wallet = seed.strata_wallet();
+        let wallet = seed.get_strata_wallet();
 
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
