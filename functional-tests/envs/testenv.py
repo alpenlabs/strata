@@ -105,6 +105,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         message_interval: int = 0,
         duty_timeout_duration: int = 10,
         custom_chain: str | dict = "dev",
+        epoch_gas_limit: Optional[int] = None,
     ):
         super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
@@ -116,6 +117,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         self.message_interval = message_interval
         self.duty_timeout_duration = duty_timeout_duration
         self.custom_chain = custom_chain
+        self.epoch_gas_limit = epoch_gas_limit
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
@@ -219,7 +221,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         seq_host = sequencer.get_prop("rpc_host")
         seq_port = sequencer.get_prop("rpc_port")
-        sequencer_signer = seq_signer_fac.create_sequencer_signer(seq_host, seq_port)
+        sequencer_signer = seq_signer_fac.create_sequencer_signer(
+            seq_host, seq_port, epoch_gas_limit=self.epoch_gas_limit
+        )
 
         svcs["sequencer"] = sequencer
         svcs["sequencer_signer"] = sequencer_signer
