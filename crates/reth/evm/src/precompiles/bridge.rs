@@ -45,8 +45,12 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
         // Validate that this is a valid BOSD
         let _ = try_into_bosd(destination)?;
 
+        let withdrawal_amount = evmctx
+            .balance(BRIDGEOUT_ADDRESS)
+            .map_err(|_| PrecompileError::other("Could not read balance"))?
+            .data;
+
         // Verify that the transaction value matches the required withdrawal amount
-        let withdrawal_amount = evmctx.env.tx.value;
         if withdrawal_amount != self.fixed_withdrawal_wei {
             return Err(PrecompileError::other(
                 "Invalid withdrawal value: must be exactly 10 BTC in wei",

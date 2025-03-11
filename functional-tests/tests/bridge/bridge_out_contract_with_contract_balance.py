@@ -25,6 +25,4 @@ class ContractBridgeOutWithContractBalanceTest(BridgePrecompileMixin):
         )
 
         tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
-        # shouldn't fail but it fails. TODO:  create a ticket to fix this
-        # assert tx_receipt.status == 1
-        assert tx_receipt.status == 0
+        assert tx_receipt.status == 1
