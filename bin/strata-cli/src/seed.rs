@@ -102,8 +102,8 @@ impl Seed {
 
         // Network choice affects how extended public and private keys are serialized. See
         // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#serialization-format.
-        // Given the popularity of MetaMask, we follow their example (they always hardcode mainnet) and
-        // hardcode Network::Bitcoin (mainnet) for EVM-based wallet.
+        // Given the popularity of MetaMask, we follow their example (they always hardcode mainnet)
+        // and hardcode Network::Bitcoin (mainnet) for EVM-based wallet.
         let master_key = Xpriv::new_master(Network::Bitcoin, self.0.as_ref()).expect("valid xpriv");
 
         // Derive the child key for the given path
