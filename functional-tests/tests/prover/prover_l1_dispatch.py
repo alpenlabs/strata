@@ -27,7 +27,9 @@ class ProverClientTest(testenv.StrataTester):
         blockhash = bytes_to_big_endian(btcrpc.proxy.getblockhash(block_height))
         block_commitment = {"height": block_height, "blkid": blockhash}
 
-        task_ids = prover_client_rpc.dev_strata_proveBtcBlocks((block_commitment, block_commitment))
+        task_ids = prover_client_rpc.dev_strata_proveBtcBlocks(
+            (block_commitment, block_commitment), 0
+        )
         self.debug(f"got task ids: {task_ids}")
         task_id = task_ids[0]
         self.debug(f"using task id: {task_id}")
