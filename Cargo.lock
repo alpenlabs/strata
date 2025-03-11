@@ -12554,9 +12554,9 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "4.1.2"
+version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13f816a774ef3f60556c011c236a2a58407fe6748291b44bbd51e89d287562e9"
+checksum = "02fecdd110076b783d6e2954069862cc2446d21fb1b9ad4f6f52f438cbe5abc3"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.18.1",
@@ -12716,9 +12716,9 @@ dependencies = [
 
 [[package]]
 name = "sp1-helper"
-version = "4.1.2"
+version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a434c0e259fa8189537d6c3b9c31d5dc06446f77cb5b81190747351ca8b7a88b"
+checksum = "0a6533fc48a503a382a4dea06e3f7877703970b2265e86c8991d0161acd29b89"
 dependencies = [
  "sp1-build",
 ]
@@ -14076,6 +14076,7 @@ dependencies = [
  "strata-db",
  "strata-eectl",
  "strata-key-derivation",
+ "strata-l1tx",
  "strata-primitives",
  "strata-state",
  "strata-status",

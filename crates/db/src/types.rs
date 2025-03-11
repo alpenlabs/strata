@@ -12,7 +12,7 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadIntent},
 };
 use strata_state::{
-    batch::{BatchInfo, Checkpoint, CheckpointSidecar},
+    batch::{BatchInfo, BatchTransition, Checkpoint, CheckpointSidecar},
     chain_state::Chainstate,
     client_state::CheckpointL1Ref,
 };
@@ -218,7 +218,7 @@ impl CheckpointEntry {
     /// Creates a new instance for a freshly defined checkpoint.
     pub fn new_pending_proof(
         info: BatchInfo,
-        transition: (Buf32, Buf32),
+        transition: BatchTransition,
         chainstate: &Chainstate,
     ) -> Self {
         let sidecar =

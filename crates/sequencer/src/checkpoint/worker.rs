@@ -3,15 +3,20 @@
 use std::sync::Arc;
 
 use strata_db::{types::CheckpointEntry, DbError};
+use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{
     self,
     epoch::EpochCommitment,
+    hash::compute_borsh_hash,
     l1::{L1BlockCommitment, L1BlockManifest},
     l2::L2BlockCommitment,
     prelude::*,
 };
 use strata_state::{
-    batch::{BatchInfo, EpochSummary},
+    batch::{
+        BatchInfo, BatchTransition, ChainstateRootTransition, EpochSummary,
+        TxFilterConfigTransition,
+    },
     block::L2BlockBundle,
     chain_state::Chainstate,
     header::*,
@@ -202,12 +207,12 @@ fn handle_ready_epoch(
 /// Container structure for convenience.
 struct CheckpointPrepData {
     info: BatchInfo,
-    tsn: (Buf32, Buf32),
+    tsn: BatchTransition,
     chainstate: Chainstate,
 }
 
 impl CheckpointPrepData {
-    fn new(info: BatchInfo, tsn: (Buf32, Buf32), chainstate: Chainstate) -> Self {
+    fn new(info: BatchInfo, tsn: BatchTransition, chainstate: Chainstate) -> Self {
         Self {
             info,
             tsn,
@@ -278,7 +283,69 @@ fn create_checkpoint_prep_data_from_summary(
         .ok_or(Error::MissingIdxChainstate(final_state_height))?;
     let l2_final_state = final_state.compute_state_root();
 
-    let new_transition = (l2_initial_state, l2_final_state);
+    let mut tx_filters = TxFilterConfig::derive_from(params)
+        .expect("tx filter derivation from rollup params should not fail");
+
+    // In the first (epoch 0), there's no changes to the TxFilterConfig
+    // It is only at the end of epoch 1, that the TxFilterConfig will be changed
+    let tx_filters_transition = if epoch < 1 {
+        let tx_filters_hash = compute_borsh_hash(&tx_filters);
+        TxFilterConfigTransition {
+            pre_config_hash: tx_filters_hash,
+            post_config_hash: tx_filters_hash,
+        }
+    } else {
+        // Chainstate based on which the tx filter rules are updated
+        let prev_checkpoint = storage
+            .checkpoint()
+            .get_checkpoint_blocking(epoch - 1)?
+            .expect("checkpoint for the previous epoch must be valid");
+
+        // Sanity check
+        assert_eq!(
+            prev_checkpoint
+                .checkpoint
+                .batch_transition()
+                .chainstate_transition
+                .post_state_root,
+            l2_initial_state,
+            "Chain state must continue from the last epoch"
+        );
+
+        // The TxFilterConfig for this epoch must be based on the TxFilterConfig derived at the end
+        // of previous epoch
+        let initial_tx_filters_config_hash = prev_checkpoint
+            .checkpoint
+            .batch_transition()
+            .tx_filters_transition
+            .post_config_hash;
+
+        // The TxFilterConfig for the next epoch is derived at the end of this epoch. This is based
+        // on the Chainstate that was posted on previous epoch, and included in L1Segment in this
+        // epoch.
+        let prev_chainstate: Chainstate =
+            borsh::from_slice(prev_checkpoint.checkpoint.sidecar().chainstate())
+                .expect("valid chainstate must be posted");
+
+        tx_filters.update_from_chainstate(&prev_chainstate);
+        let final_tx_filters_config_hash = compute_borsh_hash(&tx_filters);
+
+        TxFilterConfigTransition {
+            pre_config_hash: initial_tx_filters_config_hash,
+            post_config_hash: final_tx_filters_config_hash,
+        }
+    };
+
+    let chainstate_transition = ChainstateRootTransition {
+        pre_state_root: l2_initial_state,
+        post_state_root: l2_final_state,
+    };
+
+    let new_transition = BatchTransition {
+        chainstate_transition,
+        tx_filters_transition,
+    };
+
     let new_batch_info = BatchInfo::new(summary.epoch(), l1_range, l2_range);
 
     Ok(CheckpointPrepData::new(

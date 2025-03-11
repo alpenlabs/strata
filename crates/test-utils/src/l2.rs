@@ -139,8 +139,7 @@ pub fn get_genesis_chainstate() -> Chainstate {
     let btc_chain = BtcChainSegment::load();
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(&params);
-    let pregenesis_mfs =
-        vec![btc_chain.get_block_manifest(params.rollup().genesis_l1_height as u32)];
+    let pregenesis_mfs = vec![btc_chain.get_block_manifest(params.rollup().genesis_l1_height)];
     make_genesis_chainstate(&gblock, pregenesis_mfs, &params)
 }
 

@@ -7,7 +7,8 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
-    buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment, params::Params,
+    batch::BatchTransition, buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment,
+    params::Params,
 };
 use tracing::*;
 
@@ -378,7 +379,7 @@ pub struct L1Checkpoint {
     pub batch_info: BatchInfo,
 
     /// The inner checkpoint batch transition.
-    pub batch_transition: (Buf32, Buf32),
+    pub batch_transition: BatchTransition,
 
     /// L1 reference for this checkpoint.
     pub l1_reference: CheckpointL1Ref,
@@ -387,7 +388,7 @@ pub struct L1Checkpoint {
 impl L1Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
-        batch_transition: (Buf32, Buf32),
+        batch_transition: BatchTransition,
         l1_reference: CheckpointL1Ref,
     ) -> Self {
         Self {

@@ -74,6 +74,9 @@ pub trait StrataApi {
         terminal: L2BlockId,
     ) -> RpcResult<Option<EpochSummary>>;
 
+    #[method(name = "getChainstateRaw")]
+    async fn get_chainstate_raw(&self, slot: u64) -> RpcResult<Vec<u8>>;
+
     #[method(name = "getCLBlockWitness")]
     async fn get_cl_block_witness_raw(&self, block_id: L2BlockId) -> RpcResult<Vec<u8>>;
 
