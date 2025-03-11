@@ -161,7 +161,8 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     };
 
     // 12. Get the final chainstate and construct the output
-    let (final_chain_state, _) = state_cache.finalize();
+    let wb = state_cache.finalize();
+    let final_chain_state = wb.into_toplevel();
     let final_chainstate_root = final_chain_state.compute_state_root();
 
     let output = ClStfOutput {
