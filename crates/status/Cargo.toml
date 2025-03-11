@@ -8,6 +8,7 @@ strata-primitives.workspace = true
 strata-rpc-types.workspace = true
 strata-state.workspace = true
 
+arbitrary.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true

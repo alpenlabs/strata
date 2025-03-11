@@ -505,7 +505,8 @@ mod test {
     fn get_reader_ctx(chs: Chainstate, cls: ClientState) -> ReaderContext<TestBitcoinClient> {
         let mut gen = ArbitraryGenerator::new();
         let l1status: L1Status = gen.generate();
-        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chs.clone()));
+        let css = gen.generate(); // This is horrible but it seems that it works fine.
+        let css = ChainSyncStatusUpdate::new(css, Arc::new(chs.clone()));
         let status_channel = StatusChannel::new(cls, l1status, Some(css));
         let params = Arc::new(gen_params());
         let config = Arc::new(ReaderConfig::default());

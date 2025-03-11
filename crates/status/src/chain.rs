@@ -2,11 +2,12 @@
 
 use std::sync::Arc;
 
+use arbitrary::Arbitrary;
 use strata_primitives::{epoch::EpochCommitment, l2::L2BlockCommitment, prelude::*};
 use strata_state::chain_state::Chainstate;
 
 /// Describes FCM state.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Arbitrary)]
 pub struct ChainSyncStatus {
     /// The current chain tip.
     pub tip: L2BlockCommitment,

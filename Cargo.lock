@@ -14146,6 +14146,7 @@ dependencies = [
 name = "strata-status"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "strata-primitives",
  "strata-rpc-types",
  "strata-state",
