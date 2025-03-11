@@ -7,7 +7,10 @@ from web3 import Web3
 
 from envs import testenv
 from utils.reth import get_chainconfig
-from utils.utils import RollupParamsSettings, wait_until
+from utils.utils import (
+    RollupParamsSettings,
+    wait_until,
+)
 
 BLOCK_GAS_LIMIT = 1_000_000
 EPOCH_GAS_LIMIT = 2_000_000
@@ -26,10 +29,15 @@ def block_number_available(web3, block_no):
 @flexitest.register
 class ElBatchGasLimitTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        rollup_settings = RollupParamsSettings.new_default()
-        rollup_settings.proof_timeout = 1000  # slow batch so we dont cross epoch while testing
+        # FIXME: running in strict mode to not cross epoch boundaries while testing
+        rollup_settings = RollupParamsSettings.new_default().strict_mode()
         ctx.set_env(
-            testenv.BasicEnvConfig(110, epoch_gas_limit=EPOCH_GAS_LIMIT, custom_chain=chain_config)
+            testenv.BasicEnvConfig(
+                110,
+                rollup_settings=rollup_settings,
+                epoch_gas_limit=EPOCH_GAS_LIMIT,
+                custom_chain=chain_config,
+            )
         )
 
     def main(self, ctx: flexitest.RunContext):
@@ -86,11 +94,13 @@ def make_gas_burner_transaction(
     web3: web3.Web3, address: str, nonce: int, burn_gas: int, gas_limit: Optional[int] = None
 ):
     """
-    Performs a token transfer transaction to own account with a large calldata.
+    Performs a transaction to own account with a large calldata.
     Sends enough calldata to consume `burn_gas` gas.
     Note: reth has default calldata limit of 128kb = ~ 2M gas
 
     :param web3: Web3 instance.
+    :param address: account address
+    :param nonce: custom nonce for queueing multiple txns
     :param burn_gas: Amount of gas to burn through calldata.
     :param gas_limit: Custom gas limit to use.
     :return: Transaction id
