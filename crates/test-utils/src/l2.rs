@@ -40,8 +40,8 @@ pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
 
     let header = L2BlockHeader::new(
         block_idx,
-        timestamp,
         parent.map(|h| h.epoch()).unwrap_or(0),
+        timestamp,
         prev_block,
         &body,
         *header.state_root(),

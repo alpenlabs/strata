@@ -29,6 +29,9 @@ pub struct L2BlockHeader {
     /// Block index, obviously.
     pub(crate) block_idx: u64,
 
+    /// Epoch a block belongs to.
+    pub(crate) epoch: u64,
+
     /// Timestamp the block was (intended to be) published at.
     pub(crate) timestamp: u64,
 
@@ -46,17 +49,14 @@ pub struct L2BlockHeader {
     /// both the CL state and EL state.
     // TODO figure out the structure of this
     pub(crate) state_root: Buf32,
-
-    /// Epoch that this block is part of.
-    pub(crate) epoch: u64,
 }
 
 impl L2BlockHeader {
     /// Creates a new L2BlockHeader
     pub fn new(
         block_idx: u64,
-        timestamp: u64,
         epoch: u64,
+        timestamp: u64,
         prev_block: L2BlockId,
         body: &L2BlockBody,
         state_root: Buf32,
@@ -67,12 +67,12 @@ impl L2BlockHeader {
         let exec_segment_hash = hash::raw(&eseg_buf);
         L2BlockHeader {
             block_idx,
+            epoch,
             timestamp,
             prev_block,
             l1_segment_hash,
             exec_segment_hash,
             state_root,
-            epoch,
         }
     }
     /// Compute the sighash for this block header.
@@ -93,6 +93,10 @@ impl From<SignedL2BlockHeader> for L2BlockHeader {
 impl L2Header for L2BlockHeader {
     fn blockidx(&self) -> u64 {
         self.block_idx
+    }
+
+    fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     fn timestamp(&self) -> u64 {
@@ -117,10 +121,6 @@ impl L2Header for L2BlockHeader {
 
     fn get_blockid(&self) -> L2BlockId {
         self.get_sighash().into()
-    }
-
-    fn epoch(&self) -> u64 {
-        self.epoch
     }
 }
 
@@ -177,6 +177,10 @@ impl L2Header for SignedL2BlockHeader {
         self.header.blockidx()
     }
 
+    fn epoch(&self) -> u64 {
+        self.header.epoch
+    }
+
     fn timestamp(&self) -> u64 {
         self.header.timestamp()
     }
@@ -199,9 +203,5 @@ impl L2Header for SignedL2BlockHeader {
 
     fn get_blockid(&self) -> L2BlockId {
         self.header.get_blockid()
-    }
-
-    fn epoch(&self) -> u64 {
-        self.header.epoch
     }
 }

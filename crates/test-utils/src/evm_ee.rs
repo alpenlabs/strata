@@ -111,7 +111,7 @@ impl L2Segment {
             let ts = el_proof_in.timestamp;
             let prev_block_id = prev_block.header().get_blockid();
 
-            let fake_header = L2BlockHeader::new(slot, ts, 0, prev_block_id, &body, Buf32::zero());
+            let fake_header = L2BlockHeader::new(slot, 0, ts, prev_block_id, &body, Buf32::zero());
 
             let pre_state = prev_chainstate.clone();
             let mut state_cache = StateCache::new(pre_state.clone());
@@ -125,7 +125,7 @@ impl L2Segment {
             let (post_state, _) = state_cache.finalize();
             let new_state_root = post_state.compute_state_root();
 
-            let header = L2BlockHeader::new(slot, ts, 0, prev_block_id, &body, new_state_root);
+            let header = L2BlockHeader::new(slot, 0, ts, prev_block_id, &body, new_state_root);
             let signed_header = SignedL2BlockHeader::new(header, Buf64::zero()); // TODO: fix this
             let block = L2Block::new(signed_header, body);
 

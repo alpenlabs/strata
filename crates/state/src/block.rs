@@ -54,7 +54,7 @@ impl<'a> Arbitrary<'a> for L2Block {
         let prev = L2BlockId::from(Buf32::zero());
         let sr = Buf32::arbitrary(u)?;
         let epoch = u64::arbitrary(u)?;
-        let header = L2BlockHeader::new(idx, ts, epoch, prev, &body, sr);
+        let header = L2BlockHeader::new(idx, epoch, ts, prev, &body, sr);
         let signed_header = SignedL2BlockHeader::new(header, Buf64::arbitrary(u)?);
         Ok(Self::new(signed_header, body))
     }
