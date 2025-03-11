@@ -1,6 +1,7 @@
-use strata_db::DbError;
+use strata_db::{traits::BlockStatus, DbError};
 use strata_eectl::{engine::ExecEngineCtl, errors::EngineError, messages::ExecPayloadData};
-use strata_state::id::L2BlockId;
+use strata_primitives::l2::L2BlockCommitment;
+use strata_state::{chain_state::Chainstate, id::L2BlockId};
 use strata_storage::NodeStorage;
 use thiserror::Error;
 use tracing::{debug, info};
@@ -9,10 +10,16 @@ use tracing::{debug, info};
 pub enum Error {
     #[error("missing chainstate for slot {0}")]
     MissingChainstate(u64),
+
     #[error("missing l2block {0}")]
     MissingL2Block(L2BlockId),
+
+    #[error("missing any blocks for slot {0}")]
+    MissingBlockForSlot(u64),
+
     #[error("db: {0}")]
     Db(#[from] DbError),
+
     #[error("engine: {0}")]
     Engine(#[from] EngineError),
 }
@@ -37,9 +44,9 @@ pub fn sync_chainstate_to_el(
             return Err(Error::MissingChainstate(idx));
         };
 
-        let block_id = chain_state.chain_tip_blkid();
+        let block = resolve_chainstate_block_badly(&chain_state, storage)?;
 
-        Ok(engine.check_block_exists(*block_id)?)
+        Ok(engine.check_block_exists(*block.blkid())?)
     })?
     .map(|idx| idx + 1) // sync from next index
     .unwrap_or(0); // sync from genesis
@@ -52,16 +59,17 @@ pub fn sync_chainstate_to_el(
             return Err(Error::MissingChainstate(idx));
         };
 
-        let block_id = chain_state.chain_tip_blkid();
+        let block = resolve_chainstate_block_badly(&chain_state, storage)?;
 
-        let Some(l2block) = l2_block_manager.get_block_data_blocking(block_id)? else {
-            return Err(Error::MissingL2Block(*block_id));
+        let Some(l2block) = l2_block_manager.get_block_data_blocking(block.blkid())? else {
+            // This shouldn't happen because we just fetched it but whatever.
+            return Err(Error::MissingL2Block(*block.blkid()));
         };
 
         let payload = ExecPayloadData::from_l2_block_bundle(&l2block);
 
         engine.submit_payload(payload)?;
-        engine.update_safe_block(*block_id)?;
+        engine.update_safe_block(*block.blkid())?;
     }
 
     Ok(())
@@ -93,6 +101,35 @@ fn find_last_match(
     }
 
     Ok(best_match)
+}
+
+/// Really horrible function that resolves the block that might have produced
+/// the chainstate.
+///
+/// This makes no definite guarantees that this is actually the block that
+/// produced this chainstate.  This will be removed in STR-17.
+pub fn resolve_chainstate_block_badly(
+    chs: &Chainstate,
+    storage: &NodeStorage,
+) -> Result<L2BlockCommitment, Error> {
+    let l2man = storage.l2();
+
+    let slot = chs.chain_tip_slot();
+
+    // We *should* always find it on the first block we look at, but we
+    // can't guarantee that.
+    let blkids = l2man.get_blocks_at_height_blocking(slot)?;
+    for b in blkids {
+        let Some(status) = l2man.get_block_status_blocking(&b)? else {
+            continue;
+        };
+
+        if status == BlockStatus::Valid {
+            return Ok(L2BlockCommitment::new(slot, b));
+        }
+    }
+
+    Err(Error::MissingBlockForSlot(slot))
 }
 
 #[cfg(test)]

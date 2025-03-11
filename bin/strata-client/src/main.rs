@@ -275,7 +275,8 @@ fn do_startup_checks(
     }
 
     // Check that tip L2 block exists (and engine can be connected to)
-    let chain_tip = last_chain_state.chain_tip_blkid();
+    let block = el_sync::resolve_chainstate_block_badly(&last_chain_state, storage)?;
+    let chain_tip = block.blkid();
     match engine.check_block_exists(*chain_tip) {
         Ok(true) => {
             info!("startup: last l2 block is synced")

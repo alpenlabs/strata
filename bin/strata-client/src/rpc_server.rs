@@ -867,6 +867,23 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 
     async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>> {
+        // Fetch the tip block header.  There's some messy stuff we do here that
+        // should be refactored in the near/mid future.
+        let css = self
+            .status
+            .get_chain_sync_status()
+            .ok_or(Error::BeforeGenesis)?;
+        let tip_blkid = css.tip_blkid();
+        let block = self
+            .storage
+            .l2()
+            .get_block_data_async(tip_blkid)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?
+            .ok_or(Error::MissingL2Block(*tip_blkid))?;
+
+        let header = block.header().header();
+
         let chain_state = self
             .status
             .get_cur_tip_chainstate()
@@ -878,6 +895,7 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .ok_or(Error::MissingInternalState)?;
 
         let duties = extract_duties(
+            header,
             chain_state.as_ref(),
             client_int_state,
             &self.checkpoint_handle,
@@ -986,12 +1004,37 @@ impl StrataDebugApiServer for StrataDebugRpcImpl {
             .get_toplevel_chainstate_async(idx)
             .map_err(Error::Db)
             .await?;
+
+        use crate::el_sync;
+
         match chain_state {
-            Some(cs) => Ok(Some(RpcChainState {
-                tip_blkid: *cs.chain_tip_blkid(),
-                tip_slot: cs.chain_tip_slot(),
-                cur_epoch: cs.cur_epoch(),
-            })),
+            Some(chs) => {
+                let tip_slot = chs.chain_tip_slot();
+                let cur_epoch = chs.cur_epoch();
+
+                // Horrible query for blkid.
+                let tip_blkid = {
+                    let chs = chs.clone();
+                    let storage = self.storage.clone();
+                    let fetch_fut = tokio::task::spawn_blocking(move || {
+                        el_sync::resolve_chainstate_block_badly(&chs, storage.as_ref())
+                    });
+
+                    let tip_block = match fetch_fut.await {
+                        // This isn't the right error handling.
+                        Ok(res) => res.map_err(|_| Error::BeforeGenesis)?,
+                        Err(_) => return Err(Error::BlockingAbort("aa".to_owned()).into()),
+                    };
+
+                    *tip_block.blkid()
+                };
+
+                Ok(Some(RpcChainState {
+                    tip_blkid,
+                    tip_slot,
+                    cur_epoch,
+                }))
+            }
             None => Ok(None),
         }
     }
