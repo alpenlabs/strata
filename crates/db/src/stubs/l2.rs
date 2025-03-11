@@ -35,7 +35,7 @@ impl StubL2Db {
 impl L2BlockDatabase for StubL2Db {
     fn put_block_data(&self, bundle: L2BlockBundle) -> DbResult<()> {
         let blkid = bundle.block().header().get_blockid();
-        let idx = bundle.block().header().blockidx();
+        let idx = bundle.block().header().slot();
 
         {
             let mut tbl = self.blocks.lock();

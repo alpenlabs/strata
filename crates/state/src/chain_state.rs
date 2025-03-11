@@ -19,8 +19,11 @@ use crate::{
 /// This corresponds to the beacon chain state.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct Chainstate {
-    /// Most recent seen block.
-    pub(crate) last_block: L2BlockCommitment,
+    /// The slot that contained the block that produced this chainstate.
+    pub(crate) cur_slot: u64,
+
+    /// The parent of the block that produced this chainstate.
+    pub(crate) prev_block: L2BlockCommitment,
 
     /// The checkpoint epoch period we're currently in, and so the index we
     /// expect the next checkpoint to be for.
@@ -30,7 +33,15 @@ pub struct Chainstate {
     pub(crate) cur_epoch: u64,
 
     /// The immediately preceding epoch.
+    ///
+    /// This *should* be updated in the first block of the new epoch.
     pub(crate) prev_epoch: EpochCommitment,
+
+    /// Flag set while processing the last block of an epoch to ensure that the
+    /// next block is the first block of the next epoch.
+    ///
+    /// This is a temporary flag.
+    pub(crate) is_epoch_finishing: bool,
 
     /// The epoch that we have observed in a checkpoint in L1.
     pub(crate) finalized_epoch: EpochCommitment,
@@ -56,10 +67,12 @@ impl Chainstate {
     // TODO remove genesis blkid since apparently we don't need it anymore
     pub fn from_genesis(gdata: &GenesisStateData) -> Self {
         Self {
-            last_block: L2BlockCommitment::new(0, gdata.genesis_blkid()),
+            cur_slot: 0,
+            prev_block: L2BlockCommitment::new(u64::MAX, L2BlockId::null()),
             cur_epoch: 0,
             prev_epoch: EpochCommitment::null(),
             finalized_epoch: EpochCommitment::null(),
+            is_epoch_finishing: false,
             l1_state: gdata.l1_state().clone(),
             pending_withdraws: StateQueue::new_empty(),
             exec_env_state: gdata.exec_state().clone(),
@@ -70,14 +83,12 @@ impl Chainstate {
 
     /// Returns the slot last processed on the chainstate.
     pub fn chain_tip_slot(&self) -> u64 {
-        self.last_block.slot()
+        self.cur_slot
     }
 
-    /// Returns the blockid of the last processed block, which was used to
-    /// construct this chainstate (unless we're currently in the process of
-    /// modifying this chainstate copy).
-    pub fn chain_tip_blkid(&self) -> &L2BlockId {
-        self.last_block.blkid()
+    /// Returns the commitment to the previous block.
+    pub fn prev_block(&self) -> &L2BlockCommitment {
+        &self.prev_block
     }
 
     pub fn l1_view(&self) -> &L1ViewState {
@@ -102,8 +113,10 @@ impl Chainstate {
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
+        // FIXME this is all broken because we're doing this badly, the real
+        // solution is to use SSZ for all of this
         let hashed_state = HashedChainState {
-            last_block: compute_borsh_hash(&self.last_block),
+            prev_block: compute_borsh_hash(&self.prev_block),
             cur_epoch: self.cur_epoch,
             prev_epoch: compute_borsh_hash(&self.prev_epoch),
             l1_state_hash: compute_borsh_hash(&self.l1_state),
@@ -138,7 +151,7 @@ impl Chainstate {
 // which defines all of this more rigorously
 #[derive(BorshSerialize, BorshDeserialize, Clone, Copy)]
 pub struct HashedChainState {
-    pub last_block: Buf32,
+    pub prev_block: Buf32,
     pub cur_epoch: u64,
     pub prev_epoch: Buf32,
     pub l1_state_hash: Buf32,

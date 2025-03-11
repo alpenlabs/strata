@@ -21,7 +21,6 @@ use crate::{
     bridge_ops::DepositIntent,
     bridge_state::{DepositEntry, DepositState, DispatchCommand, DispatchedState, FulfilledState},
     chain_state::Chainstate,
-    header::L2Header,
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -132,14 +131,11 @@ impl StateCache {
         self.write_ops.is_empty()
     }
 
-    /// Finalizes the changes made to the state, exporting it and a write batch
+    /// Finalizes the changes made to the state, exporting it as a write batch
     /// that can be applied to the previous state to produce it.
     // TODO remove extra `Chainstate` return value
-    pub fn finalize(self) -> (Chainstate, WriteBatch) {
-        (
-            self.new_state.clone(),
-            WriteBatch::new(self.new_state, self.write_ops),
-        )
+    pub fn finalize(self) -> WriteBatch {
+        WriteBatch::new(self.new_state, self.write_ops)
     }
 
     // Primitive manipulation functions.
@@ -158,18 +154,21 @@ impl StateCache {
     // TODO rework a lot of these to make them lower-level and focus more on
     // just keeping the core invariants consistent
 
-    /// Sets the last block commitment, derived from a header.
-    pub fn set_cur_header(&mut self, header: &impl L2Header) {
-        self.set_last_block(L2BlockCommitment::new(
-            header.blockidx(),
-            header.get_blockid(),
-        ));
+    /// Sets the current slot.
+    ///
+    /// # Panics
+    ///
+    /// If this call does not cause the current slot to increase.
+    pub fn set_slot(&mut self, slot: u64) {
+        let state = self.state_mut();
+        assert!(slot > state.cur_slot, "stateop: decreasing slot");
+        state.cur_slot = slot;
     }
 
     /// Sets the last block commitment.
-    pub fn set_last_block(&mut self, block: L2BlockCommitment) {
+    pub fn set_prev_block(&mut self, block: L2BlockCommitment) {
         let state = self.state_mut();
-        state.last_block = block;
+        state.prev_block = block;
     }
 
     /// Sets the current epoch index.

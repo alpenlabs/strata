@@ -13,6 +13,7 @@ use strata_primitives::{
         BitcoinAmount, DepositInfo, DepositSpendInfo, L1BlockManifest, L1HeaderRecord, L1TxRef,
         OutputRef, ProtocolOperation, WithdrawalFulfillmentInfo,
     },
+    l2::L2BlockCommitment,
     params::RollupParams,
 };
 use strata_state::{
@@ -58,7 +59,10 @@ pub fn process_block(
     let mut rng = compute_init_slot_rng(state);
 
     // Update basic bookkeeping.
-    state.set_cur_header(header);
+    //state.set_cur_header(header);
+    let tip_slot = state.state().chain_tip_slot();
+    state.set_slot(header.slot());
+    state.set_prev_block(L2BlockCommitment::new(tip_slot, *header.parent()));
 
     // Go through each stage and play out the operations it has.
     let has_new_epoch = process_l1_view_update(state, body.l1_segment(), params)?;
@@ -80,7 +84,7 @@ pub fn process_block(
 /// let's not get ahead of ourselves.
 fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
     // Just take the last block's slot.
-    let blkid_buf = *state.state().chain_tip_blkid().as_ref();
+    let blkid_buf = *state.state().prev_block().blkid().as_ref();
     SlotRng::from_seed(blkid_buf)
 }
 
@@ -223,7 +227,7 @@ fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Res
 /// Advances the epoch bookkeeping, using the provided header as the terminal.
 fn advance_epoch_tracking(state: &mut StateCache, header: &impl L2Header) -> Result<(), TsnError> {
     let cur_epoch = state.state().cur_epoch();
-    let this_epoch = EpochCommitment::new(cur_epoch, header.blockidx(), header.get_blockid());
+    let this_epoch = EpochCommitment::new(cur_epoch, header.slot(), header.get_blockid());
     state.set_prev_epoch(this_epoch);
     state.set_cur_epoch(cur_epoch + 1);
     Ok(())
