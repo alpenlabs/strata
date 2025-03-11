@@ -51,6 +51,7 @@ pub fn get_verification_key(key: &ProofKey) -> VerifyingKey {
 /// SP1, and Risc0, which each implement the [`ZkVmHost`](zkaleido::ZkVmHost) trait. The
 /// [`ZkVmHost`](zkaleido::ZkVmHost) trait is not object-safe, so this enum is used to encapsulate
 /// the different implementations.
+#[non_exhaustive]
 pub enum ZkVmHostInstance {
     /// Represents the native ZKVM host implementation.
     ///
