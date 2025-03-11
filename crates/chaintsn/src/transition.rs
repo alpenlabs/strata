@@ -110,7 +110,7 @@ fn process_l1_view_update(
         return Err(TsnError::L1SegNotExtend);
     }
 
-    let prev_finalized_epoch = state.state().finalized_epoch().epoch();
+    let prev_finalized_epoch = *state.state().finalized_epoch();
 
     // Go through each manifest and process it.
     for (off, b) in l1seg.new_manifests().iter().enumerate() {
@@ -123,9 +123,17 @@ fn process_l1_view_update(
         state.update_safe_block(height, b.record().clone());
     }
 
-    let new_finalized_epoch = state.state().finalized_epoch().epoch();
+    // If prev_finalized_epoch is null, i.e. this is the genesis batch, it is safe to update the
+    // epoch
+    if prev_finalized_epoch.is_null() {
+        return Ok(true);
+    }
 
-    if new_finalized_epoch > prev_finalized_epoch {
+    // For all other non-genesis batch, we need to check that the new finalized epoch has been
+    // updated when processing L1Checkpoint
+    let new_finalized_epoch = state.state().finalized_epoch();
+
+    if new_finalized_epoch.epoch() > prev_finalized_epoch.epoch() {
         Ok(true)
     } else {
         Ok(false)
