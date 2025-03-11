@@ -1,6 +1,5 @@
 use std::sync::LazyLock;
 
-use cfg_if::cfg_if;
 use strata_primitives::proof::ProofContext;
 #[cfg(feature = "sp1-builder")]
 use strata_sp1_guest_builder::*;
@@ -9,65 +8,38 @@ use zkaleido_sp1_host::SP1Host;
 pub static ELF_BASE_PATH: LazyLock<String> =
     LazyLock::new(|| std::env::var("ELF_BASE_PATH").unwrap_or_else(|_| "elfs/sp1".to_string()));
 
-// BTC_BLOCKSPACE_HOST
-cfg_if! {
-    if #[cfg(feature = "sp1-builder")] {
-        pub static BTC_BLOCKSPACE_HOST: LazyLock<SP1Host> =
-            LazyLock::new(|| SP1Host::new_from_pk_bytes(&GUEST_BTC_BLOCKSPACE_PK));
-    } else {
-        pub static BTC_BLOCKSPACE_HOST: LazyLock<SP1Host> = LazyLock::new(|| {
-            let elf_path = format!("{}/guest-btc-blockspace.elf", &*ELF_BASE_PATH);
+macro_rules! define_host {
+    ($host_name:ident, $guest_const:ident, $elf_file:expr) => {
+        #[cfg(feature = "sp1-builder")]
+        pub static $host_name: LazyLock<SP1Host> = LazyLock::new(|| SP1Host::init(&$guest_const));
+
+        #[cfg(not(feature = "sp1-builder"))]
+        pub static $host_name: LazyLock<SP1Host> = LazyLock::new(|| {
+            let elf_path = format!("{}/{}", *ELF_BASE_PATH, $elf_file);
             let elf = std::fs::read(&elf_path)
                 .expect(&format!("Failed to read ELF file from {}", elf_path));
             SP1Host::init(&elf)
         });
-    }
+    };
 }
 
-// EVM_EE_STF_HOST
-cfg_if! {
-    if #[cfg(feature = "sp1-builder")] {
-        pub static EVM_EE_STF_HOST: LazyLock<SP1Host> =
-            LazyLock::new(|| SP1Host::new_from_pk_bytes(&GUEST_EVM_EE_STF_PK));
-    } else {
-        pub static EVM_EE_STF_HOST: LazyLock<SP1Host> = LazyLock::new(|| {
-            let elf_path = format!("{}/guest-evm-ee-stf.elf", &*ELF_BASE_PATH);
-            let elf = std::fs::read(&elf_path)
-                .expect(&format!("Failed to read ELF file from {}", elf_path));
-            SP1Host::init(&elf)
-        });
-    }
-}
-
-// CL_STF_HOST
-cfg_if! {
-    if #[cfg(feature = "sp1-builder")] {
-        pub static CL_STF_HOST: LazyLock<SP1Host> =
-            LazyLock::new(|| SP1Host::new_from_pk_bytes(&GUEST_CL_STF_PK));
-    } else {
-        pub static CL_STF_HOST: LazyLock<SP1Host> = LazyLock::new(|| {
-            let elf_path = format!("{}/guest-cl-stf.elf", &*ELF_BASE_PATH);
-            let elf = std::fs::read(&elf_path)
-                .expect(&format!("Failed to read ELF file from {}", elf_path));
-            SP1Host::init(&elf)
-        });
-    }
-}
-
-// CHECKPOINT_HOST
-cfg_if! {
-    if #[cfg(feature = "sp1-builder")] {
-        pub static CHECKPOINT_HOST: LazyLock<SP1Host> =
-            LazyLock::new(|| SP1Host::new_from_pk_bytes(&GUEST_CHECKPOINT_PK));
-    } else {
-        pub static CHECKPOINT_HOST: LazyLock<SP1Host> = LazyLock::new(|| {
-            let elf_path = format!("{}/guest-checkpoint.elf", &*ELF_BASE_PATH);
-            let elf = std::fs::read(&elf_path)
-                .expect(&format!("Failed to read ELF file from {}", elf_path));
-            SP1Host::init(&elf)
-        });
-    }
-}
+// Define hosts using the macro
+define_host!(
+    BTC_BLOCKSPACE_HOST,
+    GUEST_BTC_BLOCKSPACE_ELF,
+    "guest-btc-blockspace.elf"
+);
+define_host!(
+    EVM_EE_STF_HOST,
+    GUEST_EVM_EE_STF_ELF,
+    "guest-evm-ee-stf.elf"
+);
+define_host!(CL_STF_HOST, GUEST_CL_STF_ELF, "guest-cl-stf.elf");
+define_host!(
+    CHECKPOINT_HOST,
+    GUEST_CHECKPOINT_ELF,
+    "guest-checkpoint.elf"
+);
 
 /// Returns a reference to the appropriate `SP1Host` instance based on the given [`ProofContext`].
 ///

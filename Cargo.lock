@@ -14240,7 +14240,6 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "borsh",
- "cfg-if",
  "serde",
  "strata-primitives",
  "strata-proofimpl-btc-blockspace",

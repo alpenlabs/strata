@@ -23,7 +23,6 @@ strata-proofimpl-evm-ee-stf.workspace = true
 
 bincode.workspace = true
 borsh.workspace = true
-cfg-if.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 
