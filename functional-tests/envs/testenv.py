@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Optional
 
@@ -103,7 +104,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         n_operators: int = 2,
         message_interval: int = 0,
         duty_timeout_duration: int = 10,
-        custom_chain: str = "dev",
+        custom_chain: str | dict = "dev",
     ):
         super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
@@ -127,7 +128,17 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         # set up network params
         initdir = ctx.make_service_dir("_init")
+
+        custom_chain = self.custom_chain
+        if isinstance(custom_chain, dict):
+            json_path = os.path.join(initdir, "custom_chain.json")
+            with open(json_path, "w") as f:
+                json.dump(custom_chain, f)
+            custom_chain = json_path
+
         settings = self.rollup_settings or RollupParamsSettings.new_default().fast_batch()
+        if custom_chain != self.custom_chain:
+            settings = settings.with_chainconfig(custom_chain)
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
         # Instantiaze the generated rollup config so it's convenient to work with.
@@ -146,9 +157,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         with open(reth_secret_path, "w") as f:
             f.write(generate_jwt_secret())
 
-        reth = reth_fac.create_exec_client(
-            0, reth_secret_path, None, custom_chain=self.custom_chain
-        )
+        reth = reth_fac.create_exec_client(0, reth_secret_path, None, custom_chain=custom_chain)
         reth_port = reth.get_prop("rpc_port")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
