@@ -12,7 +12,7 @@ use strata_primitives::{
 };
 use strata_state::{
     block::{self, L2BlockBundle},
-    chain_state::Chainstate,
+    chain_state::{Chainstate, ChainstateEntry},
     client_state::*,
     header::L2Header,
     id::L2BlockId,
@@ -69,7 +69,7 @@ impl EventContext for StorageEventContext<'_> {
         self.storage
             .chainstate()
             .get_toplevel_chainstate_blocking(slot)?
-            .map(|(chainstate, _)| chainstate)
+            .map(Into::into)
             .ok_or(Error::MissingIdxChainstate(slot))
     }
 }

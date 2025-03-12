@@ -126,7 +126,7 @@ impl StrataRpcImpl {
             .chainstate()
             .get_toplevel_chainstate_async(end_commitment.slot())
             .await?
-            .map(|(chainstate, _)| chainstate)
+            .map(Into::into)
             .map(Arc::new))
     }
 
@@ -394,13 +394,14 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_chainstate_raw(&self, slot: u64) -> RpcResult<Vec<u8>> {
-        let (chs, _) = self
+        let chs = self
             .storage
             .chainstate()
             .get_toplevel_chainstate_async(slot)
             .map_err(Error::Db)
             .await?
-            .ok_or(Error::MissingChainstate(slot))?;
+            .ok_or(Error::MissingChainstate(slot))?
+            .to_chainstate();
 
         let raw_chs = borsh::to_vec(&chs)
             .map_err(|_| Error::Other("failed to serialize chainstate".to_string()))?;
@@ -413,13 +414,14 @@ impl StrataApiServer for StrataRpcImpl {
 
         let prev_slot = l2_blk_bundle.block().header().header().slot() - 1;
 
-        let (chain_state, _) = self
+        let chain_state = self
             .storage
             .chainstate()
             .get_toplevel_chainstate_async(prev_slot)
             .map_err(Error::Db)
             .await?
-            .ok_or(Error::MissingChainstate(prev_slot))?;
+            .ok_or(Error::MissingChainstate(prev_slot))?
+            .to_chainstate();
 
         let cl_block_witness = (chain_state, l2_blk_bundle.block());
         let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
@@ -989,10 +991,10 @@ impl StrataDebugApiServer for StrataDebugRpcImpl {
             .map_err(Error::Db)
             .await?;
         match chain_state_res {
-            Some((cs, tip_blockid)) => Ok(Some(RpcChainState {
-                tip_blkid: tip_blockid,
-                tip_slot: cs.chain_tip_slot(),
-                cur_epoch: cs.cur_epoch(),
+            Some(cs_entry) => Ok(Some(RpcChainState {
+                tip_blkid: *cs_entry.tip_blockid(),
+                tip_slot: cs_entry.state().chain_tip_slot(),
+                cur_epoch: cs_entry.state().cur_epoch(),
             })),
             None => Ok(None),
         }

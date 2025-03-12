@@ -33,13 +33,11 @@ pub fn sync_chainstate_to_el(
 
     // last idx of chainstate whose corresponding block is present in el
     let sync_from_idx = find_last_match((earliest_idx, latest_idx), |idx| {
-        let Some((_chain_state, tip_blockid)) =
-            chainstate_manager.get_toplevel_chainstate_blocking(idx)?
-        else {
+        let Some(entry) = chainstate_manager.get_toplevel_chainstate_blocking(idx)? else {
             return Err(Error::MissingChainstate(idx));
         };
 
-        Ok(engine.check_block_exists(tip_blockid)?)
+        Ok(engine.check_block_exists(*entry.tip_blockid())?)
     })?
     .map(|idx| idx + 1) // sync from next index
     .unwrap_or(0); // sync from genesis
@@ -48,20 +46,21 @@ pub fn sync_chainstate_to_el(
 
     for idx in sync_from_idx..=latest_idx {
         debug!(?idx, "Syncing chainstate");
-        let Some((_chain_state, tip_blockid)) =
-            chainstate_manager.get_toplevel_chainstate_blocking(idx)?
+        let Some(chainstate_entry) = chainstate_manager.get_toplevel_chainstate_blocking(idx)?
         else {
             return Err(Error::MissingChainstate(idx));
         };
 
-        let Some(l2block) = l2_block_manager.get_block_data_blocking(&tip_blockid)? else {
-            return Err(Error::MissingL2Block(tip_blockid));
+        let tip_blockid = chainstate_entry.tip_blockid();
+
+        let Some(l2block) = l2_block_manager.get_block_data_blocking(tip_blockid)? else {
+            return Err(Error::MissingL2Block(*tip_blockid));
         };
 
         let payload = ExecPayloadData::from_l2_block_bundle(&l2block);
 
         engine.submit_payload(payload)?;
-        engine.update_safe_block(tip_blockid)?;
+        engine.update_safe_block(*tip_blockid)?;
     }
 
     Ok(())

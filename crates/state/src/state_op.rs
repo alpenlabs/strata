@@ -13,14 +13,14 @@ use strata_primitives::{
     l1::{
         BitcoinAmount, L1HeaderRecord, L1VerificationError, OutputRef, WithdrawalFulfillmentInfo,
     },
-    l2::L2BlockCommitment,
+    l2::{L2BlockCommitment, L2BlockId},
 };
 use tracing::warn;
 
 use crate::{
     bridge_ops::DepositIntent,
     bridge_state::{DepositEntry, DepositState, DispatchCommand, DispatchedState, FulfilledState},
-    chain_state::Chainstate,
+    chain_state::{Chainstate, ChainstateEntry},
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -133,7 +133,6 @@ impl StateCache {
 
     /// Finalizes the changes made to the state, exporting it as a write batch
     /// that can be applied to the previous state to produce it.
-    // TODO remove extra `Chainstate` return value
     pub fn finalize(self) -> WriteBatch {
         WriteBatch::new(self.new_state, self.write_ops)
     }
@@ -336,4 +335,35 @@ impl StateCache {
     }
 
     // TODO add more manipulator functions
+}
+
+#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct WriteBatchEntry {
+    wb: WriteBatch,
+    blockid: L2BlockId,
+}
+
+impl WriteBatchEntry {
+    pub fn new(wb: WriteBatch, blockid: L2BlockId) -> Self {
+        Self { wb, blockid }
+    }
+
+    pub fn to_parts(self) -> (WriteBatch, L2BlockId) {
+        (self.wb, self.blockid)
+    }
+
+    pub fn toplevel_chainstate(&self) -> &Chainstate {
+        self.wb.new_toplevel_state()
+    }
+
+    pub fn blockid(&self) -> &L2BlockId {
+        &self.blockid
+    }
+}
+
+impl From<WriteBatchEntry> for ChainstateEntry {
+    fn from(value: WriteBatchEntry) -> Self {
+        let (wb, blockid) = value.to_parts();
+        ChainstateEntry::new(wb.into_toplevel(), blockid)
+    }
 }

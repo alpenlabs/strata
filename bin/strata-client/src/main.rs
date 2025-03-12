@@ -250,13 +250,14 @@ fn do_startup_checks(
         err => err?,
     };
 
-    let Some((last_chain_state, tip_blockid)) = storage
+    let Some(last_chain_state_entry) = storage
         .chainstate()
         .get_toplevel_chainstate_blocking(last_state_idx)?
     else {
         anyhow::bail!("Missing chain state idx: {last_state_idx}");
     };
 
+    let (last_chain_state, tip_blockid) = last_chain_state_entry.to_parts();
     // Check that we can connect to bitcoin client and block we believe to be matured in L1 is
     // actually present
     let safe_l1blockid = last_chain_state.l1_view().safe_block().blkid();

@@ -9,8 +9,13 @@ use strata_primitives::{
     epoch::EpochCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment, params::Params,
 };
 use strata_state::{
-    batch::EpochSummary, block::L2BlockBundle, block_validation::validate_block_segments,
-    chain_state::Chainstate, client_state::ClientState, prelude::*, state_op::StateCache,
+    batch::EpochSummary,
+    block::L2BlockBundle,
+    block_validation::validate_block_segments,
+    chain_state::Chainstate,
+    client_state::ClientState,
+    prelude::*,
+    state_op::{StateCache, WriteBatchEntry},
 };
 use strata_status::*;
 use strata_storage::{L2BlockManager, NodeStorage};
@@ -118,11 +123,11 @@ impl ForkChoiceManager {
             return Ok(Some(self.cur_chainstate.clone()));
         }
 
-        self.storage
+        Ok(self
+            .storage
             .chainstate()
-            .get_toplevel_chainstate_blocking(block.slot())
-            .map(|res| res.map(|(chainstate, _)| Arc::new(chainstate)))
-            .map_err(Into::into)
+            .get_toplevel_chainstate_blocking(block.slot())?
+            .map(|entry| Arc::new(entry.to_chainstate())))
     }
 
     /// Updates the stored current state.
@@ -207,10 +212,11 @@ pub fn init_forkchoice_manager(
     // initial checkpoint for the genesis epoch
 
     let latest_chainstate_idx = storage.chainstate().get_last_write_idx_blocking()?;
-    let (latest_chainstate, _tip_blockid) = storage
+    let latest_chainstate = storage
         .chainstate()
         .get_toplevel_chainstate_blocking(latest_chainstate_idx)?
-        .ok_or(DbError::MissingL2State(latest_chainstate_idx))?;
+        .ok_or(DbError::MissingL2State(latest_chainstate_idx))?
+        .to_chainstate();
 
     let chainstate_last_epoch = latest_chainstate.prev_epoch();
 
@@ -237,9 +243,10 @@ pub fn init_forkchoice_manager(
 
     // Load in that block's chainstate.
     let chsman = storage.chainstate();
-    let (chainstate, _) = chsman
+    let chainstate = chsman
         .get_toplevel_chainstate_blocking(cur_tip_block.slot())?
-        .ok_or(DbError::MissingL2State(cur_tip_block.slot()))?;
+        .ok_or(DbError::MissingL2State(cur_tip_block.slot()))?
+        .to_chainstate();
 
     // Actually assemble the forkchoice manager state.
     let mut fcm = ForkChoiceManager::new(
@@ -765,11 +772,12 @@ fn revert_chainstate_to_block(
     // Fetch the old state from the database and store in memory.  This
     // is also how  we validate that we actually *can* revert to this
     // block.
-    let (new_state, _) = fcm_state
+    let new_state = fcm_state
         .storage
         .chainstate()
         .get_toplevel_chainstate_blocking(block.slot())?
-        .ok_or(Error::MissingIdxChainstate(block.slot()))?;
+        .ok_or(Error::MissingIdxChainstate(block.slot()))?
+        .to_chainstate();
     fcm_state.update_tip_block(*block, Arc::new(new_state));
 
     // Rollback the writes on the database that we no longer need.
@@ -861,7 +869,7 @@ fn apply_blocks(
     // Apply all the write batches.
     let chsman = fcm_state.storage.chainstate();
     for (block, wb) in updates {
-        chsman.put_write_batch_blocking(block.slot(), wb, *block.blkid())?;
+        chsman.put_write_batch_blocking(block.slot(), WriteBatchEntry::new(wb, *block.blkid()))?;
     }
 
     // Update the tip block in the FCM state.

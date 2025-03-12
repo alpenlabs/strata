@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use revm_primitives::B256;
 use strata_db::errors::DbError;
 use strata_primitives::params::RollupParams;
-use strata_state::{block::L2BlockBundle, chain_state::Chainstate, id::L2BlockId};
+use strata_state::{block::L2BlockBundle, chain_state::ChainstateEntry, id::L2BlockId};
 use strata_storage::*;
 use tracing::*;
 
@@ -17,10 +17,11 @@ pub fn fetch_init_fork_choice_state(
 ) -> Result<B256> {
     // TODO switch these logs to debug
     match get_last_chainstate(storage)? {
-        Some((chs, tip)) => {
-            let slot = chs.chain_tip_slot();
+        Some(chs) => {
+            let slot = chs.state().chain_tip_slot();
+            let tip = chs.tip_blockid();
             info!(%slot, %tip, "preparing EVM initial state from chainstate");
-            compute_evm_fc_state_from_chainstate(&tip, storage)
+            compute_evm_fc_state_from_chainstate(tip, storage)
         }
         None => {
             info!("preparing EVM initial state from genesis");
@@ -41,7 +42,7 @@ fn compute_evm_fc_state_from_chainstate(
     Ok(latest_evm_block_hash)
 }
 
-fn get_last_chainstate(storage: &NodeStorage) -> Result<Option<(Chainstate, L2BlockId)>> {
+fn get_last_chainstate(storage: &NodeStorage) -> Result<Option<ChainstateEntry>> {
     let chsman = storage.chainstate();
 
     let last_write_idx = match chsman.get_last_write_idx_blocking() {

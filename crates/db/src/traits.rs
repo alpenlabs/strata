@@ -13,7 +13,7 @@ use strata_primitives::{
 };
 use strata_state::{
     block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate, operation::*,
-    state_op::WriteBatch, sync_event::SyncEvent,
+    state_op::WriteBatchEntry, sync_event::SyncEvent,
 };
 use zkaleido::ProofReceipt;
 
@@ -195,10 +195,10 @@ pub trait ChainstateDatabase {
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
     /// previous writes must be purged first in order to be replaced.
-    fn put_write_batch(&self, idx: u64, batch: WriteBatch, blockid: L2BlockId) -> DbResult<()>;
+    fn put_write_batch(&self, idx: u64, batch: WriteBatchEntry) -> DbResult<()>;
 
     /// Gets the write batch stored to compute a height.
-    fn get_write_batch(&self, idx: u64) -> DbResult<Option<(WriteBatch, L2BlockId)>>;
+    fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatchEntry>>;
 
     /// Tells the database to purge state before a certain index.
     fn purge_entries_before(&self, before_idx: u64) -> DbResult<()>;

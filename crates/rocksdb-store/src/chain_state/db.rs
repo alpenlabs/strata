@@ -2,9 +2,12 @@ use std::sync::Arc;
 
 use rockbound::{OptimisticTransactionDB, SchemaBatch, SchemaDBOperationsExt};
 use strata_db::{errors::DbError, traits::*, DbResult};
-use strata_state::{id::L2BlockId, state_op::WriteBatch};
+use strata_state::{
+    id::L2BlockId,
+    state_op::{WriteBatch, WriteBatchEntry},
+};
 
-use super::schemas::{ChainSchema, WriteBatchSchema};
+use super::schemas::WriteBatchSchema;
 use crate::{
     utils::{get_first_idx, get_last_idx},
     DbOpsConfig,
@@ -44,21 +47,15 @@ impl ChainstateDatabase for ChainstateDb {
 
         let mut batch = SchemaBatch::new();
 
-        let fake_wb = WriteBatch::new_replace(toplevel);
-        batch.put::<WriteBatchSchema>(&genesis_key, &fake_wb)?;
-        batch.put::<ChainSchema>(&genesis_key, &blockid)?;
+        let genesis_wb = WriteBatch::new_replace(toplevel);
+        batch.put::<WriteBatchSchema>(&genesis_key, &WriteBatchEntry::new(genesis_wb, blockid))?;
 
         self.db.write_schemas(batch)?;
 
         Ok(())
     }
 
-    fn put_write_batch(
-        &self,
-        idx: u64,
-        writebatch: strata_state::state_op::WriteBatch,
-        blockid: L2BlockId,
-    ) -> DbResult<()> {
+    fn put_write_batch(&self, idx: u64, writebatch: WriteBatchEntry) -> DbResult<()> {
         if self.db.get::<WriteBatchSchema>(&idx)?.is_some() {
             return Err(DbError::OverwriteStateUpdate(idx));
         }
@@ -75,12 +72,8 @@ impl ChainstateDatabase for ChainstateDb {
             None => return Err(DbError::NotBootstrapped),
         }
 
-        let mut batch = SchemaBatch::new();
         // TODO maybe do this in a tx to make sure we don't race/TOCTOU it
-        batch.put::<WriteBatchSchema>(&idx, &writebatch)?;
-        batch.put::<ChainSchema>(&idx, &blockid)?;
-
-        self.db.write_schemas(batch)?;
+        self.db.put::<WriteBatchSchema>(&idx, &writebatch)?;
 
         #[cfg(test)]
         eprintln!("db inserted index {idx}");
@@ -88,17 +81,8 @@ impl ChainstateDatabase for ChainstateDb {
         Ok(())
     }
 
-    fn get_write_batch(
-        &self,
-        idx: u64,
-    ) -> DbResult<Option<(strata_state::state_op::WriteBatch, L2BlockId)>> {
-        let wb = self.db.get::<WriteBatchSchema>(&idx)?;
-        let blockid = self.db.get::<ChainSchema>(&idx)?;
-
-        match (wb, blockid) {
-            (Some(wb), Some(blockid)) => Ok(Some((wb, blockid))),
-            _ => Ok(None),
-        }
+    fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatchEntry>> {
+        Ok(self.db.get::<WriteBatchSchema>(&idx)?)
     }
 
     fn purge_entries_before(&self, before_idx: u64) -> DbResult<()> {
@@ -114,7 +98,6 @@ impl ChainstateDatabase for ChainstateDb {
         let mut del_batch = SchemaBatch::new();
         for idx in first_idx..before_idx {
             del_batch.delete::<WriteBatchSchema>(&idx)?;
-            del_batch.delete::<ChainSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
 
@@ -145,7 +128,6 @@ impl ChainstateDatabase for ChainstateDb {
         let mut del_batch = SchemaBatch::new();
         for idx in new_tip_idx + 1..=last_idx {
             del_batch.delete::<WriteBatchSchema>(&idx)?;
-            del_batch.delete::<ChainSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
 
@@ -210,22 +192,22 @@ mod tests {
         let genesis_blockid: L2BlockId = generator.generate();
         let batch = WriteBatch::new_replace(genesis_state.clone());
 
-        let res = db.put_write_batch(1, batch.clone(), genesis_blockid);
+        let res = db.put_write_batch(1, WriteBatchEntry::new(batch.clone(), genesis_blockid));
         assert!(res.is_err_and(|x| matches!(x, DbError::NotBootstrapped)));
 
         db.write_genesis_state(genesis_state, genesis_blockid)
             .unwrap();
 
-        let res = db.put_write_batch(1, batch.clone(), generator.generate());
+        let res = db.put_write_batch(1, WriteBatchEntry::new(batch.clone(), generator.generate()));
         assert!(res.is_ok());
 
-        let res = db.put_write_batch(2, batch.clone(), generator.generate());
+        let res = db.put_write_batch(2, WriteBatchEntry::new(batch.clone(), generator.generate()));
         assert!(res.is_ok());
 
-        let res = db.put_write_batch(2, batch.clone(), generator.generate());
+        let res = db.put_write_batch(2, WriteBatchEntry::new(batch.clone(), generator.generate()));
         assert!(res.is_err_and(|x| matches!(x, DbError::OverwriteStateUpdate(2))));
 
-        let res = db.put_write_batch(4, batch.clone(), generator.generate());
+        let res = db.put_write_batch(4, WriteBatchEntry::new(batch.clone(), generator.generate()));
         assert!(res.is_err_and(|x| matches!(x, DbError::OooInsert("Chainstate", 4))));
     }
 
@@ -243,7 +225,7 @@ mod tests {
         for i in 1..=5 {
             eprintln!("test inserting index {i}");
             assert_eq!(db.get_earliest_write_idx().unwrap(), 0);
-            db.put_write_batch(i, batch.clone(), generator.generate())
+            db.put_write_batch(i, WriteBatchEntry::new(batch.clone(), generator.generate()))
                 .unwrap();
             assert_eq!(db.get_last_write_idx().unwrap(), i);
         }
@@ -261,7 +243,7 @@ mod tests {
         for i in 1..=5 {
             eprintln!("test inserting index {i}");
             assert_eq!(db.get_earliest_write_idx().unwrap(), 0);
-            db.put_write_batch(i, batch.clone(), generator.generate())
+            db.put_write_batch(i, WriteBatchEntry::new(batch.clone(), generator.generate()))
                 .unwrap();
             assert_eq!(db.get_last_write_idx().unwrap(), i);
         }
@@ -298,7 +280,7 @@ mod tests {
         db.write_genesis_state(genesis_state, generator.generate())
             .unwrap();
         for i in 1..=5 {
-            db.put_write_batch(i, batch.clone(), generator.generate())
+            db.put_write_batch(i, WriteBatchEntry::new(batch.clone(), generator.generate()))
                 .unwrap();
         }
 
@@ -342,7 +324,7 @@ mod tests {
         db.write_genesis_state(genesis_state, generator.generate())
             .unwrap();
         for i in 1..=5 {
-            db.put_write_batch(i, batch.clone(), generator.generate())
+            db.put_write_batch(i, WriteBatchEntry::new(batch.clone(), generator.generate()))
                 .unwrap();
         }
 

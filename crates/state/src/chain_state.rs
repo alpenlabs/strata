@@ -184,26 +184,35 @@ impl<'a> Arbitrary<'a> for Chainstate {
     }
 }
 
-#[allow(unused)]
-#[cfg(test)]
-mod tests {
-    //use arbitrary::Unstructured;
+pub struct ChainstateEntry {
+    state: Chainstate,
+    tip: L2BlockId,
+}
 
-    //use super::*;
+impl ChainstateEntry {
+    pub fn new(state: Chainstate, tip: L2BlockId) -> Self {
+        Self { state, tip }
+    }
 
-    // TODO re-enable this test, it's going to be changing a lot so these kinds
-    // of test vectors aren't that useful right now
-    /*#[test]
-    fn test_state_root_calc() {
-        let mut u = Unstructured::new(&[12u8; 50]);
-        let state = Chainstate::arbitrary(&mut u).unwrap();
-        let root = state.state_root();
+    pub fn to_parts(self) -> (Chainstate, L2BlockId) {
+        (self.state, self.tip)
+    }
 
-        let expected = Buf32::from([
-            151, 170, 71, 78, 222, 173, 105, 242, 232, 9, 47, 21, 45, 160, 207, 234, 161, 29, 114,
-            237, 237, 94, 26, 177, 140, 238, 193, 81, 63, 80, 88, 181,
-        ]);
+    pub fn to_chainstate(self) -> Chainstate {
+        self.state
+    }
 
-        assert_eq!(root, expected);
-    }*/
+    pub fn state(&self) -> &Chainstate {
+        &self.state
+    }
+
+    pub fn tip_blockid(&self) -> &L2BlockId {
+        &self.tip
+    }
+}
+
+impl From<ChainstateEntry> for Chainstate {
+    fn from(value: ChainstateEntry) -> Self {
+        value.to_chainstate()
+    }
 }
