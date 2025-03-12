@@ -12,6 +12,7 @@ pub(crate) struct Config {
     pub rpc_host: String,
     pub rpc_port: u16,
     pub duty_poll_interval: u64,
+    pub epoch_gas_limit: Option<u64>,
 }
 
 impl Config {
@@ -30,6 +31,7 @@ impl Config {
             duty_poll_interval: args
                 .duty_poll_interval
                 .unwrap_or(DEFAULT_DUTY_POLL_INTERVAL),
+            epoch_gas_limit: args.epoch_gas_limit,
         })
     }
 

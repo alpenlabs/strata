@@ -108,13 +108,15 @@ pub struct BlockGenerationConfig {
     ts: Option<u64>,
     // slot: Option<u64>,
     // el payload ?
+    epoch_gas_limit: Option<u64>,
 }
 
 impl BlockGenerationConfig {
     /// Create new instance with provided parent block id.
-    pub fn from_parent_block_id(parent_block_id: L2BlockId) -> Self {
+    pub fn new(parent_block_id: L2BlockId, epoch_gas_limit: Option<u64>) -> Self {
         Self {
             parent_block_id,
+            epoch_gas_limit,
             ..Default::default()
         }
     }
@@ -131,7 +133,12 @@ impl BlockGenerationConfig {
     }
 
     /// Return block timestamp.
-    pub fn ts(&self) -> &Option<u64> {
-        &self.ts
+    pub fn ts(&self) -> Option<u64> {
+        self.ts
+    }
+
+    /// Return gas limit.
+    pub fn epoch_gas_limit(&self) -> Option<u64> {
+        self.epoch_gas_limit
     }
 }

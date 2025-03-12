@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 
 import requests
 from websockets.sync.client import connect as wsconnect
@@ -32,8 +33,8 @@ def _handle_response(resp_str: str):
     return resp["result"]
 
 
-def _send_single_ws_request(url: str, request: str) -> str:
-    with wsconnect(url) as w:
+def _send_single_ws_request(url: str, request: str, max_size: Optional[int] = None) -> str:
+    with wsconnect(url, max_size=max_size) as w:
         w.send(request)
         return w.recv()
 
@@ -44,11 +45,11 @@ def _send_http_request(url: str, request: str) -> str:
     return res.text
 
 
-def _dispatch_request(url: str, request: str) -> str:
+def _dispatch_request(url: str, request: str, max_size: Optional[int] = None) -> str:
     if url.startswith("http"):
         return _send_http_request(url, request)
     elif url.startswith("ws"):
-        return _send_single_ws_request(url, request)
+        return _send_single_ws_request(url, request, max_size=max_size)
     else:
         raise ValueError(f"unsupported protocol in url '{url}'")
 
@@ -69,15 +70,16 @@ class JsonrpcClient:
                 if not r:
                     raise RuntimeError(f"failed precheck on call to '{m}'")
 
-    def _call(self, method: str, args):
+    def _call(self, method: str, args, **kwargs):
+        max_size = kwargs.get("max_size")
         self._do_pre_call_check(method)
         req = _make_request(method, self.req_idx, args)
         self.req_idx += 1
-        resp = _dispatch_request(self.url, req)
+        resp = _dispatch_request(self.url, req, max_size=max_size)
         return _handle_response(resp)
 
     def __getattr__(self, name: str):
-        def __call(*args):
-            return self._call(name, args)
+        def __call(*args, **kwargs):
+            return self._call(name, args, **kwargs)
 
         return __call

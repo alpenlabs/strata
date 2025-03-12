@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Optional
 
@@ -103,7 +104,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
         n_operators: int = 2,
         message_interval: int = 0,
         duty_timeout_duration: int = 10,
-        custom_chain: str = "dev",
+        custom_chain: str | dict = "dev",
+        epoch_gas_limit: Optional[int] = None,
     ):
         super().__init__()
         self.pre_generate_blocks = pre_generate_blocks
@@ -115,6 +117,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         self.message_interval = message_interval
         self.duty_timeout_duration = duty_timeout_duration
         self.custom_chain = custom_chain
+        self.epoch_gas_limit = epoch_gas_limit
 
     def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
         btc_fac = ctx.get_factory("bitcoin")
@@ -127,7 +130,17 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         # set up network params
         initdir = ctx.make_service_dir("_init")
+
+        custom_chain = self.custom_chain
+        if isinstance(custom_chain, dict):
+            json_path = os.path.join(initdir, "custom_chain.json")
+            with open(json_path, "w") as f:
+                json.dump(custom_chain, f)
+            custom_chain = json_path
+
         settings = self.rollup_settings or RollupParamsSettings.new_default().fast_batch()
+        if custom_chain != self.custom_chain:
+            settings = settings.with_chainconfig(custom_chain)
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
         params = params_gen_data["params"]
         # Instantiaze the generated rollup config so it's convenient to work with.
@@ -146,9 +159,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
         with open(reth_secret_path, "w") as f:
             f.write(generate_jwt_secret())
 
-        reth = reth_fac.create_exec_client(
-            0, reth_secret_path, None, custom_chain=self.custom_chain
-        )
+        reth = reth_fac.create_exec_client(0, reth_secret_path, None, custom_chain=custom_chain)
         reth_port = reth.get_prop("rpc_port")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
@@ -210,7 +221,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
 
         seq_host = sequencer.get_prop("rpc_host")
         seq_port = sequencer.get_prop("rpc_port")
-        sequencer_signer = seq_signer_fac.create_sequencer_signer(seq_host, seq_port)
+        sequencer_signer = seq_signer_fac.create_sequencer_signer(
+            seq_host, seq_port, epoch_gas_limit=self.epoch_gas_limit
+        )
 
         svcs["sequencer"] = sequencer
         svcs["sequencer_signer"] = sequencer_signer

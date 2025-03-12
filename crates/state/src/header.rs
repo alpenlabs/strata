@@ -18,6 +18,7 @@ pub trait L2Header {
     fn exec_payload_hash(&self) -> &Buf32;
     fn state_root(&self) -> &Buf32;
     fn get_blockid(&self) -> L2BlockId;
+    fn epoch(&self) -> u64;
 }
 
 /// Block header that forms the chain we use to reach consensus.
@@ -27,6 +28,9 @@ pub trait L2Header {
 pub struct L2BlockHeader {
     /// Block index, obviously.
     pub(crate) block_idx: u64,
+
+    /// Epoch a block belongs to.
+    pub(crate) epoch: u64,
 
     /// Timestamp the block was (intended to be) published at.
     pub(crate) timestamp: u64,
@@ -51,6 +55,7 @@ impl L2BlockHeader {
     /// Creates a new L2BlockHeader
     pub fn new(
         block_idx: u64,
+        epoch: u64,
         timestamp: u64,
         prev_block: L2BlockId,
         body: &L2BlockBody,
@@ -62,6 +67,7 @@ impl L2BlockHeader {
         let exec_segment_hash = hash::raw(&eseg_buf);
         L2BlockHeader {
             block_idx,
+            epoch,
             timestamp,
             prev_block,
             l1_segment_hash,
@@ -71,8 +77,8 @@ impl L2BlockHeader {
     }
     /// Compute the sighash for this block header.
     pub fn get_sighash(&self) -> Buf32 {
-        // 8 + 8 + 32 + 32 + 32 + 32 = 144
-        let mut buf = [0; 144];
+        // 8 + 8 + 8 + 32 + 32 + 32 + 32 = 152
+        let mut buf = [0; 152];
         fill_sighash_buf(self, &mut buf).expect("blockasm: compute sighash");
         strata_primitives::hash::raw(&buf)
     }
@@ -87,6 +93,10 @@ impl From<SignedL2BlockHeader> for L2BlockHeader {
 impl L2Header for L2BlockHeader {
     fn blockidx(&self) -> u64 {
         self.block_idx
+    }
+
+    fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     fn timestamp(&self) -> u64 {
@@ -120,6 +130,7 @@ fn fill_sighash_buf(tmplt: &L2BlockHeader, buf: &mut [u8]) -> Result<(), io::Err
     let mut cur = Cursor::new(&mut buf[..]);
     cur.write_all(&tmplt.block_idx.to_be_bytes())?;
     cur.write_all(&tmplt.timestamp.to_be_bytes())?;
+    cur.write_all(&tmplt.epoch.to_be_bytes())?;
     cur.write_all(Buf32::from(tmplt.prev_block).as_ref())?;
     cur.write_all(tmplt.l1_segment_hash.as_ref())?;
     cur.write_all(tmplt.exec_segment_hash.as_ref())?;
@@ -164,6 +175,10 @@ impl SignedL2BlockHeader {
 impl L2Header for SignedL2BlockHeader {
     fn blockidx(&self) -> u64 {
         self.header.blockidx()
+    }
+
+    fn epoch(&self) -> u64 {
+        self.header.epoch
     }
 
     fn timestamp(&self) -> u64 {

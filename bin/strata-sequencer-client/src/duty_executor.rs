@@ -30,6 +30,7 @@ pub(crate) async fn duty_executor_worker<R>(
     mut duty_rx: mpsc::Receiver<Duty>,
     handle: Handle,
     idata: IdentityData,
+    epoch_gas_limit: Option<u64>,
 ) -> anyhow::Result<()>
 where
     R: StrataSequencerApiClient + Send + Sync + 'static,
@@ -49,7 +50,7 @@ where
                         continue;
                     }
                     seen_duties.insert(duty.generate_id());
-                    handle.spawn(handle_duty(rpc.clone(), duty, idata.clone(), failed_duties_tx.clone()));
+                    handle.spawn(handle_duty(rpc.clone(), duty, idata.clone(), failed_duties_tx.clone(), epoch_gas_limit));
                 } else {
                     // tx is closed, we are done
                     return Ok(());
@@ -71,13 +72,16 @@ async fn handle_duty<R>(
     duty: Duty,
     idata: IdentityData,
     failed_duties_tx: mpsc::Sender<DutyId>,
+    epoch_gas_limit: Option<u64>,
 ) where
     R: StrataSequencerApiClient + Send + Sync,
 {
     let duty_id = duty.generate_id();
     debug!(%duty_id, ?duty, "handle_duty");
     let duty_result = match duty.clone() {
-        Duty::SignBlock(duty) => handle_sign_block_duty(rpc, duty, duty_id, &idata).await,
+        Duty::SignBlock(duty) => {
+            handle_sign_block_duty(rpc, duty, duty_id, &idata, epoch_gas_limit).await
+        }
         Duty::CommitBatch(duty) => handle_commit_batch_duty(rpc, duty, duty_id, &idata).await,
     };
 
@@ -92,6 +96,7 @@ async fn handle_sign_block_duty<R>(
     duty: BlockSigningDuty,
     duty_id: DutyId,
     idata: &IdentityData,
+    epoch_gas_limit: Option<u64>,
 ) -> Result<(), DutyExecError>
 where
     R: StrataSequencerApiClient + Send + Sync,
@@ -109,7 +114,7 @@ where
 
     // should this keep track of previously signed slots and dont sign conflicting blocks ?
     let template = rpc
-        .get_block_template(BlockGenerationConfig::from_parent_block_id(duty.parent()))
+        .get_block_template(BlockGenerationConfig::new(duty.parent(), epoch_gas_limit))
         .await
         .map_err(DutyExecError::GenerateTemplate)?;
 

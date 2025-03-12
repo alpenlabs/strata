@@ -19,10 +19,12 @@ use strata_reth_primitives::WithdrawalIntent;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct StrataPayloadAttributes {
-    /// An inner payload type
+    /// Original Ethereum payload attributes
     #[serde(flatten)]
     pub inner: EthPayloadAttributes,
-    // additional custom fields to be added
+    // additional custom fields for strata
+    /// Optional cumulative gas limit for blocks
+    pub batch_gas_limit: Option<u64>,
 }
 
 impl StrataPayloadAttributes {
@@ -30,6 +32,14 @@ impl StrataPayloadAttributes {
         Self {
             inner: payload_attributes,
             // more fields here
+            batch_gas_limit: None,
+        }
+    }
+
+    pub fn new(payload_attributes: EthPayloadAttributes, batch_gas_limit: Option<u64>) -> Self {
+        Self {
+            inner: payload_attributes,
+            batch_gas_limit,
         }
     }
 }
@@ -50,7 +60,16 @@ impl PayloadAttributes for StrataPayloadAttributes {
 
 /// New type around the payload builder attributes type
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StrataPayloadBuilderAttributes(pub(crate) EthPayloadBuilderAttributes);
+pub struct StrataPayloadBuilderAttributes {
+    pub(crate) inner: EthPayloadBuilderAttributes,
+    pub(crate) batch_gas_limit: Option<u64>,
+}
+
+impl StrataPayloadBuilderAttributes {
+    pub(crate) fn batch_gas_limit(&self) -> Option<u64> {
+        self.batch_gas_limit
+    }
+}
 
 impl PayloadBuilderAttributes for StrataPayloadBuilderAttributes {
     type RpcPayloadAttributes = StrataPayloadAttributes;
@@ -61,44 +80,47 @@ impl PayloadBuilderAttributes for StrataPayloadBuilderAttributes {
         attributes: StrataPayloadAttributes,
         _version: u8,
     ) -> Result<Self, Infallible> {
-        Ok(Self(EthPayloadBuilderAttributes::new(
-            parent,
-            attributes.inner,
-        )))
+        Ok(Self {
+            inner: EthPayloadBuilderAttributes::new(parent, attributes.inner),
+            batch_gas_limit: attributes.batch_gas_limit,
+        })
     }
 
     fn payload_id(&self) -> PayloadId {
-        self.0.id
+        self.inner.id
     }
 
     fn parent(&self) -> B256 {
-        self.0.parent
+        self.inner.parent
     }
 
     fn timestamp(&self) -> u64 {
-        self.0.timestamp
+        self.inner.timestamp
     }
 
     fn parent_beacon_block_root(&self) -> Option<B256> {
-        self.0.parent_beacon_block_root
+        self.inner.parent_beacon_block_root
     }
 
     fn suggested_fee_recipient(&self) -> Address {
-        self.0.suggested_fee_recipient
+        self.inner.suggested_fee_recipient
     }
 
     fn prev_randao(&self) -> B256 {
-        self.0.prev_randao
+        self.inner.prev_randao
     }
 
     fn withdrawals(&self) -> &Withdrawals {
-        &self.0.withdrawals
+        &self.inner.withdrawals
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct StrataBuiltPayload {
+    /// Payload to build ethereum block.
     pub(crate) inner: EthBuiltPayload,
+    // additional fields for strata
+    /// Requested withdrawals
     pub(crate) withdrawal_intents: Vec<WithdrawalIntent>,
 }
 

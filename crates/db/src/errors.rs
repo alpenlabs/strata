@@ -1,5 +1,5 @@
 use strata_primitives::epoch::EpochCommitment;
-use strata_state::l1::L1BlockId;
+use strata_state::{id::L2BlockId, l1::L1BlockId};
 use thiserror::Error;
 
 use crate::entities::errors::EntityError;
@@ -34,7 +34,13 @@ pub enum DbError {
     #[error("Block does not extend canonical chain tip")]
     L1InvalidNextBlock(u64, L1BlockId),
 
-    #[error("missing L2 state (idx {0})")]
+    #[error("missing L2 block (id {0})")]
+    MissingL2Block(L2BlockId),
+
+    #[error("missing L2 block (slot {0})")]
+    MissingL2BlockHeight(u64),
+
+    #[error("missing L2 state (slot {0})")]
     MissingL2State(u64),
 
     #[error("not yet bootstrapped")]

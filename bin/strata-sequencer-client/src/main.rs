@@ -70,7 +70,7 @@ fn main_inner(args: Args) -> Result<()> {
     );
     executor.spawn_critical_async(
         "duty-runner",
-        duty_executor_worker(rpc, duty_rx, handle.clone(), idata),
+        duty_executor_worker(rpc, duty_rx, handle.clone(), idata, config.epoch_gas_limit),
     );
 
     task_manager.start_signal_listeners();
