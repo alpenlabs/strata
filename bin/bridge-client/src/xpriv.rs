@@ -1,73 +1,68 @@
 //! Parses the operator's master xpriv from a file.
 
-use std::{
-    env,
-    fs::read_to_string,
-    path::{Path, PathBuf},
-};
+use std::fs::read_to_string;
 
 use bitcoin::bip32::Xpriv;
 use strata_key_derivation::operator::OperatorKeys;
-use strata_primitives::keys::ZeroizableXpriv;
+use tracing::*;
 use zeroize::Zeroize;
 
 /// The environment variable that contains the operator's master [`Xpriv`].
-const OPXPRIV_ENVVAR: &str = "STRATA_OP_MASTER_XPRIV";
+pub const OPXPRIV_ENVVAR: &str = "STRATA_OP_MASTER_XPRIV";
 
-/// Parses the master [`Xpriv`] from a file.
-pub(crate) fn parse_master_xpriv(path: &Path) -> anyhow::Result<OperatorKeys> {
-    let mut xpriv_str = read_to_string(path)?;
-    match xpriv_str.parse::<Xpriv>() {
-        Ok(mut xpriv) => {
-            // Zeroize the xpriv string after parsing it.
-            xpriv_str.zeroize();
-
-            // Parse into ZeroizableXpriv
-            let zeroizable_xpriv: ZeroizableXpriv = xpriv.into();
-
-            // Zeroize the xpriv after parsing it.
-            xpriv.private_key.non_secure_erase();
-
-            // Finally return the operator keys
-            //
-            // NOTE: `zeroizable_xpriv` is zeroized on drop.
-            Ok(OperatorKeys::new(&zeroizable_xpriv)
-                .map_err(|_| anyhow::anyhow!("invalid master xpriv"))?)
-        }
-        Err(e) => anyhow::bail!("invalid master xpriv: {}", e),
-    }
-}
-
-/// Resolves the master [`Xpriv`] from CLI arguments or environment variables.
+/// Resolves the master [`Xpriv`] from the various sources.
 ///
-/// Precedence order for resolving the master xpriv:
+/// Rules:
 ///
-/// 1. If a key is supplied via the `--master-xpriv` CLI argument, it is used.
-/// 2. Otherwise, if a file path is supplied via CLI, the key is read from that file.
-/// 3. Otherwise, if the `STRATA_OP_MASTER_XPRIV` environment variable is set, its value is used.
-/// 4. Otherwise, returns an error.
+/// 1. If none are set, error out.
+/// 2. If multiple are set, error out.
+/// 3. If we have the verbatim key provided, parse it.
+/// 4. If we have a path provided, load it and parse that instead.
 ///
 /// # Errors
 ///
-/// Returns an error if the master xpriv is invalid or not found.
+/// Returns an error if the master xpriv is invalid or not found, or if
+/// conflicting options are set.
 pub(crate) fn resolve_xpriv(
     cli_arg: Option<String>,
     cli_path: Option<String>,
+    env_val: Option<String>,
 ) -> anyhow::Result<OperatorKeys> {
-    match (cli_arg, cli_path) {
-        (Some(xpriv), _) => OperatorKeys::new(&xpriv.parse::<Xpriv>()?)
-            .map_err(|_| anyhow::anyhow!("invalid master xpriv from CLI")),
-
-        (_, Some(path)) => parse_master_xpriv(&PathBuf::from(path)),
-
-        (None, None) => match env::var(OPXPRIV_ENVVAR) {
-            Ok(xpriv_env_str) => OperatorKeys::new(&xpriv_env_str.parse::<Xpriv>()?)
-                .map_err(|_| anyhow::anyhow!("invalid master xpriv from envvar")),
-            Err(_) => {
-                anyhow::bail!(
-                    "must either set {OPXPRIV_ENVVAR} envvar or pass with `--master-xpriv`"
-                )
-            }
-        },
+    if cli_arg.is_some() {
+        error!("FOUND CLI ARG KEY, THIS IS INSECURE!");
     }
+
+    let mut xpriv_str: String = match (cli_arg, cli_path, env_val) {
+        // If there's none set then we error out.
+        (None, None, None) => {
+            anyhow::bail!(
+                "must provide root xpriv with either `--master-xpriv-path` or {OPXPRIV_ENVVAR}"
+            )
+        }
+
+        // If multiple are set then we error out.
+        (_, Some(_), Some(_)) | (Some(_), Some(_), _) | (Some(_), _, Some(_)) => {
+            anyhow::bail!("multiple root xpriv options specified, don't know what to do, aborting");
+        }
+
+        // In these cases we have the string explicitly.
+        (Some(xpriv_str), _, _) | (_, _, Some(xpriv_str)) => xpriv_str.to_owned(),
+
+        // In this case we fetch it from file.
+        (_, Some(path), _) => read_to_string(path)?,
+    };
+
+    // Some fancy dance to securely erase things.
+    let Ok(raw) = xpriv_str.parse::<Xpriv>() else {
+        xpriv_str.zeroize();
+        anyhow::bail!("invalid master xpriv");
+    };
+
+    let Ok(keys) = OperatorKeys::new(&raw) else {
+        xpriv_str.zeroize();
+        // TODO how to secure erase raw?
+        anyhow::bail!("unable to generate leaf keys");
+    };
+
+    Ok(keys)
 }
