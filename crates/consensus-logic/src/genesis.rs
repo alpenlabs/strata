@@ -166,17 +166,6 @@ fn make_genesis_block(params: &Params) -> L2BlockBundle {
     L2BlockBundle::new(block, accessory)
 }
 
-fn make_block_from_parts(
-    header: L2BlockHeader,
-    sig: Buf64,
-    body: L2BlockBody,
-    accessory: L2BlockAccessory,
-) -> L2BlockBundle {
-    let signed_genesis_header = SignedL2BlockHeader::new(header, sig);
-    let block = L2Block::new(signed_genesis_header, body);
-    L2BlockBundle::new(block, accessory)
-}
-
 fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
     pregenesis_mfs: Vec<L1BlockManifest>,
