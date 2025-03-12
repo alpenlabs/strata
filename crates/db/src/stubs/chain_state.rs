@@ -1,7 +1,7 @@
 use std::collections::*;
 
 use parking_lot::Mutex;
-use strata_state::{chain_state::Chainstate, state_op::WriteBatch};
+use strata_state::{chain_state::Chainstate, id::L2BlockId, state_op::WriteBatch};
 use tracing::*;
 
 use crate::{errors::DbError, traits::*, DbResult};
@@ -9,6 +9,7 @@ use crate::{errors::DbError, traits::*, DbResult};
 struct InnerState {
     write_batches: BTreeMap<u64, WriteBatch>,
     toplevels: BTreeMap<u64, Chainstate>,
+    blocks: BTreeMap<u64, L2BlockId>,
 }
 
 impl InnerState {
@@ -16,6 +17,7 @@ impl InnerState {
         Self {
             write_batches: BTreeMap::new(),
             toplevels: BTreeMap::new(),
+            blocks: BTreeMap::new(),
         }
     }
 
@@ -46,13 +48,14 @@ impl StubChainstateDb {
 }
 
 impl ChainstateDatabase for StubChainstateDb {
-    fn write_genesis_state(&self, toplevel: Chainstate) -> DbResult<()> {
+    fn write_genesis_state(&self, toplevel: Chainstate, blockid: L2BlockId) -> DbResult<()> {
         let mut st = self.state.lock();
         st.toplevels.insert(0, toplevel.clone());
+        st.blocks.insert(0, blockid);
         Ok(())
     }
 
-    fn put_write_batch(&self, idx: u64, batch: WriteBatch) -> DbResult<()> {
+    fn put_write_batch(&self, idx: u64, batch: WriteBatch, blockid: L2BlockId) -> DbResult<()> {
         let mut st = self.state.lock();
 
         let last_idx = st.find_last_write_batch();
@@ -69,6 +72,7 @@ impl ChainstateDatabase for StubChainstateDb {
         // Compute new state and insert things.
         st.write_batches.insert(idx, batch.clone());
         st.toplevels.insert(idx, batch.into_toplevel());
+        st.blocks.insert(idx, blockid);
 
         Ok(())
     }
@@ -147,8 +151,12 @@ impl ChainstateDatabase for StubChainstateDb {
         Ok(idx)
     }
 
-    fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatch>> {
+    fn get_write_batch(&self, idx: u64) -> DbResult<Option<(WriteBatch, L2BlockId)>> {
         let st = self.state.lock();
-        Ok(st.write_batches.get(&idx).cloned())
+        Ok(st
+            .write_batches
+            .get(&idx)
+            .cloned()
+            .map(|wb| (wb, st.blocks.get(&idx).cloned().expect("exists"))))
     }
 }

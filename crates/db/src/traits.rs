@@ -190,15 +190,15 @@ pub enum BlockStatus {
 // TODO maybe rewrite this around storing write batches according to blkid?
 pub trait ChainstateDatabase {
     /// Writes the genesis chainstate at index 0.
-    fn write_genesis_state(&self, toplevel: Chainstate) -> DbResult<()>;
+    fn write_genesis_state(&self, toplevel: Chainstate, blockid: L2BlockId) -> DbResult<()>;
 
     /// Stores a write batch in the database, possibly computing that state
     /// under the hood from the writes.  Will not overwrite existing data,
     /// previous writes must be purged first in order to be replaced.
-    fn put_write_batch(&self, idx: u64, batch: WriteBatch) -> DbResult<()>;
+    fn put_write_batch(&self, idx: u64, batch: WriteBatch, blockid: L2BlockId) -> DbResult<()>;
 
     /// Gets the write batch stored to compute a height.
-    fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatch>>;
+    fn get_write_batch(&self, idx: u64) -> DbResult<Option<(WriteBatch, L2BlockId)>>;
 
     /// Tells the database to purge state before a certain index.
     fn purge_entries_before(&self, before_idx: u64) -> DbResult<()>;

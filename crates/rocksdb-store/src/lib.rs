@@ -55,7 +55,7 @@ pub use writer::db::RBL1WriterDb;
 use writer::schemas::{IntentIdxSchema, IntentSchema, PayloadSchema};
 
 use crate::{
-    chain_state::schemas::WriteBatchSchema,
+    chain_state::schemas::{ChainSchema, WriteBatchSchema},
     client_state::schemas::ClientUpdateOutputSchema,
     l1::schemas::{
         L1BlockSchema, L1BlocksByHeightSchema, L1CanonicalBlockSchema, MmrSchema, TxnSchema,
@@ -81,6 +81,7 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     L2BlockStatusSchema::COLUMN_FAMILY_NAME,
     L2BlockHeightSchema::COLUMN_FAMILY_NAME,
     WriteBatchSchema::COLUMN_FAMILY_NAME,
+    ChainSchema::COLUMN_FAMILY_NAME,
 
     // Payload/intent schemas
     PayloadSchema::COLUMN_FAMILY_NAME,

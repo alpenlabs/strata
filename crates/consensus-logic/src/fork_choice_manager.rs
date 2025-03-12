@@ -121,7 +121,7 @@ impl ForkChoiceManager {
         self.storage
             .chainstate()
             .get_toplevel_chainstate_blocking(block.slot())
-            .map(|res| res.map(Arc::new))
+            .map(|res| res.map(|(chainstate, _)| Arc::new(chainstate)))
             .map_err(Into::into)
     }
 
@@ -207,7 +207,7 @@ pub fn init_forkchoice_manager(
     // initial checkpoint for the genesis epoch
 
     let latest_chainstate_idx = storage.chainstate().get_last_write_idx_blocking()?;
-    let latest_chainstate = storage
+    let (latest_chainstate, _tip_blockid) = storage
         .chainstate()
         .get_toplevel_chainstate_blocking(latest_chainstate_idx)?
         .ok_or(DbError::MissingL2State(latest_chainstate_idx))?;
@@ -237,7 +237,7 @@ pub fn init_forkchoice_manager(
 
     // Load in that block's chainstate.
     let chsman = storage.chainstate();
-    let chainstate = chsman
+    let (chainstate, _) = chsman
         .get_toplevel_chainstate_blocking(cur_tip_block.slot())?
         .ok_or(DbError::MissingL2State(cur_tip_block.slot()))?;
 
@@ -765,7 +765,7 @@ fn revert_chainstate_to_block(
     // Fetch the old state from the database and store in memory.  This
     // is also how  we validate that we actually *can* revert to this
     // block.
-    let new_state = fcm_state
+    let (new_state, _) = fcm_state
         .storage
         .chainstate()
         .get_toplevel_chainstate_blocking(block.slot())?
@@ -854,7 +854,7 @@ fn apply_blocks(
     // Apply all the write batches.
     let chsman = fcm_state.storage.chainstate();
     for (block, wb) in updates {
-        chsman.put_write_batch_blocking(block.slot(), wb)?;
+        chsman.put_write_batch_blocking(block.slot(), wb, *last_block.blkid())?;
     }
 
     // Update the tip block in the FCM state.

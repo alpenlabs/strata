@@ -250,7 +250,7 @@ fn do_startup_checks(
         err => err?,
     };
 
-    let Some(last_chain_state) = storage
+    let Some((last_chain_state, tip_blockid)) = storage
         .chainstate()
         .get_toplevel_chainstate_blocking(last_state_idx)?
     else {
@@ -275,8 +275,8 @@ fn do_startup_checks(
     }
 
     // Check that tip L2 block exists (and engine can be connected to)
-    let chain_tip = last_chain_state.chain_tip_blkid();
-    match engine.check_block_exists(*chain_tip) {
+    let chain_tip = tip_blockid;
+    match engine.check_block_exists(chain_tip) {
         Ok(true) => {
             info!("startup: last l2 block is synced")
         }

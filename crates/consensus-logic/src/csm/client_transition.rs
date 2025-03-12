@@ -69,6 +69,7 @@ impl EventContext for StorageEventContext<'_> {
         self.storage
             .chainstate()
             .get_toplevel_chainstate_blocking(slot)?
+            .map(|(chainstate, _)| chainstate)
             .ok_or(Error::MissingIdxChainstate(slot))
     }
 }

@@ -63,7 +63,9 @@ pub fn init_genesis_chainstate(
     let gchstate = make_genesis_chainstate(&gblock, pregenesis_mfs, params);
 
     // Now insert things into the database.
-    storage.chainstate().write_genesis_state(gchstate.clone())?;
+    storage
+        .chainstate()
+        .write_genesis_state(gchstate.clone(), gblock.header().get_blockid())?;
     storage.l2().put_block_data_blocking(gblock)?;
     // TODO: Status channel should probably be updated.
 
@@ -142,8 +144,6 @@ pub fn make_genesis_chainstate(
     pregenesis_mfs: Vec<L1BlockManifest>,
     params: &Params,
 ) -> Chainstate {
-    let genesis_blkid = gblock.header().get_blockid();
-
     let geui = gblock.exec_segment().update().input();
     let gees =
         ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
@@ -168,7 +168,7 @@ pub fn make_genesis_chainstate(
     );
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
-    let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);
+    let gdata = GenesisStateData::new(l1vs, optbl, gees);
     Chainstate::from_genesis(&gdata)
 }
 

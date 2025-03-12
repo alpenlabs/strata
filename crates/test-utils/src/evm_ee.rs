@@ -139,7 +139,7 @@ impl L2Segment {
                 params.rollup(),
             )
             .unwrap();
-            let (post_state, _) = state_cache.finalize();
+            let post_state = state_cache.finalize().into_toplevel();
             let new_state_root = post_state.compute_state_root();
 
             let header = L2BlockHeader::new(slot, 0, ts, prev_block_id, &body, new_state_root);
@@ -155,7 +155,7 @@ impl L2Segment {
                 params.rollup(),
             )
             .unwrap();
-            let (post_state, _) = state_cache.finalize();
+            let post_state = state_cache.finalize().into_toplevel();
 
             blocks.push(block.clone());
             pre_states.push(pre_state);

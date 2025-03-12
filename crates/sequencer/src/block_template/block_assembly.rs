@@ -77,7 +77,7 @@ pub fn prepare_block(
     // TODO make this get the prev block slot from somewhere more reliable in
     // case we skip slots
     let prev_slot = prev_block.header().slot();
-    let prev_chstate = chsman
+    let (prev_chstate, _) = chsman
         .get_toplevel_chainstate_blocking(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_blkid))?;
     let epoch = prev_chstate.cur_epoch();

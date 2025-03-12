@@ -126,6 +126,7 @@ impl StrataRpcImpl {
             .chainstate()
             .get_toplevel_chainstate_async(end_commitment.slot())
             .await?
+            .map(|(chainstate, _)| chainstate)
             .map(Arc::new))
     }
 
@@ -393,7 +394,7 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_chainstate_raw(&self, slot: u64) -> RpcResult<Vec<u8>> {
-        let chs = self
+        let (chs, _) = self
             .storage
             .chainstate()
             .get_toplevel_chainstate_async(slot)
@@ -412,7 +413,7 @@ impl StrataApiServer for StrataRpcImpl {
 
         let prev_slot = l2_blk_bundle.block().header().header().slot() - 1;
 
-        let chain_state = self
+        let (chain_state, _) = self
             .storage
             .chainstate()
             .get_toplevel_chainstate_async(prev_slot)
@@ -867,9 +868,9 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 
     async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>> {
-        let chain_state = self
+        let (chain_state, tip_blockid) = self
             .status
-            .get_cur_tip_chainstate()
+            .get_cur_tip_chainstate_with_block()
             .ok_or(Error::BeforeGenesis)?;
         let client_state = self.status.get_cur_client_state();
 
@@ -878,7 +879,8 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .ok_or(Error::MissingInternalState)?;
 
         let duties = extract_duties(
-            chain_state.as_ref(),
+            chain_state.chain_tip_slot(),
+            tip_blockid,
             client_int_state,
             &self.checkpoint_handle,
             self.storage.l2().as_ref(),
@@ -980,15 +982,15 @@ impl StrataDebugApiServer for StrataDebugRpcImpl {
     }
 
     async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
-        let chain_state = self
+        let chain_state_res = self
             .storage
             .chainstate()
             .get_toplevel_chainstate_async(idx)
             .map_err(Error::Db)
             .await?;
-        match chain_state {
-            Some(cs) => Ok(Some(RpcChainState {
-                tip_blkid: *cs.chain_tip_blkid(),
+        match chain_state_res {
+            Some((cs, tip_blockid)) => Ok(Some(RpcChainState {
+                tip_blkid: tip_blockid,
                 tip_slot: cs.chain_tip_slot(),
                 cur_epoch: cs.cur_epoch(),
             })),

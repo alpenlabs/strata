@@ -2,11 +2,7 @@
 
 use strata_db::types::CheckpointConfStatus;
 use strata_primitives::params::Params;
-use strata_state::{
-    chain_state::Chainstate,
-    client_state::InternalState,
-    header::{L2BlockHeader, L2Header},
-};
+use strata_state::{client_state::InternalState, header::L2Header, id::L2BlockId};
 use strata_storage::L2BlockManager;
 use tracing::*;
 
@@ -18,15 +14,15 @@ use crate::{
 
 /// Extracts new duties given a current chainstate and an identity.
 pub async fn extract_duties(
-    cur_tip_header: &L2BlockHeader,
-    chstate: &Chainstate,
+    tip_slot: u64,
+    tip_blkid: L2BlockId,
     cistate: &InternalState,
     checkpoint_handle: &CheckpointHandle,
     l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<Vec<Duty>, Error> {
     let mut duties = vec![];
-    duties.extend(extract_block_duties(cur_tip_header, chstate, l2_block_manager, params).await?);
+    duties.extend(extract_block_duties(tip_slot, tip_blkid, l2_block_manager, params).await?);
     duties.extend(extract_batch_duties(cistate, checkpoint_handle).await?);
 
     if !duties.is_empty() {
@@ -37,14 +33,11 @@ pub async fn extract_duties(
 }
 
 async fn extract_block_duties(
-    cur_tip_header: &L2BlockHeader,
-    state: &Chainstate,
+    tip_slot: u64,
+    tip_blkid: L2BlockId,
     l2_block_manager: &L2BlockManager,
     params: &Params,
 ) -> Result<Vec<Duty>, Error> {
-    let tip_slot = state.chain_tip_slot();
-    let tip_blkid = cur_tip_header.get_blockid();
-
     let tip_block_ts = l2_block_manager
         .get_block_data_async(&tip_blkid)
         .await?
