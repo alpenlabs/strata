@@ -114,6 +114,7 @@ impl ChainstateDatabase for ChainstateDb {
         let mut del_batch = SchemaBatch::new();
         for idx in first_idx..before_idx {
             del_batch.delete::<WriteBatchSchema>(&idx)?;
+            del_batch.delete::<ChainSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
 
@@ -144,6 +145,7 @@ impl ChainstateDatabase for ChainstateDb {
         let mut del_batch = SchemaBatch::new();
         for idx in new_tip_idx + 1..=last_idx {
             del_batch.delete::<WriteBatchSchema>(&idx)?;
+            del_batch.delete::<ChainSchema>(&idx)?;
         }
         self.db.write_schemas(del_batch)?;
 
