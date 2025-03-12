@@ -20,6 +20,12 @@ pub enum TsnError {
     #[error("L1 segment block did not extend the chain tip")]
     L1SegNotExtend,
 
+    #[error("Checkpoint posted do not extend the finalized epoch")]
+    EpochNotExtend,
+
+    #[error("Invalid proof")]
+    InvalidProof,
+
     #[error("ran out of deposits to assign withdrawals to")]
     InsufficientDepositsForIntents,
 

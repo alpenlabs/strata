@@ -27,6 +27,7 @@ use strata_state::{
     state_op::StateCache,
     state_queue,
 };
+use tracing::warn;
 
 use crate::{
     errors::TsnError,
@@ -136,7 +137,7 @@ fn process_l1_view_update(
     if new_finalized_epoch.epoch() > prev_finalized_epoch.epoch() {
         Ok(true)
     } else {
-        Ok(false)
+        Err(TsnError::EpochNotExtend)
     }
 }
 
@@ -180,32 +181,35 @@ fn process_l1_checkpoint(
     signed_ckpt: &SignedCheckpoint,
     params: &RollupParams,
 ) -> Result<(), TsnError> {
-    // TODO verify signature?  it should already have been validated but it
-    // doesn't hurt to do it again (just costs)
-    // TODO should we verify the proof here too?  the L1 scan proof probably
-    // should have done it, but it wouldn't be excessively complicated to
-    // re-verify it, we should formally define the answers to these questions
+    // If signature verification failed, return early and do **NOT** finalize epoch
+    // Note: This is not an error because anyone is able to post data to L1
+    if !verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule) {
+        warn!("Invalid checkpoint: signature");
+        return Ok(());
+    }
 
-    assert!(
-        verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule),
-        "Failed to verify signature"
-    );
     let ckpt = signed_ckpt.checkpoint(); // inner data
+    let ckpt_epoch = ckpt.batch_transition().epoch;
 
     let receipt = ckpt.construct_receipt();
 
+    // Note: This is error because this is done by the sequencer
+    if ckpt_epoch != 0 && ckpt_epoch != state.state().finalized_epoch().epoch() + 1 {
+        error!(%ckpt_epoch, "Invalid checkpoint: proof for invalid epoch");
+        return Err(TsnError::EpochNotExtend);
+    }
+
     if receipt.proof().is_empty() {
+        warn!(%ckpt_epoch, "Empty proof posted");
         // If the proof is empty but empty proofs are not allowed, this will fail.
-        assert!(
-            params.proof_publish_mode.allow_empty(),
-            "empty proof is not allowed"
-        );
+        if !params.proof_publish_mode.allow_empty() {
+            error!(%ckpt_epoch, "Invalid checkpoint: Empty proof");
+            return Err(TsnError::InvalidProof);
+        }
     } else {
         // Otherwise, verify the non-empty proof.
-        assert!(
-            verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk).is_ok(),
-            "posted checkpoint proof verification failed"
-        );
+        verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk)
+            .map_err(|e| TsnError::InvalidProof)?;
     }
 
     // Copy the epoch commitment and make it finalized.
