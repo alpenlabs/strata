@@ -861,7 +861,7 @@ fn apply_blocks(
     // Apply all the write batches.
     let chsman = fcm_state.storage.chainstate();
     for (block, wb) in updates {
-        chsman.put_write_batch_blocking(block.slot(), wb, *last_block.blkid())?;
+        chsman.put_write_batch_blocking(block.slot(), wb, *block.blkid())?;
     }
 
     // Update the tip block in the FCM state.
