@@ -137,7 +137,9 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 json.dump(custom_chain, f)
             custom_chain = json_path
 
-        settings = self.rollup_settings or RollupParamsSettings.new_default().fast_batch()
+        settings = (
+            self.rollup_settings or RollupParamsSettings.new_default().fast_batch().strict_mode()
+        )
         if custom_chain != self.custom_chain:
             settings = settings.with_chainconfig(custom_chain)
         params_gen_data = generate_simple_params(initdir, settings, self.n_operators)
