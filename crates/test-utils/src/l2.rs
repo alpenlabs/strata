@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use bitcoin::secp256k1::{SecretKey, SECP256K1};
 use borsh::to_vec;
 use rand::{rngs::StdRng, SeedableRng};
-use strata_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
+use strata_consensus_logic::genesis::make_l2_genesis;
 use strata_primitives::{
     block_credential,
     buf::Buf64,
@@ -135,13 +135,11 @@ pub fn make_dummy_operator_pubkeys_with_seed(seed: u64) -> OperatorPubkeys {
     OperatorPubkeys::new(pk.into(), pk.into())
 }
 
-pub fn get_genesis_chainstate() -> Chainstate {
-    let params = gen_params();
+pub fn get_genesis_chainstate(params: &Params) -> (L2BlockBundle, Chainstate) {
     let btc_chain = BtcChainSegment::load();
     // Build the genesis block and genesis consensus states.
-    let gblock = make_genesis_block(&params);
     let pregenesis_mfs = vec![btc_chain.get_block_manifest(params.rollup().genesis_l1_height)];
-    make_genesis_chainstate(&gblock, pregenesis_mfs, &params)
+    make_l2_genesis(params, pregenesis_mfs)
 }
 
 pub fn get_test_signed_checkpoint() -> SignedCheckpoint {

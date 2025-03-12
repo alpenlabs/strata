@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use strata_consensus_logic::genesis::make_genesis_block;
 use strata_primitives::buf::{Buf32, Buf64};
 use strata_proofimpl_evm_ee_stf::{
     primitives::{EvmEeProofInput, EvmEeProofOutput},
@@ -100,8 +99,8 @@ impl L2Segment {
         let mut pre_states = Vec::new();
         let mut post_states = Vec::new();
 
-        let mut prev_block = make_genesis_block(&params).block().clone();
-        let mut prev_chainstate = get_genesis_chainstate();
+        let (prev_block_bundle, mut prev_chainstate) = get_genesis_chainstate(&params);
+        let (mut prev_block, _) = prev_block_bundle.into_parts();
 
         let el_proof_ins = evm_segment.get_inputs();
         let el_proof_outs = evm_segment.get_outputs();

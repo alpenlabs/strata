@@ -238,7 +238,6 @@ mod tests {
             BitcoinAmount, DepositRequestInfo, HeaderVerificationState, L1BlockId, L1BlockManifest,
             L1HeaderRecord, L1Tx, L1TxProof, OutputRef, RawBitcoinTx, XOnlyPk,
         },
-        l2::L2BlockId,
     };
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{

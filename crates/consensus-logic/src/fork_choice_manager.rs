@@ -543,7 +543,7 @@ fn handle_new_block(
     // First, decide if the block seems correctly signed and we haven't
     // already marked it as invalid.
     let chstate = fcm_state.cur_chainstate.as_ref();
-    let correctly_signed = check_new_block(blkid, bundle, chstate, fcm_state)?;
+    let correctly_signed = check_new_block(blkid, bundle.block(), chstate, fcm_state)?;
     if !correctly_signed {
         // It's invalid, write that and return.
         return Ok(false);
@@ -834,7 +834,7 @@ fn apply_blocks(
         // If we advanced the epoch then we have to finish it.
         let is_terminal = post_state_epoch == pre_state_epoch + 1;
         if is_terminal {
-            handle_finish_epoch(&blkid, &bundle, prev_epoch_terminal, &post_state, fcm_state)?;
+            handle_finish_epoch(&blkid, &bundle, prev_epoch_terminal, post_state, fcm_state)?;
         }
 
         cur_state = post_state.clone();

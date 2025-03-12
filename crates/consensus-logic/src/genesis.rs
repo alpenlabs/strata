@@ -59,8 +59,7 @@ pub fn init_genesis_chainstate(
         load_pre_genesis_l1_manifests(l1_db.as_ref(), horizon_blk_height, genesis_blk_height)?;
 
     // Build the genesis block and genesis consensus states.
-    let gblock = make_genesis_block(params);
-    let gchstate = make_genesis_chainstate(&gblock, pregenesis_mfs, params);
+    let (gblock, gchstate) = make_l2_genesis(params, pregenesis_mfs);
 
     // Now insert things into the database.
     storage
@@ -100,10 +99,38 @@ fn load_pre_genesis_l1_manifests(
     Ok(manifests)
 }
 
+pub fn make_l2_genesis(
+    params: &Params,
+    pregenesis_mfs: Vec<L1BlockManifest>,
+) -> (L2BlockBundle, Chainstate) {
+    let gblock_provisional = make_genesis_block(params);
+    let gstate = make_genesis_chainstate(&gblock_provisional, pregenesis_mfs, params);
+    let state_root = gstate.compute_state_root();
+
+    let (block, accessory) = gblock_provisional.into_parts();
+    let (header, body) = block.into_parts();
+
+    let final_header = L2BlockHeader::new(
+        header.slot(),
+        header.epoch(),
+        header.timestamp(),
+        *header.parent(),
+        &body,
+        state_root,
+    );
+    let sig = Buf64::zero();
+    let gblock = L2BlockBundle::new(
+        L2Block::new(SignedL2BlockHeader::new(final_header, sig), body),
+        accessory,
+    );
+
+    (gblock, gstate)
+}
+
 /// Create genesis L2 block based on rollup params
 /// NOTE: generate block MUST be deterministic
 /// repeated calls with same params MUST return identical blocks
-pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
+fn make_genesis_block(params: &Params) -> L2BlockBundle {
     // Create a dummy exec state that we can build the rest of the genesis block
     // around and insert into the genesis state.
     // TODO this might need to talk to the EL to do the genesus setup *properly*
@@ -139,7 +166,18 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     L2BlockBundle::new(block, accessory)
 }
 
-pub fn make_genesis_chainstate(
+fn make_block_from_parts(
+    header: L2BlockHeader,
+    sig: Buf64,
+    body: L2BlockBody,
+    accessory: L2BlockAccessory,
+) -> L2BlockBundle {
+    let signed_genesis_header = SignedL2BlockHeader::new(header, sig);
+    let block = L2Block::new(signed_genesis_header, body);
+    L2BlockBundle::new(block, accessory)
+}
+
+fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
     pregenesis_mfs: Vec<L1BlockManifest>,
     params: &Params,

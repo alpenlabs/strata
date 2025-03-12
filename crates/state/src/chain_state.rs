@@ -1,3 +1,5 @@
+// use std::ops::Deref;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
@@ -144,6 +146,37 @@ impl Chainstate {
         &self.exec_env_state
     }
 }
+
+// #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+// pub struct CommittedChainstate {
+//     blockid: L2BlockId,
+//     chainstate: Chainstate,
+// }
+
+// impl CommittedChainstate {
+//     pub fn new(chainstate: Chainstate, blockid: L2BlockId) -> Self {
+//         Self {
+//             chainstate,
+//             blockid,
+//         }
+//     }
+
+//     pub fn chain_tip_blkid(&self) -> &L2BlockId {
+//         &self.blockid
+//     }
+
+//     pub fn chainstate(&self) -> &Chainstate {
+//         &self.chainstate
+//     }
+// }
+
+// impl Deref for CommittedChainstate {
+//     type Target = Chainstate;
+
+//     fn deref(&self) -> &Self::Target {
+//         &self.chainstate
+//     }
+// }
 
 /// Hashed Chain State. This is used to compute the state root of the [`Chainstate`]
 // TODO: FIXME: Note that this is used as a temporary solution for the state root calculation
