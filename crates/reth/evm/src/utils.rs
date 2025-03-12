@@ -1,7 +1,7 @@
 use alloy_sol_types::SolEvent;
 use reth_primitives::Receipt;
 use revm_primitives::U256;
-use strata_primitives::bitcoin_bosd::Descriptor;
+use strata_primitives::{bitcoin_bosd::Descriptor, buf::Buf32};
 use strata_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
 
 use crate::constants::BRIDGEOUT_ADDRESS;
@@ -44,6 +44,7 @@ pub fn collect_withdrawal_intents(
                         .map(|valid_descriptor| WithdrawalIntent {
                             amt: evt.amount,
                             destination: valid_descriptor,
+                            withdrawal_txid: Buf32::from(evt.withdrawal_txid),
                         })
                 })
         })

@@ -648,10 +648,12 @@ mod tests {
                 .to_descriptor()
                 .expect("infallible due to generate_valid_xonly_pk_buf32");
 
+            let random_txid: Buf32 = arb.generate();
             let dispatched_state = DepositState::Dispatched(DispatchedState::new(
                 DispatchCommand::new(vec![WithdrawOutput::new(dest_descriptor, amt)]),
                 random_assignee,
                 0,
+                random_txid,
             ));
 
             let cur_idx = deposits_table.next_idx() - 1;

@@ -386,12 +386,14 @@ fn process_deposit_updates(
                     let op_idx = ops_seq[next_intent_to_assign % ops_seq.len()];
 
                     let outp = WithdrawOutput::new(intent.destination().clone(), *intent.amt());
+                    let withdrawal_txid = *intent.withdrawal_txid();
                     let cmd = DispatchCommand::new(vec![outp]);
                     state.assign_withdrawal_command(
                         deposit_idx,
                         op_idx,
                         cmd,
                         new_exec_height as u64,
+                        withdrawal_txid,
                     );
 
                     next_intent_to_assign += 1;

@@ -401,6 +401,9 @@ pub struct DispatchedState {
     /// If a checkpoint is processed for this L1 height and the withdrawal still
     /// goes out it won't be honored.
     exec_deadline: BitcoinBlockHeight,
+
+    /// withdrawal request transaction id
+    withdrawal_txid: Buf32,
 }
 
 impl DispatchedState {
@@ -408,11 +411,13 @@ impl DispatchedState {
         cmd: DispatchCommand,
         assignee: OperatorIdx,
         exec_deadline: BitcoinBlockHeight,
+        withdrawal_txid: Buf32,
     ) -> Self {
         Self {
             cmd,
             assignee,
             exec_deadline,
+            withdrawal_txid,
         }
     }
 

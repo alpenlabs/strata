@@ -259,6 +259,7 @@ impl StateCache {
         operator_idx: OperatorIdx,
         cmd: DispatchCommand,
         exec_height: BitcoinBlockHeight,
+        withdrawal_txid: Buf32,
     ) {
         let deposit_ent = self
             .state_mut()
@@ -266,8 +267,12 @@ impl StateCache {
             .get_deposit_mut(deposit_idx)
             .expect("stateop: missing deposit idx");
 
-        let state =
-            DepositState::Dispatched(DispatchedState::new(cmd.clone(), operator_idx, exec_height));
+        let state = DepositState::Dispatched(DispatchedState::new(
+            cmd.clone(),
+            operator_idx,
+            exec_height,
+            withdrawal_txid,
+        ));
         deposit_ent.set_state(state);
     }
 
