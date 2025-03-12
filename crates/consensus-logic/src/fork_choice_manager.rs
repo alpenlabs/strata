@@ -9,8 +9,13 @@ use strata_primitives::{
     epoch::EpochCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment, params::Params,
 };
 use strata_state::{
-    batch::EpochSummary, block::L2BlockBundle, block_validation::validate_block_segments,
-    chain_state::Chainstate, client_state::ClientState, prelude::*, state_op::StateCache,
+    batch::EpochSummary,
+    block::L2BlockBundle,
+    block_validation::validate_block_segments,
+    chain_state::Chainstate,
+    client_state::ClientState,
+    prelude::*,
+    state_op::{StateCache, WriteBatchEntry},
 };
 use strata_status::*;
 use strata_storage::{L2BlockManager, NodeStorage};
@@ -105,7 +110,7 @@ impl ForkChoiceManager {
         let block = self
             .get_block_data(blkid)?
             .ok_or(Error::MissingL2Block(*blkid))?;
-        Ok(block.header().blockidx())
+        Ok(block.header().slot())
     }
 
     fn get_block_chainstate(
@@ -118,11 +123,11 @@ impl ForkChoiceManager {
             return Ok(Some(self.cur_chainstate.clone()));
         }
 
-        self.storage
+        Ok(self
+            .storage
             .chainstate()
-            .get_toplevel_chainstate_blocking(block.slot())
-            .map(|res| res.map(Arc::new))
-            .map_err(Into::into)
+            .get_toplevel_chainstate_blocking(block.slot())?
+            .map(|entry| Arc::new(entry.to_chainstate())))
     }
 
     /// Updates the stored current state.
@@ -210,7 +215,8 @@ pub fn init_forkchoice_manager(
     let latest_chainstate = storage
         .chainstate()
         .get_toplevel_chainstate_blocking(latest_chainstate_idx)?
-        .ok_or(DbError::MissingL2State(latest_chainstate_idx))?;
+        .ok_or(DbError::MissingL2State(latest_chainstate_idx))?
+        .to_chainstate();
 
     let chainstate_last_epoch = latest_chainstate.prev_epoch();
 
@@ -239,7 +245,8 @@ pub fn init_forkchoice_manager(
     let chsman = storage.chainstate();
     let chainstate = chsman
         .get_toplevel_chainstate_blocking(cur_tip_block.slot())?
-        .ok_or(DbError::MissingL2State(cur_tip_block.slot()))?;
+        .ok_or(DbError::MissingL2State(cur_tip_block.slot()))?
+        .to_chainstate();
 
     // Actually assemble the forkchoice manager state.
     let mut fcm = ForkChoiceManager::new(
@@ -286,7 +293,7 @@ fn determine_start_tip(
         .get_block_data_blocking(best)?
         .ok_or(Error::MissingL2Block(*best))?
         .header()
-        .blockidx();
+        .slot();
 
     // Iterate through the remaining elements and choose.
     for blkid in iter {
@@ -294,7 +301,7 @@ fn determine_start_tip(
             .get_block_data_blocking(blkid)?
             .ok_or(Error::MissingL2Block(*best))?
             .header()
-            .blockidx();
+            .slot();
 
         if blkid_slot == best_slot && blkid < best {
             best = blkid;
@@ -484,7 +491,7 @@ fn process_fc_message(
                 .get_block_data(&blkid)?
                 .ok_or(Error::MissingL2Block(blkid))?;
 
-            let slot = block_bundle.header().blockidx();
+            let slot = block_bundle.header().slot();
             info!(%slot, %blkid, "processing new block");
 
             let ok = match handle_new_block(fcm_state, &blkid, &block_bundle, engine) {
@@ -538,12 +545,12 @@ fn handle_new_block(
     bundle: &L2BlockBundle,
     engine: &impl ExecEngineCtl,
 ) -> anyhow::Result<bool> {
-    let slot = bundle.header().blockidx();
+    let slot = bundle.header().slot();
 
     // First, decide if the block seems correctly signed and we haven't
     // already marked it as invalid.
     let chstate = fcm_state.cur_chainstate.as_ref();
-    let correctly_signed = check_new_block(blkid, bundle, chstate, fcm_state)?;
+    let correctly_signed = check_new_block(blkid, bundle.block(), chstate, fcm_state)?;
     if !correctly_signed {
         // It's invalid, write that and return.
         return Ok(false);
@@ -644,7 +651,7 @@ fn check_new_block(
     let params = state.params.as_ref();
 
     // If it's not the genesis block, check that the block is correctly signed.
-    if block.header().blockidx() > 0 {
+    if block.header().slot() > 0 {
         let cred_ok =
             strata_state::block_validation::check_block_credential(block.header(), params.rollup());
         if !cred_ok {
@@ -696,7 +703,7 @@ fn pick_best_block<'t>(
         let best_header = best_block.header();
         let other_header = other_block.header();
 
-        if other_header.blockidx() > best_header.blockidx() {
+        if other_header.slot() > best_header.slot() {
             best_tip = other_tip;
             best_block = other_block;
         }
@@ -769,7 +776,8 @@ fn revert_chainstate_to_block(
         .storage
         .chainstate()
         .get_toplevel_chainstate_blocking(block.slot())?
-        .ok_or(Error::MissingIdxChainstate(block.slot()))?;
+        .ok_or(Error::MissingIdxChainstate(block.slot()))?
+        .to_chainstate();
     fcm_state.update_tip_block(*block, Arc::new(new_state));
 
     // Rollback the writes on the database that we no longer need.
@@ -804,15 +812,15 @@ fn apply_blocks(
             .get_block_data(&blkid)?
             .ok_or(Error::MissingL2Block(blkid))?;
 
-        let slot = bundle.header().blockidx();
+        let slot = bundle.header().slot();
         let header = bundle.header();
         let body = bundle.body();
         let block = L2BlockCommitment::new(slot, blkid);
 
         // Get the prev epoch to check if the epoch advanced, and the prev
         // epoch's terminal in case we need it.
+        let pre_state_epoch_finishing = cur_state.is_epoch_finishing();
         let pre_state_epoch = cur_state.cur_epoch();
-        let prev_epoch_terminal = cur_state.prev_epoch().to_block_commitment();
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
@@ -820,23 +828,31 @@ fn apply_blocks(
         debug!(%slot, %blkid, "processing block");
         process_block(&mut prestate_cache, header, body, &rparams)
             .map_err(|e| Error::InvalidStateTsn(blkid, e))?;
-        let (post_state, wb) = prestate_cache.finalize();
+        let wb = prestate_cache.finalize();
+        let post_state = wb.new_toplevel_state();
 
         let post_state_epoch = post_state.cur_epoch();
 
         // Sanity check for new epoch being either same or +1.
         assert!(
-            (post_state_epoch == pre_state_epoch) || (post_state_epoch == pre_state_epoch + 1),
+            (!pre_state_epoch_finishing && post_state_epoch == pre_state_epoch)
+                || (pre_state_epoch_finishing && post_state_epoch == pre_state_epoch + 1),
             "fcm: nonsensical post-state epoch (pre={pre_state_epoch}, post={post_state_epoch})"
         );
 
-        // If we advanced the epoch then we have to finish it.
-        let is_terminal = post_state_epoch == pre_state_epoch + 1;
-        if is_terminal {
-            handle_finish_epoch(&blkid, &bundle, prev_epoch_terminal, &post_state, fcm_state)?;
+        let post_stateroot = post_state.compute_state_root();
+        if header.state_root() != &post_stateroot {
+            warn!(block = %header.state_root(), chain = %post_stateroot, "stateroot mismatch");
+            Err(Error::StaterootMismatch)?
         }
 
-        cur_state = post_state;
+        // If we advanced the epoch then we have to finish it.
+        let is_terminal = post_state.is_epoch_finishing();
+        if is_terminal {
+            handle_finish_epoch(&blkid, &bundle, post_state, fcm_state)?;
+        }
+
+        cur_state = post_state.clone();
 
         // After each application we update the fork choice tip data in case we fail
         // to apply an update.
@@ -853,7 +869,7 @@ fn apply_blocks(
     // Apply all the write batches.
     let chsman = fcm_state.storage.chainstate();
     for (block, wb) in updates {
-        chsman.put_write_batch_blocking(block.slot(), wb)?;
+        chsman.put_write_batch_blocking(block.slot(), WriteBatchEntry::new(wb, *block.blkid()))?;
     }
 
     // Update the tip block in the FCM state.
@@ -876,25 +892,18 @@ fn apply_blocks(
 fn handle_finish_epoch(
     blkid: &L2BlockId,
     bundle: &L2BlockBundle,
-    prev_terminal: L2BlockCommitment,
     post_state: &Chainstate,
     fcm_state: &mut ForkChoiceManager,
 ) -> anyhow::Result<()> {
     // Construct the various parts of the summary
-    let new_epoch = post_state.cur_epoch();
-    let prev_epoch_idx = new_epoch - 1;
+    // NOTE: epoch update in chainstate happens at first slot of next epoch
+    // this code runs at final slot of current epoch.
+    let prev_epoch_idx = post_state.cur_epoch();
 
-    let slot = bundle.header().blockidx();
+    let prev_terminal = post_state.prev_epoch().to_block_commitment();
+
+    let slot = bundle.header().slot();
     let terminal = L2BlockCommitment::new(slot, *blkid);
-
-    // Sanity checks.
-    let prev_epoch = post_state.prev_epoch(); // FIXME is this right?
-    assert_eq!(prev_epoch_idx + 1, new_epoch, "fcm: epoch sequencing mixup");
-    assert_eq!(
-        terminal,
-        prev_epoch.to_block_commitment(),
-        "fcm: fcm: epoch termination mixup"
-    );
 
     let l1seg = bundle.l1_segment();
     assert!(
@@ -919,7 +928,7 @@ fn handle_finish_epoch(
     let epoch = summary.get_epoch_commitment();
 
     // TODO convert to Display
-    debug!(?epoch, "finishing chain epoch");
+    debug!(?epoch, ?summary, "finishing chain epoch");
 
     fcm_state
         .storage

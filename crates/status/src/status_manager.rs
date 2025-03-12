@@ -6,6 +6,7 @@ use strata_state::{
     bridge_state::{DepositsTable, OperatorTable},
     chain_state::Chainstate,
     client_state::{ClientState, L1Checkpoint, SyncState},
+    id::L2BlockId,
 };
 use thiserror::Error;
 use tokio::sync::watch::{self, error::RecvError};
@@ -97,6 +98,15 @@ impl StatusChannel {
             .borrow()
             .as_ref()
             .map(|css| css.new_tl_chainstate().clone())
+    }
+
+    pub fn get_cur_tip_chainstate_with_block(&self) -> Option<(Arc<Chainstate>, L2BlockId)> {
+        self.receiver.chs.borrow().as_ref().map(|css| {
+            (
+                css.new_tl_chainstate().clone(),
+                *css.new_status().tip_blkid(),
+            )
+        })
     }
 
     /// Gets the latest operator table.

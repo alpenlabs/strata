@@ -59,11 +59,12 @@ pub fn init_genesis_chainstate(
         load_pre_genesis_l1_manifests(l1_db.as_ref(), horizon_blk_height, genesis_blk_height)?;
 
     // Build the genesis block and genesis consensus states.
-    let gblock = make_genesis_block(params);
-    let gchstate = make_genesis_chainstate(&gblock, pregenesis_mfs, params);
+    let (gblock, gchstate) = make_l2_genesis(params, pregenesis_mfs);
 
     // Now insert things into the database.
-    storage.chainstate().write_genesis_state(gchstate.clone())?;
+    storage
+        .chainstate()
+        .write_genesis_state(gchstate.clone(), gblock.header().get_blockid())?;
     storage.l2().put_block_data_blocking(gblock)?;
     // TODO: Status channel should probably be updated.
 
@@ -98,10 +99,38 @@ fn load_pre_genesis_l1_manifests(
     Ok(manifests)
 }
 
+pub fn make_l2_genesis(
+    params: &Params,
+    pregenesis_mfs: Vec<L1BlockManifest>,
+) -> (L2BlockBundle, Chainstate) {
+    let gblock_provisional = make_genesis_block(params);
+    let gstate = make_genesis_chainstate(&gblock_provisional, pregenesis_mfs, params);
+    let state_root = gstate.compute_state_root();
+
+    let (block, accessory) = gblock_provisional.into_parts();
+    let (header, body) = block.into_parts();
+
+    let final_header = L2BlockHeader::new(
+        header.slot(),
+        header.epoch(),
+        header.timestamp(),
+        *header.parent(),
+        &body,
+        state_root,
+    );
+    let sig = Buf64::zero();
+    let gblock = L2BlockBundle::new(
+        L2Block::new(SignedL2BlockHeader::new(final_header, sig), body),
+        accessory,
+    );
+
+    (gblock, gstate)
+}
+
 /// Create genesis L2 block based on rollup params
 /// NOTE: generate block MUST be deterministic
 /// repeated calls with same params MUST return identical blocks
-pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
+fn make_genesis_block(params: &Params) -> L2BlockBundle {
     // Create a dummy exec state that we can build the rest of the genesis block
     // around and insert into the genesis state.
     // TODO this might need to talk to the EL to do the genesus setup *properly*
@@ -137,13 +166,11 @@ pub fn make_genesis_block(params: &Params) -> L2BlockBundle {
     L2BlockBundle::new(block, accessory)
 }
 
-pub fn make_genesis_chainstate(
+fn make_genesis_chainstate(
     gblock: &L2BlockBundle,
     pregenesis_mfs: Vec<L1BlockManifest>,
     params: &Params,
 ) -> Chainstate {
-    let genesis_blkid = gblock.header().get_blockid();
-
     let geui = gblock.exec_segment().update().input();
     let gees =
         ExecEnvState::from_base_input(geui.clone(), params.rollup.evm_genesis_block_state_root);
@@ -168,7 +195,7 @@ pub fn make_genesis_chainstate(
     );
 
     let optbl = construct_operator_table(&params.rollup().operator_config);
-    let gdata = GenesisStateData::new(genesis_blkid, l1vs, optbl, gees);
+    let gdata = GenesisStateData::new(l1vs, optbl, gees);
     Chainstate::from_genesis(&gdata)
 }
 

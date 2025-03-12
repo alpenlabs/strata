@@ -1,13 +1,13 @@
 use std::collections::*;
 
 use parking_lot::Mutex;
-use strata_state::{chain_state::Chainstate, state_op::WriteBatch};
+use strata_state::{chain_state::Chainstate, id::L2BlockId, state_op::WriteBatchEntry};
 use tracing::*;
 
 use crate::{errors::DbError, traits::*, DbResult};
 
 struct InnerState {
-    write_batches: BTreeMap<u64, WriteBatch>,
+    write_batches: BTreeMap<u64, WriteBatchEntry>,
     toplevels: BTreeMap<u64, Chainstate>,
 }
 
@@ -46,13 +46,13 @@ impl StubChainstateDb {
 }
 
 impl ChainstateDatabase for StubChainstateDb {
-    fn write_genesis_state(&self, toplevel: Chainstate) -> DbResult<()> {
+    fn write_genesis_state(&self, toplevel: Chainstate, _blockid: L2BlockId) -> DbResult<()> {
         let mut st = self.state.lock();
         st.toplevels.insert(0, toplevel.clone());
         Ok(())
     }
 
-    fn put_write_batch(&self, idx: u64, batch: WriteBatch) -> DbResult<()> {
+    fn put_write_batch(&self, idx: u64, batch: WriteBatchEntry) -> DbResult<()> {
         let mut st = self.state.lock();
 
         let last_idx = st.find_last_write_batch();
@@ -68,7 +68,8 @@ impl ChainstateDatabase for StubChainstateDb {
 
         // Compute new state and insert things.
         st.write_batches.insert(idx, batch.clone());
-        st.toplevels.insert(idx, batch.into_toplevel());
+        let (wb, _blockid) = batch.to_parts();
+        st.toplevels.insert(idx, wb.into_toplevel());
 
         Ok(())
     }
@@ -147,7 +148,7 @@ impl ChainstateDatabase for StubChainstateDb {
         Ok(idx)
     }
 
-    fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatch>> {
+    fn get_write_batch(&self, idx: u64) -> DbResult<Option<WriteBatchEntry>> {
         let st = self.state.lock();
         Ok(st.write_batches.get(&idx).cloned())
     }

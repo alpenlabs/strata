@@ -12,7 +12,7 @@ use strata_primitives::{
 };
 use strata_state::{
     block::{self, L2BlockBundle},
-    chain_state::Chainstate,
+    chain_state::{Chainstate, ChainstateEntry},
     client_state::*,
     header::L2Header,
     id::L2BlockId,
@@ -23,7 +23,7 @@ use strata_storage::NodeStorage;
 use tracing::*;
 use zkaleido::ProofReceipt;
 
-use crate::{checkpoint_verification::verify_checkpoint, errors::*, genesis::make_genesis_block};
+use crate::{checkpoint_verification::verify_checkpoint, errors::*, genesis::make_l2_genesis};
 
 /// Interface for external context necessary specifically for event validation.
 pub trait EventContext {
@@ -69,6 +69,7 @@ impl EventContext for StorageEventContext<'_> {
         self.storage
             .chainstate()
             .get_toplevel_chainstate_blocking(slot)?
+            .map(Into::into)
             .ok_or(Error::MissingIdxChainstate(slot))
     }
 }
@@ -136,9 +137,10 @@ fn handle_block(
         state.activate_chain();
 
         // Also have to set this.
-        let genesis_block = make_genesis_block(params);
+        let pregenesis_mfs = vec![block_mf.clone()];
+        let (genesis_block, _) = make_l2_genesis(params, pregenesis_mfs);
         state.set_sync_state(SyncState::from_genesis_blkid(
-            genesis_block.header().get_blockid(),
+            genesis_block.block().header().get_blockid(),
         ));
 
         state.push_action(SyncAction::L2Genesis(*block.blkid()));
@@ -409,9 +411,11 @@ mod tests {
             .get_verification_state(genesis + 1, reorg_safe_depth)
             .unwrap();
 
-        let genesis_block = genesis::make_genesis_block(&params);
-        let genesis_blockid = genesis_block.header().get_blockid();
         let l1_chain = chain.get_header_records(horizon, 10).unwrap();
+
+        let pregenesis_mfs = chain.get_block_manifests(genesis, 1).unwrap();
+        let (genesis_block, _) = genesis::make_l2_genesis(&params, pregenesis_mfs);
+        let genesis_blockid = genesis_block.header().get_blockid();
 
         let l1_blocks = l1_chain
             .iter()

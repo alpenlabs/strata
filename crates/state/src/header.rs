@@ -11,14 +11,14 @@ use strata_primitives::{
 use crate::{block::L2BlockBody, id::L2BlockId};
 
 pub trait L2Header {
-    fn blockidx(&self) -> u64;
+    fn slot(&self) -> u64;
+    fn epoch(&self) -> u64;
     fn timestamp(&self) -> u64;
     fn parent(&self) -> &L2BlockId;
     fn l1_payload_hash(&self) -> &Buf32;
     fn exec_payload_hash(&self) -> &Buf32;
     fn state_root(&self) -> &Buf32;
     fn get_blockid(&self) -> L2BlockId;
-    fn epoch(&self) -> u64;
 }
 
 /// Block header that forms the chain we use to reach consensus.
@@ -26,8 +26,10 @@ pub trait L2Header {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Serialize, Deserialize,
 )]
 pub struct L2BlockHeader {
-    /// Block index, obviously.
-    pub(crate) block_idx: u64,
+    /// Slot the block was proposed for.
+    ///
+    /// This is *like* its index, but slots may be skipped.
+    pub(crate) slot: u64,
 
     /// Epoch a block belongs to.
     pub(crate) epoch: u64,
@@ -52,9 +54,10 @@ pub struct L2BlockHeader {
 }
 
 impl L2BlockHeader {
-    /// Creates a new L2BlockHeader
+    /// Creates a new L2BlockHeader, computing the segment hashes from the
+    /// passed body.
     pub fn new(
-        block_idx: u64,
+        slot: u64,
         epoch: u64,
         timestamp: u64,
         prev_block: L2BlockId,
@@ -66,7 +69,7 @@ impl L2BlockHeader {
         let eseg_buf = borsh::to_vec(body.exec_segment()).expect("blockasm: enc exec segment");
         let exec_segment_hash = hash::raw(&eseg_buf);
         L2BlockHeader {
-            block_idx,
+            slot,
             epoch,
             timestamp,
             prev_block,
@@ -75,7 +78,9 @@ impl L2BlockHeader {
             state_root,
         }
     }
-    /// Compute the sighash for this block header.
+
+    /// Compute the sighash for this block header, used to generate a
+    /// sequencer's signature.
     pub fn get_sighash(&self) -> Buf32 {
         // 8 + 8 + 8 + 32 + 32 + 32 + 32 = 152
         let mut buf = [0; 152];
@@ -91,8 +96,8 @@ impl From<SignedL2BlockHeader> for L2BlockHeader {
 }
 
 impl L2Header for L2BlockHeader {
-    fn blockidx(&self) -> u64 {
-        self.block_idx
+    fn slot(&self) -> u64 {
+        self.slot
     }
 
     fn epoch(&self) -> u64 {
@@ -128,9 +133,9 @@ fn fill_sighash_buf(tmplt: &L2BlockHeader, buf: &mut [u8]) -> Result<(), io::Err
     // Using a cursor here to avoid manually keeping track of indexes.  This
     // should all be optimized out to basically just memcopies.
     let mut cur = Cursor::new(&mut buf[..]);
-    cur.write_all(&tmplt.block_idx.to_be_bytes())?;
-    cur.write_all(&tmplt.timestamp.to_be_bytes())?;
+    cur.write_all(&tmplt.slot.to_be_bytes())?;
     cur.write_all(&tmplt.epoch.to_be_bytes())?;
+    cur.write_all(&tmplt.timestamp.to_be_bytes())?;
     cur.write_all(Buf32::from(tmplt.prev_block).as_ref())?;
     cur.write_all(tmplt.l1_segment_hash.as_ref())?;
     cur.write_all(tmplt.exec_segment_hash.as_ref())?;
@@ -173,12 +178,12 @@ impl SignedL2BlockHeader {
 }
 
 impl L2Header for SignedL2BlockHeader {
-    fn blockidx(&self) -> u64 {
-        self.header.blockidx()
+    fn slot(&self) -> u64 {
+        self.header.slot()
     }
 
     fn epoch(&self) -> u64 {
-        self.header.epoch
+        self.header.epoch()
     }
 
     fn timestamp(&self) -> u64 {
@@ -198,7 +203,7 @@ impl L2Header for SignedL2BlockHeader {
     }
 
     fn state_root(&self) -> &Buf32 {
-        &self.header.state_root
+        self.header.state_root()
     }
 
     fn get_blockid(&self) -> L2BlockId {

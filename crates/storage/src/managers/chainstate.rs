@@ -3,14 +3,18 @@
 use std::sync::Arc;
 
 use strata_db::{traits::*, DbResult};
-use strata_state::{chain_state::Chainstate, state_op::WriteBatch};
+use strata_state::{
+    chain_state::{Chainstate, ChainstateEntry},
+    id::L2BlockId,
+    state_op::WriteBatchEntry,
+};
 use threadpool::ThreadPool;
 
 use crate::{cache, ops};
 
 pub struct ChainstateManager {
     ops: ops::chainstate::ChainstateOps,
-    wb_cache: cache::CacheTable<u64, Option<WriteBatch>>,
+    wb_cache: cache::CacheTable<u64, Option<WriteBatchEntry>>,
 }
 
 impl ChainstateManager {
@@ -24,33 +28,38 @@ impl ChainstateManager {
 
     /// Writes the genesis state.  This only exists in blocking form because
     /// that's all we need.
-    pub fn write_genesis_state(&self, toplevel: Chainstate) -> DbResult<()> {
-        self.ops.write_genesis_state_blocking(toplevel)
+    pub fn write_genesis_state(
+        &self,
+        toplevel: Chainstate,
+        genesis_blkid: L2BlockId,
+    ) -> DbResult<()> {
+        self.ops
+            .write_genesis_state_blocking(toplevel, genesis_blkid)
     }
 
     /// Stores a new write batch at a particular index.
-    pub async fn put_write_batch_async(&self, idx: u64, wb: WriteBatch) -> DbResult<()> {
+    pub async fn put_write_batch_async(&self, idx: u64, wb: WriteBatchEntry) -> DbResult<()> {
         self.ops.put_write_batch_async(idx, wb).await?;
         self.wb_cache.purge(&idx);
         Ok(())
     }
 
     /// Stores a new write batch at a particular index.
-    pub fn put_write_batch_blocking(&self, idx: u64, wb: WriteBatch) -> DbResult<()> {
+    pub fn put_write_batch_blocking(&self, idx: u64, wb: WriteBatchEntry) -> DbResult<()> {
         self.ops.put_write_batch_blocking(idx, wb)?;
         self.wb_cache.purge(&idx);
         Ok(())
     }
 
     /// Gets the writes stored for an index.
-    pub async fn get_write_batch_async(&self, idx: u64) -> DbResult<Option<WriteBatch>> {
+    pub async fn get_write_batch_async(&self, idx: u64) -> DbResult<Option<WriteBatchEntry>> {
         self.wb_cache
             .get_or_fetch(&idx, || self.ops.get_write_batch_chan(idx))
             .await
     }
 
     /// Gets the writes stored for an index.
-    pub fn get_write_batch_blocking(&self, idx: u64) -> DbResult<Option<WriteBatch>> {
+    pub fn get_write_batch_blocking(&self, idx: u64) -> DbResult<Option<WriteBatchEntry>> {
         self.wb_cache
             .get_or_fetch_blocking(&idx, || self.ops.get_write_batch_blocking(idx))
     }
@@ -105,18 +114,16 @@ impl ChainstateManager {
 
     /// Convenience function just for extracting the toplevel chainstate from
     /// the write batch at an index.
-    pub async fn get_toplevel_chainstate_async(&self, idx: u64) -> DbResult<Option<Chainstate>> {
-        Ok(self
-            .get_write_batch_async(idx)
-            .await?
-            .map(|wb| wb.into_toplevel()))
+    pub async fn get_toplevel_chainstate_async(
+        &self,
+        idx: u64,
+    ) -> DbResult<Option<ChainstateEntry>> {
+        Ok(self.get_write_batch_async(idx).await?.map(Into::into))
     }
 
     /// Convenience function just for extracting the toplevel chainstate from
     /// the write batch at an index.
-    pub fn get_toplevel_chainstate_blocking(&self, idx: u64) -> DbResult<Option<Chainstate>> {
-        Ok(self
-            .get_write_batch_blocking(idx)?
-            .map(|wb| wb.into_toplevel()))
+    pub fn get_toplevel_chainstate_blocking(&self, idx: u64) -> DbResult<Option<ChainstateEntry>> {
+        Ok(self.get_write_batch_blocking(idx)?.map(Into::into))
     }
 }

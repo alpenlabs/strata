@@ -203,7 +203,7 @@ fn generate_block_template_inner(
     // TODO get and use chainstate
 
     // next slot idx
-    let slot = parent.header().blockidx() + 1;
+    let slot = parent.header().slot() + 1;
 
     // next block timestamp
     let ts = config.ts().unwrap_or_else(now_millis);

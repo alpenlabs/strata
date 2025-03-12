@@ -238,7 +238,6 @@ mod tests {
             BitcoinAmount, DepositRequestInfo, HeaderVerificationState, L1BlockId, L1BlockManifest,
             L1HeaderRecord, L1Tx, L1TxProof, OutputRef, RawBitcoinTx, XOnlyPk,
         },
-        l2::L2BlockId,
     };
     use strata_rocksdb::{test_utils::get_rocksdb_tmp_instance, L1Db};
     use strata_state::{
@@ -601,8 +600,7 @@ mod tests {
         let base_input = UpdateInput::new(0, vec![], Buf32::zero(), vec![]);
         let exec_state = ExecEnvState::from_base_input(base_input, Buf32::zero());
 
-        let l2_block_id = L2BlockId::from(Buf32::zero());
-        let gdata = GenesisStateData::new(l2_block_id, l1_state, operator_table, exec_state);
+        let gdata = GenesisStateData::new(l1_state, operator_table, exec_state);
 
         let mut empty_chain_state = Chainstate::from_genesis(&gdata);
 

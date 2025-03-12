@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use strata_consensus_logic::genesis::make_genesis_block;
 use strata_primitives::buf::{Buf32, Buf64};
 use strata_proofimpl_evm_ee_stf::{
     primitives::{EvmEeProofInput, EvmEeProofOutput},
@@ -100,8 +99,8 @@ impl L2Segment {
         let mut pre_states = Vec::new();
         let mut post_states = Vec::new();
 
-        let mut prev_block = make_genesis_block(&params).block().clone();
-        let mut prev_chainstate = get_genesis_chainstate();
+        let (prev_block_bundle, mut prev_chainstate) = get_genesis_chainstate(&params);
+        let (mut prev_block, _) = prev_block_bundle.into_parts();
 
         let el_proof_ins = evm_segment.get_inputs();
         let el_proof_outs = evm_segment.get_outputs();
@@ -124,7 +123,7 @@ impl L2Segment {
             };
             let body = L2BlockBody::new(l1_segment, el_proof_out.clone());
 
-            let slot = prev_block.header().blockidx() + 1;
+            let slot = prev_block.header().slot() + 1;
             let ts = el_proof_in.timestamp;
             let prev_block_id = prev_block.header().get_blockid();
 
@@ -139,7 +138,7 @@ impl L2Segment {
                 params.rollup(),
             )
             .unwrap();
-            let (post_state, _) = state_cache.finalize();
+            let post_state = state_cache.finalize().into_toplevel();
             let new_state_root = post_state.compute_state_root();
 
             let header = L2BlockHeader::new(slot, 0, ts, prev_block_id, &body, new_state_root);
@@ -155,7 +154,7 @@ impl L2Segment {
                 params.rollup(),
             )
             .unwrap();
-            let (post_state, _) = state_cache.finalize();
+            let post_state = state_cache.finalize().into_toplevel();
 
             blocks.push(block.clone());
             pre_states.push(pre_state);

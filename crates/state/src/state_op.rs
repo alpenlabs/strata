@@ -13,15 +13,14 @@ use strata_primitives::{
     l1::{
         BitcoinAmount, L1HeaderRecord, L1VerificationError, OutputRef, WithdrawalFulfillmentInfo,
     },
-    l2::L2BlockCommitment,
+    l2::{L2BlockCommitment, L2BlockId},
 };
 use tracing::warn;
 
 use crate::{
     bridge_ops::DepositIntent,
     bridge_state::{DepositEntry, DepositState, DispatchCommand, DispatchedState, FulfilledState},
-    chain_state::Chainstate,
-    header::L2Header,
+    chain_state::{Chainstate, ChainstateEntry},
 };
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
@@ -132,14 +131,10 @@ impl StateCache {
         self.write_ops.is_empty()
     }
 
-    /// Finalizes the changes made to the state, exporting it and a write batch
+    /// Finalizes the changes made to the state, exporting it as a write batch
     /// that can be applied to the previous state to produce it.
-    // TODO remove extra `Chainstate` return value
-    pub fn finalize(self) -> (Chainstate, WriteBatch) {
-        (
-            self.new_state.clone(),
-            WriteBatch::new(self.new_state, self.write_ops),
-        )
+    pub fn finalize(self) -> WriteBatch {
+        WriteBatch::new(self.new_state, self.write_ops)
     }
 
     // Primitive manipulation functions.
@@ -158,18 +153,21 @@ impl StateCache {
     // TODO rework a lot of these to make them lower-level and focus more on
     // just keeping the core invariants consistent
 
-    /// Sets the last block commitment, derived from a header.
-    pub fn set_cur_header(&mut self, header: &impl L2Header) {
-        self.set_last_block(L2BlockCommitment::new(
-            header.blockidx(),
-            header.get_blockid(),
-        ));
+    /// Sets the current slot.
+    ///
+    /// # Panics
+    ///
+    /// If this call does not cause the current slot to increase.
+    pub fn set_slot(&mut self, slot: u64) {
+        let state = self.state_mut();
+        assert!(slot > state.cur_slot, "stateop: decreasing slot");
+        state.cur_slot = slot;
     }
 
     /// Sets the last block commitment.
-    pub fn set_last_block(&mut self, block: L2BlockCommitment) {
+    pub fn set_prev_block(&mut self, block: L2BlockCommitment) {
         let state = self.state_mut();
-        state.last_block = block;
+        state.prev_block = block;
     }
 
     /// Sets the current epoch index.
@@ -192,6 +190,15 @@ impl StateCache {
         let state = self.state_mut();
         state.l1_state.safe_block_height = height;
         state.l1_state.safe_block_header = record;
+    }
+
+    pub fn set_epoch_finishing_flag(&mut self, flag: bool) {
+        let state = self.state_mut();
+        state.is_epoch_finishing = flag;
+    }
+
+    pub fn should_finish_epoch(&self) -> bool {
+        self.state().is_epoch_finishing
     }
 
     /// Update HeaderVerificationState
@@ -328,4 +335,35 @@ impl StateCache {
     }
 
     // TODO add more manipulator functions
+}
+
+#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct WriteBatchEntry {
+    wb: WriteBatch,
+    blockid: L2BlockId,
+}
+
+impl WriteBatchEntry {
+    pub fn new(wb: WriteBatch, blockid: L2BlockId) -> Self {
+        Self { wb, blockid }
+    }
+
+    pub fn to_parts(self) -> (WriteBatch, L2BlockId) {
+        (self.wb, self.blockid)
+    }
+
+    pub fn toplevel_chainstate(&self) -> &Chainstate {
+        self.wb.new_toplevel_state()
+    }
+
+    pub fn blockid(&self) -> &L2BlockId {
+        &self.blockid
+    }
+}
+
+impl From<WriteBatchEntry> for ChainstateEntry {
+    fn from(value: WriteBatchEntry) -> Self {
+        let (wb, blockid) = value.to_parts();
+        ChainstateEntry::new(wb.into_toplevel(), blockid)
+    }
 }

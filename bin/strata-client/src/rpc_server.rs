@@ -126,6 +126,7 @@ impl StrataRpcImpl {
             .chainstate()
             .get_toplevel_chainstate_async(end_commitment.slot())
             .await?
+            .map(Into::into)
             .map(Arc::new))
     }
 
@@ -146,7 +147,7 @@ impl StrataRpcImpl {
 
 fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> RpcBlockHeader {
     RpcBlockHeader {
-        block_idx: blk_header.blockidx(),
+        block_idx: blk_header.slot(),
         timestamp: blk_header.timestamp(),
         block_id: *blk_header.get_blockid().as_ref(),
         prev_block: *blk_header.parent().as_ref(),
@@ -281,7 +282,7 @@ impl StrataApiServer for StrataRpcImpl {
             let l2_blk = self.fetch_l2_block_ok(&cur_blkid).await?;
             output.push(conv_blk_header_to_rpc(l2_blk.header()));
             cur_blkid = *l2_blk.header().parent();
-            if l2_blk.header().blockidx() == 0 || Buf32::from(cur_blkid).is_zero() {
+            if l2_blk.header().slot() == 0 || Buf32::from(cur_blkid).is_zero() {
                 break;
             }
         }
@@ -298,7 +299,7 @@ impl StrataApiServer for StrataRpcImpl {
 
         // check the tip idx
         let tip_block = self.fetch_l2_block_ok(tip_blkid).await?;
-        let tip_idx = tip_block.header().blockidx();
+        let tip_idx = tip_block.header().slot();
 
         if idx > tip_idx {
             return Ok(None);
@@ -399,7 +400,8 @@ impl StrataApiServer for StrataRpcImpl {
             .get_toplevel_chainstate_async(slot)
             .map_err(Error::Db)
             .await?
-            .ok_or(Error::MissingChainstate(slot))?;
+            .ok_or(Error::MissingChainstate(slot))?
+            .to_chainstate();
 
         let raw_chs = borsh::to_vec(&chs)
             .map_err(|_| Error::Other("failed to serialize chainstate".to_string()))?;
@@ -410,7 +412,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
         let l2_blk_bundle = self.fetch_l2_block_ok(&blkid).await?;
 
-        let prev_slot = l2_blk_bundle.block().header().header().blockidx() - 1;
+        let prev_slot = l2_blk_bundle.block().header().header().slot() - 1;
 
         let chain_state = self
             .storage
@@ -418,7 +420,8 @@ impl StrataApiServer for StrataRpcImpl {
             .get_toplevel_chainstate_async(prev_slot)
             .map_err(Error::Db)
             .await?
-            .ok_or(Error::MissingChainstate(prev_slot))?;
+            .ok_or(Error::MissingChainstate(prev_slot))?
+            .to_chainstate();
 
         let cl_block_witness = (chain_state, l2_blk_bundle.block());
         let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
@@ -867,9 +870,9 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 
     async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>> {
-        let chain_state = self
+        let (chain_state, tip_blockid) = self
             .status
-            .get_cur_tip_chainstate()
+            .get_cur_tip_chainstate_with_block()
             .ok_or(Error::BeforeGenesis)?;
         let client_state = self.status.get_cur_client_state();
 
@@ -878,7 +881,8 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .ok_or(Error::MissingInternalState)?;
 
         let duties = extract_duties(
-            chain_state.as_ref(),
+            chain_state.chain_tip_slot(),
+            tip_blockid,
             client_int_state,
             &self.checkpoint_handle,
             self.storage.l2().as_ref(),
@@ -980,17 +984,17 @@ impl StrataDebugApiServer for StrataDebugRpcImpl {
     }
 
     async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
-        let chain_state = self
+        let chain_state_res = self
             .storage
             .chainstate()
             .get_toplevel_chainstate_async(idx)
             .map_err(Error::Db)
             .await?;
-        match chain_state {
-            Some(cs) => Ok(Some(RpcChainState {
-                tip_blkid: *cs.chain_tip_blkid(),
-                tip_slot: cs.chain_tip_slot(),
-                cur_epoch: cs.cur_epoch(),
+        match chain_state_res {
+            Some(cs_entry) => Ok(Some(RpcChainState {
+                tip_blkid: *cs_entry.tip_blockid(),
+                tip_slot: cs_entry.state().chain_tip_slot(),
+                cur_epoch: cs_entry.state().cur_epoch(),
             })),
             None => Ok(None),
         }

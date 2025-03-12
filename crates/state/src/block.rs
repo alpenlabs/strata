@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -16,10 +14,10 @@ use crate::{
 pub struct L2Block {
     /// Header that links the block into the L2 block chain and carries the
     /// block's credential from a sequencer.
-    header: SignedL2BlockHeader,
+    pub(crate) header: SignedL2BlockHeader,
 
     /// Body that contains the bulk of the data.
-    body: L2BlockBody,
+    pub(crate) body: L2BlockBody,
 }
 
 impl L2Block {
@@ -42,6 +40,12 @@ impl L2Block {
     pub fn exec_segment(&self) -> &ExecSegment {
         &self.body.exec_segment
     }
+
+    pub fn into_parts(self) -> (SignedL2BlockHeader, L2BlockBody) {
+        let Self { header, body } = self;
+
+        (header, body)
+    }
 }
 
 /// Careful impl that makes the header consistent with the body.  But the prev
@@ -49,12 +53,12 @@ impl L2Block {
 impl<'a> Arbitrary<'a> for L2Block {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let body = L2BlockBody::arbitrary(u)?;
-        let idx = u64::arbitrary(u)?;
+        let slot = u64::arbitrary(u)?;
+        let epoch = u64::arbitrary(u)?;
         let ts = u64::arbitrary(u)?;
         let prev = L2BlockId::from(Buf32::zero());
         let sr = Buf32::arbitrary(u)?;
-        let epoch = u64::arbitrary(u)?;
-        let header = L2BlockHeader::new(idx, epoch, ts, prev, &body, sr);
+        let header = L2BlockHeader::new(slot, epoch, ts, prev, &body, sr);
         let signed_header = SignedL2BlockHeader::new(header, Buf64::arbitrary(u)?);
         Ok(Self::new(signed_header, body))
     }
@@ -206,6 +210,28 @@ impl L2BlockBundle {
     pub fn accessory(&self) -> &L2BlockAccessory {
         &self.accessory
     }
+
+    pub fn header(&self) -> &SignedL2BlockHeader {
+        self.block.header()
+    }
+
+    pub fn body(&self) -> &L2BlockBody {
+        self.block.body()
+    }
+
+    pub fn l1_segment(&self) -> &L1Segment {
+        self.block.l1_segment()
+    }
+
+    pub fn exec_segment(&self) -> &ExecSegment {
+        self.block.exec_segment()
+    }
+
+    pub fn into_parts(self) -> (L2Block, L2BlockAccessory) {
+        let Self { block, accessory } = self;
+
+        (block, accessory)
+    }
 }
 
 impl From<L2BlockBundle> for L2Block {
@@ -214,13 +240,6 @@ impl From<L2BlockBundle> for L2Block {
     }
 }
 
-impl Deref for L2BlockBundle {
-    type Target = L2Block;
-
-    fn deref(&self) -> &Self::Target {
-        &self.block
-    }
-}
 #[cfg(test)]
 mod tests {
     use strata_test_utils::ArbitraryGenerator;
