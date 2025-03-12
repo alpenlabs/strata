@@ -392,6 +392,20 @@ impl StrataApiServer for StrataRpcImpl {
         Ok(summary)
     }
 
+    async fn get_chainstate_raw(&self, slot: u64) -> RpcResult<Vec<u8>> {
+        let chs = self
+            .storage
+            .chainstate()
+            .get_toplevel_chainstate_async(slot)
+            .map_err(Error::Db)
+            .await?
+            .ok_or(Error::MissingChainstate(slot))?;
+
+        let raw_chs = borsh::to_vec(&chs)
+            .map_err(|_| Error::Other("failed to serialize chainstate".to_string()))?;
+        Ok(raw_chs)
+    }
+
     // TODO rework this, at least to use new OL naming?
     async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
         let l2_blk_bundle = self.fetch_l2_block_ok(&blkid).await?;
@@ -486,7 +500,7 @@ impl StrataApiServer for StrataRpcImpl {
             .l2()
             .get_block_data_async(&block_id)
             .await
-            .map_err(|e| Error::Other(e.to_string()))?
+            .map_err(Error::Db)?
             .map(|block| {
                 borsh::to_vec(&block)
                     .map(HexBytes)
@@ -650,7 +664,7 @@ impl StrataApiServer for StrataRpcImpl {
         if let Some(last_checkpoint) = cstate.get_last_checkpoint() {
             if last_checkpoint.batch_info.includes_l2_block(block_slot) {
                 return Ok(L2BlockStatus::Finalized(
-                    last_checkpoint.l1_reference.block_height,
+                    last_checkpoint.l1_reference.block_height(),
                 ));
             }
         }

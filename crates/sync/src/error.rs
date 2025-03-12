@@ -25,6 +25,9 @@ pub enum L2SyncError {
     #[error("loading unfinalized blocks: {0}")]
     LoadUnfinalizedFailed(String),
 
+    #[error("channel closed")]
+    ChannelClosed,
+
     #[error("client: {0}")]
     Client(#[from] ClientError),
 

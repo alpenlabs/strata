@@ -11,6 +11,7 @@ DOCKER_DIR = docker
 DOCKER_DATADIR = .data
 PROVER_PERF_EVAL_DIR  = provers/perf
 PROVER_PROOFS_CACHE_DIR  = provers/tests/proofs
+PROVER_PROGRAMS = "btc-blockscan,evm-ee-stf,cl-stf,checkpoint"
 
 # Cargo profile for builds. Default is for local builds, CI uses an override.
 PROFILE ?= release
@@ -71,7 +72,7 @@ sec: ## Check for security advisories on any dependencies.
 ##@ Prover
 .PHONY: prover-eval
 prover-eval: prover-clean ## Generate reports and profiling data for proofs
-	cd $(PROVER_PERF_EVAL_DIR) && cargo run --release -F profiling
+	cd $(PROVER_PERF_EVAL_DIR) && RUST_LOG=info ZKVM_MOCK=1 ZKVM_PROFILING=1 cargo run --release -- --programs $(PROVER_PROGRAMS)
 
 .PHONY: prover-clean
 prover-clean: ## Cleans up proofs and profiling data generated

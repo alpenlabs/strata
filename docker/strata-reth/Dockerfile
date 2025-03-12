@@ -1,6 +1,7 @@
 FROM rust:latest AS builder
 
 WORKDIR /app
+
 # Set environment variables for optimized release builds
 ENV CARGO_INCREMENTAL=0 \
     CARGO_TERM_COLOR=always \
@@ -21,36 +22,35 @@ RUN rustup toolchain install
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cargo build --release --bin strata-client
+    cargo fetch
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cp /app/target/release/strata-client /app/strata-client
+    cargo build --release --bin strata-reth
+
+
+RUN --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,sharing=private,target=/app/target \
+    cp /app/target/release/strata-reth /app/strata-reth
 
 FROM ubuntu:24.04 AS runtime
 WORKDIR /app
 
-# Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y \
-    curl \
-    iproute2 \
-    net-tools \
-    libssl-dev \
-    libffi-dev \
-    software-properties-common && \
+    curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy the built binaries and the entrypoint script from the builder stage
-COPY --from=builder /app/strata-client /usr/local/bin/strata-client
-COPY ./docker/client/entrypoint.sh entrypoint.sh
+# Copy the built binaries from the builder stage
+COPY --from=builder /app/strata-reth /usr/local/bin/strata-reth
 
-EXPOSE 8432
+COPY ./docker/strata-reth/entrypoint.sh entrypoint.sh
 
-# Make the entrypoint script executable
-RUN chmod +x entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-# Set the entrypoint
+EXPOSE 30303 8545 8546 8551
+
 ENTRYPOINT ["/app/entrypoint.sh"]

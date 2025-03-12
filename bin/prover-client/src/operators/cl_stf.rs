@@ -4,12 +4,13 @@ use jsonrpsee::http_client::HttpClient;
 use strata_db::traits::ProofDatabase;
 use strata_primitives::{
     buf::Buf32,
+    evm_exec::EvmEeBlockCommitment,
     l1::L1BlockCommitment,
     l2::L2BlockCommitment,
     params::RollupParams,
     proof::{ProofContext, ProofKey},
 };
-use strata_proofimpl_cl_stf::prover::{ClStfInput, ClStfProver};
+use strata_proofimpl_cl_stf::program::{ClStfInput, ClStfProgram};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcBlockHeader;
@@ -17,14 +18,18 @@ use strata_state::{block::L2Block, chain_state::Chainstate, header::L2Header, id
 use tokio::sync::Mutex;
 use tracing::error;
 
-use super::{btc::BtcBlockspaceOperator, evm_ee::EvmEeOperator, ProvingOp};
+use super::{
+    btc::{BtcBlockscanParams, BtcBlockspaceOperator},
+    evm_ee::EvmEeOperator,
+    ProvingOp,
+};
 use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] trait for Consensus Layer (CL) State Transition
 /// Function (STF) proof generation.
 ///
 /// It is responsible for managing the data and tasks required to generate proofs for CL state
-/// transitions. It fetches the necessary inputs for the [`ClStfProver`] by:
+/// transitions. It fetches the necessary inputs for the [`ClStfProgram`] by:
 ///
 /// - Utilizing the [`EvmEeOperator`] to create and manage proving tasks for EVM Execution
 ///   Environment (EE) STF proofs. The resulting EVM EE STF proof is incorporated as part of the
@@ -73,11 +78,18 @@ impl ClStfOperator {
         Ok(header)
     }
 
-    /// Retrieves the evm_ee block hash corresponding to the given L2 block ID
-    pub async fn get_exec_id(&self, cl_block_id: L2BlockId) -> Result<Buf32, ProvingTaskError> {
+    /// Retrieves the evm_ee block commitment corresponding to the given L2 block ID
+    pub async fn get_exec_commitment(
+        &self,
+        cl_block_id: L2BlockId,
+    ) -> Result<EvmEeBlockCommitment, ProvingTaskError> {
         let header = self.get_l2_block_header(cl_block_id).await?;
         let block = self.evm_ee_operator.get_block(header.block_idx).await?;
-        Ok(Buf32(block.header.hash.into()))
+
+        Ok(EvmEeBlockCommitment::new(
+            block.header.number,
+            Buf32(block.header.hash.into()),
+        ))
     }
 
     /// Retrieves the [`Chainstate`] before the given blocks is applied
@@ -96,10 +108,10 @@ impl ClStfOperator {
     }
 
     /// Retrieves the [`L2Block`] for the given id
-    pub async fn get_block(&self, blkid: L2BlockId) -> Result<L2Block, ProvingTaskError> {
+    pub async fn get_block(&self, blkid: &L2BlockId) -> Result<L2Block, ProvingTaskError> {
         let raw_witness: Vec<u8> = self
             .cl_client
-            .get_cl_block_witness_raw(blkid)
+            .get_cl_block_witness_raw(*blkid)
             .await
             .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
         let (_, blk): (Chainstate, L2Block) =
@@ -108,17 +120,18 @@ impl ClStfOperator {
     }
 }
 
-pub struct ClStfRange {
+pub struct ClStfParams {
+    pub epoch: u64,
     pub l2_range: (L2BlockCommitment, L2BlockCommitment),
     pub l1_range: Option<(L1BlockCommitment, L1BlockCommitment)>,
 }
 
 impl ProvingOp for ClStfOperator {
-    type Prover = ClStfProver;
-    type Params = ClStfRange;
+    type Program = ClStfProgram;
+    type Params = ClStfParams;
 
     fn construct_proof_ctx(&self, range: &Self::Params) -> Result<ProofContext, ProvingTaskError> {
-        let ClStfRange { l2_range, .. } = range;
+        let ClStfParams { l2_range, .. } = range;
 
         let (start, end) = l2_range;
         // Do some sanity checks
@@ -129,7 +142,7 @@ impl ProvingOp for ClStfOperator {
             end.slot()
         );
 
-        Ok(ProofContext::ClStf(*start.blkid(), *end.blkid()))
+        Ok(ProofContext::ClStf(*start, *end))
     }
 
     async fn fetch_input(
@@ -137,7 +150,7 @@ impl ProvingOp for ClStfOperator {
         task_id: &ProofKey,
         db: &ProofDb,
     ) -> Result<ClStfInput, ProvingTaskError> {
-        let (start_block_hash, end_block_hash) = match task_id.context() {
+        let (start_block, end_block) = match task_id.context() {
             ProofContext::ClStf(start, end) => (*start, *end),
             _ => return Err(ProvingTaskError::InvalidInput("CL_STF".to_string())),
         };
@@ -178,18 +191,16 @@ impl ProvingOp for ClStfOperator {
             })
             .transpose()?;
 
-        let chainstate = self.get_chainstate_before(start_block_hash).await?;
+        let chainstate = self.get_chainstate_before(*start_block.blkid()).await?;
         let mut l2_blocks = vec![];
-        let mut current_block_hash = end_block_hash;
+        let mut current_block_hash = *end_block.blkid();
 
         loop {
-            let l2_block = self.get_block(current_block_hash).await?;
-
+            let l2_block = self.get_block(&current_block_hash).await?;
             let prev_l2_blkid = *l2_block.header().parent();
-
             l2_blocks.push(l2_block);
 
-            if current_block_hash == start_block_hash {
+            if start_block.blkid() == &current_block_hash {
                 break;
             } else {
                 current_block_hash = prev_l2_blkid;
@@ -209,28 +220,32 @@ impl ProvingOp for ClStfOperator {
 
     async fn create_deps_tasks(
         &self,
-        range: Self::Params,
+        params: Self::Params,
         db: &ProofDb,
         task_tracker: Arc<Mutex<TaskTracker>>,
     ) -> Result<Vec<ProofKey>, ProvingTaskError> {
-        let ClStfRange { l1_range, l2_range } = range;
+        let ClStfParams {
+            epoch,
+            l1_range,
+            l2_range,
+        } = params;
 
-        let el_start_block_id = self.get_exec_id(*l2_range.0.blkid()).await?;
-        let el_end_block_id = self.get_exec_id(*l2_range.1.blkid()).await?;
+        let el_start_block = self.get_exec_commitment(*l2_range.0.blkid()).await?;
+        let el_end_block = self.get_exec_commitment(*l2_range.1.blkid()).await?;
 
         let mut tasks = self
             .evm_ee_operator
-            .create_task(
-                (el_start_block_id, el_end_block_id),
-                task_tracker.clone(),
-                db,
-            )
+            .create_task((el_start_block, el_end_block), task_tracker.clone(), db)
             .await?;
 
         if let Some(l1_range) = l1_range {
+            let btc_params = BtcBlockscanParams {
+                epoch,
+                range: l1_range,
+            };
             let btc_tasks = self
                 .btc_blockspace_operator
-                .create_task(l1_range, task_tracker, db)
+                .create_task(btc_params, task_tracker, db)
                 .await?;
             tasks.extend(btc_tasks);
         }

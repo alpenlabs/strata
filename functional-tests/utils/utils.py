@@ -291,6 +291,7 @@ class RollupParamsSettings:
     genesis_trigger: int
     message_interval: int
     proof_timeout: Optional[int] = None
+    chain_config: Optional[str] = None
 
     @classmethod
     def new_default(cls):
@@ -309,6 +310,10 @@ class RollupParamsSettings:
 
     def strict_mode(self):
         self.proof_timeout = None
+        return self
+
+    def with_chainconfig(self, chain_config: str):
+        self.chain_config = chain_config
         return self
 
 
@@ -546,6 +551,9 @@ def generate_params(settings: RollupParamsSettings, seqpubkey: str, oppubkeys: l
     ]
     if settings.proof_timeout is not None:
         cmd.extend(["--proof-timeout", str(settings.proof_timeout)])
+
+    if settings.chain_config is not None:
+        cmd.extend(["--chain-config", settings.chain_config])
     # fmt: on
 
     for k in oppubkeys:
@@ -749,9 +757,10 @@ def cl_slot_to_block_id(seqrpc, slot):
     return l2_blocks[0]["block_id"]
 
 
-def el_slot_to_block_id(rethrpc, block_num):
-    """Get EL block hash from block number using Ethereum RPC."""
-    return rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]
+def el_slot_to_block_commitment(rethrpc, block_num):
+    """Get EL block commitment from block number using Ethereum RPC."""
+    blk_id = rethrpc.eth_getBlockByNumber(hex(block_num), False)["hash"]
+    return (block_num, blk_id)
 
 
 def bytes_to_big_endian(hash):

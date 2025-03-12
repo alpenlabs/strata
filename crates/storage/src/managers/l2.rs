@@ -6,8 +6,6 @@ use strata_db::{
 };
 use strata_state::{block::L2BlockBundle, header::L2Header, id::L2BlockId};
 use threadpool::ThreadPool;
-use tokio::sync::broadcast;
-use tracing::warn;
 
 use crate::{cache, ops};
 
@@ -15,20 +13,13 @@ use crate::{cache, ops};
 pub struct L2BlockManager {
     ops: ops::l2::L2DataOps,
     block_cache: cache::CacheTable<L2BlockId, Option<L2BlockBundle>>,
-    /// Broadcaster which broadcasts about new l2_block update in db.
-    l2_blk_tx: broadcast::Sender<(u64, L2BlockId)>,
 }
 
 impl L2BlockManager {
     pub fn new<D: Database + Sync + Send + 'static>(pool: ThreadPool, db: Arc<D>) -> Self {
         let ops = ops::l2::Context::new(db.l2_db().clone()).into_ops(pool);
         let block_cache = cache::CacheTable::new(64.try_into().unwrap());
-        let (l2_blk_tx, _) = broadcast::channel::<(u64, L2BlockId)>(1024);
-        Self {
-            ops,
-            block_cache,
-            l2_blk_tx,
-        }
+        Self { ops, block_cache }
     }
 
     /// Puts a block in the database, purging cache entry.
@@ -47,11 +38,6 @@ impl L2BlockManager {
         self.ops.put_block_data_blocking(bundle)?;
         self.block_cache.purge(&id);
         Ok(())
-    }
-
-    /// Subscribe to block updates
-    pub fn subscribe_to_valid_block_updates(&self) -> broadcast::Receiver<(u64, L2BlockId)> {
-        self.l2_blk_tx.subscribe()
     }
 
     /// Gets a block either in the cache or from the underlying database.
@@ -95,17 +81,6 @@ impl L2BlockManager {
     ) -> DbResult<()> {
         self.ops.set_block_status_async(*id, status).await?;
 
-        // Broadcast, if there are any subscribers and is a valid block
-        if self.l2_blk_tx.receiver_count() > 0 && status == BlockStatus::Valid {
-            let blk = self
-                .get_block_data_async(id)
-                .await?
-                .expect("Block should be present if its status is changed");
-
-            if let Err(e) = self.l2_blk_tx.send((blk.header().blockidx(), *id)) {
-                warn!(?e, "No active listeners for l2 tx update");
-            }
-        }
         Ok(())
     }
 
@@ -113,16 +88,6 @@ impl L2BlockManager {
     pub fn set_block_status_blocking(&self, id: &L2BlockId, status: BlockStatus) -> DbResult<()> {
         self.ops.set_block_status_blocking(*id, status)?;
 
-        // Broadcast, if there are any subscribers and is a valid block
-        if self.l2_blk_tx.receiver_count() > 0 && status == BlockStatus::Valid {
-            let blk = self
-                .get_block_data_blocking(id)?
-                .expect("Block should be present if its status is changed");
-
-            if let Err(e) = self.l2_blk_tx.send((blk.header().blockidx(), *id)) {
-                warn!(?e, "No active listeners for l2 tx update");
-            }
-        }
         Ok(())
     }
 }

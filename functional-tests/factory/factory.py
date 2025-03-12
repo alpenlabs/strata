@@ -135,6 +135,7 @@ class StrataSequencerFactory(flexitest.Factory):
         sequencer_rpc_host: str,
         sequencer_rpc_port: str,
         ctx: flexitest.EnvContext,
+        epoch_gas_limit: Optional[int] = None,
     ) -> flexitest.Service:
         datadir = ctx.make_service_dir("sequencer_signer")
         seqkey_path = os.path.join(ctx.envdd_path, "_init", "seqkey.bin")
@@ -148,6 +149,9 @@ class StrataSequencerFactory(flexitest.Factory):
             "--rpc-port", str(sequencer_rpc_port),
         ]
         # fmt: on
+
+        if epoch_gas_limit is not None:
+            cmd.extend(["--epoch-gas-limit", str(epoch_gas_limit)])
 
         props = {
             "seqkey": seqkey_path,

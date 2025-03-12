@@ -12,7 +12,8 @@ use strata_primitives::{
     l1::payload::{L1Payload, PayloadIntent},
 };
 use strata_state::{
-    batch::{BatchInfo, Checkpoint},
+    batch::{BatchInfo, BatchTransition, Checkpoint, CheckpointSidecar},
+    chain_state::Chainstate,
     client_state::CheckpointL1Ref,
 };
 use zkaleido::Proof;
@@ -215,8 +216,14 @@ impl CheckpointEntry {
     }
 
     /// Creates a new instance for a freshly defined checkpoint.
-    pub fn new_pending_proof(info: BatchInfo, transition: (Buf32, Buf32)) -> Self {
-        let checkpoint = Checkpoint::new(info, transition, Proof::default());
+    pub fn new_pending_proof(
+        info: BatchInfo,
+        transition: BatchTransition,
+        chainstate: &Chainstate,
+    ) -> Self {
+        let sidecar =
+            CheckpointSidecar::new(borsh::to_vec(chainstate).expect("serialize chainstate"));
+        let checkpoint = Checkpoint::new(info, transition, Proof::default(), sidecar);
         Self::new(
             checkpoint,
             CheckpointProvingStatus::PendingProof,

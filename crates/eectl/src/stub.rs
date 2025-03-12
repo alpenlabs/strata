@@ -77,7 +77,7 @@ impl ExecEngineCtl for StubController {
                 Vec::new(),
                 Vec::new(),
             );
-            Ok(PayloadStatus::Ready(exec))
+            Ok(PayloadStatus::Ready(exec, 0))
         }
     }
 

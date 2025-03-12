@@ -3,7 +3,7 @@ from web3 import Web3
 
 from envs import testenv
 from utils import (
-    el_slot_to_block_id,
+    el_slot_to_block_commitment,
     wait_for_proof_with_time_out,
     wait_until_with_value,
 )
@@ -52,10 +52,10 @@ class ProverClientTest(testenv.StrataTester):
             error_with="EE blocks not generated",
         )
 
-        start_block_id = el_slot_to_block_id(reth_rpc, ee_prover_params["start_block"])
-        end_block_id = el_slot_to_block_id(reth_rpc, ee_prover_params["end_block"])
+        start_block = el_slot_to_block_commitment(reth_rpc, ee_prover_params["start_block"])
+        end_block = el_slot_to_block_commitment(reth_rpc, ee_prover_params["end_block"])
 
-        task_ids = prover_client_rpc.dev_strata_proveElBlocks((start_block_id, end_block_id))
+        task_ids = prover_client_rpc.dev_strata_proveElBlocks((start_block, end_block))
         self.debug(f"Prover task IDs received: {task_ids}")
 
         if not task_ids:

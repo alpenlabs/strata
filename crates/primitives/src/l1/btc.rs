@@ -127,6 +127,13 @@ impl BitcoinAddress {
         let address = Address::from_script(&script_buf, network)?;
         Ok(Self { network, address })
     }
+
+    pub fn from_descriptor(descriptor: &Descriptor, network: Network) -> Result<Self, ParseError> {
+        let address = descriptor
+            .to_address(network)
+            .map_err(|err| ParseError::Descriptor(err.to_string()))?;
+        Ok(Self { network, address })
+    }
 }
 
 impl BitcoinAddress {
@@ -871,6 +878,54 @@ impl<'a> arbitrary::Arbitrary<'a> for RawBitcoinTx {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BitcoinScriptBuf(ScriptBuf);
+
+impl BitcoinScriptBuf {
+    pub fn inner(&self) -> &ScriptBuf {
+        &self.0
+    }
+}
+
+impl From<ScriptBuf> for BitcoinScriptBuf {
+    fn from(value: ScriptBuf) -> Self {
+        Self(value)
+    }
+}
+
+// Implement BorshSerialize for BitcoinScriptBuf
+impl BorshSerialize for BitcoinScriptBuf {
+    fn serialize<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let script_bytes = self.0.to_bytes();
+        BorshSerialize::serialize(&(script_bytes.len() as u32), writer)?;
+        writer.write_all(&script_bytes)?;
+        Ok(())
+    }
+}
+
+// Implement BorshDeserialize for BitcoinScriptBuf
+impl BorshDeserialize for BitcoinScriptBuf {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> std::io::Result<Self> {
+        let script_len = u32::deserialize_reader(reader)? as usize;
+        let mut script_bytes = vec![0u8; script_len];
+        reader.read_exact(&mut script_bytes)?;
+        let script_pubkey = ScriptBuf::from(script_bytes);
+
+        Ok(BitcoinScriptBuf(script_pubkey))
+    }
+}
+
+impl<'a> Arbitrary<'a> for BitcoinScriptBuf {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Generate arbitrary script
+        let script_len = usize::arbitrary(u)? % 100; // Limit script length
+        let script_bytes = u.bytes(script_len)?;
+        let script = ScriptBuf::from(script_bytes.to_vec());
+
+        Ok(Self(script))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -890,8 +945,8 @@ mod tests {
     use strata_test_utils::ArbitraryGenerator;
 
     use super::{
-        BitcoinAddress, BitcoinAmount, BitcoinTxOut, BitcoinTxid, BorshDeserialize, BorshSerialize,
-        RawBitcoinTx, XOnlyPk,
+        BitcoinAddress, BitcoinAmount, BitcoinScriptBuf, BitcoinTxOut, BitcoinTxid,
+        BorshDeserialize, BorshSerialize, RawBitcoinTx, XOnlyPk,
     };
     use crate::{
         buf::Buf32,
@@ -1345,5 +1400,45 @@ mod tests {
         let payload = descriptor.payload();
         assert_eq!(payload.len(), 32);
         assert_eq!(payload, xonly_pk.0.as_bytes());
+    }
+
+    #[test]
+    fn test_bitcoin_scriptbuf_serialize_deserialize() {
+        let mut generator = ArbitraryGenerator::new();
+        let scriptbuf: BitcoinScriptBuf = generator.generate();
+
+        let serialized_scriptbuf = borsh::to_vec(&scriptbuf).unwrap();
+        let deserialized_scriptbuf: BitcoinScriptBuf =
+            borsh::from_slice(&serialized_scriptbuf).unwrap();
+
+        assert_eq!(
+            scriptbuf.0, deserialized_scriptbuf.0,
+            "original and deserialized scriptbuf must be the same"
+        );
+
+        // Test with an empty script
+        let scriptbuf: BitcoinScriptBuf = BitcoinScriptBuf(ScriptBuf::new());
+        let serialized_scriptbuf = borsh::to_vec(&scriptbuf).unwrap();
+        let deserialized_scriptbuf: BitcoinScriptBuf =
+            borsh::from_slice(&serialized_scriptbuf).unwrap();
+
+        assert_eq!(
+            scriptbuf.0, deserialized_scriptbuf.0,
+            "original and deserialized scriptbuf must be the same"
+        );
+
+        // Test with a more complex script.
+        let script: ScriptBuf = ScriptBuf::from_bytes(vec![0x51, 0x21, 0xFF]); // Example script
+
+        let scriptbuf: BitcoinScriptBuf = BitcoinScriptBuf(script);
+
+        let serialized_scriptbuf = borsh::to_vec(&scriptbuf).unwrap();
+        let deserialized_scriptbuf: BitcoinScriptBuf =
+            borsh::from_slice(&serialized_scriptbuf).unwrap();
+
+        assert_eq!(
+            scriptbuf.0, deserialized_scriptbuf.0,
+            "original and deserialized scriptbuf must be the same"
+        );
     }
 }

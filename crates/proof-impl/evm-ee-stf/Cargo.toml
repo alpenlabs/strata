@@ -9,6 +9,7 @@ strata-reth-evm.workspace = true
 strata-reth-primitives.workspace = true
 strata-state.workspace = true
 zkaleido.workspace = true
+zkaleido-native-adapter.workspace = true
 
 alloy-consensus = { workspace = true, features = ["serde-bincode-compat"] }
 alloy-eips.workspace = true
@@ -20,7 +21,7 @@ alloy-rpc-types-eth.workspace = true
 alloy-trie.workspace = true
 
 anyhow.workspace = true
-k256 = { version = "=0.13.3", features = [
+k256 = { version = "0.13.4", features = [
   "std",
   "ecdsa",
 ], default-features = false }

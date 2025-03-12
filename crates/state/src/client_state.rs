@@ -7,7 +7,8 @@ use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use strata_primitives::{
-    buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment, params::Params,
+    batch::BatchTransition, buf::Buf32, epoch::EpochCommitment, l1::L1BlockCommitment,
+    params::Params,
 };
 use tracing::*;
 
@@ -158,7 +159,7 @@ impl ClientState {
     pub fn get_verified_l1_height(&self, slot: u64) -> Option<u64> {
         self.get_last_checkpoint().and_then(|ckpt| {
             if ckpt.batch_info.includes_l2_block(slot) {
-                Some(ckpt.l1_reference.block_height)
+                Some(ckpt.l1_reference.block_height())
             } else {
                 None
             }
@@ -347,18 +348,26 @@ impl InternalState {
     Clone, Debug, Eq, PartialEq, Arbitrary, BorshDeserialize, BorshSerialize, Deserialize, Serialize,
 )]
 pub struct CheckpointL1Ref {
-    pub block_height: u64,
+    pub l1_commitment: L1BlockCommitment,
     pub txid: Buf32,
     pub wtxid: Buf32,
 }
 
 impl CheckpointL1Ref {
-    pub fn new(block_height: u64, txid: Buf32, wtxid: Buf32) -> Self {
+    pub fn new(l1_commitment: L1BlockCommitment, txid: Buf32, wtxid: Buf32) -> Self {
         Self {
-            block_height,
+            l1_commitment,
             txid,
             wtxid,
         }
+    }
+
+    pub fn block_height(&self) -> u64 {
+        self.l1_commitment.height()
+    }
+
+    pub fn block_id(&self) -> &L1BlockId {
+        self.l1_commitment.blkid()
     }
 }
 
@@ -370,7 +379,7 @@ pub struct L1Checkpoint {
     pub batch_info: BatchInfo,
 
     /// The inner checkpoint batch transition.
-    pub batch_transition: (Buf32, Buf32),
+    pub batch_transition: BatchTransition,
 
     /// L1 reference for this checkpoint.
     pub l1_reference: CheckpointL1Ref,
@@ -379,7 +388,7 @@ pub struct L1Checkpoint {
 impl L1Checkpoint {
     pub fn new(
         batch_info: BatchInfo,
-        batch_transition: (Buf32, Buf32),
+        batch_transition: BatchTransition,
         l1_reference: CheckpointL1Ref,
     ) -> Self {
         Self {

@@ -10,7 +10,7 @@ use secp256k1::XOnlyPublicKey;
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
     filter::{indexer::index_block, TxFilterConfig},
-    messages::{BlockData, L1Event, RelevantTxEntry},
+    messages::RelevantTxEntry,
 };
 use strata_primitives::{
     block_credential::CredRule,
@@ -25,15 +25,14 @@ use strata_status::StatusChannel;
 use strata_storage::{L1BlockManager, NodeStorage};
 use tracing::*;
 
+use super::event::L1Event;
 use crate::{
     reader::{
+        event::BlockData,
         handler::handle_bitcoin_event,
         state::ReaderState,
         tx_indexer::ReaderTxVisitorImpl,
-        utils::{
-            find_checkpoint_in_events, find_initial_checkpoint_to_wait_for,
-            wait_for_terminal_block_in_db,
-        },
+        utils::{find_checkpoint_in_events, find_last_checkpoint_chainstate},
     },
     rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
@@ -121,20 +120,6 @@ async fn do_reader_task<R: ReaderRpc>(
     loop {
         let mut status_updates: Vec<L1StatusUpdate> = Vec::new();
 
-        // Check if we need to wait for some l2 block corresponding to a checkpoint.
-        if let Some(chkpt) = state.checkpoint_to_wait_for() {
-            // Wait for the checkpoint
-            wait_for_terminal_block_in_db(ctx.storage.as_ref(), chkpt).await?;
-
-            // Reset checkpoint to wait for, which will be populated when we find checkpoint in some
-            // other block. Maybe no need to reset?
-            state.set_checkpoint_to_wait_for(None);
-        }
-        // See if epoch/filter rules have changed
-        if let Some(l1ev) = check_epoch_change(&ctx, &mut state)? {
-            handle_bitcoin_event(l1ev, &ctx, event_submitter).await?;
-        };
-
         match poll_for_new_blocks(&ctx, &mut state, &mut status_updates).await {
             Err(err) => {
                 handle_poll_error(&err, &mut status_updates);
@@ -175,46 +160,6 @@ fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdat
     }
 }
 
-/// Checks for epoch changes and any L1 reverts necessary. Internally updates reader's state.
-fn check_epoch_change<R: ReaderRpc>(
-    ctx: &ReaderContext<R>,
-    state: &mut ReaderState,
-) -> anyhow::Result<Option<L1Event>> {
-    // If we don't have a chainstate yet then we can just assume 0.  Right now
-    // we infer it all consistently from params anyways.
-    let new_epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
-
-    // If we reorg out a checkpoint then we also want to go back to the earlier epoch.
-    let cur_epoch = state.epoch();
-
-    if cur_epoch != new_epoch {
-        state.set_epoch(new_epoch);
-    }
-
-    // TODO: pass in chainstate to `derive_from`
-    let new_config = TxFilterConfig::derive_from(ctx.params.rollup())?;
-    let curr_filter_config = state.filter_config().clone();
-
-    if new_config != curr_filter_config {
-        state.set_filter_config(new_config.clone());
-
-        let last_ckpt = ctx
-            .status_channel
-            .get_last_checkpoint()
-            .expect("got epoch change without checkpoint finalized");
-
-        let last_ckpt_block = last_ckpt.batch_info.l1_range.1;
-
-        // Now, we need to revert to the point before the last checkpoint height.
-        state.rollback_to_height(last_ckpt_block.height());
-
-        // Create revert event
-        Ok(Some(L1Event::RevertTo(last_ckpt_block)))
-    } else {
-        Ok(None)
-    }
-}
-
 /// Inits the reader state by trying to backfill blocks up to a target height.
 async fn init_reader_state<R: ReaderRpc>(
     ctx: &ReaderContext<R>,
@@ -251,10 +196,13 @@ async fn init_reader_state<R: ReaderRpc>(
     }
 
     let params = ctx.params.clone();
-    let filter_config = TxFilterConfig::derive_from(params.rollup())?;
+    let mut filter_config = TxFilterConfig::derive_from(params.rollup())?;
     let epoch = ctx.status_channel.get_cur_chain_epoch().unwrap_or(0);
-    let checkpoint_to_wait_for =
-        find_initial_checkpoint_to_wait_for(ctx.storage.l1(), target_next_block - 1)?;
+
+    // update filterconfig based on chainstate of last seen checkpoint
+    if let Some(chainstate) = find_last_checkpoint_chainstate(&ctx.storage).await? {
+        filter_config.update_from_chainstate(&chainstate);
+    }
 
     let state = ReaderState::new(
         real_cur_height + 1,
@@ -262,7 +210,6 @@ async fn init_reader_state<R: ReaderRpc>(
         init_queue,
         filter_config,
         epoch,
-        checkpoint_to_wait_for,
     );
     Ok(state)
 }
@@ -313,11 +260,14 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
             Ok((blkid, evs)) => {
                 events.extend_from_slice(&evs);
 
-                // If any of the events have checkpoint, break here
                 if let Some(checkpt) = find_checkpoint_in_events(&evs) {
-                    // We need to wait for l2 block corresponding to this checkpoint.
-                    state.set_checkpoint_to_wait_for(Some(checkpt.clone()));
-                    return Ok(events);
+                    // if we have a checkpoint in this block, update filterconfig based on this
+                    let chainstate = borsh::from_slice(checkpt.checkpoint().sidecar().chainstate())
+                        .expect("deserialize chainstate");
+
+                    state
+                        .filter_config_mut()
+                        .update_from_chainstate(&chainstate);
                 }
 
                 info!(%fetch_height, %blkid, "accepted new block");
@@ -537,10 +487,7 @@ mod test {
     use bitcoin::{hashes::Hash, params::REGTEST};
     use strata_primitives::{buf::Buf32, l1::L1Status};
     use strata_rocksdb::{init_core_dbs, test_utils::get_rocksdb_tmp_instance};
-    use strata_state::{
-        chain_state::Chainstate,
-        client_state::{CheckpointL1Ref, ClientState, L1Checkpoint},
-    };
+    use strata_state::{chain_state::Chainstate, client_state::ClientState};
     use strata_status::ChainSyncStatusUpdate;
     use strata_storage::create_node_storage;
     use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
@@ -597,103 +544,7 @@ mod test {
             recent_blocks,
             filter_config,
             ctx.status_channel.get_cur_chain_epoch().unwrap(),
-            None,
         )
-    }
-
-    /// Check if updating chainstate with new epoch updates reader's state or not when filter config
-    /// remain unchanged
-    #[tokio::test]
-    async fn test_epoch_change() {
-        let mut chstate: Chainstate = ArbitraryGenerator::new().generate();
-        let clstate: ClientState = ArbitraryGenerator::new().generate();
-        let curr_epoch = chstate.cur_epoch();
-        println!("curr epoch {:?}", curr_epoch);
-
-        let ctx = get_reader_ctx(chstate.clone(), clstate);
-        let mut state = get_reader_state(&ctx, N_RECENT_BLOCKS);
-
-        // Update new chainstate from status channel
-        chstate.set_epoch(curr_epoch + 1);
-        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chstate));
-        ctx.status_channel.update_chain_sync_status(css);
-
-        let ev = check_epoch_change(&ctx, &mut state).unwrap();
-
-        assert!(
-            ev.is_none(),
-            "There should be no L1 event if filter config has not changed"
-        );
-
-        // The state's epoch should be updated
-        assert_eq!(state.epoch(), curr_epoch + 1);
-    }
-
-    /// Checks that when new epoch occurs with new tx filter config, reverts the reader state back
-    /// to the height of last finalized checkpoint.
-    #[tokio::test]
-    async fn test_new_filter_rule() {
-        let mut chstate: Chainstate = ArbitraryGenerator::new().generate();
-        let curr_epoch = chstate.cur_epoch();
-
-        // Create client state with a finalized checkpoint
-        let mut clstate: ClientState = ArbitraryGenerator::new().generate();
-        let mut ckpt: L1Checkpoint = ArbitraryGenerator::new().generate();
-
-        let ckpt_height = N_RECENT_BLOCKS as u64 - 5; // within recent blocks range, else panics
-        ckpt.l1_reference = CheckpointL1Ref::new(ckpt_height, Buf32::zero(), Buf32::zero());
-        // This is a horrible hack to update the height.
-        ckpt.batch_info.l1_range.1 =
-            L1BlockCommitment::new(ckpt_height, *ckpt.batch_info.l1_range.1.blkid());
-
-        #[allow(deprecated)]
-        clstate.set_last_finalized_checkpoint(ckpt);
-
-        // Create reader context and state
-        let mut ctx = get_reader_ctx(chstate.clone(), clstate.clone());
-        let mut state = get_reader_state(&ctx, N_RECENT_BLOCKS);
-
-        // Update status channel with client state
-        ctx.status_channel.update_client_state(clstate);
-
-        let old_filter_config = state.filter_config().clone();
-
-        // Simulate tx filter change by updating rollup params. This is because filter config
-        // currently depends only on the rollup params and not on the chainstate.
-        ctx.params = {
-            let mut p = ctx.params.as_ref().clone();
-            p.rollup.da_tag = "new-da-tag".to_string();
-            p.rollup.checkpoint_tag = "new-ckpt-tag".to_string();
-            Arc::new(p)
-        };
-
-        // Update new chainstate from status channel
-        chstate.set_epoch(curr_epoch + 1);
-        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chstate));
-        ctx.status_channel.update_chain_sync_status(css);
-
-        // Check for epoch change, this should not trigger L1 revert because filter config has not
-        // changed
-        let ev = check_epoch_change(&ctx, &mut state).unwrap();
-        assert!(
-            matches!(ev, Some(L1Event::RevertTo(_))),
-            "Should receive revert event"
-        );
-
-        // Check the reader state's next_height
-        assert_eq!(
-            state.next_height(),
-            ckpt_height + 1,
-            "Reader's next sheight should be updated"
-        );
-
-        // The state's epoch should be updated
-        assert_eq!(state.epoch(), curr_epoch + 1, "Epoch should be updated");
-
-        assert!(
-            *state.filter_config() != old_filter_config,
-            "Filter config should be updated"
-        );
     }
 
     #[tokio::test()]

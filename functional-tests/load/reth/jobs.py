@@ -1,7 +1,8 @@
 from locust import task
 
+from utils.transaction import EthTransactions, TransactionType, TransferTransaction
+
 from .reth import BaseRethLoadJob
-from .transaction import EthTransactions, TransactionType, TransferTransaction
 
 
 class BasicRethBlockJob(BaseRethLoadJob):

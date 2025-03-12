@@ -20,7 +20,7 @@ members = [
   "crates/proof-impl/checkpoint",
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
-  "crates/zkvm/hosts",
+  # "crates/zkvm/hosts",
   "crates/reth/db",
   "crates/reth/evm",
   "crates/reth/exex",
@@ -43,7 +43,6 @@ members = [
   "crates/vtxjmt",
   "provers/risc0",
   "provers/sp1",
-  "provers/tests",
 
   # binaries listed separately
   "bin/bridge-client",
@@ -112,12 +111,12 @@ strata-storage = { path = "crates/storage" }
 strata-sync = { path = "crates/sync" }
 strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
-strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
+# strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 
-zkaleido = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc2" }
-zkaleido-native-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc2" }
-zkaleido-risc0-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc2" }
-zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc2" }
+zkaleido = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5" }
+zkaleido-native-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5" }
+zkaleido-risc0-groth16-verifier = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5" }
+zkaleido-sp1-groth16-verifier = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5" }
 
 # IMPORTANT: ensure alloy-* and revm packages are of the same version as inside reth dependency
 # reth dependencies:
@@ -236,7 +235,7 @@ reqwest = { version = "0.12.7", default-features = false, features = [
   "zstd",
   "json",
 ] }
-rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "v2.0.1-alpen.2" }
+rockbound = { git = "https://github.com/alpenlabs/rockbound", rev = "v2.0.1-alpen.3" }
 secp256k1 = { version = "0.29.1", features = ["global-context", "std"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.94"

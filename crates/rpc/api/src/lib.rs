@@ -74,6 +74,9 @@ pub trait StrataApi {
         terminal: L2BlockId,
     ) -> RpcResult<Option<EpochSummary>>;
 
+    #[method(name = "getChainstateRaw")]
+    async fn get_chainstate_raw(&self, slot: u64) -> RpcResult<Vec<u8>>;
+
     #[method(name = "getCLBlockWitness")]
     async fn get_cl_block_witness_raw(&self, block_id: L2BlockId) -> RpcResult<Vec<u8>>;
 
@@ -87,6 +90,8 @@ pub trait StrataApi {
     #[method(name = "syncStatus")]
     async fn sync_status(&self) -> RpcResult<RpcSyncStatus>;
 
+    /// Get blocks in range as raw bytes of borsh serialized `Vec<L2BlockBundle>`.
+    /// `start_height` and `end_height` are inclusive.
     #[method(name = "getRawBundles")]
     async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes>;
 

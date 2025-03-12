@@ -1,11 +1,11 @@
 //! General handling around checkpoint verification.
 
-use strata_primitives::{buf::Buf32, params::*, proof::RollupVerifyingKey};
+use strata_primitives::{params::*, proof::RollupVerifyingKey};
 use strata_state::{batch::*, client_state::L1Checkpoint};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
-use zkaleido_risc0_adapter;
-use zkaleido_sp1_adapter;
+use zkaleido_risc0_groth16_verifier;
+use zkaleido_sp1_groth16_verifier;
 
 use crate::errors::CheckpointError;
 
@@ -22,10 +22,10 @@ impl VerifyingKeyExt for RollupVerifyingKey {
         // checkpoint
         match self {
             RollupVerifyingKey::Risc0VerifyingKey(vk) => {
-                zkaleido_risc0_adapter::verify_groth16(proof_receipt, vk.as_ref())
+                zkaleido_risc0_groth16_verifier::verify_groth16(proof_receipt, vk.as_ref())
             }
             RollupVerifyingKey::SP1VerifyingKey(vk) => {
-                zkaleido_sp1_adapter::verify_groth16(proof_receipt, vk.as_ref())
+                zkaleido_sp1_groth16_verifier::verify_groth16(proof_receipt, vk.as_ref())
             }
             // In Native Execution mode, we do not actually generate the proof to verify. Checking
             // public parameters is sufficient.
@@ -81,7 +81,7 @@ fn verify_checkpoint_extends(
         return Err(CheckpointError::Sequencing(epoch, prev_epoch));
     }
 
-    if last_tsn.1 != tsn.0 {
+    if last_tsn.chainstate_transition.post_state_root != tsn.chainstate_transition.pre_state_root {
         warn!("checkpoint mismatch on L2 state!");
         return Err(CheckpointError::MismatchL2State);
     }
@@ -123,7 +123,7 @@ pub fn verify_proof(
     }
 
     let expected_public_output = *checkpoint.batch_transition();
-    let actual_public_output: (Buf32, Buf32) =
+    let actual_public_output: BatchTransition =
         borsh::from_slice(proof_receipt.public_values().as_bytes())
             .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
 

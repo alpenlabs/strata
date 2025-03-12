@@ -135,10 +135,10 @@ impl BtcChainSegment {
         Ok(self.headers[*idx])
     }
 
-    pub fn get_block_manifest(&self, height: u32) -> L1BlockManifest {
-        let rec = self.get_header_record(height.into()).unwrap();
-        let header_vs = self.get_verification_state(height as u64, 0).unwrap();
-        L1BlockManifest::new(rec, Some(header_vs), Vec::new(), 1, height as u64)
+    pub fn get_block_manifest(&self, height: u64) -> L1BlockManifest {
+        let rec = self.get_header_record(height).unwrap();
+        let header_vs = self.get_verification_state(height, 0).unwrap();
+        L1BlockManifest::new(rec, Some(header_vs), Vec::new(), 1, height)
     }
 }
 
@@ -280,6 +280,21 @@ impl BtcChainSegment {
             height,
         ))
     }
+
+    pub fn get_block_manifests(
+        &self,
+        from_height: u64,
+        len: usize,
+    ) -> Result<Vec<L1BlockManifest>, Error> {
+        let mut manifests = Vec::with_capacity(len);
+        for i in 0..len {
+            let height = from_height + i as u64;
+            let manifest = self.get_block_manifest(height);
+            manifests.push(manifest);
+        }
+        Ok(manifests)
+    }
+
     pub fn get_header_record(&self, height: u64) -> Result<L1HeaderRecord, Error> {
         let header = self.get_block_header_at(height)?;
         Ok(L1HeaderRecord::new(
@@ -297,6 +312,15 @@ impl BtcChainSegment {
         let mut blocks = Vec::with_capacity(len);
         for i in 0..len {
             let block = self.get_header_record(from_height + i as u64)?;
+            blocks.push(block);
+        }
+        Ok(blocks)
+    }
+
+    pub fn get_blocks(&self, from_height: u64, len: usize) -> Result<Vec<Block>, Error> {
+        let mut blocks = Vec::with_capacity(len);
+        for i in 0..len {
+            let block = self.get_block_at(from_height + i as u64)?;
             blocks.push(block);
         }
         Ok(blocks)

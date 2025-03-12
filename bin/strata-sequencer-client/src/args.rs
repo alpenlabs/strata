@@ -16,4 +16,11 @@ pub(crate) struct Args {
 
     #[argh(option, short = 'i', description = "poll interval for duties in ms")]
     pub duty_poll_interval: Option<u64>,
+
+    #[argh(
+        option,
+        short = 'l',
+        description = "evm gas limit per epoch (optional)"
+    )]
+    pub epoch_gas_limit: Option<u64>,
 }

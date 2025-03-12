@@ -5,13 +5,12 @@ use std::sync::Arc;
 use futures::StreamExt;
 #[cfg(feature = "debug-utils")]
 use strata_common::{check_and_pause_debug_async, WorkerType};
-use strata_consensus_logic::{
-    csm::message::{ClientUpdateNotif, ForkChoiceMessage},
-    sync_manager::SyncManager,
-};
+use strata_consensus_logic::{csm::message::ForkChoiceMessage, sync_manager::SyncManager};
 use strata_primitives::epoch::EpochCommitment;
-use strata_state::{block::L2BlockBundle, client_state::ClientState, header::L2Header};
-use strata_storage::L2BlockManager;
+use strata_state::{block::L2BlockBundle, header::L2Header};
+use strata_status::ChainSyncStatusUpdate;
+use strata_storage::NodeStorage;
+use tokio::sync::watch;
 use tracing::*;
 
 use crate::{
@@ -21,93 +20,104 @@ use crate::{
 
 pub struct L2SyncContext<T: SyncClient> {
     client: T,
-    l2_block_manager: Arc<L2BlockManager>,
+    storage: Arc<NodeStorage>,
     sync_manager: Arc<SyncManager>,
 }
 
 impl<T: SyncClient> L2SyncContext<T> {
-    pub fn new(
-        client: T,
-        l2_block_manager: Arc<L2BlockManager>,
-        sync_manager: Arc<SyncManager>,
-    ) -> Self {
+    pub fn new(client: T, storage: Arc<NodeStorage>, sync_manager: Arc<SyncManager>) -> Self {
         Self {
             client,
-            l2_block_manager,
+            storage,
             sync_manager,
         }
     }
 }
 
 /// Initialize the sync state from the database and wait for the CSM to become ready.
-pub fn block_until_csm_ready_and_init_sync_state<T: SyncClient>(
+async fn wait_until_ready_and_init_sync_state<T: SyncClient>(
     context: &L2SyncContext<T>,
 ) -> Result<L2SyncState, L2SyncError> {
-    debug!("waiting for CSM to become ready");
-    let cstate = wait_for_csm_ready(&context.sync_manager);
-    debug!("CSM is ready");
-    state::initialize_from_db(&cstate, &context.l2_block_manager)
+    let mut chainsync_rx = context.sync_manager.status_channel().subscribe_chain_sync();
+    let finalized_epoch = wait_for_finalized_epoch(&mut chainsync_rx).await?;
+
+    state::initialize_from_db(finalized_epoch, context.storage.as_ref()).await
 }
 
-fn wait_for_csm_ready(sync_man: &SyncManager) -> ClientState {
-    let mut client_update_notif = sync_man.create_cstate_subscription();
+async fn wait_for_chainstate_finalized_epoch_inner(
+    chainstatus_rx: &mut watch::Receiver<Option<ChainSyncStatusUpdate>>,
+    wait_for_fn: impl FnMut(&Option<ChainSyncStatusUpdate>) -> bool,
+) -> Result<EpochCommitment, L2SyncError> {
+    let finalized_epoch = chainstatus_rx
+        .wait_for(wait_for_fn)
+        .await
+        .map_err(|_| L2SyncError::ChannelClosed)?
+        .as_ref()
+        .expect("chainstate update should be present")
+        .new_status()
+        .finalized_epoch;
 
-    loop {
-        let Ok(update) = client_update_notif.blocking_recv() else {
-            continue;
+    Ok(finalized_epoch)
+}
+
+async fn wait_for_finalized_epoch(
+    chainstatus_rx: &mut watch::Receiver<Option<ChainSyncStatusUpdate>>,
+) -> Result<EpochCommitment, L2SyncError> {
+    wait_for_chainstate_finalized_epoch_inner(chainstatus_rx, Option::is_some).await
+}
+
+async fn wait_for_finalized_epoch_changed(
+    chainstatus_rx: &mut watch::Receiver<Option<ChainSyncStatusUpdate>>,
+    last_finalized: EpochCommitment,
+) -> Result<EpochCommitment, L2SyncError> {
+    wait_for_chainstate_finalized_epoch_inner(chainstatus_rx, |update| {
+        let Some(update) = update else {
+            // dont care until we have an update
+            return false;
         };
-        let state = update.new_state();
-        if state.is_chain_active() && state.sync().is_some() {
-            return state.clone();
-        }
-    }
+
+        // else only if last finalized epoch has changed
+        update.new_status().finalized_epoch != last_finalized
+    })
+    .await
 }
 
-pub async fn sync_worker<T: SyncClient>(
-    state: &mut L2SyncState,
-    context: &L2SyncContext<T>,
-) -> Result<(), L2SyncError> {
-    let mut client_update_notif = context.sync_manager.create_cstate_subscription();
+pub async fn sync_worker<T: SyncClient>(context: &L2SyncContext<T>) -> Result<(), L2SyncError> {
+    let mut state = wait_until_ready_and_init_sync_state(context).await?;
+
+    let mut chainsync_rx = context.sync_manager.status_channel().subscribe_chain_sync();
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
     loop {
         tokio::select! {
-            client_update = client_update_notif.recv() => {
-                let Ok(update) = client_update else {
-                    continue;
+            finalized_epoch = wait_for_finalized_epoch_changed(&mut chainsync_rx, *state.finalized_epoch()) => {
+                let finalized_epoch = match finalized_epoch {
+                    Ok(epoch) => epoch,
+                    Err(err) => {
+                        warn!(?err, "failed to wait for finalized epoch change");
+                        continue;
+                    }
                 };
-
-                handle_new_client_update(update.as_ref(), state, context).await?;
+                handle_finalized_epoch(finalized_epoch, &mut state, context).await;
             }
 
             _ = interval.tick() => {
-                do_tick(state, context).await?;
+                do_tick(&mut state, context).await?;
             }
             // maybe subscribe to new blocks on client instead of polling?
         }
     }
 }
 
-async fn handle_new_client_update<T: SyncClient>(
-    update: &ClientUpdateNotif,
+async fn handle_finalized_epoch<T: SyncClient>(
+    fin_epoch: EpochCommitment,
     state: &mut L2SyncState,
     _context: &L2SyncContext<T>,
-) -> Result<(), L2SyncError> {
-    // on receiving new client update, update own finalized state
-
-    let Some(fin_epoch) = update.new_state().get_apparent_finalized_epoch() else {
-        debug!("new state but no finalized block yet, ignoring");
-        return Ok(());
-    };
-
-    let finalized_blkid = *fin_epoch.last_blkid();
-
+) {
     if let Err(e) = handle_block_finalized(state, fin_epoch).await {
-        error!(%finalized_blkid, err = %e, "failed to handle newly finalized block");
+        error!(?fin_epoch, err = %e, "failed to handle newly finalized block");
     }
-
-    Ok(())
 }
 
 async fn do_tick<T: SyncClient>(
@@ -121,13 +131,13 @@ async fn do_tick<T: SyncClient>(
         return Ok(());
     };
 
-    if state.has_block(&status.tip_block_id) {
+    if state.has_block(status.tip_block_id()) {
         // in sync with client
         return Ok(());
     }
 
     let start_slot = state.tip_height() + 1;
-    let end_slot = status.tip_height; // remote tip height
+    let end_slot = status.tip_height(); // remote tip height
 
     let span = debug_span!("sync", %start_slot, %end_slot);
 
@@ -218,7 +228,8 @@ async fn handle_new_block<T: SyncClient>(
     while let Some(block) = fetched_blocks.pop() {
         state.attach_block(block.header())?;
         context
-            .l2_block_manager
+            .storage
+            .l2()
             .put_block_data_async(block.clone())
             .await?;
         let block_idx = block.header().blockidx();

@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
+use jsonrpsee::http_client::HttpClient;
 use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{
     l1::L1BlockCommitment,
     params::RollupParams,
-    proof::{ProofContext, ProofKey},
+    proof::{Epoch, ProofContext, ProofKey},
 };
-use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, prover::BtcBlockspaceProver};
+use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, program::BtcBlockspaceProgram};
 use strata_rocksdb::prover::db::ProofDb;
+use strata_rpc_api::StrataApiClient;
+use strata_state::chain_state::Chainstate;
 use tracing::error;
 
 use super::ProvingOp;
@@ -17,33 +20,85 @@ use crate::errors::ProvingTaskError;
 /// A struct that implements the [`ProvingOp`] trait for Bitcoin blockspace proof generation.
 ///
 /// It interfaces with the Bitcoin blockchain via a [`BitcoinClient`] to fetch the necessary data
-/// required by the [`BtcBlockspaceProver`] for the proof generation.
+/// required by the [`BtcBlockspaceProgram`] for the proof generation.
 #[derive(Debug, Clone)]
 pub struct BtcBlockspaceOperator {
     pub btc_client: Arc<BitcoinClient>,
+    cl_client: HttpClient,
     rollup_params: Arc<RollupParams>,
 }
 
 impl BtcBlockspaceOperator {
     /// Creates a new BTC operations instance.
-    pub fn new(btc_client: Arc<BitcoinClient>, rollup_params: Arc<RollupParams>) -> Self {
+    pub fn new(
+        btc_client: Arc<BitcoinClient>,
+        cl_client: HttpClient,
+        rollup_params: Arc<RollupParams>,
+    ) -> Self {
         Self {
             btc_client,
+            cl_client,
             rollup_params,
         }
     }
+
+    async fn construct_tx_filter_config(
+        &self,
+        epoch: u64,
+    ) -> Result<TxFilterConfig, ProvingTaskError> {
+        let mut tx_filters =
+            TxFilterConfig::derive_from(&self.rollup_params).expect("failed to derive tx filters");
+
+        if epoch < 2 {
+            return Ok(tx_filters);
+        }
+
+        // Chainstate based on which the TxFilterRule needs to be updated
+        let epoch_commitments = self
+            .cl_client
+            .get_epoch_commitments(epoch - 2)
+            .await
+            .inspect_err(|_| error!(%epoch, "Failed to fetch epoch commitment"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+
+        // Sanity check that there is only one epoch commitment for a given epoch
+        // TODO: if there are multiple epoch commitments we need a way to handle that to determine
+        // canonical commitment
+        assert_eq!(epoch_commitments.len(), 1);
+
+        let slot = epoch_commitments[0].last_slot();
+        let chainstate_raw = self
+            .cl_client
+            .get_chainstate_raw(slot)
+            .await
+            .inspect_err(|_| error!(%slot, "Failed to fetch raw chainstate"))
+            .map_err(|e| ProvingTaskError::RpcError(e.to_string()))?;
+
+        let chainstate: Chainstate =
+            borsh::from_slice(&chainstate_raw).expect("Invalid chainstate from RPC");
+
+        tx_filters.update_from_chainstate(&chainstate);
+
+        Ok(tx_filters)
+    }
+}
+
+pub struct BtcBlockscanParams {
+    pub range: (L1BlockCommitment, L1BlockCommitment),
+    pub epoch: Epoch,
 }
 
 impl ProvingOp for BtcBlockspaceOperator {
-    type Prover = BtcBlockspaceProver;
+    type Program = BtcBlockspaceProgram;
 
-    type Params = (L1BlockCommitment, L1BlockCommitment);
+    type Params = BtcBlockscanParams;
 
     fn construct_proof_ctx(
         &self,
-        btc_range: &Self::Params,
+        btc_params: &Self::Params,
     ) -> Result<ProofContext, ProvingTaskError> {
-        let (start, end) = btc_range;
+        let BtcBlockscanParams { epoch, range } = btc_params;
+        let (start, end) = range;
         // Do some sanity checks
         assert!(
             end.height() >= start.height(),
@@ -51,7 +106,7 @@ impl ProvingOp for BtcBlockspaceOperator {
             start.height(),
             end.height()
         );
-        Ok(ProofContext::BtcBlockspace(*start.blkid(), *end.blkid()))
+        Ok(ProofContext::BtcBlockspace(*epoch, *start, *end))
     }
 
     async fn fetch_input(
@@ -59,13 +114,13 @@ impl ProvingOp for BtcBlockspaceOperator {
         task_id: &ProofKey,
         _db: &ProofDb,
     ) -> Result<BlockScanProofInput, ProvingTaskError> {
-        let (start, end) = match task_id.context() {
-            ProofContext::BtcBlockspace(start, end) => (*start, *end),
+        let (epoch, start, end) = match task_id.context() {
+            ProofContext::BtcBlockspace(epoch, start, end) => (epoch, *start, *end),
             _ => return Err(ProvingTaskError::InvalidInput("BtcBlockspace".to_string())),
         };
 
         let mut btc_blocks = vec![];
-        let mut current_block_id = end;
+        let mut current_block_id = *end.blkid();
         loop {
             let btc_block = self
                 .btc_client
@@ -78,7 +133,7 @@ impl ProvingOp for BtcBlockspaceOperator {
 
             btc_blocks.push(btc_block);
 
-            if current_block_id == start {
+            if start.blkid() == &current_block_id {
                 break;
             } else {
                 current_block_id = prev_block_hash.into();
@@ -88,8 +143,8 @@ impl ProvingOp for BtcBlockspaceOperator {
         // Reverse the blocks to make them in ascending order
         btc_blocks.reverse();
 
-        let tx_filters =
-            TxFilterConfig::derive_from(&self.rollup_params).expect("failed to derive tx filters");
+        let tx_filters = self.construct_tx_filter_config(*epoch).await?;
+
         Ok(BlockScanProofInput {
             btc_blocks,
             tx_filters,

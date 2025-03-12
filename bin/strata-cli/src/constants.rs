@@ -4,17 +4,23 @@ use alloy::consensus::constants::ETH_TO_WEI;
 use bdk_wallet::bitcoin::{bip32::ChildNumber, Amount, Network};
 
 /// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
-pub const RECOVER_DELAY: u32 = 1008;
+///
+/// 144 is the number of blocks in a day.
+pub const RECOVER_DELAY: u32 = 144;
 
-/// Number of blocks after which we'll actually attempt recovery. This is mostly to account for any
-/// reorgs that may happen at the recovery height.
-pub const RECOVER_AT_DELAY: u32 = RECOVER_DELAY + 10;
+/// Number of blocks that the wallet considers a transaction "buried" or final taking into account
+/// reorgs that might happen.
+pub const FINALITY_DEPTH: u32 = 6;
+
+/// Number of blocks after which the wallet actually enables recovery. This is mostly to account
+/// for any reorgs that may happen at the recovery height.
+pub const RECOVER_AT_DELAY: u32 = RECOVER_DELAY + FINALITY_DEPTH;
 
 pub const RECOVERY_DESC_CLEANUP_DELAY: u32 = 100;
 
-/// 10 BTC + 0.01 to cover fees in the following transaction where the operator spends it into the
-/// federation.
-pub const BRIDGE_IN_AMOUNT: Amount = Amount::from_sat(1_001_000_000);
+/// 10 BTC + 1,000 satoshi to cover fees in the following transaction where the bridge spends it
+/// into the federation.
+pub const BRIDGE_IN_AMOUNT: Amount = Amount::from_sat(1_000_001_000);
 
 /// Bridge outs are enforced to be exactly 10 BTC
 pub const BRIDGE_OUT_AMOUNT: Amount = Amount::from_int_btc(10);

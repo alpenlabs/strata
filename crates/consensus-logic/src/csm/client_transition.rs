@@ -252,7 +252,7 @@ fn process_l1_block(
                         continue;
                     }
 
-                    let ckpt_ref = get_l1_reference(tx, height)?;
+                    let ckpt_ref = get_l1_reference(tx, *block_mf.blkid(), height)?;
 
                     // Construct the state bookkeeping entry for the checkpoint.
                     let l1ckpt = L1Checkpoint::new(
@@ -266,7 +266,7 @@ fn process_l1_block(
 
                     // Emit a sync action to update checkpoint entry in db
                     sync_actions.push(SyncAction::UpdateCheckpointInclusion {
-                        epoch: ckpt.batch_info().epoch(),
+                        checkpoint: signed_ckpt.clone().into(),
                         l1_reference: ckpt_ref,
                     });
                 }
@@ -282,7 +282,7 @@ fn process_l1_block(
     Ok((istate, sync_actions))
 }
 
-fn get_l1_reference(tx: &L1Tx, height: u64) -> Result<CheckpointL1Ref, Error> {
+fn get_l1_reference(tx: &L1Tx, blockid: L1BlockId, height: u64) -> Result<CheckpointL1Ref, Error> {
     let btx: Transaction = tx.tx_data().try_into().map_err(|e| {
         warn!(%height, "Invalid bitcoin transaction data in L1Tx");
         let msg = format!(
@@ -294,7 +294,8 @@ fn get_l1_reference(tx: &L1Tx, height: u64) -> Result<CheckpointL1Ref, Error> {
 
     let txid = btx.compute_txid().into();
     let wtxid = btx.compute_wtxid().into();
-    Ok(CheckpointL1Ref::new(height, txid, wtxid))
+    let l1_comm = L1BlockCommitment::new(height, blockid);
+    Ok(CheckpointL1Ref::new(l1_comm, txid, wtxid))
 }
 
 #[cfg(test)]

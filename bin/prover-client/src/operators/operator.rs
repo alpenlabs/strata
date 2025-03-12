@@ -57,8 +57,11 @@ impl ProofOperator {
         let rollup_params = Arc::new(rollup_params);
 
         // Create each operator using the respective clients.
-        let btc_blockspace_operator =
-            BtcBlockspaceOperator::new(btc_client.clone(), rollup_params.clone());
+        let btc_blockspace_operator = BtcBlockspaceOperator::new(
+            btc_client.clone(),
+            cl_client.clone(),
+            rollup_params.clone(),
+        );
         let evm_ee_operator = EvmEeOperator::new(evm_ee_client.clone());
         let cl_stf_operator = ClStfOperator::new(
             cl_client.clone(),

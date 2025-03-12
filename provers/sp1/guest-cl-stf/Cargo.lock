@@ -735,26 +735,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
 
 [[package]]
-name = "bytemuck"
-version = "1.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8334215b81e418a0a7bdb8ef0849474f40bb10c8b71f1c4ed315cff49f32494d"
-dependencies = [
- "bytemuck_derive",
-]
-
-[[package]]
-name = "bytemuck_derive"
-version = "1.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcfcc3cd946cb52f0bbfdbbcfa2f4e24f75ebb6c0e1002f7c25904fada18b9ec"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1072,8 +1052,7 @@ checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
 [[package]]
 name = "ecdsa"
 version = "0.16.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee27f32b5c5292967d2d4a9d7f1e0b0aed2c15daded5a60300e4abb9d8020bca"
+source = "git+https://github.com/sp1-patches/signatures.git?tag=patch-16.9-sp1-4.1.0#1880299a48fe7ef249edaa616fd411239fb5daf1"
 dependencies = [
  "der",
  "digest 0.10.7",
@@ -1095,7 +1074,7 @@ dependencies = [
  "elliptic-curve",
  "hex-literal",
  "signature",
- "sp1-lib 3.1.0",
+ "sp1-lib 3.4.0",
  "spki",
 ]
 
@@ -1266,7 +1245,7 @@ name = "guest-sp1-cl-stf"
 version = "0.1.0"
 dependencies = [
  "strata-proofimpl-cl-stf",
- "zkaleido-sp1-adapter",
+ "zkaleido-sp1-guest-env",
 ]
 
 [[package]]
@@ -1470,17 +1449,18 @@ dependencies = [
 
 [[package]]
 name = "k256"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "956ff9b67e26e1a6a866cb758f12c6f8746208489e3e4a4b5580802f2f0a587b"
+version = "0.13.4"
+source = "git+https://github.com/sp1-patches/elliptic-curves?tag=patch-k256-13.4-sp1-4.1.0#dbb97456cb6bda207eb212011ac834582263e88b"
 dependencies = [
  "cfg-if",
- "ecdsa 0.16.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ecdsa 0.16.9 (git+https://github.com/sp1-patches/signatures.git?tag=patch-16.9-sp1-4.1.0)",
  "elliptic-curve",
+ "hex",
  "once_cell",
  "serdect",
  "sha2",
  "signature",
+ "sp1-lib 4.1.1",
 ]
 
 [[package]]
@@ -2295,8 +2275,7 @@ dependencies = [
 [[package]]
 name = "rfc6979"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
+source = "git+https://github.com/sp1-patches/signatures.git?tag=patch-16.9-sp1-4.1.0#1880299a48fe7ef249edaa616fd411239fb5daf1"
 dependencies = [
  "hmac",
  "subtle",
@@ -2628,9 +2607,9 @@ dependencies = [
 
 [[package]]
 name = "sp1-lib"
-version = "3.1.0"
+version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14deb700469a37ec075bcf88dac3815b026dd9c4b9cb175980826f1fbb2e4e80"
+checksum = "7a5729da1b05d56c01457e5ecabdc77f1cc941df23f2921163a2f325aec22428"
 dependencies = [
  "bincode",
  "serde",
@@ -2664,19 +2643,6 @@ dependencies = [
  "p3-symmetric",
  "serde",
  "sha2",
-]
-
-[[package]]
-name = "sp1-verifier"
-version = "4.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94bf3296a784f68f51caaa9d79a5dd4046c507bdcc54ca26e14c41c4ea7d844a"
-dependencies = [
- "hex",
- "lazy_static",
- "sha2",
- "substrate-bn-succinct",
- "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -2768,10 +2734,8 @@ name = "strata-l1tx"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arbitrary",
  "bitcoin",
  "borsh",
- "hex",
  "musig2",
  "strata-bridge-tx-builder",
  "strata-primitives",
@@ -2793,6 +2757,7 @@ dependencies = [
  "const-hex",
  "digest 0.10.7",
  "hex",
+ "k256",
  "musig2",
  "num_enum",
  "rand",
@@ -2820,6 +2785,7 @@ dependencies = [
  "strata-primitives",
  "strata-state",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -2834,6 +2800,7 @@ dependencies = [
  "strata-proofimpl-evm-ee-stf",
  "strata-state",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -2863,6 +2830,7 @@ dependencies = [
  "strata-state",
  "thiserror 2.0.11",
  "zkaleido",
+ "zkaleido-native-adapter",
 ]
 
 [[package]]
@@ -2947,23 +2915,6 @@ dependencies = [
  "lazy_static",
  "rand",
  "rustc-hex",
-]
-
-[[package]]
-name = "substrate-bn-succinct"
-version = "0.6.0-v4-rc.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b9a33ccd271a0ad4cc5ddef11ca419fe8d22c669920965be1cecbbe7d866ae1"
-dependencies = [
- "bytemuck",
- "byteorder",
- "cfg-if",
- "crunchy",
- "lazy_static",
- "num-bigint",
- "rand",
- "rustc-hex",
- "sp1-lib 4.1.1",
 ]
 
 [[package]]
@@ -3445,9 +3396,10 @@ dependencies = [
 [[package]]
 name = "zkaleido"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc2#737d8e591be90d84ab7639d8bf1bb2ed36f2735f"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
 dependencies = [
  "arbitrary",
+ "async-trait",
  "bincode",
  "borsh",
  "serde",
@@ -3455,16 +3407,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "zkaleido-sp1-adapter"
+name = "zkaleido-native-adapter"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc2#737d8e591be90d84ab7639d8bf1bb2ed36f2735f"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
+dependencies = [
+ "bincode",
+ "borsh",
+ "serde",
+ "zkaleido",
+]
+
+[[package]]
+name = "zkaleido-sp1-guest-env"
+version = "0.1.0"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc5#fcc58171608ef15e95298c51fa2ec7b50778e421"
 dependencies = [
  "bincode",
  "cfg-if",
- "hex",
  "serde",
  "sha2",
- "sp1-verifier",
  "sp1-zkvm",
  "zkaleido",
 ]

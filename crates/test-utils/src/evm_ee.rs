@@ -16,7 +16,10 @@ use strata_state::{
     state_op::StateCache,
 };
 
-use crate::l2::{gen_params, get_genesis_chainstate};
+use crate::{
+    bitcoin_mainnet_segment::BtcChainSegment,
+    l2::{gen_params, get_genesis_chainstate},
+};
 
 /// Represents a segment of EVM execution by holding inputs and outputs for
 /// block heights within a range. This struct is used to simulate EVM proof
@@ -103,15 +106,29 @@ impl L2Segment {
         let el_proof_ins = evm_segment.get_inputs();
         let el_proof_outs = evm_segment.get_outputs();
 
-        for (el_proof_in, el_proof_out) in el_proof_ins.iter().zip(el_proof_outs.iter()) {
-            let l1_segment = L1Segment::new_empty(params.rollup().genesis_l1_height);
+        for (idx, (el_proof_in, el_proof_out)) in
+            el_proof_ins.iter().zip(el_proof_outs.iter()).enumerate()
+        {
+            // If it is a terminal block, fill L1Segment
+            let genesis_height = params.rollup().genesis_l1_height;
+            let l1_segment = if idx == evm_segment.get_inputs().len() - 1 {
+                let starting_height = genesis_height + 1;
+                let len = 3;
+                let new_height = starting_height + len - 1; // because inclusive
+                let manifests = BtcChainSegment::load()
+                    .get_block_manifests(starting_height, len as usize)
+                    .expect("fetch manifests");
+                L1Segment::new(new_height, manifests)
+            } else {
+                L1Segment::new_empty(genesis_height)
+            };
             let body = L2BlockBody::new(l1_segment, el_proof_out.clone());
 
             let slot = prev_block.header().blockidx() + 1;
             let ts = el_proof_in.timestamp;
             let prev_block_id = prev_block.header().get_blockid();
 
-            let fake_header = L2BlockHeader::new(slot, ts, prev_block_id, &body, Buf32::zero());
+            let fake_header = L2BlockHeader::new(slot, 0, ts, prev_block_id, &body, Buf32::zero());
 
             let pre_state = prev_chainstate.clone();
             let mut state_cache = StateCache::new(pre_state.clone());
@@ -125,7 +142,7 @@ impl L2Segment {
             let (post_state, _) = state_cache.finalize();
             let new_state_root = post_state.compute_state_root();
 
-            let header = L2BlockHeader::new(slot, ts, prev_block_id, &body, new_state_root);
+            let header = L2BlockHeader::new(slot, 0, ts, prev_block_id, &body, new_state_root);
             let signed_header = SignedL2BlockHeader::new(header, Buf64::zero()); // TODO: fix this
             let block = L2Block::new(signed_header, body);
 

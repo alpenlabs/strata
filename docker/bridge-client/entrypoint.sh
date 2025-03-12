@@ -25,11 +25,11 @@ sleep 10
 
 # Start the Strata Operator Client
 strata-bridge-client operator \
-  --xpriv-str $XPRIV_STR \
+  --master-xpriv $XPRIV_STR \
   --rpc-host $RPC_HOST \
   --rpc-port $RPC_PORT \
   --btc-url $BTC_URL \
   --btc-user $BTC_USER \
   --btc-pass $BTC_PASS \
   --rollup-url $ROLLUP_URL \
-  --data-dir $DATADIR $@
+  --datadir $DATADIR $@

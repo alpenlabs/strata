@@ -1,6 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bitcoin::secp256k1::{SecretKey, SECP256K1};
+use borsh::to_vec;
 use rand::{rngs::StdRng, SeedableRng};
 use strata_consensus_logic::genesis::{make_genesis_block, make_genesis_chainstate};
 use strata_primitives::{
@@ -11,6 +12,7 @@ use strata_primitives::{
     proof::RollupVerifyingKey,
 };
 use strata_state::{
+    batch::{Checkpoint, CheckpointSidecar, SignedCheckpoint},
     block::{L2Block, L2BlockAccessory, L2BlockBody, L2BlockBundle},
     chain_state::Chainstate,
     client_state::ClientState,
@@ -38,6 +40,7 @@ pub fn gen_block(parent: Option<&SignedL2BlockHeader>) -> L2BlockBundle {
 
     let header = L2BlockHeader::new(
         block_idx,
+        parent.map(|h| h.epoch()).unwrap_or(0),
         timestamp,
         prev_block,
         &body,
@@ -137,7 +140,19 @@ pub fn get_genesis_chainstate() -> Chainstate {
     let btc_chain = BtcChainSegment::load();
     // Build the genesis block and genesis consensus states.
     let gblock = make_genesis_block(&params);
-    let pregenesis_mfs =
-        vec![btc_chain.get_block_manifest(params.rollup().genesis_l1_height as u32)];
+    let pregenesis_mfs = vec![btc_chain.get_block_manifest(params.rollup().genesis_l1_height)];
     make_genesis_chainstate(&gblock, pregenesis_mfs, &params)
+}
+
+pub fn get_test_signed_checkpoint() -> SignedCheckpoint {
+    let chstate: Chainstate = ArbitraryGenerator::new_with_size(1 << 12).generate();
+    SignedCheckpoint::new(
+        Checkpoint::new(
+            ArbitraryGenerator::new().generate(),
+            ArbitraryGenerator::new().generate(),
+            ArbitraryGenerator::new().generate(),
+            CheckpointSidecar::new(to_vec(&chstate).unwrap()),
+        ),
+        ArbitraryGenerator::new().generate(),
+    )
 }

@@ -7,7 +7,7 @@ use strata_primitives::{
     l2::L2BlockCommitment,
     proof::{ProofContext, ProofKey},
 };
-use strata_proofimpl_checkpoint::prover::{CheckpointProver, CheckpointProverInput};
+use strata_proofimpl_checkpoint::program::{CheckpointProgram, CheckpointProverInput};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::{RpcCheckpointConfStatus, RpcCheckpointInfo};
@@ -17,13 +17,13 @@ use tracing::{error, info};
 use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{
     checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError, hosts,
-    operators::cl_stf::ClStfRange, task_tracker::TaskTracker,
+    operators::cl_stf::ClStfParams, task_tracker::TaskTracker,
 };
 
 /// A struct that implements the [`ProvingOp`] for Checkpoint Proof.
 ///
 /// It is responsible for managing the data and tasks required to generate Checkpoint Proof. It
-/// fetches the necessary inputs for the [`CheckpointProver`] by:
+/// fetches the necessary inputs for the [`CheckpointProgram`] by:
 // TODO: update docstring here
 #[derive(Debug, Clone)]
 pub struct CheckpointOperator {
@@ -75,7 +75,8 @@ impl CheckpointOperator {
         // Since the EVM EE STF will be the heaviest, the splitting can be done based on that
         //
         // For now, do everything on a single chunk
-        let cl_stf_params = ClStfRange {
+        let cl_stf_params = ClStfParams {
+            epoch: checkpoint_info.idx,
             l1_range: Some(checkpoint_info.l1_range),
             l2_range: checkpoint_info.l2_range,
         };
@@ -186,7 +187,7 @@ impl CheckpointOperator {
 }
 
 impl ProvingOp for CheckpointOperator {
-    type Prover = CheckpointProver;
+    type Program = CheckpointProgram;
     type Params = u64;
 
     fn construct_proof_ctx(

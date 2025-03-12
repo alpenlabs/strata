@@ -1,7 +1,7 @@
 x-base-client: &base-client
   build:
     context: ../
-    dockerfile: ./docker/client/Dockerfile
+    dockerfile: ./docker/strata-client/Dockerfile
   image: "strata_client:0.1.0"
   networks:
     - strata_network
@@ -9,7 +9,7 @@ x-base-client: &base-client
 x-base-reth: &base-reth
   build:
     context: ../
-    dockerfile: ./docker/reth/Dockerfile
+    dockerfile: ./docker/strata-reth/Dockerfile
   image: "strata_reth:0.1.0"
   networks:
     - strata_network
@@ -103,7 +103,7 @@ services:
   sequencer-signer:
     build:
       context: ../
-      dockerfile: ./docker/sequencer-signer/Dockerfile
+      dockerfile: ./docker/strata-sequencer-client/Dockerfile
     image: "strata_sequencer-signer:0.1.0"
     networks:
       - strata_network
@@ -124,7 +124,7 @@ services:
     volumes:
       - ./configs/params.json:/app/params.json
       - ./.data/prover-client:/app/.data
-      - ../elfs:/app/elfs
+      - ./prover-client/elfs:/app/elfs
     env_file:
       - prover-client/prover-client.env
 

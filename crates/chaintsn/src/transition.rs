@@ -9,7 +9,10 @@ use rand_core::{RngCore, SeedableRng};
 use strata_primitives::{
     batch::SignedCheckpoint,
     epoch::EpochCommitment,
-    l1::{BitcoinAmount, DepositInfo, L1BlockManifest, L1TxRef, OutputRef, ProtocolOperation},
+    l1::{
+        BitcoinAmount, DepositInfo, DepositSpendInfo, L1BlockManifest, L1HeaderRecord, L1TxRef,
+        OutputRef, ProtocolOperation, WithdrawalFulfillmentInfo,
+    },
     params::RollupParams,
 };
 use strata_state::{
@@ -134,6 +137,14 @@ fn process_l1_block(state: &mut StateCache, block_mf: &L1BlockManifest) -> Resul
                     process_l1_deposit(state, block_mf, info)?;
                 }
 
+                ProtocolOperation::WithdrawalFulfillment(info) => {
+                    process_withdrawal_fulfillment(state, info)?;
+                }
+
+                ProtocolOperation::DepositSpent(info) => {
+                    process_deposit_spent(state, info)?;
+                }
+
                 // Other operations we don't do anything with for now.
                 _ => {}
             }
@@ -188,6 +199,24 @@ fn process_l1_deposit(
     // Logging so we know if it got there.
     trace!(?outpoint, "handled deposit");
 
+    Ok(())
+}
+
+/// Withdrawal Fulfillment with correct metadata is seen.
+/// Mark the withthdrawal as being executed and prevent reassignment to another operator.
+fn process_withdrawal_fulfillment(
+    state: &mut StateCache,
+    info: &WithdrawalFulfillmentInfo,
+) -> Result<(), TsnError> {
+    state.mark_deposit_fulfilled(info);
+    Ok(())
+}
+
+/// Locked deposit on L1 has been spent.
+fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Result<(), TsnError> {
+    // Currently, we are not tracking how this was spent, only that it was.
+
+    state.mark_deposit_reimbursed(info.deposit_idx);
     Ok(())
 }
 
@@ -395,7 +424,12 @@ fn process_deposit_updates(
                 }
             }
 
-            DepositState::Executed => {
+            DepositState::Fulfilled(_) => {
+                // dont reassign executing withdrawals as front payment has been done.
+                // nothing else to do here for now
+            }
+
+            DepositState::Reimbursed => {
                 deposit_idxs_to_remove.push(deposit_idx);
             }
         }

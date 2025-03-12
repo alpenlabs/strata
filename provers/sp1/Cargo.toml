@@ -5,21 +5,16 @@ version = "0.1.0"
 
 [dependencies]
 once_cell = "1.20.2"
-zkaleido-sp1-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc2", features = [
-  "prover",
-], optional = true }
+zkaleido-sp1-guest-env = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc5" }
 
 [build-dependencies]
 bincode.workspace = true
 cargo_metadata = "0.19.1"
 cfg-if.workspace = true
 sha2.workspace = true
-sp1-helper = { git = "https://github.com/succinctlabs/sp1.git", rev = "6c5a7f2846cd3610ecd38b1641f0e370fd07ee83" }
-sp1-sdk = "4.0.0"
+sp1-helper = "4.1.0"
+sp1-sdk = "4.1.0"
 
 [features]
-default = ["prover"]
 docker-build = []
-mock = []
-prover = ["zkaleido-sp1-adapter"]
 sp1-dev = []

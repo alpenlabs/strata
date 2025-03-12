@@ -1,27 +1,28 @@
 //! worker to monitor chainstate and create checkpoint entries.
 
-#![allow(unused)] // TODO clean this up once we're sure we don't need these fns
-
 use std::sync::Arc;
 
 use strata_db::{types::CheckpointEntry, DbError};
+use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{
     self,
     epoch::EpochCommitment,
+    hash::compute_borsh_hash,
     l1::{L1BlockCommitment, L1BlockManifest},
     l2::L2BlockCommitment,
     prelude::*,
 };
 use strata_state::{
-    batch::{BatchInfo, EpochSummary},
+    batch::{
+        BatchInfo, BatchTransition, ChainstateRootTransition, EpochSummary,
+        TxFilterConfigTransition,
+    },
     block::L2BlockBundle,
     chain_state::Chainstate,
     header::*,
 };
 use strata_status::*;
-use strata_storage::{
-    ChainstateManager, CheckpointDbManager, L1BlockManager, L2BlockManager, NodeStorage,
-};
+use strata_storage::{CheckpointDbManager, L1BlockManager, L2BlockManager, NodeStorage};
 use strata_tasks::ShutdownGuard;
 use tokio::runtime::Handle;
 use tracing::*;
@@ -195,7 +196,7 @@ fn handle_ready_epoch(
 
     // else save a pending proof checkpoint entry
     debug!(%epoch, "saving unproven checkpoint");
-    let entry = CheckpointEntry::new_pending_proof(cpd.info, cpd.tsn);
+    let entry = CheckpointEntry::new_pending_proof(cpd.info, cpd.tsn, &cpd.chainstate);
     if let Err(e) = ckhandle.put_checkpoint_and_notify_blocking(epoch, entry) {
         warn!(%epoch, err = %e, "failed to save checkpoint");
     }
@@ -206,12 +207,17 @@ fn handle_ready_epoch(
 /// Container structure for convenience.
 struct CheckpointPrepData {
     info: BatchInfo,
-    tsn: (Buf32, Buf32),
+    tsn: BatchTransition,
+    chainstate: Chainstate,
 }
 
 impl CheckpointPrepData {
-    fn new(info: BatchInfo, tsn: (Buf32, Buf32)) -> Self {
-        Self { info, tsn }
+    fn new(info: BatchInfo, tsn: BatchTransition, chainstate: Chainstate) -> Self {
+        Self {
+            info,
+            tsn,
+            chainstate,
+        }
     }
 }
 
@@ -224,21 +230,9 @@ fn create_checkpoint_prep_data_from_summary(
     let l1man = storage.l1();
     let l2man = storage.l2();
     let chsman = storage.chainstate();
-    let rollup_params_hash = params.compute_hash();
 
     let epoch = summary.epoch();
     let is_genesis_epoch = epoch == 0;
-
-    let prev_checkpoint = if !is_genesis_epoch {
-        let prev_epoch = epoch - 1;
-        let prev = storage.checkpoint().get_checkpoint_blocking(prev_epoch)?;
-        if prev.is_none() {
-            warn!(%epoch, %prev_epoch, "missing expected checkpoint for previous epoch, continuing with none, this might produce an invalid checkpoint proof");
-        }
-        prev
-    } else {
-        None
-    };
 
     // There's some special handling we have to do if we're the genesis epoch.
     let prev_summary = if !is_genesis_epoch {
@@ -289,18 +283,82 @@ fn create_checkpoint_prep_data_from_summary(
         .ok_or(Error::MissingIdxChainstate(final_state_height))?;
     let l2_final_state = final_state.compute_state_root();
 
-    let new_transition = (l2_initial_state, l2_final_state);
+    let mut tx_filters = TxFilterConfig::derive_from(params)
+        .expect("tx filter derivation from rollup params should not fail");
+
+    // In the first (epoch 0), there's no changes to the TxFilterConfig
+    // It is only at the end of epoch 1, that the TxFilterConfig will be changed
+    let tx_filters_transition = if epoch < 1 {
+        let tx_filters_hash = compute_borsh_hash(&tx_filters);
+        TxFilterConfigTransition {
+            pre_config_hash: tx_filters_hash,
+            post_config_hash: tx_filters_hash,
+        }
+    } else {
+        // Chainstate based on which the tx filter rules are updated
+        let prev_checkpoint = storage
+            .checkpoint()
+            .get_checkpoint_blocking(epoch - 1)?
+            .expect("checkpoint for the previous epoch must be valid");
+
+        // Sanity check
+        assert_eq!(
+            prev_checkpoint
+                .checkpoint
+                .batch_transition()
+                .chainstate_transition
+                .post_state_root,
+            l2_initial_state,
+            "Chain state must continue from the last epoch"
+        );
+
+        // The TxFilterConfig for this epoch must be based on the TxFilterConfig derived at the end
+        // of previous epoch
+        let initial_tx_filters_config_hash = prev_checkpoint
+            .checkpoint
+            .batch_transition()
+            .tx_filters_transition
+            .post_config_hash;
+
+        // The TxFilterConfig for the next epoch is derived at the end of this epoch. This is based
+        // on the Chainstate that was posted on previous epoch, and included in L1Segment in this
+        // epoch.
+        let prev_chainstate: Chainstate =
+            borsh::from_slice(prev_checkpoint.checkpoint.sidecar().chainstate())
+                .expect("valid chainstate must be posted");
+
+        tx_filters.update_from_chainstate(&prev_chainstate);
+        let final_tx_filters_config_hash = compute_borsh_hash(&tx_filters);
+
+        TxFilterConfigTransition {
+            pre_config_hash: initial_tx_filters_config_hash,
+            post_config_hash: final_tx_filters_config_hash,
+        }
+    };
+
+    let chainstate_transition = ChainstateRootTransition {
+        pre_state_root: l2_initial_state,
+        post_state_root: l2_final_state,
+    };
+
+    let new_transition = BatchTransition {
+        chainstate_transition,
+        tx_filters_transition,
+    };
+
     let new_batch_info = BatchInfo::new(summary.epoch(), l1_range, l2_range);
 
-    Ok(CheckpointPrepData::new(new_batch_info, new_transition))
+    Ok(CheckpointPrepData::new(
+        new_batch_info,
+        new_transition,
+        final_state,
+    ))
 }
 
 fn fetch_epoch_l2_headers(
     summary: &EpochSummary,
     l2man: &L2BlockManager,
 ) -> anyhow::Result<Vec<L2BlockHeader>> {
-    let limit = 5000; // TODO make a const
-
     let mut headers = Vec::new();
 
     let terminal = fetch_l2_block(summary.terminal().blkid(), l2man)?;
@@ -311,9 +369,11 @@ fn fetch_epoch_l2_headers(
     //
     // The break conditions are a little weird so we use a bare `loop`.
     loop {
-        if headers.len() >= limit {
-            return Err(Error::MalformedEpoch(summary.get_epoch_commitment()).into());
-        }
+        // let limit = 5000; // TODO make a const
+        // TODO: we need some way to limit L2 blocks in an epoch, we can't just error like this
+        // if headers.len() >= limit {
+        //     return Err(Error::MalformedEpoch(summary.get_epoch_commitment()).into());
+        // }
 
         let cur = headers.last().unwrap();
         let cur_parent = cur.parent();
@@ -347,31 +407,8 @@ fn fetch_l2_block(blkid: &L2BlockId, l2man: &L2BlockManager) -> anyhow::Result<L
         .ok_or(Error::MissingL2Block(*blkid))?)
 }
 
-fn fetch_chainstate(slot: u64, chsman: &ChainstateManager) -> anyhow::Result<Chainstate> {
-    Ok(chsman
-        .get_toplevel_chainstate_blocking(slot)?
-        .ok_or(Error::MissingIdxChainstate(slot))?)
-}
-
 fn fetch_l1_block_manifest(height: u64, l1man: &L1BlockManager) -> anyhow::Result<L1BlockManifest> {
     Ok(l1man
         .get_block_manifest_at_height(height)?
         .ok_or(DbError::MissingL1Block(height))?)
-}
-
-/// Fetches and L1 block manifest, checking that the manifest that we found
-/// reported as specific epoch index.
-// TODO maybe convert this fn to use epoch commitments?
-fn fetch_block_manifest_at_epoch(
-    height: u64,
-    epoch: u64,
-    l1man: &L1BlockManager,
-) -> anyhow::Result<L1BlockManifest> {
-    let mf = fetch_l1_block_manifest(height, l1man)?;
-
-    if mf.epoch() != epoch {
-        return Err(Error::L1ManifestEpochMismatch(*mf.blkid(), mf.epoch(), epoch).into());
-    }
-
-    Ok(mf)
 }

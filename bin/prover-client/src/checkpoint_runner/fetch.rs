@@ -1,6 +1,5 @@
 use jsonrpsee::http_client::HttpClient;
 use strata_rpc_api::StrataApiClient;
-use tracing::error;
 
 use super::errors::CheckpointResult;
 use crate::checkpoint_runner::errors::CheckpointError;
@@ -10,12 +9,6 @@ pub async fn fetch_latest_checkpoint_index(cl_client: &HttpClient) -> Checkpoint
     cl_client
         .get_latest_checkpoint_index(None)
         .await
-        .map_err(|e| {
-            error!(err = ?e, "Failed to fetch current checkpoint index");
-            CheckpointError::FetchError(e.to_string())
-        })?
-        .ok_or_else(|| {
-            error!("No checkpoint index returned from sequencer");
-            CheckpointError::CheckpointNotFound(0)
-        })
+        .map_err(|e| CheckpointError::FetchError(e.to_string()))?
+        .ok_or(CheckpointError::CheckpointNotFound(0))
 }

@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, thread};
 
-use strata_db::types::CheckpointConfStatus;
+use strata_db::types::{CheckpointConfStatus, CheckpointEntry, CheckpointProvingStatus};
 use strata_eectl::engine::ExecEngineCtl;
 use strata_primitives::prelude::*;
 use strata_state::{
@@ -376,12 +376,22 @@ fn apply_action(
 
         // Update checkpoint entry in database to mark it as included in L1.
         SyncAction::UpdateCheckpointInclusion {
-            epoch,
+            checkpoint,
             l1_reference,
         } => {
-            let Some(mut ckpt_entry) = ckpt_db.get_checkpoint_blocking(epoch)? else {
-                warn!(%epoch, "missing checkpoint we wanted to set the state of, ignoring");
-                return Ok(());
+            let epoch = checkpoint.batch_info().epoch();
+
+            let mut ckpt_entry = match ckpt_db.get_checkpoint_blocking(epoch)? {
+                Some(c) => c,
+                None => {
+                    info!(%epoch, "creating new checkpoint entry since the database does not have one");
+
+                    CheckpointEntry::new(
+                        checkpoint,
+                        CheckpointProvingStatus::ProofReady,
+                        CheckpointConfStatus::Pending,
+                    )
+                }
             };
 
             ckpt_entry.confirmation_status = CheckpointConfStatus::Confirmed(l1_reference);

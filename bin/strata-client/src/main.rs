@@ -167,18 +167,11 @@ fn main_inner(args: Args) -> anyhow::Result<()> {
 
         let rpc_client = sync_client(sync_endpoint);
         let sync_peer = RpcSyncPeer::new(rpc_client, 10);
-        let l2_sync_context = L2SyncContext::new(
-            sync_peer,
-            ctx.storage.l2().clone(),
-            ctx.sync_manager.clone(),
-        );
-        // NOTE: this might block for some time during first run with empty db until genesis
-        // block is generated
-        let mut l2_sync_state =
-            strata_sync::block_until_csm_ready_and_init_sync_state(&l2_sync_context)?;
+        let l2_sync_context =
+            L2SyncContext::new(sync_peer, ctx.storage.clone(), ctx.sync_manager.clone());
 
         executor.spawn_critical_async("l2-sync-manager", async move {
-            strata_sync::sync_worker(&mut l2_sync_state, &l2_sync_context)
+            strata_sync::sync_worker(&l2_sync_context)
                 .await
                 .map_err(Into::into)
         });
