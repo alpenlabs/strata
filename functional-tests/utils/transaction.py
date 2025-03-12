@@ -10,7 +10,7 @@ from web3.types import TxReceipt
 
 from load.reth.log_helper import log_metadata_var, tx_caller
 
-from .account import AbstractAccount
+from .evm_account import AbstractAccount
 
 
 class TransactionType(Enum):
@@ -169,7 +169,7 @@ class SmartContracts(TransactionSender):
     Mixin to work with smart contracts.
     """
 
-    CONTRACTS_DIR = "load/reth/contracts/"
+    CONTRACTS_DIR = "contracts/"
     SOL_VERSION = "0.8.7"
 
     _smart_contracts_storage = dict()
