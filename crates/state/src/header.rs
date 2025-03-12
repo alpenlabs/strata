@@ -19,7 +19,6 @@ pub trait L2Header {
     fn exec_payload_hash(&self) -> &Buf32;
     fn state_root(&self) -> &Buf32;
     fn get_blockid(&self) -> L2BlockId;
-    fn epoch(&self) -> u64;
 }
 
 /// Block header that forms the chain we use to reach consensus.
@@ -31,9 +30,6 @@ pub struct L2BlockHeader {
     ///
     /// This is *like* its index, but slots may be skipped.
     pub(crate) slot: u64,
-
-    /// Epoch a block belongs to.
-    pub(crate) epoch: u64,
 
     /// Epoch a block belongs to.
     pub(crate) epoch: u64,
@@ -108,10 +104,6 @@ impl L2Header for L2BlockHeader {
         self.epoch
     }
 
-    fn epoch(&self) -> u64 {
-        self.epoch
-    }
-
     fn timestamp(&self) -> u64 {
         self.timestamp
     }
@@ -144,7 +136,6 @@ fn fill_sighash_buf(tmplt: &L2BlockHeader, buf: &mut [u8]) -> Result<(), io::Err
     cur.write_all(&tmplt.slot.to_be_bytes())?;
     cur.write_all(&tmplt.epoch.to_be_bytes())?;
     cur.write_all(&tmplt.timestamp.to_be_bytes())?;
-    cur.write_all(&tmplt.epoch.to_be_bytes())?;
     cur.write_all(Buf32::from(tmplt.prev_block).as_ref())?;
     cur.write_all(tmplt.l1_segment_hash.as_ref())?;
     cur.write_all(tmplt.exec_segment_hash.as_ref())?;
@@ -193,10 +184,6 @@ impl L2Header for SignedL2BlockHeader {
 
     fn epoch(&self) -> u64 {
         self.header.epoch()
-    }
-
-    fn epoch(&self) -> u64 {
-        self.header.epoch
     }
 
     fn timestamp(&self) -> u64 {

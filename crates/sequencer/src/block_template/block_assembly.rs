@@ -28,7 +28,7 @@ use super::error::BlockAssemblyError as Error;
 
 /// Get the total gas used by EL blocks from start of current epoch till prev_slot
 fn get_total_gas_used_in_epoch(storage: &NodeStorage, prev_slot: u64) -> Result<u64, Error> {
-    let chainstate = storage
+    let (chainstate, _) = storage
         .chainstate()
         .get_toplevel_chainstate_blocking(prev_slot)?
         .ok_or(Error::Db(DbError::MissingL2State(prev_slot)))?;
@@ -80,8 +80,7 @@ pub fn prepare_block(
     let (prev_chstate, _) = chsman
         .get_toplevel_chainstate_blocking(prev_slot)?
         .ok_or(Error::MissingBlockChainstate(prev_blkid))?;
-    let epoch = prev_chstate.cur_epoch();
-    let first_block_of_epoch = prev_chstate.prev_epoch().last_slot() + 1 == slot;
+    let first_block_of_epoch = prev_chstate.is_epoch_finishing();
 
     // Figure out the safe L1 blkid.
     // FIXME this is somewhat janky, should get it from the MMR
