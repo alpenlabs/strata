@@ -193,11 +193,19 @@ fn process_l1_checkpoint(
     let ckpt = signed_ckpt.checkpoint(); // inner data
 
     let receipt = ckpt.construct_receipt();
-    if !params.proof_publish_mode.allow_empty() {
+
+    if receipt.proof().is_empty() {
+        // If the proof is empty but empty proofs are not allowed, this will fail.
+        assert!(
+            params.proof_publish_mode.allow_empty(),
+            "empty proof is not allowed"
+        );
+    } else {
+        // Otherwise, verify the non-empty proof.
         assert!(
             verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk).is_ok(),
             "posted checkpoint proof verification failed"
-        )
+        );
     }
 
     // Copy the epoch commitment and make it finalized.
