@@ -165,6 +165,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     let final_chainstate_root = final_chain_state.compute_state_root();
 
     let output = ClStfOutput {
+        epoch: final_chain_state.cur_epoch(),
         initial_chainstate_root,
         final_chainstate_root,
         tx_filters_transition,

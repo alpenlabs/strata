@@ -358,6 +358,9 @@ impl BatchInfo {
     Serialize,
 )]
 pub struct BatchTransition {
+    /// Epoch
+    pub epoch: u64,
+
     /// Transition commitment for `Chainstate`
     pub chainstate_transition: ChainstateRootTransition,
 
