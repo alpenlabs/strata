@@ -120,10 +120,15 @@ pub fn prepare_block(
     )?;
 
     // Assemble the body and fake header.
-    let block_epoch = prev_chstate.cur_epoch(); // FIXME make this consistent
+    let epoch = if first_block_of_epoch {
+        prev_chstate.cur_epoch() + 1
+    } else {
+        prev_chstate.cur_epoch()
+    };
+
     let body = L2BlockBody::new(l1_seg, exec_seg);
     let fake_stateroot = Buf32::zero();
-    let fake_header = L2BlockHeader::new(slot, block_epoch, ts, prev_blkid, &body, fake_stateroot);
+    let fake_header = L2BlockHeader::new(slot, epoch, ts, prev_blkid, &body, fake_stateroot);
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
@@ -132,7 +137,7 @@ pub fn prepare_block(
     // FIXME: invalid stateroot. Remove l2blockid from ChainState or stateroot from L2Block header.
     let new_state_root = post_state.compute_state_root();
 
-    let header = L2BlockHeader::new(slot, block_epoch, ts, prev_blkid, &body, new_state_root);
+    let header = L2BlockHeader::new(slot, epoch, ts, prev_blkid, &body, new_state_root);
 
     Ok((header, body, block_acc))
 }

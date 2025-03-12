@@ -64,6 +64,12 @@ pub fn process_block(
     state.set_slot(header.slot());
     state.set_prev_block(L2BlockCommitment::new(tip_slot, *header.parent()));
     advance_epoch_tracking(state)?;
+    if state.state().cur_epoch() != header.epoch() {
+        return Err(TsnError::MismatchEpoch(
+            header.epoch(),
+            state.state().cur_epoch(),
+        ));
+    }
 
     // Go through each stage and play out the operations it has.
     let has_new_epoch = process_l1_view_update(state, body.l1_segment(), params)?;
