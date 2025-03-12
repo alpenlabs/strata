@@ -123,14 +123,15 @@ pub fn prepare_block(
     // Assemble the body and fake header.
     let block_epoch = prev_chstate.cur_epoch(); // FIXME make this consistent
     let body = L2BlockBody::new(l1_seg, exec_seg);
-    let fake_header = L2BlockHeader::new(slot, block_epoch, ts, prev_blkid, &body, Buf32::zero());
+    let fake_stateroot = Buf32::zero();
+    let fake_header = L2BlockHeader::new(slot, block_epoch, ts, prev_blkid, &body, fake_stateroot);
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
-    let wb = compute_post_state(prev_chstate, &fake_header, &body, params)?;
+    let post_state = compute_post_state(prev_chstate, &fake_header, &body, params)?;
 
     // FIXME: invalid stateroot. Remove l2blockid from ChainState or stateroot from L2Block header.
-    let new_state_root = wb.new_toplevel_state().compute_state_root();
+    let new_state_root = post_state.compute_state_root();
 
     let header = L2BlockHeader::new(slot, block_epoch, ts, prev_blkid, &body, new_state_root);
 
@@ -165,7 +166,7 @@ fn prepare_l1_segment(
     // make the L1 scan proof stuff more sophisticated.
     let mut payloads = Vec::new();
     let mut is_epoch_final_block = {
-        if prev_chstate.cur_epoch() == 0 {
+        if prev_chstate.cur_epoch() == 0 && !prev_chstate.is_epoch_finishing() {
             // no previous epoch, end epoch and send commitment immediately
             // including first L1 block available.
             true
@@ -363,9 +364,9 @@ fn compute_post_state(
     header: &impl L2Header,
     body: &L2BlockBody,
     params: &Params,
-) -> Result<WriteBatch, Error> {
+) -> Result<Chainstate, Error> {
     let mut state_cache = StateCache::new(prev_chstate);
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
     let wb = state_cache.finalize();
-    Ok(wb)
+    Ok(wb.into_toplevel())
 }

@@ -216,7 +216,7 @@ impl L2Header for SignedL2BlockHeader {
     }
 
     fn state_root(&self) -> &Buf32 {
-        &self.header.state_root
+        self.header.state_root()
     }
 
     fn get_blockid(&self) -> L2BlockId {

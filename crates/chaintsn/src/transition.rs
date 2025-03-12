@@ -52,7 +52,7 @@ pub fn process_block(
 ) -> Result<(), TsnError> {
     // We want to fail quickly here because otherwise we don't know what's
     // happening.
-    if !state.is_empty() {
+    if !state.is_empty() && state.original_state() == state.state() {
         panic!("transition: state cache not fresh");
     }
 
@@ -63,6 +63,7 @@ pub fn process_block(
     let tip_slot = state.state().chain_tip_slot();
     state.set_slot(header.slot());
     state.set_prev_block(L2BlockCommitment::new(tip_slot, *header.parent()));
+    advance_epoch_tracking(state)?;
 
     // Go through each stage and play out the operations it has.
     let has_new_epoch = process_l1_view_update(state, body.l1_segment(), params)?;
@@ -71,7 +72,7 @@ pub fn process_block(
 
     // If we checked in with L1, then advance the epoch.
     if has_new_epoch {
-        advance_epoch_tracking(state, header)?;
+        state.mark_epoch_finishing(true);
     }
 
     Ok(())
@@ -224,12 +225,18 @@ fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Res
     Ok(())
 }
 
-/// Advances the epoch bookkeeping, using the provided header as the terminal.
-fn advance_epoch_tracking(state: &mut StateCache, header: &impl L2Header) -> Result<(), TsnError> {
+/// Advances the epoch bookkeeping, if this is first slot of new epoch.
+fn advance_epoch_tracking(state: &mut StateCache) -> Result<(), TsnError> {
+    if !state.should_finish_epoch() {
+        return Ok(());
+    }
+
+    let prev_block = state.state().prev_block();
     let cur_epoch = state.state().cur_epoch();
-    let this_epoch = EpochCommitment::new(cur_epoch, header.slot(), header.get_blockid());
-    state.set_prev_epoch(this_epoch);
+    let ended_epoch = EpochCommitment::new(cur_epoch, prev_block.slot(), *prev_block.blkid());
+    state.set_prev_epoch(ended_epoch);
     state.set_cur_epoch(cur_epoch + 1);
+    state.mark_epoch_finishing(false);
     Ok(())
 }
 

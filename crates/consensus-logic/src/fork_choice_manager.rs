@@ -811,8 +811,8 @@ fn apply_blocks(
 
         // Get the prev epoch to check if the epoch advanced, and the prev
         // epoch's terminal in case we need it.
+        let pre_state_epoch_finishing = cur_state.is_epoch_finishing();
         let pre_state_epoch = cur_state.cur_epoch();
-        let prev_epoch_terminal = cur_state.prev_epoch().to_block_commitment();
 
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
@@ -827,14 +827,21 @@ fn apply_blocks(
 
         // Sanity check for new epoch being either same or +1.
         assert!(
-            (post_state_epoch == pre_state_epoch) || (post_state_epoch == pre_state_epoch + 1),
+            (!pre_state_epoch_finishing && post_state_epoch == pre_state_epoch)
+                || (pre_state_epoch_finishing && post_state_epoch == pre_state_epoch + 1),
             "fcm: nonsensical post-state epoch (pre={pre_state_epoch}, post={post_state_epoch})"
         );
 
+        assert_eq!(
+            &post_state.compute_state_root(),
+            header.state_root(),
+            "state root mismatch"
+        );
+
         // If we advanced the epoch then we have to finish it.
-        let is_terminal = post_state_epoch == pre_state_epoch + 1;
+        let is_terminal = post_state.is_epoch_finishing();
         if is_terminal {
-            handle_finish_epoch(&blkid, &bundle, prev_epoch_terminal, post_state, fcm_state)?;
+            handle_finish_epoch(&blkid, &bundle, post_state, fcm_state)?;
         }
 
         cur_state = post_state.clone();
@@ -877,25 +884,18 @@ fn apply_blocks(
 fn handle_finish_epoch(
     blkid: &L2BlockId,
     bundle: &L2BlockBundle,
-    prev_terminal: L2BlockCommitment,
     post_state: &Chainstate,
     fcm_state: &mut ForkChoiceManager,
 ) -> anyhow::Result<()> {
     // Construct the various parts of the summary
-    let new_epoch = post_state.cur_epoch();
-    let prev_epoch_idx = new_epoch - 1;
+    // NOTE: epoch update in chainstate happens at first slot of next epoch
+    // this code runs at final slot of current epoch.
+    let prev_epoch_idx = post_state.cur_epoch();
+
+    let prev_terminal = post_state.prev_epoch().to_block_commitment();
 
     let slot = bundle.header().slot();
     let terminal = L2BlockCommitment::new(slot, *blkid);
-
-    // Sanity checks.
-    let prev_epoch = post_state.prev_epoch(); // FIXME is this right?
-    assert_eq!(prev_epoch_idx + 1, new_epoch, "fcm: epoch sequencing mixup");
-    assert_eq!(
-        terminal,
-        prev_epoch.to_block_commitment(),
-        "fcm: fcm: epoch termination mixup"
-    );
 
     let l1seg = bundle.l1_segment();
     assert!(
@@ -920,7 +920,7 @@ fn handle_finish_epoch(
     let epoch = summary.get_epoch_commitment();
 
     // TODO convert to Display
-    debug!(?epoch, "finishing chain epoch");
+    debug!(?epoch, ?summary, "finishing chain epoch");
 
     fcm_state
         .storage
