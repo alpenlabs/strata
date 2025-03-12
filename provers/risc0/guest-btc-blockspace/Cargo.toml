@@ -6,7 +6,6 @@ version = "0.1.0"
 [workspace]
 
 [dependencies]
-risc0-zkvm = { version = "1.2.3", features = ["getrandom"] }
 strata-proofimpl-btc-blockspace = { path = "../../../crates/proof-impl/btc-blockspace" }
 zkaleido-risc0-guest-env = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6" }
 

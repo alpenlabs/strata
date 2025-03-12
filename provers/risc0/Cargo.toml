@@ -4,7 +4,7 @@ name = "strata-risc0-guest-builder"
 version = "0.1.0"
 
 [dependencies]
-risc0-zkvm = "1.2.3"
+risc0-zkvm = "1.2.5"
 zkaleido-risc0-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6" }
 
 [dev-dependencies]
