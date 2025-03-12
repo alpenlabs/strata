@@ -193,7 +193,7 @@ impl StateCache {
         state.l1_state.safe_block_header = record;
     }
 
-    pub fn mark_epoch_finishing(&mut self, flag: bool) {
+    pub fn set_epoch_finishing_flag(&mut self, flag: bool) {
         let state = self.state_mut();
         state.is_epoch_finishing = flag;
     }

@@ -832,11 +832,11 @@ fn apply_blocks(
             "fcm: nonsensical post-state epoch (pre={pre_state_epoch}, post={post_state_epoch})"
         );
 
-        assert_eq!(
-            &post_state.compute_state_root(),
-            header.state_root(),
-            "state root mismatch"
-        );
+        let post_stateroot = post_state.compute_state_root();
+        if header.state_root() != &post_stateroot {
+            warn!(block = %header.state_root(), chain = %post_stateroot, "stateroot mismatch");
+            Err(Error::StaterootMismatch)?
+        }
 
         // If we advanced the epoch then we have to finish it.
         let is_terminal = post_state.is_epoch_finishing();

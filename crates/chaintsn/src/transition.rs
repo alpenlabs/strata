@@ -52,17 +52,17 @@ pub fn process_block(
 ) -> Result<(), TsnError> {
     // We want to fail quickly here because otherwise we don't know what's
     // happening.
-    if !state.is_empty() && state.original_state() == state.state() {
+    if !state.is_empty() {
         panic!("transition: state cache not fresh");
     }
 
     let mut rng = compute_init_slot_rng(state);
 
     // Update basic bookkeeping.
-    //state.set_cur_header(header);
-    let tip_slot = state.state().chain_tip_slot();
+    let prev_tip_slot = state.state().chain_tip_slot();
+    let prev_tip_blkid = *header.parent();
     state.set_slot(header.slot());
-    state.set_prev_block(L2BlockCommitment::new(tip_slot, *header.parent()));
+    state.set_prev_block(L2BlockCommitment::new(prev_tip_slot, prev_tip_blkid));
     advance_epoch_tracking(state)?;
     if state.state().cur_epoch() != header.epoch() {
         return Err(TsnError::MismatchEpoch(
@@ -78,7 +78,7 @@ pub fn process_block(
 
     // If we checked in with L1, then advance the epoch.
     if has_new_epoch {
-        state.mark_epoch_finishing(true);
+        state.set_epoch_finishing_flag(true);
     }
 
     Ok(())
@@ -242,7 +242,7 @@ fn advance_epoch_tracking(state: &mut StateCache) -> Result<(), TsnError> {
     let ended_epoch = EpochCommitment::new(cur_epoch, prev_block.slot(), *prev_block.blkid());
     state.set_prev_epoch(ended_epoch);
     state.set_cur_epoch(cur_epoch + 1);
-    state.mark_epoch_finishing(false);
+    state.set_epoch_finishing_flag(false);
     Ok(())
 }
 

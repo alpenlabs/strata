@@ -75,6 +75,9 @@ pub enum Error {
     #[error("checkpoint invalid: {0}")]
     InvalidCheckpoint(#[from] CheckpointError),
 
+    #[error("stateroot mismatch")]
+    StaterootMismatch,
+
     #[error("chaintip: {0}")]
     ChainTip(#[from] ChainTipError),
 
