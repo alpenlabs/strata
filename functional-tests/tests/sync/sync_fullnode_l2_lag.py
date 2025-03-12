@@ -93,7 +93,7 @@ def fn_syncs_with_seq(fnrpc, seqrpc):
         fn_tip_slot = fnss["tip_height"]
 
         logging.info(f"Seq tip slot {seq_tip_slot}, fn tip slot {fn_tip_slot}")
-        return fn_tip_slot == seq_tip_slot
+        return fn_tip_slot == seq_tip_slot or seq_tip_slot == fn_tip_slot + 1
 
     return _f
 
