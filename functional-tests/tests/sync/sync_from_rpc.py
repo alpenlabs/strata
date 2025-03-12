@@ -16,6 +16,7 @@ class SyncFromRpcTest(testenv.StrataTester):
 
     def main(self, ctx: flexitest.RunContext):
         seqrpc = ctx.get_service("seq_node").create_rpc()
+        btcrpc = ctx.get_service("bitcoin").create_rpc()
         fnrpc = ctx.get_service("follower_1_node").create_rpc()
         seq_reth_rpc = ctx.get_service("seq_reth").create_rpc()
         fullnode_reth_rpc = ctx.get_service("follower_1_reth").create_rpc()
@@ -73,3 +74,14 @@ class SyncFromRpcTest(testenv.StrataTester):
 
         assert fn_checkpt_info["l1_reference"] == sq_checkpt_info["l1_reference"]
         assert fn_checkpt_info["confirmation_status"] == sq_checkpt_info["confirmation_status"]
+
+        # Check l1_reference txid and blockids are actually present in bitcoin
+        txid = fn_checkpt_info["l1_reference"]["txid"]
+        txdata = btcrpc.proxy.gettransaction(txid)
+        assert txdata["confirmations"] > 0
+
+        blkid = fn_checkpt_info["l1_reference"]["block_id"]
+        blkheight = fn_checkpt_info["l1_reference"]["block_height"]
+        blkdata = btcrpc.proxy.getblock(blkid)
+        assert blkdata["confirmations"] > 0
+        assert blkheight > 0
