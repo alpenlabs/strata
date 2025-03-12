@@ -51,9 +51,9 @@ impl<DB: Database> ContextStatefulPrecompile<DB> for BridgeoutPrecompile {
             .data;
 
         // Verify that the transaction value matches the required withdrawal amount
-        if withdrawal_amount != self.fixed_withdrawal_wei {
+        if withdrawal_amount < self.fixed_withdrawal_wei {
             return Err(PrecompileError::other(
-                "Invalid withdrawal value: must be exactly 10 BTC in wei",
+                "Invalid withdrawal value: must have 10 BTC in wei",
             )
             .into());
         }
