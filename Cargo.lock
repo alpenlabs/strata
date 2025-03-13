@@ -13102,39 +13102,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "strata-bridge-client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "argh",
- "async-trait",
- "bitcoin",
- "chrono",
- "deadpool",
- "directories",
- "jsonrpsee",
- "rockbound",
- "strata-bridge-exec",
- "strata-bridge-rpc-api",
- "strata-bridge-sig-manager",
- "strata-bridge-tx-builder",
- "strata-btcio",
- "strata-common",
- "strata-key-derivation",
- "strata-primitives",
- "strata-rocksdb",
- "strata-rpc-api",
- "strata-rpc-types",
- "strata-state",
- "strata-storage",
- "thiserror 2.0.11",
- "threadpool",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
 name = "strata-bridge-exec"
 version = "0.1.0"
 dependencies = [

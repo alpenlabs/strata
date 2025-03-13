@@ -45,7 +45,6 @@ members = [
   "provers/sp1",
 
   # binaries listed separately
-  "bin/bridge-client",
   "bin/datatool",
   "bin/strata-cli",
   "bin/strata-client",
@@ -60,12 +59,12 @@ members = [
 ]
 
 default-members = [
-  "bin/bridge-client",
   "bin/datatool",
   "bin/prover-client",
   "bin/strata-reth",
   "bin/strata-client",
   "bin/strata-sequencer-client",
+  "crates/util/python-utils",
 ]
 
 resolver = "2"
