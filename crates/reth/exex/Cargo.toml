@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 strata-proofimpl-evm-ee-stf.workspace = true
 strata-reth-db.workspace = true
+strata-reth-evm.workspace = true
 strata-reth-node.workspace = true
 
 alloy-consensus.workspace = true
