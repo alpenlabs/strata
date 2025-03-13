@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use alloy_consensus::Header;
 use alloy_rpc_types::{serde_helpers::JsonStorageKey, BlockNumHash, EIP1186AccountProofResponse};
 use eyre::eyre;
 use futures_util::TryStreamExt;
@@ -184,6 +185,16 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
     )
     .expect("Proof to tries infallible");
 
+    // Get ancestor headers
+    let ancestor_headers = get_ancestor_headers(ctx, current_block_idx)?;
+    // let ancestor_headers = Vec::new();
+
+    println!(
+        "Abishek got ancestor_headers: num {:?} {:?}",
+        ancestor_headers.len(),
+        ancestor_headers
+    );
+
     let input = EvmBlockStfInput {
         beneficiary: current_block.header.beneficiary,
         gas_limit: current_block.gas_limit,
@@ -196,10 +207,26 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
         pre_state_storage: storage,
         contracts,
         parent_header: prev_block.header,
-        // NOTE: using default to save prover cost.
-        // Will need to revisit if BLOCKHASH opcode operation is a blocker
-        ancestor_headers: Default::default(),
+        ancestor_headers,
     };
 
     Ok(input)
+}
+
+fn get_ancestor_headers<Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>>(
+    ctx: &ExExContext<Node>,
+    block_idx: u64,
+) -> eyre::Result<Vec<Header>> {
+    let start_index = block_idx.saturating_sub(256);
+    let provider = ctx.provider();
+    let mut headers = Vec::with_capacity((block_idx - start_index) as usize);
+
+    for block_num in start_index..block_idx {
+        let block = provider
+            .block_by_number(block_num)?
+            .ok_or_else(|| eyre!("Block not found for block number {block_num}"))?;
+        headers.push(block.header);
+    }
+
+    Ok(headers)
 }
