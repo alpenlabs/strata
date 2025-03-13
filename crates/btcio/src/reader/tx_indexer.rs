@@ -287,11 +287,12 @@ mod test {
         let params = gen_params();
         let filter_config = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
+        let idx = 0xdeadbeef;
         let ee_addr = vec![1u8; 20]; // Example EVM address
 
         // Create deposit utxo
         let deposit_script =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), ee_addr.clone());
+            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx, ee_addr.clone());
 
         let mut tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
