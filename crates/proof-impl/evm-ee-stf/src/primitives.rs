@@ -71,6 +71,7 @@ pub struct EvmBlockStfInput {
     pub contracts: Vec<Bytes>,
 
     /// The ancestor headers of the parent block.
+    #[serde_as(as = "Vec<serde_bincode_compat_header::Header>")]
     pub ancestor_headers: Vec<Header>,
 
     /// A list of transactions to process.
