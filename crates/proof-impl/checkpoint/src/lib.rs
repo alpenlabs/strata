@@ -13,6 +13,7 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
     assert!(batches_count > 0);
 
     let ClStfOutput {
+        epoch,
         initial_chainstate_root,
         mut final_chainstate_root,
         mut tx_filters_transition,
@@ -27,6 +28,11 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
             "continuity error"
         );
 
+        assert_eq!(
+            epoch, cl_stf_output.epoch,
+            "transition must be within the same epoch"
+        );
+
         final_chainstate_root = cl_stf_output.final_chainstate_root;
 
         // If there was some update to TxFiltersConfig update it, else leave as is
@@ -39,6 +45,7 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
     };
 
     let output = BatchTransition {
+        epoch,
         chainstate_transition,
         tx_filters_transition: tx_filters_transition
             .expect("checkpoint must include a valid tx filters transition"),

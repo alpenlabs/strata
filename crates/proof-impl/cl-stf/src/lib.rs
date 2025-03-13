@@ -25,6 +25,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
 
     // 2. Read the initial chainstate from which we start the transition and create the state cache
     let initial_chainstate: Chainstate = zkvm.read_borsh();
+    let epoch = initial_chainstate.cur_epoch();
     let initial_chainstate_root = initial_chainstate.compute_state_root();
     let cur_epoch = initial_chainstate.cur_epoch();
     let mut state_cache = StateCache::new(initial_chainstate);
@@ -166,6 +167,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     let final_chainstate_root = final_chain_state.compute_state_root();
 
     let output = ClStfOutput {
+        epoch,
         initial_chainstate_root,
         final_chainstate_root,
         tx_filters_transition,

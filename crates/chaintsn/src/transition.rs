@@ -6,6 +6,7 @@ use std::{cmp::max, collections::HashMap};
 
 use bitcoin::{block::Header, consensus, params::Params, OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
+use strata_crypto::groth16_verifier::verify_rollup_groth16_proof_receipt;
 use strata_primitives::{
     batch::SignedCheckpoint,
     epoch::EpochCommitment,
@@ -17,6 +18,7 @@ use strata_primitives::{
     params::RollupParams,
 };
 use strata_state::{
+    batch::verify_signed_checkpoint_sig,
     block::L1Segment,
     bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
@@ -26,6 +28,7 @@ use strata_state::{
     state_op::StateCache,
     state_queue,
 };
+use tracing::warn;
 
 use crate::{
     errors::TsnError,
@@ -97,7 +100,7 @@ fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
 
 /// Update our view of the L1 state, playing out downstream changes from that.
 ///
-/// Returns if there was an update processed.
+/// Returns true if there epoch needs to be updated.
 fn process_l1_view_update(
     state: &mut StateCache,
     l1seg: &L1Segment,
@@ -105,43 +108,61 @@ fn process_l1_view_update(
 ) -> Result<bool, TsnError> {
     let l1v = state.state().l1_view();
 
-    // Accept new blocks.
-    if !l1seg.new_manifests().is_empty() {
-        let cur_safe_height = l1v.safe_height();
+    if l1seg.new_manifests().is_empty() {
+        return Ok(false);
+    }
 
-        // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
-        // more complicated to check the PoW.
-        let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
-        // FIXME: This check is just redundant.
-        if new_tip_height <= l1v.safe_height() {
-            return Err(TsnError::L1SegNotExtend);
-        }
+    let cur_safe_height = l1v.safe_height();
 
-        // Go through each manifest and process it.
-        for (off, b) in l1seg.new_manifests().iter().enumerate() {
-            // PoW checks are done when we try to update the HeaderVerificationState
-            let header: Header =
-                consensus::deserialize(b.header()).expect("invalid bitcoin header");
-            state.update_header_vs(&header, &Params::new(params.network))?;
+    // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
+    // more complicated to check the PoW.
+    let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
+    // FIXME: This check is just redundant.
+    if new_tip_height <= l1v.safe_height() {
+        return Err(TsnError::L1SegNotExtend);
+    }
 
-            let height = cur_safe_height + off as u64 + 1;
-            process_l1_block(state, b)?;
-            state.update_safe_block(height, b.record().clone());
-        }
+    let prev_finalized_epoch = *state.state().finalized_epoch();
 
+    // Go through each manifest and process it.
+    for (off, b) in l1seg.new_manifests().iter().enumerate() {
+        // PoW checks are done when we try to update the HeaderVerificationState
+        let header: Header = consensus::deserialize(b.header()).expect("invalid bitcoin header");
+        state.update_header_vs(&header, &Params::new(params.network))?;
+
+        let height = cur_safe_height + off as u64 + 1;
+        process_l1_block(state, b, params)?;
+        state.update_safe_block(height, b.record().clone());
+    }
+
+    // If prev_finalized_epoch is null, i.e. this is the genesis batch, it is safe to update the
+    // epoch
+    if prev_finalized_epoch.is_null() {
+        return Ok(true);
+    }
+
+    // For all other non-genesis batch, we need to check that the new finalized epoch has been
+    // updated when processing L1Checkpoint
+    let new_finalized_epoch = state.state().finalized_epoch();
+
+    if new_finalized_epoch.epoch() > prev_finalized_epoch.epoch() {
         Ok(true)
     } else {
-        Ok(false)
+        Err(TsnError::EpochNotExtend)
     }
 }
 
-fn process_l1_block(state: &mut StateCache, block_mf: &L1BlockManifest) -> Result<(), TsnError> {
+fn process_l1_block(
+    state: &mut StateCache,
+    block_mf: &L1BlockManifest,
+    params: &RollupParams,
+) -> Result<(), TsnError> {
     // Just iterate through every tx's operation and call out to the handlers for that.
     for tx in block_mf.txs() {
         for op in tx.protocol_ops() {
             match &op {
                 ProtocolOperation::Checkpoint(ckpt) => {
-                    process_l1_checkpoint(state, block_mf, ckpt)?;
+                    process_l1_checkpoint(state, block_mf, ckpt, params)?;
                 }
 
                 ProtocolOperation::Deposit(info) => {
@@ -169,14 +190,38 @@ fn process_l1_checkpoint(
     state: &mut StateCache,
     src_block_mf: &L1BlockManifest,
     signed_ckpt: &SignedCheckpoint,
+    params: &RollupParams,
 ) -> Result<(), TsnError> {
-    // TODO verify signature?  it should already have been validated but it
-    // doesn't hurt to do it again (just costs)
-    // TODO should we verify the proof here too?  the L1 scan proof probably
-    // should have done it, but it wouldn't be excessively complicated to
-    // re-verify it, we should formally define the answers to these questions
+    // If signature verification failed, return early and do **NOT** finalize epoch
+    // Note: This is not an error because anyone is able to post data to L1
+    if !verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule) {
+        warn!("Invalid checkpoint: signature");
+        return Ok(());
+    }
 
     let ckpt = signed_ckpt.checkpoint(); // inner data
+    let ckpt_epoch = ckpt.batch_transition().epoch;
+
+    let receipt = ckpt.construct_receipt();
+
+    // Note: This is error because this is done by the sequencer
+    if ckpt_epoch != 0 && ckpt_epoch != state.state().finalized_epoch().epoch() + 1 {
+        error!(%ckpt_epoch, "Invalid checkpoint: proof for invalid epoch");
+        return Err(TsnError::EpochNotExtend);
+    }
+
+    if receipt.proof().is_empty() {
+        warn!(%ckpt_epoch, "Empty proof posted");
+        // If the proof is empty but empty proofs are not allowed, this will fail.
+        if !params.proof_publish_mode.allow_empty() {
+            error!(%ckpt_epoch, "Invalid checkpoint: Empty proof");
+            return Err(TsnError::InvalidProof);
+        }
+    } else {
+        // Otherwise, verify the non-empty proof.
+        verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk)
+            .map_err(|e| TsnError::InvalidProof)?;
+    }
 
     // Copy the epoch commitment and make it finalized.
     let old_fin_epoch = state.state().finalized_epoch();

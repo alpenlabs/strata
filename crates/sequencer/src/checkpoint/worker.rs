@@ -344,6 +344,7 @@ fn create_checkpoint_prep_data_from_summary(
     };
 
     let new_transition = BatchTransition {
+        epoch: summary.epoch(),
         chainstate_transition,
         tx_filters_transition,
     };
