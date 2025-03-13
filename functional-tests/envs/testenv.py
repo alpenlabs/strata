@@ -233,8 +233,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
         if self.auto_generate_blocks:
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
-        operator_message_interval = self.message_interval or settings.message_interval
-
         seq_port = sequencer.get_prop("rpc_port")
         reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
 
