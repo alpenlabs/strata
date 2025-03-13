@@ -306,12 +306,7 @@ impl DepositsTable {
             Err(pos) => {
                 let entry = DepositEntry::new(idx, tx_ref, operators, amt);
                 self.deposits.insert(pos as usize, entry);
-
-                // Tricky bookkeeping.
-                if idx >= self.next_idx {
-                    self.next_idx = u32::max(self.next_idx, idx) + 1;
-                }
-
+                self.next_idx = u32::max(self.next_idx + 1, idx);
                 true
             }
         }
