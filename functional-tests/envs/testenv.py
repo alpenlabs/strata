@@ -124,7 +124,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
         seq_fac = ctx.get_factory("sequencer")
         seq_signer_fac = ctx.get_factory("sequencer_signer")
         reth_fac = ctx.get_factory("reth")
-        bridge_fac = ctx.get_factory("bridge_client")
 
         svcs = {}
 
@@ -235,22 +234,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
 
         operator_message_interval = self.message_interval or settings.message_interval
-        # Create all the bridge clients.
-        for i in range(self.n_operators):
-            xpriv_path = params_gen_data["opseedpaths"][i]
-            xpriv = None
-            with open(xpriv_path) as f:
-                xpriv = f.read().strip()
-            seq_url = sequencer.get_prop("rpc_url")
-            br = bridge_fac.create_operator(
-                xpriv,
-                seq_url,
-                bitcoind_config,
-                message_interval=operator_message_interval,
-                duty_timeout_duration=self.duty_timeout_duration,
-            )
-            name = f"bridge.{i}"
-            svcs[name] = br
 
         seq_port = sequencer.get_prop("rpc_port")
         reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
@@ -291,7 +274,6 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         seq_signer_fac = ctx.get_factory("sequencer_signer")
         reth_fac = ctx.get_factory("reth")
         fn_fac = ctx.get_factory("fullnode")
-        bridge_fac = ctx.get_factory("bridge_client")
 
         # set up network params
         initdir = ctx.make_service_dir("_init")
@@ -386,23 +368,6 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "follower_1_node": fullnode,
             "follower_1_reth": fullnode_reth,
         }
-
-        # Create all the bridge clients.
-        for i in range(self.n_operators):
-            xpriv_path = params_gen_data["opseedpaths"][i]
-            xpriv = None
-            with open(xpriv_path) as f:
-                xpriv = f.read().strip()
-            seq_url = sequencer.get_prop("rpc_url")
-            br = bridge_fac.create_operator(
-                xpriv,
-                seq_url,
-                bitcoind_config,
-                message_interval=settings.message_interval,
-                duty_timeout_duration=self.duty_timeout_duration,
-            )
-            name = f"bridge.{i}"
-            svcs[name] = br
 
         return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)
 
