@@ -16,7 +16,6 @@ use strata_primitives::{
 };
 use strata_state::{
     batch::BatchInfo,
-    bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     bridge_state::{DepositEntry, DepositState},
     client_state::CheckpointL1Ref,
@@ -358,25 +357,6 @@ impl From<CheckpointEntry> for RpcCheckpointInfo {
         item.confirmation_status = value.confirmation_status.into();
         item
     }
-}
-
-/// The duties assigned to an operator within a given range.
-///
-/// # Note
-///
-/// The `index`'s are only relevant for Deposit duties as those are stored off-chain in a database.
-/// The withdrawal duties are fetched from the current chain state.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RpcBridgeDuties {
-    /// The actual [`BridgeDuty`]'s assigned to an operator which includes both the deposit and
-    /// withdrawal duties.
-    pub duties: Vec<BridgeDuty>,
-
-    /// The starting index (inclusive) from which the duties are fetched.
-    pub start_index: u64,
-
-    /// The last block index (inclusive) upto which the duties are feched.
-    pub stop_index: u64,
 }
 
 /// Deposit entry for RPC corresponding to [`DepositEntry`].

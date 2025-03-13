@@ -12,8 +12,8 @@ use strata_primitives::{
     proof::{ProofContext, ProofKey},
 };
 use strata_state::{
-    block::L2BlockBundle, bridge_duties::BridgeDutyStatus, chain_state::Chainstate, operation::*,
-    state_op::WriteBatchEntry, sync_event::SyncEvent,
+    block::L2BlockBundle, chain_state::Chainstate, operation::*, state_op::WriteBatchEntry,
+    sync_event::SyncEvent,
 };
 use zkaleido::ProofReceipt;
 
@@ -355,38 +355,4 @@ pub trait BridgeTxDatabase {
 
     /// Fetch [`BridgeTxState`] from db.
     fn get_tx_state(&self, txid: Buf32) -> DbResult<Option<BridgeTxState>>;
-}
-
-/// Provides methods to manage the status of a deposit or withdrawal duty that a bridge client
-/// executes.
-///
-/// Each such duty can be identified uniquely with a [`Txid`](bitcoin::Txid) (represented as a
-/// [`Buf32`]). For a deposit duty, this `txid` refers to that of the Deposit Request and for the
-/// withdrawal duty, it refers to that of the Deposit Transaction.
-pub trait BridgeDutyDatabase {
-    /// Get the status of a duty identified by a given `txid` if it exists.
-    fn get_status(&self, txid: Buf32) -> DbResult<Option<BridgeDutyStatus>>;
-
-    /// Remove duty from the database and return the status of the removed duty.
-    fn delete_duty(&self, txid: Buf32) -> DbResult<Option<BridgeDutyStatus>>;
-
-    /// Adds a duty status to the DB, updating the entry if one exists.
-    ///
-    /// # Errors
-    ///
-    /// If a duty for the given `txid` is not present
-    fn put_duty_status(&self, txid: Buf32, status: BridgeDutyStatus) -> DbResult<()>;
-}
-
-/// Provides methods to manage the duty index for the deposit duties.
-pub trait BridgeDutyIndexDatabase {
-    /// Get the checkpoint upto which the duties have been fetched.
-    ///
-    /// This checkpoint is the same as the index in [`L1Database`].
-    fn get_index(&self) -> DbResult<Option<u64>>;
-
-    /// Set the checkpoint to a new value.
-    ///
-    /// This is done in response to the response received from the full node's RPC.
-    fn set_index(&self, index: u64) -> DbResult<()>;
 }

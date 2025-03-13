@@ -1,12 +1,12 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
 use bitcoin::{opcodes::all::OP_RETURN, OutPoint, ScriptBuf, Transaction};
-use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
 use strata_primitives::{
     l1::{DepositInfo, OutputRef},
     prelude::DepositTxParams,
 };
 
+use super::constants::*;
 use crate::{
     deposit::error::DepositParseError,
     utils::{next_bytes, next_op},

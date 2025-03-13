@@ -10,7 +10,6 @@ use bitcoin::{
 };
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
-use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
 use strata_common::BAIL_SENDER;
@@ -31,8 +30,8 @@ use strata_rpc_api::{
 };
 use strata_rpc_types::{
     errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, HexBytes64, L2BlockStatus,
-    RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo,
-    RpcClientStatus, RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
+    RpcBlockHeader, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo, RpcClientStatus,
+    RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_sequencer::{
@@ -45,7 +44,6 @@ use strata_sequencer::{
 use strata_state::{
     batch::{Checkpoint, SignedCheckpoint},
     block::{L2Block, L2BlockBundle},
-    bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     chain_state::Chainstate,
     client_state::ClientState,
@@ -60,14 +58,12 @@ use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 use zkaleido::ProofReceipt;
 
-use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
-
 pub struct StrataRpcImpl {
     status_channel: StatusChannel,
     sync_manager: Arc<SyncManager>,
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
-    relayer_handle: Arc<RelayerHandle>,
+    //relayer_handle: Arc<RelayerHandle>,
 }
 
 impl StrataRpcImpl {
@@ -77,14 +73,14 @@ impl StrataRpcImpl {
         sync_manager: Arc<SyncManager>,
         storage: Arc<NodeStorage>,
         checkpoint_handle: Arc<CheckpointHandle>,
-        relayer_handle: Arc<RelayerHandle>,
+        //relayer_handle: Arc<RelayerHandle>,
     ) -> Self {
         Self {
             status_channel,
             sync_manager,
             storage,
             checkpoint_handle,
-            relayer_handle,
+            //relayer_handle,
         }
     }
 
@@ -108,26 +104,6 @@ impl StrataRpcImpl {
         let chs = self.status_channel.get_cur_tip_chainstate().clone();
 
         Ok((cs, chs))
-    }
-
-    // TODO remove this RPC, we aren't supposed to be exposing this
-    async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
-        let client_state = self.status_channel.get_cur_client_state();
-
-        let Some(last_checkpoint) = client_state.get_last_checkpoint() else {
-            return Ok(None);
-        };
-
-        // in current implementation, chainstate idx == l2 block idx
-        let (_, end_commitment) = last_checkpoint.batch_info.l2_range;
-
-        Ok(self
-            .storage
-            .chainstate()
-            .get_toplevel_chainstate_async(end_commitment.slot())
-            .await?
-            .map(Into::into)
-            .map(Arc::new))
     }
 
     async fn fetch_l2_block_ok(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
@@ -513,75 +489,14 @@ impl StrataApiServer for StrataRpcImpl {
         Ok(block)
     }
 
-    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
-        let msgs = self
-            .relayer_handle
-            .get_message_by_scope_async(scope.0)
-            .map_err(to_jsonrpsee_error("querying relayer db"))
-            .await?;
-
-        let mut raw_msgs = Vec::new();
-        for m in msgs {
-            match borsh::to_vec(&m) {
-                Ok(m) => raw_msgs.push(HexBytes(m)),
-                Err(_) => {
-                    let msg_id = m.compute_id();
-                    warn!(%msg_id, "failed to serialize bridge msg");
-                }
-            }
-        }
-
-        Ok(raw_msgs)
+    async fn get_msgs_by_scope(&self, _scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
+        warn!("call to get_msgs_by_scope, bridge relay system derecated");
+        Ok(Vec::new())
     }
 
-    async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()> {
-        let msg =
-            borsh::from_slice(&raw_msg.0).map_err(to_jsonrpsee_error("parse bridge message"))?;
-        self.relayer_handle.submit_message_async(msg).await;
+    async fn submit_bridge_msg(&self, _raw_msg: HexBytes) -> RpcResult<()> {
+        warn!("call to submit_bridge_msg, bridge relay system derecated");
         Ok(())
-    }
-
-    // FIXME: find a way to handle reorgs if that becomes a problem
-    async fn get_bridge_duties(
-        &self,
-        operator_idx: OperatorIdx,
-        start_index: u64,
-    ) -> RpcResult<RpcBridgeDuties> {
-        info!(%operator_idx, %start_index, "received request for bridge duties");
-
-        // OPTIMIZE: the extraction of deposit and withdrawal duties can happen in parallel as they
-        // depend on independent sources of information. This optimization can be done if this RPC
-        // call takes a lot of time (for example, when there are hundreds of thousands of
-        // deposits/withdrawals).
-
-        let network = self.sync_manager.params().rollup().network;
-
-        let (deposit_duties, latest_index) =
-            extract_deposit_requests(self.storage.l1().as_ref(), start_index, network).await?;
-
-        let deposit_duties = deposit_duties.map(BridgeDuty::from);
-
-        // withdrawal duties should only be generated from finalized checkpoint states
-        let withdrawal_duties = self
-            .get_last_checkpoint_chainstate()
-            .await?
-            .map(|chainstate| {
-                extract_withdrawal_infos(chainstate.deposits_table())
-                    .map(BridgeDuty::from)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        let mut duties = vec![];
-        duties.extend(deposit_duties);
-        duties.extend(withdrawal_duties.into_iter());
-
-        info!(%operator_idx, %start_index, "dispatching duties");
-        Ok(RpcBridgeDuties {
-            duties,
-            start_index,
-            stop_index: latest_index,
-        })
     }
 
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
