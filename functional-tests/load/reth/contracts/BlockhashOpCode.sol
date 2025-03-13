@@ -5,9 +5,8 @@ contract BlockhashOpCode {
     bytes32 public lastBlockHash;
 
     function updateBlockHash() external {
-        // Ensure that there is a previous block.
-        require(block.number > 1, "No previous block available");
-        // Retrieve the hash of the previous block (block.number - 1)
-        lastBlockHash = blockhash(block.number - 1);
+        bytes32 lastBlockHash1 = blockhash(block.number - 1);
+        bytes32 lastBlockHash2 = blockhash(block.number - 2);
+        lastBlockHash = lastBlockHash1 ^ lastBlockHash2;
     }
 }

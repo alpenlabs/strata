@@ -5,6 +5,7 @@ from envs import testenv
 from utils import (
     el_slot_to_block_commitment,
     wait_for_proof_with_time_out,
+    wait_until,
     wait_until_with_value,
 )
 from utils.eth import make_native_token_transfer
@@ -54,6 +55,12 @@ class ProverClientTest(testenv.StrataTester):
 
         start_block = el_slot_to_block_commitment(reth_rpc, ee_prover_params["start_block"])
         end_block = el_slot_to_block_commitment(reth_rpc, ee_prover_params["end_block"])
+
+        # Wait until the prover client reports readiness
+        wait_until(
+            lambda: prover_client_rpc.dev_strata_getReport() is not None,
+            error_with="Prover did not start on time",
+        )
 
         task_ids = prover_client_rpc.dev_strata_proveElBlocks((start_block, end_block))
         self.debug(f"Prover task IDs received: {task_ids}")

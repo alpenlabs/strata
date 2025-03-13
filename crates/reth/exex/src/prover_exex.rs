@@ -15,6 +15,7 @@ use reth_trie_common::KeccakKeyHasher;
 use revm_primitives::alloy_primitives::{Address, B256};
 use strata_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, EvmBlockStfInput};
 use strata_reth_db::WitnessStore;
+use strata_reth_evm::constants::MAX_ANCESTOR_DEPTH;
 use tracing::{debug, error};
 
 use crate::{
@@ -187,7 +188,6 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
 
     // Get ancestor headers
     let ancestor_headers = get_ancestor_headers(ctx, current_block_idx)?;
-    // let ancestor_headers = Vec::new();
 
     println!(
         "Abishek got ancestor_headers: num {:?} {:?}",
@@ -217,11 +217,12 @@ fn get_ancestor_headers<Node: FullNodeComponents<Types: NodeTypes<Primitives = E
     ctx: &ExExContext<Node>,
     block_idx: u64,
 ) -> eyre::Result<Vec<Header>> {
-    let start_index = block_idx.saturating_sub(256);
+    let oldest_parent = block_idx.saturating_sub(MAX_ANCESTOR_DEPTH);
+    let prev_block_idx = block_idx.saturating_sub(1);
     let provider = ctx.provider();
-    let mut headers = Vec::with_capacity((block_idx - start_index) as usize);
+    let mut headers = Vec::with_capacity((block_idx - oldest_parent) as usize);
 
-    for block_num in start_index..block_idx {
+    for block_num in (oldest_parent..prev_block_idx).rev() {
         let block = provider
             .block_by_number(block_num)?
             .ok_or_else(|| eyre!("Block not found for block number {block_num}"))?;
