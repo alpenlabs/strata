@@ -14,7 +14,6 @@ use colored::Colorize;
 use indicatif::ProgressBar;
 use make_buf::make_buf;
 use strata_bridge_tx_builder::constants::MAGIC_BYTES;
-use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
 use strata_primitives::constants::RECOVER_DELAY;
 
 use crate::{
@@ -164,6 +163,14 @@ pub async fn deposit(
     println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Strata.");
 }
 
+/// Generates a bridge-in descriptor for a given bridge public key and recovery address.
+///
+/// Returns a P2TR descriptor template for the bridge-in transaction.
+///
+/// # Implementation Details
+///
+/// This is a P2TR address that the key path spend is locked to the bridge aggregated public key
+/// and the single script path spend is locked to the user's recovery address with a timelock of
 fn bridge_in_descriptor(
     bridge_pubkey: XOnlyPublicKey,
     recovery_address: Address,
@@ -171,10 +178,9 @@ fn bridge_in_descriptor(
     let recovery_xonly_pubkey = recovery_address.extract_p2tr_pubkey()?;
 
     let desc = bdk_wallet::descriptor!(
-        tr(UNSPENDABLE_PUBLIC_KEY, {
-            pk(bridge_pubkey),
+        tr(bridge_pubkey,
             and_v(v:pk(recovery_xonly_pubkey),older(RECOVER_DELAY))
-        })
+        )
     )
     .expect("valid descriptor");
 
@@ -182,8 +188,8 @@ fn bridge_in_descriptor(
     // i have tried to extract it directly from the desc above
     // it is a massive pita
     let recovery_script = Miniscript::<XOnlyPublicKey, Tap>::from_str(&format!(
-        "and_v(v:pk({}),older(1008))",
-        recovery_xonly_pubkey
+        "and_v(v:pk({}),older({}))",
+        recovery_xonly_pubkey, RECOVER_DELAY
     ))
     .expect("valid recovery script")
     .encode();
