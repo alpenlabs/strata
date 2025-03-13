@@ -629,7 +629,7 @@ mod tests {
             let tx_ref: OutputRef = arb.generate();
             let amt: BitcoinAmount = arb.generate();
 
-            deposits_table.add_deposit(tx_ref, operators.clone(), amt);
+            deposits_table.create_next_deposit(tx_ref, operators.clone(), amt);
 
             // dispatch about half of the deposits
             let should_dispatch = OsRng.gen_bool(0.5);
