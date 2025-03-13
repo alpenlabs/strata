@@ -15,9 +15,10 @@ use indicatif::ProgressBar;
 use make_buf::make_buf;
 use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
+use strata_primitives::constants::RECOVER_DELAY;
 
 use crate::{
-    constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, SIGNET_BLOCK_TIME},
+    constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
