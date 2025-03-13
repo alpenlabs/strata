@@ -13857,6 +13857,7 @@ dependencies = [
 name = "strata-reth-exex"
 version = "0.1.0"
 dependencies = [
+ "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
  "alloy-rpc-types 0.9.2",
  "anyhow",
