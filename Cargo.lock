@@ -6515,6 +6515,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "make_buf"
+version = "1.0.1"
+source = "git+https://github.com/alpenlabs/make_buf.git?rev=903dbe1d4068712ee046c54fe2906ba04e72c905#903dbe1d4068712ee046c54fe2906ba04e72c905"
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13511,6 +13516,7 @@ dependencies = [
  "directories",
  "indicatif",
  "keyring",
+ "make_buf",
  "rand_core 0.6.4",
  "reqwest 0.12.12",
  "serde",

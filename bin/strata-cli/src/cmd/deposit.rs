@@ -12,6 +12,8 @@ use bdk_wallet::{
 };
 use colored::Colorize;
 use indicatif::ProgressBar;
+use make_buf::make_buf;
+use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
 
 use crate::{
@@ -112,10 +114,12 @@ pub async fn deposit(
     // <strata_address>
     const MBL: usize = MAGIC_BYTES.len();
     const XONLYPK: usize = 32; // X-only PKs are 32-bytes in P2TR SegWit v1 addresses
-    let mut op_return_data = [0u8; MBL + XONLYPK + StrataAddress::len_bytes()];
-    op_return_data[..MBL].copy_from_slice(MAGIC_BYTES);
-    op_return_data[MBL..MBL + XONLYPK].copy_from_slice(&recovery_address_pk.serialize());
-    op_return_data[MBL + XONLYPK..].copy_from_slice(strata_address.as_slice());
+    const STRATA_ADDRESS_LEN: usize = 20; // EVM addresses are 20 bytes long
+    let op_return_data = make_buf! {
+        (MAGIC_BYTES, MBL),
+        (&recovery_address_pk.serialize(), XONLYPK),
+        (strata_address.as_slice(), STRATA_ADDRESS_LEN)
+    };
 
     let mut psbt = {
         let mut builder = l1w.build_tx();
