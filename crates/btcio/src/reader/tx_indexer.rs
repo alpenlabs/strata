@@ -128,9 +128,10 @@ mod test {
         let params = gen_params();
         let filter_config = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
+        let idx = 0xdeadbeef;
         let ee_addr = vec![1u8; 20]; // Example EVM address
         let deposit_script =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), ee_addr.clone());
+            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx, ee_addr.clone());
 
         let tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
@@ -146,7 +147,8 @@ mod test {
 
         for op in tx_entries[0].contents().protocol_ops() {
             if let ProtocolOperation::Deposit(deposit_info) = op {
-                assert_eq!(deposit_info.address, ee_addr, "EE address should match");
+                assert_eq!(deposit_info.address, ee_addr, "test: dest should match");
+                assert_eq!(deposit_info.deposit_idx, idx, "test: idx should match");
                 assert_eq!(
                     deposit_info.amt,
                     BitcoinAmount::from_sat(deposit_config.deposit_amount),
@@ -226,13 +228,15 @@ mod test {
         let params = gen_params();
         let filter_config = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
+        let idx1 = 0xdeadbeef;
+        let idx2 = 0x1badb007;
         let dest_addr1 = vec![3u8; 20];
         let dest_addr2 = vec![4u8; 20];
 
         let deposit_script1 =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), dest_addr1.clone());
+            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx1, dest_addr1.clone());
         let deposit_script2 =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), dest_addr2.clone());
+            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx2, dest_addr2.clone());
 
         let tx1 = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
@@ -264,17 +268,16 @@ mod test {
                     } else {
                         dest_addr2.clone()
                     },
-                    "EVM address should match for transaction {}",
-                    i
+                    "test: dest should match for transaction {i}",
                 );
+                assert_eq!(deposit_info.idx, [idx1, idx2][i], "test: idx should match");
                 assert_eq!(
                     deposit_info.amt,
                     BitcoinAmount::from_sat(deposit_config.deposit_amount),
-                    "Deposit amount should match for transaction {}",
-                    i
+                    "test: deposit amount should match for transaction {i}",
                 );
             } else {
-                panic!("Expected Deposit info for transaction {}", i);
+                panic!("test: expected DepositInfo for transaction {i}");
             }
         }
     }
