@@ -240,20 +240,26 @@ fn process_l1_deposit(
     src_block_mf: &L1BlockManifest,
     info: &DepositInfo,
 ) -> Result<(), TsnError> {
+    let requested_idx = info.deposit_idx;
     let outpoint = info.outpoint;
 
     // Create the deposit entry to track it on the bridge side.
     //
     // Right now all operators sign all deposits, take them all.
     let all_operators = state.state().operator_table().indices().collect::<_>();
-    state.insert_deposit_entry(outpoint, info.amt, all_operators);
+    let ok = state.insert_deposit_entry(requested_idx, outpoint, info.amt, all_operators);
 
-    // Insert an intent to credit the destination with it.
-    let deposit_intent = DepositIntent::new(info.amt, info.address.clone());
-    state.insert_deposit_intent(0, deposit_intent);
+    // If we inserted it successfully, create the intent.
+    if ok {
+        // Insert an intent to credit the destination with it.
+        let deposit_intent = DepositIntent::new(info.amt, info.address.clone());
+        state.insert_deposit_intent(0, deposit_intent);
 
-    // Logging so we know if it got there.
-    trace!(?outpoint, "handled deposit");
+        // Logging so we know if it got there.
+        trace!(?outpoint, "handled deposit");
+    } else {
+        warn!(?outpoint, %requested_idx, "ignoring deposit that would have overwritten entry");
+    }
 
     Ok(())
 }

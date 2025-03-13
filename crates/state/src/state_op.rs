@@ -251,12 +251,13 @@ impl StateCache {
     /// Inserts a new deposit with some settings.
     pub fn insert_deposit_entry(
         &mut self,
+        idx: u32,
         tx_ref: OutputRef,
         amt: BitcoinAmount,
         operators: Vec<OperatorIdx>,
-    ) -> u32 {
+    ) -> bool {
         let dt = self.state_mut().deposits_table_mut();
-        dt.add_deposit(tx_ref, operators, amt)
+        dt.try_create_deposit_at(idx, tx_ref, operators, amt)
     }
 
     /// Assigns a withdrawal command to a deposit, with an expiration.
