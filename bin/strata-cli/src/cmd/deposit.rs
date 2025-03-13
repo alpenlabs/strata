@@ -3,7 +3,7 @@ use std::{str::FromStr, time::Duration};
 use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
-    bitcoin::{hashes::Hash, taproot::LeafVersion, Address, TapNodeHash, XOnlyPublicKey},
+    bitcoin::{taproot::LeafVersion, Address, TapNodeHash, XOnlyPublicKey},
     chain::ChainOracle,
     descriptor::IntoWalletDescriptor,
     miniscript::{miniscript::Tap, Miniscript},
@@ -57,6 +57,7 @@ pub async fn deposit(
 
     l1w.sync().await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
+    let recovery_address_pk = recovery_address.extract_p2tr_pubkey().unwrap();
     l1w.persist().unwrap();
 
     let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
@@ -71,7 +72,7 @@ pub async fn deposit(
         recovery_address.to_string().yellow()
     );
 
-    let (bridge_in_desc, recovery_script_hash) =
+    let (bridge_in_desc, _recovery_script_hash) =
         bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
             .expect("valid bridge in descriptor");
 
@@ -105,13 +106,16 @@ pub async fn deposit(
     let fee_rate = get_fee_rate(fee_rate, settings.signet_backend.as_ref()).await;
     log_fee_rate(&fee_rate);
 
+    // Construct the DRT metadata OP_RETURN:
+    // <magic_bytes>
+    // <recovery_address_pk>
+    // <strata_address>
     const MBL: usize = MAGIC_BYTES.len();
-    const TNHL: usize = TapNodeHash::LEN;
-    let mut op_return_data = [0u8; MBL + TNHL + StrataAddress::len_bytes()];
+    const XONLYPK: usize = 32; // X-only PKs are 32-bytes in P2TR SegWit v1 addresses
+    let mut op_return_data = [0u8; MBL + XONLYPK + StrataAddress::len_bytes()];
     op_return_data[..MBL].copy_from_slice(MAGIC_BYTES);
-    op_return_data[MBL..MBL + TNHL]
-        .copy_from_slice(recovery_script_hash.as_raw_hash().as_byte_array());
-    op_return_data[MBL + TNHL..].copy_from_slice(strata_address.as_slice());
+    op_return_data[MBL..MBL + XONLYPK].copy_from_slice(&recovery_address_pk.serialize());
+    op_return_data[MBL + XONLYPK..].copy_from_slice(strata_address.as_slice());
 
     let mut psbt = {
         let mut builder = l1w.build_tx();
