@@ -3,7 +3,7 @@ use std::{str::FromStr, time::Duration};
 use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
-    bitcoin::{taproot::LeafVersion, Address, TapNodeHash, XOnlyPublicKey},
+    bitcoin::{taproot::LeafVersion, Address, ScriptBuf, TapNodeHash, XOnlyPublicKey},
     chain::ChainOracle,
     descriptor::IntoWalletDescriptor,
     miniscript::{miniscript::Tap, Miniscript},
@@ -74,7 +74,7 @@ pub async fn deposit(
         recovery_address.to_string().yellow()
     );
 
-    let (bridge_in_desc, _recovery_script_hash) =
+    let (bridge_in_desc, _recovery_script, _recovery_script_hash) =
         bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
             .expect("valid bridge in descriptor");
 
@@ -174,7 +174,7 @@ pub async fn deposit(
 fn bridge_in_descriptor(
     bridge_pubkey: XOnlyPublicKey,
     recovery_address: Address,
-) -> Result<(DescriptorTemplateOut, TapNodeHash), NotTaprootAddress> {
+) -> Result<(DescriptorTemplateOut, ScriptBuf, TapNodeHash), NotTaprootAddress> {
     let recovery_xonly_pubkey = recovery_address.extract_p2tr_pubkey()?;
 
     let desc = bdk_wallet::descriptor!(
@@ -196,5 +196,33 @@ fn bridge_in_descriptor(
 
     let recovery_script_hash = TapNodeHash::from_script(&recovery_script, LeafVersion::TapScript);
 
-    Ok((desc, recovery_script_hash))
+    Ok((desc, recovery_script, recovery_script_hash))
+}
+
+#[cfg(test)]
+mod tests {
+    use bdk_wallet::bitcoin::{consensus, secp256k1::SECP256K1, Network, Sequence};
+
+    use super::*;
+    use crate::constants::BRIDGE_MUSIG2_PUBKEY;
+
+    #[test]
+    fn bridge_in_descriptor_script() {
+        let bridge_musig2_pubkey = BRIDGE_MUSIG2_PUBKEY.parse::<XOnlyPublicKey>().unwrap();
+        let internal_recovery_pubkey = XOnlyPublicKey::from_slice(&[2u8; 32]).unwrap();
+        let recovery_address =
+            Address::p2tr(SECP256K1, internal_recovery_pubkey, None, Network::Bitcoin);
+        let external_recovery_pubkey = recovery_address.extract_p2tr_pubkey().unwrap();
+        let sequence = Sequence::from_consensus(RECOVER_DELAY);
+        let sequence_hex = consensus::encode::serialize_hex(&sequence);
+
+        let (_bridge_in_descriptor, recovery_script, _recovery_script_hash) =
+            bridge_in_descriptor(bridge_musig2_pubkey, recovery_address).unwrap();
+
+        let expected = format!(
+            "OP_PUSHBYTES_32 {external_recovery_pubkey} OP_CHECKSIGVERIFY OP_PUSHBYTES_2 {sequence_hex:.4} OP_CSV"
+        );
+        let got = recovery_script.to_asm_string();
+        assert_eq!(got, expected);
+    }
 }
