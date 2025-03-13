@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use alloy_consensus::Header;
 use alloy_rpc_types::{serde_helpers::JsonStorageKey, BlockNumHash, EIP1186AccountProofResponse};
@@ -15,7 +18,6 @@ use reth_trie_common::KeccakKeyHasher;
 use revm_primitives::alloy_primitives::{Address, B256};
 use strata_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, EvmBlockStfInput};
 use strata_reth_db::WitnessStore;
-use strata_reth_evm::constants::MAX_ANCESTOR_DEPTH;
 use tracing::{debug, error};
 
 use crate::{
@@ -140,10 +142,10 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
 
     let mut parent_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
     let mut current_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
-    let contracts = accessed_states.accessed_contracts;
+    let contracts = accessed_states.accessed_contracts().clone();
 
     // Accumulate account proof of account in previous block
-    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
+    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts().iter() {
         let slots: Vec<B256> = accessed_slots
             .iter()
             .map(|el| B256::from_slice(&el.to_be_bytes::<32>()))
@@ -162,7 +164,7 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
     }
 
     // Accumulate account proof of account in current block
-    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
+    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts().iter() {
         let slots: Vec<B256> = accessed_slots
             .iter()
             .map(|el| B256::from_slice(&el.to_be_bytes::<32>()))
@@ -186,14 +188,11 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
     )
     .expect("Proof to tries infallible");
 
-    // Get ancestor headers
-    let ancestor_headers = get_ancestor_headers(ctx, current_block_idx)?;
-
-    println!(
-        "Abishek got ancestor_headers: num {:?} {:?}",
-        ancestor_headers.len(),
-        ancestor_headers
-    );
+    let ancestor_headers = get_ancestor_headers(
+        ctx,
+        current_block_idx,
+        accessed_states.accessed_block_idxs(),
+    )?;
 
     let input = EvmBlockStfInput {
         beneficiary: current_block.header.beneficiary,
@@ -213,21 +212,30 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
     Ok(input)
 }
 
-fn get_ancestor_headers<Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>>(
+fn get_ancestor_headers<Node>(
     ctx: &ExExContext<Node>,
-    block_idx: u64,
-) -> eyre::Result<Vec<Header>> {
-    let oldest_parent = block_idx.saturating_sub(MAX_ANCESTOR_DEPTH);
-    let prev_block_idx = block_idx.saturating_sub(1);
-    let provider = ctx.provider();
-    let mut headers = Vec::with_capacity((block_idx - oldest_parent) as usize);
+    current_blk_idx: u64,
+    accessed_block_idxs: &HashSet<u64>,
+) -> eyre::Result<Vec<Header>>
+where
+    Node: FullNodeComponents,
+    Node::Types: NodeTypes<Primitives = EthPrimitives>,
+{
+    let Some(oldest_parent_idx) = accessed_block_idxs.iter().copied().min_by(|a, b| a.cmp(b))
+    else {
+        return Ok(Vec::new());
+    };
 
-    for block_num in (oldest_parent..prev_block_idx).rev() {
-        let block = provider
-            .block_by_number(block_num)?
-            .ok_or_else(|| eyre!("Block not found for block number {block_num}"))?;
-        headers.push(block.header);
-    }
+    let provider = ctx.provider();
+    let headers = (oldest_parent_idx..current_blk_idx.saturating_sub(1))
+        .rev()
+        .map(|block_num| {
+            provider
+                .block_by_number(block_num)?
+                .map(|block| block.header)
+                .ok_or_else(|| eyre!("Block not found for block number {block_num}"))
+        })
+        .collect::<eyre::Result<Vec<_>>>()?;
 
     Ok(headers)
 }
