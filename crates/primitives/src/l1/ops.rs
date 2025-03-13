@@ -89,13 +89,16 @@ pub enum ProtocolOperation {
     Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Arbitrary, Serialize, Deserialize,
 )]
 pub struct DepositInfo {
-    /// Bitcoin amount
+    /// Deposit from tag output, as assigned by operators.
+    pub deposit_idx: u32,
+
+    /// Bitcoin amount.
     pub amt: BitcoinAmount,
 
-    /// outpoint
+    /// Output for deposit funds at rest.
     pub outpoint: OutputRef,
 
-    /// EE address
+    /// Destination address payload.
     pub address: Vec<u8>,
 }
 
