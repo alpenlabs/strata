@@ -5509,8 +5509,6 @@ dependencies = [
  "anyhow",
  "bitcoincore-rpc",
  "corepc-node",
- "strata-bridge-sig-manager",
- "strata-bridge-tx-builder",
  "strata-common",
  "strata-primitives",
  "strata-rocksdb",
@@ -13102,85 +13100,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "strata-bridge-exec"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "borsh",
- "deadpool",
- "format_serde_error",
- "jsonrpsee",
- "serde",
- "strata-bridge-sig-manager",
- "strata-bridge-tx-builder",
- "strata-btcio",
- "strata-common",
- "strata-primitives",
- "strata-rpc-api",
- "strata-rpc-types",
- "thiserror 2.0.11",
- "toml 0.5.11",
- "tracing",
-]
-
-[[package]]
-name = "strata-bridge-relay"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitcoin",
- "sha2 0.10.8",
- "strata-btcio",
- "strata-config",
- "strata-primitives",
- "strata-state",
- "strata-status",
- "strata-storage",
- "strata-tasks",
- "strata-test-utils",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "strata-bridge-rpc-api"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "jsonrpsee",
- "strata-state",
-]
-
-[[package]]
-name = "strata-bridge-sig-manager"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "bitcoin",
- "musig2",
- "strata-bridge-tx-builder",
- "strata-db",
- "strata-primitives",
- "strata-storage",
- "strata-test-utils",
- "thiserror 2.0.11",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "strata-bridge-tx-builder"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "musig2",
- "serde",
- "strata-primitives",
- "strata-test-utils",
- "thiserror 2.0.11",
-]
-
-[[package]]
 name = "strata-btcio"
 version = "0.1.0"
 dependencies = [
@@ -13202,7 +13121,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.8",
- "strata-bridge-tx-builder",
  "strata-common",
  "strata-config",
  "strata-db",
@@ -13265,7 +13183,6 @@ dependencies = [
  "sha2 0.10.8",
  "shrex",
  "sled",
- "strata-bridge-tx-builder",
  "strata-primitives",
  "terrors",
  "tokio",
@@ -13295,8 +13212,6 @@ dependencies = [
  "rockbound",
  "serde",
  "serde_json",
- "strata-bridge-relay",
- "strata-bridge-tx-builder",
  "strata-btcio",
  "strata-common",
  "strata-config",
@@ -13523,7 +13438,6 @@ dependencies = [
  "bitcoin",
  "borsh",
  "musig2",
- "strata-bridge-tx-builder",
  "strata-btcio",
  "strata-primitives",
  "strata-state",
@@ -13583,7 +13497,6 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "sha2 0.10.8",
- "strata-bridge-tx-builder",
  "strata-btcio",
  "strata-l1tx",
  "strata-primitives",
@@ -14010,8 +13923,6 @@ dependencies = [
  "jsonrpsee",
  "serde",
  "serde_with",
- "strata-bridge-sig-manager",
- "strata-bridge-tx-builder",
  "strata-common",
  "strata-db",
  "strata-primitives",
@@ -14124,7 +14035,6 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "sha2 0.10.8",
- "strata-bridge-tx-builder",
  "strata-crypto",
  "strata-primitives",
  "strata-test-utils",

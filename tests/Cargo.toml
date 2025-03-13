@@ -13,8 +13,6 @@ rust.unused_must_use = "deny"
 rustdoc.all = "warn"
 
 [dependencies]
-strata-bridge-sig-manager.workspace = true
-strata-bridge-tx-builder.workspace = true
 strata-common.workspace = true
 strata-primitives.workspace = true
 strata-rocksdb.workspace = true
