@@ -15,6 +15,7 @@ use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::RpcBlockHeader;
 use strata_state::{block::L2Block, chain_state::Chainstate, header::L2Header, id::L2BlockId};
+use strata_zkvm_hosts::get_verification_key;
 use tokio::sync::Mutex;
 use tracing::error;
 
@@ -23,7 +24,7 @@ use super::{
     evm_ee::EvmEeOperator,
     ProvingOp,
 };
-use crate::{errors::ProvingTaskError, hosts, task_tracker::TaskTracker};
+use crate::{errors::ProvingTaskError, task_tracker::TaskTracker};
 
 /// A struct that implements the [`ProvingOp`] trait for Consensus Layer (CL) State Transition
 /// Function (STF) proof generation.
@@ -174,7 +175,7 @@ impl ProvingOp for ClStfOperator {
             .get_proof(&evm_ee_key)
             .map_err(ProvingTaskError::DatabaseError)?
             .ok_or(ProvingTaskError::ProofNotFound(evm_ee_key))?;
-        let evm_ee_vk = hosts::get_verification_key(&evm_ee_key);
+        let evm_ee_vk = get_verification_key(&evm_ee_key);
         let evm_ee_proof_with_vk = (evm_ee_proof, evm_ee_vk);
 
         // Second dependency that is optional is BTC Blockspace Proof
@@ -186,7 +187,7 @@ impl ProvingOp for ClStfOperator {
                     .get_proof(&btc_blockspace_key)
                     .map_err(ProvingTaskError::DatabaseError)?
                     .ok_or(ProvingTaskError::ProofNotFound(evm_ee_key))?;
-                let btc_blockspace_vk = hosts::get_verification_key(&btc_blockspace_key);
+                let btc_blockspace_vk = get_verification_key(&btc_blockspace_key);
                 Ok((btc_blockspace_proof, btc_blockspace_vk))
             })
             .transpose()?;

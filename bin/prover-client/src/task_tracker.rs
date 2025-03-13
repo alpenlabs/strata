@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, HashMap, HashSet};
 use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{errors::ProvingTaskError, status::ProvingTaskStatus};
 
@@ -185,6 +185,8 @@ impl TaskTracker {
                         self.pending_dependencies.remove(&task);
                         if let Some(task_status) = self.tasks.get_mut(&task) {
                             task_status.transition(ProvingTaskStatus::Pending)?;
+                        } else {
+                            warn!(%task, "failed to find dependent task")
                         }
                     }
 
@@ -214,6 +216,19 @@ impl TaskTracker {
                     // The task has failed permanently and is not retriable, so we clean up failed
                     // task counter entry.
                     self.transient_failed_tasks.remove(&id);
+
+                    // If the dependency has failed, the task that depends on the dependency should
+                    // also be marked as Failed
+                    // Otherwise it will stuck on WaitingForDependencies
+                    for (dependent_task, deps) in self.pending_dependencies.iter_mut() {
+                        if deps.remove(&id) {
+                            if let Some(task_status) = self.tasks.get_mut(dependent_task) {
+                                task_status.transition(ProvingTaskStatus::Failed)?;
+                            } else {
+                                warn!(%dependent_task, "failed to find dependent task")
+                            }
+                        }
+                    }
                 }
                 _ => {}
             };

@@ -1,13 +1,16 @@
-use std::sync::Arc;
+use std::{
+    panic::{catch_unwind, AssertUnwindSafe},
+    sync::Arc,
+};
 
 use strata_state::batch::BatchTransition;
 use zkaleido::{
-    AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
-    ZkVmProgramPerf, ZkVmResult,
+    AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmError, ZkVmInputResult,
+    ZkVmProgram, ZkVmProgramPerf, ZkVmResult,
 };
 use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
-use crate::process_checkpoint_proof_outer;
+use crate::process_checkpoint_proof;
 
 pub struct CheckpointProverInput {
     pub cl_stf_proofs: Vec<ProofReceipt>,
@@ -57,10 +60,13 @@ impl ZkVmProgramPerf for CheckpointProgram {}
 
 impl CheckpointProgram {
     pub fn native_host() -> NativeHost {
-        const MOCK_VK: [u32; 8] = [0u32; 8];
+        const MOCK_CL_STF_VK: [u32; 8] = [0u32; 8];
         NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_checkpoint_proof_outer(zkvm, &MOCK_VK);
+                catch_unwind(AssertUnwindSafe(|| {
+                    process_checkpoint_proof(zkvm, &MOCK_CL_STF_VK);
+                }))
+                .map_err(|_| ZkVmError::ExecutionError(Self::name()))?;
                 Ok(())
             })),
         }

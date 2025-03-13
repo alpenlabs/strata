@@ -11,12 +11,13 @@ use strata_proofimpl_checkpoint::program::{CheckpointProgram, CheckpointProverIn
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_api::StrataApiClient;
 use strata_rpc_types::{RpcCheckpointConfStatus, RpcCheckpointInfo};
+use strata_zkvm_hosts::get_verification_key;
 use tokio::sync::Mutex;
 use tracing::{error, info};
 
 use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{
-    checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError, hosts,
+    checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError,
     operators::cl_stf::ClStfParams, task_tracker::TaskTracker,
 };
 
@@ -210,7 +211,7 @@ impl ProvingOp for CheckpointOperator {
         assert!(!deps.is_empty(), "checkpoint must have some CL STF proofs");
 
         let cl_stf_key = ProofKey::new(deps[0], *task_id.host());
-        let cl_stf_vk = hosts::get_verification_key(&cl_stf_key);
+        let cl_stf_vk = get_verification_key(&cl_stf_key);
 
         let mut cl_stf_proofs = Vec::with_capacity(deps.len());
         for dep in deps {
