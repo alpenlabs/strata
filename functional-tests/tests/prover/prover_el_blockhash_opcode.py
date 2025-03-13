@@ -3,16 +3,16 @@ from solcx import install_solc, set_solc_version
 from web3 import Web3
 
 from envs import testenv
-from load.reth.transaction import SmartContracts
 from utils import (
     el_slot_to_block_commitment,
     wait_for_proof_with_time_out,
     wait_until_with_value,
 )
+from utils.transaction import SmartContracts
 
 
 @flexitest.register
-class ElShaPrecompileTest(testenv.StrataTester):
+class ElBlockhashOpcodeTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         install_solc(version="0.8.16")
         set_solc_version("0.8.16")

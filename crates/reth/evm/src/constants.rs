@@ -16,6 +16,3 @@ pub const BASEFEE_ADDRESS: Address = address!("540000000000000000000000000000000
 
 /// The address to send transaction priority fees to.
 pub const COINBASE_ADDRESS: Address = address!("5400000000000000000000000000000000000011");
-
-/// The maximum depth of the ancestor chain that can be accessed by BLOCKHASH opcode.
-pub const MAX_ANCESTOR_DEPTH: u64 = 256;
