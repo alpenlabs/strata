@@ -25,7 +25,11 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
     """This tests sync when el is missing blocks"""
 
     def __init__(self, ctx: flexitest.InitContext):
-        ctx.set_env(testenv.BasicEnvConfig(101))
+        ctx.set_env(
+            testenv.BasicEnvConfig(
+                101, prover_client_settings=ProverClientSettings.new_with_proving()
+            )
+        )
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
