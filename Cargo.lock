@@ -5505,19 +5505,6 @@ dependencies = [
 [[package]]
 name = "integration-tests"
 version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitcoincore-rpc",
- "corepc-node",
- "strata-common",
- "strata-primitives",
- "strata-rocksdb",
- "strata-storage",
- "strata-test-utils",
- "threadpool",
- "tokio",
- "tracing",
-]
 
 [[package]]
 name = "interprocess"

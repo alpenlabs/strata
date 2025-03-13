@@ -20,7 +20,6 @@ use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable, TxSigningData},
     l1::{BitcoinPsbt, BitcoinTxOut, OutputRef, TaprootSpendPath},
 };
-use strata_storage::ops::bridge::{BridgeTxStateOps, Context};
 use threadpool::ThreadPool;
 
 /// Generate `count` (public key, private key) pairs as two separate [`Vec`].
@@ -152,16 +151,6 @@ pub fn generate_mock_tx_signing_data(keys_spend_only: bool) -> TxSigningData {
     let psbt = BitcoinPsbt::from(psbt);
 
     TxSigningData { psbt, spend_path }
-}
-
-/// Create mock database ops to interact with the bridge tx state in a stubbed in-memory database.
-pub fn generate_mock_tx_state_ops(num_threads: usize) -> BridgeTxStateOps {
-    let storage = StubTxStateDb::default();
-    let storage_ctx = Context::new(Arc::new(storage));
-
-    let pool = ThreadPool::new(num_threads);
-
-    storage_ctx.into_ops(pool)
 }
 
 /// Generate a MuSig2 sec nonce.
