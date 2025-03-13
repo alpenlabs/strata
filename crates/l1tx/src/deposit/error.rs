@@ -2,26 +2,31 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum DepositParseError {
-    #[error("No OP_RETURN")]
-    NoOpReturn,
+    #[error("missing tag")]
+    MissingTag,
 
-    #[error("No data")]
+    /// What is this used for?
+    #[error("no data")]
     NoData,
 
-    #[error("no magic bytes")]
-    NoMagicBytes,
+    /// We don't accept nonstandard deposit things.
+    #[error("tag too large")]
+    TagOversized,
 
-    #[error("magic bytes mismatch")]
-    MagicBytesMismatch,
+    #[error("missing magic bytes")]
+    MissingMagic,
 
-    #[error("no address found")]
-    NoDestAddress,
+    #[error("invalid magic bytes")]
+    InvalidMagic,
 
-    #[error("invalid destination Address length {0}")]
-    InvalidDestAddress(u8),
+    #[error("missing destination")]
+    MissingDest,
+
+    #[error("invalid destination length {0}")]
+    InvalidDestLen(u8),
 
     #[error("unexpected amount (exp {0}, found {1}) ")]
-    ExpectedAmount(u64, u64),
+    UnexpectedAmt(u64, u64),
 
     #[error("no leaf hash found")]
     NoLeafHash,
@@ -29,6 +34,7 @@ pub enum DepositParseError {
     #[error("expected 32 byte leaf Hash")]
     LeafHashLenMismatch,
 
-    #[error("no taproot script")]
-    NoP2TR,
+    /// Previously called "NoP2TR" which was really ambiguous.
+    #[error("invalid deposit output")]
+    InvalidDepositOutput,
 }

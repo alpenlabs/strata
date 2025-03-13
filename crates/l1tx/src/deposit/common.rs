@@ -17,12 +17,12 @@ pub fn check_magic_bytes(
     // magic bytes
     if let Some(magic_bytes) = next_bytes(instructions) {
         if magic_bytes != config.magic_bytes {
-            return Err(DepositParseError::MagicBytesMismatch);
+            return Err(DepositParseError::InvalidMagic);
         }
         return Ok(());
     }
 
-    Err(DepositParseError::NoMagicBytes)
+    Err(DepositParseError::MissingMagic)
 }
 
 /// extracts the Execution environment bytes(most possibly EVM bytes)
@@ -33,11 +33,11 @@ pub fn extract_ee_bytes<'a>(
     match next_bytes(instructions) {
         Some(ee_bytes) => {
             if ee_bytes.len() as u8 != config.address_length {
-                return Err(DepositParseError::InvalidDestAddress(ee_bytes.len() as u8));
+                return Err(DepositParseError::InvalidDestLen(ee_bytes.len() as u8));
             }
             Ok(ee_bytes)
         }
-        None => Err(DepositParseError::NoDestAddress),
+        None => Err(DepositParseError::MissingDest),
     }
 }
 
@@ -76,7 +76,7 @@ mod tests {
         let mut instructions = script.instructions();
 
         let result = check_magic_bytes(&mut instructions, &config);
-        assert!(matches!(result, Err(DepositParseError::MagicBytesMismatch)));
+        assert!(matches!(result, Err(DepositParseError::InvalidMagic)));
     }
 
     #[test]
@@ -86,7 +86,7 @@ mod tests {
         let mut instructions = script.instructions();
 
         let result = check_magic_bytes(&mut instructions, &config);
-        assert!(matches!(result, Err(DepositParseError::NoMagicBytes)));
+        assert!(matches!(result, Err(DepositParseError::MissingMagic)));
     }
 
     #[test]
@@ -115,10 +115,7 @@ mod tests {
         let mut instructions = script.instructions();
 
         let result = extract_ee_bytes(&mut instructions, &config);
-        assert!(matches!(
-            result,
-            Err(DepositParseError::InvalidDestAddress(_))
-        ));
+        assert!(matches!(result, Err(DepositParseError::InvalidDestLen(_))));
     }
 
     #[test]
@@ -128,6 +125,6 @@ mod tests {
         let mut instructions = script.instructions();
 
         let result = extract_ee_bytes(&mut instructions, &config);
-        assert!(matches!(result, Err(DepositParseError::NoDestAddress)));
+        assert!(matches!(result, Err(DepositParseError::MissingDest)));
     }
 }

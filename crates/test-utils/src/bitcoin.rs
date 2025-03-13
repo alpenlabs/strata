@@ -110,8 +110,9 @@ pub fn build_test_deposit_request_script(
     builder.into_script()
 }
 
-pub fn build_test_deposit_script(magic: Vec<u8>, dest_addr: Vec<u8>) -> ScriptBuf {
+pub fn build_test_deposit_script(magic: Vec<u8>, idx: u32, dest_addr: Vec<u8>) -> ScriptBuf {
     let mut data = magic;
+    data.extend(&idx.to_be_bytes()[..]);
     data.extend(dest_addr);
 
     let builder = script::Builder::new()
