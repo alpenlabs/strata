@@ -270,7 +270,11 @@ mod test {
                     },
                     "test: dest should match for transaction {i}",
                 );
-                assert_eq!(deposit_info.idx, [idx1, idx2][i], "test: idx should match");
+                assert_eq!(
+                    deposit_info.deposit_idx,
+                    [idx1, idx2][i],
+                    "test: idx should match"
+                );
                 assert_eq!(
                     deposit_info.amt,
                     BitcoinAmount::from_sat(deposit_config.deposit_amount),
