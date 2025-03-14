@@ -1,3 +1,4 @@
+import logging
 import time
 
 import flexitest

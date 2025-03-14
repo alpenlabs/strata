@@ -1,5 +1,6 @@
-import flexitest
 import logging
+
+import flexitest
 
 from envs import net_settings, testenv
 from mixins.bridge_out_precompile_contract_mixin import BridgePrecompileMixin
