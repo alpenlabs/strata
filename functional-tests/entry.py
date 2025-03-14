@@ -97,7 +97,6 @@ def main(argv):
         "fullnode": fullnode_fac,
         "reth": reth_fac,
         "prover_client": prover_client_fac,
-        "bridge_client": bridge_client_fac,
         "load_generator": load_gen_fac,
     }
 
