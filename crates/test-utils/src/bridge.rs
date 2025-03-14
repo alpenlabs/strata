@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashSet};
 
 use arbitrary::{Arbitrary, Unstructured};
 use bitcoin::{
@@ -15,12 +12,10 @@ use bitcoin::{
 };
 use musig2::{KeyAggContext, SecNonce};
 use rand::{rngs::OsRng, seq::SliceRandom, RngCore};
-use strata_db::stubs::bridge::StubTxStateDb;
 use strata_primitives::{
     bridge::{OperatorIdx, PublickeyTable, TxSigningData},
     l1::{BitcoinPsbt, BitcoinTxOut, OutputRef, TaprootSpendPath},
 };
-use threadpool::ThreadPool;
 
 /// Generate `count` (public key, private key) pairs as two separate [`Vec`].
 pub fn generate_keypairs(count: usize) -> (Vec<PublicKey>, Vec<SecretKey>) {
