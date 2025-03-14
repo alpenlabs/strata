@@ -490,12 +490,12 @@ impl StrataApiServer for StrataRpcImpl {
     }
 
     async fn get_msgs_by_scope(&self, _scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
-        warn!("call to get_msgs_by_scope, bridge relay system derecated");
+        warn!("call to get_msgs_by_scope, bridge relay system deprecated");
         Ok(Vec::new())
     }
 
     async fn submit_bridge_msg(&self, _raw_msg: HexBytes) -> RpcResult<()> {
-        warn!("call to submit_bridge_msg, bridge relay system derecated");
+        warn!("call to submit_bridge_msg, bridge relay system deprecated");
         Ok(())
     }
 
