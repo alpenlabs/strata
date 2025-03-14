@@ -174,7 +174,11 @@ def wait_until_next_chain_epoch(rpc, **kwargs) -> int:
     init_epoch = rpc.strata_syncStatus()["cur_epoch"]
 
     def _query():
-        return rpc.strata_syncStatus()["cur_epoch"]
+        ss = rpc.strata_syncStatus()
+        slot = ss["tip_height"]
+        safe_l1 = ss["safe_l1_block"]["height"]
+        logging.info(f"waiting for next epoch (cur slot {slot}, safe L1 {safe_l1})")
+        return ss["cur_epoch"]
 
     def _check(epoch):
         return epoch > init_epoch
