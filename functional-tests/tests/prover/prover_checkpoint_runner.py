@@ -1,3 +1,4 @@
+import logging
 import time
 
 import flexitest
@@ -48,12 +49,14 @@ class ProverCheckpointRunnerTest(testenv.StrataTester):
             error_with="Prover did not start on time",
         )
 
+        def _ck1():
+            ckpt_idx = sequencer_rpc.strata_getLatestCheckpointIndex()
+            logging.info(f"cur checkpoint idx: {ckpt_idx}")
+            return ckpt_idx == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"]
+
         # Wait until the required number of consecutive checkpoint proofs are generated and verified
         wait_until(
-            lambda: (
-                sequencer_rpc.strata_getLatestCheckpointIndex()
-                == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"]
-            ),
+            _ck1,
             timeout=PROVER_CHECKPOINT_SETTINGS["PROVER_TIMEOUT_SECONDS"],
         )
 
@@ -64,12 +67,14 @@ class ProverCheckpointRunnerTest(testenv.StrataTester):
         sequencer.start()
         sequencer_rpc = sequencer.create_rpc()
 
+        def _ck2():
+            ckpt_idx = sequencer_rpc.strata_getLatestCheckpointIndex()
+            logging.info(f"cur checkpoint idx: {ckpt_idx}")
+            return ckpt_idx == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"] * 2
+
         # Wait until another portion of consecutive proofs are generated and verified
         # after the restart of the sequencer.
         wait_until(
-            lambda: (
-                sequencer_rpc.strata_getLatestCheckpointIndex()
-                == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"] * 2
-            ),
+            _ck2,
             timeout=PROVER_CHECKPOINT_SETTINGS["PROVER_TIMEOUT_SECONDS"],
         )
