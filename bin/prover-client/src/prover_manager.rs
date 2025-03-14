@@ -1,13 +1,14 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use strata_primitives::proof::{ProofKey, ProofZkVm};
+use strata_db::traits::ProofDatabase;
+use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::{spawn, sync::Mutex, time::sleep};
 use tracing::{error, info};
 
 use crate::{
-    errors::ProvingTaskError, operators::ProofOperator, retry_policy::ExponentialBackoff,
-    status::ProvingTaskStatus, task_tracker::TaskTracker,
+    checkpoint_runner::errors::CheckpointError, errors::ProvingTaskError, operators::ProofOperator,
+    retry_policy::ExponentialBackoff, status::ProvingTaskStatus, task_tracker::TaskTracker,
 };
 
 #[derive(Debug, Clone)]
@@ -136,17 +137,39 @@ async fn make_proof(
     }
 
     info!(?task, ?delay_seconds, "start proving the task");
-    let res = operator.process_proof(&task, &db).await;
 
-    {
-        let mut task_tracker = task_tracker.lock().await;
-        match res {
-            Ok(_) => task_tracker.update_status(task, ProvingTaskStatus::Completed)?,
-            Err(e) => task_tracker.update_status(task, handle_task_error(task, e))?,
+    // Check if the proof already exists and do the proving only if it doesn't.
+    // N.B. Currently, it can only happen if checkpoint submit is being retried.
+    let mut proving_task_res = {
+        if let Ok(Some(_)) = db.get_proof(&task) {
+            Ok(())
+        } else {
+            operator.process_proof(&task, &db).await
+        }
+    };
+
+    // If the task is a Checkpoint, try to submit checkpoint proof back to the sequencer.
+    if let ProofContext::Checkpoint(checkpoint_index, ..) = task.context() {
+        if proving_task_res.is_ok() {
+            proving_task_res = operator
+                .checkpoint_operator()
+                .submit_checkpoint_proof(*checkpoint_index, &task, &db)
+                .await
+                .map_err(handle_checkpoint_error);
         }
     }
 
-    Ok(())
+    // Determine the next status for the task given the result.
+    let new_status = match proving_task_res {
+        Ok(_) => ProvingTaskStatus::Completed,
+        Err(e) => handle_task_error(task, e),
+    };
+
+    // Update the task status.
+    {
+        let mut task_tracker = task_tracker.lock().await;
+        task_tracker.update_status(task, new_status)
+    }
 }
 
 /// Handles the task error by determining the next status based on [`ProvingTaskError`] nature.
@@ -163,5 +186,17 @@ fn handle_task_error(task: ProofKey, e: ProvingTaskError) -> ProvingTaskStatus {
             error!(?task, ?e, "proving task failed");
             ProvingTaskStatus::Failed
         }
+    }
+}
+
+/// Handles the checkpoint submit error by converting it to the appropriate [`ProvingTaskError`].
+/// Then, the [`ProvingTaskError`] is handled as usual.
+fn handle_checkpoint_error(chkpt_err: CheckpointError) -> ProvingTaskError {
+    match chkpt_err {
+        CheckpointError::FetchError(error) | CheckpointError::SubmitProofError { error, .. } => {
+            ProvingTaskError::RpcError(error)
+        }
+        CheckpointError::CheckpointNotFound(_) => ProvingTaskError::WitnessNotFound,
+        CheckpointError::ProofErr(proving_task_error) => proving_task_error,
     }
 }
