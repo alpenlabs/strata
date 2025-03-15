@@ -203,20 +203,20 @@ pub trait StrataSequencerApi {
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
 
-    #[method(name = "strata_getSequencerDuties")]
+    #[method(name = "strataadmin_getSequencerDuties")]
     async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>>;
 
-    #[method(name = "strata_getBlockTemplate")]
+    #[method(name = "strataadmin_getBlockTemplate")]
     async fn get_block_template(&self, config: BlockGenerationConfig) -> RpcResult<BlockTemplate>;
 
-    #[method(name = "strata_completeBlockTemplate")]
+    #[method(name = "strataadmin_completeBlockTemplate")]
     async fn complete_block_template(
         &self,
         template_id: L2BlockId,
         completion: BlockCompletionData,
     ) -> RpcResult<L2BlockId>;
 
-    #[method(name = "strata_completeCheckpointSignature")]
+    #[method(name = "strataadmin_completeCheckpointSignature")]
     async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()>;
 }
 
