@@ -19,12 +19,28 @@ pub struct CacheDBProvider {
     accounts: RefCell<HashMap<Address, AccountInfo>>,
     storage: RefCell<HashMap<Address, HashMap<U256, U256>>>,
     bytecodes: RefCell<HashSet<Bytes>>,
+    accessed_blkd_ids: RefCell<HashSet<u64>>,
 }
 
 #[derive(Debug)]
 pub struct AccessedState {
-    pub accessed_accounts: HashMap<Address, Vec<Uint<256, 4>>>,
-    pub accessed_contracts: Vec<Bytes>,
+    accessed_accounts: HashMap<Address, Vec<Uint<256, 4>>>,
+    accessed_contracts: Vec<Bytes>,
+    accessed_block_idxs: HashSet<u64>,
+}
+
+impl AccessedState {
+    pub fn accessed_block_idxs(&self) -> &HashSet<u64> {
+        &self.accessed_block_idxs
+    }
+
+    pub fn accessed_accounts(&self) -> &HashMap<Address, Vec<Uint<256, 4>>> {
+        &self.accessed_accounts
+    }
+
+    pub fn accessed_contracts(&self) -> &Vec<Bytes> {
+        &self.accessed_contracts
+    }
 }
 
 impl CacheDBProvider {
@@ -34,6 +50,7 @@ impl CacheDBProvider {
             accounts: Default::default(),
             storage: Default::default(),
             bytecodes: Default::default(),
+            accessed_blkd_ids: Default::default(),
         }
     }
 
@@ -44,6 +61,7 @@ impl CacheDBProvider {
         AccessedState {
             accessed_accounts,
             accessed_contracts,
+            accessed_block_idxs: self.accessed_blkd_ids.borrow().clone(),
         }
     }
 
@@ -130,8 +148,13 @@ impl DatabaseRef for CacheDBProvider {
 
     /// Get block hash by block number.
     fn block_hash_ref(&self, number: u64) -> Result<B256, Self::Error> {
-        self.provider
+        let blk_id = self
+            .provider
             .block_hash(number)?
-            .ok_or(ProviderError::BlockBodyIndicesNotFound(number))
+            .ok_or(ProviderError::BlockBodyIndicesNotFound(number))?;
+
+        self.accessed_blkd_ids.borrow_mut().insert(number);
+
+        Ok(blk_id)
     }
 }
