@@ -13,4 +13,3 @@
 //! Apparently, `clippy` isn't smart enough for that kind of analysis.
 
 pub(crate) mod bitcoind;
-pub(crate) mod bridge;

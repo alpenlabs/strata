@@ -1,9 +1,5 @@
 [workspace]
 members = [
-  "crates/bridge-exec",
-  "crates/bridge-relay",
-  "crates/bridge-sig-manager",
-  "crates/bridge-tx-builder",
   "crates/btcio",
   "crates/chaintsn",
   "crates/common",
@@ -27,7 +23,6 @@ members = [
   "crates/reth/node",
   "crates/reth/rpc",
   "crates/rpc/api",
-  "crates/rpc/bridge-api",
   "crates/rpc/prover-client-api",
   "crates/rpc/types",
   "crates/rpc/utils",
@@ -45,7 +40,6 @@ members = [
   "provers/sp1",
 
   # binaries listed separately
-  "bin/bridge-client",
   "bin/datatool",
   "bin/strata-cli",
   "bin/strata-client",
@@ -60,22 +54,17 @@ members = [
 ]
 
 default-members = [
-  "bin/bridge-client",
   "bin/datatool",
   "bin/prover-client",
   "bin/strata-reth",
   "bin/strata-client",
   "bin/strata-sequencer-client",
+  "crates/util/python-utils",
 ]
 
 resolver = "2"
 
 [workspace.dependencies]
-strata-bridge-exec = { path = "crates/bridge-exec" }
-strata-bridge-relay = { path = "crates/bridge-relay" }
-strata-bridge-rpc-api = { path = "crates/rpc/bridge-api" }
-strata-bridge-sig-manager = { path = "crates/bridge-sig-manager" }
-strata-bridge-tx-builder = { path = "crates/bridge-tx-builder" }
 strata-btcio = { path = "crates/btcio" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }

@@ -167,11 +167,14 @@ impl ForkChoiceManager {
             return false;
         }
 
-        if epoch.epoch() <= last_finalized_epoch.epoch()
-            || epoch.last_slot() <= last_finalized_epoch.last_slot()
-        {
-            warn!(?last_finalized_epoch, received = ?epoch, "received invalid or out of order epoch");
-            return false;
+        // Some checks to make sure we don't go backwards.
+        if last_finalized_epoch.last_slot() > 0 {
+            let epoch_advances = epoch.epoch() > last_finalized_epoch.epoch();
+            let block_advances = epoch.last_slot() > last_finalized_epoch.last_slot();
+            if !epoch_advances || !block_advances {
+                warn!(?last_finalized_epoch, received = ?epoch, "received invalid or out of order epoch");
+                return false;
+            }
         }
 
         self.epochs_pending_finalization.push_back(epoch);

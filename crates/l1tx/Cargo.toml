@@ -4,7 +4,6 @@ name = "strata-l1tx"
 version = "0.1.0"
 
 [dependencies]
-strata-bridge-tx-builder.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
 

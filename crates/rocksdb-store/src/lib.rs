@@ -1,4 +1,3 @@
-pub mod bridge;
 pub mod bridge_relay;
 pub mod broadcaster;
 pub mod chain_state;
@@ -22,10 +21,6 @@ pub mod test_utils;
 
 use std::{fs, path::Path, sync::Arc};
 
-use bridge::schemas::{
-    BridgeDutyCheckpointSchema, BridgeDutyStatusSchema, BridgeDutyTxidSchema, BridgeTxStateSchema,
-    BridgeTxStateTxidSchema,
-};
 pub const PROVER_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     SequenceSchema::COLUMN_FAMILY_NAME,
     prover::schemas::ProofSchema::COLUMN_FAMILY_NAME,
@@ -94,17 +89,6 @@ pub const STORE_COLUMN_FAMILIES: &[ColumnFamilyName] = &[
     // Bridge relay schemas
     BridgeMsgIdSchema::COLUMN_FAMILY_NAME,
     ScopeMsgIdSchema::COLUMN_FAMILY_NAME,
-
-    // Bridge signature schemas
-    BridgeTxStateTxidSchema::COLUMN_FAMILY_NAME,
-    BridgeTxStateSchema::COLUMN_FAMILY_NAME,
-
-    // Bridge duty schemas
-    BridgeDutyTxidSchema::COLUMN_FAMILY_NAME,
-    BridgeDutyStatusSchema::COLUMN_FAMILY_NAME,
-
-    // Bridge duty checkpoint
-    BridgeDutyCheckpointSchema::COLUMN_FAMILY_NAME,
 
     // Checkpoint schemas
     CheckpointSchema::COLUMN_FAMILY_NAME,

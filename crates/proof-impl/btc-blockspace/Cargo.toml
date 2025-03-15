@@ -4,17 +4,17 @@ name = "strata-proofimpl-btc-blockspace"
 version = "0.1.0"
 
 [dependencies]
-bitcoin = { workspace = true, features = ["serde"] }
-borsh.workspace = true
-digest.workspace = true
-serde = { workspace = true, features = ["derive"] }
-sha2.workspace = true
-strata-bridge-tx-builder.workspace = true
 strata-l1tx.workspace = true
 strata-primitives.workspace = true
 strata-state.workspace = true
 zkaleido.workspace = true
 zkaleido-native-adapter.workspace = true
+
+bitcoin = { workspace = true, features = ["serde"] }
+borsh.workspace = true
+digest.workspace = true
+serde = { workspace = true, features = ["derive"] }
+sha2.workspace = true
 
 [dev-dependencies]
 hex.workspace = true

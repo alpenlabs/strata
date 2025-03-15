@@ -364,66 +364,6 @@ class ProverClientFactory(flexitest.Factory):
         return svc
 
 
-class BridgeClientFactory(flexitest.Factory):
-    def __init__(self, port_range: list[int]):
-        super().__init__(port_range)
-        self._next_idx = 1
-
-    def next_idx(self) -> int:
-        idx = self._next_idx
-        self._next_idx += 1
-        return idx
-
-    @flexitest.with_ectx("ctx")
-    def create_operator(
-        self,
-        master_xpriv: str,
-        node_url: str,
-        bitcoind_config: BitcoindConfig,
-        ctx: flexitest.EnvContext,
-        message_interval: int,
-        duty_timeout_duration: int,
-    ):
-        idx = self.next_idx()
-        name = f"bridge.{idx}"
-        datadir = ctx.make_service_dir(name)
-        rpc_host = "127.0.0.1"
-        rpc_port = self.next_port()
-        logfile = os.path.join(datadir, "service.log")
-
-        # fmt: off
-        cmd = [
-            "strata-bridge-client",
-            "operator",
-            "--datadir", datadir,
-            "--master-xpriv", master_xpriv,
-            "--rpc-host", rpc_host,
-            "--rpc-port", str(rpc_port),
-            "--btc-url", "http://" + bitcoind_config.rpc_url,
-            "--btc-user", bitcoind_config.rpc_user,
-            "--btc-pass", bitcoind_config.rpc_password,
-            "--rollup-url", node_url,
-            "--message-interval", str(message_interval),
-            "--duty-timeout-duration", str(duty_timeout_duration),
-        ]
-        # fmt: on
-
-        # TODO add a way to expose this
-        # TODO remove this after adding a proper config file
-        # ruff: noqa: F841
-        envvars = {
-            "STRATA_OP_MASTER_XPRIV": master_xpriv,
-        }
-
-        props = {"id": idx, "rpc_host": rpc_host, "rpc_port": rpc_port}
-        rpc_url = f"ws://localhost:{rpc_port}"
-
-        svc = flexitest.service.ProcService(props, cmd, stdout=logfile)
-        svc.start()
-        _inject_service_create_rpc(svc, rpc_url, name)
-        return svc
-
-
 class LoadGeneratorFactory(flexitest.Factory):
     def __init__(self, port_range: list[int]):
         super().__init__(port_range)

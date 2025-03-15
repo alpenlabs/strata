@@ -14,24 +14,6 @@ x-base-reth: &base-reth
   networks:
     - strata_network
 
-x-base-bridge-client: &base-bridge-client
-  build:
-    context: ../
-    dockerfile: ./docker/bridge-client/Dockerfile
-  image: "strata_bridge_client:v0.1.0"
-  environment:
-    BTC_URL: "http://bitcoind:18443"
-    BTC_USER: rpcuser
-    BTC_PASS: rpcpassword
-    RPC_HOST: "0.0.0.0"
-    RPC_PORT: 4781 # default
-    ROLLUP_URL: "ws://sequencer:8432"
-    DATADIR: .data # default
-  networks:
-    - strata_network
-  depends_on:
-    - sequencer
-
 x-base-prover: &base-prover
   build:
     context: ../
@@ -139,7 +121,6 @@ services:
       "--enable-checkpoint-runner", "true"
     ]
 
-
   fullnode:
     <<: *base-client
     container_name: strata_fullnode
@@ -170,9 +151,6 @@ services:
       BITCOIND_RPC_USER: rpcuser
       BITCOIND_RPC_PASSWORD: rpcpassword
       BITCOIND_WALLET: default
-      BRIDGE_WALLET_1: bridge_0
-      BRIDGE_WALLET_2: bridge_1
-      BRIDGE_WALLET_3: bridge_2
       GENERATE_BLOCKS: 4 # if env is set then blocks are generated. the number is number of seconds between L1 blocks / 4
     container_name: strata_bitcoind
     volumes:
@@ -182,29 +160,6 @@ services:
       - "18443:18443"
     networks:
       - strata_network
-
-
-  bridge-client-1:
-    <<: *base-bridge-client
-    container_name: bridge-client-1
-    volumes:
-      - ./configs/operator1.bin:/app/.secrets/xpriv.bin
-      - ./.data/bridge-client-1:/app/.data
-    ports:
-      - 4781:4781
-    profiles:
-      - bridge
-
-  bridge-client-2:
-    <<: *base-bridge-client
-    container_name: bridge-client-2
-    volumes:
-      - ./configs/operator2.bin:/app/.secrets/xpriv.bin
-      - ./.data/bridge-client-2:/app/.data
-    ports:
-      - 4782:4781
-    profiles:
-      - bridge
 
 networks:
   strata_network:

@@ -3,12 +3,14 @@ use std::path::PathBuf;
 use bitcoin::Network;
 use serde::{Deserialize, Serialize};
 
-use crate::{bridge::RelayerConfig, btcio::BtcioConfig};
+use crate::btcio::BtcioConfig;
 
 /// Default value for `rpc_port` in [`ClientConfig`].
 const DEFAULT_RPC_PORT: u16 = 8542;
+
 /// Default value for `p2p_port` in [`ClientConfig`].
 const DEFAULT_P2P_PORT: u16 = 8543;
+
 /// Default value for `datadir` in [`ClientConfig`].
 const DEFAULT_DATADIR: &str = "strata-data";
 
@@ -94,7 +96,6 @@ pub struct Config {
     pub btcio: BtcioConfig,
     pub sync: SyncConfig,
     pub exec: ExecConfig,
-    pub relayer: RelayerConfig,
 }
 
 #[cfg(test)]
@@ -141,11 +142,6 @@ mod test {
 
             [btcio.broadcaster]
             poll_interval_ms = 1000
-
-            [relayer]
-            refresh_interval = 10
-            stale_duration = 120
-            relay_misc = true
         "#;
 
         let config = toml::from_str::<Config>(config_string_sequencer);

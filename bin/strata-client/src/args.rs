@@ -143,8 +143,8 @@ mod test {
 
     use bitcoin::Network;
     use strata_config::{
-        bridge::RelayerConfig, btcio::BtcioConfig, BitcoindConfig, ClientConfig, Config,
-        ExecConfig, RethELConfig, SyncConfig,
+        btcio::BtcioConfig, BitcoindConfig, ClientConfig, Config, ExecConfig, RethELConfig,
+        SyncConfig,
     };
 
     use super::*;
@@ -179,11 +179,6 @@ mod test {
                     rpc_url: "".to_string(),
                     secret: "".into(),
                 },
-            },
-            relayer: RelayerConfig {
-                refresh_interval: 1,
-                stale_duration: 2,
-                relay_misc: false,
             },
             sync: SyncConfig {
                 l1_follow_distance: 1,

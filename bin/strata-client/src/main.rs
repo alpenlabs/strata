@@ -7,7 +7,6 @@ use el_sync::sync_chainstate_to_el;
 use errors::InitError;
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
-use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     reader::query::bitcoin_data_reader_task,
@@ -50,7 +49,6 @@ use crate::{args::Args, helpers::*};
 mod args;
 mod el_sync;
 mod errors;
-mod extractor;
 mod helpers;
 mod network;
 mod rpc_client;
@@ -230,7 +228,6 @@ pub struct CoreContext {
     pub sync_manager: Arc<SyncManager>,
     pub status_channel: StatusChannel,
     pub engine: Arc<RpcExecEngineCtl<EngineRpcClient>>,
-    pub relayer_handle: Arc<RelayerHandle>,
     pub bitcoin_client: Arc<BitcoinClient>,
 }
 
@@ -305,7 +302,7 @@ fn start_core_tasks(
     params: Arc<Params>,
     database: Arc<CommonDb>,
     storage: Arc<NodeStorage>,
-    bridge_msg_ops: Arc<BridgeMsgOps>,
+    _bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
     let runtime = executor.handle().clone();
@@ -347,14 +344,6 @@ fn start_core_tasks(
         ),
     );
 
-    // Start relayer task.
-    let relayer_handle = strata_bridge_relay::relayer::start_bridge_relayer_task(
-        bridge_msg_ops,
-        status_channel.clone(),
-        config.relayer,
-        executor,
-    );
-
     Ok(CoreContext {
         runtime,
         database,
@@ -364,7 +353,6 @@ fn start_core_tasks(
         sync_manager,
         status_channel,
         engine,
-        relayer_handle,
         bitcoin_client,
     })
 }
@@ -489,7 +477,6 @@ async fn start_rpc(
         storage,
         sync_manager,
         status_channel,
-        relayer_handle,
         ..
     } = ctx;
 
@@ -501,7 +488,6 @@ async fn start_rpc(
         sync_manager.clone(),
         storage.clone(),
         checkpoint_handle,
-        relayer_handle.clone(),
     );
     methods.merge(strata_rpc.into_rpc())?;
 
