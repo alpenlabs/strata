@@ -9,10 +9,13 @@ on:
       environment:
         description: "Select environment"
         required: true
-        default: "staging"
+        default: "testnet1_staging"
         type: choice
         options:
-          - staging
+          # Env that corresponds to the releases/0.2.0 branch
+          - testnet1_staging
+          # Env that corresponds to the main branch
+          - development
 
 env:
   CI: false
@@ -28,7 +31,7 @@ jobs:
       id-token: write
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'staging') }}
+    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'development') }}
     strategy:
       matrix:
         # The names of the programs must match the names of the directories that we
@@ -124,7 +127,7 @@ jobs:
     name: Update Helm Values
     needs: [build-and-push]
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'staging') }}
+    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'development') }}
     steps:
       - name: Set up SSH for private repo access
         uses: webfactory/ssh-agent@v0.9.0
