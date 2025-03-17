@@ -156,11 +156,17 @@ impl ForkChoiceManager {
         self.cur_chainstate.finalized_epoch()
     }
 
-    fn attach_epoch_pending_finalization(&mut self, epoch: EpochCommitment) -> bool {
-        let last_finalized_epoch = self
-            .epochs_pending_finalization
+    /// Gets the most recently finalized epoch, even if it's one that we haven't
+    /// accepted as a new base yet due to missing intermediary blocks.
+    fn get_most_recently_finalized_epoch(&self) -> &EpochCommitment {
+        self.epochs_pending_finalization
             .back()
-            .unwrap_or(self.chain_tracker.finalized_epoch());
+            .unwrap_or(self.chain_tracker.finalized_epoch())
+    }
+
+    /// Does handling to accept a new un
+    fn attach_epoch_pending_finalization(&mut self, epoch: EpochCommitment) -> bool {
+        let last_finalized_epoch = self.get_most_recently_finalized_epoch();
 
         if epoch.is_null() {
             warn!("tried to finalize null epoch");
