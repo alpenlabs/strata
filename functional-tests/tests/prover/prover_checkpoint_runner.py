@@ -54,7 +54,7 @@ class ProverCheckpointRunnerTest(testenv.StrataTester):
         logging.info(f"it's now epoch {epoch}")
 
         def _ck1():
-            ckpt_idx = sequencer_rpc.strata_getLatestCheckpointIndex()
+            ckpt_idx = sequencer_rpc.strata_getLatestCheckpointIndex(True)
             logging.info(f"cur checkpoint idx: {ckpt_idx}")
             return ckpt_idx == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"]
 
@@ -72,7 +72,7 @@ class ProverCheckpointRunnerTest(testenv.StrataTester):
         sequencer_rpc = sequencer.create_rpc()
 
         def _ck2():
-            ckpt_idx = sequencer_rpc.strata_getLatestCheckpointIndex()
+            ckpt_idx = sequencer_rpc.strata_getLatestCheckpointIndex(True)
             logging.info(f"cur checkpoint idx: {ckpt_idx}")
             return ckpt_idx == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"] * 2
 
