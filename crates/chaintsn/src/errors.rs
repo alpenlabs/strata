@@ -45,3 +45,17 @@ pub enum TsnError {
     #[error("L1 block verification failed: {0}")]
     L1BlockVerification(#[from] L1VerificationError),
 }
+
+/// Errors for processing protocol operations.
+#[derive(Debug, Error)]
+pub enum OpError {
+    #[error("invalid signature")]
+    InvalidSignature,
+
+    #[error("invalid proof")]
+    InvalidProof,
+
+    /// Used to discard checkpoints we aren't looking for.
+    #[error("operation does not advance the finalized epoch")]
+    EpochNotExtend,
+}
