@@ -735,42 +735,53 @@ impl StrataSequencerApiServer for SequencerServerImpl {
 
     async fn submit_checkpoint_proof(
         &self,
-        idx: u64,
+        ckpt: u64,
         proof_receipt: ProofReceipt,
     ) -> RpcResult<()> {
         // TODO shift all this logic somewhere else that's closer to where it's
         // relevant and not in the RPC method impls
 
-        debug!(%idx, "received checkpoint proof request");
-        let mut entry = self
-            .checkpoint_handle
-            .get_checkpoint(idx)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?
-            .ok_or(Error::MissingCheckpointInDb(idx))?;
-        debug!(%idx, "found checkpoint in db");
+        let span = debug_span!("accept-ckpt-proof", %ckpt);
 
-        // If proof is not pending error out
-        if entry.proving_status != CheckpointProvingStatus::PendingProof {
-            return Err(Error::ProofAlreadyCreated(idx))?;
+        let fut = async {
+            debug!(%ckpt, "received checkpoint proof request");
+
+            let mut entry = self
+                .checkpoint_handle
+                .get_checkpoint(ckpt)
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?
+                .ok_or(Error::MissingCheckpointInDb(ckpt))?;
+            trace!("found checkpoint in db");
+
+            // If proof is not pending error out.
+            if entry.proving_status != CheckpointProvingStatus::PendingProof {
+                warn!("already have proof?");
+                return Err(Error::ProofAlreadyCreated(ckpt))?;
+            }
+
+            let checkpoint = entry.clone().into_batch_checkpoint();
+            verify_proof(&checkpoint, &proof_receipt, self.params.rollup()).map_err(|e| {
+                warn!("proof is invalid");
+                Error::InvalidProof(ckpt, e.to_string())
+            })?;
+
+            entry.checkpoint.set_proof(proof_receipt.proof().clone());
+            entry.proving_status = CheckpointProvingStatus::ProofReady;
+
+            trace!("proof is pending, setting proof ready");
+
+            self.checkpoint_handle
+                .put_checkpoint(ckpt, entry)
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?;
+            debug!("proof stored successfully");
+
+            Ok(())
         }
+        .instrument(span);
 
-        let checkpoint = entry.clone().into_batch_checkpoint();
-        verify_proof(&checkpoint, &proof_receipt, self.params.rollup())
-            .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
-
-        entry.checkpoint.set_proof(proof_receipt.proof().clone());
-        entry.proving_status = CheckpointProvingStatus::ProofReady;
-
-        debug!(%idx, "Proof is pending, setting proof ready");
-
-        self.checkpoint_handle
-            .put_checkpoint(idx, entry)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-        debug!(%idx, "Success");
-
-        Ok(())
+        fut.await
     }
 
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>> {

@@ -664,7 +664,7 @@ fn check_new_block(
         let cred_ok =
             strata_state::block_validation::check_block_credential(block.header(), params.rollup());
         if !cred_ok {
-            warn!(?blkid, "block has invalid credential");
+            warn!("block has invalid credential");
             return Ok(false);
         }
     }
@@ -672,7 +672,7 @@ fn check_new_block(
     // Check that we haven't already marked the block as invalid.
     if let Some(status) = state.get_block_status(blkid)? {
         if status == strata_db::traits::BlockStatus::Invalid {
-            warn!(?blkid, "rejecting block that fails validation");
+            warn!("rejecting block that fails validation");
             return Ok(false);
         }
     }
@@ -822,6 +822,12 @@ fn apply_blocks(
             .ok_or(Error::MissingL2Block(blkid))?;
 
         let slot = bundle.header().slot();
+        let epoch = bundle.header().epoch();
+
+        // Set up a new logging span for this block.
+        let block_span = debug_span!("vfyblk", %slot, %epoch, %blkid);
+        let _guard = block_span.enter();
+
         let header = bundle.header();
         let body = bundle.body();
         let block = L2BlockCommitment::new(slot, blkid);
@@ -834,7 +840,7 @@ fn apply_blocks(
         // Compute the transition write batch, then compute the new state
         // locally and update our going state.
         let mut prestate_cache = StateCache::new(cur_state);
-        debug!(%slot, %blkid, "processing block");
+        debug!("processing block transition");
         process_block(&mut prestate_cache, header, body, &rparams)
             .map_err(|e| Error::InvalidStateTsn(blkid, e))?;
         let wb = prestate_cache.finalize();
@@ -849,9 +855,10 @@ fn apply_blocks(
             "fcm: nonsensical post-state epoch (pre={pre_state_epoch}, post={post_state_epoch})"
         );
 
-        let post_stateroot = post_state.compute_state_root();
-        if header.state_root() != &post_stateroot {
-            warn!(block = %header.state_root(), chain = %post_stateroot, "stateroot mismatch");
+        // Verify state root matches.
+        let computed_sr = post_state.compute_state_root();
+        if *header.state_root() != computed_sr {
+            warn!(block_sr = %header.state_root(), %computed_sr, "state root mismatch");
             Err(Error::StaterootMismatch)?
         }
 
@@ -934,10 +941,8 @@ fn handle_finish_epoch(
         epoch_final_state,
     );
 
-    let epoch = summary.get_epoch_commitment();
-
     // TODO convert to Display
-    debug!(?epoch, ?summary, "finishing chain epoch");
+    debug!(?summary, "finishing chain epoch");
 
     fcm_state
         .storage

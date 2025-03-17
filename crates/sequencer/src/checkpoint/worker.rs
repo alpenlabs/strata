@@ -164,7 +164,7 @@ fn handle_ready_epoch(
     let epoch = epoch_summary.epoch();
     let new_l1 = epoch_summary.new_l1();
 
-    info!(?epoch, ?new_l1, "preparing checkpoint data");
+    info!(%epoch, ?new_l1, "preparing checkpoint data");
 
     // REALLY make sure we don't already have checkpoint for the epoch.
     if ckhandle.get_checkpoint_blocking(epoch)?.is_some() {
