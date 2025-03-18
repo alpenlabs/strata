@@ -7,7 +7,6 @@ from envs import testenv
 from envs.testenv import BasicEnvConfig
 from utils import *
 
-
 # Test configuration for checkpoint-based prover
 PROVER_CHECKPOINT_SETTINGS = {
     "CONSECUTIVE_PROOFS_REQUIRED": 3,
