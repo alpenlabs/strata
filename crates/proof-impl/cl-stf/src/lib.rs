@@ -25,9 +25,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
 
     // 2. Read the initial chainstate from which we start the transition and create the state cache
     let initial_chainstate: Chainstate = zkvm.read_borsh();
-    let epoch = initial_chainstate.cur_epoch();
     let initial_chainstate_root = initial_chainstate.compute_state_root();
-    let cur_epoch = initial_chainstate.cur_epoch();
     let mut state_cache = StateCache::new(initial_chainstate);
 
     // 3. Read L2 blocks
@@ -124,7 +122,14 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         .expect("failed to process L2 Block");
     }
 
-    // 11. Get the checkpoint that was posted to Bitcoin (if any) and check if we have used the
+    // 11. Get the final chainstate and construct the output
+    let wb = state_cache.finalize();
+    let final_chain_state = wb.into_toplevel();
+    let final_chainstate_root = final_chain_state.compute_state_root();
+    // NOTE: block range in cl-stf must not cross epoch boundaries
+    let epoch = final_chain_state.cur_epoch();
+
+    // 12. Get the checkpoint that was posted to Bitcoin (if any) and check if we have used the
     //     right TxFilters and update it
     // TODO: this makes sense to be somewhere in the chainstate
     let tx_filters_transition = if is_l1_segment_present {
@@ -135,7 +140,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         // rule will not change i.e. the final_tx_filters_hash = initial_tx_filters_hash
         // In case of other epoch, the transaction filters will change based on the chainstate
         // posted to Bitcoin
-        let final_tx_filters_hash = if cur_epoch > 0 {
+        let final_tx_filters_hash = if epoch > 0 {
             let (posted_chainstate, prev_post_config_hash) =
                 get_posted_chainstate_and_post_tx_filter_config(&l1_updates);
 
@@ -160,11 +165,6 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     } else {
         None
     };
-
-    // 12. Get the final chainstate and construct the output
-    let wb = state_cache.finalize();
-    let final_chain_state = wb.into_toplevel();
-    let final_chainstate_root = final_chain_state.compute_state_root();
 
     let output = ClStfOutput {
         epoch,
