@@ -5,12 +5,10 @@ pub mod program;
 
 use program::ClStfOutput;
 use strata_chaintsn::transition::process_block;
-use strata_primitives::{
-    buf::Buf32, hash::compute_borsh_hash, l1::ProtocolOperation, params::RollupParams,
-};
+use strata_primitives::{hash::compute_borsh_hash, l1::ProtocolOperation, params::RollupParams};
 use strata_proofimpl_btc_blockspace::logic::{BlockScanResult, BlockscanProofOutput};
 use strata_state::{
-    batch::TxFilterConfigTransition,
+    batch::{BatchTransition, TxFilterConfigTransition},
     block::{ExecSegment, L2Block},
     block_validation::{check_block_credential, validate_block_segments},
     chain_state::Chainstate,
@@ -127,7 +125,7 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
     // 11. Get the checkpoint that was posted to Bitcoin (if any) and check if we have used the
     //     right TxFilters and update it
     // TODO: this makes sense to be somewhere in the chainstate
-    let tx_filters_transition = if is_l1_segment_present {
+    let (tx_filters_transition, prev_chainstate_transition) = if is_l1_segment_present {
         let mut tx_filters = tx_filters.expect("must have tx filters");
         let initial_tx_filters_hash = compute_borsh_hash(&tx_filters);
 
@@ -135,20 +133,26 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         // rule will not change i.e. the final_tx_filters_hash = initial_tx_filters_hash
         // In case of other epoch, the transaction filters will change based on the chainstate
         // posted to Bitcoin
-        let final_tx_filters_hash = if cur_epoch > 0 {
-            let (posted_chainstate, prev_post_config_hash) =
-                get_posted_chainstate_and_post_tx_filter_config(&l1_updates);
+        let (final_tx_filters_hash, prev_chainstate_transition) = if cur_epoch > 0 {
+            let (posted_chainstate, posted_batch_transition) =
+                get_posted_chainstate_and_batch_transition(&l1_updates);
 
             // Verify we have used the right TxFilters
             assert_eq!(
-                initial_tx_filters_hash, prev_post_config_hash,
+                initial_tx_filters_hash,
+                posted_batch_transition
+                    .tx_filters_transition
+                    .post_config_hash,
                 "must use right tx filters"
             );
 
             tx_filters.update_from_chainstate(&posted_chainstate);
-            compute_borsh_hash(&tx_filters)
+            (
+                compute_borsh_hash(&tx_filters),
+                Some(posted_batch_transition.chainstate_transition),
+            )
         } else {
-            initial_tx_filters_hash
+            (initial_tx_filters_hash, None)
         };
 
         let tx_filter_transition = TxFilterConfigTransition {
@@ -156,9 +160,9 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
             post_config_hash: final_tx_filters_hash,
         };
 
-        Some(tx_filter_transition)
+        (Some(tx_filter_transition), prev_chainstate_transition)
     } else {
-        None
+        (None, None)
     };
 
     // 12. Get the final chainstate and construct the output
@@ -171,14 +175,15 @@ pub fn process_cl_stf(zkvm: &impl ZkVmEnv, el_vkey: &[u32; 8], btc_blockscan_vke
         initial_chainstate_root,
         final_chainstate_root,
         tx_filters_transition,
+        prev_chainstate_transition,
     };
 
     zkvm.commit_borsh(&output);
 }
 
-fn get_posted_chainstate_and_post_tx_filter_config(
+fn get_posted_chainstate_and_batch_transition(
     l1_updates: &[BlockScanResult],
-) -> (Chainstate, Buf32) {
+) -> (Chainstate, BatchTransition) {
     let last_l1_block = l1_updates
         .last()
         .expect("there should be at least one L1 Segment");
@@ -195,11 +200,5 @@ fn get_posted_chainstate_and_post_tx_filter_config(
     let cs: Chainstate = borsh::from_slice(cp.checkpoint().sidecar().chainstate())
         .expect("valid chainstate needs to be posted on checkpoint");
 
-    (
-        cs,
-        cp.checkpoint()
-            .batch_transition()
-            .tx_filters_transition
-            .post_config_hash,
-    )
+    (cs, *cp.checkpoint().batch_transition())
 }
