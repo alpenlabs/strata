@@ -918,7 +918,7 @@ fn handle_finish_epoch(
 
     // Actually construct and insert the epoch summary.
     let summary = EpochSummary::new(
-        prev_epoch_idx,
+        prev_epoch_idx + 1,
         terminal,
         prev_terminal,
         new_l1_block,
