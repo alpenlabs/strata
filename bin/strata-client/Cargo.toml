@@ -8,8 +8,6 @@ name = "strata-client"
 path = "src/main.rs"
 
 [dependencies]
-strata-bridge-relay.workspace = true
-strata-bridge-tx-builder.workspace = true
 strata-btcio.workspace = true
 strata-common = { workspace = true, default-features = true }
 strata-config.workspace = true

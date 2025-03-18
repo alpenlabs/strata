@@ -1,14 +1,11 @@
+import logging
 import time
 
 import flexitest
 
 from envs import testenv
 from envs.testenv import BasicEnvConfig
-from utils import (
-    ProverClientSettings,
-    RollupParamsSettings,
-    wait_until,
-)
+from utils import *
 
 # Test configuration for checkpoint-based prover
 PROVER_CHECKPOINT_SETTINGS = {
@@ -43,17 +40,26 @@ class ProverCheckpointRunnerTest(testenv.StrataTester):
         sequencer_rpc = sequencer.create_rpc()
 
         # Wait until the prover client reports readiness
+        # TODO this should be done in the env init
+        time.sleep(1)
         wait_until(
             lambda: prover_rpc.dev_strata_getReport() is not None,
             error_with="Prover did not start on time",
         )
 
+        epoch = wait_until_next_chain_epoch(sequencer_rpc, timeout=60)
+        logging.info(f"it's now epoch {epoch}")
+        epoch = wait_until_next_chain_epoch(sequencer_rpc, timeout=60)
+        logging.info(f"it's now epoch {epoch}")
+
+        def _ck1():
+            ckpt_idx = sequencer_rpc.strata_getLatestCheckpointIndex(True)
+            logging.info(f"cur checkpoint idx: {ckpt_idx}")
+            return ckpt_idx == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"]
+
         # Wait until the required number of consecutive checkpoint proofs are generated and verified
         wait_until(
-            lambda: (
-                sequencer_rpc.strata_getLatestCheckpointIndex()
-                == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"]
-            ),
+            _ck1,
             timeout=PROVER_CHECKPOINT_SETTINGS["PROVER_TIMEOUT_SECONDS"],
         )
 
@@ -64,12 +70,14 @@ class ProverCheckpointRunnerTest(testenv.StrataTester):
         sequencer.start()
         sequencer_rpc = sequencer.create_rpc()
 
+        def _ck2():
+            ckpt_idx = sequencer_rpc.strata_getLatestCheckpointIndex(True)
+            logging.info(f"cur checkpoint idx: {ckpt_idx}")
+            return ckpt_idx == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"] * 2
+
         # Wait until another portion of consecutive proofs are generated and verified
         # after the restart of the sequencer.
         wait_until(
-            lambda: (
-                sequencer_rpc.strata_getLatestCheckpointIndex()
-                == PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"] * 2
-            ),
+            _ck2,
             timeout=PROVER_CHECKPOINT_SETTINGS["PROVER_TIMEOUT_SECONDS"],
         )

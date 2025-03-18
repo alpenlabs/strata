@@ -19,7 +19,7 @@ use strata_status::StatusChannel;
 use strata_storage::NodeStorage;
 use strata_tasks::ShutdownGuard;
 use tokio::sync::{mpsc, RwLock};
-use tracing::warn;
+use tracing::*;
 
 use super::{
     prepare_block, BlockCompletionData, BlockGenerationConfig, BlockTemplate, Error,
@@ -212,6 +212,9 @@ fn generate_block_template_inner(
     if ts < parent_ts + params.rollup().block_time {
         Err(Error::TimestampTooEarly(ts))?;
     }
+
+    let asm_span = debug_span!("asmblk", %slot, %parent_blkid);
+    let _guard = asm_span.enter();
 
     // Actually put the template together.
     let (header, body, accessory) = prepare_block(

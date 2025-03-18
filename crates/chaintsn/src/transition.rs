@@ -31,7 +31,7 @@ use strata_state::{
 use tracing::warn;
 
 use crate::{
-    errors::TsnError,
+    errors::{OpError, TsnError},
     macros::*,
     slot_rng::{self, SlotRng},
 };
@@ -135,8 +135,8 @@ fn process_l1_view_update(
         state.update_safe_block(height, b.record().clone());
     }
 
-    // If prev_finalized_epoch is null, i.e. this is the genesis batch, it is safe to update the
-    // epoch
+    // If prev_finalized_epoch is null, i.e. this is the genesis batch, it is
+    // always safe to update the epoch.
     if prev_finalized_epoch.is_null() {
         return Ok(true);
     }
@@ -145,11 +145,16 @@ fn process_l1_view_update(
     // updated when processing L1Checkpoint
     let new_finalized_epoch = state.state().finalized_epoch();
 
-    if new_finalized_epoch.epoch() > prev_finalized_epoch.epoch() {
-        Ok(true)
-    } else {
-        Err(TsnError::EpochNotExtend)
+    // This checks to make sure that the L1 segment actually advances the
+    // observed final epoch.  We don't want to allow segments that don't
+    // advance the finalized epoch.
+    //
+    // QUESTION: why again exactly?
+    if new_finalized_epoch.epoch() <= prev_finalized_epoch.epoch() {
+        return Err(TsnError::EpochNotExtend);
     }
+
+    Ok(true)
 }
 
 fn process_l1_block(
@@ -159,28 +164,43 @@ fn process_l1_block(
 ) -> Result<(), TsnError> {
     // Just iterate through every tx's operation and call out to the handlers for that.
     for tx in block_mf.txs() {
+        let in_blkid = block_mf.blkid();
         for op in tx.protocol_ops() {
-            match &op {
-                ProtocolOperation::Checkpoint(ckpt) => {
-                    process_l1_checkpoint(state, block_mf, ckpt, params)?;
-                }
-
-                ProtocolOperation::Deposit(info) => {
-                    process_l1_deposit(state, block_mf, info)?;
-                }
-
-                ProtocolOperation::WithdrawalFulfillment(info) => {
-                    process_withdrawal_fulfillment(state, info)?;
-                }
-
-                ProtocolOperation::DepositSpent(info) => {
-                    process_deposit_spent(state, info)?;
-                }
-
-                // Other operations we don't do anything with for now.
-                _ => {}
+            // Try to process it, log a warning if there's an error.
+            if let Err(e) = process_proto_op(state, block_mf, op, params) {
+                warn!(?op, %in_blkid, %e, "invalid protocol operation");
             }
         }
+    }
+
+    Ok(())
+}
+
+fn process_proto_op(
+    state: &mut StateCache,
+    block_mf: &L1BlockManifest,
+    op: &ProtocolOperation,
+    params: &RollupParams,
+) -> Result<(), OpError> {
+    match &op {
+        ProtocolOperation::Checkpoint(ckpt) => {
+            process_l1_checkpoint(state, block_mf, ckpt, params)?;
+        }
+
+        ProtocolOperation::Deposit(info) => {
+            process_l1_deposit(state, block_mf, info)?;
+        }
+
+        ProtocolOperation::WithdrawalFulfillment(info) => {
+            process_withdrawal_fulfillment(state, info)?;
+        }
+
+        ProtocolOperation::DepositSpent(info) => {
+            process_deposit_spent(state, info)?;
+        }
+
+        // Other operations we don't do anything with for now.
+        _ => {}
     }
 
     Ok(())
@@ -191,12 +211,12 @@ fn process_l1_checkpoint(
     src_block_mf: &L1BlockManifest,
     signed_ckpt: &SignedCheckpoint,
     params: &RollupParams,
-) -> Result<(), TsnError> {
+) -> Result<(), OpError> {
     // If signature verification failed, return early and do **NOT** finalize epoch
     // Note: This is not an error because anyone is able to post data to L1
     if !verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule) {
         warn!("Invalid checkpoint: signature");
-        return Ok(());
+        return Err(OpError::InvalidSignature);
     }
 
     let ckpt = signed_ckpt.checkpoint(); // inner data
@@ -207,20 +227,22 @@ fn process_l1_checkpoint(
     // Note: This is error because this is done by the sequencer
     if ckpt_epoch != 0 && ckpt_epoch != state.state().finalized_epoch().epoch() + 1 {
         error!(%ckpt_epoch, "Invalid checkpoint: proof for invalid epoch");
-        return Err(TsnError::EpochNotExtend);
+        return Err(OpError::EpochNotExtend);
     }
 
+    // TODO refactor this to encapsulate the conditional verification into
+    // another fn so we don't have to think about it here
     if receipt.proof().is_empty() {
         warn!(%ckpt_epoch, "Empty proof posted");
         // If the proof is empty but empty proofs are not allowed, this will fail.
         if !params.proof_publish_mode.allow_empty() {
             error!(%ckpt_epoch, "Invalid checkpoint: Empty proof");
-            return Err(TsnError::InvalidProof);
+            return Err(OpError::InvalidProof);
         }
     } else {
         // Otherwise, verify the non-empty proof.
         verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk)
-            .map_err(|e| TsnError::InvalidProof)?;
+            .map_err(|e| OpError::InvalidProof)?;
     }
 
     // Copy the epoch commitment and make it finalized.
@@ -239,7 +261,7 @@ fn process_l1_deposit(
     state: &mut StateCache,
     src_block_mf: &L1BlockManifest,
     info: &DepositInfo,
-) -> Result<(), TsnError> {
+) -> Result<(), OpError> {
     let requested_idx = info.deposit_idx;
     let outpoint = info.outpoint;
 
@@ -269,13 +291,13 @@ fn process_l1_deposit(
 fn process_withdrawal_fulfillment(
     state: &mut StateCache,
     info: &WithdrawalFulfillmentInfo,
-) -> Result<(), TsnError> {
+) -> Result<(), OpError> {
     state.mark_deposit_fulfilled(info);
     Ok(())
 }
 
 /// Locked deposit on L1 has been spent.
-fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Result<(), TsnError> {
+fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Result<(), OpError> {
     // Currently, we are not tracking how this was spent, only that it was.
 
     state.mark_deposit_reimbursed(info.deposit_idx);

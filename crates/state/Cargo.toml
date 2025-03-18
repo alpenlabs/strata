@@ -7,7 +7,6 @@ version = "0.1.0"
 # reuse much of reth in this crate so that we can factor it all out eventually.
 
 [dependencies]
-strata-bridge-tx-builder.workspace = true
 strata-crypto.workspace = true
 strata-primitives.workspace = true
 zkaleido.workspace = true

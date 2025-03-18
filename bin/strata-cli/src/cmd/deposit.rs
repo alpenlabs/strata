@@ -12,7 +12,6 @@ use bdk_wallet::{
 };
 use colored::Colorize;
 use indicatif::ProgressBar;
-use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
 
 use crate::{
@@ -25,6 +24,9 @@ use crate::{
     strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
+
+/// Magic bytes to attach to the deposit request.
+pub const MAGIC_BYTES: &[u8] = r"alpen".as_bytes();
 
 /// Deposit 10 BTC from signet to Strata. If an address is not provided, the wallet's internal
 /// Strata address will be used.
