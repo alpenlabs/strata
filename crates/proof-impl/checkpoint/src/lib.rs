@@ -17,6 +17,7 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
         initial_chainstate_root,
         mut final_chainstate_root,
         mut tx_filters_transition,
+        mut prev_chainstate_transition,
     } = zkvm.read_verified_borsh(cl_stf_vk);
 
     // Starting with 1 since we have already read the first CL STF output
@@ -37,12 +38,25 @@ pub fn process_checkpoint_proof_outer(zkvm: &impl ZkVmEnv, cl_stf_vk: &[u32; 8])
 
         // If there was some update to TxFiltersConfig update it, else leave as is
         tx_filters_transition = tx_filters_transition.or(cl_stf_output.tx_filters_transition);
+
+        prev_chainstate_transition =
+            prev_chainstate_transition.or(cl_stf_output.prev_chainstate_transition);
     }
 
     let chainstate_transition = ChainstateRootTransition {
         pre_state_root: initial_chainstate_root,
         post_state_root: final_chainstate_root,
     };
+
+    if epoch > 0 {
+        assert_eq!(
+            initial_chainstate_root,
+            prev_chainstate_transition
+                .expect("must include a prev chainstate transition")
+                .post_state_root,
+            "state between checkpoint must be continous"
+        );
+    }
 
     let output = BatchTransition {
         epoch,
