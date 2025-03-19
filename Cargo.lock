@@ -3465,7 +3465,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1145d32e826a7748b69ee8fc62d3e6355ff7f1051df53141e7048162fc90481b"
 dependencies = [
  "data-encoding",
- "syn 2.0.97",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -11311,7 +11311,7 @@ dependencies = [
  "serde",
  "sha2 0.10.8",
  "tracing",
- "zip 2.2.2",
+ "zip 2.4.1",
 ]
 
 [[package]]
@@ -16098,9 +16098,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "2.2.2"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae9c1ea7b3a5e1f4b922ff856a129881167511563dc219869afe3787fc0c1a45"
+checksum = "938cc23ac49778ac8340e366ddc422b2227ea176edb447e23fc0627608dddadd"
 dependencies = [
  "arbitrary",
  "crc32fast",
