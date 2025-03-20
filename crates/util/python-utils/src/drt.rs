@@ -11,10 +11,10 @@ use bdk_wallet::{
 };
 use pyo3::prelude::*;
 use revm_primitives::alloy_primitives::Address as RethAddress;
-use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
+use strata_primitives::constants::{RECOVER_DELAY, UNSPENDABLE_PUBLIC_KEY};
 
 use crate::{
-    constants::{BRIDGE_IN_AMOUNT, MAGIC_BYTES, NETWORK, RECOVER_DELAY, XPRIV},
+    constants::{BRIDGE_IN_AMOUNT, MAGIC_BYTES, NETWORK, XPRIV},
     error::Error,
     parse::{parse_address, parse_el_address, parse_xonly_pk},
     taproot::{bridge_wallet, new_bitcoind_client, sync_wallet, taproot_wallet, ExtractP2trPubkey},
