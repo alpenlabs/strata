@@ -8,6 +8,7 @@ strata-proofimpl-evm-ee-stf.workspace = true
 strata-reth-db.workspace = true
 strata-reth-node.workspace = true
 
+alloy-consensus.workspace = true
 alloy-eips.workspace = true
 alloy-rpc-types.workspace = true
 anyhow.workspace = true

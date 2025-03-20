@@ -1,5 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
+use alloy_consensus::Header;
 use alloy_rpc_types::{serde_helpers::JsonStorageKey, BlockNumHash, EIP1186AccountProofResponse};
 use eyre::eyre;
 use futures_util::TryStreamExt;
@@ -138,10 +142,10 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
 
     let mut parent_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
     let mut current_proofs: HashMap<Address, EIP1186AccountProofResponse> = HashMap::new();
-    let contracts = accessed_states.accessed_contracts;
+    let contracts = accessed_states.accessed_contracts().clone();
 
     // Accumulate account proof of account in previous block
-    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
+    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts().iter() {
         let slots: Vec<B256> = accessed_slots
             .iter()
             .map(|el| B256::from_slice(&el.to_be_bytes::<32>()))
@@ -160,7 +164,7 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
     }
 
     // Accumulate account proof of account in current block
-    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts.iter() {
+    for (accessed_address, accessed_slots) in accessed_states.accessed_accounts().iter() {
         let slots: Vec<B256> = accessed_slots
             .iter()
             .map(|el| B256::from_slice(&el.to_be_bytes::<32>()))
@@ -184,6 +188,12 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
     )
     .expect("Proof to tries infallible");
 
+    let ancestor_headers = get_ancestor_headers(
+        ctx,
+        current_block_idx,
+        accessed_states.accessed_block_idxs(),
+    )?;
+
     let input = EvmBlockStfInput {
         beneficiary: current_block.header.beneficiary,
         gas_limit: current_block.gas_limit,
@@ -196,10 +206,36 @@ fn extract_zkvm_input<Node: FullNodeComponents<Types: NodeTypes<Primitives = Eth
         pre_state_storage: storage,
         contracts,
         parent_header: prev_block.header,
-        // NOTE: using default to save prover cost.
-        // Will need to revisit if BLOCKHASH opcode operation is a blocker
-        ancestor_headers: Default::default(),
+        ancestor_headers,
     };
 
     Ok(input)
+}
+
+fn get_ancestor_headers<Node>(
+    ctx: &ExExContext<Node>,
+    current_blk_idx: u64,
+    accessed_block_idxs: &HashSet<u64>,
+) -> eyre::Result<Vec<Header>>
+where
+    Node: FullNodeComponents,
+    Node::Types: NodeTypes<Primitives = EthPrimitives>,
+{
+    let Some(oldest_parent_idx) = accessed_block_idxs.iter().copied().min_by(|a, b| a.cmp(b))
+    else {
+        return Ok(Vec::new());
+    };
+
+    let provider = ctx.provider();
+    let headers = (oldest_parent_idx..current_blk_idx.saturating_sub(1))
+        .rev()
+        .map(|block_num| {
+            provider
+                .block_by_number(block_num)?
+                .map(|block| block.header)
+                .ok_or_else(|| eyre!("Block not found for block number {block_num}"))
+        })
+        .collect::<eyre::Result<Vec<_>>>()?;
+
+    Ok(headers)
 }
