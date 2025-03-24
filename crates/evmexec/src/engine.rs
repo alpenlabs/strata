@@ -415,8 +415,12 @@ struct ForkchoiceStatePartial {
 fn to_bridge_withdrawal_intent(
     rpc_withdrawal_intent: strata_reth_node::WithdrawalIntent,
 ) -> bridge_ops::WithdrawalIntent {
-    let strata_reth_node::WithdrawalIntent { amt, destination } = rpc_withdrawal_intent;
-    bridge_ops::WithdrawalIntent::new(BitcoinAmount::from_sat(amt), destination)
+    let strata_reth_node::WithdrawalIntent {
+        amt,
+        destination,
+        withdrawal_txid,
+    } = rpc_withdrawal_intent;
+    bridge_ops::WithdrawalIntent::new(BitcoinAmount::from_sat(amt), destination, withdrawal_txid)
 }
 
 #[cfg(test)]

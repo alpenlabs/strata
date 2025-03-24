@@ -1,5 +1,5 @@
 use alloy_sol_types::SolEvent;
-use reth_primitives::Receipt;
+use reth_primitives::{Receipt, TransactionSigned};
 use revm_primitives::U256;
 use strata_primitives::{bitcoin_bosd::Descriptor, buf::Buf32};
 use strata_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
@@ -28,24 +28,31 @@ pub fn wei_to_sats(wei: U256) -> (U256, U256) {
 /// # Note
 ///
 /// A [`Descriptor`], if invalid does not create an [`WithdrawalIntent`].
-pub fn collect_withdrawal_intents(
-    receipts: impl Iterator<Item = Option<Receipt>>,
-) -> impl Iterator<Item = WithdrawalIntent> {
-    receipts
-        .flatten()
-        .flat_map(|receipt| receipt.logs)
-        .filter(|log| log.address == BRIDGEOUT_ADDRESS)
-        .filter_map(|log| {
-            WithdrawalIntentEvent::decode_log(&log, true)
+pub fn collect_withdrawal_intents<'a, I>(
+    tx_receipt_pairs: I,
+) -> impl Iterator<Item = WithdrawalIntent> + 'a
+where
+    I: Iterator<Item = (&'a TransactionSigned, &'a Receipt)> + 'a,
+{
+    tx_receipt_pairs.flat_map(|(tx, receipt)| {
+        let txid = Buf32(tx.hash().as_slice().try_into().expect("32 bytes"));
+
+        receipt.logs.iter().filter_map(move |log| {
+            if log.address != BRIDGEOUT_ADDRESS {
+                return None;
+            }
+
+            WithdrawalIntentEvent::decode_log(log, true)
                 .ok()
                 .and_then(|evt| {
                     Descriptor::from_bytes(&evt.destination)
                         .ok()
-                        .map(|valid_descriptor| WithdrawalIntent {
+                        .map(|destination| WithdrawalIntent {
                             amt: evt.amount,
-                            destination: valid_descriptor,
-                            withdrawal_txid: Buf32::from(evt.withdrawal_txid),
+                            destination,
+                            withdrawal_txid: txid,
                         })
                 })
         })
+    })
 }

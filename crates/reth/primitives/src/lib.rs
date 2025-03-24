@@ -26,7 +26,5 @@ sol! {
         uint64 amount,
         /// BOSD descriptor for withdrawal destinations in L1.
         bytes destination,
-        /// withdrawal request transaction id
-        bytes withdrawal_txid,
     );
 }
