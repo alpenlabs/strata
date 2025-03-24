@@ -67,8 +67,8 @@ class ProverClientTest(testenv.StrataTester):
         # Proof generation is expected to fail because the range will not match
         # CL STF Proof will fail, which in turns fails the checkpoint proof
         #
-        # TODO: Proof generation is failing consistently on my local machine but it
-        # is consistently failing on the CI. Not sure on how this can be fixed. I have
+        # FIXME: Proof generation is failing consistently on my local machine but the
+        # test fails consistently CI. Not sure on how this can be fixed. I have
         # tried changing the checkpoint prover params. So for now, leaving out the assertion
         # and addition a debug statement instead
         # assert not is_proof_generation_completed
