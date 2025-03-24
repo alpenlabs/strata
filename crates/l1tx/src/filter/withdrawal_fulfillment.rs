@@ -155,7 +155,8 @@ mod test {
              deposit_idx: u32,
              addr: Descriptor,
              deadline: u64,
-             deposit_txid: &[u8; 32]| {
+             deposit_txid: &[u8; 32],
+             withdraw_txid: Buf32| {
                 DepositEntry::new(
                     deposit_idx,
                     create_outputref(deposit_txid, 0),
@@ -169,15 +170,36 @@ mod test {
                     )]),
                     operator_idx,
                     deadline,
-                    gen.generate(),
+                    withdraw_txid,
                 )))
             };
 
         let deposits = vec![
             // deposits with withdrawal assignments
-            create_dispatched_deposit_entry(1, 2, addresses[0].clone(), 100, &txids[0]),
-            create_dispatched_deposit_entry(2, 3, addresses[1].clone(), 100, &txids[1]),
-            create_dispatched_deposit_entry(0, 4, addresses[2].clone(), 100, &txids[2]),
+            create_dispatched_deposit_entry(
+                1,
+                2,
+                addresses[0].clone(),
+                100,
+                &txids[0],
+                gen.generate(),
+            ),
+            create_dispatched_deposit_entry(
+                2,
+                3,
+                addresses[1].clone(),
+                100,
+                &txids[1],
+                gen.generate(),
+            ),
+            create_dispatched_deposit_entry(
+                0,
+                4,
+                addresses[2].clone(),
+                100,
+                &txids[2],
+                gen.generate(),
+            ),
             // deposits without withdrawal assignments
             DepositEntry::new(
                 5,
