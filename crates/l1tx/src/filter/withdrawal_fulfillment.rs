@@ -169,6 +169,7 @@ mod test {
                     )]),
                     operator_idx,
                     deadline,
+                    gen.generate(),
                 )))
             };
 
