@@ -4,7 +4,7 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use bitcoin::{Network, Txid};
+use bitcoin::{BlockHash, Network, Txid, Wtxid};
 use serde::{Deserialize, Serialize};
 use strata_db::types::{CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
@@ -16,7 +16,6 @@ use strata_primitives::{
 };
 use strata_state::{
     batch::BatchInfo,
-    bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     bridge_state::{DepositEntry, DepositState},
     client_state::CheckpointL1Ref,
@@ -311,7 +310,7 @@ pub struct RpcCheckpointInfo {
     /// L2 range the checkpoint covers
     pub l2_range: (L2BlockCommitment, L2BlockCommitment),
     /// Info on txn where checkpoint is committed on chain
-    pub l1_reference: Option<CheckpointL1Ref>,
+    pub l1_reference: Option<RpcCheckpointL1Ref>,
     /// Confirmation status of checkpoint
     pub confirmation_status: RpcCheckpointConfStatus,
 }
@@ -328,36 +327,36 @@ impl From<BatchInfo> for RpcCheckpointInfo {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RpcCheckpointL1Ref {
+    pub block_height: u64,
+    pub block_id: BlockHash,
+    pub txid: Txid,
+    pub wtxid: Wtxid,
+}
+
+impl From<CheckpointL1Ref> for RpcCheckpointL1Ref {
+    fn from(l1ref: CheckpointL1Ref) -> Self {
+        Self {
+            block_height: l1ref.l1_commitment.height(),
+            block_id: (*l1ref.l1_commitment.blkid()).into(),
+            txid: l1ref.txid.into(),
+            wtxid: l1ref.wtxid.into(),
+        }
+    }
+}
+
 impl From<CheckpointEntry> for RpcCheckpointInfo {
     fn from(value: CheckpointEntry) -> Self {
         let mut item: Self = value.checkpoint.batch_info().clone().into();
         item.l1_reference = match value.confirmation_status.clone() {
             CheckpointConfStatus::Pending => None,
-            CheckpointConfStatus::Confirmed(lref) => Some(lref),
-            CheckpointConfStatus::Finalized(lref) => Some(lref),
+            CheckpointConfStatus::Confirmed(lref) => Some(lref.into()),
+            CheckpointConfStatus::Finalized(lref) => Some(lref.into()),
         };
         item.confirmation_status = value.confirmation_status.into();
         item
     }
-}
-
-/// The duties assigned to an operator within a given range.
-///
-/// # Note
-///
-/// The `index`'s are only relevant for Deposit duties as those are stored off-chain in a database.
-/// The withdrawal duties are fetched from the current chain state.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RpcBridgeDuties {
-    /// The actual [`BridgeDuty`]'s assigned to an operator which includes both the deposit and
-    /// withdrawal duties.
-    pub duties: Vec<BridgeDuty>,
-
-    /// The starting index (inclusive) from which the duties are fetched.
-    pub start_index: u64,
-
-    /// The last block index (inclusive) upto which the duties are feched.
-    pub stop_index: u64,
 }
 
 /// Deposit entry for RPC corresponding to [`DepositEntry`].

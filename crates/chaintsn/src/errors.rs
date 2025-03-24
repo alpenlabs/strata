@@ -11,6 +11,9 @@ pub enum TsnError {
     #[error("mismatch parent (head {0:?}, parent {1:?}")]
     MismatchParent(L2BlockId, L2BlockId),
 
+    #[error("mismatch epoch (block {0}, expected {1}")]
+    MismatchEpoch(u64, u64),
+
     #[error("attested mismatched ID for {0} (set {1}, computed {2})")]
     L1BlockIdMismatch(u64, L1BlockId, L1BlockId),
 
@@ -19,6 +22,12 @@ pub enum TsnError {
 
     #[error("L1 segment block did not extend the chain tip")]
     L1SegNotExtend,
+
+    #[error("Checkpoint posted do not extend the finalized epoch")]
+    EpochNotExtend,
+
+    #[error("Invalid proof")]
+    InvalidProof,
 
     #[error("ran out of deposits to assign withdrawals to")]
     InsufficientDepositsForIntents,
@@ -35,4 +44,18 @@ pub enum TsnError {
     /// failure.
     #[error("L1 block verification failed: {0}")]
     L1BlockVerification(#[from] L1VerificationError),
+}
+
+/// Errors for processing protocol operations.
+#[derive(Debug, Error)]
+pub enum OpError {
+    #[error("invalid signature")]
+    InvalidSignature,
+
+    #[error("invalid proof")]
+    InvalidProof,
+
+    /// Used to discard checkpoints we aren't looking for.
+    #[error("operation does not advance the finalized epoch")]
+    EpochNotExtend,
 }

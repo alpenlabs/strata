@@ -12,7 +12,7 @@ from utils.transaction import SmartContracts
 
 
 @flexitest.register
-class ElPrecompileTest(testenv.StrataTester):
+class ElBlockhashOpcodeTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         install_solc(version="0.8.16")
         set_solc_version("0.8.16")
@@ -29,16 +29,14 @@ class ElPrecompileTest(testenv.StrataTester):
         web3.eth.default_account = web3.address
 
         # Deploy the contract
-        abi, bytecode = SmartContracts.compile_contract(
-            "PrecompileTestContract.sol", "PrecompileTestContract"
-        )
+        abi, bytecode = SmartContracts.compile_contract("BlockhashOpCode.sol", "BlockhashOpCode")
         contract = web3.eth.contract(abi=abi, bytecode=bytecode)
         tx_hash = contract.constructor().transact()
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
 
         # Call the contract function
         contract_instance = web3.eth.contract(abi=abi, address=tx_receipt.contractAddress)
-        tx_hash = contract_instance.functions.testPrecompiles().transact()
+        tx_hash = contract_instance.functions.updateBlockHash().transact()
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
 
         # Prove the corresponding EE block
@@ -65,5 +63,8 @@ class ElPrecompileTest(testenv.StrataTester):
 
         task_id = task_ids[0]
         self.debug(f"Using task ID: {task_id}")
+
+        lastBlockHash = contract_instance.functions.lastBlockHash().call()
+        print(f"lastBlockHash: {type(lastBlockHash)} {lastBlockHash.hex()}")
 
         wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)

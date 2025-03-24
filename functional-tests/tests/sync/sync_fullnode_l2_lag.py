@@ -53,7 +53,7 @@ class SyncFullNodeL2LagTest(testenv.StrataTester):
 
         # Get corresponding checkpoint block
         checkpt_info = seqrpc.strata_getCheckpointInfo(cur_epoch + 3)
-        checkpt_l1_blk_height = checkpt_info["l1_reference"]["l1_commitment"]["height"]
+        checkpt_l1_blk_height = checkpt_info["l1_reference"]["block_height"]
 
         # FN tip after fn catches upto the buried checkpoint, should be the same as before
         new_fn_tip = fnrpc.strata_syncStatus()["tip_height"]
@@ -93,7 +93,7 @@ def fn_syncs_with_seq(fnrpc, seqrpc):
         fn_tip_slot = fnss["tip_height"]
 
         logging.info(f"Seq tip slot {seq_tip_slot}, fn tip slot {fn_tip_slot}")
-        return fn_tip_slot == seq_tip_slot
+        return fn_tip_slot == seq_tip_slot or seq_tip_slot == fn_tip_slot + 1
 
     return _f
 

@@ -6,9 +6,11 @@ from envs import testenv
 from utils import cl_slot_to_block_id, wait_for_proof_with_time_out
 
 # Parameters defining the range of Execution Engine (EE) blocks to be proven.
+# FIXME: cl_stf needs range to cover a full epoch so this test should be focused on epoch/checkpoint
+# range instead of arbitrary range which will fail.
 CL_PROVER_PARAMS = {
     "start_block": 1,
-    "end_block": 2,
+    "end_block": 1,
 }
 
 

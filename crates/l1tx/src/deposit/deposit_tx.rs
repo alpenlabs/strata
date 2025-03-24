@@ -1,12 +1,12 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
 use bitcoin::{opcodes::all::OP_RETURN, OutPoint, ScriptBuf, Transaction};
-use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
 use strata_primitives::{
     l1::{DepositInfo, OutputRef},
     prelude::DepositTxParams,
 };
 
+use super::constants::*;
 use crate::{
     deposit::error::DepositParseError,
     utils::{next_bytes, next_op},
@@ -20,18 +20,19 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
     // Get the second output (index 1)
     let op_return_out = tx.output.get(1)?;
 
-    // Parse the deposit script from the second output's script_pubkey
-    let ee_address = parse_deposit_script(&op_return_out.script_pubkey, config).ok()?;
-
-    // check if it is exact BRIDGE_DENOMINATION amount
+    // Check if it is exact BRIDGE_DENOMINATION amount
+    // TODO make this not a const!
     if send_addr_out.value.to_sat() != BRIDGE_DENOMINATION.to_sat() {
         return None;
     }
 
-    // check if p2tr address matches
+    // Check if deposit output address matches.
     if send_addr_out.script_pubkey != config.address.address().script_pubkey() {
         return None;
     }
+
+    // Parse the tag from the OP_RETURN output.
+    let tag_data = parse_tag_script(&op_return_out.script_pubkey, config).ok()?;
 
     // Get the first input of the transaction
     let deposit_outpoint = OutputRef::from(OutPoint {
@@ -41,46 +42,79 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
 
     // Construct and return the DepositInfo
     Some(DepositInfo {
+        deposit_idx: tag_data.deposit_idx,
         amt: send_addr_out.value.into(),
-        address: ee_address.to_vec(),
+        address: tag_data.dest_buf.to_vec(),
         outpoint: deposit_outpoint,
     })
 }
 
+struct DepositTag<'buf> {
+    deposit_idx: u32,
+    dest_buf: &'buf [u8],
+}
+
 /// extracts the EE address given that the script is OP_RETURN type and contains the Magic Bytes
-fn parse_deposit_script<'a>(
+fn parse_tag_script<'a>(
     script: &'a ScriptBuf,
     config: &DepositTxParams,
-) -> Result<&'a [u8], DepositParseError> {
+) -> Result<DepositTag<'a>, DepositParseError> {
     let mut instructions = script.instructions();
 
-    // check if OP_RETURN is present and if not just discard it
+    // Check if OP_RETURN is present and if not just discard it.
     if next_op(&mut instructions) != Some(OP_RETURN) {
-        return Err(DepositParseError::NoOpReturn);
+        return Err(DepositParseError::MissingTag);
     }
 
+    // Extract the data from the next push.
     let Some(data) = next_bytes(&mut instructions) else {
         return Err(DepositParseError::NoData);
     };
 
-    assert!(data.len() < 80);
+    // If it's not a standard tx then something is *probably* up.
+    if data.len() > 80 {
+        return Err(DepositParseError::TagOversized);
+    }
 
+    parse_tag(data, config)
+}
+
+fn parse_tag<'b>(
+    buf: &'b [u8],
+    config: &DepositTxParams,
+) -> Result<DepositTag<'b>, DepositParseError> {
     // data has expected magic bytes
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
 
-    if data.len() < magic_len || &data[..magic_len] != magic_bytes {
-        return Err(DepositParseError::MagicBytesMismatch);
+    // Do some math to make sure there is a magic.
+    let exp_min_len = magic_len + 4;
+    if buf.len() < exp_min_len {
+        return Err(DepositParseError::InvalidMagic);
     }
 
-    // configured bytes for address
-    let address = &data[magic_len..];
-    if address.len() != config.address_length as usize {
+    let magic_slice = &buf[..magic_len];
+    if magic_slice != magic_bytes {
+        return Err(DepositParseError::InvalidMagic);
+    }
+
+    // Extract the deposit idx.
+    let di_buf = &buf[magic_len..exp_min_len];
+    let deposit_idx = u32::from_be_bytes([di_buf[0], di_buf[1], di_buf[2], di_buf[3]]);
+
+    // The rest of the buffer is the dest.
+    let dest_buf = &buf[exp_min_len..];
+
+    // TODO make this variable sized
+    if dest_buf.len() != config.address_length as usize {
         // casting is safe as address.len() < data.len() < 80
-        return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
+        return Err(DepositParseError::InvalidDestLen(dest_buf.len() as u8));
     }
 
-    Ok(address)
+    Ok(DepositTag {
+        deposit_idx,
+        dest_buf,
+    })
 }
 
 #[cfg(test)]
@@ -98,10 +132,11 @@ mod tests {
         // values for testing
         let config = get_deposit_tx_config();
         let amt = Amount::from_sat(config.deposit_amount);
+        let idx = 0xdeadbeef;
         let ee_addr = [1; 20];
 
         let deposit_request_script =
-            build_test_deposit_script(config.magic_bytes, ee_addr.to_vec());
+            build_test_deposit_script(config.magic_bytes, idx, ee_addr.to_vec());
 
         let test_transaction = create_test_deposit_tx(
             Amount::from_sat(config.deposit_amount),
@@ -115,6 +150,7 @@ mod tests {
         let out = out.unwrap();
 
         assert_eq!(out.amt, amt.into());
+        assert_eq!(out.deposit_idx, idx);
         assert_eq!(out.address, ee_addr);
     }
 }

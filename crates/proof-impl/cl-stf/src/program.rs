@@ -21,6 +21,7 @@ pub struct ClStfInput {
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ClStfOutput {
+    pub epoch: u64,
     pub initial_chainstate_root: Buf32,
     pub final_chainstate_root: Buf32,
     pub tx_filters_transition: Option<TxFilterConfigTransition>,

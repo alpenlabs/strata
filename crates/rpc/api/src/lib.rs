@@ -3,15 +3,11 @@ use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use strata_common::{Action, WorkerType};
 use strata_db::types::{L1TxEntry, L1TxStatus};
-use strata_primitives::{
-    batch::EpochSummary,
-    bridge::{OperatorIdx, PublickeyTable},
-    epoch::EpochCommitment,
-};
+use strata_primitives::{batch::EpochSummary, bridge::PublickeyTable, epoch::EpochCommitment};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
-    HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcBridgeDuties, RpcChainState,
-    RpcCheckpointConfStatus, RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
+    HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcChainState, RpcCheckpointConfStatus,
+    RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
 };
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate},
@@ -106,18 +102,6 @@ pub trait StrataApi {
     #[method(name = "submitBridgeMsg")]
     async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()>;
 
-    /// Get the [`RpcBridgeDuties`] from a certain `start_index` for a given [`OperatorIdx`].
-    ///
-    /// The `start_index` is a monotonically increasing number with no gaps. So, it is safe to call
-    /// this method with any `u64` value. If an entry corresponding to the `start_index` is not
-    /// found, an empty list is returned.
-    #[method(name = "getBridgeDuties")]
-    async fn get_bridge_duties(
-        &self,
-        operator_idx: OperatorIdx,
-        start_index: u64,
-    ) -> RpcResult<RpcBridgeDuties>;
-
     /// Get the operators' public key table that is used to sign transactions and messages.
     ///
     /// # Note
@@ -203,20 +187,20 @@ pub trait StrataSequencerApi {
     #[method(name = "strata_getTxStatus")]
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>>;
 
-    #[method(name = "strata_getSequencerDuties")]
+    #[method(name = "strataadmin_getSequencerDuties")]
     async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>>;
 
-    #[method(name = "strata_getBlockTemplate")]
+    #[method(name = "strataadmin_getBlockTemplate")]
     async fn get_block_template(&self, config: BlockGenerationConfig) -> RpcResult<BlockTemplate>;
 
-    #[method(name = "strata_completeBlockTemplate")]
+    #[method(name = "strataadmin_completeBlockTemplate")]
     async fn complete_block_template(
         &self,
         template_id: L2BlockId,
         completion: BlockCompletionData,
     ) -> RpcResult<L2BlockId>;
 
-    #[method(name = "strata_completeCheckpointSignature")]
+    #[method(name = "strataadmin_completeCheckpointSignature")]
     async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()>;
 }
 

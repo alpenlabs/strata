@@ -119,12 +119,8 @@ impl ProofOperator {
             ProofContext::ClStf(..) => {
                 Self::prove(&self.cl_stf_operator, proof_key, db, host).await
             }
-            ProofContext::Checkpoint(checkpoint_index) => {
-                Self::prove(&self.checkpoint_operator, proof_key, db, host).await?;
-                self.checkpoint_operator
-                    .submit_checkpoint_proof(*checkpoint_index, proof_key, db)
-                    .await;
-                Ok(())
+            ProofContext::Checkpoint(..) => {
+                Self::prove(&self.checkpoint_operator, proof_key, db, host).await
             }
         }
     }

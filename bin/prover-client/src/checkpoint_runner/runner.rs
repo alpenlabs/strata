@@ -47,25 +47,25 @@ async fn process_checkpoint(
     db: &Arc<ProofDb>,
     runner_state: &mut CheckpointRunnerState,
 ) -> anyhow::Result<()> {
-    let latest_checkpoint = fetch_latest_checkpoint_index(operator.cl_client()).await;
-
-    let checkpoint_idx = match latest_checkpoint {
+    let res = fetch_latest_checkpoint_index(operator.cl_client()).await;
+    let fetched_ckpt = match res {
         Ok(idx) => idx,
         Err(e) => {
-            warn!(error = ?e, "Unable to fetch latest checkpoint index");
+            warn!(err = %e, "unable to fetch latest checkpoint index");
             return Ok(());
         }
     };
 
-    if !should_update_checkpoint(runner_state.current_checkpoint_idx, checkpoint_idx) {
-        warn!("Fetched checkpoint {checkpoint_idx} is not newer than current checkpoint");
+    let cur = runner_state.current_checkpoint_idx;
+    if !should_update_checkpoint(cur, fetched_ckpt) {
+        warn!(fetched = %fetched_ckpt, ?cur, "fetched checkpoint is not newer than current");
         return Ok(());
     }
 
     operator
-        .create_task(checkpoint_idx, task_tracker.clone(), db)
+        .create_task(fetched_ckpt, task_tracker.clone(), db)
         .await?;
-    runner_state.current_checkpoint_idx = Some(checkpoint_idx);
+    runner_state.current_checkpoint_idx = Some(fetched_ckpt);
 
     Ok(())
 }

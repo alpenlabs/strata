@@ -3,11 +3,10 @@
 use std::convert::TryInto;
 
 use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
-use strata_bridge_tx_builder::prelude::BRIDGE_DENOMINATION;
 use strata_primitives::{l1::DepositRequestInfo, params::DepositTxParams};
 use tracing::debug;
 
-use super::{common::DepositRequestScriptInfo, error::DepositParseError};
+use super::{common::DepositRequestScriptInfo, constants::*, error::DepositParseError};
 use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
@@ -53,7 +52,7 @@ pub fn parse_deposit_request_script(
         // helpful.  We shouldn't be emitting a log message for every single tx
         // we see on chain.
         //debug!(?instructions, "missing op_return");
-        return Err(DepositParseError::NoOpReturn);
+        return Err(DepositParseError::MissingTag);
     }
 
     let Some(data) = next_bytes(&mut instructions) else {
@@ -64,40 +63,51 @@ pub fn parse_deposit_request_script(
     // Added a cfg to assert since it feels like it could crash us in
     // production.  I believe this is just a tx standardness policy, not a
     // consensus rule.
+    //
+    // Since it's not a consensus rule, it's a normal error not a panic.
     #[cfg(debug_assertions)]
-    assert!(data.len() < 80);
+    if data.len() > 80 {
+        return Err(DepositParseError::TagOversized);
+    }
 
-    // data has expected magic bytes
+    parse_tag_script(data, config)
+}
+
+fn parse_tag_script(
+    buf: &[u8],
+    config: &DepositTxParams,
+) -> Result<DepositRequestScriptInfo, DepositParseError> {
+    // buf has expected magic bytes
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
-    let actual_magic_bytes = &data[..magic_len];
-    if data.len() < magic_len || actual_magic_bytes != magic_bytes {
+    let actual_magic_bytes = &buf[..magic_len];
+    if buf.len() < magic_len || actual_magic_bytes != magic_bytes {
         //debug!(expected_magic_bytes = ?magic_bytes, ?actual_magic_bytes, "mismatched magic
         // bytes");
-        return Err(DepositParseError::MagicBytesMismatch);
+        return Err(DepositParseError::InvalidMagic);
     }
 
     // 32 bytes of control hash
-    let data = &data[magic_len..];
-    if data.len() < 32 {
-        //debug!(?data, expected = 32, got = %data.len(), "incorrect number of bytes in hash");
+    let buf = &buf[magic_len..];
+    if buf.len() < 32 {
+        //debug!(?buf, expected = 32, got = %buf.len(), "incorrect number of bytes in hash");
         return Err(DepositParseError::LeafHashLenMismatch);
     }
-    let ctrl_hash: &[u8; 32] = &data[..32]
+    let ctrl_hash: &[u8; 32] = &buf[..32]
         .try_into()
-        .expect("data length must be greater than 32");
+        .expect("buf length must be greater than 32");
 
     // configured bytes for address
-    let address = &data[32..];
-    if address.len() != config.address_length as usize {
-        // casting is safe as address.len() < data.len() < 80
-        debug!(?data, expected = config.address_length, got = %address.len(), "incorrect number of bytes in address");
-        return Err(DepositParseError::InvalidDestAddress(address.len() as u8));
+    let dest = &buf[32..];
+    if dest.len() != config.address_length as usize {
+        // casting is safe as address.len() < buf.len() < 80
+        debug!(?buf, expected = config.address_length, got = %dest.len(), "incorrect number of bytes in dest");
+        return Err(DepositParseError::InvalidDestLen(dest.len() as u8));
     }
 
     Ok(DepositRequestScriptInfo {
         tap_ctrl_blk_hash: *ctrl_hash,
-        ee_bytes: address.into(),
+        ee_bytes: dest.into(),
     })
 }
 
@@ -163,7 +173,7 @@ mod tests {
         let out = parse_deposit_request_script(&invalid_script, &config);
 
         // Should return an error as there's no OP_RETURN
-        assert!(matches!(out, Err(DepositParseError::NoOpReturn)));
+        assert!(matches!(out, Err(DepositParseError::MissingTag)));
     }
 
     #[test]
@@ -181,7 +191,7 @@ mod tests {
         let out = parse_deposit_request_script(&script, &config);
 
         // Should return an error as EVM address length is invalid
-        assert!(matches!(out, Err(DepositParseError::InvalidDestAddress(_))));
+        assert!(matches!(out, Err(DepositParseError::InvalidDestLen(_))));
     }
 
     #[test]
@@ -218,7 +228,7 @@ mod tests {
         let out = parse_deposit_request_script(&invalid_script, &config);
 
         // Should return an error due to invalid magic bytes
-        assert!(matches!(out, Err(DepositParseError::MagicBytesMismatch)));
+        assert!(matches!(out, Err(DepositParseError::InvalidMagic)));
     }
 
     #[test]

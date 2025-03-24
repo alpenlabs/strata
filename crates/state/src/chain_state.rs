@@ -1,3 +1,5 @@
+// use std::ops::Deref;
+
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
@@ -19,8 +21,11 @@ use crate::{
 /// This corresponds to the beacon chain state.
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct Chainstate {
-    /// Most recent seen block.
-    pub(crate) last_block: L2BlockCommitment,
+    /// The slot that contained the block that produced this chainstate.
+    pub(crate) cur_slot: u64,
+
+    /// The parent of the block that produced this chainstate.
+    pub(crate) prev_block: L2BlockCommitment,
 
     /// The checkpoint epoch period we're currently in, and so the index we
     /// expect the next checkpoint to be for.
@@ -30,7 +35,15 @@ pub struct Chainstate {
     pub(crate) cur_epoch: u64,
 
     /// The immediately preceding epoch.
+    ///
+    /// This *should* be updated in the first block of the new epoch.
     pub(crate) prev_epoch: EpochCommitment,
+
+    /// Flag set while processing the last block of an epoch to ensure that the
+    /// next block is the first block of the next epoch.
+    ///
+    /// This is a temporary flag.
+    pub(crate) is_epoch_finishing: bool,
 
     /// The epoch that we have observed in a checkpoint in L1.
     pub(crate) finalized_epoch: EpochCommitment,
@@ -56,10 +69,12 @@ impl Chainstate {
     // TODO remove genesis blkid since apparently we don't need it anymore
     pub fn from_genesis(gdata: &GenesisStateData) -> Self {
         Self {
-            last_block: L2BlockCommitment::new(0, gdata.genesis_blkid()),
+            cur_slot: 0,
+            prev_block: L2BlockCommitment::new(u64::MAX, L2BlockId::null()),
             cur_epoch: 0,
             prev_epoch: EpochCommitment::null(),
             finalized_epoch: EpochCommitment::null(),
+            is_epoch_finishing: false,
             l1_state: gdata.l1_state().clone(),
             pending_withdraws: StateQueue::new_empty(),
             exec_env_state: gdata.exec_state().clone(),
@@ -70,14 +85,12 @@ impl Chainstate {
 
     /// Returns the slot last processed on the chainstate.
     pub fn chain_tip_slot(&self) -> u64 {
-        self.last_block.slot()
+        self.cur_slot
     }
 
-    /// Returns the blockid of the last processed block, which was used to
-    /// construct this chainstate (unless we're currently in the process of
-    /// modifying this chainstate copy).
-    pub fn chain_tip_blkid(&self) -> &L2BlockId {
-        self.last_block.blkid()
+    /// Returns the commitment to the previous block.
+    pub fn prev_block(&self) -> &L2BlockCommitment {
+        &self.prev_block
     }
 
     pub fn l1_view(&self) -> &L1ViewState {
@@ -102,8 +115,10 @@ impl Chainstate {
     /// Computes a commitment to a the chainstate.  This is super expensive
     /// because it does a bunch of hashing.
     pub fn compute_state_root(&self) -> Buf32 {
+        // FIXME this is all broken because we're doing this badly, the real
+        // solution is to use SSZ for all of this
         let hashed_state = HashedChainState {
-            last_block: compute_borsh_hash(&self.last_block),
+            prev_block: compute_borsh_hash(&self.prev_block),
             cur_epoch: self.cur_epoch,
             prev_epoch: compute_borsh_hash(&self.prev_epoch),
             l1_state_hash: compute_borsh_hash(&self.l1_state),
@@ -130,6 +145,10 @@ impl Chainstate {
     pub fn exec_env_state(&self) -> &ExecEnvState {
         &self.exec_env_state
     }
+
+    pub fn is_epoch_finishing(&self) -> bool {
+        self.is_epoch_finishing
+    }
 }
 
 /// Hashed Chain State. This is used to compute the state root of the [`Chainstate`]
@@ -138,7 +157,7 @@ impl Chainstate {
 // which defines all of this more rigorously
 #[derive(BorshSerialize, BorshDeserialize, Clone, Copy)]
 pub struct HashedChainState {
-    pub last_block: Buf32,
+    pub prev_block: Buf32,
     pub cur_epoch: u64,
     pub prev_epoch: Buf32,
     pub l1_state_hash: Buf32,
@@ -165,26 +184,35 @@ impl<'a> Arbitrary<'a> for Chainstate {
     }
 }
 
-#[allow(unused)]
-#[cfg(test)]
-mod tests {
-    //use arbitrary::Unstructured;
+pub struct ChainstateEntry {
+    state: Chainstate,
+    tip: L2BlockId,
+}
 
-    //use super::*;
+impl ChainstateEntry {
+    pub fn new(state: Chainstate, tip: L2BlockId) -> Self {
+        Self { state, tip }
+    }
 
-    // TODO re-enable this test, it's going to be changing a lot so these kinds
-    // of test vectors aren't that useful right now
-    /*#[test]
-    fn test_state_root_calc() {
-        let mut u = Unstructured::new(&[12u8; 50]);
-        let state = Chainstate::arbitrary(&mut u).unwrap();
-        let root = state.state_root();
+    pub fn to_parts(self) -> (Chainstate, L2BlockId) {
+        (self.state, self.tip)
+    }
 
-        let expected = Buf32::from([
-            151, 170, 71, 78, 222, 173, 105, 242, 232, 9, 47, 21, 45, 160, 207, 234, 161, 29, 114,
-            237, 237, 94, 26, 177, 140, 238, 193, 81, 63, 80, 88, 181,
-        ]);
+    pub fn to_chainstate(self) -> Chainstate {
+        self.state
+    }
 
-        assert_eq!(root, expected);
-    }*/
+    pub fn state(&self) -> &Chainstate {
+        &self.state
+    }
+
+    pub fn tip_blockid(&self) -> &L2BlockId {
+        &self.tip
+    }
+}
+
+impl From<ChainstateEntry> for Chainstate {
+    fn from(value: ChainstateEntry) -> Self {
+        value.to_chainstate()
+    }
 }

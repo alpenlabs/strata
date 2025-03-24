@@ -6,6 +6,7 @@ use std::{cmp::max, collections::HashMap};
 
 use bitcoin::{block::Header, consensus, params::Params, OutPoint, Transaction};
 use rand_core::{RngCore, SeedableRng};
+use strata_crypto::groth16_verifier::verify_rollup_groth16_proof_receipt;
 use strata_primitives::{
     batch::SignedCheckpoint,
     epoch::EpochCommitment,
@@ -13,9 +14,11 @@ use strata_primitives::{
         BitcoinAmount, DepositInfo, DepositSpendInfo, L1BlockManifest, L1HeaderRecord, L1TxRef,
         OutputRef, ProtocolOperation, WithdrawalFulfillmentInfo,
     },
+    l2::L2BlockCommitment,
     params::RollupParams,
 };
 use strata_state::{
+    batch::verify_signed_checkpoint_sig,
     block::L1Segment,
     bridge_ops::{DepositIntent, WithdrawalIntent},
     bridge_state::{DepositState, DispatchCommand, WithdrawOutput},
@@ -25,9 +28,10 @@ use strata_state::{
     state_op::StateCache,
     state_queue,
 };
+use tracing::warn;
 
 use crate::{
-    errors::TsnError,
+    errors::{OpError, TsnError},
     macros::*,
     slot_rng::{self, SlotRng},
 };
@@ -58,7 +62,17 @@ pub fn process_block(
     let mut rng = compute_init_slot_rng(state);
 
     // Update basic bookkeeping.
-    state.set_cur_header(header);
+    let prev_tip_slot = state.state().chain_tip_slot();
+    let prev_tip_blkid = *header.parent();
+    state.set_slot(header.slot());
+    state.set_prev_block(L2BlockCommitment::new(prev_tip_slot, prev_tip_blkid));
+    advance_epoch_tracking(state)?;
+    if state.state().cur_epoch() != header.epoch() {
+        return Err(TsnError::MismatchEpoch(
+            header.epoch(),
+            state.state().cur_epoch(),
+        ));
+    }
 
     // Go through each stage and play out the operations it has.
     let has_new_epoch = process_l1_view_update(state, body.l1_segment(), params)?;
@@ -67,7 +81,7 @@ pub fn process_block(
 
     // If we checked in with L1, then advance the epoch.
     if has_new_epoch {
-        advance_epoch_tracking(state, header)?;
+        state.set_epoch_finishing_flag(true);
     }
 
     Ok(())
@@ -80,13 +94,13 @@ pub fn process_block(
 /// let's not get ahead of ourselves.
 fn compute_init_slot_rng(state: &StateCache) -> SlotRng {
     // Just take the last block's slot.
-    let blkid_buf = *state.state().chain_tip_blkid().as_ref();
+    let blkid_buf = *state.state().prev_block().blkid().as_ref();
     SlotRng::from_seed(blkid_buf)
 }
 
 /// Update our view of the L1 state, playing out downstream changes from that.
 ///
-/// Returns if there was an update processed.
+/// Returns true if there epoch needs to be updated.
 fn process_l1_view_update(
     state: &mut StateCache,
     l1seg: &L1Segment,
@@ -94,61 +108,99 @@ fn process_l1_view_update(
 ) -> Result<bool, TsnError> {
     let l1v = state.state().l1_view();
 
-    // Accept new blocks.
-    if !l1seg.new_manifests().is_empty() {
-        let cur_safe_height = l1v.safe_height();
-
-        // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
-        // more complicated to check the PoW.
-        let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
-        // FIXME: This check is just redundant.
-        if new_tip_height <= l1v.safe_height() {
-            return Err(TsnError::L1SegNotExtend);
-        }
-
-        // Go through each manifest and process it.
-        for (off, b) in l1seg.new_manifests().iter().enumerate() {
-            // PoW checks are done when we try to update the HeaderVerificationState
-            let header: Header =
-                consensus::deserialize(b.header()).expect("invalid bitcoin header");
-            state.update_header_vs(&header, &Params::new(params.network))?;
-
-            let height = cur_safe_height + off as u64 + 1;
-            process_l1_block(state, b)?;
-            state.update_safe_block(height, b.record().clone());
-        }
-
-        Ok(true)
-    } else {
-        Ok(false)
+    if l1seg.new_manifests().is_empty() {
+        return Ok(false);
     }
+
+    let cur_safe_height = l1v.safe_height();
+
+    // Validate the new blocks actually extend the tip.  This is what we have to tweak to make
+    // more complicated to check the PoW.
+    let new_tip_height = cur_safe_height + l1seg.new_manifests().len() as u64;
+    // FIXME: This check is just redundant.
+    if new_tip_height <= l1v.safe_height() {
+        return Err(TsnError::L1SegNotExtend);
+    }
+
+    let prev_finalized_epoch = *state.state().finalized_epoch();
+
+    // Go through each manifest and process it.
+    for (off, b) in l1seg.new_manifests().iter().enumerate() {
+        // PoW checks are done when we try to update the HeaderVerificationState
+        let header: Header = consensus::deserialize(b.header()).expect("invalid bitcoin header");
+        state.update_header_vs(&header, &Params::new(params.network))?;
+
+        let height = cur_safe_height + off as u64 + 1;
+        process_l1_block(state, b, params)?;
+        state.update_safe_block(height, b.record().clone());
+    }
+
+    // If prev_finalized_epoch is null, i.e. this is the genesis batch, it is
+    // always safe to update the epoch.
+    if prev_finalized_epoch.is_null() {
+        return Ok(true);
+    }
+
+    // For all other non-genesis batch, we need to check that the new finalized epoch has been
+    // updated when processing L1Checkpoint
+    let new_finalized_epoch = state.state().finalized_epoch();
+
+    // This checks to make sure that the L1 segment actually advances the
+    // observed final epoch.  We don't want to allow segments that don't
+    // advance the finalized epoch.
+    //
+    // QUESTION: why again exactly?
+    if new_finalized_epoch.epoch() <= prev_finalized_epoch.epoch() {
+        return Err(TsnError::EpochNotExtend);
+    }
+
+    Ok(true)
 }
 
-fn process_l1_block(state: &mut StateCache, block_mf: &L1BlockManifest) -> Result<(), TsnError> {
+fn process_l1_block(
+    state: &mut StateCache,
+    block_mf: &L1BlockManifest,
+    params: &RollupParams,
+) -> Result<(), TsnError> {
     // Just iterate through every tx's operation and call out to the handlers for that.
     for tx in block_mf.txs() {
+        let in_blkid = block_mf.blkid();
         for op in tx.protocol_ops() {
-            match &op {
-                ProtocolOperation::Checkpoint(ckpt) => {
-                    process_l1_checkpoint(state, block_mf, ckpt)?;
-                }
-
-                ProtocolOperation::Deposit(info) => {
-                    process_l1_deposit(state, block_mf, info)?;
-                }
-
-                ProtocolOperation::WithdrawalFulfillment(info) => {
-                    process_withdrawal_fulfillment(state, info)?;
-                }
-
-                ProtocolOperation::DepositSpent(info) => {
-                    process_deposit_spent(state, info)?;
-                }
-
-                // Other operations we don't do anything with for now.
-                _ => {}
+            // Try to process it, log a warning if there's an error.
+            if let Err(e) = process_proto_op(state, block_mf, op, params) {
+                warn!(?op, %in_blkid, %e, "invalid protocol operation");
             }
         }
+    }
+
+    Ok(())
+}
+
+fn process_proto_op(
+    state: &mut StateCache,
+    block_mf: &L1BlockManifest,
+    op: &ProtocolOperation,
+    params: &RollupParams,
+) -> Result<(), OpError> {
+    match &op {
+        ProtocolOperation::Checkpoint(ckpt) => {
+            process_l1_checkpoint(state, block_mf, ckpt, params)?;
+        }
+
+        ProtocolOperation::Deposit(info) => {
+            process_l1_deposit(state, block_mf, info)?;
+        }
+
+        ProtocolOperation::WithdrawalFulfillment(info) => {
+            process_withdrawal_fulfillment(state, info)?;
+        }
+
+        ProtocolOperation::DepositSpent(info) => {
+            process_deposit_spent(state, info)?;
+        }
+
+        // Other operations we don't do anything with for now.
+        _ => {}
     }
 
     Ok(())
@@ -158,14 +210,40 @@ fn process_l1_checkpoint(
     state: &mut StateCache,
     src_block_mf: &L1BlockManifest,
     signed_ckpt: &SignedCheckpoint,
-) -> Result<(), TsnError> {
-    // TODO verify signature?  it should already have been validated but it
-    // doesn't hurt to do it again (just costs)
-    // TODO should we verify the proof here too?  the L1 scan proof probably
-    // should have done it, but it wouldn't be excessively complicated to
-    // re-verify it, we should formally define the answers to these questions
+    params: &RollupParams,
+) -> Result<(), OpError> {
+    // If signature verification failed, return early and do **NOT** finalize epoch
+    // Note: This is not an error because anyone is able to post data to L1
+    if !verify_signed_checkpoint_sig(signed_ckpt, &params.cred_rule) {
+        warn!("Invalid checkpoint: signature");
+        return Err(OpError::InvalidSignature);
+    }
 
     let ckpt = signed_ckpt.checkpoint(); // inner data
+    let ckpt_epoch = ckpt.batch_transition().epoch;
+
+    let receipt = ckpt.construct_receipt();
+
+    // Note: This is error because this is done by the sequencer
+    if ckpt_epoch != 0 && ckpt_epoch != state.state().finalized_epoch().epoch() + 1 {
+        error!(%ckpt_epoch, "Invalid checkpoint: proof for invalid epoch");
+        return Err(OpError::EpochNotExtend);
+    }
+
+    // TODO refactor this to encapsulate the conditional verification into
+    // another fn so we don't have to think about it here
+    if receipt.proof().is_empty() {
+        warn!(%ckpt_epoch, "Empty proof posted");
+        // If the proof is empty but empty proofs are not allowed, this will fail.
+        if !params.proof_publish_mode.allow_empty() {
+            error!(%ckpt_epoch, "Invalid checkpoint: Empty proof");
+            return Err(OpError::InvalidProof);
+        }
+    } else {
+        // Otherwise, verify the non-empty proof.
+        verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk)
+            .map_err(|e| OpError::InvalidProof)?;
+    }
 
     // Copy the epoch commitment and make it finalized.
     let old_fin_epoch = state.state().finalized_epoch();
@@ -183,21 +261,27 @@ fn process_l1_deposit(
     state: &mut StateCache,
     src_block_mf: &L1BlockManifest,
     info: &DepositInfo,
-) -> Result<(), TsnError> {
+) -> Result<(), OpError> {
+    let requested_idx = info.deposit_idx;
     let outpoint = info.outpoint;
 
     // Create the deposit entry to track it on the bridge side.
     //
     // Right now all operators sign all deposits, take them all.
     let all_operators = state.state().operator_table().indices().collect::<_>();
-    state.insert_deposit_entry(outpoint, info.amt, all_operators);
+    let ok = state.insert_deposit_entry(requested_idx, outpoint, info.amt, all_operators);
 
-    // Insert an intent to credit the destination with it.
-    let deposit_intent = DepositIntent::new(info.amt, info.address.clone());
-    state.insert_deposit_intent(0, deposit_intent);
+    // If we inserted it successfully, create the intent.
+    if ok {
+        // Insert an intent to credit the destination with it.
+        let deposit_intent = DepositIntent::new(info.amt, info.address.clone());
+        state.insert_deposit_intent(0, deposit_intent);
 
-    // Logging so we know if it got there.
-    trace!(?outpoint, "handled deposit");
+        // Logging so we know if it got there.
+        trace!(?outpoint, "handled deposit");
+    } else {
+        warn!(?outpoint, %requested_idx, "ignoring deposit that would have overwritten entry");
+    }
 
     Ok(())
 }
@@ -207,25 +291,31 @@ fn process_l1_deposit(
 fn process_withdrawal_fulfillment(
     state: &mut StateCache,
     info: &WithdrawalFulfillmentInfo,
-) -> Result<(), TsnError> {
+) -> Result<(), OpError> {
     state.mark_deposit_fulfilled(info);
     Ok(())
 }
 
 /// Locked deposit on L1 has been spent.
-fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Result<(), TsnError> {
+fn process_deposit_spent(state: &mut StateCache, info: &DepositSpendInfo) -> Result<(), OpError> {
     // Currently, we are not tracking how this was spent, only that it was.
 
     state.mark_deposit_reimbursed(info.deposit_idx);
     Ok(())
 }
 
-/// Advances the epoch bookkeeping, using the provided header as the terminal.
-fn advance_epoch_tracking(state: &mut StateCache, header: &impl L2Header) -> Result<(), TsnError> {
+/// Advances the epoch bookkeeping, if this is first slot of new epoch.
+fn advance_epoch_tracking(state: &mut StateCache) -> Result<(), TsnError> {
+    if !state.should_finish_epoch() {
+        return Ok(());
+    }
+
+    let prev_block = state.state().prev_block();
     let cur_epoch = state.state().cur_epoch();
-    let this_epoch = EpochCommitment::new(cur_epoch, header.blockidx(), header.get_blockid());
-    state.set_prev_epoch(this_epoch);
+    let ended_epoch = EpochCommitment::new(cur_epoch, prev_block.slot(), *prev_block.blkid());
+    state.set_prev_epoch(ended_epoch);
     state.set_cur_epoch(cur_epoch + 1);
+    state.set_epoch_finishing_flag(false);
     Ok(())
 }
 

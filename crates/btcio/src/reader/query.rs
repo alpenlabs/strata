@@ -485,45 +485,14 @@ pub async fn fetch_verification_state(
 #[cfg(test)]
 mod test {
     use bitcoin::{hashes::Hash, params::REGTEST};
-    use strata_primitives::{buf::Buf32, l1::L1Status};
-    use strata_rocksdb::{init_core_dbs, test_utils::get_rocksdb_tmp_instance};
-    use strata_state::{chain_state::Chainstate, client_state::ClientState};
-    use strata_status::ChainSyncStatusUpdate;
-    use strata_storage::create_node_storage;
-    use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
-    use threadpool::ThreadPool;
+    use strata_primitives::buf::Buf32;
+    use strata_test_utils::ArbitraryGenerator;
 
     use super::*;
     use crate::test_utils::{
         corepc_node_helpers::{get_bitcoind_and_client, mine_blocks},
         TestBitcoinClient,
     };
-
-    /// Used to populate recent blocks in reader state.
-    const N_RECENT_BLOCKS: usize = 10;
-
-    fn get_reader_ctx(chs: Chainstate, cls: ClientState) -> ReaderContext<TestBitcoinClient> {
-        let mut gen = ArbitraryGenerator::new();
-        let l1status: L1Status = gen.generate();
-        let css = ChainSyncStatusUpdate::new_transitional(Arc::new(chs.clone()));
-        let status_channel = StatusChannel::new(cls, l1status, Some(css));
-        let params = Arc::new(gen_params());
-        let config = Arc::new(ReaderConfig::default());
-        let client = Arc::new(TestBitcoinClient::new(1));
-
-        let (rbdb, db_ops) = get_rocksdb_tmp_instance().unwrap();
-        let db = init_core_dbs(rbdb, db_ops);
-        let pool = ThreadPool::new(1);
-        let storage = Arc::new(create_node_storage(db, pool).unwrap());
-        ReaderContext {
-            storage,
-            config,
-            status_channel,
-            params,
-            client,
-            seq_pubkey: None,
-        }
-    }
 
     // Get reader state with provided recent blocks
     fn get_reader_state(

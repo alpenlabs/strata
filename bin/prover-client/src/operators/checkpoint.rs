@@ -16,8 +16,11 @@ use tracing::{error, info};
 
 use super::{cl_stf::ClStfOperator, ProvingOp};
 use crate::{
-    checkpoint_runner::submit::submit_checkpoint_proof, errors::ProvingTaskError, hosts,
-    operators::cl_stf::ClStfParams, task_tracker::TaskTracker,
+    checkpoint_runner::{errors::CheckpointResult, submit::submit_checkpoint_proof},
+    errors::ProvingTaskError,
+    hosts,
+    operators::cl_stf::ClStfParams,
+    task_tracker::TaskTracker,
 };
 
 /// A struct that implements the [`ProvingOp`] for Checkpoint Proof.
@@ -177,12 +180,11 @@ impl CheckpointOperator {
         checkpoint_index: u64,
         proof_key: &ProofKey,
         proof_db: &ProofDb,
-    ) {
-        if self.enable_checkpoint_runner {
-            submit_checkpoint_proof(checkpoint_index, self.cl_client(), proof_key, proof_db)
-                .await
-                .unwrap_or_else(|err| error!(?err, "Failed to submit checkpoint proof"));
+    ) -> CheckpointResult<()> {
+        if !self.enable_checkpoint_runner {
+            return Ok(());
         }
+        submit_checkpoint_proof(checkpoint_index, self.cl_client(), proof_key, proof_db).await
     }
 }
 

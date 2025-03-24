@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use revm_primitives::B256;
 use strata_db::errors::DbError;
 use strata_primitives::params::RollupParams;
-use strata_state::{block::L2BlockBundle, chain_state::Chainstate, id::L2BlockId};
+use strata_state::{block::L2BlockBundle, chain_state::ChainstateEntry, id::L2BlockId};
 use strata_storage::*;
 use tracing::*;
 
@@ -18,10 +18,10 @@ pub fn fetch_init_fork_choice_state(
     // TODO switch these logs to debug
     match get_last_chainstate(storage)? {
         Some(chs) => {
-            let tip = chs.chain_tip_blkid();
-            let slot = chs.chain_tip_slot();
+            let slot = chs.state().chain_tip_slot();
+            let tip = chs.tip_blockid();
             info!(%slot, %tip, "preparing EVM initial state from chainstate");
-            compute_evm_fc_state_from_chainstate(&chs, storage)
+            compute_evm_fc_state_from_chainstate(tip, storage)
         }
         None => {
             info!("preparing EVM initial state from genesis");
@@ -32,14 +32,17 @@ pub fn fetch_init_fork_choice_state(
     }
 }
 
-fn compute_evm_fc_state_from_chainstate(chs: &Chainstate, storage: &NodeStorage) -> Result<B256> {
+fn compute_evm_fc_state_from_chainstate(
+    tip_blockid: &L2BlockId,
+    storage: &NodeStorage,
+) -> Result<B256> {
     let l2man = storage.l2();
-    let latest_evm_block_hash = get_evm_block_hash_by_id(chs.chain_tip_blkid(), l2man)?
-        .expect("evmexec: missing expected block");
+    let latest_evm_block_hash =
+        get_evm_block_hash_by_id(tip_blockid, l2man)?.expect("evmexec: missing expected block");
     Ok(latest_evm_block_hash)
 }
 
-fn get_last_chainstate(storage: &NodeStorage) -> Result<Option<Chainstate>> {
+fn get_last_chainstate(storage: &NodeStorage) -> Result<Option<ChainstateEntry>> {
     let chsman = storage.chainstate();
 
     let last_write_idx = match chsman.get_last_write_idx_blocking() {

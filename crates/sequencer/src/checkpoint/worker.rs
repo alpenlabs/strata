@@ -164,7 +164,7 @@ fn handle_ready_epoch(
     let epoch = epoch_summary.epoch();
     let new_l1 = epoch_summary.new_l1();
 
-    info!(?epoch, ?new_l1, "preparing checkpoint data");
+    info!(%epoch, ?new_l1, "preparing checkpoint data");
 
     // REALLY make sure we don't already have checkpoint for the epoch.
     if ckhandle.get_checkpoint_blocking(epoch)?.is_some() {
@@ -267,20 +267,22 @@ fn create_checkpoint_prep_data_from_summary(
     let first_block = l2_blocks.first().unwrap();
     let last_block = l2_blocks.last().unwrap();
     let initial_l2_commitment =
-        L2BlockCommitment::new(first_block.blockidx(), first_block.get_blockid());
+        L2BlockCommitment::new(first_block.slot(), first_block.get_blockid());
     let l2_range = (initial_l2_commitment, *summary.terminal());
 
     // Initial state is the state before applying the first block
-    let initial_state_height = first_block.blockidx() - 1;
+    let initial_state_height = first_block.slot() - 1;
     let initial_state = chsman
         .get_toplevel_chainstate_blocking(initial_state_height)?
-        .ok_or(Error::MissingIdxChainstate(initial_state_height))?;
+        .ok_or(Error::MissingIdxChainstate(initial_state_height))?
+        .to_chainstate();
     let l2_initial_state = initial_state.compute_state_root();
 
-    let final_state_height = last_block.blockidx();
+    let final_state_height = last_block.slot();
     let final_state = chsman
         .get_toplevel_chainstate_blocking(final_state_height)?
-        .ok_or(Error::MissingIdxChainstate(final_state_height))?;
+        .ok_or(Error::MissingIdxChainstate(final_state_height))?
+        .to_chainstate();
     let l2_final_state = final_state.compute_state_root();
 
     let mut tx_filters = TxFilterConfig::derive_from(params)
@@ -342,6 +344,7 @@ fn create_checkpoint_prep_data_from_summary(
     };
 
     let new_transition = BatchTransition {
+        epoch: summary.epoch(),
         chainstate_transition,
         tx_filters_transition,
     };
@@ -380,7 +383,7 @@ fn fetch_epoch_l2_headers(
 
         // If we're at the first block we can just exit.
         // Checkpoint 0 range starts from block 1.
-        if cur.blockidx() == 1 {
+        if cur.slot() == 1 {
             break;
         }
 

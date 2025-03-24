@@ -10,7 +10,6 @@ use bitcoin::{
 };
 use futures::TryFutureExt;
 use jsonrpsee::core::RpcResult;
-use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{broadcaster::L1BroadcastHandle, writer::EnvelopeHandle};
 #[cfg(feature = "debug-utils")]
 use strata_common::BAIL_SENDER;
@@ -31,8 +30,8 @@ use strata_rpc_api::{
 };
 use strata_rpc_types::{
     errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, HexBytes64, L2BlockStatus,
-    RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo,
-    RpcClientStatus, RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
+    RpcBlockHeader, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo, RpcClientStatus,
+    RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_sequencer::{
@@ -45,7 +44,6 @@ use strata_sequencer::{
 use strata_state::{
     batch::{Checkpoint, SignedCheckpoint},
     block::{L2Block, L2BlockBundle},
-    bridge_duties::BridgeDuty,
     bridge_ops::WithdrawalIntent,
     chain_state::Chainstate,
     client_state::ClientState,
@@ -60,14 +58,12 @@ use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 use zkaleido::ProofReceipt;
 
-use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
-
 pub struct StrataRpcImpl {
     status_channel: StatusChannel,
     sync_manager: Arc<SyncManager>,
     storage: Arc<NodeStorage>,
     checkpoint_handle: Arc<CheckpointHandle>,
-    relayer_handle: Arc<RelayerHandle>,
+    //relayer_handle: Arc<RelayerHandle>,
 }
 
 impl StrataRpcImpl {
@@ -77,14 +73,14 @@ impl StrataRpcImpl {
         sync_manager: Arc<SyncManager>,
         storage: Arc<NodeStorage>,
         checkpoint_handle: Arc<CheckpointHandle>,
-        relayer_handle: Arc<RelayerHandle>,
+        //relayer_handle: Arc<RelayerHandle>,
     ) -> Self {
         Self {
             status_channel,
             sync_manager,
             storage,
             checkpoint_handle,
-            relayer_handle,
+            //relayer_handle,
         }
     }
 
@@ -110,25 +106,6 @@ impl StrataRpcImpl {
         Ok((cs, chs))
     }
 
-    // TODO remove this RPC, we aren't supposed to be exposing this
-    async fn get_last_checkpoint_chainstate(&self) -> Result<Option<Arc<Chainstate>>, Error> {
-        let client_state = self.status_channel.get_cur_client_state();
-
-        let Some(last_checkpoint) = client_state.get_last_checkpoint() else {
-            return Ok(None);
-        };
-
-        // in current implementation, chainstate idx == l2 block idx
-        let (_, end_commitment) = last_checkpoint.batch_info.l2_range;
-
-        Ok(self
-            .storage
-            .chainstate()
-            .get_toplevel_chainstate_async(end_commitment.slot())
-            .await?
-            .map(Arc::new))
-    }
-
     async fn fetch_l2_block_ok(&self, blkid: &L2BlockId) -> Result<L2BlockBundle, Error> {
         self.fetch_l2_block(blkid)
             .await?
@@ -146,7 +123,7 @@ impl StrataRpcImpl {
 
 fn conv_blk_header_to_rpc(blk_header: &impl L2Header) -> RpcBlockHeader {
     RpcBlockHeader {
-        block_idx: blk_header.blockidx(),
+        block_idx: blk_header.slot(),
         timestamp: blk_header.timestamp(),
         block_id: *blk_header.get_blockid().as_ref(),
         prev_block: *blk_header.parent().as_ref(),
@@ -281,7 +258,7 @@ impl StrataApiServer for StrataRpcImpl {
             let l2_blk = self.fetch_l2_block_ok(&cur_blkid).await?;
             output.push(conv_blk_header_to_rpc(l2_blk.header()));
             cur_blkid = *l2_blk.header().parent();
-            if l2_blk.header().blockidx() == 0 || Buf32::from(cur_blkid).is_zero() {
+            if l2_blk.header().slot() == 0 || Buf32::from(cur_blkid).is_zero() {
                 break;
             }
         }
@@ -298,7 +275,7 @@ impl StrataApiServer for StrataRpcImpl {
 
         // check the tip idx
         let tip_block = self.fetch_l2_block_ok(tip_blkid).await?;
-        let tip_idx = tip_block.header().blockidx();
+        let tip_idx = tip_block.header().slot();
 
         if idx > tip_idx {
             return Ok(None);
@@ -403,7 +380,8 @@ impl StrataApiServer for StrataRpcImpl {
             .get_toplevel_chainstate_async(slot)
             .map_err(Error::Db)
             .await?
-            .ok_or(Error::MissingChainstate(slot))?;
+            .ok_or(Error::MissingChainstate(slot))?
+            .to_chainstate();
 
         let raw_chs = borsh::to_vec(&chs)
             .map_err(|_| Error::Other("failed to serialize chainstate".to_string()))?;
@@ -414,7 +392,7 @@ impl StrataApiServer for StrataRpcImpl {
     async fn get_cl_block_witness_raw(&self, blkid: L2BlockId) -> RpcResult<Vec<u8>> {
         let l2_blk_bundle = self.fetch_l2_block_ok(&blkid).await?;
 
-        let prev_slot = l2_blk_bundle.block().header().header().blockidx() - 1;
+        let prev_slot = l2_blk_bundle.block().header().header().slot() - 1;
 
         let chain_state = self
             .storage
@@ -422,7 +400,8 @@ impl StrataApiServer for StrataRpcImpl {
             .get_toplevel_chainstate_async(prev_slot)
             .map_err(Error::Db)
             .await?
-            .ok_or(Error::MissingChainstate(prev_slot))?;
+            .ok_or(Error::MissingChainstate(prev_slot))?
+            .to_chainstate();
 
         let cl_block_witness = (chain_state, l2_blk_bundle.block());
         let raw_cl_block_witness = borsh::to_vec(&cl_block_witness)
@@ -514,75 +493,14 @@ impl StrataApiServer for StrataRpcImpl {
         Ok(block)
     }
 
-    async fn get_msgs_by_scope(&self, scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
-        let msgs = self
-            .relayer_handle
-            .get_message_by_scope_async(scope.0)
-            .map_err(to_jsonrpsee_error("querying relayer db"))
-            .await?;
-
-        let mut raw_msgs = Vec::new();
-        for m in msgs {
-            match borsh::to_vec(&m) {
-                Ok(m) => raw_msgs.push(HexBytes(m)),
-                Err(_) => {
-                    let msg_id = m.compute_id();
-                    warn!(%msg_id, "failed to serialize bridge msg");
-                }
-            }
-        }
-
-        Ok(raw_msgs)
+    async fn get_msgs_by_scope(&self, _scope: HexBytes) -> RpcResult<Vec<HexBytes>> {
+        warn!("call to get_msgs_by_scope, bridge relay system deprecated");
+        Ok(Vec::new())
     }
 
-    async fn submit_bridge_msg(&self, raw_msg: HexBytes) -> RpcResult<()> {
-        let msg =
-            borsh::from_slice(&raw_msg.0).map_err(to_jsonrpsee_error("parse bridge message"))?;
-        self.relayer_handle.submit_message_async(msg).await;
+    async fn submit_bridge_msg(&self, _raw_msg: HexBytes) -> RpcResult<()> {
+        warn!("call to submit_bridge_msg, bridge relay system deprecated");
         Ok(())
-    }
-
-    // FIXME: find a way to handle reorgs if that becomes a problem
-    async fn get_bridge_duties(
-        &self,
-        operator_idx: OperatorIdx,
-        start_index: u64,
-    ) -> RpcResult<RpcBridgeDuties> {
-        info!(%operator_idx, %start_index, "received request for bridge duties");
-
-        // OPTIMIZE: the extraction of deposit and withdrawal duties can happen in parallel as they
-        // depend on independent sources of information. This optimization can be done if this RPC
-        // call takes a lot of time (for example, when there are hundreds of thousands of
-        // deposits/withdrawals).
-
-        let network = self.sync_manager.params().rollup().network;
-
-        let (deposit_duties, latest_index) =
-            extract_deposit_requests(self.storage.l1().as_ref(), start_index, network).await?;
-
-        let deposit_duties = deposit_duties.map(BridgeDuty::from);
-
-        // withdrawal duties should only be generated from finalized checkpoint states
-        let withdrawal_duties = self
-            .get_last_checkpoint_chainstate()
-            .await?
-            .map(|chainstate| {
-                extract_withdrawal_infos(chainstate.deposits_table())
-                    .map(BridgeDuty::from)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        let mut duties = vec![];
-        duties.extend(deposit_duties);
-        duties.extend(withdrawal_duties.into_iter());
-
-        info!(%operator_idx, %start_index, "dispatching duties");
-        Ok(RpcBridgeDuties {
-            duties,
-            start_index,
-            stop_index: latest_index,
-        })
     }
 
     async fn get_active_operator_chain_pubkey_set(&self) -> RpcResult<PublickeyTable> {
@@ -821,42 +739,53 @@ impl StrataSequencerApiServer for SequencerServerImpl {
 
     async fn submit_checkpoint_proof(
         &self,
-        idx: u64,
+        ckpt: u64,
         proof_receipt: ProofReceipt,
     ) -> RpcResult<()> {
         // TODO shift all this logic somewhere else that's closer to where it's
         // relevant and not in the RPC method impls
 
-        debug!(%idx, "received checkpoint proof request");
-        let mut entry = self
-            .checkpoint_handle
-            .get_checkpoint(idx)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?
-            .ok_or(Error::MissingCheckpointInDb(idx))?;
-        debug!(%idx, "found checkpoint in db");
+        let span = debug_span!("accept-ckpt-proof", %ckpt);
 
-        // If proof is not pending error out
-        if entry.proving_status != CheckpointProvingStatus::PendingProof {
-            return Err(Error::ProofAlreadyCreated(idx))?;
+        let fut = async {
+            debug!(%ckpt, "received checkpoint proof request");
+
+            let mut entry = self
+                .checkpoint_handle
+                .get_checkpoint(ckpt)
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?
+                .ok_or(Error::MissingCheckpointInDb(ckpt))?;
+            trace!("found checkpoint in db");
+
+            // If proof is not pending error out.
+            if entry.proving_status != CheckpointProvingStatus::PendingProof {
+                warn!("already have proof?");
+                return Err(Error::ProofAlreadyCreated(ckpt))?;
+            }
+
+            let checkpoint = entry.clone().into_batch_checkpoint();
+            verify_proof(&checkpoint, &proof_receipt, self.params.rollup()).map_err(|e| {
+                warn!("proof is invalid");
+                Error::InvalidProof(ckpt, e.to_string())
+            })?;
+
+            entry.checkpoint.set_proof(proof_receipt.proof().clone());
+            entry.proving_status = CheckpointProvingStatus::ProofReady;
+
+            trace!("proof is pending, setting proof ready");
+
+            self.checkpoint_handle
+                .put_checkpoint(ckpt, entry)
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?;
+            debug!("proof stored successfully");
+
+            Ok(())
         }
+        .instrument(span);
 
-        let checkpoint = entry.clone().into_batch_checkpoint();
-        verify_proof(&checkpoint, &proof_receipt, self.params.rollup())
-            .map_err(|e| Error::InvalidProof(idx, e.to_string()))?;
-
-        entry.checkpoint.set_proof(proof_receipt.proof().clone());
-        entry.proving_status = CheckpointProvingStatus::ProofReady;
-
-        debug!(%idx, "Proof is pending, setting proof ready");
-
-        self.checkpoint_handle
-            .put_checkpoint(idx, entry)
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-        debug!(%idx, "Success");
-
-        Ok(())
+        fut.await
     }
 
     async fn get_tx_status(&self, txid: HexBytes32) -> RpcResult<Option<L1TxStatus>> {
@@ -871,9 +800,9 @@ impl StrataSequencerApiServer for SequencerServerImpl {
     }
 
     async fn get_sequencer_duties(&self) -> RpcResult<Vec<Duty>> {
-        let chain_state = self
+        let (chain_state, tip_blockid) = self
             .status
-            .get_cur_tip_chainstate()
+            .get_cur_tip_chainstate_with_block()
             .ok_or(Error::BeforeGenesis)?;
         let client_state = self.status.get_cur_client_state();
 
@@ -882,7 +811,8 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .ok_or(Error::MissingInternalState)?;
 
         let duties = extract_duties(
-            chain_state.as_ref(),
+            chain_state.chain_tip_slot(),
+            tip_blockid,
             client_int_state,
             &self.checkpoint_handle,
             self.storage.l2().as_ref(),
@@ -984,17 +914,17 @@ impl StrataDebugApiServer for StrataDebugRpcImpl {
     }
 
     async fn get_chainstate_at_idx(&self, idx: u64) -> RpcResult<Option<RpcChainState>> {
-        let chain_state = self
+        let chain_state_res = self
             .storage
             .chainstate()
             .get_toplevel_chainstate_async(idx)
             .map_err(Error::Db)
             .await?;
-        match chain_state {
-            Some(cs) => Ok(Some(RpcChainState {
-                tip_blkid: *cs.chain_tip_blkid(),
-                tip_slot: cs.chain_tip_slot(),
-                cur_epoch: cs.cur_epoch(),
+        match chain_state_res {
+            Some(cs_entry) => Ok(Some(RpcChainState {
+                tip_blkid: *cs_entry.tip_blockid(),
+                tip_slot: cs_entry.state().chain_tip_slot(),
+                cur_epoch: cs_entry.state().cur_epoch(),
             })),
             None => Ok(None),
         }

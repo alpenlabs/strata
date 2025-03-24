@@ -31,7 +31,8 @@ fn get_total_gas_used_in_epoch(storage: &NodeStorage, prev_slot: u64) -> Result<
     let chainstate = storage
         .chainstate()
         .get_toplevel_chainstate_blocking(prev_slot)?
-        .ok_or(Error::Db(DbError::MissingL2State(prev_slot)))?;
+        .ok_or(Error::Db(DbError::MissingL2State(prev_slot)))?
+        .to_chainstate();
 
     let epoch_start_slot = chainstate.prev_epoch().last_slot() + 1;
     let mut gas_used = 0;
@@ -76,12 +77,12 @@ pub fn prepare_block(
     // Get the previous block's state
     // TODO make this get the prev block slot from somewhere more reliable in
     // case we skip slots
-    let prev_slot = prev_block.header().blockidx();
+    let prev_slot = prev_block.header().slot();
     let prev_chstate = chsman
         .get_toplevel_chainstate_blocking(prev_slot)?
-        .ok_or(Error::MissingBlockChainstate(prev_blkid))?;
-    let epoch = prev_chstate.cur_epoch();
-    let first_block_of_epoch = prev_chstate.prev_epoch().last_slot() + 1 == slot;
+        .ok_or(Error::MissingBlockChainstate(prev_blkid))?
+        .to_chainstate();
+    let first_block_of_epoch = prev_chstate.is_epoch_finishing();
 
     // Figure out the safe L1 blkid.
     // FIXME this is somewhat janky, should get it from the MMR
@@ -121,12 +122,19 @@ pub fn prepare_block(
     )?;
 
     // Assemble the body and fake header.
+    let epoch = if first_block_of_epoch {
+        prev_chstate.cur_epoch() + 1
+    } else {
+        prev_chstate.cur_epoch()
+    };
+
     let body = L2BlockBody::new(l1_seg, exec_seg);
-    let fake_header = L2BlockHeader::new(slot, epoch, ts, prev_blkid, &body, Buf32::zero());
+    let fake_stateroot = Buf32::zero();
+    let fake_header = L2BlockHeader::new(slot, epoch, ts, prev_blkid, &body, fake_stateroot);
 
     // Execute the block to compute the new state root, then assemble the real header.
     // TODO do something with the write batch?  to prepare it in the database?
-    let (post_state, _wb) = compute_post_state(prev_chstate, &fake_header, &body, params)?;
+    let post_state = compute_post_state(prev_chstate, &fake_header, &body, params)?;
 
     // FIXME: invalid stateroot. Remove l2blockid from ChainState or stateroot from L2Block header.
     let new_state_root = post_state.compute_state_root();
@@ -164,7 +172,7 @@ fn prepare_l1_segment(
     // make the L1 scan proof stuff more sophisticated.
     let mut payloads = Vec::new();
     let mut is_epoch_final_block = {
-        if prev_chstate.cur_epoch() == 0 {
+        if prev_chstate.cur_epoch() == 0 && !prev_chstate.is_epoch_finishing() {
             // no previous epoch, end epoch and send commitment immediately
             // including first L1 block available.
             true
@@ -362,9 +370,9 @@ fn compute_post_state(
     header: &impl L2Header,
     body: &L2BlockBody,
     params: &Params,
-) -> Result<(Chainstate, WriteBatch), Error> {
+) -> Result<Chainstate, Error> {
     let mut state_cache = StateCache::new(prev_chstate);
     strata_chaintsn::transition::process_block(&mut state_cache, header, body, params.rollup())?;
-    let (post_state, wb) = state_cache.finalize();
-    Ok((post_state, wb))
+    let wb = state_cache.finalize();
+    Ok(wb.into_toplevel())
 }

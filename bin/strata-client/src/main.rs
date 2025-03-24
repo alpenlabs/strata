@@ -7,7 +7,6 @@ use el_sync::sync_chainstate_to_el;
 use errors::InitError;
 use jsonrpsee::Methods;
 use rpc_client::sync_client;
-use strata_bridge_relay::relayer::RelayerHandle;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     reader::query::bitcoin_data_reader_task,
@@ -50,7 +49,6 @@ use crate::{args::Args, helpers::*};
 mod args;
 mod el_sync;
 mod errors;
-mod extractor;
 mod helpers;
 mod network;
 mod rpc_client;
@@ -230,7 +228,6 @@ pub struct CoreContext {
     pub sync_manager: Arc<SyncManager>,
     pub status_channel: StatusChannel,
     pub engine: Arc<RpcExecEngineCtl<EngineRpcClient>>,
-    pub relayer_handle: Arc<RelayerHandle>,
     pub bitcoin_client: Arc<BitcoinClient>,
 }
 
@@ -250,13 +247,14 @@ fn do_startup_checks(
         err => err?,
     };
 
-    let Some(last_chain_state) = storage
+    let Some(last_chain_state_entry) = storage
         .chainstate()
         .get_toplevel_chainstate_blocking(last_state_idx)?
     else {
         anyhow::bail!("Missing chain state idx: {last_state_idx}");
     };
 
+    let (last_chain_state, tip_blockid) = last_chain_state_entry.to_parts();
     // Check that we can connect to bitcoin client and block we believe to be matured in L1 is
     // actually present
     let safe_l1blockid = last_chain_state.l1_view().safe_block().blkid();
@@ -275,8 +273,8 @@ fn do_startup_checks(
     }
 
     // Check that tip L2 block exists (and engine can be connected to)
-    let chain_tip = last_chain_state.chain_tip_blkid();
-    match engine.check_block_exists(*chain_tip) {
+    let chain_tip = tip_blockid;
+    match engine.check_block_exists(chain_tip) {
         Ok(true) => {
             info!("startup: last l2 block is synced")
         }
@@ -304,7 +302,7 @@ fn start_core_tasks(
     params: Arc<Params>,
     database: Arc<CommonDb>,
     storage: Arc<NodeStorage>,
-    bridge_msg_ops: Arc<BridgeMsgOps>,
+    _bridge_msg_ops: Arc<BridgeMsgOps>,
     bitcoin_client: Arc<BitcoinClient>,
 ) -> anyhow::Result<CoreContext> {
     let runtime = executor.handle().clone();
@@ -346,14 +344,6 @@ fn start_core_tasks(
         ),
     );
 
-    // Start relayer task.
-    let relayer_handle = strata_bridge_relay::relayer::start_bridge_relayer_task(
-        bridge_msg_ops,
-        status_channel.clone(),
-        config.relayer,
-        executor,
-    );
-
     Ok(CoreContext {
         runtime,
         database,
@@ -363,7 +353,6 @@ fn start_core_tasks(
         sync_manager,
         status_channel,
         engine,
-        relayer_handle,
         bitcoin_client,
     })
 }
@@ -488,7 +477,6 @@ async fn start_rpc(
         storage,
         sync_manager,
         status_channel,
-        relayer_handle,
         ..
     } = ctx;
 
@@ -500,7 +488,6 @@ async fn start_rpc(
         sync_manager.clone(),
         storage.clone(),
         checkpoint_handle,
-        relayer_handle.clone(),
     );
     methods.merge(strata_rpc.into_rpc())?;
 

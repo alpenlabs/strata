@@ -83,17 +83,21 @@ mod test {
         let params = gen_params();
         let filter_conf = create_tx_filter_config(&params);
         let deposit_config = filter_conf.deposit_config.clone();
+        let idx = 0xdeadbeef;
         let ee_addr = vec![1u8; 20]; // Example EVM address
         let deposit_script =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), ee_addr.clone());
+            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx, ee_addr.clone());
 
         let tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &deposit_config.address.address().script_pubkey(),
             &deposit_script,
         );
+
         let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
         assert_eq!(deposits.len(), 1, "Should find one deposit transaction");
+
+        assert_eq!(deposits[0].deposit_idx, idx, "deposit idx should match");
         assert_eq!(deposits[0].address, ee_addr, "EE address should match");
         assert_eq!(
             deposits[0].amt,
