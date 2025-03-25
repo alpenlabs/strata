@@ -3,11 +3,15 @@ use bitcoin::Txid;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use strata_common::{Action, WorkerType};
 use strata_db::types::{L1TxEntry, L1TxStatus};
-use strata_primitives::{batch::EpochSummary, bridge::PublickeyTable, epoch::EpochCommitment};
+use strata_primitives::{
+    batch::EpochSummary,
+    bridge::{OperatorIdx, PublickeyTable},
+    epoch::EpochCommitment,
+};
 use strata_rpc_types::{
     types::{RpcBlockHeader, RpcClientStatus, RpcL1Status},
-    HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcChainState, RpcCheckpointConfStatus,
-    RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
+    HexBytes, HexBytes32, HexBytes64, L2BlockStatus, RpcBridgeDuties, RpcChainState,
+    RpcCheckpointConfStatus, RpcCheckpointInfo, RpcDepositEntry, RpcExecUpdate, RpcSyncStatus,
 };
 use strata_sequencer::{
     block_template::{BlockCompletionData, BlockGenerationConfig, BlockTemplate},
@@ -202,6 +206,13 @@ pub trait StrataSequencerApi {
 
     #[method(name = "strataadmin_completeCheckpointSignature")]
     async fn complete_checkpoint_signature(&self, idx: u64, sig: HexBytes64) -> RpcResult<()>;
+
+    #[method(name = "strata_getBridgeDuties")]
+    async fn get_bridge_duties(
+        &self,
+        operator_idx: OperatorIdx,
+        start_index: u64,
+    ) -> RpcResult<RpcBridgeDuties>;
 }
 
 /// rpc endpoints that are only available for debugging purpose and subject to change.

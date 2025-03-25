@@ -49,6 +49,7 @@ use crate::{args::Args, helpers::*};
 mod args;
 mod el_sync;
 mod errors;
+mod extractor;
 mod helpers;
 mod network;
 mod rpc_client;

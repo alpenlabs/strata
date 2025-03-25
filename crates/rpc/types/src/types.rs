@@ -4,13 +4,14 @@
 //!  - implementation of RPC client
 //!  - crate for just data structures that represents the JSON responses from Bitcoin core RPC
 
-use bitcoin::{BlockHash, Network, Txid, Wtxid};
+use bitcoin::{Amount, BlockHash, Network, OutPoint as BitcoinOutPoint, TapNodeHash, Txid, Wtxid};
 use serde::{Deserialize, Serialize};
 use strata_db::types::{CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
-    bridge::OperatorIdx,
+    bitcoin_bosd::Descriptor,
+    bridge::{BitcoinBlockHeight, OperatorIdx},
     epoch::EpochCommitment,
-    l1::{BitcoinAmount, L1BlockCommitment, OutputRef},
+    l1::{BitcoinAddress, BitcoinAmount, L1BlockCommitment, OutputRef},
     l2::L2BlockCommitment,
     prelude::L1Status,
 };
@@ -21,6 +22,232 @@ use strata_state::{
     client_state::CheckpointL1Ref,
     id::L2BlockId,
 };
+
+/// The various duties that can be assigned to an operator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "payload")]
+pub enum BridgeDuty {
+    /// The duty to create and sign a Deposit Transaction so as to move funds from the user to the
+    /// Bridge Address.
+    ///
+    /// This duty is created when a user deposit request comes in, and applies to all operators.
+    SignDeposit(DepositInfo),
+
+    /// The duty to fulfill a withdrawal request that is assigned to a particular operator.
+    ///
+    /// This duty is created when a user requests a withdrawal by calling a precompile in the EL
+    /// and the [`crate::bridge_state::DepositState`] transitions to
+    /// [`crate::bridge_state::DepositState::Dispatched`].
+    ///
+    /// This kicks off the withdrawal process which involves cooperative signing by the operator
+    /// set, or a more involved unilateral withdrawal process (in the future) if not all operators
+    /// cooperate in the process.
+    FulfillWithdrawal(CooperativeWithdrawalInfo),
+}
+
+/// The deposit information  required to create the Deposit Transaction.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DepositInfo {
+    /// The deposit request transaction outpoints from the users.
+    deposit_request_outpoint: BitcoinOutPoint,
+
+    /// The execution layer address to mint the equivalent tokens to.
+    /// As of now, this is just the 20-byte EVM address.
+    el_address: Vec<u8>,
+
+    /// The amount in bitcoins that the user is sending.
+    ///
+    /// This amount should be greater than the [`BRIDGE_DENOMINATION`] for the deposit to be
+    /// confirmed on bitcoin. The excess amount is used as miner fees for the Deposit Transaction.
+    total_amount: Amount,
+
+    /// The hash of the take back leaf in the Deposit Request Transaction (DRT) as provided by the
+    /// user in their `OP_RETURN` output.
+    take_back_leaf_hash: TapNodeHash,
+
+    /// The original taproot address in the Deposit Request Transaction (DRT) output used to
+    /// sanity check computation internally i.e., whether the known information (n/n script spend
+    /// path, [`static@UNSPENDABLE_INTERNAL_KEY`]) + the [`Self::take_back_leaf_hash`] yields the
+    /// same P2TR address.
+    original_taproot_addr: BitcoinAddress,
+}
+
+impl DepositInfo {
+    /// Create a new deposit info with all the necessary data required to create a deposit
+    /// transaction.
+    pub fn new(
+        deposit_request_outpoint: BitcoinOutPoint,
+        el_address: Vec<u8>,
+        total_amount: Amount,
+        take_back_leaf_hash: TapNodeHash,
+        original_taproot_addr: BitcoinAddress,
+    ) -> Self {
+        Self {
+            deposit_request_outpoint,
+            el_address,
+            total_amount,
+            take_back_leaf_hash,
+            original_taproot_addr,
+        }
+    }
+}
+
+impl From<DepositInfo> for BridgeDuty {
+    fn from(value: DepositInfo) -> Self {
+        Self::SignDeposit(value)
+    }
+}
+
+/// Details for a withdrawal info assigned to an operator.
+///
+/// It has all the information required to create a transaction for fulfilling a user's withdrawal
+/// request and pay operator fees.
+// TODO: This can be multiple withdrawal destinations by adding
+//       that `user_destination` is `IntoIterator<Descriptor>`
+//       and the user can send a single BOSD or multiple BOSDs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CooperativeWithdrawalInfo {
+    /// The [`OutPoint`] of the UTXO in the Bridge Address that is to be used to service the
+    /// withdrawal request.
+    deposit_outpoint: BitcoinOutPoint,
+
+    /// The BOSD [`Descriptor`] supplied by the user.
+    user_destination: Descriptor,
+
+    /// The index of the operator that is assigned the withdrawal.
+    assigned_operator_idx: OperatorIdx,
+
+    /// The bitcoin block height before which the withdrawal has to be processed.
+    ///
+    /// Any withdrawal request whose `exec_deadline` is before the current bitcoin block height is
+    /// considered stale and must be ignored.
+    exec_deadline: BitcoinBlockHeight,
+}
+
+impl CooperativeWithdrawalInfo {
+    /// Create a new withdrawal request.
+    pub fn new(
+        deposit_outpoint: BitcoinOutPoint,
+        user_destination: Descriptor,
+        assigned_operator_idx: OperatorIdx,
+        exec_deadline: BitcoinBlockHeight,
+    ) -> Self {
+        Self {
+            deposit_outpoint,
+            user_destination,
+            assigned_operator_idx,
+            exec_deadline,
+        }
+    }
+}
+
+impl From<CooperativeWithdrawalInfo> for BridgeDuty {
+    fn from(value: CooperativeWithdrawalInfo) -> Self {
+        Self::FulfillWithdrawal(value)
+    }
+}
+
+/// The various states a bridge duty may be in.
+///
+/// The full state transition looks as follows:
+///
+/// `Received` --|`CollectingNonces`|--> `CollectedNonces` --|`CollectingPartialSigs`|-->
+/// `CollectedSignatures` --|`Broadcasting`|--> `Executed`.
+///
+/// The duty execution might fail as well at any step in which case the status would be `Failed`.
+///
+/// # Note
+///
+/// This type does not dictate the exact state transition path. A transition from `Received` to
+/// `Executed` is perfectly valid to allow for maximum flexibility.
+// TODO: use a typestate pattern with a `next` method that does the state transition. This can
+// be left as is to allow for flexible level of granularity. For example, one could just have
+// `Received`, `CollectedSignatures` and `Executed`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BridgeDutyStatus {
+    /// The duty has been received.
+    ///
+    /// This usually entails collecting nonces before the corresponding transaction can be
+    /// partially signed.
+    Received,
+
+    /// The required nonces are being collected.
+    CollectingNonces {
+        /// The number of nonces collected so far.
+        collected: u32,
+
+        /// The indexes of operators that are yet to provide nonces.
+        remaining: Vec<OperatorIdx>,
+    },
+
+    /// The required nonces have been collected.
+    ///
+    /// This state can be inferred from the previous state but might still be useful as the
+    /// required number of nonces is context-driven and it cannot be determined whether all
+    /// nonces have been collected by looking at the above variant alone.
+    CollectedNonces,
+
+    /// The partial signatures are being collected.
+    CollectingSignatures {
+        /// The number of nonces collected so far.
+        collected: u32,
+
+        /// The indexes of operators that are yet to provide partial signatures.
+        remaining: Vec<OperatorIdx>,
+    },
+
+    /// The required partial signatures have been collected.
+    ///
+    /// This state can be inferred from the previous state but might still be useful as the
+    /// required number of signatures is context-driven and it cannot be determined whether all
+    /// partial signatures have been collected by looking at the above variant alone.
+    CollectedSignatures,
+
+    /// The duty has been executed.
+    ///
+    /// This means that the required transaction has been fully signed and broadcasted to Bitcoin.
+    Executed,
+
+    /// The duty could not be executed.
+    ///
+    /// Holds the error message as a [`String`] for context.
+    // TODO: this should hold `strata-bridge-exec::ExecError` instead but that requires
+    // implementing `BorshSerialize` and `BorshDeserialize`.
+    Failed(String),
+}
+
+impl Default for BridgeDutyStatus {
+    fn default() -> Self {
+        Self::Received
+    }
+}
+
+impl BridgeDutyStatus {
+    /// Checks if the [`BridgeDutyStatus`] is in its final state.
+    pub fn is_done(&self) -> bool {
+        matches!(self, BridgeDutyStatus::Executed)
+    }
+}
+
+/// The duties assigned to an operator within a given range.
+///
+/// # Note
+///
+/// The `index`'s are only relevant for Deposit duties as those are stored off-chain in a database.
+/// The withdrawal duties are fetched from the current chain state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RpcBridgeDuties {
+    /// The actual [`BridgeDuty`]'s assigned to an operator which includes both the deposit and
+    /// withdrawal duties.
+    pub duties: Vec<BridgeDuty>,
+
+    /// The starting index (inclusive) from which the duties are fetched.
+    pub start_index: u64,
+
+    /// The last block index (inclusive) upto which the duties are feched.
+    pub stop_index: u64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexBytes(#[serde(with = "hex::serde")] pub Vec<u8>);

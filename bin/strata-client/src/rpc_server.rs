@@ -29,9 +29,9 @@ use strata_rpc_api::{
     StrataAdminApiServer, StrataApiServer, StrataDebugApiServer, StrataSequencerApiServer,
 };
 use strata_rpc_types::{
-    errors::RpcServerError as Error, DaBlob, HexBytes, HexBytes32, HexBytes64, L2BlockStatus,
-    RpcBlockHeader, RpcChainState, RpcCheckpointConfStatus, RpcCheckpointInfo, RpcClientStatus,
-    RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
+    errors::RpcServerError as Error, BridgeDuty, DaBlob, HexBytes, HexBytes32, HexBytes64,
+    L2BlockStatus, RpcBlockHeader, RpcBridgeDuties, RpcChainState, RpcCheckpointConfStatus,
+    RpcCheckpointInfo, RpcClientStatus, RpcDepositEntry, RpcExecUpdate, RpcL1Status, RpcSyncStatus,
 };
 use strata_rpc_utils::to_jsonrpsee_error;
 use strata_sequencer::{
@@ -57,6 +57,8 @@ use strata_storage::NodeStorage;
 use tokio::sync::{oneshot, Mutex};
 use tracing::*;
 use zkaleido::ProofReceipt;
+
+use crate::extractor::{extract_deposit_requests, extract_withdrawal_infos};
 
 pub struct StrataRpcImpl {
     status_channel: StatusChannel,
@@ -735,6 +737,64 @@ impl StrataSequencerApiServer for SequencerServerImpl {
             .map_err(|e| Error::Other(e.to_string()))?;
 
         Ok(txid)
+    }
+
+    // FIXME: find a way to handle reorgs if that becomes a problem
+    async fn get_bridge_duties(
+        &self,
+        operator_idx: OperatorIdx,
+        start_index: u64,
+    ) -> RpcResult<RpcBridgeDuties> {
+        info!(%operator_idx, %start_index, "received request for bridge duties");
+
+        // OPTIMIZE: the extraction of deposit and withdrawal duties can happen in parallel as they
+        // depend on independent sources of information. This optimization can be done if this RPC
+        // call takes a lot of time (for example, when there are hundreds of thousands of
+        // deposits/withdrawals).
+
+        let network = self.params.network();
+
+        let (deposit_duties, latest_index) =
+            extract_deposit_requests(self.storage.l1().as_ref(), start_index, network).await?;
+
+        let deposit_duties = deposit_duties.map(BridgeDuty::from);
+
+        // withdrawal duties should only be generated from finalized checkpoint states
+        let latest_checkpoint_idx = self
+            .checkpoint_handle
+            .get_last_checkpoint_idx()
+            .await
+            .unwrap()
+            .ok_or(Error::Other(format!("cannot fetch latest checkpoint")))?;
+
+        let checkpoint = self
+            .checkpoint_handle
+            .get_checkpoint(latest_checkpoint_idx)
+            .await
+            .unwrap()
+            .ok_or(Error::Other(format!(
+                "cannot fetch checkpoint: {}",
+                latest_checkpoint_idx
+            )))?;
+        let chainstate: Chainstate =
+            borsh::from_slice(checkpoint.checkpoint.sidecar().chainstate()).map_err(|e| {
+                Error::Other(format!("Cannot extract chainstate from checkpoint sidecar"))
+            })?;
+
+        let withdrawal_duties = extract_withdrawal_infos(chainstate.deposits_table())
+            .map(BridgeDuty::from)
+            .collect::<Vec<_>>();
+
+        let mut duties = vec![];
+        duties.extend(deposit_duties);
+        duties.extend(withdrawal_duties.into_iter());
+
+        info!(%operator_idx, %start_index, "dispatching duties");
+        Ok(RpcBridgeDuties {
+            duties,
+            start_index,
+            stop_index: latest_index,
+        })
     }
 
     async fn submit_checkpoint_proof(

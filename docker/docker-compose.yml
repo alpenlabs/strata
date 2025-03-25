@@ -45,26 +45,26 @@ services:
       - 8545:8545
       - 8546:8546
 
-  reth-fn:
-    <<: *base-reth
-    container_name: strata_reth_fn
-    environment:
-      JWTSECRET: "configs/jwt.fn.hex"
-    command:
-      - "--sequencer-http"
-      - "http://strata_reth:8545"
-      # FIXME: datatool should not default to dev chain
-      - "--custom-chain"
-      - "dev"
-    volumes:
-      - ./.data/data-reth-fn:/app/reth
-      - ./configs:/app/configs
-    ports:
-      - 8561:8551
-      - 8555:8545
-      - 8556:8546
-    profiles:
-      - fullnode
+  # reth-fn:
+  #   <<: *base-reth
+  #   container_name: strata_reth_fn
+  #   environment:
+  #     JWTSECRET: "configs/jwt.fn.hex"
+  #   command:
+  #     - "--sequencer-http"
+  #     - "http://strata_reth:8545"
+  #     # FIXME: datatool should not default to dev chain
+  #     - "--custom-chain"
+  #     - "dev"
+  #   volumes:
+  #     - ./.data/data-reth-fn:/app/reth
+  #     - ./configs:/app/configs
+  #   ports:
+  #     - 8561:8551
+  #     - 8555:8545
+  #     - 8556:8546
+  #   profiles:
+  #     - fullnode
 
   sequencer:
     <<: *base-client
@@ -121,26 +121,26 @@ services:
       "--enable-checkpoint-runner", "true"
     ]
 
-  fullnode:
-    <<: *base-client
-    container_name: strata_fullnode
-    ports:
-      - 8433:8432
-    environment:
-      CONFIG_PATH: "configs/config.fn.toml"
-      PARAM_PATH: "configs/params.json"
-    volumes:
-      - ./.data/data-fullnode:/app/data
-      - ./configs:/app/configs
-      # need to wait for sequencer to start
-    entrypoint: /bin/sh -c "sleep 10 && /app/entrypoint.sh \"$@\"" --
-    command: ["--reth-jwtsecret", "configs/jwt.fn.hex"]
-    depends_on:
-      - bitcoind
-      - reth-fn
-      - sequencer
-    profiles:
-      - fullnode
+  # fullnode:
+  #   <<: *base-client
+  #   container_name: strata_fullnode
+  #   ports:
+  #     - 8433:8432
+  #   environment:
+  #     CONFIG_PATH: "configs/config.fn.toml"
+  #     PARAM_PATH: "configs/params.json"
+  #   volumes:
+  #     - ./.data/data-fullnode:/app/data
+  #     - ./configs:/app/configs
+  #     # need to wait for sequencer to start
+  #   entrypoint: /bin/sh -c "sleep 10 && /app/entrypoint.sh \"$@\"" --
+  #   command: ["--reth-jwtsecret", "configs/jwt.fn.hex"]
+  #   depends_on:
+  #     - bitcoind
+  #     - reth-fn
+  #     - sequencer
+  #   profiles:
+  #     - fullnode
 
   bitcoind:
     build:
@@ -151,6 +151,9 @@ services:
       BITCOIND_RPC_USER: rpcuser
       BITCOIND_RPC_PASSWORD: rpcpassword
       BITCOIND_WALLET: default
+      BRIDGE_WALLET_1: bridge_0
+      BRIDGE_WALLET_2: bridge_1
+      BRIDGE_WALLET_3: bridge_2
       GENERATE_BLOCKS: 4 # if env is set then blocks are generated. the number is number of seconds between L1 blocks / 4
     container_name: strata_bitcoind
     volumes:
