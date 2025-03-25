@@ -55,6 +55,6 @@ jobs:
           --pr-number "${{ github.event.pull_request.number }}" \
           --commit-hash "${{ github.sha }}" \
           --programs btc-blockscan,evm-ee-stf,cl-stf,checkpoint
-        working-directory: provers/perf
+        working-directory: bin/prover-perf
         env:
           RUSTFLAGS: "-C target-cpu=native -C link-arg=-fuse-ld=lld"

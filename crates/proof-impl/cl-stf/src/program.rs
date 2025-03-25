@@ -1,11 +1,14 @@
-use std::sync::Arc;
+use std::{
+    panic::{catch_unwind, AssertUnwindSafe},
+    sync::Arc,
+};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{buf::Buf32, params::RollupParams};
 use strata_state::{batch::TxFilterConfigTransition, block::L2Block, chain_state::Chainstate};
 use zkaleido::{
-    AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmInputResult, ZkVmProgram,
-    ZkVmProgramPerf, ZkVmResult,
+    AggregationInput, ProofReceipt, PublicValues, VerifyingKey, ZkVmError, ZkVmInputResult,
+    ZkVmProgram, ZkVmProgramPerf, ZkVmResult,
 };
 use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
@@ -81,7 +84,10 @@ impl ClStfProgram {
         const MOCK_VK: [u32; 8] = [0u32; 8];
         NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_cl_stf(zkvm, &MOCK_VK, &MOCK_VK);
+                catch_unwind(AssertUnwindSafe(|| {
+                    process_cl_stf(zkvm, &MOCK_VK, &MOCK_VK);
+                }))
+                .map_err(|_| ZkVmError::ExecutionError(Self::name()))?;
                 Ok(())
             })),
         }

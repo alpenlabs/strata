@@ -1,7 +1,10 @@
-use std::sync::Arc;
+use std::{
+    panic::{catch_unwind, AssertUnwindSafe},
+    sync::Arc,
+};
 
 use zkaleido::{
-    ProofType, PublicValues, ZkVmInputResult, ZkVmProgram, ZkVmProgramPerf, ZkVmResult,
+    ProofType, PublicValues, ZkVmError, ZkVmInputResult, ZkVmProgram, ZkVmProgramPerf, ZkVmResult,
 };
 use zkaleido_native_adapter::{NativeHost, NativeMachine};
 
@@ -52,7 +55,10 @@ impl EvmEeProgram {
     pub fn native_host() -> NativeHost {
         NativeHost {
             process_proof: Arc::new(Box::new(move |zkvm: &NativeMachine| {
-                process_block_transaction_outer(zkvm);
+                catch_unwind(AssertUnwindSafe(|| {
+                    process_block_transaction_outer(zkvm);
+                }))
+                .map_err(|_| ZkVmError::ExecutionError(Self::name()))?;
                 Ok(())
             })),
         }

@@ -65,30 +65,6 @@ pub fn proof_with_vk(
     (proof, cl_stf_host.vk())
 }
 
-#[cfg(feature = "sp1")]
-pub mod sp1 {
-    use strata_sp1_guest_builder::GUEST_CL_STF_ELF;
-    use zkaleido_sp1_host::SP1Host;
-
-    use super::*;
-
-    pub fn host() -> impl ZkVmHostPerf {
-        SP1Host::init(&GUEST_CL_STF_ELF)
-    }
-}
-
-#[cfg(feature = "risc0")]
-pub mod risc0 {
-    use strata_risc0_guest_builder::GUEST_RISC0_EVM_EE_STF_ELF;
-    use zkaleido_risc0_host::Risc0Host;
-
-    use super::*;
-
-    pub fn host() -> impl ZkVmHostPerf {
-        Risc0Host::init(GUEST_RISC0_EVM_EE_STF_ELF)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use strata_proofimpl_btc_blockspace::program::BtcBlockspaceProgram;
