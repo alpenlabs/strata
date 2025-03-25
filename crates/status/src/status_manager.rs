@@ -156,6 +156,10 @@ impl StatusChannel {
         self.receiver.cl.borrow().clone()
     }
 
+    pub fn get_last_sync_status_update(&self) -> Option<ChainSyncStatusUpdate> {
+        self.receiver.chs.borrow().clone()
+    }
+
     /// Gets the chain sync status, which is regularly updated by the FCM
     /// whenever the tip changes, if set.
     pub fn get_chain_sync_status(&self) -> Option<ChainSyncStatus> {

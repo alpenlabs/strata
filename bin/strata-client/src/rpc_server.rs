@@ -429,18 +429,22 @@ impl StrataApiServer for StrataRpcImpl {
     // FIXME: remove deprecated
     #[allow(deprecated)]
     async fn sync_status(&self) -> RpcResult<RpcSyncStatus> {
-        let css = self.status_channel.get_chain_sync_status();
-        Ok(css
-            .map(|css| RpcSyncStatus {
-                tip_height: css.tip_slot(),
-                tip_block_id: *css.tip_blkid(),
-                cur_epoch: css.cur_epoch(),
-                prev_epoch: css.prev_epoch,
-                observed_finalized_epoch: css.finalized_epoch,
-                safe_l1_block: css.safe_l1,
-                finalized_block_id: *css.finalized_blkid(),
-            })
-            .ok_or(Error::BeforeGenesis)?)
+        let cssu = self
+            .status_channel
+            .get_last_sync_status_update()
+            .ok_or(Error::BeforeGenesis)?;
+
+        let css = cssu.new_status();
+
+        Ok(RpcSyncStatus {
+            tip_height: css.tip_slot(),
+            tip_block_id: *css.tip_blkid(),
+            cur_epoch: css.cur_epoch(),
+            prev_epoch: css.prev_epoch,
+            observed_finalized_epoch: *cssu.new_tl_chainstate().finalized_epoch(),
+            safe_l1_block: css.safe_l1,
+            finalized_block_id: *css.finalized_blkid(),
+        })
     }
 
     async fn get_raw_bundles(&self, start_height: u64, end_height: u64) -> RpcResult<HexBytes> {
