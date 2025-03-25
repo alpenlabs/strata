@@ -3117,17 +3117,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "strata-bridge-tx-builder"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "musig2",
- "serde",
- "strata-primitives",
- "thiserror 2.0.12",
-]
-
-[[package]]
 name = "strata-crypto"
 version = "0.1.0"
 dependencies = [
@@ -3232,7 +3221,6 @@ dependencies = [
  "hex",
  "serde",
  "sha2",
- "strata-bridge-tx-builder",
  "strata-crypto",
  "strata-primitives",
  "tracing",
@@ -3292,14 +3280,17 @@ dependencies = [
 [[package]]
 name = "substrate-bn"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b5bbfa79abbae15dd642ea8176a21a635ff3c00059961d1ea27ad04e5b441c"
+source = "git+https://github.com/sp1-patches/bn?tag=patch-0.6.0-sp1-4.0.0#1bd84110963662fae88baa5ad07c9ab92b6acdbb"
 dependencies = [
+ "bytemuck",
  "byteorder",
+ "cfg-if",
  "crunchy",
  "lazy_static",
+ "num-bigint",
  "rand",
  "rustc-hex",
+ "sp1-lib 4.1.3",
 ]
 
 [[package]]
