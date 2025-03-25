@@ -13599,6 +13599,7 @@ dependencies = [
  "strata-sp1-guest-builder",
  "strata-state",
  "strata-test-utils",
+ "strata-zkvm-hosts",
  "thiserror 2.0.11",
  "tokio",
  "tracing",
@@ -13641,6 +13642,7 @@ dependencies = [
  "strata-risc0-guest-builder",
  "strata-sp1-guest-builder",
  "strata-test-utils",
+ "strata-zkvm-hosts",
  "time",
  "tokio",
  "tracing",
@@ -14124,6 +14126,27 @@ dependencies = [
  "strata-storage",
  "threadpool",
  "tokio",
+]
+
+[[package]]
+name = "strata-zkvm-hosts"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "borsh",
+ "serde",
+ "strata-primitives",
+ "strata-proofimpl-btc-blockspace",
+ "strata-proofimpl-checkpoint",
+ "strata-proofimpl-cl-stf",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-risc0-guest-builder",
+ "strata-sp1-guest-builder",
+ "thiserror 2.0.11",
+ "zkaleido",
+ "zkaleido-native-adapter",
+ "zkaleido-risc0-host",
+ "zkaleido-sp1-host",
 ]
 
 [[package]]

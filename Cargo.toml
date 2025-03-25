@@ -16,7 +16,7 @@ members = [
   "crates/proof-impl/checkpoint",
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
-  # "crates/zkvm/hosts",
+  "crates/zkvm/hosts",
   "crates/reth/db",
   "crates/reth/evm",
   "crates/reth/exex",
@@ -46,7 +46,7 @@ members = [
   "bin/strata-reth",
   "bin/strata-sequencer-client",
   "bin/prover-client",
-  "provers/perf",
+  "bin/prover-perf",
 
   # integration tests
   "tests",
@@ -100,7 +100,7 @@ strata-storage = { path = "crates/storage" }
 strata-sync = { path = "crates/sync" }
 strata-tasks = { path = "crates/tasks" }
 strata-test-utils = { path = "crates/test-utils" }
-# strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
+strata-zkvm-hosts = { path = "crates/zkvm/hosts" }
 
 zkaleido = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6" }
 zkaleido-native-adapter = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6" }

@@ -14,14 +14,15 @@ strata-proofimpl-evm-ee-stf.workspace = true
 
 strata-l1tx.workspace = true
 strata-test-utils.workspace = true
+strata-zkvm-hosts.workspace = true
 
 # sp1
 sp1-sdk = "4.1.0"
-strata-sp1-guest-builder = { path = "../sp1", optional = true }
+strata-sp1-guest-builder = { path = "../../provers/sp1", optional = true }
 zkaleido-sp1-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6", optional = true }
 
 # risc0
-strata-risc0-guest-builder = { path = "../risc0", optional = true }
+strata-risc0-guest-builder = { path = "../../provers/risc0", optional = true }
 zkaleido-risc0-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6", optional = true }
 
 anyhow.workspace = true
@@ -38,5 +39,5 @@ tracing.workspace = true
 
 [features]
 default = ["sp1"]
-sp1 = ["zkaleido-sp1-host/perf", "strata-sp1-guest-builder/sp1-dev"]
-risc0 = ["zkaleido-risc0-host/perf", "strata-risc0-guest-builder"]
+sp1 = ["zkaleido-sp1-host/perf", "strata-zkvm-hosts/sp1-builder"]
+risc0 = ["zkaleido-risc0-host/perf", "strata-zkvm-hosts/risc0-builder"]

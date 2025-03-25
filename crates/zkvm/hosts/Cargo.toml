@@ -4,16 +4,16 @@ name = "strata-zkvm-hosts"
 version = "0.1.0"
 
 [dependencies]
+zkaleido.workspace = true
+zkaleido-native-adapter.workspace = true
+
 # sp1
 strata-sp1-guest-builder = { path = "../../../provers/sp1", optional = true }
-zkaleido-sp1-host = { workspace = true, optional = true }
+zkaleido-sp1-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6", optional = true }
 
 # risc0
 strata-risc0-guest-builder = { path = "../../../provers/risc0", optional = true }
-zkaleido-risc0-host = { workspace = true, optional = true }
-
-# native
-zkaleido-native-adapter = { workspace = true, optional = true }
+zkaleido-risc0-host = { git = "https://github.com/alpenlabs/zkaleido", tag = "v0.1.0-alpha-rc6", optional = true }
 
 strata-primitives.workspace = true
 strata-proofimpl-btc-blockspace.workspace = true
@@ -23,12 +23,12 @@ strata-proofimpl-evm-ee-stf.workspace = true
 
 bincode.workspace = true
 borsh.workspace = true
-cfg-if.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 
 [features]
 default = []
-native = ["zkaleido-native-adapter"]
-risc0 = ["zkaleido-risc0-host", "strata-risc0-guest-builder/prover"]
-sp1 = ["zkaleido-sp1-host", "strata-sp1-guest-builder/prover"]
+risc0 = ["dep:zkaleido-risc0-host"]
+risc0-builder = ["risc0", "dep:strata-risc0-guest-builder"]
+sp1 = ["dep:zkaleido-sp1-host"]
+sp1-builder = ["sp1", "strata-sp1-guest-builder/sp1-dev"]
