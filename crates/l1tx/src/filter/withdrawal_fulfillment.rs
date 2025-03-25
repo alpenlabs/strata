@@ -156,12 +156,13 @@ mod test {
              addr: Descriptor,
              deadline: u64,
              deposit_txid: &[u8; 32],
-             withdraw_txid: Buf32| {
+             withdrawal_request_txid: Option<Buf32>| {
                 DepositEntry::new(
                     deposit_idx,
                     create_outputref(deposit_txid, 0),
                     vec![0, 1, 2],
                     deposit_amt(),
+                    withdrawal_request_txid,
                 )
                 .with_state(DepositState::Dispatched(DispatchedState::new(
                     DispatchCommand::new(vec![WithdrawOutput::new(
@@ -170,7 +171,6 @@ mod test {
                     )]),
                     operator_idx,
                     deadline,
-                    withdraw_txid,
                 )))
             };
 
@@ -206,6 +206,7 @@ mod test {
                 create_outputref(&txids[3], 0),
                 vec![0, 1, 2],
                 deposit_amt(),
+                None,
             )
             .with_state(DepositState::Accepted),
             DepositEntry::new(
@@ -213,6 +214,7 @@ mod test {
                 create_outputref(&txids[4], 0),
                 vec![0, 1, 2],
                 deposit_amt(),
+                None,
             )
             .with_state(DepositState::Accepted),
         ];

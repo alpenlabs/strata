@@ -275,13 +275,10 @@ impl StateCache {
             .get_deposit_mut(deposit_idx)
             .expect("stateop: missing deposit idx");
 
-        let state = DepositState::Dispatched(DispatchedState::new(
-            cmd.clone(),
-            operator_idx,
-            exec_height,
-            withdrawal_txid,
-        ));
+        let state =
+            DepositState::Dispatched(DispatchedState::new(cmd.clone(), operator_idx, exec_height));
         deposit_ent.set_state(state);
+        deposit_ent.set_withdrawal_request_txid(Some(withdrawal_txid));
     }
 
     /// Updates the deposit assignee and expiration date.
