@@ -46,7 +46,7 @@ impl ProverManager {
     pub async fn process_pending_tasks(&self) {
         loop {
             // Step 1: Fetch tasks data without holding the lock
-            let (pending_tasks, dependency_waiting_tasks, retriable_tasks, mut in_progress_tasks) = {
+            let (pending_tasks, _, retriable_tasks, mut in_progress_tasks) = {
                 let task_tracker = self.task_tracker.lock().await;
                 let pending_tasks = task_tracker
                     .get_tasks_by_status(|status| matches!(status, ProvingTaskStatus::Pending));
@@ -57,14 +57,6 @@ impl ProverManager {
                     task_tracker.get_in_progress_tasks().clone(),
                 )
             };
-
-            info!(
-                "Processing tasks: in_progress {:?} dependency_waiting {} pending {}, retriable {}",
-                in_progress_tasks,
-                dependency_waiting_tasks.len(),
-                pending_tasks.len(),
-                retriable_tasks.len()
-            );
 
             // Step 2: Process each task:
             // We chain pending tasks (with retry=0) and retriable_tasks (with retry > 0) into one
