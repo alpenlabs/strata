@@ -1536,17 +1536,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-bridge-tx-builder"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "musig2",
- "serde",
- "strata-primitives",
- "thiserror 2.0.12",
-]
-
-[[package]]
 name = "strata-crypto"
 version = "0.1.0"
 dependencies = [
@@ -1566,7 +1555,6 @@ dependencies = [
  "bitcoin",
  "borsh",
  "musig2",
- "strata-bridge-tx-builder",
  "strata-primitives",
  "strata-state",
  "thiserror 2.0.12",
@@ -1609,7 +1597,6 @@ dependencies = [
  "digest",
  "serde",
  "sha2",
- "strata-bridge-tx-builder",
  "strata-l1tx",
  "strata-primitives",
  "strata-state",
@@ -1631,7 +1618,6 @@ dependencies = [
  "hex",
  "serde",
  "sha2",
- "strata-bridge-tx-builder",
  "strata-crypto",
  "strata-primitives",
  "tracing",

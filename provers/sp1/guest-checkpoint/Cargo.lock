@@ -3118,17 +3118,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "strata-bridge-tx-builder"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "musig2",
- "serde",
- "strata-primitives",
- "thiserror 2.0.12",
-]
-
-[[package]]
 name = "strata-chaintsn"
 version = "0.1.0"
 dependencies = [
@@ -3173,7 +3162,6 @@ dependencies = [
  "bitcoin",
  "borsh",
  "musig2",
- "strata-bridge-tx-builder",
  "strata-primitives",
  "strata-state",
  "thiserror 2.0.12",
@@ -3216,7 +3204,6 @@ dependencies = [
  "digest 0.10.7",
  "serde",
  "sha2",
- "strata-bridge-tx-builder",
  "strata-l1tx",
  "strata-primitives",
  "strata-state",
@@ -3322,7 +3309,6 @@ dependencies = [
  "hex",
  "serde",
  "sha2",
- "strata-bridge-tx-builder",
  "strata-crypto",
  "strata-primitives",
  "tracing",
