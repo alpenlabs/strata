@@ -376,6 +376,9 @@ pub struct RpcDepositEntry {
 
     /// Deposit state.
     state: DepositState,
+
+    /// Withdrawal request transaction id
+    withdrawal_request_txid: Option<Buf32>,
 }
 
 impl RpcDepositEntry {
@@ -386,6 +389,7 @@ impl RpcDepositEntry {
             notary_operators: ent.notary_operators().to_vec(),
             amt: ent.amt(),
             state: ent.deposit_state().clone(),
+            withdrawal_request_txid: ent.withdrawal_request_txid(),
         }
     }
 }
