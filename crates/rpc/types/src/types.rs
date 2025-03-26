@@ -49,27 +49,37 @@ pub enum BridgeDuty {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DepositInfo {
     /// The deposit request transaction outpoints from the users.
-    deposit_request_outpoint: BitcoinOutPoint,
+    pub deposit_request_outpoint: BitcoinOutPoint,
+
+    /// The stake index that will be tied to this deposit.
+    ///
+    /// This is required in order to make sure that the at withdrawal time, deposit UTXOs are
+    /// assigned in the same order that the stake transactions were linked during setup time
+    ///
+    /// # Note
+    ///
+    /// The stake index must be encoded in 4-byte big-endian.
+    pub stake_index: u32,
 
     /// The execution layer address to mint the equivalent tokens to.
     /// As of now, this is just the 20-byte EVM address.
-    el_address: Vec<u8>,
+    pub el_address: Vec<u8>,
 
     /// The amount in bitcoins that the user is sending.
     ///
     /// This amount should be greater than the [`BRIDGE_DENOMINATION`] for the deposit to be
     /// confirmed on bitcoin. The excess amount is used as miner fees for the Deposit Transaction.
-    total_amount: Amount,
+    pub total_amount: Amount,
 
     /// The hash of the take back leaf in the Deposit Request Transaction (DRT) as provided by the
     /// user in their `OP_RETURN` output.
-    take_back_leaf_hash: TapNodeHash,
+    pub take_back_leaf_hash: TapNodeHash,
 
     /// The original taproot address in the Deposit Request Transaction (DRT) output used to
     /// sanity check computation internally i.e., whether the known information (n/n script spend
     /// path, [`static@UNSPENDABLE_INTERNAL_KEY`]) + the [`Self::take_back_leaf_hash`] yields the
     /// same P2TR address.
-    original_taproot_addr: BitcoinAddress,
+    pub original_taproot_addr: BitcoinAddress,
 }
 
 impl DepositInfo {
@@ -77,6 +87,7 @@ impl DepositInfo {
     /// transaction.
     pub fn new(
         deposit_request_outpoint: BitcoinOutPoint,
+        stake_index: u32,
         el_address: Vec<u8>,
         total_amount: Amount,
         take_back_leaf_hash: TapNodeHash,
@@ -84,6 +95,7 @@ impl DepositInfo {
     ) -> Self {
         Self {
             deposit_request_outpoint,
+            stake_index,
             el_address,
             total_amount,
             take_back_leaf_hash,

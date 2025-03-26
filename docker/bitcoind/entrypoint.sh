@@ -14,6 +14,9 @@ maxburnamount=1
 server=1
 txindex=1
 acceptnonstdtxn=1
+minrelaytxfee=0.0
+blockmintxfee=0.0
+dustRelayFee=0.0
 EOF
 
 echo "Bitcoin RPC User: $BITCOIND_RPC_USER"
@@ -78,26 +81,24 @@ check_wallet_exists $BRIDGE_WALLET_3
 
 VAL=$(bitcoin-cli getblockcount)
 
-if [[ $VAL -eq 0 ]]; then
-    # Get a new Bitcoin address from the wallet
-    ADDRESS=$(bcli -rpcwallet="${BITCOIND_WALLET}" getnewaddress)
+# Get a new Bitcoin address from the wallet
+ADDRESS=$(bcli -rpcwallet="${BITCOIND_WALLET}" getnewaddress)
 
-    BRIDGE_ADDRESS_1=$(bcli -rpcwallet="${BRIDGE_WALLET_1}" getnewaddress)
-    BRIDGE_ADDRESS_2=$(bcli -rpcwallet="${BRIDGE_WALLET_2}" getnewaddress)
-    BRIDGE_ADDRESS_3=$(bcli -rpcwallet="${BRIDGE_WALLET_3}" getnewaddress)
+BRIDGE_ADDRESS_1=$(bcli -rpcwallet="${BRIDGE_WALLET_1}" getnewaddress)
+BRIDGE_ADDRESS_2=$(bcli -rpcwallet="${BRIDGE_WALLET_2}" getnewaddress)
+BRIDGE_ADDRESS_3=$(bcli -rpcwallet="${BRIDGE_WALLET_3}" getnewaddress)
 
-    echo "Generated new address: $ADDRESS"
-    echo $ADDRESS > /root/.bitcoin/bitcoin-address
+echo "Generated new address: $ADDRESS"
+echo $ADDRESS > /root/.bitcoin/bitcoin-address
 
-    # Generate 120 blocks to the new address
-    # (101 to mature the coinbase transactions and a few more for rollup genesis)
-    echo "Generating 120 blocks..."
-    bcli generatetoaddress 120 "$ADDRESS"
+# Generate 120 blocks to the new address
+# (101 to mature the coinbase transactions and a few more for rollup genesis)
+echo "Generating 120 blocks..."
+bcli generatetoaddress 120 "$ADDRESS"
 
-    bcli generatetoaddress 101 "$BRIDGE_ADDRESS_1"
-    bcli generatetoaddress 101 "$BRIDGE_ADDRESS_2"
-    bcli generatetoaddress 101 "$BRIDGE_ADDRESS_3"
-fi
+bcli generatetoaddress 101 "$BRIDGE_ADDRESS_1"
+bcli generatetoaddress 101 "$BRIDGE_ADDRESS_2"
+bcli generatetoaddress 101 "$BRIDGE_ADDRESS_3"
 
 # generate single blocks
 if [ ! -z $GENERATE_BLOCKS ];then

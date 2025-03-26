@@ -115,6 +115,7 @@ pub(crate) async fn extract_deposit_requests(
 
                 let deposit_info = DepositInfo::new(
                     deposit_request_outpoint,
+                    0,
                     el_address,
                     total_amount,
                     take_back_leaf_hash,
