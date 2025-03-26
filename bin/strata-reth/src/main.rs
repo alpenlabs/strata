@@ -18,7 +18,8 @@ use strata_reth_node::{args::StrataNodeArgs, StrataEthereumNode};
 use strata_reth_rpc::{StrataRPC, StrataRpcApiServer};
 use tracing::info;
 
-const DEFAULT_CHAIN_SPEC: &str = include_str!("../res/devnet-chain.json");
+const DEFAULT_CHAIN_SPEC: &str = include_str!("../res/testnet-chain.json");
+const DEVNET_CHAIN_SPEC: &str = include_str!("../res/devnet-chain.json");
 const DEV_CHAIN_SPEC: &str = include_str!("../res/alpen-dev-chain.json");
 
 fn main() {
@@ -90,7 +91,7 @@ pub struct AdditionalConfig {
     #[arg(
         long,
         value_name = "CHAIN_OR_PATH",
-        default_value = "devnet",
+        default_value = "testnet",
         value_parser = chain_value_parser,
         required = false,
     )]
@@ -111,7 +112,7 @@ pub struct StrataChainSpecParser;
 impl ChainSpecParser for StrataChainSpecParser {
     type ChainSpec = ChainSpec;
 
-    const SUPPORTED_CHAINS: &'static [&'static str] = &["dev", "devnet"];
+    const SUPPORTED_CHAINS: &'static [&'static str] = &["dev", "devnet", "testnet"];
 
     fn parse(s: &str) -> eyre::Result<Arc<Self::ChainSpec>> {
         chain_value_parser(s)
@@ -120,7 +121,8 @@ impl ChainSpecParser for StrataChainSpecParser {
 
 pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> {
     Ok(match s {
-        "devnet" => parse_chain_spec(DEFAULT_CHAIN_SPEC)?,
+        "testnet" => parse_chain_spec(DEFAULT_CHAIN_SPEC)?,
+        "devnet" => parse_chain_spec(DEVNET_CHAIN_SPEC)?,
         "dev" => parse_chain_spec(DEV_CHAIN_SPEC)?,
         _ => {
             // try to read json from path first
