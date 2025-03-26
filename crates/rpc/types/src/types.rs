@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use strata_db::types::{CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
+    buf::Buf32,
     epoch::EpochCommitment,
     l1::{BitcoinAmount, L1BlockCommitment, OutputRef},
     l2::L2BlockCommitment,
