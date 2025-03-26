@@ -16140,7 +16140,7 @@ dependencies = [
 [[package]]
 name = "zkaleido"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc6#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc7#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
 dependencies = [
  "arbitrary",
  "async-trait",
@@ -16153,7 +16153,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-native-adapter"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc6#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc7#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
 dependencies = [
  "bincode",
  "borsh",
@@ -16164,7 +16164,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-risc0-groth16-verifier"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc6#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc7#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
 dependencies = [
  "hex",
  "risc0-binfmt",
@@ -16176,7 +16176,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-risc0-host"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc6#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc7#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
 dependencies = [
  "bincode",
  "borsh",
@@ -16189,7 +16189,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-sp1-groth16-verifier"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc6#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc7#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
 dependencies = [
  "hex",
  "sp1-verifier",
@@ -16199,7 +16199,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-sp1-guest-env"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc6#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc7#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
 dependencies = [
  "bincode",
  "cfg-if",
@@ -16211,7 +16211,7 @@ dependencies = [
 [[package]]
 name = "zkaleido-sp1-host"
 version = "0.1.0"
-source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc6#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
+source = "git+https://github.com/alpenlabs/zkaleido?tag=v0.1.0-alpha-rc7#d49e58a56818a39d5b48b7c40b0ac65ab3d21161"
 dependencies = [
  "bincode",
  "borsh",
