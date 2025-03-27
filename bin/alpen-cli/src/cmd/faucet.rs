@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-#[cfg(feature = "strata_faucet")]
-use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
+#[cfg(feature = "alpen_faucet")]
+use alloy::{primitives::Address as AlpenAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use indicatif::ProgressBar;
@@ -10,10 +10,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
-#[cfg(feature = "strata_faucet")]
+#[cfg(feature = "alpen_faucet")]
 use crate::{
     net_type::{net_type_or_exit, NetworkType},
-    strata::StrataWallet,
+    alpen::AlpenWallet,
 };
 use crate::{seed::Seed, settings::Settings, signet::SignetWallet};
 
@@ -21,8 +21,8 @@ use crate::{seed::Seed, settings::Settings, signet::SignetWallet};
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "faucet")]
 pub struct FaucetArgs {
-    /// either "signet" or "strata"
-    #[cfg(feature = "strata_faucet")]
+    /// either "signet" or "alpen"
+    #[cfg(feature = "alpen_faucet")]
     #[argh(positional)]
     network_type: String,
     /// address that funds will be sent to. defaults to internal wallet
@@ -42,7 +42,7 @@ pub struct PowChallenge {
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     println!("Fetching challenge from faucet");
 
-    #[cfg(feature = "strata_faucet")]
+    #[cfg(feature = "alpen_faucet")]
     let network_type = net_type_or_exit(&args.network_type);
 
     let client = reqwest::Client::new();
@@ -63,7 +63,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let mut solution = 0u64;
     let prehash = {
         let mut hasher = Sha256::new();
-        hasher.update(b"strata faucet 2024");
+        hasher.update(b"alpen faucet 2024");
         hasher.update(challenge.nonce.0);
         hasher
     };
@@ -84,7 +84,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         "✔ Solved challenge after {solution} attempts. Claiming now."
     ));
 
-    #[cfg(feature = "strata_faucet")]
+    #[cfg(feature = "alpen_faucet")]
     let url = match network_type {
         NetworkType::Signet => {
             let mut l1w =
@@ -112,14 +112,14 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
                 address
             )
         }
-        NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
+        NetworkType::Alpen => {
+            let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint).unwrap();
             // they said EVMs were advanced 👁️👁️
             let address = match args.address {
-                Some(address) => StrataAddress::from_str(&address).expect("bad address"),
+                Some(address) => AlpenAddress::from_str(&address).expect("bad address"),
                 None => l2w.default_signer_address(),
             };
-            println!("Claiming to Strata address {}", address);
+            println!("Claiming to Alpen address {}", address);
             format!(
                 "{base}claim_l2/{}/{}",
                 encode(&solution.to_le_bytes()),
@@ -128,7 +128,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         }
     };
 
-    #[cfg(not(feature = "strata_faucet"))]
+    #[cfg(not(feature = "alpen_faucet"))]
     let url = {
         let mut l1w =
             SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();

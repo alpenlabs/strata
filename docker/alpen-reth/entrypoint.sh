@@ -9,7 +9,7 @@ mkdir -p /app/reth
 
 echo "starting Reth"
 
-strata-reth \
+alpen-reth \
     --disable-discovery \
     --datadir ${DATADIR:-/app/reth} \
     --port 30303 \

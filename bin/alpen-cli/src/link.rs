@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use alloy::primitives::{Address as StrataAddress, TxHash};
+use alloy::primitives::{Address as AlpenAddress, TxHash};
 use bdk_wallet::bitcoin;
 
 /// Represents something that can be represented on-chain.
@@ -15,9 +15,9 @@ impl<'a> From<&'a bitcoin::Address> for OnchainObject<'a> {
     }
 }
 
-impl<'a> From<&'a StrataAddress> for OnchainObject<'a> {
-    fn from(address: &'a StrataAddress) -> Self {
-        OnchainObject::Address(Address::Strata(address))
+impl<'a> From<&'a AlpenAddress> for OnchainObject<'a> {
+    fn from(address: &'a AlpenAddress) -> Self {
+        OnchainObject::Address(Address::Alpen(address))
     }
 }
 
@@ -29,7 +29,7 @@ impl<'a> From<&'a bitcoin::Txid> for OnchainObject<'a> {
 
 impl<'a> From<&'a TxHash> for OnchainObject<'a> {
     fn from(txid: &'a TxHash) -> Self {
-        OnchainObject::Transaction(Txid::Strata(txid))
+        OnchainObject::Transaction(Txid::Alpen(txid))
     }
 }
 
@@ -103,18 +103,18 @@ impl Display for OnchainObject<'_> {
     }
 }
 
-/// A wrapper around a bitcoin transaction ID or a Strata transaction ID.
+/// A wrapper around a bitcoin transaction ID or a Alpen transaction ID.
 #[derive(Clone, Copy)]
 pub enum Txid<'a> {
     /// A transaction ID for a Bitcoin transaction.
     Bitcoin(&'a bitcoin::Txid),
-    /// A transaction ID for a Strata transaction.
-    Strata(&'a TxHash),
+    /// A transaction ID for a Alpen transaction.
+    Alpen(&'a TxHash),
 }
 
 impl<'a> From<&'a TxHash> for Txid<'a> {
     fn from(v: &'a TxHash) -> Self {
-        Self::Strata(v)
+        Self::Alpen(v)
     }
 }
 
@@ -128,23 +128,23 @@ impl Display for Txid<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Txid::Bitcoin(txid) => txid.fmt(f),
-            Txid::Strata(txid) => txid.fmt(f),
+            Txid::Alpen(txid) => txid.fmt(f),
         }
     }
 }
 
-/// A wrapper address that wraps either a bitcoin address or a strata address.
+/// A wrapper address that wraps either a bitcoin address or a alpen address.
 #[derive(Clone, Copy)]
 pub enum Address<'a> {
     Bitcoin(&'a bitcoin::Address),
-    Strata(&'a StrataAddress),
+    Alpen(&'a AlpenAddress),
 }
 
 impl Display for Address<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Address::Bitcoin(address) => address.fmt(f),
-            Address::Strata(address) => address.fmt(f),
+            Address::Alpen(address) => address.fmt(f),
         }
     }
 }
@@ -165,13 +165,13 @@ impl Display for Link<'_, '_> {
         match self.object {
             OnchainObject::Transaction(ref txid) => match txid {
                 Txid::Bitcoin(txid) => write!(f, "{}/tx/{}", self.explorer_ep, txid),
-                Txid::Strata(txid) => write!(f, "{}/tx/{}", self.explorer_ep, txid),
+                Txid::Alpen(txid) => write!(f, "{}/tx/{}", self.explorer_ep, txid),
             },
             OnchainObject::Address(ref address) => match address {
                 Address::Bitcoin(address) => {
                     write!(f, "{}/address/{}", self.explorer_ep, address)
                 }
-                Address::Strata(address) => {
+                Address::Alpen(address) => {
                     write!(f, "{}/address/{}", self.explorer_ep, address)
                 }
             },

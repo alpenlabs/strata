@@ -10,15 +10,15 @@ use indicatif::ProgressBar;
 use strata_primitives::bitcoin_bosd::Descriptor;
 
 use crate::{
+    alpen::AlpenWallet,
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::StrataWallet,
 };
 
-/// Withdraw 10 BTC from Strata to signet
+/// Withdraw 10 BTC from Alpen to signet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "withdraw")]
 pub struct WithdrawArgs {
@@ -37,7 +37,7 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
 
     let mut l1w =
         SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
+    let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint).unwrap();
 
     let address = match address {
         Some(a) => a,
@@ -53,9 +53,9 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
 
     let tx = l2w
         .transaction_request()
-        .with_to(settings.bridge_strata_address)
+        .with_to(settings.bridge_alpen_address)
         .with_value(U256::from(BRIDGE_OUT_AMOUNT.to_sat() as u128 * SATS_TO_WEI))
-        // calldata for the Strata EVM-BOSD descriptor
+        // calldata for the Alpen EVM-BOSD descriptor
         .input(TransactionInput::new(bosd.to_bytes().into()));
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");

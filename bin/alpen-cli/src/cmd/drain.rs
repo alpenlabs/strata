@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use alloy::{
-    primitives::{Address as StrataAddress, U256},
+    primitives::{Address as AlpenAddress, U256},
     providers::{Provider, WalletProvider},
 };
 use argh::FromArgs;
@@ -9,16 +9,16 @@ use bdk_wallet::bitcoin::{Address, Amount};
 use colored::Colorize;
 
 use crate::{
+    alpen::AlpenWallet,
     constants::SATS_TO_WEI,
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, SignetWallet},
-    strata::StrataWallet,
 };
 
 /// Drains the internal wallet to the provided
-/// signet and Strata addresses
+/// signet and Alpen addresses
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "drain")]
 pub struct DrainArgs {
@@ -26,9 +26,9 @@ pub struct DrainArgs {
     #[argh(option, short = 's')]
     signet_address: Option<String>,
 
-    /// a Strata address for Strata funds to be drained to
+    /// a Alpen address for Alpen funds to be drained to
     #[argh(option, short = 'r')]
-    strata_address: Option<String>,
+    alpen_address: Option<String>,
 
     /// override signet fee rate in sat/vbyte. must be >=1
     #[argh(option)]
@@ -38,14 +38,14 @@ pub struct DrainArgs {
 pub async fn drain(
     DrainArgs {
         signet_address,
-        strata_address,
+        alpen_address,
         fee_rate,
     }: DrainArgs,
     seed: Seed,
     settings: Settings,
 ) {
-    if strata_address.is_none() && signet_address.is_none() {
-        println!("Either signet or Strata address should be provided");
+    if alpen_address.is_none() && signet_address.is_none() {
+        println!("Either signet or Alpen address should be provided");
     }
 
     let signet_address = signet_address.map(|a| {
@@ -54,8 +54,8 @@ pub async fn drain(
             .require_network(settings.network)
             .expect("correct network")
     });
-    let strata_address =
-        strata_address.map(|a| StrataAddress::from_str(&a).expect("valid Strata address"));
+    let alpen_address =
+        alpen_address.map(|a| AlpenAddress::from_str(&a).expect("valid Alpen address"));
 
     if let Some(address) = signet_address {
         let mut l1w =
@@ -91,11 +91,11 @@ pub async fn drain(
         println!("Drained signet wallet to {}", address,);
     }
 
-    if let Some(address) = strata_address {
-        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
+    if let Some(address) = alpen_address {
+        let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint).unwrap();
         let balance = l2w.get_balance(l2w.default_signer_address()).await.unwrap();
         if balance == U256::ZERO {
-            println!("No Strata bitcoin to send");
+            println!("No Alpen bitcoin to send");
         }
 
         let estimate_tx = l2w
@@ -122,7 +122,7 @@ pub async fn drain(
         );
 
         println!(
-            "Drained {} from Strata wallet to {}",
+            "Drained {} from Alpen wallet to {}",
             Amount::from_sat((max_send_amount / U256::from(SATS_TO_WEI)).wrapping_to()),
             address,
         );

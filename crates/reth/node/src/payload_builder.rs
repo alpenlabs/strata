@@ -39,7 +39,7 @@ use revm_primitives::{
     calc_excess_blob_gas, BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg,
     InvalidTransaction, ResultAndState, TxEnv, U256,
 };
-use strata_reth_evm::collect_withdrawal_intents;
+use alpen_reth_evm::collect_withdrawal_intents;
 use tracing::{debug, trace, warn};
 
 use crate::{
