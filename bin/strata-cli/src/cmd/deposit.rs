@@ -3,10 +3,9 @@ use std::{str::FromStr, time::Duration};
 use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
-    bitcoin::{hashes::Hash, taproot::LeafVersion, Address, TapNodeHash, XOnlyPublicKey},
+    bitcoin::{key::constants::SCHNORR_PUBLIC_KEY_SIZE, Address, XOnlyPublicKey},
     chain::ChainOracle,
     descriptor::IntoWalletDescriptor,
-    miniscript::{miniscript::Tap, Miniscript},
     template::DescriptorTemplateOut,
     KeychainKind, TxOrdering, Wallet,
 };
@@ -71,7 +70,7 @@ pub async fn deposit(
         recovery_address.to_string().yellow()
     );
 
-    let (bridge_in_desc, recovery_script_hash) =
+    let (bridge_in_desc, recovery_x_only_pubkey) =
         bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
             .expect("valid bridge in descriptor");
 
@@ -106,12 +105,11 @@ pub async fn deposit(
     log_fee_rate(&fee_rate);
 
     const MBL: usize = MAGIC_BYTES.len();
-    const TNHL: usize = TapNodeHash::LEN;
-    let mut op_return_data = [0u8; MBL + TNHL + StrataAddress::len_bytes()];
+    let mut op_return_data = [0u8; MBL + SCHNORR_PUBLIC_KEY_SIZE + StrataAddress::len_bytes()];
     op_return_data[..MBL].copy_from_slice(MAGIC_BYTES);
-    op_return_data[MBL..MBL + TNHL]
-        .copy_from_slice(recovery_script_hash.as_raw_hash().as_byte_array());
-    op_return_data[MBL + TNHL..].copy_from_slice(strata_address.as_slice());
+    op_return_data[MBL..MBL + SCHNORR_PUBLIC_KEY_SIZE]
+        .copy_from_slice(&recovery_x_only_pubkey.serialize());
+    op_return_data[MBL + SCHNORR_PUBLIC_KEY_SIZE..].copy_from_slice(strata_address.as_slice());
 
     let mut psbt = {
         let mut builder = l1w.build_tx();
@@ -158,7 +156,7 @@ pub async fn deposit(
 fn bridge_in_descriptor(
     bridge_pubkey: XOnlyPublicKey,
     recovery_address: Address,
-) -> Result<(DescriptorTemplateOut, TapNodeHash), NotTaprootAddress> {
+) -> Result<(DescriptorTemplateOut, XOnlyPublicKey), NotTaprootAddress> {
     let recovery_xonly_pubkey = recovery_address.extract_p2tr_pubkey()?;
 
     let desc = bdk_wallet::descriptor!(
@@ -169,17 +167,5 @@ fn bridge_in_descriptor(
     )
     .expect("valid descriptor");
 
-    // we have to do this to obtain the script hash
-    // i have tried to extract it directly from the desc above
-    // it is a massive pita
-    let recovery_script = Miniscript::<XOnlyPublicKey, Tap>::from_str(&format!(
-        "and_v(v:pk({}),older(1008))",
-        recovery_xonly_pubkey
-    ))
-    .expect("valid recovery script")
-    .encode();
-
-    let recovery_script_hash = TapNodeHash::from_script(&recovery_script, LeafVersion::TapScript);
-
-    Ok((desc, recovery_script_hash))
+    Ok((desc, recovery_xonly_pubkey))
 }
