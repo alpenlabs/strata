@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "strata-cli"
+name = "alpen-cli"
 version = "0.3.0"
 
 [[bin]]
