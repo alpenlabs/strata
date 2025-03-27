@@ -12,11 +12,11 @@ use bdk_wallet::bitcoin::{Network, XOnlyPublicKey};
 use config::Config;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use shrex::{decode, Hex};
+use shrex::Hex;
 use terrors::OneOf;
 
 use crate::{
-    constants::{BRIDGE_MUSIG2_PUBKEY, BRIDGE_STRATA_ADDRESS, DEFAULT_NETWORK},
+    constants::{BRIDGE_STRATA_ADDRESS, DEFAULT_NETWORK},
     signet::{backend::SignetBackend, EsploraClient},
 };
 
@@ -31,7 +31,7 @@ pub struct SettingsFromFile {
     pub faucet_endpoint: String,
     pub mempool_endpoint: Option<String>,
     pub blockscout_endpoint: Option<String>,
-    pub bridge_pubkey: Option<Hex<[u8; 32]>>,
+    pub bridge_pubkey: Hex<[u8; 32]>,
     pub network: Option<Network>,
 }
 
@@ -108,15 +108,8 @@ impl Settings {
             strata_endpoint: from_file.strata_endpoint,
             data_dir: proj_dirs.data_dir().to_owned(),
             faucet_endpoint: from_file.faucet_endpoint,
-            bridge_musig2_pubkey: XOnlyPublicKey::from_slice(&match from_file.bridge_pubkey {
-                Some(key) => key.0,
-                None => {
-                    let mut buf = [0u8; 32];
-                    decode(BRIDGE_MUSIG2_PUBKEY, &mut buf).expect("valid hex");
-                    buf
-                }
-            })
-            .expect("valid length"),
+            bridge_musig2_pubkey: XOnlyPublicKey::from_slice(&from_file.bridge_pubkey.0)
+                .expect("valid bridge musig2 pubkey"),
             descriptor_db: descriptor_file,
             mempool_space_endpoint: from_file.mempool_endpoint,
             blockscout_endpoint: from_file.blockscout_endpoint,
