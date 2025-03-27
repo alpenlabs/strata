@@ -9,8 +9,8 @@ x-base-client: &base-client
 x-base-reth: &base-reth
   build:
     context: ../
-    dockerfile: ./docker/strata-reth/Dockerfile
-  image: "strata_reth:0.1.0"
+    dockerfile: ./docker/alpen-reth/Dockerfile
+  image: "alpen_reth:0.1.0"
   networks:
     - strata_network
 
@@ -29,7 +29,7 @@ x-base-prover: &base-prover
 services:
   reth:
     <<: *base-reth
-    container_name: strata_reth
+    container_name: alpen_reth
     environment:
       JWTSECRET: "configs/jwt.hex"
     volumes:
@@ -52,7 +52,7 @@ services:
       JWTSECRET: "configs/jwt.fn.hex"
     command:
       - "--sequencer-http"
-      - "http://strata_reth:8545"
+      - "http://alpen_reth:8545"
       # FIXME: datatool should not default to dev chain
       - "--custom-chain"
       - "dev"

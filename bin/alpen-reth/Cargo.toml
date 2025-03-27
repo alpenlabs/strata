@@ -1,10 +1,10 @@
 [package]
 edition = "2021"
-name = "strata-reth"
+name = "alpen-reth"
 version = "0.1.0"
 
 [[bin]]
-name = "strata-reth"
+name = "alpen-reth"
 path = "src/main.rs"
 
 [dependencies]
