@@ -37,7 +37,7 @@ use revm_primitives::{
     alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
     Account,
 };
-use strata_reth_evm::{
+use alpen_reth_evm::{
     constants::{BRIDGEOUT_ADDRESS, SCHNORR_ADDRESS},
     set_evm_handles,
 };

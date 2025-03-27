@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "strata-reth-db"
+name = "alpen-reth-db"
 version = "0.1.0"
 
 [dependencies]

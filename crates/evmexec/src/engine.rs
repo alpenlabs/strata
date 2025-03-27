@@ -14,8 +14,8 @@ use strata_eectl::{
     messages::{ExecPayloadData, PayloadEnv},
 };
 use strata_primitives::l1::BitcoinAmount;
-use strata_reth_evm::constants::COINBASE_ADDRESS;
-use strata_reth_node::{
+use alpen_reth_evm::constants::COINBASE_ADDRESS;
+use alpen_reth_node::{
     ExecutionPayloadFieldV2, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
 };
 use strata_state::{
@@ -413,9 +413,9 @@ struct ForkchoiceStatePartial {
 }
 
 fn to_bridge_withdrawal_intent(
-    rpc_withdrawal_intent: strata_reth_node::WithdrawalIntent,
+    rpc_withdrawal_intent: alpen_reth_node::WithdrawalIntent,
 ) -> bridge_ops::WithdrawalIntent {
-    let strata_reth_node::WithdrawalIntent { amt, destination } = rpc_withdrawal_intent;
+    let alpen_reth_node::WithdrawalIntent { amt, destination } = rpc_withdrawal_intent;
     bridge_ops::WithdrawalIntent::new(BitcoinAmount::from_sat(amt), destination)
 }
 
@@ -426,7 +426,7 @@ mod tests {
     use revm_primitives::{alloy_primitives::Bloom, Bytes, FixedBytes, U256};
     use strata_eectl::{errors::EngineResult, messages::PayloadEnv};
     use strata_primitives::buf::Buf32;
-    use strata_reth_node::{ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2};
+    use alpen_reth_node::{ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2};
     use strata_state::block::{L2Block, L2BlockAccessory};
 
     use super::*;

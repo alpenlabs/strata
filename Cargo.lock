@@ -1386,6 +1386,159 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-reth-db"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "borsh",
+ "revm-primitives",
+ "rockbound",
+ "serde",
+ "serde_json",
+ "strata-db",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-rocksdb",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "alpen-reth-evm"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types",
+ "alpen-reth-primitives",
+ "reth-primitives",
+ "revm",
+ "revm-primitives",
+ "secp256k1",
+ "strata-crypto",
+ "strata-primitives",
+]
+
+[[package]]
+name = "alpen-reth-exex"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus 0.9.2",
+ "alloy-eips 0.9.2",
+ "alloy-rpc-types 0.9.2",
+ "alpen-reth-db",
+ "alpen-reth-node",
+ "anyhow",
+ "bincode",
+ "eyre",
+ "futures-util",
+ "reth-evm",
+ "reth-exex",
+ "reth-node-api",
+ "reth-primitives",
+ "reth-provider",
+ "reth-revm",
+ "reth-rpc-types-compat",
+ "reth-trie",
+ "reth-trie-common",
+ "revm-primitives",
+ "rockbound",
+ "serde",
+ "serde_json",
+ "strata-proofimpl-evm-ee-stf",
+ "tempfile",
+ "thiserror 2.0.11",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "alpen-reth-node"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus 0.9.2",
+ "alloy-eips 0.9.2",
+ "alloy-rpc-types 0.9.2",
+ "alpen-reth-evm",
+ "alpen-reth-primitives",
+ "alpen-reth-rpc",
+ "eyre",
+ "reth",
+ "reth-basic-payload-builder",
+ "reth-chain-state",
+ "reth-chainspec",
+ "reth-db",
+ "reth-errors",
+ "reth-ethereum-payload-builder",
+ "reth-evm",
+ "reth-evm-ethereum",
+ "reth-node-api",
+ "reth-node-builder",
+ "reth-node-ethereum",
+ "reth-payload-builder",
+ "reth-payload-validator",
+ "reth-primitives",
+ "reth-provider",
+ "reth-transaction-pool",
+ "reth-trie-db",
+ "revm",
+ "revm-primitives",
+ "serde",
+ "tracing",
+]
+
+[[package]]
+name = "alpen-reth-primitives"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types",
+ "serde",
+ "strata-primitives",
+]
+
+[[package]]
+name = "alpen-reth-rpc"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus 0.9.2",
+ "alloy-eips 0.9.2",
+ "alloy-network 0.9.2",
+ "alloy-primitives",
+ "alloy-rpc-types 0.9.2",
+ "alloy-rpc-types-eth 0.9.2",
+ "alpen-reth-db",
+ "bincode",
+ "eyre",
+ "hex",
+ "jsonrpsee",
+ "jsonrpsee-types",
+ "parking_lot 0.12.3",
+ "reqwest 0.12.12",
+ "reth-chainspec",
+ "reth-ethereum-forks",
+ "reth-evm",
+ "reth-network-api",
+ "reth-node-api",
+ "reth-node-builder",
+ "reth-primitives",
+ "reth-provider",
+ "reth-revm",
+ "reth-rpc",
+ "reth-rpc-eth-api",
+ "reth-rpc-eth-types",
+ "reth-rpc-server-types",
+ "reth-tasks",
+ "reth-transaction-pool",
+ "revm",
+ "revm-primitives",
+ "serde",
+ "serde_json",
+ "strata-proofimpl-evm-ee-stf",
+ "strata-rpc-utils",
+ "thiserror 2.0.11",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13713,6 +13866,8 @@ version = "0.1.0"
 dependencies = [
  "alloy-network 0.9.2",
  "alloy-rpc-types 0.9.2",
+ "alpen-reth-evm",
+ "alpen-reth-node",
  "anyhow",
  "arbitrary",
  "borsh",
@@ -13735,8 +13890,6 @@ dependencies = [
  "strata-db",
  "strata-eectl",
  "strata-primitives",
- "strata-reth-evm",
- "strata-reth-node",
  "strata-state",
  "strata-storage",
  "strata-test-utils",
@@ -13887,6 +14040,8 @@ dependencies = [
  "alloy-rpc-types 0.9.2",
  "alloy-rpc-types-eth 0.9.2",
  "alloy-trie",
+ "alpen-reth-evm",
+ "alpen-reth-primitives",
  "anyhow",
  "bincode",
  "hex-literal",
@@ -13900,8 +14055,6 @@ dependencies = [
  "serde_json",
  "serde_with",
  "strata-primitives",
- "strata-reth-evm",
- "strata-reth-primitives",
  "strata-state",
  "thiserror 2.0.11",
  "zkaleido",
@@ -14026,6 +14179,10 @@ version = "0.1.0"
 dependencies = [
  "alloy-genesis 0.9.2",
  "alloy-rpc-types 0.9.2",
+ "alpen-reth-db",
+ "alpen-reth-exex",
+ "alpen-reth-node",
+ "alpen-reth-rpc",
  "async-trait",
  "clap",
  "eyre",
@@ -14045,164 +14202,7 @@ dependencies = [
  "rockbound",
  "serde_json",
  "shellexpand",
- "strata-reth-db",
- "strata-reth-exex",
- "strata-reth-node",
- "strata-reth-rpc",
  "thiserror 2.0.11",
- "tracing",
-]
-
-[[package]]
-name = "strata-reth-db"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "borsh",
- "revm-primitives",
- "rockbound",
- "serde",
- "serde_json",
- "strata-db",
- "strata-proofimpl-evm-ee-stf",
- "strata-rocksdb",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "strata-reth-evm"
-version = "0.1.0"
-dependencies = [
- "alloy-sol-types",
- "reth-primitives",
- "revm",
- "revm-primitives",
- "secp256k1",
- "strata-crypto",
- "strata-primitives",
- "strata-reth-primitives",
-]
-
-[[package]]
-name = "strata-reth-exex"
-version = "0.1.0"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-eips 0.9.2",
- "alloy-rpc-types 0.9.2",
- "anyhow",
- "bincode",
- "eyre",
- "futures-util",
- "reth-evm",
- "reth-exex",
- "reth-node-api",
- "reth-primitives",
- "reth-provider",
- "reth-revm",
- "reth-rpc-types-compat",
- "reth-trie",
- "reth-trie-common",
- "revm-primitives",
- "rockbound",
- "serde",
- "serde_json",
- "strata-proofimpl-evm-ee-stf",
- "strata-reth-db",
- "strata-reth-node",
- "tempfile",
- "thiserror 2.0.11",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "strata-reth-node"
-version = "0.1.0"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-eips 0.9.2",
- "alloy-rpc-types 0.9.2",
- "eyre",
- "reth",
- "reth-basic-payload-builder",
- "reth-chain-state",
- "reth-chainspec",
- "reth-db",
- "reth-errors",
- "reth-ethereum-payload-builder",
- "reth-evm",
- "reth-evm-ethereum",
- "reth-node-api",
- "reth-node-builder",
- "reth-node-ethereum",
- "reth-payload-builder",
- "reth-payload-validator",
- "reth-primitives",
- "reth-provider",
- "reth-transaction-pool",
- "reth-trie-db",
- "revm",
- "revm-primitives",
- "serde",
- "strata-reth-evm",
- "strata-reth-primitives",
- "strata-reth-rpc",
- "tracing",
-]
-
-[[package]]
-name = "strata-reth-primitives"
-version = "0.1.0"
-dependencies = [
- "alloy-sol-types",
- "serde",
- "strata-primitives",
-]
-
-[[package]]
-name = "strata-reth-rpc"
-version = "0.1.0"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-eips 0.9.2",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-rpc-types 0.9.2",
- "alloy-rpc-types-eth 0.9.2",
- "bincode",
- "eyre",
- "hex",
- "jsonrpsee",
- "jsonrpsee-types",
- "parking_lot 0.12.3",
- "reqwest 0.12.12",
- "reth-chainspec",
- "reth-ethereum-forks",
- "reth-evm",
- "reth-network-api",
- "reth-node-api",
- "reth-node-builder",
- "reth-primitives",
- "reth-provider",
- "reth-revm",
- "reth-rpc",
- "reth-rpc-eth-api",
- "reth-rpc-eth-types",
- "reth-rpc-server-types",
- "reth-tasks",
- "reth-transaction-pool",
- "revm",
- "revm-primitives",
- "serde",
- "serde_json",
- "strata-proofimpl-evm-ee-stf",
- "strata-reth-db",
- "strata-rpc-utils",
- "thiserror 2.0.11",
- "tokio",
  "tracing",
 ]
 

@@ -47,7 +47,7 @@ services:
 
   reth-fn:
     <<: *base-reth
-    container_name: strata_reth_fn
+    container_name: alpen_reth_fn
     environment:
       JWTSECRET: "configs/jwt.fn.hex"
     command:
