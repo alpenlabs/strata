@@ -1353,6 +1353,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-cli"
+version = "0.3.0"
+dependencies = [
+ "aes-gcm-siv",
+ "alloy",
+ "argh",
+ "argon2",
+ "async-trait",
+ "bdk_bitcoind_rpc",
+ "bdk_esplora",
+ "bdk_wallet",
+ "bip39",
+ "chrono",
+ "colored",
+ "config",
+ "dialoguer",
+ "directories",
+ "indicatif",
+ "keyring",
+ "make_buf",
+ "rand_core 0.6.4",
+ "reqwest 0.12.12",
+ "serde",
+ "sha2 0.10.8",
+ "shrex",
+ "sled",
+ "strata-primitives",
+ "terrors",
+ "tokio",
+ "zeroize",
+ "zxcvbn",
+]
+
+[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13492,40 +13526,6 @@ dependencies = [
  "strata-test-utils",
  "thiserror 2.0.11",
  "tracing",
-]
-
-[[package]]
-name = "strata-cli"
-version = "0.3.0"
-dependencies = [
- "aes-gcm-siv",
- "alloy",
- "argh",
- "argon2",
- "async-trait",
- "bdk_bitcoind_rpc",
- "bdk_esplora",
- "bdk_wallet",
- "bip39",
- "chrono",
- "colored",
- "config",
- "dialoguer",
- "directories",
- "indicatif",
- "keyring",
- "make_buf",
- "rand_core 0.6.4",
- "reqwest 0.12.12",
- "serde",
- "sha2 0.10.8",
- "shrex",
- "sled",
- "strata-primitives",
- "terrors",
- "tokio",
- "zeroize",
- "zxcvbn",
 ]
 
 [[package]]
