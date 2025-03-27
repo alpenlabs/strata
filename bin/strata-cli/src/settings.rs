@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use alloy::primitives::Address as StrataAddress;
+use alloy::primitives::Address as AlpenAddress;
 use bdk_bitcoind_rpc::bitcoincore_rpc::{Auth, Client};
 use bdk_wallet::bitcoin::{Network, XOnlyPublicKey};
 use config::Config;
@@ -27,7 +27,7 @@ pub struct SettingsFromFile {
     pub bitcoind_rpc_pw: Option<String>,
     pub bitcoind_rpc_cookie: Option<PathBuf>,
     pub bitcoind_rpc_endpoint: Option<String>,
-    pub strata_endpoint: String,
+    pub alpen_endpoint: String,
     pub faucet_endpoint: String,
     pub mempool_endpoint: Option<String>,
     pub blockscout_endpoint: Option<String>,
@@ -40,14 +40,14 @@ pub struct SettingsFromFile {
 #[derive(Debug)]
 pub struct Settings {
     pub esplora: Option<String>,
-    pub strata_endpoint: String,
+    pub alpen_endpoint: String,
     pub data_dir: PathBuf,
     pub faucet_endpoint: String,
     pub bridge_musig2_pubkey: XOnlyPublicKey,
     pub descriptor_db: PathBuf,
     pub mempool_space_endpoint: Option<String>,
     pub blockscout_endpoint: Option<String>,
-    pub bridge_strata_address: StrataAddress,
+    pub bridge_alpen_address: AlpenAddress,
     pub linux_seed_file: PathBuf,
     pub network: Network,
     pub config_file: PathBuf,
@@ -55,7 +55,7 @@ pub struct Settings {
 }
 
 pub static PROJ_DIRS: LazyLock<ProjectDirs> = LazyLock::new(|| {
-    ProjectDirs::from("io", "alpenlabs", "strata").expect("project dir should be available")
+    ProjectDirs::from("io", "alpenlabs", "alpen").expect("project dir should be available")
 });
 
 pub static CONFIG_FILE: LazyLock<PathBuf> =
@@ -105,7 +105,7 @@ impl Settings {
 
         Ok(Settings {
             esplora: from_file.esplora,
-            strata_endpoint: from_file.strata_endpoint,
+            alpen_endpoint: from_file.alpen_endpoint,
             data_dir: proj_dirs.data_dir().to_owned(),
             faucet_endpoint: from_file.faucet_endpoint,
             bridge_musig2_pubkey: XOnlyPublicKey::from_slice(&match from_file.bridge_pubkey {
@@ -120,8 +120,8 @@ impl Settings {
             descriptor_db: descriptor_file,
             mempool_space_endpoint: from_file.mempool_endpoint,
             blockscout_endpoint: from_file.blockscout_endpoint,
-            bridge_strata_address: StrataAddress::from_str(BRIDGE_STRATA_ADDRESS)
-                .expect("valid strata address"),
+            bridge_alpen_address: AlpenAddress::from_str(BRIDGE_STRATA_ADDRESS)
+                .expect("valid alpen address"),
             linux_seed_file,
             network: from_file.network.unwrap_or(DEFAULT_NETWORK),
             config_file: CONFIG_FILE.clone(),

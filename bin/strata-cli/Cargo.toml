@@ -4,10 +4,10 @@ name = "strata-cli"
 version = "0.2.0"
 
 [features]
-strata_faucet = []
+alpen_faucet = []
 
 [[bin]]
-name = "strata"
+name = "alpen"
 path = "src/main.rs"
 
 [dependencies]
