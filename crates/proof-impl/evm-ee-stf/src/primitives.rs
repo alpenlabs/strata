@@ -8,7 +8,7 @@ use reth_primitives::{
 use revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use strata_reth_primitives::WithdrawalIntent;
+use alpen_reth_primitives::WithdrawalIntent;
 use strata_state::block::ExecSegment;
 
 use crate::mpt::{MptNode, StorageEntry};

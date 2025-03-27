@@ -11,7 +11,7 @@ use reth_primitives::{Block, SealedBlock, TransactionSigned};
 use reth_rpc_api::{EngineApiClient, EthApiClient};
 use reth_rpc_layer::{AuthClientLayer, AuthClientService};
 use revm_primitives::alloy_primitives::BlockHash;
-use strata_reth_node::{
+use alpen_reth_node::{
     StrataEngineTypes, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
 };
 

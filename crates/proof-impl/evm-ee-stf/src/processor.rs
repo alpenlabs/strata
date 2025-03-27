@@ -23,6 +23,7 @@ use alloy_primitives::map::DefaultHashBuilder;
 use alloy_rlp::BufMut;
 use alloy_rpc_types_eth::TransactionTrait;
 use alloy_trie::root::ordered_trie_root_with_encoder;
+use alpen_reth_evm::set_evm_handles;
 use anyhow::anyhow;
 use reth_primitives::{Header, Receipt, Transaction, TransactionSigned};
 use reth_primitives_traits::{constants::MINIMUM_GAS_LIMIT, SignedTransaction};
@@ -36,7 +37,6 @@ use revm_primitives::{
     alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
     Account,
 };
-use strata_reth_evm::set_evm_handles;
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},
