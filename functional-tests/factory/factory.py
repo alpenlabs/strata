@@ -253,7 +253,7 @@ class RethFactory(flexitest.Factory):
 
         # fmt: off
         cmd = [
-            "strata-reth",
+            "alpen-reth",
             "--disable-discovery",
             "--ipcdisable",
             "--datadir", datadir,

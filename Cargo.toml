@@ -43,7 +43,7 @@ members = [
   "bin/datatool",
   "bin/alpen-cli",
   "bin/strata-client",
-  "bin/strata-reth",
+  "bin/alpen-reth",
   "bin/strata-sequencer-client",
   "bin/prover-client",
   "bin/prover-perf",
@@ -56,7 +56,7 @@ members = [
 default-members = [
   "bin/datatool",
   "bin/prover-client",
-  "bin/strata-reth",
+  "bin/alpen-reth",
   "bin/strata-client",
   "bin/strata-sequencer-client",
   "crates/util/python-utils",
