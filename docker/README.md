@@ -41,7 +41,7 @@ After that, you can simply restart the containers:
 
 ```bash
 docker start strata_sequencer
-docker start strata_reth_fn # if you want to test the full node
+docker start alpen_reth_fn # if you want to test the full node
 ```
 
 

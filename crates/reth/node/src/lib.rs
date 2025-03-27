@@ -13,4 +13,4 @@ pub use payload::{
     ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, StrataExecutionPayloadEnvelopeV2,
     StrataPayloadAttributes,
 };
-pub use strata_reth_primitives::WithdrawalIntent;
+pub use alpen_reth_primitives::WithdrawalIntent;
