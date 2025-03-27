@@ -115,7 +115,7 @@ async fn handle_pending_checkpoint_expiry(checkpoint_handle: &CheckpointHandle, 
                 warn!("Got request for already ready proof");
                 return;
             }
-            warn!(%idx, "Checkpoint proof generation timed out");
+            error!(%idx, "Checkpoint proof generation timed out");
         }
         Ok(None) => {
             error!(%idx, "Expected checkpoint not found in db");
