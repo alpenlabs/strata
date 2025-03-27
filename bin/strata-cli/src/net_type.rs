@@ -1,11 +1,11 @@
 use std::{fmt, str::FromStr};
 
-/// Represents a type of network, either Alpen's signet or Strata
+/// Represents a type of network, either Alpen's signet or Alpen
 #[non_exhaustive]
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum NetworkType {
     Signet,
-    Strata,
+    Alpen,
 }
 
 /// Attempted to parse a string into [`NetworkType`] but the input was invalid.
@@ -17,7 +17,7 @@ impl FromStr for NetworkType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "signet" => Ok(Self::Signet),
-            "strata" => Ok(Self::Strata),
+            "alpen" => Ok(Self::Alpen),
             _ => Err(InvalidNetworkType),
         }
     }
@@ -38,7 +38,7 @@ pub fn net_type_or_exit(val: &str) -> NetworkType {
     match NetworkType::from_str(val) {
         Ok(t) => t,
         Err(InvalidNetworkType) => {
-            println!("Invalid network type. Must be signet or strata");
+            println!("Invalid network type. Must be signet or alpen");
             std::process::exit(1)
         }
     }

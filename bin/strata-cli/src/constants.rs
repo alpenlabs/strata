@@ -37,7 +37,7 @@ pub const DEFAULT_NETWORK: Network = Network::Signet;
 pub const BRIDGE_STRATA_ADDRESS: &str = "0x5400000000000000000000000000000000000001";
 pub const SIGNET_BLOCK_TIME: Duration = Duration::from_secs(30);
 
-/// Strata CLI [`DerivationPath`](bdk_wallet::bitcoin::bip32::DerivationPath) for Strata EVM wallet
+/// Alpen CLI [`DerivationPath`](bdk_wallet::bitcoin::bip32::DerivationPath) for Alpen EVM wallet
 ///
 /// This corresponds to the path: `m/44'/60'/0'/0/0`.
 pub const BIP44_STRATA_EVM_WALLET_PATH: &[ChildNumber] = &[
