@@ -1,6 +1,6 @@
 use std::{fmt, str::FromStr};
 
-use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
+use alloy::{primitives::Address as AlpenAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use indicatif::ProgressBar;
@@ -14,14 +14,14 @@ use crate::{
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::StrataWallet,
+    alpen::AlpenWallet,
 };
 
 /// Request some bitcoin from the faucet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "faucet")]
 pub struct FaucetArgs {
-    /// either "signet" or "strata"
+    /// either "signet" or "alpen"
     #[argh(positional)]
     network_type: String,
     /// address that funds will be sent to. defaults to internal wallet
@@ -102,7 +102,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let mut solution = 0u64;
     let prehash = {
         let mut hasher = Sha256::new();
-        hasher.update(b"strata faucet 2024");
+        hasher.update(b"alpen faucet 2024");
         hasher.update(challenge.nonce.0);
         hasher
     };

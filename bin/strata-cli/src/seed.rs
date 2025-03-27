@@ -50,7 +50,7 @@ impl Seed {
 
     pub fn descriptor_recovery_key(&self) -> [u8; 32] {
         let mut hasher = <Sha256 as Digest>::new(); // this is to appease the analyzer
-        hasher.update(b"alpen labs strata descriptor recovery file 2024");
+        hasher.update(b"alpen labs alpen descriptor recovery file 2024");
         hasher.update(self.0.as_slice());
         hasher.finalize().into()
     }
@@ -98,7 +98,7 @@ impl Seed {
         )
     }
 
-    pub fn get_strata_wallet(&self) -> EthereumWallet {
+    pub fn get_alpen_wallet(&self) -> EthereumWallet {
         let derivation_path = DerivationPath::master().extend(BIP44_STRATA_EVM_WALLET_PATH);
 
         let mnemonic = Mnemonic::from_entropy(self.0.as_ref()).expect("valid entropy");

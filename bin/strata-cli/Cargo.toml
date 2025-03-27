@@ -4,7 +4,7 @@ name = "strata-cli"
 version = "0.3.0"
 
 [[bin]]
-name = "strata"
+name = "alpen"
 path = "src/main.rs"
 
 [dependencies]

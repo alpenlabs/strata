@@ -28,15 +28,15 @@ type Provider = FillProvider<
     Ethereum,
 >;
 
-pub struct StrataWallet(Provider);
+pub struct AlpenWallet(Provider);
 
-impl DerefMut for StrataWallet {
+impl DerefMut for AlpenWallet {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl Deref for StrataWallet {
+impl Deref for AlpenWallet {
     type Target = Provider;
 
     fn deref(&self) -> &Self::Target {
@@ -47,9 +47,9 @@ impl Deref for StrataWallet {
 #[derive(Debug)]
 pub struct L2EndpointParseError;
 
-impl StrataWallet {
+impl AlpenWallet {
     pub fn new(seed: &Seed, l2_http_endpoint: &str) -> Result<Self, L2EndpointParseError> {
-        let wallet = seed.get_strata_wallet();
+        let wallet = seed.get_alpen_wallet();
 
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
