@@ -1387,6 +1387,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-reth"
+version = "0.1.0"
+dependencies = [
+ "alloy-genesis 0.9.2",
+ "alloy-rpc-types 0.9.2",
+ "alpen-reth-db",
+ "alpen-reth-exex",
+ "alpen-reth-node",
+ "alpen-reth-rpc",
+ "async-trait",
+ "clap",
+ "eyre",
+ "hex",
+ "jsonrpsee-types",
+ "reqwest 0.12.12",
+ "reth",
+ "reth-chainspec",
+ "reth-cli",
+ "reth-cli-commands",
+ "reth-cli-util",
+ "reth-db",
+ "reth-primitives",
+ "reth-provider",
+ "reth-rpc-eth-api",
+ "reth-rpc-eth-types",
+ "rockbound",
+ "serde_json",
+ "shellexpand",
+ "thiserror 2.0.11",
+ "tracing",
+]
+
+[[package]]
 name = "alpen-reth-db"
 version = "0.1.0"
 dependencies = [
@@ -14174,39 +14207,6 @@ dependencies = [
  "strata-crypto",
  "strata-primitives",
  "tokio",
- "tracing",
-]
-
-[[package]]
-name = "strata-reth"
-version = "0.1.0"
-dependencies = [
- "alloy-genesis 0.9.2",
- "alloy-rpc-types 0.9.2",
- "alpen-reth-db",
- "alpen-reth-exex",
- "alpen-reth-node",
- "alpen-reth-rpc",
- "async-trait",
- "clap",
- "eyre",
- "hex",
- "jsonrpsee-types",
- "reqwest 0.12.12",
- "reth",
- "reth-chainspec",
- "reth-cli",
- "reth-cli-commands",
- "reth-cli-util",
- "reth-db",
- "reth-primitives",
- "reth-provider",
- "reth-rpc-eth-api",
- "reth-rpc-eth-types",
- "rockbound",
- "serde_json",
- "shellexpand",
- "thiserror 2.0.11",
  "tracing",
 ]
 
