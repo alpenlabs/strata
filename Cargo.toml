@@ -41,7 +41,7 @@ members = [
 
   # binaries listed separately
   "bin/datatool",
-  "bin/strata-cli",
+  "bin/alpen-cli",
   "bin/strata-client",
   "bin/strata-reth",
   "bin/strata-sequencer-client",
