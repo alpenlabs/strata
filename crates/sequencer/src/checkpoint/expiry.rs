@@ -7,7 +7,7 @@ use tokio::{
     select,
     time::{self, Duration, Instant},
 };
-use tracing::{debug, error, warn};
+use tracing::{error, warn};
 
 use crate::checkpoint::CheckpointHandle;
 
@@ -110,18 +110,12 @@ pub async fn checkpoint_expiry_worker(
 
 async fn handle_pending_checkpoint_expiry(checkpoint_handle: &CheckpointHandle, idx: u64) {
     match checkpoint_handle.get_checkpoint(idx).await {
-        Ok(Some(mut entry)) => {
+        Ok(Some(entry)) => {
             if entry.proving_status != CheckpointProvingStatus::PendingProof {
                 warn!("Got request for already ready proof");
                 return;
             }
-            debug!(%idx, "Proof is pending, setting proof ready");
-
-            entry.proving_status = CheckpointProvingStatus::ProofReady;
-            if let Err(e) = checkpoint_handle.put_checkpoint(idx, entry).await {
-                warn!(?e, "Error updating checkpoint after timeout");
-            }
-            debug!(%idx, "Successfully submitted proof after timeout");
+            error!(%idx, "Checkpoint proof generation timed out");
         }
         Ok(None) => {
             error!(%idx, "Expected checkpoint not found in db");
