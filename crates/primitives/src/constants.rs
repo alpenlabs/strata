@@ -23,6 +23,9 @@ pub const SEC_NONCE_SIZE: usize = 64;
 /// The size (in bytes) of a Hash (such as [`Txid`](bitcoin::Txid)).
 pub const HASH_SIZE: usize = 32;
 
+/// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
+pub const RECOVER_DELAY: u32 = 1_008;
+
 /// Strata base index for keys.
 ///
 /// These should be _hardened_ [`ChildNumber`].

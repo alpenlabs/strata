@@ -2,11 +2,7 @@ use std::time::Duration;
 
 use alloy::consensus::constants::ETH_TO_WEI;
 use bdk_wallet::bitcoin::{bip32::ChildNumber, Amount, Network};
-
-/// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
-///
-/// 144 is the number of blocks in a day.
-pub const RECOVER_DELAY: u32 = 144;
+use strata_primitives::constants::RECOVER_DELAY;
 
 /// Number of blocks that the wallet considers a transaction "buried" or final taking into account
 /// reorgs that might happen.

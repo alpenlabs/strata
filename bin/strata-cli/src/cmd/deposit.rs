@@ -3,7 +3,7 @@ use std::{str::FromStr, time::Duration};
 use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
-    bitcoin::{hashes::Hash, taproot::LeafVersion, Address, TapNodeHash, XOnlyPublicKey},
+    bitcoin::{taproot::LeafVersion, Address, ScriptBuf, TapNodeHash, XOnlyPublicKey},
     chain::ChainOracle,
     descriptor::IntoWalletDescriptor,
     miniscript::{miniscript::Tap, Miniscript},
@@ -12,10 +12,12 @@ use bdk_wallet::{
 };
 use colored::Colorize;
 use indicatif::ProgressBar;
-use strata_primitives::constants::UNSPENDABLE_PUBLIC_KEY;
+use make_buf::make_buf;
+use strata_bridge_tx_builder::constants::MAGIC_BYTES;
+use strata_primitives::constants::RECOVER_DELAY;
 
 use crate::{
-    constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, RECOVER_DELAY, SIGNET_BLOCK_TIME},
+    constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
@@ -57,6 +59,7 @@ pub async fn deposit(
 
     l1w.sync().await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
+    let recovery_address_pk = recovery_address.extract_p2tr_pubkey().unwrap();
     l1w.persist().unwrap();
 
     let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
@@ -71,7 +74,7 @@ pub async fn deposit(
         recovery_address.to_string().yellow()
     );
 
-    let (bridge_in_desc, recovery_script_hash) =
+    let (bridge_in_desc, _recovery_script, _recovery_script_hash) =
         bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
             .expect("valid bridge in descriptor");
 
@@ -105,13 +108,18 @@ pub async fn deposit(
     let fee_rate = get_fee_rate(fee_rate, settings.signet_backend.as_ref()).await;
     log_fee_rate(&fee_rate);
 
+    // Construct the DRT metadata OP_RETURN:
+    // <magic_bytes>
+    // <recovery_address_pk>
+    // <strata_address>
     const MBL: usize = MAGIC_BYTES.len();
-    const TNHL: usize = TapNodeHash::LEN;
-    let mut op_return_data = [0u8; MBL + TNHL + StrataAddress::len_bytes()];
-    op_return_data[..MBL].copy_from_slice(MAGIC_BYTES);
-    op_return_data[MBL..MBL + TNHL]
-        .copy_from_slice(recovery_script_hash.as_raw_hash().as_byte_array());
-    op_return_data[MBL + TNHL..].copy_from_slice(strata_address.as_slice());
+    const XONLYPK: usize = 32; // X-only PKs are 32-bytes in P2TR SegWit v1 addresses
+    const STRATA_ADDRESS_LEN: usize = 20; // EVM addresses are 20 bytes long
+    let op_return_data = make_buf! {
+        (MAGIC_BYTES, MBL),
+        (&recovery_address_pk.serialize(), XONLYPK),
+        (strata_address.as_slice(), STRATA_ADDRESS_LEN)
+    };
 
     let mut psbt = {
         let mut builder = l1w.build_tx();
@@ -155,17 +163,24 @@ pub async fn deposit(
     println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Strata.");
 }
 
+/// Generates a bridge-in descriptor for a given bridge public key and recovery address.
+///
+/// Returns a P2TR descriptor template for the bridge-in transaction.
+///
+/// # Implementation Details
+///
+/// This is a P2TR address that the key path spend is locked to the bridge aggregated public key
+/// and the single script path spend is locked to the user's recovery address with a timelock of
 fn bridge_in_descriptor(
     bridge_pubkey: XOnlyPublicKey,
     recovery_address: Address,
-) -> Result<(DescriptorTemplateOut, TapNodeHash), NotTaprootAddress> {
+) -> Result<(DescriptorTemplateOut, ScriptBuf, TapNodeHash), NotTaprootAddress> {
     let recovery_xonly_pubkey = recovery_address.extract_p2tr_pubkey()?;
 
     let desc = bdk_wallet::descriptor!(
-        tr(UNSPENDABLE_PUBLIC_KEY, {
-            pk(bridge_pubkey),
+        tr(bridge_pubkey,
             and_v(v:pk(recovery_xonly_pubkey),older(RECOVER_DELAY))
-        })
+        )
     )
     .expect("valid descriptor");
 
@@ -173,13 +188,41 @@ fn bridge_in_descriptor(
     // i have tried to extract it directly from the desc above
     // it is a massive pita
     let recovery_script = Miniscript::<XOnlyPublicKey, Tap>::from_str(&format!(
-        "and_v(v:pk({}),older(1008))",
-        recovery_xonly_pubkey
+        "and_v(v:pk({}),older({}))",
+        recovery_xonly_pubkey, RECOVER_DELAY
     ))
     .expect("valid recovery script")
     .encode();
 
     let recovery_script_hash = TapNodeHash::from_script(&recovery_script, LeafVersion::TapScript);
 
-    Ok((desc, recovery_script_hash))
+    Ok((desc, recovery_script, recovery_script_hash))
+}
+
+#[cfg(test)]
+mod tests {
+    use bdk_wallet::bitcoin::{consensus, secp256k1::SECP256K1, Network, Sequence};
+
+    use super::*;
+    use crate::constants::BRIDGE_MUSIG2_PUBKEY;
+
+    #[test]
+    fn bridge_in_descriptor_script() {
+        let bridge_musig2_pubkey = BRIDGE_MUSIG2_PUBKEY.parse::<XOnlyPublicKey>().unwrap();
+        let internal_recovery_pubkey = XOnlyPublicKey::from_slice(&[2u8; 32]).unwrap();
+        let recovery_address =
+            Address::p2tr(SECP256K1, internal_recovery_pubkey, None, Network::Bitcoin);
+        let external_recovery_pubkey = recovery_address.extract_p2tr_pubkey().unwrap();
+        let sequence = Sequence::from_consensus(RECOVER_DELAY);
+        let sequence_hex = consensus::encode::serialize_hex(&sequence);
+
+        let (_bridge_in_descriptor, recovery_script, _recovery_script_hash) =
+            bridge_in_descriptor(bridge_musig2_pubkey, recovery_address).unwrap();
+
+        let expected = format!(
+            "OP_PUSHBYTES_32 {external_recovery_pubkey} OP_CHECKSIGVERIFY OP_PUSHBYTES_2 {sequence_hex:.4} OP_CSV"
+        );
+        let got = recovery_script.to_asm_string();
+        assert_eq!(got, expected);
+    }
 }

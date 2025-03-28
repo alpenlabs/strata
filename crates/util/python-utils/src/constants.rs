@@ -5,9 +5,6 @@ use bdk_wallet::bitcoin::{Amount, Network};
 /// Magic bytes to add to the metadata output in transactions to help identify them.
 pub const MAGIC_BYTES: &[u8; 11] = b"alpenstrata";
 
-/// Number of blocks after bridge in transaction confirmation that the recovery path can be spent.
-pub(crate) const RECOVER_DELAY: u32 = 1008;
-
 /// 10 BTC + 0.01 to cover fees in the following transaction where the operator spends it into the
 /// federation.
 pub(crate) const BRIDGE_IN_AMOUNT: Amount = Amount::from_sat(1_001_000_000);
