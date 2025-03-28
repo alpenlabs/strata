@@ -39,45 +39,49 @@ pub struct PowChallenge {
     difficulty: u8,
 }
 
+#[cfg(feature = "strata_faucet")]
 /// Which chain the faucet is reasoning about.
 enum Chain {
     L1,
     L2,
 }
 
+#[cfg(feature = "strata_faucet")]
 impl Chain {
-    fn from_network_type(network_type: &str) -> Result<Self, String> {
+    fn from_network_type(network_type: NetworkType) -> Result<Self, String> {
         match network_type {
-            "signet" => Ok(LayerType::L1),
-            "strata" => Ok(LayerType::L2),
+            NetworkType::Signet => Ok(Chain::L1),
+            NetworkType::Strata => Ok(Chain::L2),
             _ => Err(format!("Unsupported network type: {}", network_type)),
         }
     }
 
     fn as_str(&self) -> &'static str {
         match self {
-            LayerType::L1 => "l1",
-            LayerType::L2 => "l2",
+            Chain::L1 => "l1",
+            Chain::L2 => "l2",
         }
     }
 }
 
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     println!("Fetching challenge from faucet");
-
-    #[cfg(feature = "strata_faucet")]
-    let network_type = net_type_or_exit(&args.network_type);
-
-    let chain = match network_type {
-        "signet" => Ok("l1"),
-        "strata" => Ok("l2"),
-        _ => Err(format!("Unsupported network type: {}", network_type)),
-    };
-
     let client = reqwest::Client::new();
     let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
+
+    #[cfg(feature = "strata_faucet")]
+    let endpoint = {
+        let network_type = net_type_or_exit(&args.network_type);
+        let chain = Chain::from_network_type(network_type)?;
+        base.join(&format!("/pow_challenge/{}", chain.as_str()))
+            .unwrap()
+    };
+
+    #[cfg(not(feature = "strata_faucet"))]
+    let endpoint = base.join("/pow_challenge").unwrap();
+
     let challenge = client
-        .get(base.join(&format!("/pow_challenge/{}", chain?)).unwrap())
+        .get(endpoint)
         .send()
         .await
         .unwrap()
