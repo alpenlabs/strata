@@ -39,16 +39,44 @@ pub struct PowChallenge {
     difficulty: u8,
 }
 
+enum Chain {
+    L1,
+    L2,
+}
+
+impl Chain {
+    fn from_network_type(network_type: &str) -> Result<Self, String> {
+        match network_type {
+            "signet" => Ok(LayerType::L1),
+            "strata" => Ok(LayerType::L2),
+            _ => Err(format!("Unsupported network type: {}", network_type)),
+        }
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            LayerType::L1 => "l1",
+            LayerType::L2 => "l2",
+        }
+    }
+}
+
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     println!("Fetching challenge from faucet");
 
     #[cfg(feature = "strata_faucet")]
     let network_type = net_type_or_exit(&args.network_type);
 
+    let chain = match network_type {
+        "signet" => Ok("l1"),
+        "strata" => Ok("l2"),
+        _ => Err(format!("Unsupported network type: {}", network_type)),
+    };
+
     let client = reqwest::Client::new();
     let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
     let challenge = client
-        .get(base.join("/pow_challenge").unwrap())
+        .get(base.join(&format!("/pow_challenge/{}", chain?)).unwrap())
         .send()
         .await
         .unwrap()
