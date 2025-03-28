@@ -52,7 +52,6 @@ impl Chain {
         match network_type {
             NetworkType::Signet => Ok(Chain::L1),
             NetworkType::Strata => Ok(Chain::L2),
-            _ => Err(format!("Unsupported network type: {:?}", network_type)),
         }
     }
 
