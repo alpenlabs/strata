@@ -39,6 +39,7 @@ pub struct PowChallenge {
     difficulty: u8,
 }
 
+/// Which chain the faucet is reasoning about.
 enum Chain {
     L1,
     L2,
