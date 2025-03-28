@@ -218,6 +218,8 @@ class BasicEnvConfig(flexitest.EnvConfig):
             rpc_url=f"localhost:{reth_port}",
             secret=reth_secret_path,
         )
+        reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
+
         sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
         seq_host = sequencer.get_prop("rpc_host")
@@ -234,9 +236,6 @@ class BasicEnvConfig(flexitest.EnvConfig):
         # Sleeping some more for safety
         if self.auto_generate_blocks:
             time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
-
-        seq_port = sequencer.get_prop("rpc_port")
-        reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
 
         prover_client_fac = ctx.get_factory("prover_client")
         prover_client_settings = self.prover_client_settings or ProverClientSettings.new_default()
@@ -334,6 +333,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             rpc_url=f"localhost:{reth_authrpc_port}",
             secret=reth_secret_path,
         )
+        reth_rpc_http_port = reth.get_prop("eth_rpc_http_port")
         sequencer = seq_fac.create_sequencer_node(bitcoind_config, reth_config, seqaddr, params)
 
         seq_host = sequencer.get_prop("rpc_host")
@@ -360,6 +360,16 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             params,
         )
 
+        prover_client_fac = ctx.get_factory("prover_client")
+        prover_client_settings = ProverClientSettings.new_with_proving()
+        prover_client = prover_client_fac.create_prover_client(
+            bitcoind_config,
+            f"http://localhost:{seq_port}",
+            f"http://localhost:{reth_rpc_http_port}",
+            params,
+            prover_client_settings,
+        )
+
         svcs = {
             "bitcoin": bitcoind,
             "seq_node": sequencer,
@@ -367,6 +377,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
             "seq_reth": reth,
             "follower_1_node": fullnode,
             "follower_1_reth": fullnode_reth,
+            "prover_client": prover_client,
         }
 
         return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)

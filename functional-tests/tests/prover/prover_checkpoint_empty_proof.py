@@ -1,5 +1,4 @@
 import logging
-import time
 
 import flexitest
 
@@ -35,7 +34,7 @@ class ProverCheckpointEmptyProofRunnerTest(testenv.StrataTester):
         empty_proof_receipt = {"proof": [], "public_values": []}
 
         current_epoch = sequencer_rpc.strata_getLatestCheckpointIndex(None)
-        for proof_num in range(PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"]):
+        for _ in range(PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"]):
             logging.info(f"Submitting proof for epoch {current_epoch}")
 
             # Submit empty proof
@@ -43,8 +42,12 @@ class ProverCheckpointEmptyProofRunnerTest(testenv.StrataTester):
 
             # Wait for epoch increment
             wait_until(
-                lambda: sequencer_rpc.strata_getLatestCheckpointIndex(None) == current_epoch + 1,
+                lambda current_epoch=current_epoch: sequencer_rpc.strata_getLatestCheckpointIndex(
+                    None
+                )
+                == current_epoch + 1,
                 error_with="Checkpoint index did not increment",
             )
+
             current_epoch += 1
             logging.info(f"Epoch advanced to {current_epoch}")

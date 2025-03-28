@@ -16,7 +16,13 @@ class BlockFinalizationTest(testenv.StrataTester):
         settings = net_settings.get_fast_batch_settings()
         settings.genesis_trigger = premine_blocks + 5
 
-        ctx.set_env(testenv.BasicEnvConfig(premine_blocks, rollup_settings=settings))
+        ctx.set_env(
+            testenv.BasicEnvConfig(
+                premine_blocks,
+                rollup_settings=settings,
+                prover_client_settings=ProverClientSettings.new_with_proving(),
+            )
+        )
 
     def main(self, ctx: flexitest.RunContext):
         seq = ctx.get_service("sequencer")
