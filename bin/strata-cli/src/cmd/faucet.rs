@@ -1,3 +1,5 @@
+#[cfg(feature = "strata_faucet")]
+use std::fmt;
 use std::str::FromStr;
 
 #[cfg(feature = "strata_faucet")]
@@ -54,12 +56,16 @@ impl Chain {
             NetworkType::Strata => Ok(Chain::L2),
         }
     }
+}
 
-    fn to_string(&self) -> String {
-        match self {
-            Chain::L1 => "l1".to_string(),
-            Chain::L2 => "l2".to_string(),
-        }
+#[cfg(feature = "strata_faucet")]
+impl fmt::Display for Chain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let chain_str = match self {
+            Chain::L1 => "l1",
+            Chain::L2 => "l2",
+        };
+        write!(f, "{}", chain_str)
     }
 }
 
@@ -74,8 +80,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     #[cfg(feature = "strata_faucet")]
     let endpoint = {
         let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
-        base.join(&format!("/pow_challenge/{}", chain.to_string()))
-            .unwrap()
+        base.join(&format!("/pow_challenge/{}", chain)).unwrap()
     };
 
     #[cfg(not(feature = "strata_faucet"))]
