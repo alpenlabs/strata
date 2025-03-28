@@ -52,7 +52,7 @@ impl Chain {
         match network_type {
             NetworkType::Signet => Ok(Chain::L1),
             NetworkType::Strata => Ok(Chain::L2),
-            _ => Err(format!("Unsupported network type: {}", network_type)),
+            _ => Err(format!("Unsupported network type: {:?}", network_type)),
         }
     }
 
@@ -74,7 +74,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
 
     #[cfg(feature = "strata_faucet")]
     let endpoint = {
-        let chain = Chain::from_network_type(network_type).expect("conversion to succeed");
+        let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
         base.join(&format!("/pow_challenge/{}", chain.as_str()))
             .unwrap()
     };
