@@ -70,9 +70,11 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
 
     #[cfg(feature = "strata_faucet")]
+    let network_type = net_type_or_exit(&args.network_type);
+
+    #[cfg(feature = "strata_faucet")]
     let endpoint = {
-        let network_type = net_type_or_exit(&args.network_type);
-        let chain = Chain::from_network_type(network_type)?;
+        let chain = Chain::from_network_type(network_type).expect("conversion to succeed");
         base.join(&format!("/pow_challenge/{}", chain.as_str()))
             .unwrap()
     };
