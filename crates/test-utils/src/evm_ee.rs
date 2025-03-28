@@ -41,7 +41,7 @@ impl EvmSegment {
         use revm::primitives::SpecId;
 
         const EVM_CONFIG: EvmConfig = EvmConfig {
-            chain_id: 12345,
+            chain_id: 2892,
             spec_id: SpecId::SHANGHAI,
         };
 

@@ -33,7 +33,7 @@ use zkaleido::ZkVmEnv;
 
 // TODO: Read the evm config from the genesis config. This should be done in compile time.
 const EVM_CONFIG: EvmConfig = EvmConfig {
-    chain_id: 12345,
+    chain_id: 2892,
     spec_id: SpecId::SHANGHAI,
 };
 /// Executes the block with the given input and EVM configuration, returning public parameters.
