@@ -12,7 +12,8 @@ services:
       RETH_AUTH_RPC_PORT: ${RETH_AUTH_RPC_PORT:-8551}
       JWTSECRET: ${JWTSECRET}
     volumes:
-      - ./data/data-reth:/app/reth
+      - ./data/reth:/app/reth
+      - ./configs:/app/configs
     ports:
       - "${RETH_AUTH_RPC_PORT:-8551}:${RETH_AUTH_RPC_PORT:-8551}"
       - "${RETH_PORT:-8545}:${RETH_PORT:-8545}"
@@ -25,38 +26,18 @@ services:
   client:
     build:
       context: ../
-      dockerfile: ./docker/client/Dockerfile
-    image: "strata_client:v0.1.0"
+      dockerfile: ./docker/strata-client/Dockerfile
+    image: "strata_client:v0.2.0"  # TODO: Use either latest or tagged image here instead of building
     environment:
-      BITCOIND_RPC_PORT: ${BITCOIND_RPC_PORT}
-      BITCOIND_HOST: ${BITCOIND_HOST}
-      CLIENT_MODE: "full_node"
-      BITCOIND_RPC_USER: ${BITCOIND_RPC_USER}
-      BITCOIND_RPC_PASSWORD: ${BITCOIND_RPC_PASSWORD}
-      BITCOIND_WALLET: ${BITCOIND_WALLET}
-      NETWORK: ${NETWORK:-regtest}
-      JWTSECRET: ${JWTSECRET}
-      RETH_HOST: ${RETH_HOST}
-      RETH_PORT: ${RETH_AUTH_RPC_PORT:-8551}
-      RPC_HOST: ${RPC_HOST:-"0.0.0.0"}
-      RPC_PORT: ${RPC_PORT:-"12332"}
-      SEQUENCER_RPC: ${RPC_URL:-"ws://0.0.0.0:12332"}
-      BTC_ADDRESS: ${BTC_ADDRESS}
-      SECRETKEY: ${SECRETKEY}
-      DB_RETRY_COUNT: ${DB_RETRY_COUNT:-5}
-      L2_BLOCKS_FETCH_LIMIT: ${L2_BLOCKS_FETCH_LIMIT:-100}
-      L1_FOLLOW_DISTANCE: ${L1_FOLLOW_DISTANCE:-6}
-      MAX_REORG_DEPTH: ${MAX_REORG_DEPTH:-4}
-      CLIENT_POLL_DUR_MS: ${CLIENT_POLL_DUR_MS:-2000}
-      CHECKPOINT_INTERVAL: ${CHECKPOINT_INTERVAL:-20}
-      RUST_LOG: ${RUST_LOG:-info}
+      CONFIG_PATH: /app/configs/config.toml
+      PARAM_PATH: /app/configs/params.json
+      RUST_LOG: ${RUST_LOG:-debug}
     container_name: strata_client
     ports:
-      - "${RPC_PORT:-12332}:${RPC_PORT:-12332}"
-    expose:
-      - ${RPC_PORT:-12332}
+      - "8432:8432"
     volumes:
-      - ./data/data-bitcoind:/root/.bitcoin/
+      - ./data/data-strata:/app/data
+      - ./configs:/app/configs
     depends_on:
       - bitcoind
       - reth
@@ -64,23 +45,16 @@ services:
       - strata_network
 
   bitcoind:
-    build:
-      context: ../
-      dockerfile: ./docker/bitcoind/Dockerfile
-    image: "strata_bitcoind:v0.1.0"
+    image: "public.ecr.aws/s6b4k6i9/strata/signet:latest"
     environment:
-      BITCOIND_RPC_PORT: ${BITCOIND_RPC_PORT}
-      BITCOIND_WALLET: ${BITCOIND_WALLET}
-      BITCOIND_HOST: ${BITCOIND_HOST}
-      BITCOIND_RPC_USER: ${BITCOIND_RPC_USER}
-      BITCOIND_RPC_PASSWORD: ${BITCOIND_RPC_PASSWORD}
-      RPC_BIND: "0.0.0.0"
-      RPC_ALLOW_IP: "0.0.0.0/0"
+      MINERENABLED: 0
+      ADDNODE: ${ADDNODE}
+      SIGNETCHALLENGE: ${SIGNETCHALLENGE}
     container_name: strata_bitcoind
     volumes:
       - ./data/data-bitcoind:/root/.bitcoin/
     ports:
-      - "${BITCOIND_RPC_PORT:-9823}:${BITCOIND_RPC_PORT:-9823}"
+      - "38332:38332"
     expose:
       - ${BITCOIND_RPC_PORT:-9823}
     networks:
