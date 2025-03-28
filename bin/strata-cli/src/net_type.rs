@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 /// Represents a type of network, either Alpen's signet or Strata
+#[non_exhaustive]
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum NetworkType {
     Signet,

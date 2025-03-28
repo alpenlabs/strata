@@ -55,10 +55,10 @@ impl Chain {
         }
     }
 
-    fn as_str(&self) -> &'static str {
+    fn to_string(&self) -> String {
         match self {
-            Chain::L1 => "l1",
-            Chain::L2 => "l2",
+            Chain::L1 => "l1".to_string(),
+            Chain::L2 => "l2".to_string(),
         }
     }
 }
@@ -74,7 +74,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     #[cfg(feature = "strata_faucet")]
     let endpoint = {
         let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
-        base.join(&format!("/pow_challenge/{}", chain.as_str()))
+        base.join(&format!("/pow_challenge/{}", chain.to_string()))
             .unwrap()
     };
 
