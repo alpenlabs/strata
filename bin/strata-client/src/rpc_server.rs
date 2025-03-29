@@ -316,7 +316,11 @@ impl StrataApiServer for StrataRpcImpl {
                     .withdrawals()
                     .iter()
                     .map(|intent| {
-                        WithdrawalIntent::new(*intent.amt(), intent.destination().clone())
+                        WithdrawalIntent::new(
+                            *intent.amt(),
+                            intent.destination().clone(),
+                            *intent.withdrawal_txid(),
+                        )
                     })
                     .collect();
 

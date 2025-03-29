@@ -236,7 +236,8 @@
         "withdrawal_intents": [
             {
                 "amt": 1000000000,
-                "destination": "04be27fa8b1f5278faf82cab8da23e8761f8f9bd5d5ebebbb37e0e12a70d92dd16"
+                "destination": "04be27fa8b1f5278faf82cab8da23e8761f8f9bd5d5ebebbb37e0e12a70d92dd16",
+                "withdrawal_txid": "0xead5e5e095a140c0f330b4952191ebde361b8bdec3f91009ddfcbb4643f65af2"
             }
         ],
         "deposit_requests": []

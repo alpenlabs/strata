@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use strata_db::types::{CheckpointConfStatus, CheckpointEntry};
 use strata_primitives::{
     bridge::OperatorIdx,
+    buf::Buf32,
     epoch::EpochCommitment,
     l1::{BitcoinAmount, L1BlockCommitment, OutputRef},
     l2::L2BlockCommitment,
@@ -376,6 +377,9 @@ pub struct RpcDepositEntry {
 
     /// Deposit state.
     state: DepositState,
+
+    /// Withdrawal request transaction id
+    withdrawal_request_txid: Option<Buf32>,
 }
 
 impl RpcDepositEntry {
@@ -386,6 +390,7 @@ impl RpcDepositEntry {
             notary_operators: ent.notary_operators().to_vec(),
             amt: ent.amt(),
             state: ent.deposit_state().clone(),
+            withdrawal_request_txid: ent.withdrawal_request_txid(),
         }
     }
 }

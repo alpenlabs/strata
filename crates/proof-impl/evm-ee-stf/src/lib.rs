@@ -62,7 +62,7 @@ pub fn process_block_transaction(
     };
 
     evm_processor.initialize();
-    let receipts = evm_processor.execute();
+    let (executed_txs, receipts) = evm_processor.execute();
     evm_processor.finalize();
 
     // Extract the header and compute the new block hash
@@ -71,8 +71,8 @@ pub fn process_block_transaction(
 
     // TODO: Optimize receipt iteration by implementing bloom filters or adding hints to
     // `ElBlockStfInput`. This will allow for efficient filtering of `WithdrawalIntentEvents`.
-    let withdrawal_intents =
-        collect_withdrawal_intents(receipts.into_iter().map(Some)).collect::<Vec<_>>();
+    let withdrawal_intents: Vec<_> =
+        collect_withdrawal_intents(executed_txs.iter().zip(receipts.iter())).collect();
 
     // Construct the public parameters for the proof
     EvmBlockStfOutput {

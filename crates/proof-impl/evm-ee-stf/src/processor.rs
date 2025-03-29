@@ -169,7 +169,12 @@ where
     }
 
     /// Processes each transaction and collect receipts and storage changes.
-    pub fn execute(&mut self) -> Vec<reth_primitives::Receipt> {
+    pub fn execute(
+        &mut self,
+    ) -> (
+        Vec<reth_primitives::TransactionSigned>,
+        Vec<reth_primitives::Receipt>,
+    ) {
         let gwei_to_wei: U256 = U256::from(GWEI_TO_WEI);
         let mut evm = Evm::builder()
             .with_spec_id(self.evm_config.spec_id)
@@ -193,6 +198,7 @@ where
         let mut logs_bloom = Bloom::default();
         let mut cumulative_gas_used = U256::ZERO;
         let mut receipts = Vec::new();
+        let mut executed_txs = Vec::new();
 
         for (tx_no, tx) in self.input.transactions.iter().enumerate() {
             // Recover the sender from the transaction signature.
@@ -227,6 +233,7 @@ where
                 logs: res.result.logs().to_vec(),
             };
 
+            executed_txs.push(tx.clone());
             // Update logs bloom.
             logs_bloom.accrue_bloom(&receipt.bloom_slow());
             receipts.push(receipt);
@@ -266,7 +273,7 @@ where
 
         self.db = Some(evm.context.evm.db.clone());
 
-        receipts
+        (executed_txs, receipts)
     }
 }
 

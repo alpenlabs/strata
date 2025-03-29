@@ -2,7 +2,7 @@
 
 use alloy_sol_types::sol;
 use serde::{Deserialize, Serialize};
-use strata_primitives::bitcoin_bosd::Descriptor;
+use strata_primitives::{bitcoin_bosd::Descriptor, buf::Buf32};
 
 /// Type for withdrawal_intents in rpc.
 /// Distinct from `strata_state::bridge_ops::WithdrawalIntent`
@@ -14,6 +14,9 @@ pub struct WithdrawalIntent {
 
     /// Dynamic-sized bytes BOSD descriptor for the withdrawal destinations in L1.
     pub destination: Descriptor,
+
+    /// withdrawal request transaction id
+    pub withdrawal_txid: Buf32,
 }
 
 sol! {

@@ -267,6 +267,7 @@ impl StateCache {
         operator_idx: OperatorIdx,
         cmd: DispatchCommand,
         exec_height: BitcoinBlockHeight,
+        withdrawal_txid: Buf32,
     ) {
         let deposit_ent = self
             .state_mut()
@@ -277,6 +278,7 @@ impl StateCache {
         let state =
             DepositState::Dispatched(DispatchedState::new(cmd.clone(), operator_idx, exec_height));
         deposit_ent.set_state(state);
+        deposit_ent.set_withdrawal_request_txid(Some(withdrawal_txid));
     }
 
     /// Updates the deposit assignee and expiration date.

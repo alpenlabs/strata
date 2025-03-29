@@ -275,7 +275,7 @@ impl DepositsTable {
         amt: BitcoinAmount,
     ) -> u32 {
         let idx = self.next_idx();
-        let deposit_entry = DepositEntry::new(idx, tx_ref, operators, amt);
+        let deposit_entry = DepositEntry::new(idx, tx_ref, operators, amt, None);
         self.deposits.push(deposit_entry);
         self.next_idx += 1;
         idx
@@ -304,7 +304,7 @@ impl DepositsTable {
         match self.get_deposit_entry_pos(idx) {
             Ok(_) => false,
             Err(pos) => {
-                let entry = DepositEntry::new(idx, tx_ref, operators, amt);
+                let entry = DepositEntry::new(idx, tx_ref, operators, amt, None);
                 self.deposits.insert(pos as usize, entry);
 
                 // Tricky bookkeeping.
@@ -343,6 +343,9 @@ pub struct DepositEntry {
 
     /// Deposit state.
     state: DepositState,
+
+    /// Withdrawal request transaction id
+    withdrawal_request_txid: Option<Buf32>,
 }
 
 impl DepositEntry {
@@ -351,6 +354,7 @@ impl DepositEntry {
         output: OutputRef,
         operators: Vec<OperatorIdx>,
         amt: BitcoinAmount,
+        withdrawal_request_txid: Option<Buf32>,
     ) -> Self {
         Self {
             deposit_idx: idx,
@@ -358,6 +362,7 @@ impl DepositEntry {
             notary_operators: operators,
             amt,
             state: DepositState::Accepted,
+            withdrawal_request_txid,
         }
     }
 
@@ -387,6 +392,14 @@ impl DepositEntry {
 
     pub fn set_state(&mut self, new_state: DepositState) {
         self.state = new_state;
+    }
+
+    pub fn withdrawal_request_txid(&self) -> Option<Buf32> {
+        self.withdrawal_request_txid
+    }
+
+    pub fn set_withdrawal_request_txid(&mut self, new_wr_txid: Option<Buf32>) {
+        self.withdrawal_request_txid = new_wr_txid;
     }
 }
 
