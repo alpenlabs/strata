@@ -3,6 +3,7 @@ from bitcoinlib.services.bitcoind import BitcoindClient
 
 from envs import testenv
 from utils import (
+    ProverClientSettings,
     RollupParamsSettings,
     generate_n_blocks,
     get_envelope_pushdata,
@@ -17,7 +18,13 @@ class ResubmitCheckpointTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         settings = RollupParamsSettings.new_default()
         settings.proof_timeout = 5
-        ctx.set_env(testenv.BasicEnvConfig(101, rollup_settings=settings))
+        ctx.set_env(
+            testenv.BasicEnvConfig(
+                101,
+                prover_client_settings=ProverClientSettings.new_with_proving(),
+                rollup_settings=settings,
+            )
+        )
 
     def main(self, ctx: flexitest.RunContext):
         btc = ctx.get_service("bitcoin")

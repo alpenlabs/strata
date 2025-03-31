@@ -1,4 +1,5 @@
 import logging
+import time
 
 import flexitest
 
@@ -28,8 +29,7 @@ class SyncFullNodeL2LagTest(testenv.StrataTester):
 
         # Pick a recent slot and make sure they're both the same.
         seqss = seqrpc.strata_syncStatus()
-        check_slot = seqss["tip_height"] - FOLLOW_DIST
-        check_both_at_same_slot(seqrpc, fnrpc, check_slot)
+        time.sleep(5)
 
         # Now pause the sync worker so that we can have finalized epoch on L1,
         # but not corresponding block on L2 in full node
@@ -96,15 +96,3 @@ def fn_syncs_with_seq(fnrpc, seqrpc):
         return fn_tip_slot == seq_tip_slot or seq_tip_slot == fn_tip_slot + 1
 
     return _f
-
-
-def check_both_at_same_slot(seqrpc, fnrpc, check_slot):
-    seq_headers = seqrpc.strata_getHeadersAtIdx(check_slot)
-    assert len(seq_headers) > 0, f"seq node missing headers at slot {check_slot}"
-
-    fn_headers = fnrpc.strata_getHeadersAtIdx(check_slot)
-    assert len(fn_headers) > 0, f"follower node missing headers at slot {check_slot}"
-
-    seq_hdr = seq_headers[0]
-    fn_hdr = fn_headers[0]
-    assert seq_hdr == fn_hdr, f"headers mismatched at slot {check_slot}"

@@ -73,7 +73,7 @@ class SyncFullNodeL2LagRestartTest(testenv.StrataTester):
             ),
             lambda v: v[0] >= checkpt_l1_blk_height,
             error_with="Fullnode L1 sync did not catch upto buried checkpoint",
-            timeout=300,
+            timeout=60,
             debug=True,
         )
 
