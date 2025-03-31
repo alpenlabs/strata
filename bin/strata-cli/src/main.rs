@@ -44,7 +44,10 @@ async fn main() {
 
     assert!(set_data_dir(settings.data_dir.clone()));
 
-    let seed = seed::load_or_create(&persister).unwrap();
+    let seed = seed::load_or_create(&persister).unwrap_or_else(|e| {
+        eprintln!("{:?}", e);
+        std::process::exit(1);
+    });
 
     match cmd {
         Commands::Recover(args) => recover(args, seed, settings).await,
