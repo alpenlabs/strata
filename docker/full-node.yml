@@ -27,7 +27,7 @@ services:
     build:
       context: ../
       dockerfile: ./docker/strata-client/Dockerfile
-    image: "strata_client:v0.2.0"  # TODO: Use either latest or tagged image here instead of building
+    image: "strata_client:v0.2.0"
     environment:
       CONFIG_PATH: /app/configs/config.toml
       PARAM_PATH: /app/configs/params.json
