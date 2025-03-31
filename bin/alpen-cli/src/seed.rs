@@ -400,7 +400,7 @@ mod test {
             ]
             .into(),
         );
-        let l2wallet = seed.get_strata_wallet();
+        let l2wallet = seed.get_alpen_wallet();
         let address = l2wallet.default_signer().address().to_string();
         // BIP39 Mnemonic for `seed` should be:
         // rival ivory defy future meat build young envelope mimic like motion loan

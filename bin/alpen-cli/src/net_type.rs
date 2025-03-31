@@ -27,7 +27,7 @@ impl fmt::Display for NetworkType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let net_str = match self {
             NetworkType::Signet => "signet",
-            NetworkType::Strata => "strata",
+            NetworkType::Alpen => "strata",
         };
         write!(f, "{}", net_str)
     }
