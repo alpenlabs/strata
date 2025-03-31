@@ -1,4 +1,5 @@
 # Running Locally
+*TODO: This doc needs to be updated with appropriate changes inside the `docker/` directory.*
 
 The [docker-compose](./docker-compose.yml) file is meant for local dev environments
 (although it could just as easily be used in production environments as well with the right setup).
