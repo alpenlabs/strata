@@ -82,8 +82,8 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
             );
         }
         NetworkType::Alpen => {
-            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).expect("valid wallet");
-            let address = StrataAddress::from_str(&args.address).unwrap_or_else(|_| {
+            let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint).expect("valid wallet");
+            let address = AlpenAddress::from_str(&args.address).unwrap_or_else(|_| {
                 eprintln!(
                     "Invalid strata address provided as argument - must be an EVM-compatible address."
                 );

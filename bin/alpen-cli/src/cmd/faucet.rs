@@ -10,11 +10,11 @@ use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
 use crate::{
+    alpen::AlpenWallet,
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    alpen::AlpenWallet,
 };
 
 /// Request some bitcoin from the faucet
@@ -48,7 +48,7 @@ impl Chain {
     fn from_network_type(network_type: NetworkType) -> Result<Self, String> {
         match network_type {
             NetworkType::Signet => Ok(Chain::L1),
-            NetworkType::Strata => Ok(Chain::L2),
+            NetworkType::Alpen => Ok(Chain::L2),
         }
     }
 }
@@ -71,7 +71,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
             resolve_signet_address(&args, &seed, &settings).to_string(),
             "claim_l1",
         ),
-        NetworkType::Strata => (
+        NetworkType::Alpen => (
             resolve_strata_address(&args, &seed, &settings).to_string(),
             "claim_l2",
         ),
@@ -185,10 +185,10 @@ fn resolve_strata_address(
     seed: &Seed,
     settings: &Settings,
 ) -> alloy::primitives::Address {
-    let l2w = StrataWallet::new(seed, &settings.strata_endpoint).unwrap();
+    let l2w = AlpenWallet::new(seed, &settings.alpen_endpoint).unwrap();
 
     match &args.address {
-        Some(address) => StrataAddress::from_str(address).unwrap_or_else(|_| {
+        Some(address) => AlpenAddress::from_str(address).unwrap_or_else(|_| {
             eprintln!(
                 "Invalid strata address provided as argument - must be an EVM-compatible address."
             );
