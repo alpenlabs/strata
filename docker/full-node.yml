@@ -5,10 +5,7 @@ services:
       dockerfile: ./docker/reth/Dockerfile
     image: "alpen_reth:v0.1.0"
     environment:
-      CONFIG_FILE: ${CONFIG_FILE:-example_config.toml}
       BUILD_PROFILE: ${BUILD_PROFILE:-release}
-      RETH_PORT: ${RETH_PORT:-12002}
-      P2P_SECRET_KEY: ${P2P_RETH_SECRET_KEY:-8f2a559490d8e61f3fa578be89e65bdca1e5a48f7b840a5a5dbd71a7a21c22a9}
       RETH_AUTH_RPC_PORT: ${RETH_AUTH_RPC_PORT:-8551}
       JWTSECRET: ${JWTSECRET}
     volumes:
@@ -29,7 +26,7 @@ services:
       dockerfile: ./docker/strata-client/Dockerfile
     image: "strata_client:v0.2.0"
     environment:
-      CONFIG_PATH: /app/configs/config.toml
+      CONFIG_PATH: /app/configs/config.fn.toml
       PARAM_PATH: /app/configs/params.json
       RUST_LOG: ${RUST_LOG:-debug}
     container_name: strata_client
