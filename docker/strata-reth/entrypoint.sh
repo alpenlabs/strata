@@ -20,10 +20,10 @@ strata-reth \
     --http \
     --http.addr 0.0.0.0 \
     --http.port 8545 \
-    --http.api ${HTTP_API-eth,net,web3,txpool} \
+    --http.api ${HTTP_API:-eth,net,web3,txpool} \
     --ws \
     --ws.addr 0.0.0.0 \
     --ws.port 8546 \
-    --ws.api ${WS_API-eth,net,web3,txpool} \
+    --ws.api ${WS_API:-eth,net,web3,txpool} \
     --color never \
     -vvvv $@
