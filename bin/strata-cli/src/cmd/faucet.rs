@@ -1,8 +1,5 @@
-#[cfg(feature = "strata_faucet")]
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
-#[cfg(feature = "strata_faucet")]
 use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
@@ -12,19 +9,19 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
-#[cfg(feature = "strata_faucet")]
 use crate::{
     net_type::{net_type_or_exit, NetworkType},
+    seed::Seed,
+    settings::Settings,
+    signet::SignetWallet,
     strata::StrataWallet,
 };
-use crate::{seed::Seed, settings::Settings, signet::SignetWallet};
 
 /// Request some bitcoin from the faucet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "faucet")]
 pub struct FaucetArgs {
     /// either "signet" or "strata"
-    #[cfg(feature = "strata_faucet")]
     #[argh(positional)]
     network_type: String,
     /// address that funds will be sent to. defaults to internal wallet
@@ -41,14 +38,12 @@ pub struct PowChallenge {
     difficulty: u8,
 }
 
-#[cfg(feature = "strata_faucet")]
 /// Which chain the faucet is reasoning about.
 enum Chain {
     L1,
     L2,
 }
 
-#[cfg(feature = "strata_faucet")]
 impl Chain {
     fn from_network_type(network_type: NetworkType) -> Result<Self, String> {
         match network_type {
@@ -58,7 +53,6 @@ impl Chain {
     }
 }
 
-#[cfg(feature = "strata_faucet")]
 impl fmt::Display for Chain {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let chain_str = match self {
@@ -70,10 +64,8 @@ impl fmt::Display for Chain {
 }
 
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
-    #[cfg(feature = "strata_faucet")]
     let network_type = net_type_or_exit(&args.network_type);
 
-    #[cfg(feature = "strata_faucet")]
     let (address, claim) = match network_type {
         NetworkType::Signet => (
             resolve_signet_address(&args, &seed, &settings).to_string(),
@@ -85,25 +77,14 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         ),
     };
 
-    #[cfg(not(feature = "strata_faucet"))]
-    let (address, claim) = (
-        resolve_signet_address(&args, &seed, &settings).to_string(),
-        "claim_l1",
-    );
-
     println!("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
     let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
-
-    #[cfg(feature = "strata_faucet")]
     let endpoint = {
         let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
         base.join(&format!("/pow_challenge/{}", chain)).unwrap()
     };
-
-    #[cfg(not(feature = "strata_faucet"))]
-    let endpoint = base.join("/pow_challenge").unwrap();
 
     let challenge = client
         .get(endpoint)
@@ -142,11 +123,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         "✔ Solved challenge after {solution} attempts. Claiming now."
     ));
 
-    #[cfg(feature = "strata_faucet")]
     println!("Claiming to {} address {}", network_type, address);
-
-    #[cfg(not(feature = "strata_faucet"))]
-    println!("Claiming to signet address {}", address);
 
     let url = format!(
         "{base}{}/{}/{}",
@@ -203,7 +180,6 @@ fn resolve_signet_address(
     }
 }
 
-#[cfg(feature = "strata_faucet")]
 fn resolve_strata_address(
     args: &FaucetArgs,
     seed: &Seed,
