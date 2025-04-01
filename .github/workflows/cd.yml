@@ -130,7 +130,7 @@ jobs:
     environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'development') }}
     steps:
       - name: Set up SSH for private repo access
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.DEPLOYMENTS_REPO_WRITE }}
       - name: Clone deployments repo (specific branch)
