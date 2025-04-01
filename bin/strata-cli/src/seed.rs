@@ -33,6 +33,7 @@ impl BaseWallet {
 }
 
 #[derive(Clone)]
+// NOTE: This is not a BIP39 seed, instead a random bytes of entropy.
 pub struct Seed(Zeroizing<[u8; SEED_LEN]>);
 
 impl Seed {
@@ -100,11 +101,14 @@ impl Seed {
     pub fn get_strata_wallet(&self) -> EthereumWallet {
         let derivation_path = DerivationPath::master().extend(BIP44_STRATA_EVM_WALLET_PATH);
 
+        let mnemonic = Mnemonic::from_entropy(self.0.as_ref()).expect("valid entropy");
+        // Assuming an empty passphrase.
+        let bip39_seed = mnemonic.to_seed("");
         // Network choice affects how extended public and private keys are serialized. See
         // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#serialization-format.
         // Given the popularity of MetaMask, we follow their example (they always hardcode mainnet)
         // and hardcode Network::Bitcoin (mainnet) for EVM-based wallet.
-        let master_key = Xpriv::new_master(Network::Bitcoin, self.0.as_ref()).expect("valid xpriv");
+        let master_key = Xpriv::new_master(Network::Bitcoin, &bip39_seed).expect("valid xpriv");
 
         // Derive the child key for the given path
         let derived_key = master_key.derive_priv(SECP256K1, &derivation_path).unwrap();
