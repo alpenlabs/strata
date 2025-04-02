@@ -33,7 +33,7 @@ impl BaseWallet {
 }
 
 #[derive(Clone)]
-// NOTE: This is not a BIP39 seed, instead a random bytes of entropy.
+// NOTE: This is not a BIP39 seed, instead random bytes of entropy.
 pub struct Seed(Zeroizing<[u8; SEED_LEN]>);
 
 impl Seed {
