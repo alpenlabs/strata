@@ -276,12 +276,10 @@ pub mod password;
 
 #[cfg(test)]
 mod test {
-    use alloy::providers::WalletProvider;
     use rand_core::OsRng;
     use sha2::digest::generic_array::GenericArray;
 
     use super::*;
-    use crate::{settings::Settings, strata::StrataWallet};
 
     #[test]
     // Sanity checks on curve scalar construction, to ensure proper rejection
@@ -403,9 +401,8 @@ mod test {
             ]
             .into(),
         );
-        let settings = Settings::load().unwrap();
-        let l2wallet = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
-        let address = l2wallet.default_signer_address().to_string();
+        let l2wallet = seed.get_strata_wallet();
+        let address = l2wallet.default_signer().address().to_string();
         // BIP39 Mnemonic for `seed` should be:
         // rival ivory defy future meat build young envelope mimic like motion loan
         // The expected address is obtained using the BIP39 tool with the above mnemonic
