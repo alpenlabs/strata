@@ -30,7 +30,10 @@ pub struct WithdrawArgs {
 pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
     let address = args.address.map(|a| {
         Address::from_str(&a)
-            .expect("valid address")
+            .unwrap_or_else(|_| {
+                eprintln!("Invalid signet address provided as argument.");
+                std::process::exit(1);
+            })
             .require_network(settings.network)
             .expect("correct network")
     });

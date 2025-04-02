@@ -47,7 +47,10 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
         NetworkType::Signet => {
             let amount = Amount::from_sat(args.amount);
             let address = Address::from_str(&args.address)
-                .expect("valid address")
+                .unwrap_or_else(|_| {
+                    eprintln!("Invalid signet address provided as argument.");
+                    std::process::exit(1);
+                })
                 .require_network(settings.network)
                 .expect("correct network");
             let mut l1w =
@@ -80,7 +83,12 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
         }
         NetworkType::Strata => {
             let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).expect("valid wallet");
-            let address = StrataAddress::from_str(&args.address).expect("valid address");
+            let address = StrataAddress::from_str(&args.address).unwrap_or_else(|_| {
+                eprintln!(
+                    "Invalid strata address provided as argument - must be an EVM-compatible address."
+                );
+                std::process::exit(1);
+            });
             let tx = TransactionRequest::default()
                 .with_to(address)
                 .with_value(U256::from(args.amount as u128 * SATS_TO_WEI));
