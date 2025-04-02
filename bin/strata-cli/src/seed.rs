@@ -170,7 +170,6 @@ pub fn load_or_create(
             Err(e) => {
                 let narrowed = e.narrow::<aes_gcm_siv::Error, _>();
                 if let Ok(_aes_error) = narrowed {
-                    println!("Incorrect password");
                     return Err(OneOf::new(IncorrectPassword));
                 }
 

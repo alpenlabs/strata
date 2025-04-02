@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 /// Represents a type of network, either Alpen's signet or Strata
 #[non_exhaustive]
@@ -20,6 +20,16 @@ impl FromStr for NetworkType {
             "strata" => Ok(Self::Strata),
             _ => Err(InvalidNetworkType),
         }
+    }
+}
+
+impl fmt::Display for NetworkType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let net_str = match self {
+            NetworkType::Signet => "signet",
+            NetworkType::Strata => "strata",
+        };
+        write!(f, "{}", net_str)
     }
 }
 
