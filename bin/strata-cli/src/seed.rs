@@ -276,10 +276,12 @@ pub mod password;
 
 #[cfg(test)]
 mod test {
+    use alloy::providers::WalletProvider;
     use rand_core::OsRng;
     use sha2::digest::generic_array::GenericArray;
 
     use super::*;
+    use crate::{settings::Settings, strata::StrataWallet};
 
     #[test]
     // Sanity checks on curve scalar construction, to ensure proper rejection
@@ -388,5 +390,26 @@ mod test {
         encrypted_seed.0[index] = !encrypted_seed.0[index];
 
         assert!(encrypted_seed.decrypt(&mut password).is_err());
+    }
+
+    #[test]
+    // Test L2 wallet address  matches the one from BIP39 tool.
+    fn test_l2_wallet_address() {
+        let seed = Seed(
+            [
+                0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36,
+                0x41, 0x41,
+            ]
+            .into(),
+        );
+        let settings = Settings::load().unwrap();
+        let l2wallet = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
+        let address = l2wallet.default_signer_address().to_string();
+        // BIP39 Mnemonic for `seed` should be:
+        // rival ivory defy future meat build young envelope mimic like motion loan
+        // The expected address is obtained using the BIP39 tool with the above mnemonic
+        // and BIP44 derivation path m/44'/60'/0'/0/0.
+        let expected_address = "0x4eEE6B504Bc2c47650bAa7d135DA10F2A469E582".to_string();
+        assert_eq!(address, expected_address);
     }
 }
