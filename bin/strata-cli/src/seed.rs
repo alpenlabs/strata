@@ -102,7 +102,7 @@ impl Seed {
         let derivation_path = DerivationPath::master().extend(BIP44_STRATA_EVM_WALLET_PATH);
 
         let mnemonic = Mnemonic::from_entropy(self.0.as_ref()).expect("valid entropy");
-        // Assuming an empty passphrase.
+        // We do not use a passphrase.
         let bip39_seed = mnemonic.to_seed("");
         // Network choice affects how extended public and private keys are serialized. See
         // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#serialization-format.
