@@ -393,7 +393,8 @@ mod test {
     }
 
     #[test]
-    // Test L2 wallet address  matches the one from BIP39 tool.
+    // Test L2 wallet address matches the one from BIP39 tool (e.g. https://iancoleman.io/bip39/)
+    // using the same menmonic and derivation path.
     fn test_l2_wallet_address() {
         let seed = Seed(
             [
