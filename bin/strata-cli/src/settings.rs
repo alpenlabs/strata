@@ -12,7 +12,7 @@ use bdk_wallet::bitcoin::{Network, XOnlyPublicKey};
 use config::Config;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use shrex::{decode, Hex};
+use shrex::Hex;
 use terrors::OneOf;
 
 use crate::{
