@@ -1,12 +1,12 @@
 [package]
 edition = "2021"
-name = "strata-reth-evm"
+name = "alpen-reth-evm"
 version = "0.1.0"
 
 [dependencies]
+alpen-reth-primitives.workspace = true
 strata-crypto.workspace = true
 strata-primitives.workspace = true
-strata-reth-primitives.workspace = true
 
 alloy-sol-types.workspace = true
 reth-primitives.workspace = true
