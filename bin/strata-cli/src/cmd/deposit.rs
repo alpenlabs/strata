@@ -13,7 +13,6 @@ use bdk_wallet::{
 use colored::Colorize;
 use indicatif::ProgressBar;
 use make_buf::make_buf;
-use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 use strata_primitives::constants::RECOVER_DELAY;
 
 use crate::{
@@ -204,10 +203,12 @@ mod tests {
     use bdk_wallet::bitcoin::{consensus, secp256k1::SECP256K1, Network, Sequence};
 
     use super::*;
-    use crate::constants::BRIDGE_MUSIG2_PUBKEY;
 
     #[test]
     fn bridge_in_descriptor_script() {
+        pub const BRIDGE_MUSIG2_PUBKEY: &str =
+            "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
+
         let bridge_musig2_pubkey = BRIDGE_MUSIG2_PUBKEY.parse::<XOnlyPublicKey>().unwrap();
         let internal_recovery_pubkey = XOnlyPublicKey::from_slice(&[2u8; 32]).unwrap();
         let recovery_address =
