@@ -37,9 +37,6 @@ pub const DEFAULT_NETWORK: Network = Network::Signet;
 pub const BRIDGE_STRATA_ADDRESS: &str = "0x5400000000000000000000000000000000000001";
 pub const SIGNET_BLOCK_TIME: Duration = Duration::from_secs(30);
 
-pub const BRIDGE_MUSIG2_PUBKEY: &str =
-    "14ced579c6a92533fa68ccc16da93b41073993cfc6cc982320645d8e9a63ee65";
-
 /// Strata CLI [`DerivationPath`](bdk_wallet::bitcoin::bip32::DerivationPath) for Strata EVM wallet
 ///
 /// This corresponds to the path: `m/44'/60'/0'/0/0`.
