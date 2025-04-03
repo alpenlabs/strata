@@ -13,7 +13,6 @@ use bdk_wallet::{
 use colored::Colorize;
 use indicatif::ProgressBar;
 use make_buf::make_buf;
-use strata_bridge_tx_builder::constants::MAGIC_BYTES;
 use strata_primitives::constants::RECOVER_DELAY;
 
 use crate::{

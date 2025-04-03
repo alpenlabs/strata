@@ -3,6 +3,7 @@ use backup::BackupArgs;
 use balance::BalanceArgs;
 use change_pwd::ChangePwdArgs;
 use config::ConfigArgs;
+use deposit::DepositArgs;
 use drain::DrainArgs;
 use faucet::FaucetArgs;
 use receive::ReceiveArgs;
@@ -16,6 +17,7 @@ pub mod backup;
 pub mod balance;
 pub mod change_pwd;
 pub mod config;
+pub mod deposit;
 pub mod drain;
 pub mod faucet;
 pub mod receive;
@@ -39,6 +41,7 @@ pub enum Commands {
     Drain(DrainArgs),
     Balance(BalanceArgs),
     Backup(BackupArgs),
+    Deposit(DepositArgs),
     Withdraw(WithdrawArgs),
     Faucet(FaucetArgs),
     Send(SendArgs),
