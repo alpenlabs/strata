@@ -20,12 +20,6 @@ if [[ $error -ne 0 ]]; then
     exit 1
 fi
 
-ARGS=""
-
-# if [ ! -z "$BITCOIND_PASSWORD" ]; then
-#     ARGS="$ARGS --bitcoind-password $BITCOIND_PASSWORD"
-# fi
-
 export RUST_LOG=${RUST_LOG:-info}
 
 # Start the Strata Client
