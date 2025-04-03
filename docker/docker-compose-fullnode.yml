@@ -2,8 +2,8 @@ services:
   reth:
     build:
       context: ../
-      dockerfile: ./docker/reth/Dockerfile
-    image: "alpen_reth:v0.1.0"
+      dockerfile: ./docker/strata-reth/Dockerfile
+    image: public.ecr.aws/s6b4k6i9/strata_reth:v0.1.11
     environment:
       BUILD_PROFILE: ${BUILD_PROFILE:-release}
       RETH_AUTH_RPC_PORT: ${RETH_AUTH_RPC_PORT:-8551}
@@ -24,7 +24,7 @@ services:
     build:
       context: ../
       dockerfile: ./docker/strata-client/Dockerfile
-    image: "strata_client:v0.2.0"
+    image: strata_client:v0.2.0
     environment:
       CONFIG_PATH: /app/configs/config.fn.toml
       PARAM_PATH: /app/configs/params.json
@@ -42,7 +42,7 @@ services:
       - strata_network
 
   bitcoind:
-    image: "public.ecr.aws/s6b4k6i9/strata/signet:latest"
+    image: public.ecr.aws/s6b4k6i9/strata/signet:latest
     environment:
       MINERENABLED: 0
       ADDNODE: ${ADDNODE}
