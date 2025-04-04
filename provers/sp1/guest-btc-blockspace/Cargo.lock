@@ -960,7 +960,7 @@ dependencies = [
  "once_cell",
  "sha2",
  "signature",
- "sp1-lib 4.1.7",
+ "sp1-lib",
 ]
 
 [[package]]
@@ -1610,16 +1610,6 @@ dependencies = [
 
 [[package]]
 name = "sp1-lib"
-version = "3.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a5729da1b05d56c01457e5ecabdc77f1cc941df23f2921163a2f325aec22428"
-dependencies = [
- "bincode",
- "serde",
-]
-
-[[package]]
-name = "sp1-lib"
 version = "4.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4b2747ae411bca4ba0dd4112779246b101ac7e8f70afc1a33cf8ee003980d7"
@@ -1676,7 +1666,7 @@ dependencies = [
  "p3-field",
  "rand",
  "sha2",
- "sp1-lib 4.1.7",
+ "sp1-lib",
  "sp1-primitives",
 ]
 
@@ -1797,9 +1787,9 @@ dependencies = [
 
 [[package]]
 name = "substrate-bn-succinct"
-version = "0.6.0"
+version = "0.6.0-v4-rc.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "114c855c26ad0594c830129cb868552fb41415603a6133276c2ecdd9e5ef4255"
+checksum = "4b9a33ccd271a0ad4cc5ddef11ca419fe8d22c669920965be1cecbbe7d866ae1"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -1809,7 +1799,7 @@ dependencies = [
  "num-bigint",
  "rand",
  "rustc-hex",
- "sp1-lib 3.4.0",
+ "sp1-lib",
 ]
 
 [[package]]
