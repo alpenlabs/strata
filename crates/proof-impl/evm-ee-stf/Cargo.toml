@@ -25,6 +25,7 @@ k256 = { version = "0.13.4", features = [
   "std",
   "ecdsa",
 ], default-features = false }
+reth-ethereum-primitives = { workspace = true, features = ["serde-bincode-compat"] }
 reth-primitives = { workspace = true, features = ["serde-bincode-compat"] }
 reth-primitives-traits.workspace = true
 revm.workspace = true
