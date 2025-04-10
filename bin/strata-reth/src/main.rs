@@ -1,12 +1,13 @@
 mod db;
 
-use std::{fs, future::Future, path::PathBuf, sync::Arc};
+use std::{fs, future::Future, path::PathBuf, str::FromStr, sync::Arc};
 
 use alloy_genesis::Genesis;
 use clap::Parser;
 use reth::{
     args::LogArgs,
     builder::{NodeBuilder, WithLaunchContext},
+    revm::primitives::Address,
     CliRunner,
 };
 use reth_chainspec::ChainSpec;
@@ -40,8 +41,16 @@ fn main() {
     if let Err(err) = run(command, |builder, ext| async move {
         let datadir = builder.config().datadir().data_dir().to_path_buf();
 
+        let allowed_addrs: Vec<Address> = ext
+            .allowed_eoa_addrs
+            .into_iter()
+            .map(|x| Address::from_str(&x))
+            .collect::<Result<_, _>>()?; // TODO: better error messaging
+
         let node_args = StrataNodeArgs {
             sequencer_http: ext.sequencer_http.clone(),
+            allowed_eoa_addrs: allowed_addrs,
+            enable_eoa: ext.enable_eoa,
         };
 
         let mut node_builder = builder.node(StrataEthereumNode::new(node_args));
@@ -103,6 +112,14 @@ pub struct AdditionalConfig {
     /// Rpc of sequener's reth node to forward transactions to.
     #[arg(long, required = false)]
     pub sequencer_http: Option<String>,
+
+    /// To enable EOA txs or not.
+    #[arg(long, default_value_t = false)]
+    pub enable_eoa: bool,
+
+    /// Allowed EOA addresses, if `enable_eoa` is set to false.
+    #[arg(long, num_args(1..))]
+    pub allowed_eoa_addrs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]

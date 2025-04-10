@@ -14190,6 +14190,7 @@ dependencies = [
  "reth-node-api",
  "reth-node-builder",
  "reth-primitives",
+ "reth-primitives-traits",
  "reth-provider",
  "reth-revm",
  "reth-rpc",
