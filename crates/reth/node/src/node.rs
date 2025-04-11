@@ -1,7 +1,9 @@
+use alloy_consensus::Header;
 use alpen_reth_rpc::{SequencerClient, StrataEthApi};
 use reth_chainspec::{ChainSpec, EthereumHardforks};
 use reth_db::transaction::{DbTx, DbTxMut};
-use reth_node_api::{AddOnsContext, EngineValidator, FullNodeComponents, NodeAddOns};
+use reth_evm::ConfigureEvm;
+use reth_node_api::{AddOnsContext, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{
     components::{ComponentsBuilder, ExecutorBuilder},
     node::{FullNodeTypes, NodeTypes, NodeTypesWithEngine},
@@ -12,14 +14,15 @@ use reth_node_ethereum::{
     node::{EthereumConsensusBuilder, EthereumNetworkBuilder, EthereumPoolBuilder},
     BasicBlockExecutorProvider, EthExecutionStrategyFactory,
 };
-use reth_primitives::{BlockBody, PooledTransaction};
+use reth_primitives::BlockBody;
 use reth_provider::{
     providers::{ChainStorage, NodeTypesForProvider},
     BlockBodyReader, BlockBodyWriter, ChainSpecProvider, ChainStorageReader, ChainStorageWriter,
-    DBProvider, DatabaseProvider, EthStorage, ProviderResult, ReadBodyInput, StorageLocation,
+    DBProvider, DatabaseProvider, EthStorage, OmmersProvider, ProviderResult, ReadBodyInput,
+    StorageLocation,
 };
-use reth_transaction_pool::{PoolTransaction, TransactionPool};
-use revm_primitives::alloy_primitives;
+use reth_rpc_eth_types::{error::FromEvmError, EthApiError};
+use revm_primitives::{alloy_primitives, TxEnv};
 
 use crate::{
     args::StrataNodeArgs,
@@ -56,8 +59,11 @@ impl<Provider: DBProvider<Tx: DbTxMut>> BlockBodyWriter<Provider, BlockBody> for
     }
 }
 
-impl<Provider: DBProvider + ChainSpecProvider<ChainSpec: EthereumHardforks>>
-    BlockBodyReader<Provider> for StrataStorage
+impl<
+        Provider: DBProvider
+            + ChainSpecProvider<ChainSpec: EthereumHardforks>
+            + OmmersProvider<Header = Header>,
+    > BlockBodyReader<Provider> for StrataStorage
 {
     type Block = reth_primitives::Block;
 
@@ -213,9 +219,9 @@ where
             Storage = StrataStorage,
             Engine = StrataEngineTypes,
         >,
-        Pool: TransactionPool<Transaction: PoolTransaction<Pooled = PooledTransaction>>,
+        Evm: ConfigureEvm<TxEnv = TxEnv>,
     >,
-    StrataEngineValidator: EngineValidator<<N::Types as NodeTypesWithEngine>::Engine>,
+    EthApiError: FromEvmError<N::Evm>,
 {
     type Handle = RpcHandle<N, StrataEthApi<N>>;
 
@@ -240,9 +246,9 @@ where
             Storage = StrataStorage,
             Engine = StrataEngineTypes,
         >,
-        Pool: TransactionPool<Transaction: PoolTransaction<Pooled = PooledTransaction>>,
+        Evm: ConfigureEvm<TxEnv = TxEnv>,
     >,
-    StrataEngineValidator: EngineValidator<<N::Types as NodeTypesWithEngine>::Engine>,
+    EthApiError: FromEvmError<N::Evm>,
 {
     type EthApi = StrataEthApi<N>;
 
@@ -282,6 +288,7 @@ impl StrataAddOnsBuilder {
                         .with_sequencer(sequencer_client)
                         .build(ctx)
                 },
+                Default::default(),
                 Default::default(),
             ),
         }

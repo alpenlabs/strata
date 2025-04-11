@@ -9,8 +9,7 @@ use alloy_rpc_types::{
     Withdrawal,
 };
 use alpen_reth_primitives::WithdrawalIntent;
-use reth::rpc::compat::engine::payload::block_to_payload_v2;
-use reth_chain_state::ExecutedBlock;
+use reth_chain_state::ExecutedBlockWithTrieUpdates;
 use reth_node_api::{BuiltPayload, PayloadAttributes, PayloadBuilderAttributes};
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
 use reth_primitives::{EthPrimitives, SealedBlock};
@@ -144,8 +143,8 @@ impl BuiltPayload for StrataBuiltPayload {
         self.inner.fees()
     }
 
-    fn executed_block(&self) -> Option<ExecutedBlock> {
-        self.inner.executed_block()
+    fn executed_block(&self) -> Option<ExecutedBlockWithTrieUpdates<Self::Primitives>> {
+        self.inner.executed_block().clone()
     }
 
     fn requests(&self) -> Option<Requests> {
@@ -202,7 +201,9 @@ impl From<EthBuiltPayload> for ExecutionPayloadEnvelopeV2 {
 
         Self {
             block_value: fees,
-            execution_payload: ExecutionPayloadFieldV2::V2(block_to_payload_v2(block)),
+            execution_payload: ExecutionPayloadFieldV2::V2(
+                ExecutionPayloadV2::from_block_unchecked(block.hash(), &block.into_block()),
+            ),
         }
     }
 }
