@@ -64,12 +64,6 @@ pub struct StrataPayloadBuilderAttributes {
     pub(crate) batch_gas_limit: Option<u64>,
 }
 
-impl StrataPayloadBuilderAttributes {
-    pub(crate) fn batch_gas_limit(&self) -> Option<u64> {
-        self.batch_gas_limit
-    }
-}
-
 impl PayloadBuilderAttributes for StrataPayloadBuilderAttributes {
     type RpcPayloadAttributes = StrataPayloadAttributes;
     type Error = Infallible;
