@@ -4,7 +4,7 @@ use alloy_consensus::{Signed, Transaction as _, TxEnvelope};
 use alloy_primitives::{Bytes, PrimitiveSignature as Signature, B256};
 use alloy_rpc_types_eth::{Transaction, TransactionInfo, TransactionRequest};
 use reth_node_api::FullNodeComponents;
-use reth_primitives::{RecoveredTx, TransactionSigned};
+use reth_primitives::{Recovered, TransactionSigned};
 use reth_provider::{
     BlockReader, BlockReaderIdExt, ProviderTx, ReceiptProvider, TransactionsProvider,
 };
@@ -80,16 +80,14 @@ where
 
     fn fill(
         &self,
-        tx: RecoveredTx<TransactionSigned>,
+        tx: Recovered<TransactionSigned>,
         tx_info: TransactionInfo,
     ) -> Result<Self::Transaction, Self::Error> {
         let from = tx.signer();
-        let hash = tx.hash();
-        let TransactionSigned {
-            transaction,
-            signature,
-            ..
-        } = tx.into_tx();
+        let hash = *tx.hash();
+        let tx = tx.into_tx();
+        let signature = *tx.signature();
+        let transaction = tx.transaction().clone();
 
         let inner = match transaction {
             reth_primitives::Transaction::Legacy(tx) => {
@@ -117,10 +115,7 @@ where
 
         let effective_gas_price = base_fee
             .map(|base_fee| {
-                inner
-                    .effective_tip_per_gas(base_fee as u64)
-                    .unwrap_or_default()
-                    + base_fee
+                inner.effective_tip_per_gas(base_fee).unwrap_or_default() + base_fee as u128
             })
             .unwrap_or_else(|| inner.max_fee_per_gas());
 
