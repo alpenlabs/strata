@@ -1,7 +1,10 @@
 use argh::FromArgs;
 use bip39::Language;
 
-use crate::seed::Seed;
+use crate::{
+    errors::{CliError, UserInputError},
+    seed::Seed,
+};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "backup")]
@@ -15,7 +18,7 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
-pub async fn backup(args: BackupArgs, seed: Seed) {
+pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), CliError> {
     let language = match args.language {
         Some(s) => s,
         None => "en".to_owned(),
@@ -30,10 +33,8 @@ pub async fn backup(args: BackupArgs, seed: Seed) {
         "jp" => Language::Japanese,
         "kr" => Language::Korean,
         "es" => Language::Spanish,
-        _ => {
-            println!("invalid language. use --help to check available languages");
-            std::process::exit(1);
-        }
+        _ => return Err(CliError::UserInput(UserInputError::UnsupportedLanguage)),
     };
     seed.print_mnemonic(language);
+    Ok(())
 }

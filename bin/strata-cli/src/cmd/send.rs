@@ -11,8 +11,9 @@ use bdk_wallet::bitcoin::{Address, Amount};
 
 use crate::{
     constants::SATS_TO_WEI,
+    errors::{CliError, UserInputError},
     link::{OnchainObject, PrettyPrint},
-    net_type::{net_type_or_exit, NetworkType},
+    net_type::{parse_net_type, NetworkType},
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, SignetWallet},
@@ -40,39 +41,59 @@ pub struct SendArgs {
     fee_rate: Option<u64>,
 }
 
-pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
-    let network_type = net_type_or_exit(&args.network_type);
+pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
+    let network_type = parse_net_type(&args.network_type)?;
 
     match network_type {
         NetworkType::Signet => {
             let amount = Amount::from_sat(args.amount);
             let address = Address::from_str(&args.address)
-                .unwrap_or_else(|_| {
-                    eprintln!("Invalid signet address provided as argument.");
-                    std::process::exit(1);
-                })
+                .map_err(|_| CliError::UserInput(UserInputError::InvalidSignetAddress))?
                 .require_network(settings.network)
-                .expect("correct network");
+                .map_err(|_| CliError::UserInput(UserInputError::WrongNetwork))?;
             let mut l1w =
                 SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-                    .expect("valid wallet");
-            l1w.sync().await.unwrap();
+                    .map_err(|e| {
+                        CliError::Internal(anyhow::anyhow!("failed to load signet wallet: {:?}", e))
+                    })?;
+            l1w.sync().await.map_err(|e| {
+                CliError::Internal(anyhow::anyhow!("failed to sync signet wallet: {:?}", e))
+            })?;
             let fee_rate = get_fee_rate(args.fee_rate, settings.signet_backend.as_ref()).await;
             log_fee_rate(&fee_rate);
             let mut psbt = {
                 let mut builder = l1w.build_tx();
                 builder.add_recipient(address.script_pubkey(), amount);
                 builder.fee_rate(fee_rate);
-                builder.finish().expect("valid psbt")
+                builder.finish().map_err(|e| {
+                    CliError::Internal(anyhow::anyhow!(
+                        "failed to build signet transaction: {:?}",
+                        e
+                    ))
+                })?
             };
-            l1w.sign(&mut psbt, Default::default())
-                .expect("signable psbt");
-            let tx = psbt.extract_tx().expect("signed tx");
+            l1w.sign(&mut psbt, Default::default()).map_err(|e| {
+                CliError::Internal(anyhow::anyhow!(
+                    "failed to sign signet transaction: {:?}",
+                    e
+                ))
+            })?;
+            let tx = psbt.extract_tx().map_err(|e| {
+                CliError::Internal(anyhow::anyhow!(
+                    "failed to extract signet transaction: {:?}",
+                    e
+                ))
+            })?;
             settings
                 .signet_backend
                 .broadcast_tx(&tx)
                 .await
-                .expect("successful broadcast");
+                .map_err(|e| {
+                    CliError::Internal(anyhow::anyhow!(
+                        "failed to broadcast signet transaction: {:?}",
+                        e
+                    ))
+                })?;
             let txid = tx.compute_txid();
             println!(
                 "{}",
@@ -82,20 +103,20 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
             );
         }
         NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).expect("valid wallet");
-            let address = StrataAddress::from_str(&args.address).unwrap_or_else(|_| {
-                eprintln!(
-                    "Invalid strata address provided as argument - must be an EVM-compatible address."
-                );
-                std::process::exit(1);
-            });
+            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).map_err(|e| {
+                CliError::Internal(anyhow::anyhow!("failed to load strata wallet: {:?}", e))
+            })?;
+            let address = StrataAddress::from_str(&args.address)
+                .map_err(|_| CliError::UserInput(UserInputError::InvalidStrataAddress))?;
             let tx = TransactionRequest::default()
                 .with_to(address)
                 .with_value(U256::from(args.amount as u128 * SATS_TO_WEI));
-            let res = l2w
-                .send_transaction(tx)
-                .await
-                .expect("successful broadcast");
+            let res = l2w.send_transaction(tx).await.map_err(|e| {
+                CliError::Internal(anyhow::anyhow!(
+                    "failed to broadcast strata transaction: {:?}",
+                    e
+                ))
+            })?;
             println!(
                 "{}",
                 OnchainObject::from(res.tx_hash())
@@ -106,4 +127,5 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
     };
 
     println!("Sent {} to {}", Amount::from_sat(args.amount), args.address,);
+    Ok(())
 }

@@ -1,5 +1,7 @@
 use std::{fmt, str::FromStr};
 
+use crate::errors::{CliError, UserInputError};
+
 /// Represents a type of network, either Alpen's signet or Strata
 #[non_exhaustive]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -8,17 +10,14 @@ pub enum NetworkType {
     Strata,
 }
 
-/// Attempted to parse a string into [`NetworkType`] but the input was invalid.
-pub struct InvalidNetworkType;
-
 impl FromStr for NetworkType {
-    type Err = InvalidNetworkType;
+    type Err = CliError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, CliError> {
         match s.to_lowercase().as_str() {
             "signet" => Ok(Self::Signet),
             "strata" => Ok(Self::Strata),
-            _ => Err(InvalidNetworkType),
+            _ => Err(CliError::UserInput(UserInputError::UnsupportedNetwork)),
         }
     }
 }
@@ -34,12 +33,6 @@ impl fmt::Display for NetworkType {
 }
 
 /// Parses `val` as a [`NetworkType`]. Prints error message and exits if invalid.
-pub fn net_type_or_exit(val: &str) -> NetworkType {
-    match NetworkType::from_str(val) {
-        Ok(t) => t,
-        Err(InvalidNetworkType) => {
-            println!("Invalid network type. Must be signet or strata");
-            std::process::exit(1)
-        }
-    }
+pub fn parse_net_type(val: &str) -> Result<NetworkType, CliError> {
+    val.parse()
 }

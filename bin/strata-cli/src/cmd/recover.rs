@@ -7,6 +7,7 @@ use colored::Colorize;
 
 use crate::{
     constants::RECOVERY_DESC_CLEANUP_DELAY,
+    errors::CliError,
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
@@ -22,25 +23,44 @@ pub struct RecoverArgs {
     fee_rate: Option<u64>,
 }
 
-pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
-    let mut l1w =
-        SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
-    l1w.sync().await.unwrap();
+pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
+    let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!("failed to load signet wallet: {:?}", e))
+        })?;
+    l1w.sync().await.map_err(|e| {
+        CliError::Internal(anyhow::anyhow!("failed to sync signet wallet: {:?}", e))
+    })?;
 
     println!("Opening descriptor recovery");
     let mut descriptor_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)
         .await
-        .unwrap();
-    let current_height = l1w.local_chain().get_chain_tip().unwrap().height;
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!(
+                "failed to open descriptor recovery: {:?}",
+                e
+            ))
+        })?;
+    let current_height = match l1w.local_chain().get_chain_tip() {
+        Ok(tip) => tip.height,
+        Err(e) => {
+            eprintln!("DEBUG: get_chain_tip failed: {:?}", e);
+            return Err(CliError::Internal(anyhow::anyhow!(
+                "failed to get signet chain tip: {:?}",
+                e
+            )));
+        }
+    };
+
     println!("Current signet chain height: {current_height}");
     let descs = descriptor_file
         .read_descs_after_block(current_height)
         .await
-        .unwrap();
+        .map_err(|e| CliError::Internal(anyhow::anyhow!("failed to read descriptors: {:?}", e)))?;
 
     if descs.is_empty() {
         println!("Nothing to recover");
-        return;
+        return Ok(());
     }
 
     let fee_rate = get_fee_rate(args.fee_rate, settings.signet_backend.as_ref()).await;
@@ -50,25 +70,36 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
         let desc = desc
             .clone()
             .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
-            .expect("valid descriptor");
+            .map_err(|e| {
+                CliError::Internal(anyhow::anyhow!(
+                    "failed to convert to wallet descriptor: {:?}",
+                    e
+                ))
+            })?;
 
         let mut recovery_wallet = Wallet::create_single(desc)
             .network(settings.network)
             .create_wallet_no_persist()
-            .expect("valid wallet");
+            .map_err(|e| {
+                CliError::Internal(anyhow::anyhow!("failed to create recovery wallet: {:?}", e))
+            })?;
 
         // reveal the address for the wallet so we can sync it
         let address = recovery_wallet.reveal_next_address(KeychainKind::External);
         sync_wallet(&mut recovery_wallet, settings.signet_backend.clone())
             .await
-            .expect("successful recovery wallet sync");
+            .map_err(|e| {
+                CliError::Internal(anyhow::anyhow!("failed to sync recovery wallet: {:?}", e))
+            })?;
         let needs_recovery = recovery_wallet.balance().confirmed > Amount::ZERO;
 
         if !needs_recovery {
             assert!(key.len() > 4);
             let desc_height = u32::from_be_bytes(unsafe { *(key[..4].as_ptr() as *const [_; 4]) });
             if desc_height + RECOVERY_DESC_CLEANUP_DELAY > current_height {
-                descriptor_file.remove(key).expect("removal should succeed");
+                descriptor_file.remove(key).map_err(|e| {
+                    CliError::Internal(anyhow::anyhow!("failed to remove old descriptor: {:?}", e))
+                })?;
                 println!(
                     "removed old, already claimed descriptor due for recovery at {desc_height}"
                 );
@@ -92,18 +123,40 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
             let mut builder = recovery_wallet.build_tx();
             builder.drain_to(recover_to.script_pubkey());
             builder.fee_rate(fee_rate);
-            builder.finish().expect("valid tx")
+            builder.finish().map_err(|e| {
+                CliError::Internal(anyhow::anyhow!(
+                    "failed to build signet transaction: {:?}",
+                    e
+                ))
+            })?
         };
 
         recovery_wallet
             .sign(&mut psbt, Default::default())
-            .expect("valid sign op");
+            .map_err(|e| {
+                CliError::Internal(anyhow::anyhow!(
+                    "failed to sign signet transaction: {:?}",
+                    e
+                ))
+            })?;
 
-        let tx = psbt.extract_tx().unwrap();
+        let tx = psbt.extract_tx().map_err(|e| {
+            CliError::Internal(anyhow::anyhow!(
+                "failed to extract signet transaction: {:?}",
+                e
+            ))
+        })?;
         settings
             .signet_backend
             .broadcast_tx(&tx)
             .await
-            .expect("broadcast to succeed")
+            .map_err(|e| {
+                CliError::Internal(anyhow::anyhow!(
+                    "failed to broadcast signet transaction: {:?}",
+                    e
+                ))
+            })?
     }
+
+    Ok(())
 }

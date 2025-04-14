@@ -11,6 +11,7 @@ use strata_primitives::bitcoin_bosd::Descriptor;
 
 use crate::{
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
+    errors::{CliError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -27,20 +28,27 @@ pub struct WithdrawArgs {
     address: Option<String>,
 }
 
-pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
-    let address = args.address.map(|a| {
-        Address::from_str(&a)
-            .unwrap_or_else(|_| {
-                eprintln!("Invalid signet address provided as argument.");
-                std::process::exit(1);
-            })
-            .require_network(settings.network)
-            .expect("correct network")
-    });
+pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
+    let address = args
+        .address
+        .map(|a| {
+            Address::from_str(&a)
+                .map_err(|_| CliError::UserInput(UserInputError::InvalidStrataAddress))
+        })
+        .transpose()?
+        .map(|a| {
+            a.require_network(settings.network)
+                .map_err(|_| CliError::UserInput(UserInputError::WrongNetwork))
+        })
+        .transpose()?;
 
-    let mut l1w =
-        SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
+    let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!("failed to load signet wallet: {:?}", e))
+        })?;
+    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).map_err(|e| {
+        CliError::Internal(anyhow::anyhow!("failed to load strata wallet: {:?}", e))
+    })?;
 
     let address = match address {
         Some(a) => a,
@@ -63,7 +71,12 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
-    let res = l2w.send_transaction(tx).await.unwrap();
+    let res = l2w.send_transaction(tx).await.map_err(|e| {
+        CliError::Internal(anyhow::anyhow!(
+            "failed to broadcast strata transaction: {:?}",
+            e
+        ))
+    })?;
     pb.finish_with_message("Broadcast successful");
     println!(
         "{}",
@@ -71,4 +84,6 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
             .with_maybe_explorer(settings.blockscout_endpoint.as_deref())
             .pretty(),
     );
+
+    Ok(())
 }

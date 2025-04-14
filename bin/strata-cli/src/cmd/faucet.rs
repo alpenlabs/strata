@@ -10,7 +10,8 @@ use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
 use crate::{
-    net_type::{net_type_or_exit, NetworkType},
+    errors::{CliError, UserInputError},
+    net_type::{parse_net_type, NetworkType},
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
@@ -63,8 +64,8 @@ impl fmt::Display for Chain {
     }
 }
 
-pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
-    let network_type = net_type_or_exit(&args.network_type);
+pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
+    let network_type = parse_net_type(&args.network_type)?;
 
     let (address, claim) = match network_type {
         NetworkType::Signet => (
@@ -80,20 +81,24 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     println!("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
-    let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
-    let endpoint = {
-        let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
-        base.join(&format!("/pow_challenge/{}", chain)).unwrap()
-    };
+    let base = Url::from_str(&settings.faucet_endpoint)
+        .map_err(|e| CliError::Internal(anyhow::anyhow!("failed to parse faucet URL: {:?}", e)))?;
+    let chain = Chain::from_network_type(network_type.clone())
+        .map_err(|_| CliError::UserInput(UserInputError::UnsupportedNetwork))?;
+    let endpoint = base
+        .join(&format!("/pow_challenge/{chain}"))
+        .expect("a valid URL");
 
     let challenge = client
         .get(endpoint)
         .send()
         .await
-        .unwrap()
+        .map_err(|e| CliError::Internal(anyhow::anyhow!("failed to fetch POW challenge: {:?}", e)))?
         .json::<PowChallenge>()
         .await
-        .expect("invalid response");
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!("failed to parse faucet response: {:?}", e))
+        })?;
     println!(
         "Received POW challenge with difficulty 2^{} from faucet: {:?}. Solving...",
         challenge.difficulty, challenge.nonce
@@ -131,15 +136,22 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         encode(&solution.to_le_bytes()),
         address
     );
-    let res = client.get(url).send().await.unwrap();
+    let res =
+        client.get(url).send().await.map_err(|e| {
+            CliError::Internal(anyhow::anyhow!("failed to claim from faucet: {:?}", e))
+        })?;
 
     let status = res.status();
-    let body = res.text().await.expect("invalid response");
+    let body = res.text().await.map_err(|e| {
+        CliError::Internal(anyhow::anyhow!("unexpected response from faucet: {:?}", e))
+    })?;
     if status == StatusCode::OK {
         println!("Faucet claim successfully queued. The funds should appear in your wallet soon.",);
     } else {
         println!("Failed: faucet responded with {status}: {body}");
     }
+
+    Ok(())
 }
 
 fn count_leading_zeros(data: &[u8]) -> u8 {

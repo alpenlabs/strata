@@ -13500,6 +13500,7 @@ version = "0.3.0"
 dependencies = [
  "aes-gcm-siv",
  "alloy",
+ "anyhow",
  "argh",
  "argon2",
  "async-trait",
@@ -13523,6 +13524,7 @@ dependencies = [
  "sled",
  "strata-primitives",
  "terrors",
+ "thiserror 2.0.11",
  "tokio",
  "zeroize",
  "zxcvbn",

@@ -17,6 +17,7 @@ use strata_primitives::constants::RECOVER_DELAY;
 
 use crate::{
     constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
+    errors::{CliError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
@@ -49,17 +50,31 @@ pub async fn deposit(
     }: DepositArgs,
     seed: Seed,
     settings: Settings,
-) {
-    let requested_strata_address =
-        strata_address.map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
-    let mut l1w =
-        SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
+) -> Result<(), CliError> {
+    let requested_strata_address = strata_address
+        .map(|a| {
+            StrataAddress::from_str(&a)
+                .map_err(|_| CliError::UserInput(UserInputError::InvalidStrataAddress))
+        })
+        .transpose()?;
+    let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!("failed to load signet wallet: {:?}", e))
+        })?;
+    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).map_err(|e| {
+        CliError::Internal(anyhow::anyhow!("failed to load strata wallet: {:?}", e))
+    })?;
 
-    l1w.sync().await.unwrap();
+    l1w.sync().await.map_err(|e| {
+        CliError::Internal(anyhow::anyhow!("failed to sync signet wallet: {:?}", e))
+    })?;
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
-    let recovery_address_pk = recovery_address.extract_p2tr_pubkey().unwrap();
-    l1w.persist().unwrap();
+    let recovery_address_pk = recovery_address.extract_p2tr_pubkey().map_err(|e| {
+        CliError::Internal(anyhow::anyhow!("failed to extract P2TR pub key: {:?}", e))
+    })?;
+    l1w.persist().map_err(|e| {
+        CliError::Internal(anyhow::anyhow!("failed to persist signet wallet: {:?}", e))
+    })?;
 
     let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
     println!(
@@ -74,24 +89,43 @@ pub async fn deposit(
     );
 
     let (bridge_in_desc, _recovery_script, _recovery_script_hash) =
-        bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
-            .expect("valid bridge in descriptor");
+        bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address).map_err(|e| {
+            CliError::Internal(anyhow::anyhow!(
+                "failed to generate bridge-in descriptor: {:?}",
+                e
+            ))
+        })?;
 
     let desc = bridge_in_desc
         .clone()
         .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
-        .expect("valid descriptor");
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!(
+                "failed to convert to wallet descriptor: {:?}",
+                e
+            ))
+        })?;
 
     let mut temp_wallet = Wallet::create_single(desc.clone())
         .network(settings.network)
         .create_wallet_no_persist()
-        .expect("valid wallet");
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!(
+                "failed to create temporary wallet: {:?}",
+                e
+            ))
+        })?;
 
-    let current_block_height = l1w
-        .local_chain()
-        .get_chain_tip()
-        .expect("valid chain tip")
-        .height;
+    let current_block_height = match l1w.local_chain().get_chain_tip() {
+        Ok(tip) => tip.height,
+        Err(e) => {
+            eprintln!("DEBUG: get_chain_tip failed: {:?}", e);
+            return Err(CliError::Internal(anyhow::anyhow!(
+                "failed to get signet chain tip: {:?}",
+                e
+            )));
+        }
+    };
 
     let recover_at = current_block_height + RECOVER_AT_DELAY;
 
@@ -127,23 +161,45 @@ pub async fn deposit(
         builder.add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT);
         builder.add_data(&op_return_data);
         builder.fee_rate(fee_rate);
-        builder.finish().expect("valid psbt")
+        builder.finish().map_err(|e| {
+            CliError::Internal(anyhow::anyhow!(
+                "failed to build signet transaction: {:?}",
+                e
+            ))
+        })?
     };
-    l1w.sign(&mut psbt, Default::default()).unwrap();
+    l1w.sign(&mut psbt, Default::default()).map_err(|e| {
+        CliError::Internal(anyhow::anyhow!(
+            "failed to sign signet transaction: {:?}",
+            e
+        ))
+    })?;
     println!("Built transaction");
 
-    let tx = psbt.extract_tx().expect("valid tx");
+    let tx = psbt.extract_tx().map_err(|e| {
+        CliError::Internal(anyhow::anyhow!(
+            "failed to extract signet transaction: {:?}",
+            e
+        ))
+    })?;
 
     let pb = ProgressBar::new_spinner().with_message("Saving output descriptor");
     pb.enable_steady_tick(Duration::from_millis(100));
 
     let mut desc_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)
         .await
-        .unwrap();
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!("failed to open output descriptor: {:?}", e))
+        })?;
     desc_file
         .add_desc(recover_at, &bridge_in_desc)
         .await
-        .unwrap();
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!(
+                "failed to update output descriptor: {:?}",
+                e
+            ))
+        })?;
     pb.finish_with_message("Saved output descriptor");
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
@@ -152,14 +208,21 @@ pub async fn deposit(
         .signet_backend
         .broadcast_tx(&tx)
         .await
-        .expect("successful broadcast");
+        .map_err(|e| {
+            CliError::Internal(anyhow::anyhow!(
+                "failed to broadcast signet transaction: {:?}",
+                e
+            ))
+        })?;
     let txid = tx.compute_txid();
     pb.finish_with_message(
         OnchainObject::from(&txid)
             .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
             .pretty(),
     );
+
     println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Strata.");
+    Ok(())
 }
 
 /// Generates a bridge-in descriptor for a given bridge public key and recovery address.
