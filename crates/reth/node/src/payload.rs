@@ -9,6 +9,7 @@ use alloy_rpc_types::{
     Withdrawal,
 };
 use reth_chain_state::ExecutedBlockWithTrieUpdates;
+use reth_engine_local::payload::UnsupportedLocalAttributes;
 use reth_node_api::{BuiltPayload, PayloadAttributes, PayloadBuilderAttributes};
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
 use reth_primitives::{EthPrimitives, SealedBlock};
@@ -42,6 +43,8 @@ impl StrataPayloadAttributes {
         }
     }
 }
+
+impl UnsupportedLocalAttributes for StrataPayloadAttributes {}
 
 impl PayloadAttributes for StrataPayloadAttributes {
     fn timestamp(&self) -> u64 {
