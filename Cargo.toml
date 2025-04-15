@@ -122,7 +122,9 @@ alloy-consensus = { version = "0.11.1", default-features = false }
 alloy-eips = { version = "0.11.1", default-features = false }
 alloy-genesis = { version = "0.11.1", default-features = false }
 alloy-network = { version = "0.11.1", default-features = false }
-alloy-primitives = { version = "0.8.20", default-features = false, features = ["map-foldhash"] }
+alloy-primitives = { version = "0.8.20", default-features = false, features = [
+  "map-foldhash",
+] }
 alloy-rlp = { version = "0.3.10", default-features = false }
 alloy-rlp-derive = "0.3.10"
 alloy-rpc-types = { version = "0.11.1", features = [
@@ -135,7 +137,10 @@ alloy-serde = { version = "0.11.1", default-features = false }
 alloy-sol-types = "0.8.20"
 # reth has its version 0.7, but cargo decides to use the wrong patch version here
 # so specifying the exact one here.
-alloy-trie = { version = "0.7.9", default-features = false, features = ["arbitrary", "serde"] }
+alloy-trie = { version = "0.7.9", default-features = false, features = [
+  "arbitrary",
+  "serde",
+] }
 revm = { version = "19.5.0", features = ["std"], default-features = false }
 revm-primitives = { version = "15.2.0", features = [
   "std",
@@ -155,8 +160,8 @@ reth-engine-local = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1
 reth-engine-primitives = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-errors = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-ethereum-forks = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
-reth-ethereum-primitives = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-ethereum-payload-builder = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
+reth-ethereum-primitives = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-evm = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
@@ -183,7 +188,7 @@ reth-rpc-server-types = { git = "https://github.com/paradigmxyz/reth.git", rev =
 reth-rpc-types-compat = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-tasks = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
-reth-trie = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0"}
+reth-trie = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0", default-features = false }
 reth-trie-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "v1.2.0" }
 
