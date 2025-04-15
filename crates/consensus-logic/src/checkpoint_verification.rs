@@ -1,7 +1,7 @@
 //! General handling around checkpoint verification.
 
 use strata_crypto::groth16_verifier::verify_rollup_groth16_proof_receipt;
-use strata_primitives::params::*;
+use strata_primitives::{params::*, proof::RollupVerifyingKey};
 use strata_state::{batch::*, client_state::L1Checkpoint};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
@@ -88,10 +88,11 @@ pub fn verify_proof(
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
-    if rollup_params.proof_publish_mode.allow_empty()
-        && proof_receipt.proof().is_empty()
-        && proof_receipt.public_values().is_empty()
-    {
+    let allow_empty = rollup_params.proof_publish_mode.allow_empty();
+    let is_proof_empty = proof_receipt.proof().is_empty();
+    let is_non_native_vk = !matches!(rollup_vk, RollupVerifyingKey::NativeVerifyingKey(_));
+
+    if allow_empty && is_proof_empty && is_non_native_vk {
         warn!(%checkpoint_idx, "verifying empty proof as correct");
         return Ok(());
     }
