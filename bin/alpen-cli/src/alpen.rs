@@ -9,7 +9,6 @@ use alloy::{
         },
         Identity, ProviderBuilder, RootProvider,
     },
-    transports::http::{Client, Http},
 };
 
 use crate::seed::Seed;
@@ -23,9 +22,7 @@ type Provider = FillProvider<
         >,
         WalletFiller<EthereumWallet>,
     >,
-    RootProvider<Http<Client>>,
-    Http<Client>,
-    Ethereum,
+    RootProvider<Ethereum>,
 >;
 
 pub struct AlpenWallet(Provider);
@@ -52,7 +49,6 @@ impl AlpenWallet {
         let wallet = seed.get_alpen_wallet();
 
         let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
             .wallet(wallet)
             .on_http(l2_http_endpoint.parse().map_err(|_| L2EndpointParseError)?);
         Ok(Self(provider))
