@@ -8,9 +8,10 @@ use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
+use terrors::OneOf;
 
 use crate::{
-    errors::{CliError, UserInputError},
+    errors::{InternalError, UserInputError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -64,8 +65,12 @@ impl fmt::Display for Chain {
     }
 }
 
-pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = args.network_type.parse()?;
+pub async fn faucet(
+    args: FaucetArgs,
+    seed: Seed,
+    settings: Settings,
+) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+    let network_type = args.network_type.parse().map_err(OneOf::new)?;
 
     let (address, claim) = match network_type {
         NetworkType::Signet => (
@@ -82,9 +87,9 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<
 
     let client = reqwest::Client::new();
     let base = Url::from_str(&settings.faucet_endpoint)
-        .map_err(|e| CliError::Internal(anyhow::anyhow!("failed to parse faucet URL: {:?}", e)))?;
+        .map_err(|_| OneOf::new(UserInputError::InvalidFaucetUrl))?;
     let chain = Chain::from_network_type(network_type.clone())
-        .map_err(|_| CliError::UserInput(UserInputError::UnsupportedNetwork))?;
+        .map_err(|_| OneOf::new(UserInputError::UnsupportedNetwork))?;
     let endpoint = base
         .join(&format!("/pow_challenge/{chain}"))
         .expect("a valid URL");
@@ -93,12 +98,10 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<
         .get(endpoint)
         .send()
         .await
-        .map_err(|e| CliError::Internal(anyhow::anyhow!("failed to fetch POW challenge: {:?}", e)))?
+        .map_err(|e| OneOf::new(InternalError::FectFaucetPowChallenge(format!("{e:?}"))))?
         .json::<PowChallenge>()
         .await
-        .map_err(|e| {
-            CliError::Internal(anyhow::anyhow!("failed to parse faucet response: {:?}", e))
-        })?;
+        .map_err(|e| OneOf::new(InternalError::ParseFaucetResponse(format!("{e:?}"))))?;
     println!(
         "Received POW challenge with difficulty 2^{} from faucet: {:?}. Solving...",
         challenge.difficulty, challenge.nonce
@@ -136,15 +139,17 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<
         encode(&solution.to_le_bytes()),
         address
     );
-    let res =
-        client.get(url).send().await.map_err(|e| {
-            CliError::Internal(anyhow::anyhow!("failed to claim from faucet: {:?}", e))
-        })?;
+    let res = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| OneOf::new(InternalError::ClaimFromFaucet(format!("{e:?}"))))?;
 
     let status = res.status();
-    let body = res.text().await.map_err(|e| {
-        CliError::Internal(anyhow::anyhow!("unexpected response from faucet: {:?}", e))
-    })?;
+    let body = res
+        .text()
+        .await
+        .map_err(|e| OneOf::new(InternalError::UnexpectedFaucetResponse(format!("{e:?}"))))?;
     if status == StatusCode::OK {
         println!("Faucet claim successfully queued. The funds should appear in your wallet soon.",);
     } else {

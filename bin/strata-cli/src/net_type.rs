@@ -1,6 +1,6 @@
 use std::{fmt, str::FromStr};
 
-use crate::errors::{CliError, UserInputError};
+use crate::errors::UserInputError;
 
 /// Represents a type of network, either Alpen's signet or Strata
 #[non_exhaustive]
@@ -11,13 +11,13 @@ pub enum NetworkType {
 }
 
 impl FromStr for NetworkType {
-    type Err = CliError;
+    type Err = UserInputError;
 
-    fn from_str(s: &str) -> Result<Self, CliError> {
+    fn from_str(s: &str) -> Result<Self, UserInputError> {
         match s.to_lowercase().as_str() {
             "signet" => Ok(Self::Signet),
             "strata" => Ok(Self::Strata),
-            _ => Err(CliError::UserInput(UserInputError::UnsupportedNetwork)),
+            _ => Err(UserInputError::UnsupportedNetwork),
         }
     }
 }

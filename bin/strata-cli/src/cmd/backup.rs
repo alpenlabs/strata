@@ -1,8 +1,9 @@
 use argh::FromArgs;
 use bip39::Language;
+use terrors::OneOf;
 
 use crate::{
-    errors::{CliError, UserInputError},
+    errors::{InternalError, UserInputError},
     seed::Seed,
 };
 
@@ -18,7 +19,10 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
-pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), CliError> {
+pub async fn backup(
+    args: BackupArgs,
+    seed: Seed,
+) -> Result<(), OneOf<(InternalError, UserInputError)>> {
     let language = match args.language {
         Some(s) => s,
         None => "en".to_owned(),
@@ -33,7 +37,7 @@ pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), CliError> {
         "jp" => Language::Japanese,
         "kr" => Language::Korean,
         "es" => Language::Spanish,
-        _ => return Err(CliError::UserInput(UserInputError::UnsupportedLanguage)),
+        _ => return Err(OneOf::new(UserInputError::UnsupportedLanguage)),
     };
     seed.print_mnemonic(language);
     Ok(())

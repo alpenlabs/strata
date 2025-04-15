@@ -8,10 +8,11 @@ use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use indicatif::ProgressBar;
 use strata_primitives::bitcoin_bosd::Descriptor;
+use terrors::OneOf;
 
 use crate::{
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
-    errors::{CliError, UserInputError},
+    errors::{InternalError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -28,33 +29,34 @@ pub struct WithdrawArgs {
     address: Option<String>,
 }
 
-pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
+pub async fn withdraw(
+    args: WithdrawArgs,
+    seed: Seed,
+    settings: Settings,
+) -> Result<(), OneOf<(InternalError, UserInputError)>> {
     let address = args
         .address
         .map(|a| {
             Address::from_str(&a)
-                .map_err(|_| CliError::UserInput(UserInputError::InvalidStrataAddress))
-        })
-        .transpose()?
-        .map(|a| {
-            a.require_network(settings.network)
-                .map_err(|_| CliError::UserInput(UserInputError::WrongNetwork))
+                .map_err(|_| OneOf::new(UserInputError::InvalidSignetAddress))
+                .and_then(|a| {
+                    a.require_network(settings.network)
+                        .map_err(|_| OneOf::new(UserInputError::WrongNetwork))
+                })
         })
         .transpose()?;
 
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-        .map_err(|e| {
-            CliError::Internal(anyhow::anyhow!("failed to load signet wallet: {:?}", e))
-        })?;
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).map_err(|e| {
-        CliError::Internal(anyhow::anyhow!("failed to load strata wallet: {:?}", e))
-    })?;
+        .map_err(|e| OneOf::new(InternalError::LoadSignetWallet(format!("{e:?}"))))?;
+    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)
+        .map_err(|e| OneOf::new(InternalError::LoadStrataWallet(format!("{e:?}"))))?;
 
     let address = match address {
         Some(a) => a,
         None => {
             let info = l1w.reveal_next_address(KeychainKind::External);
-            l1w.persist().unwrap();
+            l1w.persist()
+                .map_err(|e| OneOf::new(InternalError::PersistSignetWallet(format!("{e:?}"))))?;
             info.address
         }
     };
@@ -71,12 +73,10 @@ pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) -> Res
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
-    let res = l2w.send_transaction(tx).await.map_err(|e| {
-        CliError::Internal(anyhow::anyhow!(
-            "failed to broadcast strata transaction: {:?}",
-            e
-        ))
-    })?;
+    let res = l2w
+        .send_transaction(tx)
+        .await
+        .map_err(|e| OneOf::new(InternalError::BroadcastStrataTxn(format!("{e:?}"))))?;
     pb.finish_with_message("Broadcast successful");
     println!(
         "{}",
