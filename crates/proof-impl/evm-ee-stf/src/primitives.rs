@@ -73,6 +73,8 @@ pub struct EvmBlockStfInput {
     pub ancestor_headers: Vec<Header>,
 
     /// A list of transactions to process.
+    // #[serde_as(as = "Vec<serde_bincode_compat::TransactionSigned>")]
+    // https://github.com/paradigmxyz/reth/issues/15751
     pub transactions: Vec<TransactionSigned>,
 
     /// A list of withdrawals to process.
