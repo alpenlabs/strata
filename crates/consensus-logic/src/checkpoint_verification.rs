@@ -88,10 +88,7 @@ pub fn verify_proof(
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
-    if rollup_params.proof_publish_mode.allow_empty()
-        && proof_receipt.proof().is_empty()
-        && proof_receipt.public_values().is_empty()
-    {
+    if rollup_params.proof_publish_mode.allow_empty() && proof_receipt.proof().is_empty() {
         warn!(%checkpoint_idx, "verifying empty proof as correct");
         return Ok(());
     }
