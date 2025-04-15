@@ -13,7 +13,7 @@ use crate::{
     constants::SATS_TO_WEI,
     errors::{CliError, UserInputError},
     link::{OnchainObject, PrettyPrint},
-    net_type::{parse_net_type, NetworkType},
+    net_type::NetworkType,
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, SignetWallet},
@@ -42,7 +42,7 @@ pub struct SendArgs {
 }
 
 pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = parse_net_type(&args.network_type)?;
+    let network_type = args.network_type.parse()?;
 
     match network_type {
         NetworkType::Signet => {

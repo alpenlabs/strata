@@ -3,11 +3,7 @@ use argh::FromArgs;
 use bdk_wallet::KeychainKind;
 
 use crate::{
-    errors::CliError,
-    net_type::{parse_net_type, NetworkType},
-    seed::Seed,
-    settings::Settings,
-    signet::SignetWallet,
+    errors::CliError, net_type::NetworkType, seed::Seed, settings::Settings, signet::SignetWallet,
     strata::StrataWallet,
 };
 
@@ -21,7 +17,7 @@ pub struct ReceiveArgs {
 }
 
 pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = parse_net_type(&args.network_type)?;
+    let network_type = args.network_type.parse()?;
 
     let address = match network_type {
         NetworkType::Signet => {

@@ -11,7 +11,7 @@ use shrex::{encode, Hex};
 
 use crate::{
     errors::{CliError, UserInputError},
-    net_type::{parse_net_type, NetworkType},
+    net_type::NetworkType,
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
@@ -65,7 +65,7 @@ impl fmt::Display for Chain {
 }
 
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = parse_net_type(&args.network_type)?;
+    let network_type = args.network_type.parse()?;
 
     let (address, claim) = match network_type {
         NetworkType::Signet => (

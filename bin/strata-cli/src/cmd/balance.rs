@@ -6,13 +6,8 @@ use argh::FromArgs;
 use bdk_wallet::bitcoin::Amount;
 
 use crate::{
-    constants::SATS_TO_WEI,
-    errors::CliError,
-    net_type::{parse_net_type, NetworkType},
-    seed::Seed,
-    settings::Settings,
-    signet::SignetWallet,
-    strata::StrataWallet,
+    constants::SATS_TO_WEI, errors::CliError, net_type::NetworkType, seed::Seed,
+    settings::Settings, signet::SignetWallet, strata::StrataWallet,
 };
 
 /// Prints the wallet's current balance(s)
@@ -25,7 +20,7 @@ pub struct BalanceArgs {
 }
 
 pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = parse_net_type(&args.network_type)?;
+    let network_type = args.network_type.parse()?;
 
     if let NetworkType::Signet = network_type {
         let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())

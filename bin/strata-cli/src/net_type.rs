@@ -31,8 +31,3 @@ impl fmt::Display for NetworkType {
         write!(f, "{}", net_str)
     }
 }
-
-/// Parses `val` as a [`NetworkType`]. Prints error message and exits if invalid.
-pub fn parse_net_type(val: &str) -> Result<NetworkType, CliError> {
-    val.parse()
-}
