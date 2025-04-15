@@ -4,7 +4,7 @@ use dialoguer::Confirm;
 use terrors::OneOf;
 
 use crate::{
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError},
     seed::EncryptedSeedPersister,
     settings::Settings,
 };
@@ -23,7 +23,7 @@ pub async fn reset(
     args: ResetArgs,
     persister: impl EncryptedSeedPersister,
     settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+) -> Result<(), CliError> {
     let confirm = if args.assume_yes {
         true
     } else {

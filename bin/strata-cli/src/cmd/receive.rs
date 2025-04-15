@@ -4,7 +4,7 @@ use bdk_wallet::KeychainKind;
 use terrors::OneOf;
 
 use crate::{
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -21,11 +21,7 @@ pub struct ReceiveArgs {
     network_type: String,
 }
 
-pub async fn receive(
-    args: ReceiveArgs,
-    seed: Seed,
-    settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
     let network_type = args.network_type.parse().map_err(OneOf::new)?;
 
     let address = match network_type {

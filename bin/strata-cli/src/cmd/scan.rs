@@ -2,7 +2,7 @@ use argh::FromArgs;
 use terrors::OneOf;
 
 use crate::{
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError},
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
@@ -13,11 +13,7 @@ use crate::{
 #[argh(subcommand, name = "scan")]
 pub struct ScanArgs {}
 
-pub async fn scan(
-    _args: ScanArgs,
-    seed: Seed,
-    settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+pub async fn scan(_args: ScanArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
         .map_err(|e| OneOf::new(InternalError::LoadSignetWallet(format!("{e:?}"))))?;
     l1w.scan()

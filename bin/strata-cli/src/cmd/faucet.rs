@@ -11,7 +11,7 @@ use shrex::{encode, Hex};
 use terrors::OneOf;
 
 use crate::{
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError, UserInputError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -65,11 +65,7 @@ impl fmt::Display for Chain {
     }
 }
 
-pub async fn faucet(
-    args: FaucetArgs,
-    seed: Seed,
-    settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
     let network_type = args.network_type.parse().map_err(OneOf::new)?;
 
     let (address, claim) = match network_type {

@@ -1,3 +1,4 @@
+use terrors::OneOf;
 use thiserror::Error;
 
 /// Errors related to user input
@@ -139,3 +140,5 @@ pub enum InternalError {
     #[error("Failed to sync signet wallet: {0}")]
     UnexpectedFaucetResponse(String),
 }
+
+pub type CliError = OneOf<(InternalError, UserInputError)>;

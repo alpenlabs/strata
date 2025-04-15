@@ -12,7 +12,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -29,11 +29,7 @@ pub struct WithdrawArgs {
     address: Option<String>,
 }
 
-pub async fn withdraw(
-    args: WithdrawArgs,
-    seed: Seed,
-    settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
     let address = args
         .address
         .map(|a| {

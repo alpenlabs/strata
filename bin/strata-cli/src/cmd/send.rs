@@ -12,7 +12,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     net_type::NetworkType,
     seed::Seed,
@@ -42,11 +42,7 @@ pub struct SendArgs {
     fee_rate: Option<u64>,
 }
 
-pub async fn send(
-    args: SendArgs,
-    seed: Seed,
-    settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
     let network_type = args.network_type.parse().map_err(OneOf::new)?;
 
     match network_type {

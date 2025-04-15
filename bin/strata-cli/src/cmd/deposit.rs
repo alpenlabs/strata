@@ -18,7 +18,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
@@ -51,7 +51,7 @@ pub async fn deposit(
     }: DepositArgs,
     seed: Seed,
     settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+) -> Result<(), CliError> {
     let requested_strata_address = strata_address
         .map(|a| {
             StrataAddress::from_str(&a)

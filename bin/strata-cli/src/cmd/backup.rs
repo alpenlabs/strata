@@ -3,7 +3,7 @@ use bip39::Language;
 use terrors::OneOf;
 
 use crate::{
-    errors::{InternalError, UserInputError},
+    errors::{CliError, UserInputError},
     seed::Seed,
 };
 
@@ -19,10 +19,7 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
-pub async fn backup(
-    args: BackupArgs,
-    seed: Seed,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), CliError> {
     let language = match args.language {
         Some(s) => s,
         None => "en".to_owned(),

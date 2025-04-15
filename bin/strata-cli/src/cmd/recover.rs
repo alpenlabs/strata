@@ -8,7 +8,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::RECOVERY_DESC_CLEANUP_DELAY,
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError},
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
@@ -24,11 +24,7 @@ pub struct RecoverArgs {
     fee_rate: Option<u64>,
 }
 
-pub async fn recover(
-    args: RecoverArgs,
-    seed: Seed,
-    settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
         .map_err(|e| OneOf::new(InternalError::LoadSignetWallet(format!("{e:?}"))))?;
     l1w.sync()

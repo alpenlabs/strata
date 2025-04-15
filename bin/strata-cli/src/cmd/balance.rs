@@ -8,7 +8,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -25,11 +25,7 @@ pub struct BalanceArgs {
     network_type: String,
 }
 
-pub async fn balance(
-    args: BalanceArgs,
-    seed: Seed,
-    settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
     let network_type = args.network_type.parse().map_err(OneOf::new)?;
 
     if let NetworkType::Signet = network_type {

@@ -3,7 +3,7 @@ use rand_core::OsRng;
 use terrors::OneOf;
 
 use crate::{
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError},
     seed::{password::Password, EncryptedSeedPersister, Seed},
 };
 
@@ -16,7 +16,7 @@ pub async fn change_pwd(
     _args: ChangePwdArgs,
     seed: Seed,
     persister: impl EncryptedSeedPersister,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+) -> Result<(), CliError> {
     let mut new_pw = Password::read(true)
         .map_err(|e| OneOf::new(InternalError::ReadPassword(format!("{e:?}"))))?;
     if let Err(feedback) = new_pw.validate() {

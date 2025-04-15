@@ -11,7 +11,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{InternalError, UserInputError},
+    errors::{CliError, InternalError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -45,7 +45,7 @@ pub async fn drain(
     }: DrainArgs,
     seed: Seed,
     settings: Settings,
-) -> Result<(), OneOf<(InternalError, UserInputError)>> {
+) -> Result<(), CliError> {
     if strata_address.is_none() && signet_address.is_none() {
         return Err(OneOf::new(UserInputError::MissingTargetAddress));
     }
