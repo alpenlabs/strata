@@ -8,7 +8,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::RECOVERY_DESC_CLEANUP_DELAY,
-    errors::{CliError, InternalError},
+    errors::{internal_err, CliError, InternalError},
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
@@ -26,15 +26,15 @@ pub struct RecoverArgs {
 
 pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-        .map_err(|e| OneOf::new(InternalError::LoadSignetWallet(format!("{e:?}"))))?;
+        .map_err(internal_err(InternalError::LoadSignetWallet))?;
     l1w.sync()
         .await
-        .map_err(|e| OneOf::new(InternalError::SyncSignetWallet(format!("{e:?}"))))?;
+        .map_err(internal_err(InternalError::SyncSignetWallet))?;
 
     println!("Opening descriptor recovery");
     let mut descriptor_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)
         .await
-        .map_err(|e| OneOf::new(InternalError::OpenDescriptorDatabase(format!("{e:?}"))))?;
+        .map_err(internal_err(InternalError::OpenDescriptorDatabase))?;
     let current_height = match l1w.local_chain().get_chain_tip() {
         Ok(tip) => tip.height,
         Err(e) => {
@@ -50,7 +50,7 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) -> Resul
     let descs = descriptor_file
         .read_descs_after_block(current_height)
         .await
-        .map_err(|e| OneOf::new(InternalError::ReadDescriptors(format!("{e:?}"))))?;
+        .map_err(internal_err(InternalError::ReadDescriptors))?;
 
     if descs.is_empty() {
         println!("Nothing to recover");
@@ -64,18 +64,18 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) -> Resul
         let desc = desc
             .clone()
             .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
-            .map_err(|e| OneOf::new(InternalError::ConvertToWalletDescriptor(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::ConvertToWalletDescriptor))?;
 
         let mut recovery_wallet = Wallet::create_single(desc)
             .network(settings.network)
             .create_wallet_no_persist()
-            .map_err(|e| OneOf::new(InternalError::CreateRecoveryWallet(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::CreateRecoveryWallet))?;
 
         // reveal the address for the wallet so we can sync it
         let address = recovery_wallet.reveal_next_address(KeychainKind::External);
         sync_wallet(&mut recovery_wallet, settings.signet_backend.clone())
             .await
-            .map_err(|e| OneOf::new(InternalError::SyncRecoveryWallet(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::SyncRecoveryWallet))?;
         let needs_recovery = recovery_wallet.balance().confirmed > Amount::ZERO;
 
         if !needs_recovery {
@@ -84,7 +84,7 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) -> Resul
             if desc_height + RECOVERY_DESC_CLEANUP_DELAY > current_height {
                 descriptor_file
                     .remove(key)
-                    .map_err(|e| OneOf::new(InternalError::RemoveDescriptor(format!("{e:?}"))))?;
+                    .map_err(internal_err(InternalError::RemoveDescriptor))?;
                 println!(
                     "removed old, already claimed descriptor due for recovery at {desc_height}"
                 );
@@ -110,21 +110,21 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) -> Resul
             builder.fee_rate(fee_rate);
             builder
                 .finish()
-                .map_err(|e| OneOf::new(InternalError::BuildSignetTxn(format!("{e:?}"))))?
+                .map_err(internal_err(InternalError::BuildSignetTxn))?
         };
 
         recovery_wallet
             .sign(&mut psbt, Default::default())
-            .map_err(|e| OneOf::new(InternalError::SignSignetTxn(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::SignSignetTxn))?;
 
         let tx = psbt
             .extract_tx()
-            .map_err(|e| OneOf::new(InternalError::FinalizeSignetTxn(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::FinalizeSignetTxn))?;
         settings
             .signet_backend
             .broadcast_tx(&tx)
             .await
-            .map_err(|e| OneOf::new(InternalError::BroadcastSignetTxn(format!("{e:?}"))))?
+            .map_err(internal_err(InternalError::BroadcastSignetTxn))?
     }
 
     Ok(())

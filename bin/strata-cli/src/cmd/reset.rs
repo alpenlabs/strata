@@ -1,10 +1,9 @@
 use argh::FromArgs;
 use colored::Colorize;
 use dialoguer::Confirm;
-use terrors::OneOf;
 
 use crate::{
-    errors::{CliError, InternalError},
+    errors::{internal_err, CliError, InternalError},
     seed::EncryptedSeedPersister,
     settings::Settings,
 };
@@ -31,16 +30,16 @@ pub async fn reset(
         Confirm::new()
             .with_prompt("Do you REALLY want to continue?")
             .interact()
-            .map_err(|e| OneOf::new(InternalError::ReadConfirmation(format!("{e:?}"))))?
+            .map_err(internal_err(InternalError::ReadConfirmation))?
     };
 
     if confirm {
         persister
             .delete()
-            .map_err(|e| OneOf::new(InternalError::DeleteSeed(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::DeleteSeed))?;
         println!("Wiped seed");
         std::fs::remove_dir_all(settings.data_dir.clone())
-            .map_err(|e| OneOf::new(InternalError::DeleteDataDirectory(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::DeleteDataDirectory))?;
         println!("Wiped data directory");
     }
 

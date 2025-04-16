@@ -4,7 +4,7 @@ use bdk_wallet::KeychainKind;
 use terrors::OneOf;
 
 use crate::{
-    errors::{CliError, InternalError},
+    errors::{internal_err, CliError, InternalError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -28,24 +28,24 @@ pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) -> Resul
         NetworkType::Signet => {
             let mut l1w =
                 SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-                    .map_err(|e| OneOf::new(InternalError::LoadSignetWallet(format!("{e:?}"))))?;
+                    .map_err(internal_err(InternalError::LoadSignetWallet))?;
 
             println!("Syncing signet wallet...");
             l1w.sync()
                 .await
-                .map_err(|e| OneOf::new(InternalError::SyncSignetWallet(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::SyncSignetWallet))?;
             println!("Wallet synced.");
 
             let address_info = l1w.reveal_next_address(KeychainKind::External);
 
             l1w.persist()
-                .map_err(|e| OneOf::new(InternalError::PersistSignetWallet(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::PersistSignetWallet))?;
 
             address_info.address.to_string()
         }
         NetworkType::Strata => {
             let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)
-                .map_err(|e| OneOf::new(InternalError::LoadStrataWallet(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::LoadStrataWallet))?;
             l2w.default_signer_address().to_string()
         }
     };

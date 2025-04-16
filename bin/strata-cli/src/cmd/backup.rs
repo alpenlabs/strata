@@ -1,9 +1,8 @@
 use argh::FromArgs;
 use bip39::Language;
-use terrors::OneOf;
 
 use crate::{
-    errors::{CliError, UserInputError},
+    errors::{user_err, CliError, UserInputError},
     seed::Seed,
 };
 
@@ -34,7 +33,7 @@ pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), CliError> {
         "jp" => Language::Japanese,
         "kr" => Language::Korean,
         "es" => Language::Spanish,
-        _ => return Err(OneOf::new(UserInputError::UnsupportedLanguage)),
+        _ => return Err(user_err(UserInputError::UnsupportedLanguage)),
     };
     seed.print_mnemonic(language);
     Ok(())

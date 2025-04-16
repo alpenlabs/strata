@@ -12,7 +12,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{CliError, InternalError, UserInputError},
+    errors::{internal_err, user_err, CliError, InternalError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     net_type::NetworkType,
     seed::Seed,
@@ -49,15 +49,15 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
         NetworkType::Signet => {
             let amount = Amount::from_sat(args.amount);
             let address = Address::from_str(&args.address)
-                .map_err(|_| OneOf::new(UserInputError::InvalidStrataAddress))?
+                .map_err(|_| user_err(UserInputError::InvalidStrataAddress))?
                 .require_network(settings.network)
-                .map_err(|_| OneOf::new(UserInputError::WrongNetwork))?;
+                .map_err(|_| user_err(UserInputError::WrongNetwork))?;
             let mut l1w =
                 SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-                    .map_err(|e| OneOf::new(InternalError::LoadSignetWallet(format!("{e:?}"))))?;
+                    .map_err(internal_err(InternalError::LoadSignetWallet))?;
             l1w.sync()
                 .await
-                .map_err(|e| OneOf::new(InternalError::SyncSignetWallet(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::SyncSignetWallet))?;
             let fee_rate = get_fee_rate(args.fee_rate, settings.signet_backend.as_ref()).await;
             log_fee_rate(&fee_rate);
             let mut psbt = {
@@ -66,18 +66,18 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
                 builder.fee_rate(fee_rate);
                 builder
                     .finish()
-                    .map_err(|e| OneOf::new(InternalError::BuildSignetTxn(format!("{e:?}"))))?
+                    .map_err(internal_err(InternalError::BuildSignetTxn))?
             };
             l1w.sign(&mut psbt, Default::default())
-                .map_err(|e| OneOf::new(InternalError::SignSignetTxn(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::SignSignetTxn))?;
             let tx = psbt
                 .extract_tx()
-                .map_err(|e| OneOf::new(InternalError::FinalizeSignetTxn(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::FinalizeSignetTxn))?;
             settings
                 .signet_backend
                 .broadcast_tx(&tx)
                 .await
-                .map_err(|e| OneOf::new(InternalError::BroadcastSignetTxn(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::BroadcastSignetTxn))?;
             let txid = tx.compute_txid();
             println!(
                 "{}",
@@ -88,7 +88,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
         }
         NetworkType::Strata => {
             let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)
-                .map_err(|e| OneOf::new(InternalError::LoadStrataWallet(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::LoadStrataWallet))?;
             let address = StrataAddress::from_str(&args.address)
                 .map_err(|_| OneOf::new(UserInputError::InvalidStrataAddress))?;
             let tx = TransactionRequest::default()
@@ -97,7 +97,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
             let res = l2w
                 .send_transaction(tx)
                 .await
-                .map_err(|e| OneOf::new(InternalError::BroadcastStrataTxn(format!("{e:?}"))))?;
+                .map_err(internal_err(InternalError::BroadcastStrataTxn))?;
             println!(
                 "{}",
                 OnchainObject::from(res.tx_hash())

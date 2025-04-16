@@ -1,9 +1,8 @@
 use argh::FromArgs;
 use rand_core::OsRng;
-use terrors::OneOf;
 
 use crate::{
-    errors::{CliError, InternalError},
+    errors::{internal_err, CliError, InternalError},
     seed::{password::Password, EncryptedSeedPersister, Seed},
 };
 
@@ -17,17 +16,16 @@ pub async fn change_pwd(
     seed: Seed,
     persister: impl EncryptedSeedPersister,
 ) -> Result<(), CliError> {
-    let mut new_pw = Password::read(true)
-        .map_err(|e| OneOf::new(InternalError::ReadPassword(format!("{e:?}"))))?;
+    let mut new_pw = Password::read(true).map_err(internal_err(InternalError::ReadPassword))?;
     if let Err(feedback) = new_pw.validate() {
         println!("Password is weak. {}", feedback);
     }
     let encrypted_seed = seed
         .encrypt(&mut new_pw, &mut OsRng)
-        .map_err(|e| OneOf::new(InternalError::EncryptSeed(format!("{e:?}"))))?;
+        .map_err(internal_err(InternalError::EncryptSeed))?;
     persister
         .save(&encrypted_seed)
-        .map_err(|e| OneOf::new(InternalError::PersistEncryptedSeed(format!("{e:?}"))))?;
+        .map_err(internal_err(InternalError::PersistEncryptedSeed))?;
 
     println!("Password changed successfully");
     Ok(())

@@ -174,3 +174,18 @@ pub enum InternalError {
 
 /// Convenience type for one or both error types
 pub type CliError = OneOf<(InternalError, UserInputError)>;
+
+/// Convnience function to go from [`InternalError`] to [`CliError`].
+/// We are including the original error message.
+pub fn internal_err<E, F>(f: F) -> impl FnOnce(E) -> CliError
+where
+    E: std::fmt::Debug,
+    F: FnOnce(String) -> InternalError,
+{
+    move |e| OneOf::new(f(format!("{e:?}")))
+}
+
+/// Convnience function to go from [`UserInputError`] to [`CliError`].
+pub fn user_err(variant: UserInputError) -> CliError {
+    OneOf::new(variant)
+}

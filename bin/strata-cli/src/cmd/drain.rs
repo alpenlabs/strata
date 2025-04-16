@@ -7,11 +7,10 @@ use alloy::{
 use argh::FromArgs;
 use bdk_wallet::bitcoin::{Address, Amount};
 use colored::Colorize;
-use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{CliError, InternalError, UserInputError},
+    errors::{internal_err, user_err, CliError, InternalError, UserInputError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -47,32 +46,29 @@ pub async fn drain(
     settings: Settings,
 ) -> Result<(), CliError> {
     if strata_address.is_none() && signet_address.is_none() {
-        return Err(OneOf::new(UserInputError::MissingTargetAddress));
+        return Err(user_err(UserInputError::MissingTargetAddress));
     }
 
     let signet_address = signet_address
-        .map(|a| {
-            Address::from_str(&a).map_err(|_| OneOf::new(UserInputError::InvalidSignetAddress))
-        })
+        .map(|a| Address::from_str(&a).map_err(|_| user_err(UserInputError::InvalidSignetAddress)))
         .transpose()?
         .map(|a| {
             a.require_network(settings.network)
-                .map_err(|_| OneOf::new(UserInputError::WrongNetwork))
+                .map_err(|_| user_err(UserInputError::WrongNetwork))
         })
         .transpose()?;
     let strata_address = strata_address
         .map(|a| {
-            StrataAddress::from_str(&a)
-                .map_err(|_| OneOf::new(UserInputError::InvalidStrataAddress))
+            StrataAddress::from_str(&a).map_err(|_| user_err(UserInputError::InvalidStrataAddress))
         })
         .transpose()?;
 
     if let Some(address) = signet_address {
         let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-            .map_err(|e| OneOf::new(InternalError::LoadSignetWallet(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::LoadSignetWallet))?;
         l1w.sync()
             .await
-            .map_err(|e| OneOf::new(InternalError::SyncSignetWallet(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::SyncSignetWallet))?;
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {
             println!(
@@ -90,18 +86,18 @@ pub async fn drain(
             builder.fee_rate(fee_rate);
             builder
                 .finish()
-                .map_err(|e| OneOf::new(InternalError::BuildSignetTxn(format!("{e:?}"))))?
+                .map_err(internal_err(InternalError::BuildSignetTxn))?
         };
         l1w.sign(&mut psbt, Default::default())
-            .map_err(|e| OneOf::new(InternalError::SignSignetTxn(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::SignSignetTxn))?;
         let tx = psbt
             .extract_tx()
-            .map_err(|e| OneOf::new(InternalError::FinalizeSignetTxn(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::FinalizeSignetTxn))?;
         settings
             .signet_backend
             .broadcast_tx(&tx)
             .await
-            .map_err(|e| OneOf::new(InternalError::BroadcastSignetTxn(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::BroadcastSignetTxn))?;
         let txid = tx.compute_txid();
         println!(
             "{}",
@@ -114,11 +110,11 @@ pub async fn drain(
 
     if let Some(address) = strata_address {
         let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)
-            .map_err(|e| OneOf::new(InternalError::LoadStrataWallet(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::LoadStrataWallet))?;
         let balance = l2w
             .get_balance(l2w.default_signer_address())
             .await
-            .map_err(|e| OneOf::new(InternalError::FetchStrataBalance(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::FetchStrataBalance))?;
         if balance == U256::ZERO {
             println!("No Strata bitcoin to send");
         }
@@ -132,11 +128,11 @@ pub async fn drain(
         let gas_price = l2w
             .get_gas_price()
             .await
-            .map_err(|e| OneOf::new(InternalError::FetchStrataGasPrice(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::FetchStrataGasPrice))?;
         let gas_estimate = l2w
             .estimate_gas(&estimate_tx)
             .await
-            .map_err(|e| OneOf::new(InternalError::EstimateStrataGas(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::EstimateStrataGas))?;
 
         let total_fee = gas_estimate * gas_price;
         let max_send_amount = balance.saturating_sub(U256::from(total_fee));
@@ -146,7 +142,7 @@ pub async fn drain(
         let res = l2w
             .send_transaction(tx)
             .await
-            .map_err(|e| OneOf::new(InternalError::BroadcastStrataTxn(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::BroadcastStrataTxn))?;
 
         println!(
             "{}",

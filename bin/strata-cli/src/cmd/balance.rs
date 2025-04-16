@@ -8,7 +8,7 @@ use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{CliError, InternalError},
+    errors::{internal_err, CliError, InternalError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -30,11 +30,11 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) -> Resul
 
     if let NetworkType::Signet = network_type {
         let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-            .map_err(|e| OneOf::new(InternalError::LoadSignetWallet(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::LoadSignetWallet))?;
 
         l1w.sync()
             .await
-            .map_err(|e| OneOf::new(InternalError::SyncSignetWallet(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::SyncSignetWallet))?;
 
         let balance = l1w.balance();
         println!("Total: {}", balance.total());
@@ -46,12 +46,12 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) -> Resul
 
     if let NetworkType::Strata = network_type {
         let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)
-            .map_err(|e| OneOf::new(InternalError::LoadStrataWallet(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::LoadStrataWallet))?;
         println!("Getting balance...");
         let raw_balance = l2w
             .get_balance(l2w.default_signer_address())
             .await
-            .map_err(|e| OneOf::new(InternalError::FetchStrataBalance(format!("{e:?}"))))?;
+            .map_err(internal_err(InternalError::FetchStrataBalance))?;
         let sats = (raw_balance / U256::from(SATS_TO_WEI))
             .try_into()
             .expect("to fit into u64");
