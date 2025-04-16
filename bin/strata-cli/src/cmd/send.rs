@@ -72,7 +72,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
                 .map_err(|e| OneOf::new(InternalError::SignSignetTxn(format!("{e:?}"))))?;
             let tx = psbt
                 .extract_tx()
-                .map_err(|e| OneOf::new(InternalError::ExtractSignetTxn(format!("{e:?}"))))?;
+                .map_err(|e| OneOf::new(InternalError::FinalizeSignetTxn(format!("{e:?}"))))?;
             settings
                 .signet_backend
                 .broadcast_tx(&tx)

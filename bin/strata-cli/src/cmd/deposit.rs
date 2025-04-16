@@ -69,7 +69,7 @@ pub async fn deposit(
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
     let recovery_address_pk = recovery_address
         .extract_p2tr_pubkey()
-        .map_err(|e| OneOf::new(InternalError::ExtractP2trPubkey(format!("{e:?}"))))?;
+        .map_err(|e| OneOf::new(InternalError::NotTaprootAddress(format!("{e:?}"))))?;
     l1w.persist()
         .map_err(|e| OneOf::new(InternalError::PersistSignetWallet(format!("{e:?}"))))?;
 
@@ -87,7 +87,7 @@ pub async fn deposit(
 
     let (bridge_in_desc, _recovery_script, _recovery_script_hash) =
         bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
-            .map_err(|e| OneOf::new(InternalError::GenerateBridgeInDescriptor(format!("{e:?}"))))?;
+            .map_err(|e| OneOf::new(InternalError::NotTaprootAddress(format!("{e:?}"))))?;
 
     let desc = bridge_in_desc
         .clone()
