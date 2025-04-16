@@ -52,9 +52,9 @@ jobs:
           echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
           echo  "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.7
+        uses: mozilla-actions/sccache-action@v0.0.8
         with:
-          version: "v0.8.1" # sccache version
+          version: "v0.10.0" # sccache version
 
       - run: cargo hack check --locked
 
