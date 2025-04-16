@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum UserInputError {
     /// Invalid `signet` address
-    #[error("Invalid faucet url. Ensure faucet URL is correct in config file.")]
+    #[error("Invalid faucet URL. Ensure faucet URL is correct in config file.")]
     InvalidFaucetUrl,
 
     /// Invalid `signet` address
@@ -91,13 +91,13 @@ pub enum InternalError {
     #[error("Failed to finalize transaction from PSBT: {0}")]
     FinalizeSignetTxn(String),
 
-    /// Provided address is not a Taproot (P2TR) address
+    /// Provided address is not a taproot (P2TR) address
     #[error("Not a taproot (P2TR) address: {0}")]
     NotTaprootAddress(String),
 
     /// Failed to fetch PoW challenge from faucet
     #[error("Failed to fetch PoW challenge from faucet: {0}")]
-    FectFaucetPowChallenge(String),
+    FetchFaucetPowChallenge(String),
 
     /// Failed to fetch strata wallet balance
     #[error("Failed to fetch strata balance: {0}")]
@@ -155,7 +155,7 @@ pub enum InternalError {
     #[error("Failed to scan signet wallet: {0}")]
     ScanSignetWallet(String),
 
-    /// Failed to sign signet trasaction
+    /// Failed to sign signet transaction
     #[error("Failed to sign signet transaction: {0}")]
     SignSignetTxn(String),
 

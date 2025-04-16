@@ -94,7 +94,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<
         .get(endpoint)
         .send()
         .await
-        .map_err(|e| OneOf::new(InternalError::FectFaucetPowChallenge(format!("{e:?}"))))?
+        .map_err(|e| OneOf::new(InternalError::FetchFaucetPowChallenge(format!("{e:?}"))))?
         .json::<PowChallenge>()
         .await
         .map_err(|e| OneOf::new(InternalError::ParseFaucetResponse(format!("{e:?}"))))?;
