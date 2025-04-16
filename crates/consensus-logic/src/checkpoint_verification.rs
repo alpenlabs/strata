@@ -1,7 +1,7 @@
 //! General handling around checkpoint verification.
 
 use strata_crypto::groth16_verifier::verify_rollup_groth16_proof_receipt;
-use strata_primitives::params::*;
+use strata_primitives::{params::*, proof::RollupVerifyingKey};
 use strata_state::{batch::*, client_state::L1Checkpoint};
 use tracing::*;
 use zkaleido::{ProofReceipt, ZkVmError, ZkVmResult};
@@ -88,24 +88,28 @@ pub fn verify_proof(
 
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
-    if rollup_params.proof_publish_mode.allow_empty()
-        && proof_receipt.proof().is_empty()
-        && proof_receipt.public_values().is_empty()
-    {
-        warn!(%checkpoint_idx, "verifying empty proof as correct");
-        return Ok(());
+    let allow_empty = rollup_params.proof_publish_mode.allow_empty();
+    let accept_empty_proof = proof_receipt.proof().is_empty() && allow_empty;
+    let skip_public_param_check = proof_receipt.public_values().is_empty() && allow_empty;
+    let is_non_native_vk = !matches!(rollup_vk, RollupVerifyingKey::NativeVerifyingKey(_));
+
+    if !skip_public_param_check {
+        let expected_public_output = *checkpoint.batch_transition();
+        let actual_public_output: BatchTransition =
+            borsh::from_slice(proof_receipt.public_values().as_bytes())
+                .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
+
+        if expected_public_output != actual_public_output {
+            dbg!(actual_public_output, expected_public_output);
+            return Err(ZkVmError::ProofVerificationError(
+                "Public output mismatch during proof verification".to_string(),
+            ));
+        }
     }
 
-    let expected_public_output = *checkpoint.batch_transition();
-    let actual_public_output: BatchTransition =
-        borsh::from_slice(proof_receipt.public_values().as_bytes())
-            .map_err(|e| ZkVmError::OutputExtractionError { source: e.into() })?;
-
-    if expected_public_output != actual_public_output {
-        dbg!(actual_public_output, expected_public_output);
-        return Err(ZkVmError::ProofVerificationError(
-            "Public output mismatch during proof verification".to_string(),
-        ));
+    if accept_empty_proof && is_non_native_vk {
+        warn!(%checkpoint_idx, "verifying empty proof as correct");
+        return Ok(());
     }
 
     verify_rollup_groth16_proof_receipt(proof_receipt, &rollup_vk)
