@@ -1,4 +1,3 @@
-use terrors::OneOf;
 use thiserror::Error;
 
 /// Errors from CLI commands
