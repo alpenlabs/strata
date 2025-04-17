@@ -8,7 +8,6 @@ use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
-use terrors::OneOf;
 
 use crate::{
     errors::{internal_err, user_err, CliError, InternalError, UserInputError},
@@ -66,7 +65,7 @@ impl fmt::Display for Chain {
 }
 
 pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = args.network_type.parse().map_err(OneOf::new)?;
+    let network_type = args.network_type.parse()?;
 
     let (address, claim): (String, &str) = match network_type {
         NetworkType::Signet => {

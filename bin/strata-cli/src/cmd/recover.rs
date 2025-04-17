@@ -4,7 +4,6 @@ use bdk_wallet::{
 };
 use chrono::Utc;
 use colored::Colorize;
-use terrors::OneOf;
 
 use crate::{
     constants::RECOVERY_DESC_CLEANUP_DELAY,
@@ -39,10 +38,7 @@ pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) -> Resul
         Ok(tip) => tip.height,
         Err(e) => {
             eprintln!("DEBUG: get_chain_tip failed: {:?}", e);
-            return Err(OneOf::new(InternalError::GetSignetChainTip(format!(
-                "{:?}",
-                e
-            ))));
+            return Err(internal_err(InternalError::GetSignetChainTip)(e));
         }
     };
 

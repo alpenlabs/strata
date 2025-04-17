@@ -8,7 +8,6 @@ use alloy::{
 };
 use argh::FromArgs;
 use bdk_wallet::bitcoin::{Address, Amount};
-use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
@@ -43,7 +42,7 @@ pub struct SendArgs {
 }
 
 pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = args.network_type.parse().map_err(OneOf::new)?;
+    let network_type = args.network_type.parse()?;
 
     match network_type {
         NetworkType::Signet => {
@@ -90,7 +89,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
             let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)
                 .map_err(internal_err(InternalError::LoadStrataWallet))?;
             let address = StrataAddress::from_str(&args.address)
-                .map_err(|_| OneOf::new(UserInputError::InvalidStrataAddress))?;
+                .map_err(|_| user_err(UserInputError::InvalidStrataAddress))?;
             let tx = TransactionRequest::default()
                 .with_to(address)
                 .with_value(U256::from(args.amount as u128 * SATS_TO_WEI));

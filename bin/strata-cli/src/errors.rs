@@ -1,6 +1,18 @@
 use terrors::OneOf;
 use thiserror::Error;
 
+/// Errors from CLI commands
+#[derive(Debug, Error)]
+pub enum CliError {
+    /// Errors the user can take action to address
+    #[error("Invalid input: {0}")]
+    UserInputError(#[from] UserInputError),
+
+    /// Errors that occur while handling user requests
+    #[error("Internal error: {0}")]
+    InternalError(#[from] InternalError),
+}
+
 /// Errors related to user input
 ///
 /// The user can address these providing expected input.
@@ -172,9 +184,6 @@ pub enum InternalError {
     UnexpectedFaucetResponse(String),
 }
 
-/// Convenience type for one or both error types
-pub type CliError = OneOf<(InternalError, UserInputError)>;
-
 /// Convnience function to go from [`InternalError`] to [`CliError`].
 /// We are including the original error message.
 pub fn internal_err<E, F>(f: F) -> impl FnOnce(E) -> CliError
@@ -182,10 +191,10 @@ where
     E: std::fmt::Debug,
     F: FnOnce(String) -> InternalError,
 {
-    move |e| OneOf::new(f(format!("{e:?}")))
+    move |e| CliError::InternalError(f(format!("{e:?}")))
 }
 
 /// Convnience function to go from [`UserInputError`] to [`CliError`].
 pub fn user_err(variant: UserInputError) -> CliError {
-    OneOf::new(variant)
+    CliError::UserInputError(variant)
 }

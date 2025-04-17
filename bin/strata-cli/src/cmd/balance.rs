@@ -4,7 +4,6 @@ use alloy::{
 };
 use argh::FromArgs;
 use bdk_wallet::bitcoin::Amount;
-use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
@@ -26,7 +25,7 @@ pub struct BalanceArgs {
 }
 
 pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = args.network_type.parse().map_err(OneOf::new)?;
+    let network_type = args.network_type.parse()?;
 
     if let NetworkType::Signet = network_type {
         let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())

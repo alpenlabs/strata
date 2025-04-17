@@ -1,7 +1,6 @@
 use alloy::providers::WalletProvider;
 use argh::FromArgs;
 use bdk_wallet::KeychainKind;
-use terrors::OneOf;
 
 use crate::{
     errors::{internal_err, CliError, InternalError},
@@ -22,7 +21,7 @@ pub struct ReceiveArgs {
 }
 
 pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = args.network_type.parse().map_err(OneOf::new)?;
+    let network_type = args.network_type.parse()?;
 
     let address = match network_type {
         NetworkType::Signet => {
