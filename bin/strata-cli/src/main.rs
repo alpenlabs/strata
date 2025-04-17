@@ -41,7 +41,7 @@ async fn main() {
     if let Commands::Reset(args) = cmd {
         let result = reset(args, persister, settings).await;
         if let Err(e) = result {
-            eprintln!("Error: {e}");
+            eprintln!("{e}");
             std::process::exit(1);
         };
         return;
@@ -70,7 +70,7 @@ async fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {e}");
+        eprintln!("{e}");
         std::process::exit(1);
     }
 }
