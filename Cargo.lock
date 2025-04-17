@@ -13500,7 +13500,6 @@ version = "0.3.0"
 dependencies = [
  "aes-gcm-siv",
  "alloy",
- "anyhow",
  "argh",
  "argon2",
  "async-trait",

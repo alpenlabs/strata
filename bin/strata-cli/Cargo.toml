@@ -20,7 +20,6 @@ alloy = { version = "0.3.5", features = [
   "providers",
   "rpc-types",
 ] }
-anyhow.workspace = true
 argh.workspace = true
 argon2 = "0.5.3"
 async-trait.workspace = true
