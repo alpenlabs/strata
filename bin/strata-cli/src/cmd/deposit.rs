@@ -149,7 +149,7 @@ pub async fn deposit(
 
     let tx = psbt
         .extract_tx()
-        .map_err(internal_err(InternalError::BroadcastSignetTxn))?;
+        .map_err(internal_err(InternalError::FinalizeSignetTxn))?;
 
     let pb = ProgressBar::new_spinner().with_message("Saving output descriptor");
     pb.enable_steady_tick(Duration::from_millis(100));
