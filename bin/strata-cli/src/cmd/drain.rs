@@ -105,7 +105,7 @@ pub async fn drain(
             .value(U256::from(1));
 
         let gas_price = l2w.get_gas_price().await.unwrap();
-        let gas_estimate = l2w.estimate_gas(&estimate_tx).await.unwrap();
+        let gas_estimate = l2w.estimate_gas(&estimate_tx).await.unwrap() as u128;
 
         let total_fee = gas_estimate * gas_price;
         let max_send_amount = balance.saturating_sub(U256::from(total_fee));

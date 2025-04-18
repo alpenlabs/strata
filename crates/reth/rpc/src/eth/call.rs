@@ -5,7 +5,7 @@ use reth_provider::ProviderHeader;
 use reth_revm::primitives::{BlockEnv, TxEnv};
 use reth_rpc_eth_api::{
     helpers::{estimate::EstimateCall, Call, EthCall, LoadBlock, LoadState, SpawnBlocking},
-    FromEthApiError, FullEthApiTypes, IntoEthApiError,
+    FromEthApiError, FromEvmError, FullEthApiTypes, IntoEthApiError,
 };
 use reth_rpc_eth_types::{revm_utils::CallFees, EthApiError, RpcInvalidTransactionError};
 
@@ -28,7 +28,10 @@ where
 
 impl<N> Call for StrataEthApi<N>
 where
-    Self: LoadState<Evm: ConfigureEvm<Header = ProviderHeader<Self::Provider>>> + SpawnBlocking,
+    Self: LoadState<
+            Evm: ConfigureEvm<Header = ProviderHeader<Self::Provider>, TxEnv = TxEnv>,
+            Error: FromEvmError<Self::Evm>,
+        > + SpawnBlocking,
     Self::Error: From<EthApiError>,
     N: StrataNodeCore,
 {

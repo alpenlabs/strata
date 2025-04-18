@@ -28,7 +28,7 @@ use reth_rpc_eth_api::{
         AddDevSigners, EthApiSpec, EthFees, EthSigner, EthState, LoadBlock, LoadFee, LoadState,
         SpawnBlocking, Trace,
     },
-    EthApiTypes, RpcNodeCore, RpcNodeCoreExt,
+    EthApiTypes, FromEvmError, RpcNodeCore, RpcNodeCoreExt,
 };
 use reth_rpc_eth_types::{EthApiError, EthStateCache, FeeHistoryCache, GasPriceOracle};
 use reth_tasks::{
@@ -240,6 +240,7 @@ where
                 Header = ProviderHeader<Self::Provider>,
                 Transaction = ProviderTx<Self::Provider>,
             >,
+            Error: FromEvmError<Self::Evm>,
         >,
     N: StrataNodeCore,
 {
@@ -321,7 +322,7 @@ impl StrataEthApiBuilder {
             blocking_task_pool,
             ctx.new_fee_history_cache(),
             ctx.evm_config.clone(),
-            ctx.executor.clone(),
+            Box::new(ctx.executor.clone()),
             ctx.config.proof_permits,
         );
 

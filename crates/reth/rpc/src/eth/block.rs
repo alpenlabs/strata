@@ -2,13 +2,13 @@
 
 use alloy_consensus::BlockHeader;
 use alloy_rpc_types_eth::{BlockId, TransactionReceipt};
-use reth_chainspec::{ChainSpec, ChainSpecProvider};
+use reth_chainspec::{ChainSpec, ChainSpecProvider, EthChainSpec};
 use reth_node_api::BlockBody;
 use reth_primitives::{Receipt, TransactionMeta, TransactionSigned};
 use reth_provider::{BlockReader, HeaderProvider};
 use reth_rpc_eth_api::{
     helpers::{EthBlocks, LoadBlock, LoadPendingBlock, LoadReceipt, SpawnBlocking},
-    RpcReceipt,
+    RpcNodeCore, RpcReceipt,
 };
 use reth_rpc_eth_types::{EthApiError, EthReceiptBuilder};
 
@@ -36,6 +36,10 @@ where
             let block_hash = block.hash();
             let excess_blob_gas = block.excess_blob_gas();
             let timestamp = block.timestamp();
+            let blob_params = self
+                .provider()
+                .chain_spec()
+                .blob_params_at_timestamp(timestamp);
 
             return block
                 .body()
@@ -45,7 +49,7 @@ where
                 .enumerate()
                 .map(|(idx, (tx, receipt))| {
                     let meta = TransactionMeta {
-                        tx_hash: tx.hash(),
+                        tx_hash: *tx.hash(),
                         index: idx as u64,
                         block_hash,
                         block_number,
@@ -53,8 +57,8 @@ where
                         excess_blob_gas,
                         timestamp,
                     };
-
-                    EthReceiptBuilder::new(tx, meta, receipt, &receipts)
+                    // TODO: fix blob params.
+                    EthReceiptBuilder::new(tx, meta, receipt, &receipts, blob_params)
                         .map(|builder| builder.build())
                 })
                 .collect::<Result<Vec<_>, Self::Error>>()

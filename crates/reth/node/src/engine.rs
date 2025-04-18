@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
 use alloy_rpc_types::engine::{
-    ExecutionPayload, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
-    ExecutionPayloadSidecar, ExecutionPayloadV1, PayloadError,
+    ExecutionPayload, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadV1,
+    PayloadError,
 };
-use reth::rpc::compat::engine::payload::block_to_payload;
+use reth::primitives::SealedBlock;
 use reth_chainspec::ChainSpec;
 use reth_node_api::{
     payload::PayloadTypes, validate_version_specific_fields, AddOnsContext, BuiltPayload,
     EngineApiMessageVersion, EngineObjectValidationError, EngineTypes, EngineValidator,
-    NodePrimitives, PayloadOrAttributes, PayloadValidator,
+    ExecutionData, NodePrimitives, PayloadOrAttributes, PayloadValidator,
 };
 use reth_node_builder::{rpc::EngineValidatorBuilder, FullNodeComponents, NodeTypesWithEngine};
 use reth_payload_validator::ExecutionPayloadValidator;
-use reth_primitives::{Block, SealedBlockFor};
+use reth_primitives::Block;
 use serde::{Deserialize, Serialize};
 
 use super::payload::{StrataBuiltPayload, StrataPayloadBuilderAttributes};
@@ -40,17 +40,20 @@ where
         + TryInto<ExecutionPayloadEnvelopeV3>
         + TryInto<ExecutionPayloadEnvelopeV4>,
 {
+    type ExecutionData = ExecutionData;
     type ExecutionPayloadEnvelopeV1 = ExecutionPayloadV1;
     type ExecutionPayloadEnvelopeV2 = StrataExecutionPayloadEnvelopeV2;
     type ExecutionPayloadEnvelopeV3 = ExecutionPayloadEnvelopeV3;
     type ExecutionPayloadEnvelopeV4 = ExecutionPayloadEnvelopeV4;
 
     fn block_to_payload(
-        block: SealedBlockFor<
+        block: SealedBlock<
             <<Self::BuiltPayload as BuiltPayload>::Primitives as NodePrimitives>::Block,
         >,
-    ) -> (ExecutionPayload, ExecutionPayloadSidecar) {
-        block_to_payload(block)
+    ) -> ExecutionData {
+        let (payload, sidecar) =
+            ExecutionPayload::from_block_unchecked(block.hash(), &block.into_block());
+        ExecutionData { payload, sidecar }
     }
 }
 
@@ -86,19 +89,19 @@ impl StrataEngineValidator {
 
 impl PayloadValidator for StrataEngineValidator {
     type Block = Block;
+    type ExecutionData = ExecutionData;
 
     fn ensure_well_formed_payload(
         &self,
-        payload: ExecutionPayload,
-        sidecar: ExecutionPayloadSidecar,
-    ) -> Result<SealedBlockFor<Self::Block>, PayloadError> {
-        self.inner.ensure_well_formed_payload(payload, sidecar)
+        payload: ExecutionData,
+    ) -> Result<SealedBlock<Self::Block>, PayloadError> {
+        self.inner.ensure_well_formed_payload(payload)
     }
 }
 
 impl<T> EngineValidator<T> for StrataEngineValidator
 where
-    T: EngineTypes<PayloadAttributes = StrataPayloadAttributes>,
+    T: EngineTypes<PayloadAttributes = StrataPayloadAttributes, ExecutionData = ExecutionData>,
 {
     fn validate_version_specific_fields(
         &self,

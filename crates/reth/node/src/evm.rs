@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
+use reth::revm::primitives::EVMError;
 use reth_chainspec::ChainSpec;
-use reth_evm::{env::EvmEnv, ConfigureEvm, ConfigureEvmEnv, NextBlockEnvAttributes};
-use reth_node_ethereum::EthEvmConfig;
+use reth_evm::{env::EvmEnv, ConfigureEvm, ConfigureEvmEnv, Database, NextBlockEnvAttributes};
+use reth_evm_ethereum::{EthEvm, EthEvmConfig};
 use reth_primitives::{Header, TransactionSigned};
-use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
-use revm_primitives::{Address, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv};
+use revm::{inspector_handle_register, EvmBuilder};
+use revm_primitives::{Address, CfgEnvWithHandlerCfg, HaltReason, HandlerCfg, TxEnv};
 use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
@@ -30,63 +31,74 @@ impl StrataEvmConfig {
 impl ConfigureEvmEnv for StrataEvmConfig {
     type Header = Header;
     type Transaction = TransactionSigned;
-    type Error = core::convert::Infallible;
+    type Error = std::convert::Infallible;
+    type TxEnv = TxEnv;
+    type Spec = revm_primitives::SpecId;
 
-    fn fill_cfg_env(&self, cfg_env: &mut CfgEnvWithHandlerCfg, header: &Self::Header) {
-        self.inner.fill_cfg_env(cfg_env, header);
+    fn tx_env(&self, transaction: &Self::Transaction, signer: Address) -> Self::TxEnv {
+        self.inner.tx_env(transaction, signer)
     }
 
-    fn fill_tx_env(&self, tx_env: &mut TxEnv, transaction: &TransactionSigned, sender: Address) {
-        self.inner.fill_tx_env(tx_env, transaction, sender);
+    fn evm_env(&self, header: &Self::Header) -> EvmEnv<Self::Spec> {
+        self.inner.evm_env(header)
     }
 
-    fn fill_tx_env_system_contract_call(
-        &self,
-        env: &mut Env,
-        caller: Address,
-        contract: Address,
-        data: Bytes,
-    ) {
-        self.inner
-            .fill_tx_env_system_contract_call(env, caller, contract, data);
-    }
-
-    fn next_cfg_and_block_env(
+    fn next_evm_env(
         &self,
         parent: &Self::Header,
         attributes: NextBlockEnvAttributes,
-    ) -> Result<EvmEnv, Self::Error> {
-        self.inner.next_cfg_and_block_env(parent, attributes)
+    ) -> Result<EvmEnv<Self::Spec>, Self::Error> {
+        self.inner.next_evm_env(parent, attributes)
     }
 }
 
 impl ConfigureEvm for StrataEvmConfig {
-    type DefaultExternalContext<'a> = ();
+    type Evm<'a, DB: Database + 'a, I: 'a> = EthEvm<'a, I, DB>;
+    type EvmError<DBError: core::error::Error + Send + Sync + 'static> = EVMError<DBError>;
+    type HaltReason = HaltReason;
 
-    fn evm<DB: Database>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
+    fn evm_with_env<DB: Database>(
+        &self,
+        db: DB,
+        evm_env: EvmEnv<Self::Spec>,
+    ) -> Self::Evm<'_, DB, ()> {
+        let cfg_env_with_handler_cfg = CfgEnvWithHandlerCfg {
+            cfg_env: evm_env.cfg_env,
+            handler_cfg: HandlerCfg::new(evm_env.spec),
+        };
+
         EvmBuilder::default()
             .with_db(db)
-            // add additional precompiles
+            .with_cfg_env_with_handler_cfg(cfg_env_with_handler_cfg)
+            .with_block_env(evm_env.block_env)
             .append_handler_register(set_evm_handles)
             .build()
+            .into()
     }
 
-    fn evm_with_inspector<DB, I>(&self, db: DB, inspector: I) -> Evm<'_, I, DB>
+    fn evm_with_env_and_inspector<DB, I>(
+        &self,
+        db: DB,
+        evm_env: EvmEnv<Self::Spec>,
+        inspector: I,
+    ) -> Self::Evm<'_, DB, I>
     where
         DB: Database,
-        I: GetInspector<DB>,
+        I: revm::GetInspector<DB>,
     {
+        let cfg_env_with_handler_cfg = CfgEnvWithHandlerCfg {
+            cfg_env: evm_env.cfg_env,
+            handler_cfg: HandlerCfg::new(evm_env.spec),
+        };
+
         EvmBuilder::default()
             .with_db(db)
             .with_external_context(inspector)
-            // add additional precompiles
+            .with_cfg_env_with_handler_cfg(cfg_env_with_handler_cfg)
+            .with_block_env(evm_env.block_env)
             .append_handler_register(set_evm_handles)
             .append_handler_register(inspector_handle_register)
             .build()
-    }
-
-    #[doc = " Provides the default external context."]
-    fn default_external_context<'a>(&self) -> Self::DefaultExternalContext<'a> {
-        self.inner.default_external_context()
+            .into()
     }
 }
