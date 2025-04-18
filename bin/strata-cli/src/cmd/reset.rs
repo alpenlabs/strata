@@ -2,7 +2,11 @@ use argh::FromArgs;
 use colored::Colorize;
 use dialoguer::Confirm;
 
-use crate::{seed::EncryptedSeedPersister, settings::Settings};
+use crate::{
+    errors::{internal_err, CliError, InternalError},
+    seed::EncryptedSeedPersister,
+    settings::Settings,
+};
 
 /// DANGER: resets the CLI completely, destroying all keys and databases.
 /// Keeps config.
@@ -14,7 +18,11 @@ pub struct ResetArgs {
     assume_yes: bool,
 }
 
-pub async fn reset(args: ResetArgs, persister: impl EncryptedSeedPersister, settings: Settings) {
+pub async fn reset(
+    args: ResetArgs,
+    persister: impl EncryptedSeedPersister,
+    settings: Settings,
+) -> Result<(), CliError> {
     let confirm = if args.assume_yes {
         true
     } else {
@@ -22,13 +30,18 @@ pub async fn reset(args: ResetArgs, persister: impl EncryptedSeedPersister, sett
         Confirm::new()
             .with_prompt("Do you REALLY want to continue?")
             .interact()
-            .unwrap()
+            .map_err(internal_err(InternalError::ReadConfirmation))?
     };
 
     if confirm {
-        persister.delete().unwrap();
+        persister
+            .delete()
+            .map_err(internal_err(InternalError::DeleteSeed))?;
         println!("Wiped seed");
-        std::fs::remove_dir_all(settings.data_dir.clone()).unwrap();
+        std::fs::remove_dir_all(settings.data_dir.clone())
+            .map_err(internal_err(InternalError::DeleteDataDirectory))?;
         println!("Wiped data directory");
     }
+
+    Ok(())
 }

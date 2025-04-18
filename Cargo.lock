@@ -13523,6 +13523,7 @@ dependencies = [
  "sled",
  "strata-primitives",
  "terrors",
+ "thiserror 2.0.11",
  "tokio",
  "zeroize",
  "zxcvbn",

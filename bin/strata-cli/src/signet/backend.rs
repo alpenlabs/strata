@@ -44,8 +44,12 @@ macro_rules! boxed_err {
     };
 }
 
-type BoxedInner = dyn Debug + Send + Sync;
-type BoxedErr = Box<BoxedInner>;
+pub(crate) type BoxedInner = dyn Debug + Send + Sync;
+pub(crate) type BoxedErr = Box<BoxedInner>;
+
+#[derive(Debug)]
+pub struct UpdateError(BoxedErr);
+boxed_err!(UpdateError);
 
 #[derive(Debug)]
 pub struct SyncError(BoxedErr);

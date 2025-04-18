@@ -10,7 +10,8 @@ use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
 use crate::{
-    net_type::{net_type_or_exit, NetworkType},
+    errors::{internal_err, user_err, CliError, InternalError, UserInputError},
+    net_type::NetworkType,
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
@@ -63,37 +64,39 @@ impl fmt::Display for Chain {
     }
 }
 
-pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
-    let network_type = net_type_or_exit(&args.network_type);
+pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
+    let network_type = args.network_type.parse()?;
 
-    let (address, claim) = match network_type {
-        NetworkType::Signet => (
-            resolve_signet_address(&args, &seed, &settings).to_string(),
-            "claim_l1",
-        ),
-        NetworkType::Strata => (
-            resolve_strata_address(&args, &seed, &settings).to_string(),
-            "claim_l2",
-        ),
+    let (address, claim): (String, &str) = match network_type {
+        NetworkType::Signet => {
+            let addr = resolve_signet_address(&args, &seed, &settings)?;
+            (addr.to_string(), "claim_l1")
+        }
+        NetworkType::Strata => {
+            let addr = resolve_strata_address(&args, &seed, &settings)?;
+            (addr.to_string(), "claim_l2")
+        }
     };
 
     println!("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
-    let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
-    let endpoint = {
-        let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
-        base.join(&format!("/pow_challenge/{}", chain)).unwrap()
-    };
+    let base = Url::from_str(&settings.faucet_endpoint)
+        .map_err(|_| user_err(UserInputError::InvalidFaucetUrl))?;
+    let chain = Chain::from_network_type(network_type.clone())
+        .map_err(|_| user_err(UserInputError::UnsupportedNetwork))?;
+    let endpoint = base
+        .join(&format!("/pow_challenge/{chain}"))
+        .expect("a valid URL");
 
     let challenge = client
         .get(endpoint)
         .send()
         .await
-        .unwrap()
+        .map_err(internal_err(InternalError::FetchFaucetPowChallenge))?
         .json::<PowChallenge>()
         .await
-        .expect("invalid response");
+        .map_err(internal_err(InternalError::ParseFaucetResponse))?;
     println!(
         "Received POW challenge with difficulty 2^{} from faucet: {:?}. Solving...",
         challenge.difficulty, challenge.nonce
@@ -131,15 +134,24 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         encode(&solution.to_le_bytes()),
         address
     );
-    let res = client.get(url).send().await.unwrap();
+    let res = client
+        .get(url)
+        .send()
+        .await
+        .map_err(internal_err(InternalError::ClaimFromFaucet))?;
 
     let status = res.status();
-    let body = res.text().await.expect("invalid response");
+    let body = res
+        .text()
+        .await
+        .map_err(internal_err(InternalError::UnexpectedFaucetResponse))?;
     if status == StatusCode::OK {
         println!("Faucet claim successfully queued. The funds should appear in your wallet soon.",);
     } else {
         println!("Failed: faucet responded with {status}: {body}");
     }
+
+    Ok(())
 }
 
 fn count_leading_zeros(data: &[u8]) -> u8 {
@@ -158,7 +170,7 @@ fn resolve_signet_address(
     args: &FaucetArgs,
     seed: &Seed,
     settings: &Settings,
-) -> bdk_wallet::bitcoin::Address {
+) -> Result<bdk_wallet::bitcoin::Address, CliError> {
     let mut l1w =
         SignetWallet::new(seed, settings.network, settings.signet_backend.clone()).unwrap();
 
@@ -166,16 +178,15 @@ fn resolve_signet_address(
         None => {
             let address_info = l1w.reveal_next_address(KeychainKind::External);
             l1w.persist().unwrap();
-            address_info.address
+            Ok(address_info.address)
         }
-        Some(address) => {
-            let address = Address::from_str(address).unwrap_or_else(|_| {
-                eprintln!("Invalid signet address provided as argument.");
-                std::process::exit(1);
-            });
-            address
+        Some(a) => {
+            let address = Address::from_str(a)
+                .map_err(|_| user_err(UserInputError::InvalidSignetAddress))?
                 .require_network(settings.network)
-                .expect("wrong bitcoin network")
+                .map_err(|_| user_err(UserInputError::WrongNetwork))?;
+
+            Ok(address)
         }
     }
 }
@@ -184,16 +195,15 @@ fn resolve_strata_address(
     args: &FaucetArgs,
     seed: &Seed,
     settings: &Settings,
-) -> alloy::primitives::Address {
+) -> Result<alloy::primitives::Address, CliError> {
     let l2w = StrataWallet::new(seed, &settings.strata_endpoint).unwrap();
 
     match &args.address {
-        Some(address) => StrataAddress::from_str(address).unwrap_or_else(|_| {
-            eprintln!(
-                "Invalid strata address provided as argument - must be an EVM-compatible address."
-            );
-            std::process::exit(1);
-        }),
-        None => l2w.default_signer_address(),
+        Some(a) => {
+            let address = StrataAddress::from_str(a)
+                .map_err(|_| user_err(UserInputError::InvalidStrataAddress))?;
+            Ok(address)
+        }
+        None => Ok(l2w.default_signer_address()),
     }
 }
