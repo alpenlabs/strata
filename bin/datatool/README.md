@@ -33,7 +33,7 @@ Alternatively, instead of passing `-f`, you can pass `-E` and define either
 
 ## Generating VerifyingKey
 
-Before proceeding, make sure that you have SP1 correctly set up by following the installation instructions provided [here](https://docs.succinct.xyz/getting-started/install.html)
+Before proceeding, make sure that you have SP1 correctly set up by following the installation instructions provided [here](https://docs.succinct.xyz/docs/sp1/getting-started/install)
 
 To ensure that the RollupParams contain the correct verifying key, build the binary in release mode and confirm that SP1 is set up correctly by following its installation instructions.
 
