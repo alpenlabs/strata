@@ -303,7 +303,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         reth_authrpc_port = reth.get_prop("rpc_port")
 
         bitcoind = btc_fac.create_regtest_bitcoin()
-        # wait for services to to startup
+        # wait for services to startup
         time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
 
         brpc = bitcoind.create_rpc()
