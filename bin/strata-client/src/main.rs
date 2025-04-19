@@ -279,7 +279,7 @@ fn do_startup_checks(
             info!("startup: last l2 block is synced")
         }
         Ok(false) => {
-            // Current chain tip tip block is not known by the EL.
+            // Current chain tip block is not known by the EL.
             warn!(%chain_tip, "missing expected EVM block");
             sync_chainstate_to_el(storage, engine)?;
         }
