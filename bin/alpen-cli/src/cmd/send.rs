@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use alloy::{
     network::TransactionBuilder,
-    primitives::{Address as StrataAddress, U256},
+    primitives::{Address as AlpenAddress, U256},
     providers::Provider,
     rpc::types::TransactionRequest,
 };
@@ -10,20 +10,20 @@ use argh::FromArgs;
 use bdk_wallet::bitcoin::{Address, Amount};
 
 use crate::{
+    alpen::AlpenWallet,
     constants::SATS_TO_WEI,
     link::{OnchainObject, PrettyPrint},
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, SignetWallet},
-    strata::StrataWallet,
 };
 
 /// Send some bitcoin from the internal wallet.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "send")]
 pub struct SendArgs {
-    /// either "signet" or "strata"
+    /// either "signet" or "alpen"
     #[argh(positional)]
     network_type: String,
 
@@ -81,7 +81,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) {
                     .pretty(),
             );
         }
-        NetworkType::Strata => {
+        NetworkType::Alpen => {
             let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).expect("valid wallet");
             let address = StrataAddress::from_str(&args.address).unwrap_or_else(|_| {
                 eprintln!(

@@ -1,17 +1,17 @@
 [package]
 edition = "2021"
-name = "strata-reth"
+name = "alpen-reth"
 version = "0.1.0"
 
 [[bin]]
-name = "strata-reth"
+name = "alpen-reth"
 path = "src/main.rs"
 
 [dependencies]
-strata-reth-db.workspace = true
-strata-reth-exex.workspace = true
-strata-reth-node.workspace = true
-strata-reth-rpc.workspace = true
+alpen-reth-db.workspace = true
+alpen-reth-exex.workspace = true
+alpen-reth-node.workspace = true
+alpen-reth-rpc.workspace = true
 
 alloy-genesis.workspace = true
 alloy-rpc-types.workspace = true

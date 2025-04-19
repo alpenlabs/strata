@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
+use alloy::{primitives::Address as AlpenAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
     bitcoin::{taproot::LeafVersion, Address, ScriptBuf, TapNodeHash, XOnlyPublicKey},
@@ -16,26 +16,26 @@ use make_buf::make_buf;
 use strata_primitives::constants::RECOVER_DELAY;
 
 use crate::{
+    alpen::AlpenWallet,
     constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, SignetWallet},
-    strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
 
 /// Magic bytes to attach to the deposit request.
 pub const MAGIC_BYTES: &[u8] = r"alpen".as_bytes();
 
-/// Deposit 10 BTC from signet to Strata. If an address is not provided, the wallet's internal
-/// Strata address will be used.
+/// Deposit 10 BTC from signet to Alpen. If an address is not provided, the wallet's internal
+/// Alpen address will be used.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "deposit")]
 pub struct DepositArgs {
     #[argh(positional)]
-    strata_address: Option<String>,
+    alpen_address: Option<String>,
 
     /// override signet fee rate in sat/vbyte. must be >=1
     #[argh(option)]
@@ -44,28 +44,28 @@ pub struct DepositArgs {
 
 pub async fn deposit(
     DepositArgs {
-        strata_address,
+        alpen_address,
         fee_rate,
     }: DepositArgs,
     seed: Seed,
     settings: Settings,
 ) {
-    let requested_strata_address =
-        strata_address.map(|a| StrataAddress::from_str(&a).expect("bad strata address"));
+    let requested_alpen_address =
+        alpen_address.map(|a| AlpenAddress::from_str(&a).expect("bad alpen address"));
     let mut l1w =
         SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
+    let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint).unwrap();
 
     l1w.sync().await.unwrap();
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
     let recovery_address_pk = recovery_address.extract_p2tr_pubkey().unwrap();
     l1w.persist().unwrap();
 
-    let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
+    let alpen_address = requested_alpen_address.unwrap_or(l2w.default_signer_address());
     println!(
-        "Bridging {} to Strata address {}",
+        "Bridging {} to Alpen address {}",
         BRIDGE_IN_AMOUNT.to_string().green(),
-        strata_address.to_string().cyan(),
+        alpen_address.to_string().cyan(),
     );
 
     println!(
@@ -113,11 +113,11 @@ pub async fn deposit(
     // <strata_address>
     const MBL: usize = MAGIC_BYTES.len();
     const XONLYPK: usize = 32; // X-only PKs are 32-bytes in P2TR SegWit v1 addresses
-    const STRATA_ADDRESS_LEN: usize = 20; // EVM addresses are 20 bytes long
+    const ALPEN_ADDRESS_LEN: usize = 20; // EVM addresses are 20 bytes long
     let op_return_data = make_buf! {
         (MAGIC_BYTES, MBL),
         (&recovery_address_pk.serialize(), XONLYPK),
-        (strata_address.as_slice(), STRATA_ADDRESS_LEN)
+        (alpen_address.as_slice(), ALPEN_ADDRESS_LEN)
     };
 
     let mut psbt = {
@@ -159,7 +159,7 @@ pub async fn deposit(
             .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
             .pretty(),
     );
-    println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Strata.");
+    println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Alpen.");
 }
 
 /// Generates a bridge-in descriptor for a given bridge public key and recovery address.

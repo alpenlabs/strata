@@ -4,7 +4,7 @@ use revm::{
 };
 use revm_primitives::{Bytes, Log, LogData, U256};
 use strata_primitives::bitcoin_bosd::Descriptor;
-use strata_reth_primitives::WithdrawalIntentEvent;
+use alpen_reth_primitives::WithdrawalIntentEvent;
 
 pub use crate::constants::BRIDGEOUT_ADDRESS;
 use crate::utils::wei_to_sats;

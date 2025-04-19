@@ -41,9 +41,9 @@ members = [
 
   # binaries listed separately
   "bin/datatool",
-  "bin/strata-cli",
+  "bin/alpen-cli",
   "bin/strata-client",
-  "bin/strata-reth",
+  "bin/alpen-reth",
   "bin/strata-sequencer-client",
   "bin/prover-client",
   "bin/prover-perf",
@@ -56,7 +56,7 @@ members = [
 default-members = [
   "bin/datatool",
   "bin/prover-client",
-  "bin/strata-reth",
+  "bin/alpen-reth",
   "bin/strata-client",
   "bin/strata-sequencer-client",
   "crates/util/python-utils",
@@ -65,6 +65,12 @@ default-members = [
 resolver = "2"
 
 [workspace.dependencies]
+alpen-reth-db = { path = "crates/reth/db" }
+alpen-reth-evm = { path = "crates/reth/evm" }
+alpen-reth-exex = { path = "crates/reth/exex" }
+alpen-reth-node = { path = "crates/reth/node" }
+alpen-reth-primitives = { path = "crates/reth/primitives" }
+alpen-reth-rpc = { path = "crates/reth/rpc" }
 strata-btcio = { path = "crates/btcio" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }
@@ -83,12 +89,6 @@ strata-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }
 strata-proofimpl-cl-stf = { path = "crates/proof-impl/cl-stf" }
 strata-proofimpl-evm-ee-stf = { path = "crates/proof-impl/evm-ee-stf" }
 strata-prover-client-rpc-api = { path = "crates/rpc/prover-client-api" }
-strata-reth-db = { path = "crates/reth/db" }
-strata-reth-evm = { path = "crates/reth/evm" }
-strata-reth-exex = { path = "crates/reth/exex" }
-strata-reth-node = { path = "crates/reth/node" }
-strata-reth-primitives = { path = "crates/reth/primitives" }
-strata-reth-rpc = { path = "crates/reth/rpc" }
 strata-rocksdb = { path = "crates/rocksdb-store" }
 strata-rpc-api = { path = "crates/rpc/api" }
 strata-rpc-types = { path = "crates/rpc/types" }
