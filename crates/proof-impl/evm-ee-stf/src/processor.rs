@@ -300,6 +300,8 @@ impl EvmProcessor<InMemoryDB> {
                 continue;
             }
 
+            println!("Processing account: {:?}", address);
+
             let state_trie_index = keccak(address);
 
             // Remove from state trie if it has been deleted.

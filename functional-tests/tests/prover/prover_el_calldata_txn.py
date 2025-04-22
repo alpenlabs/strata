@@ -1,5 +1,4 @@
 import flexitest
-from solcx import install_solc, set_solc_version
 from web3 import Web3
 
 from envs import testenv
@@ -8,14 +7,11 @@ from utils import (
     wait_for_proof_with_time_out,
     wait_until_with_value,
 )
-from utils.transaction import SmartContracts
 
 
 @flexitest.register
-class ElBlockhashOpcodeTest(testenv.StrataTester):
+class ElCalldataTransactionProofTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
-        install_solc(version="0.8.16")
-        set_solc_version("0.8.16")
         ctx.set_env("prover")
 
     def main(self, ctx: flexitest.RunContext):
@@ -28,15 +24,14 @@ class ElBlockhashOpcodeTest(testenv.StrataTester):
         web3: Web3 = reth.create_web3()
         web3.eth.default_account = web3.address
 
-        # Deploy the contract
-        abi, bytecode = SmartContracts.compile_contract("BlockhashOpCode.sol", "BlockhashOpCode")
-        contract = web3.eth.contract(abi=abi, bytecode=bytecode)
-        tx_hash = contract.constructor().transact()
-        tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
-
-        # Call the contract function
-        contract_instance = web3.eth.contract(abi=abi, address=tx_receipt.contractAddress)
-        tx_hash = contract_instance.functions.updateBlockHash().transact()
+        # Create a random address and calldata
+        random_address = Web3.to_checksum_address("0x" + "dead" * 10)
+        calldata = Web3.to_hex(text="Hello, Alpen!")[2:]  # remove '0x' prefix
+        tx = {
+            "to": random_address,
+            "data": calldata,
+        }
+        tx_hash = web3.eth.send_transaction(tx)
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
 
         # Prove the corresponding EE block
@@ -63,8 +58,5 @@ class ElBlockhashOpcodeTest(testenv.StrataTester):
 
         task_id = task_ids[0]
         self.debug(f"Using task ID: {task_id}")
-
-        lastBlockHash = contract_instance.functions.lastBlockHash().call()
-        self.debug(f"lastBlockHash: {type(lastBlockHash)} {lastBlockHash.hex()}")
 
         assert wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)
