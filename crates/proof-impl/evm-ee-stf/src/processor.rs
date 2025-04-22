@@ -29,7 +29,6 @@ use reth_primitives_traits::{constants::MINIMUM_GAS_LIMIT, SignedTransaction};
 use revm::{
     db::{AccountState, InMemoryDB},
     interpreter::Host,
-    precompile::{PrecompileSpecId, Precompiles},
     primitives::{SpecId, TransactTo, TxEnv},
     Database, DatabaseCommit, Evm,
 };
@@ -37,14 +36,11 @@ use revm_primitives::{
     alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
     Account,
 };
-use strata_reth_evm::{
-    constants::{BRIDGEOUT_ADDRESS, SCHNORR_ADDRESS},
-    set_evm_handles,
-};
+use strata_reth_evm::set_evm_handles;
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},
-    EvmBlockStfInput, EVM_CONFIG,
+    EvmBlockStfInput,
 };
 
 /// The divisor for the gas limit bound.
@@ -281,7 +277,6 @@ impl EvmProcessor<InMemoryDB> {
     /// Process all state changes and finalize the header's state root.
     pub fn finalize(&mut self) {
         let db = self.db.take().expect("DB not initialized");
-        let precompiles = Precompiles::new(PrecompileSpecId::from_spec_id(EVM_CONFIG.spec_id));
 
         let mut state_trie = mem::take(&mut self.input.pre_state_trie);
         for (address, account) in &db.accounts {
@@ -289,19 +284,7 @@ impl EvmProcessor<InMemoryDB> {
             if account.account_state == AccountState::None {
                 continue;
             }
-
-            // Ignore Ethereum stateless precompiles
-            if precompiles.contains(address) {
-                continue;
-            }
-
-            // Ignore strata stateless precompiles
-            if address == &BRIDGEOUT_ADDRESS || address == &SCHNORR_ADDRESS {
-                continue;
-            }
-
             println!("Processing account: {:?}", address);
-
             let state_trie_index = keccak(address);
 
             // Remove from state trie if it has been deleted.
@@ -310,9 +293,24 @@ impl EvmProcessor<InMemoryDB> {
                 continue;
             }
 
+            let mut state_account = StateAccount {
+                nonce: account.info.nonce,
+                balance: account.info.balance,
+                storage_root: Default::default(),
+                code_hash: account.info.code_hash,
+            };
+
+            // Skip insert if the account is empty.
+            if state_account.is_account_empty() {
+                println!("Accoint {:?} {:?} is empty", address, account);
+                continue;
+            } else {
+                println!("Account {:?} {:?} is not empty", address, account);
+            }
+
             // Update storage root for account.
             let state_storage = &account.storage;
-            let storage_root = {
+            state_account.storage_root = {
                 let (storage_trie, _) = self.input.pre_state_storage.get_mut(address).unwrap();
                 // If the account has been cleared, clear the storage trie.
                 if account.account_state == AccountState::StorageCleared {
@@ -332,13 +330,6 @@ impl EvmProcessor<InMemoryDB> {
                 }
 
                 storage_trie.hash()
-            };
-
-            let state_account = StateAccount {
-                nonce: account.info.nonce,
-                balance: account.info.balance,
-                storage_root,
-                code_hash: account.info.code_hash,
             };
 
             state_trie
