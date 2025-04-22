@@ -284,7 +284,6 @@ impl EvmProcessor<InMemoryDB> {
             if account.account_state == AccountState::None {
                 continue;
             }
-            println!("Processing account: {:?}", address);
             let state_trie_index = keccak(address);
 
             // Remove from state trie if it has been deleted.
@@ -302,10 +301,7 @@ impl EvmProcessor<InMemoryDB> {
 
             // Skip insert if the account is empty.
             if state_account.is_account_empty() {
-                println!("Accoint {:?} {:?} is empty", address, account);
                 continue;
-            } else {
-                println!("Account {:?} {:?} is not empty", address, account);
             }
 
             // Update storage root for account.
