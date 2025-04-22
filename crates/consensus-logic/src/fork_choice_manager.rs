@@ -3,6 +3,7 @@
 use std::{collections::VecDeque, sync::Arc};
 
 use strata_chaintsn::transition::process_block;
+use strata_common::retry::{policies::ExponentialBackoff, retry_with_backoff};
 use strata_db::{errors::DbError, traits::BlockStatus, types::CheckpointConfStatus};
 use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::{
@@ -32,6 +33,8 @@ use crate::{
     tip_update::{compute_tip_update, TipUpdate},
     unfinalized_tracker::{self, UnfinalizedBlockTracker},
 };
+
+const ENGINE_CALL_MAX_RETRIES: u16 = 4;
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
 pub struct ForkChoiceManager {
@@ -416,6 +419,11 @@ enum FcmEvent {
     Abort,
 }
 
+enum FcmError {
+    EngineError(String),
+    Other(String),
+}
+
 fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
     shutdown: &ShutdownGuard,
     handle: Handle,
@@ -571,9 +579,15 @@ fn handle_new_block(
     // actually have a well-formed accessory and it gets mad at us.
     if slot > 0 {
         let exec_hash = bundle.header().exec_payload_hash();
-        let eng_payload = ExecPayloadData::from_l2_block_bundle(bundle);
         debug!(?blkid, ?exec_hash, "submitting execution payload");
-        let res = engine.submit_payload(eng_payload)?;
+        let eng_payload = ExecPayloadData::from_l2_block_bundle(bundle);
+
+        let res = retry_with_backoff(
+            "engine_submit_payload",
+            ENGINE_CALL_MAX_RETRIES,
+            &ExponentialBackoff::default(),
+            || engine.submit_payload(eng_payload.clone()),
+        )?;
 
         // If the payload is invalid then we should write the full block as
         // being invalid and return too.
@@ -620,7 +634,12 @@ fn handle_new_block(
             // Also this is the point at which we update the engine head and
             // safe blocks.  We only have to actually call this one, it counts
             // for both.
-            engine.update_safe_block(tip_blkid)?;
+            retry_with_backoff(
+                "engine_update_safe_block",
+                ENGINE_CALL_MAX_RETRIES,
+                &ExponentialBackoff::default(),
+                || engine.update_safe_block(tip_blkid),
+            )?;
 
             Ok(true)
         }
@@ -1016,8 +1035,13 @@ fn handle_epoch_finalization(
         "got new CSM state, updating finalized block"
     );
 
-    // TODO error checking here ?
-    engine.update_finalized_block(*next_finalizable_epoch.last_blkid())?;
+    // Try calling engine with retries.
+    retry_with_backoff(
+        "engine_update_finalized",
+        ENGINE_CALL_MAX_RETRIES,
+        &ExponentialBackoff::default(),
+        || engine.update_finalized_block(*next_finalizable_epoch.last_blkid()),
+    )?;
 
     let fin_report = fcm_state
         .chain_tracker

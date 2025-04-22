@@ -13,21 +13,6 @@ use super::Backoff;
 ///   `multiplier_base = 100` represents a 1.5× multiplier.
 /// - `multiplier_base`: The denominator of the backoff multiplier. Used in conjunction with
 ///   `multiplier` to scale the delay after each retry.
-///
-/// # Example
-///
-/// ```
-/// use std::time::Duration;
-///
-/// let backoff = ExponentialBackoff {
-///     base_delay_ms: 1000,
-///     multiplier: 150,
-///     multiplier_base: 100,
-/// };
-///
-/// // This represents a backoff that starts at 1000ms,
-/// // and grows by 1.5x each retry: 1000ms → 1500ms → 2250ms → ...
-/// ```
 pub struct ExponentialBackoff {
     /// Initial delay before the first retry, in milliseconds.
     base_delay_ms: u64,
@@ -46,6 +31,13 @@ impl ExponentialBackoff {
             base_delay_ms,
             multiplier,
             multiplier_base,
+        }
+    }
+
+    pub fn new_with_default_multiplier(base_delay_ms: u64) -> Self {
+        Self {
+            base_delay_ms,
+            ..Default::default()
         }
     }
 }
