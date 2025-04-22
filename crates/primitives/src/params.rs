@@ -138,7 +138,7 @@ impl RollupParams {
 /// Configuration common among deposit and deposit request transaction
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
 pub struct DepositTxParams {
-    /// Magic bytes we use to regonize a deposit with.
+    /// Magic bytes we use to recognize a deposit with.
     pub magic_bytes: Vec<u8>,
 
     /// Maximum EE address length.
