@@ -44,21 +44,21 @@ jobs:
       program: ${{ matrix.program }}
       sp1_value: ${{ steps.extract-sp1-value.outputs.sp1_value }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
       - name: Configure AWS ECR Details
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
         with:
           role-to-assume: ${{ secrets.AWS_ECR_ROLE }}
           aws-region: us-east-1
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2
         with:
           mask-password: "true"
       - name: Set up Clang
-        uses: egor-tensin/setup-clang@v1
+        uses: egor-tensin/setup-clang@ef434b41eb33a70396fb336b1bae39c76d740c3d # v1
         with:
           version: latest
           platform: x64
@@ -130,7 +130,7 @@ jobs:
     environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'development') }}
     steps:
       - name: Set up SSH for private repo access
-        uses: webfactory/ssh-agent@v0.9.1
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
           ssh-private-key: ${{ secrets.DEPLOYMENTS_REPO_WRITE }}
       - name: Clone deployments repo (specific branch)
