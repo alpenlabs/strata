@@ -12,7 +12,7 @@ from utils.transaction import SmartContracts
 
 
 @flexitest.register
-class ElBlockhashOpcodeTest(testenv.StrataTester):
+class ElSelfDestructContractTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         install_solc(version="0.8.16")
         set_solc_version("0.8.16")
@@ -29,20 +29,25 @@ class ElBlockhashOpcodeTest(testenv.StrataTester):
         web3.eth.default_account = web3.address
 
         # Deploy the contract
-        abi, bytecode = SmartContracts.compile_contract("BlockhashOpCode.sol", "BlockhashOpCode")
+        abi, bytecode = SmartContracts.compile_contract("SelfDestruct.sol", "SelfDestruct")
         contract = web3.eth.contract(abi=abi, bytecode=bytecode)
         tx_hash = contract.constructor().transact()
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
 
         # Call the contract function
         contract_instance = web3.eth.contract(abi=abi, address=tx_receipt.contractAddress)
-        tx_hash = contract_instance.functions.updateBlockHash().transact()
-        tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
+        tx_hash = contract_instance.functions.updateState().transact()
+        web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
+
+        # Call the contract function
+        contract_instance = web3.eth.contract(abi=abi, address=tx_receipt.contractAddress)
+        tx_hash = contract_instance.functions.destroyContract().transact()
+        tx_receipt_2 = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
 
         # Prove the corresponding EE block
         ee_prover_params = {
             "start_block": tx_receipt["blockNumber"] - 1,
-            "end_block": tx_receipt["blockNumber"] + 1,
+            "end_block": tx_receipt_2["blockNumber"] + 1,
         }
 
         # Wait until the end EE block is generated.
@@ -63,8 +68,5 @@ class ElBlockhashOpcodeTest(testenv.StrataTester):
 
         task_id = task_ids[0]
         self.debug(f"Using task ID: {task_id}")
-
-        lastBlockHash = contract_instance.functions.lastBlockHash().call()
-        self.debug(f"lastBlockHash: {type(lastBlockHash)} {lastBlockHash.hex()}")
 
         assert wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)

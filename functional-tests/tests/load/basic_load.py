@@ -35,4 +35,4 @@ class BasicLoadGenerationTest(testenv.StrataTester):
         self.debug(f"using task id: {task_id}")
         assert task_id is not None
 
-        wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)
+        assert wait_for_proof_with_time_out(prover_client_rpc, task_id, time_out=30)

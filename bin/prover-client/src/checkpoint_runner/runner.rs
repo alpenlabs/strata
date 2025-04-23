@@ -58,7 +58,7 @@ async fn process_checkpoint(
 
     let cur = runner_state.current_checkpoint_idx;
     if !should_update_checkpoint(cur, fetched_ckpt) {
-        warn!(fetched = %fetched_ckpt, ?cur, "fetched checkpoint is not newer than current");
+        info!(fetched = %fetched_ckpt, ?cur, "fetched checkpoint is not newer than current");
         return Ok(());
     }
 

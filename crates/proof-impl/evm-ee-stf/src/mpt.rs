@@ -64,6 +64,12 @@ pub struct StateAccount {
     pub code_hash: B256,
 }
 
+impl StateAccount {
+    pub fn is_account_empty(&self) -> bool {
+        self.nonce == 0 && self.balance.is_zero() && self.code_hash == KECCAK_EMPTY
+    }
+}
+
 impl Default for StateAccount {
     /// Provides default values for a [StateAccount].
     ///
