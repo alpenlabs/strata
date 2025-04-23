@@ -1,4 +1,6 @@
-use std::io::ErrorKind;
+use std::io::{
+    ErrorKind, {self},
+};
 
 use argh::FromArgs;
 use colored::Colorize;

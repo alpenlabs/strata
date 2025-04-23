@@ -1,3 +1,5 @@
+use std::io::{self};
+
 use argh::FromArgs;
 use rand_core::OsRng;
 use terrors::OneOf;
