@@ -23,6 +23,8 @@ use zeroize::Zeroizing;
 use crate::constants::{
     AES_NONCE_LEN, AES_TAG_LEN, BIP44_STRATA_EVM_WALLET_PATH, PW_SALT_LEN, SEED_LEN,
 };
+#[cfg(not(target_os = "linux"))]
+use crate::errors::{NoStorageAccess, PlatformFailure};
 
 pub struct BaseWallet(LoadParams, CreateParams);
 
@@ -232,7 +234,6 @@ pub fn load_or_create(
 }
 
 #[cfg(not(target_os = "linux"))]
-use crate::errors::{NoStorageAccess, PlatformFailure};
 type PersisterErr = OneOf<(PlatformFailure, NoStorageAccess)>;
 
 #[cfg(target_os = "linux")]
