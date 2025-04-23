@@ -89,12 +89,6 @@ pub struct NoEntry;
 #[allow(unused)]
 pub struct BadEncoding(Vec<u8>);
 
-impl BadEncoding {
-    pub fn new(inner: Vec<u8>) -> Self {
-        Self(inner)
-    }
-}
-
 /// This indicates that one of the entry's credential attributes exceeded a length limit in the
 /// underlying platform. The attached values give the name of the attribute and the platform length
 /// limit that was exceeded.
@@ -103,12 +97,6 @@ impl BadEncoding {
 pub struct TooLong {
     name: String,
     limit: u32,
-}
-
-impl TooLong {
-    pub fn new(name: String, limit: u32) -> Self {
-        Self { name, limit }
-    }
 }
 
 /// This indicates that one of the entry's required credential attributes was invalid. The attached
@@ -120,23 +108,11 @@ pub struct Invalid {
     reason: String,
 }
 
-impl Invalid {
-    pub fn new(name: String, reason: String) -> Self {
-        Self { name, reason }
-    }
-}
-
 /// This indicates that there is more than one credential found in the store that matches the entry.
 /// Its value is a vector of the matching credentials.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Ambiguous(Vec<Box<Credential>>);
-
-impl Ambiguous {
-    pub fn new(inner: Vec<Box<Credential>>) -> Self {
-        Self(inner)
-    }
-}
 
 #[cfg(not(target_os = "linux"))]
 type KeyRingErrors = (
@@ -154,10 +130,10 @@ fn keyring_oneof(err: keyring::Error) -> OneOf<KeyRingErrors> {
         Error::PlatformFailure(error) => OneOf::new(PlatformFailure::new(error)),
         Error::NoStorageAccess(error) => OneOf::new(NoStorageAccess::new(error)),
         Error::NoEntry => OneOf::new(NoEntry),
-        Error::BadEncoding(vec) => OneOf::new(BadEncoding::new(vec)),
-        Error::TooLong(name, limit) => OneOf::new(TooLong::new(name, limit)),
-        Error::Invalid(name, reason) => OneOf::new(Invalid::new(name, reason)),
-        Error::Ambiguous(vec) => OneOf::new(Ambiguous::new(vec)),
+        Error::BadEncoding(vec) => OneOf::new(BadEncoding(vec)),
+        Error::TooLong(name, limit) => OneOf::new(TooLong { name, limit }),
+        Error::Invalid(name, reason) => OneOf::new(Invalid { name, reason }),
+        Error::Ambiguous(vec) => OneOf::new(Ambiguous(vec)),
         _ => todo!(),
     }
 }
