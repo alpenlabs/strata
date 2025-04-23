@@ -1,5 +1,3 @@
-use std::io::ErrorKind;
-
 use argh::FromArgs;
 use colored::Colorize;
 use dialoguer::Confirm;
@@ -53,12 +51,7 @@ async fn reset_inner(
     if confirm {
         persister.delete().map_err(OneOf::broaden)?;
         println!("Wiped seed");
-        std::fs::remove_dir_all(settings.data_dir.clone()).map_err(|e| match e.kind() {
-            ErrorKind::PermissionDenied | ErrorKind::NotFound => {
-                OneOf::new(NoStorageAccess::new(e))
-            }
-            _ => OneOf::new(PlatformFailure::new(e)),
-        })?;
+        std::fs::remove_dir_all(settings.data_dir.clone()).map_err(OneOf::new)?;
         println!("Wiped data directory");
     }
 
