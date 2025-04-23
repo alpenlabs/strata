@@ -1,12 +1,10 @@
-#[cfg(target_os = "linux")]
-use std::io;
-
 use argh::FromArgs;
 use rand_core::OsRng;
 use terrors::OneOf;
 
+#[cfg(not(target_os = "linux"))]
+use crate::errors::{NoStorageAccess, PlatformFailure};
 use crate::{
-    errors::{NoStorageAccess, PlatformFailure},
     handle_or_exit,
     seed::{password::Password, EncryptedSeedPersister, Seed},
 };
@@ -18,7 +16,7 @@ pub struct ChangePwdArgs {}
 
 /// Errors that can occur when changing seed encryption password
 #[cfg(target_os = "linux")]
-pub(crate) type ChangePasswordError = OneOf<(io::Error, dialoguer::Error, argon2::Error)>;
+pub(crate) type ChangePasswordError = OneOf<(std::io::Error, dialoguer::Error, argon2::Error)>;
 
 #[cfg(not(target_os = "linux"))]
 pub(crate) type ChangePasswordError = OneOf<(

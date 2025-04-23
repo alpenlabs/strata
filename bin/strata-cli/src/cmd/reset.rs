@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use std::io;
 use std::io::ErrorKind;
 
 use argh::FromArgs;
@@ -7,12 +5,9 @@ use colored::Colorize;
 use dialoguer::Confirm;
 use terrors::OneOf;
 
-use crate::{
-    errors::{NoStorageAccess, PlatformFailure},
-    handle_or_exit,
-    seed::EncryptedSeedPersister,
-    settings::Settings,
-};
+#[cfg(not(target_os = "linux"))]
+use crate::errors::{NoStorageAccess, PlatformFailure};
+use crate::{handle_or_exit, seed::EncryptedSeedPersister, settings::Settings};
 
 /// DANGER: resets the CLI completely, destroying all keys and databases.
 /// Keeps config.
