@@ -1,10 +1,8 @@
 use argh::FromArgs;
 use bip39::Language;
+use terrors::OneOf;
 
-use crate::{
-    errors::{user_err, CliError, UserInputError},
-    seed::Seed,
-};
+use crate::{errors::UnsupportedLanguage, handle_or_exit, seed::Seed};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "backup")]
@@ -18,7 +16,14 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
-pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), CliError> {
+/// Errors that can occur when printing the BIP39 mnemonic
+pub(crate) type BackupError = OneOf<(UnsupportedLanguage,)>;
+
+pub async fn backup(args: BackupArgs, seed: Seed) {
+    handle_or_exit!(backup_inner(args, seed).await);
+}
+
+async fn backup_inner(args: BackupArgs, seed: Seed) -> Result<(), BackupError> {
     let language = match args.language {
         Some(s) => s,
         None => "en".to_owned(),
@@ -33,7 +38,7 @@ pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), CliError> {
         "jp" => Language::Japanese,
         "kr" => Language::Korean,
         "es" => Language::Spanish,
-        _ => return Err(user_err(UserInputError::UnsupportedLanguage)),
+        _ => return Err(OneOf::new(UnsupportedLanguage(language)))?,
     };
     seed.print_mnemonic(language);
     Ok(())

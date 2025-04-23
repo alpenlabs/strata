@@ -231,6 +231,8 @@ pub fn load_or_create(
     }
 }
 
+use crate::errors::{NoStorageAccess, PlatformFailure};
+
 #[cfg(not(target_os = "linux"))]
 type PersisterErr = OneOf<(PlatformFailure, NoStorageAccess)>;
 #[cfg(target_os = "linux")]

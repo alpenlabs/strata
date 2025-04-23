@@ -1,9 +1,13 @@
+use std::io::ErrorKind;
+
 use argh::FromArgs;
 use colored::Colorize;
 use dialoguer::Confirm;
+use terrors::OneOf;
 
 use crate::{
-    errors::{internal_err, CliError, InternalError},
+    errors::{NoStorageAccess, PlatformFailure},
+    handle_or_exit,
     seed::EncryptedSeedPersister,
     settings::Settings,
 };
@@ -18,11 +22,27 @@ pub struct ResetArgs {
     assume_yes: bool,
 }
 
-pub async fn reset(
+/// Errors that can occur when resetting the CLI
+#[cfg(target_os = "linux")]
+pub(crate) type ResetError = OneOf<(std::io::Error, dialoguer::Error, argon2::Error)>;
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) type ResetError = OneOf<(
+    PlatformFailure,
+    NoStorageAccess,
+    dialoguer::Error,
+    std::io::Error,
+)>;
+
+pub async fn reset(args: ResetArgs, persister: impl EncryptedSeedPersister, settings: Settings) {
+    handle_or_exit!(reset_inner(args, persister, settings).await);
+}
+
+async fn reset_inner(
     args: ResetArgs,
     persister: impl EncryptedSeedPersister,
     settings: Settings,
-) -> Result<(), CliError> {
+) -> Result<(), ResetError> {
     let confirm = if args.assume_yes {
         true
     } else {
@@ -30,16 +50,18 @@ pub async fn reset(
         Confirm::new()
             .with_prompt("Do you REALLY want to continue?")
             .interact()
-            .map_err(internal_err(InternalError::ReadConfirmation))?
+            .map_err(OneOf::new)?
     };
 
     if confirm {
-        persister
-            .delete()
-            .map_err(internal_err(InternalError::DeleteSeed))?;
+        persister.delete().map_err(OneOf::broaden)?;
         println!("Wiped seed");
-        std::fs::remove_dir_all(settings.data_dir.clone())
-            .map_err(internal_err(InternalError::DeleteDataDirectory))?;
+        std::fs::remove_dir_all(settings.data_dir.clone()).map_err(|e| match e.kind() {
+            ErrorKind::PermissionDenied | ErrorKind::NotFound => {
+                OneOf::new(NoStorageAccess::new(e))
+            }
+            _ => OneOf::new(PlatformFailure::new(e)),
+        })?;
         println!("Wiped data directory");
     }
 

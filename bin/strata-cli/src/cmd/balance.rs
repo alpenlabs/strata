@@ -4,10 +4,12 @@ use alloy::{
 };
 use argh::FromArgs;
 use bdk_wallet::bitcoin::Amount;
+use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{internal_err, CliError, InternalError},
+    errors::{InvalidStrataEndpoint, SignetWalletError, StrataWalletError, UnsupportedNetwork},
+    handle_or_exit,
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -24,16 +26,34 @@ pub struct BalanceArgs {
     network_type: String,
 }
 
-pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) -> Result<(), CliError> {
-    let network_type = args.network_type.parse()?;
+/// Errors that can occur when querying wallet balance
+pub(crate) type BalanceError = OneOf<(
+    SignetWalletError,
+    StrataWalletError,
+    InvalidStrataEndpoint,
+    UnsupportedNetwork,
+)>;
+
+pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) {
+    handle_or_exit!(balance_inner(args, seed, settings).await);
+}
+
+async fn balance_inner(
+    args: BalanceArgs,
+    seed: Seed,
+    settings: Settings,
+) -> Result<(), BalanceError> {
+    let network_type = args.network_type.parse().map_err(OneOf::new)?;
 
     if let NetworkType::Signet = network_type {
         let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-            .map_err(internal_err(InternalError::LoadSignetWallet))?;
+            .map_err(|e| {
+            BalanceError::new(SignetWalletError::new("Failed to load signet wallet", e))
+        })?;
 
-        l1w.sync()
-            .await
-            .map_err(internal_err(InternalError::SyncSignetWallet))?;
+        l1w.sync().await.map_err(|e| {
+            BalanceError::new(SignetWalletError::new("failed to sync signet wallet", e))
+        })?;
 
         let balance = l1w.balance();
         println!("Total: {}", balance.total());
@@ -44,13 +64,14 @@ pub async fn balance(args: BalanceArgs, seed: Seed, settings: Settings) -> Resul
     }
 
     if let NetworkType::Strata = network_type {
-        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)
-            .map_err(internal_err(InternalError::LoadStrataWallet))?;
+        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).map_err(BalanceError::new)?;
         println!("Getting balance...");
         let raw_balance = l2w
             .get_balance(l2w.default_signer_address())
             .await
-            .map_err(internal_err(InternalError::FetchStrataBalance))?;
+            .map_err(|e| {
+                BalanceError::new(StrataWalletError::new("Failed to fetch strata balance", e))
+            })?;
         let sats = (raw_balance / U256::from(SATS_TO_WEI))
             .try_into()
             .expect("to fit into u64");

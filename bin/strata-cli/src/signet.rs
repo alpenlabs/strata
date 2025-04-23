@@ -10,7 +10,7 @@ use std::{
     sync::Arc,
 };
 
-use backend::{BoxedErr, ScanError, SignetBackend, SyncError, UpdateError, WalletUpdate};
+use backend::{ScanError, SignetBackend, SyncError, UpdateError, WalletUpdate};
 use bdk_esplora::esplora_client::{self, AsyncClient};
 use bdk_wallet::{
     bitcoin::{FeeRate, Network},
@@ -21,7 +21,7 @@ use persist::Persister;
 use terrors::OneOf;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
-use crate::seed::Seed;
+use crate::{errors::BoxedErr, seed::Seed};
 
 pub fn log_fee_rate(fr: &FeeRate) {
     println!(

@@ -12,7 +12,7 @@ use alloy::{
     transports::http::{Client, Http},
 };
 
-use crate::seed::Seed;
+use crate::{errors::InvalidStrataEndpoint, seed::Seed};
 
 // alloy moment 💀
 type Provider = FillProvider<
@@ -44,17 +44,18 @@ impl Deref for StrataWallet {
     }
 }
 
-#[derive(Debug)]
-pub struct L2EndpointParseError;
-
 impl StrataWallet {
-    pub fn new(seed: &Seed, l2_http_endpoint: &str) -> Result<Self, L2EndpointParseError> {
+    pub fn new(seed: &Seed, l2_http_endpoint: &str) -> Result<Self, InvalidStrataEndpoint> {
         let wallet = seed.get_strata_wallet();
 
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
-            .on_http(l2_http_endpoint.parse().map_err(|_| L2EndpointParseError)?);
+            .on_http(
+                l2_http_endpoint
+                    .parse()
+                    .map_err(|_| InvalidStrataEndpoint(l2_http_endpoint.to_string()))?,
+            );
         Ok(Self(provider))
     }
 }

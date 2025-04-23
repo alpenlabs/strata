@@ -25,27 +25,36 @@ use terrors::OneOf;
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::EsploraClient;
+use crate::errors::{BoxedErr, BoxedInner};
 
+#[macro_export]
 macro_rules! boxed_err {
     ($name:ident) => {
         impl std::ops::Deref for $name {
             type Target = BoxedInner;
-
             fn deref(&self) -> &Self::Target {
                 self.0.as_ref()
             }
         }
-
         impl From<BoxedErr> for $name {
             fn from(err: BoxedErr) -> Self {
                 Self(err)
             }
         }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{:?}", self.0)
+            }
+        }
+
+        impl std::error::Error for $name {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                self.0.source()
+            }
+        }
     };
 }
-
-pub(crate) type BoxedInner = dyn Debug + Send + Sync;
-pub(crate) type BoxedErr = Box<BoxedInner>;
 
 #[derive(Debug)]
 pub struct UpdateError(BoxedErr);

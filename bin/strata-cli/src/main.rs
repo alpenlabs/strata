@@ -1,5 +1,6 @@
 pub mod cmd;
 pub mod constants;
+#[macro_use]
 pub mod errors;
 mod link;
 pub mod net_type;
@@ -39,11 +40,7 @@ async fn main() {
     let persister = FilePersister::new(settings.linux_seed_file.clone());
 
     if let Commands::Reset(args) = cmd {
-        let result = reset(args, persister, settings).await;
-        if let Err(e) = result {
-            eprintln!("{e}");
-            std::process::exit(1);
-        };
+        reset(args, persister, settings).await;
         return;
     }
 
@@ -54,7 +51,7 @@ async fn main() {
         std::process::exit(1);
     });
 
-    let result = match cmd {
+    match cmd {
         Commands::Recover(args) => recover(args, seed, settings).await,
         Commands::Drain(args) => drain(args, seed, settings).await,
         Commands::Balance(args) => balance(args, seed, settings).await,
@@ -66,11 +63,6 @@ async fn main() {
         Commands::Receive(args) => receive(args, seed, settings).await,
         Commands::ChangePwd(args) => change_pwd(args, seed, persister).await,
         Commands::Scan(args) => scan(args, seed, settings).await,
-        _ => Ok(()),
-    };
-
-    if let Err(e) = result {
-        eprintln!("{e}");
-        std::process::exit(1);
+        _ => {}
     }
 }
