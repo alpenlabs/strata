@@ -1,16 +1,15 @@
 //! Loads Strata pending block for a RPC response.
 
 use alloy_consensus::{
-    constants::EMPTY_WITHDRAWALS, proofs::calculate_transaction_root, Header, EMPTY_OMMER_ROOT_HASH,
+    constants::EMPTY_WITHDRAWALS, proofs::calculate_transaction_root, Header, Transaction,
+    EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{eip7685::EMPTY_REQUESTS_HASH, merge::BEACON_NONCE, BlockNumberOrTag};
 use alloy_primitives::{B256, U256};
 use reth_chainspec::{EthChainSpec, EthereumHardforks};
 use reth_evm::ConfigureEvm;
-use reth_primitives::{
-    logs_bloom, proofs::calculate_receipt_root_no_memo, BlockBody, Receipt, SealedBlockWithSenders,
-    TransactionSigned,
-};
+use reth_primitives::{logs_bloom, BlockBody, Receipt, TransactionSigned};
+use reth_primitives_traits::block::RecoveredBlock;
 use reth_provider::{
     BlockReader, BlockReaderIdExt, ChainSpecProvider, ProviderBlock, ProviderHeader,
     ProviderReceipt, ProviderTx, ReceiptProvider, StateProviderFactory,
@@ -18,7 +17,7 @@ use reth_provider::{
 use reth_revm::primitives::{BlockEnv, ExecutionResult};
 use reth_rpc_eth_api::{
     helpers::{LoadPendingBlock, SpawnBlocking},
-    EthApiTypes, FromEthApiError, RpcNodeCore,
+    EthApiTypes, FromEthApiError, FromEvmError, RpcNodeCore,
 };
 use reth_rpc_eth_types::{EthApiError, PendingBlock};
 use reth_transaction_pool::{PoolTransaction, TransactionPool};
@@ -32,6 +31,7 @@ where
             NetworkTypes: alloy_network::Network<
                 HeaderResponse = alloy_rpc_types_eth::Header<ProviderHeader<Self::Provider>>,
             >,
+            Error: FromEvmError<Self::Evm>,
         >,
     N: RpcNodeCore<
         Provider: BlockReaderIdExt<
@@ -57,7 +57,13 @@ where
     /// Returns the locally built pending block
     async fn local_pending_block(
         &self,
-    ) -> Result<Option<(SealedBlockWithSenders, Vec<Receipt>)>, Self::Error> {
+    ) -> Result<
+        Option<(
+            RecoveredBlock<ProviderBlock<Self::Provider>>,
+            Vec<ProviderReceipt<Self::Provider>>,
+        )>,
+        Self::Error,
+    > {
         // See: <https://github.com/ethereum-optimism/op-geth/blob/f2e69450c6eec9c35d56af91389a1c47737206ca/miner/worker.go#L367-L375>
         let latest = self
             .provider()
@@ -69,8 +75,7 @@ where
             .provider()
             .block_with_senders(block_id, Default::default())
             .map_err(Self::Error::from_eth_err)?
-            .ok_or(EthApiError::HeaderNotFound(block_id.into()))?
-            .seal_slow();
+            .ok_or(EthApiError::HeaderNotFound(block_id.into()))?;
 
         let receipts = self
             .provider()
@@ -93,7 +98,7 @@ where
         let timestamp = block_env.timestamp.to::<u64>();
 
         let transactions_root = calculate_transaction_root(&transactions);
-        let receipts_root = calculate_receipt_root_no_memo(&receipts.iter().collect::<Vec<_>>());
+        let receipts_root = Receipt::calculate_receipt_root_no_memo(receipts);
 
         let logs_bloom = logs_bloom(receipts.iter().flat_map(|r| &r.logs));
         let is_cancun = chain_spec.is_cancun_active_at_timestamp(timestamp);
