@@ -2,70 +2,6 @@ use keyring::{Credential, Entry, Error};
 use terrors::OneOf;
 
 use super::{EncryptedSeed, EncryptedSeedPersister, PersisterErr};
-use crate::errors::{NoStorageAccess, PlatformFailure};
-
-// below is wrapper around [`keyring::Error`] so it can be used with OneOf to more precisely handle
-// errors
-
-/// This indicates that there is no underlying credential entry in the platform for this entry.
-/// Either one was never set, or it was deleted.
-#[derive(Debug)]
-pub struct NoEntry;
-
-/// This indicates that the retrieved password blob was not a UTF-8 string. The underlying bytes are
-/// available for examination in the attached value.
-#[derive(Debug)]
-#[allow(unused)]
-pub struct BadEncoding(Vec<u8>);
-
-impl BadEncoding {
-    pub fn new(inner: Vec<u8>) -> Self {
-        Self(inner)
-    }
-}
-
-/// This indicates that one of the entry's credential attributes exceeded a length limit in the
-/// underlying platform. The attached values give the name of the attribute and the platform length
-/// limit that was exceeded.
-#[derive(Debug)]
-#[allow(unused)]
-pub struct TooLong {
-    name: String,
-    limit: u32,
-}
-
-impl TooLong {
-    pub fn new(name: String, limit: u32) -> Self {
-        Self { name, limit }
-    }
-}
-
-/// This indicates that one of the entry's required credential attributes was invalid. The attached
-/// value gives the name of the attribute and the reason it's invalid.
-#[derive(Debug)]
-#[allow(unused)]
-pub struct Invalid {
-    name: String,
-    reason: String,
-}
-
-impl Invalid {
-    pub fn new(name: String, reason: String) -> Self {
-        Self { name, reason }
-    }
-}
-
-/// This indicates that there is more than one credential found in the store that matches the entry.
-/// Its value is a vector of the matching credentials.
-#[derive(Debug)]
-#[allow(unused)]
-pub struct Ambiguous(Vec<Box<Credential>>);
-
-impl Ambiguous {
-    pub fn new(inner: Vec<Box<Credential>>) -> Self {
-        Self(inner)
-    }
-}
 
 #[derive(Clone, Copy)]
 pub struct KeychainPersister;
@@ -134,6 +70,71 @@ impl EncryptedSeedPersister for KeychainPersister {
             }
         }
         Ok(())
+    }
+}
+
+use crate::errors::{NoStorageAccess, PlatformFailure};
+
+// below is wrapper around [`keyring::Error`] so it can be used with OneOf to more precisely handle
+// errors
+
+/// This indicates that there is no underlying credential entry in the platform for this entry.
+/// Either one was never set, or it was deleted.
+#[derive(Debug)]
+pub struct NoEntry;
+
+/// This indicates that the retrieved password blob was not a UTF-8 string. The underlying bytes are
+/// available for examination in the attached value.
+#[derive(Debug)]
+#[allow(unused)]
+pub struct BadEncoding(Vec<u8>);
+
+impl BadEncoding {
+    pub fn new(inner: Vec<u8>) -> Self {
+        Self(inner)
+    }
+}
+
+/// This indicates that one of the entry's credential attributes exceeded a length limit in the
+/// underlying platform. The attached values give the name of the attribute and the platform length
+/// limit that was exceeded.
+#[derive(Debug)]
+#[allow(unused)]
+pub struct TooLong {
+    name: String,
+    limit: u32,
+}
+
+impl TooLong {
+    pub fn new(name: String, limit: u32) -> Self {
+        Self { name, limit }
+    }
+}
+
+/// This indicates that one of the entry's required credential attributes was invalid. The attached
+/// value gives the name of the attribute and the reason it's invalid.
+#[derive(Debug)]
+#[allow(unused)]
+pub struct Invalid {
+    name: String,
+    reason: String,
+}
+
+impl Invalid {
+    pub fn new(name: String, reason: String) -> Self {
+        Self { name, reason }
+    }
+}
+
+/// This indicates that there is more than one credential found in the store that matches the entry.
+/// Its value is a vector of the matching credentials.
+#[derive(Debug)]
+#[allow(unused)]
+pub struct Ambiguous(Vec<Box<Credential>>);
+
+impl Ambiguous {
+    pub fn new(inner: Vec<Box<Credential>>) -> Self {
+        Self(inner)
     }
 }
 
