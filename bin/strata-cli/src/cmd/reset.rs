@@ -1,6 +1,6 @@
-use std::io::{
-    ErrorKind, {self},
-};
+#[cfg(target_os = "linux")]
+use std::io;
+use std::io::ErrorKind;
 
 use argh::FromArgs;
 use colored::Colorize;

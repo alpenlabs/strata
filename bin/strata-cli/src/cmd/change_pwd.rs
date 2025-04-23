@@ -1,4 +1,5 @@
-use std::io::{self};
+#[cfg(target_os = "linux")]
+use std::io;
 
 use argh::FromArgs;
 use rand_core::OsRng;
