@@ -5,6 +5,7 @@ use alloy_eips::{
     eip4844::MAX_DATA_GAS_PER_BLOCK, eip7002::WITHDRAWAL_REQUEST_TYPE,
     eip7251::CONSOLIDATION_REQUEST_TYPE, eip7685::Requests, merge::BEACON_NONCE,
 };
+use alpen_reth_evm::collect_withdrawal_intents;
 use reth::{
     builder::{components::PayloadServiceBuilder, BuilderContext, PayloadBuilderConfig},
     providers::{CanonStateSubscriptions, ExecutionOutcome, StateProviderFactory},
@@ -39,7 +40,6 @@ use revm_primitives::{
     calc_excess_blob_gas, BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg,
     InvalidTransaction, ResultAndState, TxEnv, U256,
 };
-use alpen_reth_evm::collect_withdrawal_intents;
 use tracing::{debug, trace, warn};
 
 use crate::{

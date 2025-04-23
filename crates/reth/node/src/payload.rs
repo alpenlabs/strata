@@ -8,6 +8,7 @@ use alloy_rpc_types::{
     },
     Withdrawal,
 };
+use alpen_reth_primitives::WithdrawalIntent;
 use reth::rpc::compat::engine::payload::block_to_payload_v2;
 use reth_chain_state::ExecutedBlock;
 use reth_node_api::{BuiltPayload, PayloadAttributes, PayloadBuilderAttributes};
@@ -15,7 +16,6 @@ use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
 use reth_primitives::{EthPrimitives, SealedBlock};
 use revm_primitives::alloy_primitives::{Address, B256, U256};
 use serde::{Deserialize, Serialize};
-use alpen_reth_primitives::WithdrawalIntent;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct StrataPayloadAttributes {

@@ -4,6 +4,9 @@ use alloy_rpc_types::engine::{
     ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ForkchoiceState, ForkchoiceUpdated,
     JwtSecret, PayloadId,
 };
+use alpen_reth_node::{
+    StrataEngineTypes, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
+};
 use jsonrpsee::http_client::{transport::HttpBackend, HttpClient, HttpClientBuilder};
 #[cfg(test)]
 use mockall::automock;
@@ -11,9 +14,6 @@ use reth_primitives::{Block, SealedBlock, TransactionSigned};
 use reth_rpc_api::{EngineApiClient, EthApiClient};
 use reth_rpc_layer::{AuthClientLayer, AuthClientService};
 use revm_primitives::alloy_primitives::BlockHash;
-use alpen_reth_node::{
-    StrataEngineTypes, StrataExecutionPayloadEnvelopeV2, StrataPayloadAttributes,
-};
 
 fn http_client(http_url: &str, secret: JwtSecret) -> HttpClient<AuthClientService<HttpBackend>> {
     let middleware = tower::ServiceBuilder::new().layer(AuthClientLayer::new(secret));

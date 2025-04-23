@@ -1,10 +1,10 @@
+use alpen_reth_primitives::WithdrawalIntentEvent;
 use revm::{
     primitives::{PrecompileError, PrecompileErrors, PrecompileOutput, PrecompileResult},
     ContextStatefulPrecompile, Database,
 };
 use revm_primitives::{Bytes, Log, LogData, U256};
 use strata_primitives::bitcoin_bosd::Descriptor;
-use alpen_reth_primitives::WithdrawalIntentEvent;
 
 pub use crate::constants::BRIDGEOUT_ADDRESS;
 use crate::utils::wei_to_sats;
