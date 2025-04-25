@@ -5,10 +5,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 
 CHAIN_CONFIGS = {
     "dev": os.path.join(
-        current_dir, "..", "..", "bin", "strata-reth", "res", "alpen-dev-chain.json"
+        current_dir, "..", "..", "bin", "alpen-reth", "res", "alpen-dev-chain.json"
     ),
     "devnet": os.path.join(
-        current_dir, "..", "..", "bin", "strata-reth", "res", "devnet-chain.json"
+        current_dir, "..", "..", "bin", "alpen-reth", "res", "devnet-chain.json"
     ),
 }
 

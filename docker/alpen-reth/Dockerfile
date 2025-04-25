@@ -27,13 +27,13 @@ RUN --mount=type=cache,target=/usr/local/cargo/git \
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cargo build --release --bin strata-reth
+    cargo build --release --bin alpen-reth
 
 
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,sharing=private,target=/app/target \
-    cp /app/target/release/strata-reth /app/strata-reth
+    cp /app/target/release/alpen-reth /app/alpen-reth
 
 FROM ubuntu:24.04 AS runtime
 WORKDIR /app
@@ -45,9 +45,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the built binaries from the builder stage
-COPY --from=builder /app/strata-reth /usr/local/bin/strata-reth
+COPY --from=builder /app/alpen-reth /usr/local/bin/alpen-reth
 
-COPY ./docker/strata-reth/entrypoint.sh entrypoint.sh
+COPY ./docker/alpen-reth/entrypoint.sh entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
 

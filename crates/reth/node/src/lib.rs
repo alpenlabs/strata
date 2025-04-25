@@ -7,10 +7,10 @@ mod payload;
 mod payload_builder;
 
 pub mod args;
+pub use alpen_reth_primitives::WithdrawalIntent;
 pub use engine::{StrataEngineTypes, StrataEngineValidator, StrataPayloadTypes};
 pub use node::StrataEthereumNode;
 pub use payload::{
     ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, StrataExecutionPayloadEnvelopeV2,
     StrataPayloadAttributes,
 };
-pub use strata_reth_primitives::WithdrawalIntent;
