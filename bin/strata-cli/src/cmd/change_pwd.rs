@@ -1,9 +1,10 @@
 use argh::FromArgs;
 use rand_core::OsRng;
 
-#[cfg(not(target_os = "linux"))]
-use crate::errors::{DisplayableError, DisplayedError};
-use crate::seed::{password::Password, EncryptedSeedPersister, Seed};
+use crate::{
+    errors::{DisplayableError, DisplayedError},
+    seed::{password::Password, EncryptedSeedPersister, Seed},
+};
 
 /// Changes the seed's encryption password
 #[derive(FromArgs, PartialEq, Debug)]

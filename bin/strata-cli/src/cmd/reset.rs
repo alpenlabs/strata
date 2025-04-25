@@ -2,9 +2,11 @@ use argh::FromArgs;
 use colored::Colorize;
 use dialoguer::Confirm;
 
-#[cfg(not(target_os = "linux"))]
-use crate::errors::{DisplayableError, DisplayedError};
-use crate::{seed::EncryptedSeedPersister, settings::Settings};
+use crate::{
+    errors::{DisplayableError, DisplayedError},
+    seed::EncryptedSeedPersister,
+    settings::Settings,
+};
 
 /// DANGER: resets the CLI completely, destroying all keys and databases.
 /// Keeps config.
