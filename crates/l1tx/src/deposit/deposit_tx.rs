@@ -1,8 +1,16 @@
 //! parser types for Deposit Tx, and later deposit Request Tx
 
-use bitcoin::{opcodes::all::OP_RETURN, OutPoint, ScriptBuf, Transaction};
+use bitcoin::{
+    hashes::Hash,
+    key::{Secp256k1, TapTweak},
+    opcodes::all::OP_RETURN,
+    sighash::{Prevouts, SighashCache},
+    Amount, OutPoint, ScriptBuf, TapNodeHash, TapSighashType, Transaction, TxOut, XOnlyPublicKey,
+};
+use secp256k1::{schnorr::Signature, Message};
 use strata_primitives::{
-    l1::{DepositInfo, OutputRef},
+    buf::Buf32,
+    l1::{DepositInfo, OutputRef, XOnlyPk},
     prelude::DepositTxParams,
 };
 
@@ -40,6 +48,10 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
         vout: 0, // deposit must always exist in the first output
     });
 
+    // Check if it was signed off by the operators and hence verify that this is just not someone
+    // else sending bitcoin to N-of-N address.
+    validate_deposit_signature(tx, &tag_data, config)?;
+
     // Construct and return the DepositInfo
     Some(DepositInfo {
         deposit_idx: tag_data.deposit_idx,
@@ -49,9 +61,60 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
     })
 }
 
+/// Validate that the transaction has been signed off by the N of N operators pubkey.
+fn validate_deposit_signature(
+    tx: &Transaction,
+    tag_data: &DepositTag<'_>,
+    dep_config: &DepositTxParams,
+) -> Option<()> {
+    // --- Initialize necessary variables and dependencies
+    let secp = Secp256k1::verification_only();
+
+    // --- Extract and validate input signature
+    let input = tx.input[0].clone();
+    let sig_bytes = &input.witness[0];
+    let schnorr_sig = Signature::from_slice(&sig_bytes[..64]).unwrap(); // TODO: enforce length?
+
+    // --- Parse the internal pubkey and merkle root
+    let internal_pubkey = XOnlyPk::from_address(&dep_config.address).ok()?;
+    let mut hash_bytes = [0; 32];
+    hash_bytes.copy_from_slice(tag_data.tapscript_root.as_bytes());
+    let merkle_root: TapNodeHash = TapNodeHash::from_byte_array(hash_bytes);
+
+    let int_key = XOnlyPublicKey::from_slice(internal_pubkey.inner().as_bytes()).unwrap();
+    // --- Compute the tweaked output key
+    let (output_key, _) = int_key.tap_tweak(&secp, Some(merkle_root));
+
+    // --- Build the scriptPubKey for the UTXO
+    let script_pubkey = ScriptBuf::new_p2tr(&secp, int_key, Some(merkle_root));
+
+    let utxo = TxOut {
+        value: Amount::from_sat(tag_data.amount),
+        script_pubkey,
+    };
+
+    // --- Compute the sighash
+    let prevout = Prevouts::One(0, utxo);
+    let sighash = SighashCache::new(tx)
+        .taproot_key_spend_signature_hash(0, &prevout, TapSighashType::Default)
+        .unwrap();
+
+    // --- Prepare the message for signature verification
+    let mut digest = [0; 32];
+    digest.copy_from_slice(sighash.as_byte_array());
+    let msg = Message::from_digest(digest);
+
+    // --- Verify the Schnorr signature
+    secp.verify_schnorr(&schnorr_sig, &msg, &output_key.to_inner())
+        .ok()
+}
+
 struct DepositTag<'buf> {
     deposit_idx: u32,
     dest_buf: &'buf [u8],
+    // TODO: better naming
+    amount: u64,
+    tapscript_root: Buf32,
 }
 
 /// extracts the EE address given that the script is OP_RETURN type and contains the Magic Bytes
@@ -114,6 +177,9 @@ fn parse_tag<'b>(
     Ok(DepositTag {
         deposit_idx,
         dest_buf,
+        // TODO
+        amount: 0,
+        tapscript_root: Buf32::zero(),
     })
 }
 
