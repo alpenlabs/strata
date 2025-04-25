@@ -50,11 +50,11 @@ pub async fn balance(
     if let NetworkType::Strata = network_type {
         let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
         println!("Getting balance...");
-        let raw_balance = l2w
+        let eth_balance = l2w
             .get_balance(l2w.default_signer_address())
             .await
             .internal_error("Failed to fetch strata balance")?;
-        let sats = (raw_balance / U256::from(SATS_TO_WEI))
+        let sats = (eth_balance / U256::from(SATS_TO_WEI))
             .try_into()
             .expect("to fit into u64");
         let balance = Amount::from_sat(sats);
