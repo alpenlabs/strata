@@ -14,15 +14,10 @@ use colored::Colorize;
 use indicatif::ProgressBar;
 use make_buf::make_buf;
 use strata_primitives::constants::RECOVER_DELAY;
-use terrors::OneOf;
 
 use crate::{
     constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
-    errors::{
-        DescriptorRecoveryError, InvalidStrataAddress, InvalidStrataEndpoint, SignetChainError,
-        SignetTxError, SignetWalletError, StrataTxError, StrataWalletError,
-    },
-    handle_or_exit,
+    errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
@@ -48,53 +43,30 @@ pub struct DepositArgs {
     fee_rate: Option<u64>,
 }
 
-/// Errors that can occur when processing deposit
-pub(crate) type DepositError = OneOf<(
-    InvalidStrataEndpoint,
-    InvalidStrataAddress,
-    NotTaprootAddress,
-    SignetWalletError,
-    StrataWalletError,
-    SignetChainError,
-    SignetTxError,
-    StrataTxError,
-    DescriptorRecoveryError,
-)>;
-
-pub async fn deposit(args: DepositArgs, seed: Seed, settings: Settings) {
-    handle_or_exit!(deposit_inner(args, seed, settings).await);
-}
-
-async fn deposit_inner(
+pub async fn deposit(
     DepositArgs {
         strata_address,
         fee_rate,
     }: DepositArgs,
     seed: Seed,
     settings: Settings,
-) -> Result<(), DepositError> {
+) -> Result<(), DisplayedError> {
     let requested_strata_address = strata_address
-        .map(|a| {
-            StrataAddress::from_str(&a)
-                .map_err(|_| DepositError::new(InvalidStrataAddress(a.clone())))
-        })
+        .map(|a| StrataAddress::from_str(&a).user_error("Provided strata address is invalid"))
         .transpose()?;
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-        .map_err(|e| {
-            DepositError::new(SignetWalletError::new("Failed to load signet wallet", e))
-        })?;
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).map_err(DepositError::new)?;
+        .internal_error("Failed to load signet wallet")?;
+    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
 
-    l1w.sync().await.map_err(|e| {
-        DepositError::new(SignetWalletError::new("Failed to sync signet wallet", e))
-    })?;
+    l1w.sync()
+        .await
+        .internal_error("Failed to sync signet wallet")?;
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
     let recovery_address_pk = recovery_address
         .extract_p2tr_pubkey()
-        .map_err(DepositError::new)?;
-    l1w.persist().map_err(|e| {
-        DepositError::new(SignetWalletError::new("Failed to persist signet wallet", e))
-    })?;
+        .expect("internal keychain should be taproot");
+    l1w.persist()
+        .internal_error("Failed to persist signet wallet")?;
 
     let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
     println!(
@@ -110,38 +82,23 @@ async fn deposit_inner(
 
     let (bridge_in_desc, _recovery_script, _recovery_script_hash) =
         bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
-            .map_err(DepositError::new)?;
+            .internal_error("Recovery address is not a P2TR address")?;
 
     let desc = bridge_in_desc
         .clone()
         .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
-        .map_err(|e| {
-            DepositError::new(DescriptorRecoveryError::new(
-                "Failed to convert to wallet descriptor",
-                e,
-            ))
-        })?;
+        .internal_error("Error creating bridge in descriptor")?;
 
     let mut temp_wallet = Wallet::create_single(desc.clone())
         .network(settings.network)
         .create_wallet_no_persist()
-        .map_err(|e| {
-            DepositError::new(DescriptorRecoveryError::new(
-                "Failed to create temporary wallet",
-                e,
-            ))
-        })?;
+        .expect("valid descriptor");
 
-    let current_block_height = match l1w.local_chain().get_chain_tip() {
-        Ok(tip) => tip.height,
-        Err(e) => {
-            eprintln!("DEBUG: get_chain_tip failed: {:?}", e);
-            return Err(DepositError::new(SignetChainError::new(
-                "Failed to get signet chain tip",
-                e,
-            )));
-        }
-    };
+    let current_block_height = l1w
+        .local_chain()
+        .get_chain_tip()
+        .expect("infallible")
+        .height;
 
     let recover_at = current_block_height + RECOVER_AT_DELAY;
 
@@ -177,39 +134,26 @@ async fn deposit_inner(
         builder.add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT);
         builder.add_data(&op_return_data);
         builder.fee_rate(fee_rate);
-        builder.finish().map_err(|e| {
-            DepositError::new(SignetTxError::new("Failed to build signet transaction", e))
-        })?
+        builder
+            .finish()
+            .internal_error("Failed to create bridge transaction")?
     };
-    l1w.sign(&mut psbt, Default::default()).map_err(|e| {
-        DepositError::new(SignetTxError::new("Failed to sign signet transaction", e))
-    })?;
+    l1w.sign(&mut psbt, Default::default())
+        .expect("tx should be signed");
     println!("Built transaction");
 
-    let tx = psbt.extract_tx().map_err(|e| {
-        DepositError::new(SignetTxError::new(
-            "Failed to finalize signet transaction",
-            e,
-        ))
-    })?;
+    let tx = psbt.extract_tx().expect("tx should be signed and ready");
 
     let pb = ProgressBar::new_spinner().with_message("Saving output descriptor");
     pb.enable_steady_tick(Duration::from_millis(100));
 
     let mut desc_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)
         .await
-        .map_err(|e| {
-            DepositError::new(DescriptorRecoveryError::new(
-                "Failed to open descriptor database",
-                e,
-            ))
-        })?;
+        .internal_error("Failed to open descriptor recovery file")?;
     desc_file
         .add_desc(recover_at, &bridge_in_desc)
         .await
-        .map_err(|e| {
-            DepositError::new(DescriptorRecoveryError::new("Failed to add descriptor", e))
-        })?;
+        .internal_error("Failed to save recovery descriptor to recovery file")?;
     pb.finish_with_message("Saved output descriptor");
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
@@ -218,12 +162,7 @@ async fn deposit_inner(
         .signet_backend
         .broadcast_tx(&tx)
         .await
-        .map_err(|e| {
-            DepositError::new(SignetTxError::new(
-                "Failed to broadcast signet transaction",
-                e,
-            ))
-        })?;
+        .internal_error("Failed to broadcast transaction")?;
     let txid = tx.compute_txid();
     pb.finish_with_message(
         OnchainObject::from(&txid)

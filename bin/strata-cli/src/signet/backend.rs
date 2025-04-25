@@ -25,7 +25,6 @@ use terrors::OneOf;
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::EsploraClient;
-use crate::errors::{BoxedErr, BoxedInner};
 
 #[macro_export]
 macro_rules! boxed_err {
@@ -55,6 +54,8 @@ macro_rules! boxed_err {
         }
     };
 }
+
+use crate::errors::{BoxedErr, BoxedInner};
 
 #[derive(Debug)]
 pub struct UpdateError(BoxedErr);

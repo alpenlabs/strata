@@ -7,15 +7,10 @@ use alloy::{
 use argh::FromArgs;
 use bdk_wallet::bitcoin::{Address, Amount};
 use colored::Colorize;
-use terrors::OneOf;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{
-        InvalidSignetAddress, InvalidStrataAddress, InvalidStrataEndpoint, MissingTargetAddress,
-        SignetTxError, SignetWalletError, StrataTxError, StrataWalletError, WrongNetwork,
-    },
-    handle_or_exit,
+    errors::{user_error, DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -41,24 +36,7 @@ pub struct DrainArgs {
     fee_rate: Option<u64>,
 }
 
-/// Errors that can occur when draining the wallet
-pub(crate) type DrainError = OneOf<(
-    InvalidStrataEndpoint,
-    MissingTargetAddress,
-    InvalidSignetAddress,
-    InvalidStrataAddress,
-    WrongNetwork,
-    SignetWalletError,
-    StrataWalletError,
-    SignetTxError,
-    StrataTxError,
-)>;
-
-pub async fn drain(args: DrainArgs, seed: Seed, settings: Settings) {
-    handle_or_exit!(drain_inner(args, seed, settings).await);
-}
-
-async fn drain_inner(
+pub async fn drain(
     DrainArgs {
         signet_address,
         strata_address,
@@ -66,40 +44,46 @@ async fn drain_inner(
     }: DrainArgs,
     seed: Seed,
     settings: Settings,
-) -> Result<(), DrainError> {
+) -> Result<(), DisplayedError> {
     if strata_address.is_none() && signet_address.is_none() {
-        return Err(DrainError::new(MissingTargetAddress));
+        return Err(user_error(
+            "Missing target address. Must provide a `signet` address or `strata` address.",
+        ));
     }
 
     let signet_address = signet_address
         .map(|a| {
-            Address::from_str(&a)
-                .map_err(|_| DrainError::new(InvalidSignetAddress(a.clone())))
-                .and_then(|addr| {
-                    addr.require_network(settings.network).map_err(|_| {
-                        OneOf::new(WrongNetwork {
-                            address: a.clone(),
-                            network: settings.network.to_string(),
-                        })
-                    })
-                })
+            let unchecked = Address::from_str(&a).user_error(format!(
+                "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
+                a
+            ))?;
+
+            let checked = unchecked
+                .require_network(settings.network)
+                .user_error(format!(
+                    "Address '{}' is not valid for network '{}'",
+                    a, settings.network
+                ))?;
+
+            Ok(checked)
         })
         .transpose()?;
+
     let strata_address = strata_address
         .map(|a| {
-            StrataAddress::from_str(&a)
-                .map_err(|_| DrainError::new(InvalidStrataAddress(a.clone())))
+            StrataAddress::from_str(&a).user_error(format!(
+                "Invalid strata address {}. Must be an EVM-compatible address.",
+                a
+            ))
         })
         .transpose()?;
 
     if let Some(address) = signet_address {
         let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-            .map_err(|e| {
-            DrainError::new(SignetWalletError::new("Failed to load signet wallet", e))
-        })?;
-        l1w.sync().await.map_err(|e| {
-            DrainError::new(SignetWalletError::new("Failed to sync signet wallet", e))
-        })?;
+            .internal_error("Failed to load signet wallet")?;
+        l1w.sync()
+            .await
+            .internal_error("Failed to sync signet wallet")?;
         let balance = l1w.balance();
         if balance.untrusted_pending > Amount::ZERO {
             println!(
@@ -115,29 +99,18 @@ async fn drain_inner(
             builder.drain_wallet();
             builder.drain_to(address.script_pubkey());
             builder.fee_rate(fee_rate);
-            builder.finish().map_err(|e| {
-                DrainError::new(SignetTxError::new("Failed to build signet transaction", e))
-            })?
+            builder
+                .finish()
+                .internal_error("Failed to build signet transaction")?
         };
-        l1w.sign(&mut psbt, Default::default()).map_err(|e| {
-            DrainError::new(SignetTxError::new("Failed to sign signet transaction", e))
-        })?;
-        let tx = psbt.extract_tx().map_err(|e| {
-            DrainError::new(SignetTxError::new(
-                "Failed to finalize signet transaction",
-                e,
-            ))
-        })?;
+        l1w.sign(&mut psbt, Default::default())
+            .expect("tx should be signed");
+        let tx = psbt.extract_tx().expect("tx should be signed and ready");
         settings
             .signet_backend
             .broadcast_tx(&tx)
             .await
-            .map_err(|e| {
-                DrainError::new(SignetTxError::new(
-                    "Failed to broadcast signet transaction",
-                    e,
-                ))
-            })?;
+            .internal_error("Failed to broadcast signet transaction")?;
         let txid = tx.compute_txid();
         println!(
             "{}",
@@ -149,13 +122,11 @@ async fn drain_inner(
     }
 
     if let Some(address) = strata_address {
-        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).map_err(DrainError::new)?;
+        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
         let balance = l2w
             .get_balance(l2w.default_signer_address())
             .await
-            .map_err(|e| {
-                DrainError::new(StrataWalletError::new("Failed to fetch strata balance", e))
-            })?;
+            .internal_error("Failed to fetch strata balance")?;
         if balance == U256::ZERO {
             println!("No Strata bitcoin to send");
         }
@@ -166,25 +137,24 @@ async fn drain_inner(
             .to(address)
             .value(U256::from(1));
 
-        let gas_price = l2w.get_gas_price().await.map_err(|e| {
-            DrainError::new(StrataTxError::new("Failed to get strata gas price", e))
-        })?;
+        let gas_price = l2w
+            .get_gas_price()
+            .await
+            .internal_error("Failed to fetch strata gas price.")?;
         let gas_estimate = l2w
             .estimate_gas(&estimate_tx)
             .await
-            .map_err(|e| DrainError::new(StrataTxError::new("Failed to estimate strata gas", e)))?;
+            .internal_error("Failed to estimate strata gas")?;
 
         let total_fee = gas_estimate * gas_price;
         let max_send_amount = balance.saturating_sub(U256::from(total_fee));
 
         let tx = l2w.transaction_request().to(address).value(max_send_amount);
 
-        let res = l2w.send_transaction(tx).await.map_err(|e| {
-            DrainError::new(StrataTxError::new(
-                "Failed to broadcast strata transaction",
-                e,
-            ))
-        })?;
+        let res = l2w
+            .send_transaction(tx)
+            .await
+            .internal_error("Failed to broadcast strata transaction")?;
 
         println!(
             "{}",

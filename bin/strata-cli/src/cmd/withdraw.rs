@@ -8,14 +8,10 @@ use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use indicatif::ProgressBar;
 use strata_primitives::bitcoin_bosd::Descriptor;
-use terrors::OneOf;
 
 use crate::{
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
-    errors::{
-        InvalidSignetAddress, InvalidStrataEndpoint, SignetWalletError, StrataTxError, WrongNetwork,
-    },
-    handle_or_exit,
+    errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -32,56 +28,43 @@ pub struct WithdrawArgs {
     address: Option<String>,
 }
 
-/// Errors that can occur when withdrawing BTC from strata to signet
-pub(crate) type WithdrawError = OneOf<(
-    InvalidSignetAddress,
-    WrongNetwork,
-    SignetWalletError,
-    InvalidStrataEndpoint,
-    StrataTxError,
-)>;
-
-pub async fn withdraw(args: WithdrawArgs, seed: Seed, settings: Settings) {
-    handle_or_exit!(withdraw_inner(args, seed, settings).await);
-}
-
-async fn withdraw_inner(
+pub async fn withdraw(
     args: WithdrawArgs,
     seed: Seed,
     settings: Settings,
-) -> Result<(), WithdrawError> {
+) -> Result<(), DisplayedError> {
     let address = args
         .address
         .map(|a| {
-            Address::from_str(&a)
-                .map_err(|_| WithdrawError::new(InvalidSignetAddress(a.clone())))
-                .and_then(|addr| {
-                    addr.require_network(settings.network).map_err(|_| {
-                        OneOf::new(WrongNetwork {
-                            address: a.clone(),
-                            network: settings.network.to_string(),
-                        })
-                    })
-                })
+            let unchecked = Address::from_str(&a).user_error(format!(
+                "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
+                a
+            ))?;
+
+            let checked = unchecked
+                .require_network(settings.network)
+                .user_error(format!(
+                    "Address '{}' is not valid for network '{}'",
+                    a, settings.network
+                ))?;
+
+            Ok(checked)
         })
         .transpose()?;
 
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-        .map_err(|e| {
-            WithdrawError::new(SignetWalletError::new("Failed to load signet wallet", e))
-        })?;
-    l1w.sync().await.map_err(|e| {
-        WithdrawError::new(SignetWalletError::new("Failed to sync signet wallet", e))
-    })?;
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).map_err(WithdrawError::new)?;
+        .internal_error("Failed to load signet wallet")?;
+    l1w.sync()
+        .await
+        .internal_error("Failed to sync signet wallet")?;
+    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
 
     let address = match address {
         Some(a) => a,
         None => {
             let info = l1w.reveal_next_address(KeychainKind::External);
-            l1w.persist().map_err(|e| {
-                WithdrawError::new(SignetWalletError::new("Failed to persist signet wallet", e))
-            })?;
+            l1w.persist()
+                .internal_error("Failed to persist signet wallet")?;
             info.address
         }
     };
@@ -98,12 +81,10 @@ async fn withdraw_inner(
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
     pb.enable_steady_tick(Duration::from_millis(100));
-    let res = l2w.send_transaction(tx).await.map_err(|e| {
-        WithdrawError::new(StrataTxError::new(
-            "Failed to broadcast strata transaction",
-            e,
-        ))
-    })?;
+    let res = l2w
+        .send_transaction(tx)
+        .await
+        .internal_error("Failed to broadcast strata transaction")?;
     pb.finish_with_message("Broadcast successful");
     println!(
         "{}",

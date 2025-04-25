@@ -4,12 +4,10 @@ use bdk_wallet::{
 };
 use chrono::Utc;
 use colored::Colorize;
-use terrors::OneOf;
 
 use crate::{
     constants::RECOVERY_DESC_CLEANUP_DELAY,
-    errors::{DescriptorRecoveryError, SignetChainError, SignetTxError, SignetWalletError},
-    handle_or_exit,
+    errors::{DisplayableError, DisplayedError},
     recovery::DescriptorRecovery,
     seed::Seed,
     settings::Settings,
@@ -25,64 +23,32 @@ pub struct RecoverArgs {
     fee_rate: Option<u64>,
 }
 
-/// Errors that can occur when recovering old deposit transactions
-pub(crate) type RecoverError = OneOf<(
-    SignetWalletError,
-    SignetChainError,
-    SignetTxError,
-    DescriptorRecoveryError,
-)>;
-
-pub async fn recover(args: RecoverArgs, seed: Seed, settings: Settings) {
-    handle_or_exit!(recover_inner(args, seed, settings).await);
-}
-
-async fn recover_inner(
+pub async fn recover(
     args: RecoverArgs,
     seed: Seed,
     settings: Settings,
-) -> Result<(), RecoverError> {
+) -> Result<(), DisplayedError> {
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
-        .map_err(|e| {
-            RecoverError::new(SignetWalletError::new("Failed to load signet wallet", e))
-        })?;
-    l1w.sync().await.map_err(|e| {
-        RecoverError::new(SignetWalletError::from_debug(
-            "Failed to sync signet wallet",
-            e,
-        ))
-    })?;
+        .internal_error("Failed to load signet wallet")?;
+    l1w.sync()
+        .await
+        .internal_error("Failed to sync signet wallet")?;
 
     println!("Opening descriptor recovery");
     let mut descriptor_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)
         .await
-        .map_err(|e| {
-            RecoverError::new(DescriptorRecoveryError::new(
-                "Failed to open descriptor database",
-                e,
-            ))
-        })?;
-    let current_height = match l1w.local_chain().get_chain_tip() {
-        Ok(tip) => tip.height,
-        Err(e) => {
-            eprintln!("DEBUG: get_chain_tip failed: {:?}", e);
-            return Err(RecoverError::new(SignetChainError::new(
-                "Failed to get signet chain tip",
-                e,
-            )));
-        }
-    };
+        .internal_error("Failed to open descriptor recovery file")?;
+    let current_height = l1w
+        .local_chain()
+        .get_chain_tip()
+        .expect("infallible")
+        .height;
 
     println!("Current signet chain height: {current_height}");
     let descs = descriptor_file
         .read_descs_after_block(current_height)
         .await
-        .map_err(|e| {
-            RecoverError::new(DescriptorRecoveryError::from_debug(
-                "Failed to read descriptors",
-                e,
-            ))
-        })?;
+        .internal_error("Failed to read descriptors after chain height")?;
 
     if descs.is_empty() {
         println!("Nothing to recover");
@@ -96,45 +62,27 @@ async fn recover_inner(
         let desc = desc
             .clone()
             .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
-            .map_err(|e| {
-                RecoverError::new(DescriptorRecoveryError::new(
-                    "Failed to convert to wallet descriptor",
-                    e,
-                ))
-            })?;
+            .internal_error("Failed to convert to wallet descriptor")?;
 
         let mut recovery_wallet = Wallet::create_single(desc)
             .network(settings.network)
             .create_wallet_no_persist()
-            .map_err(|e| {
-                RecoverError::new(DescriptorRecoveryError::new(
-                    "Failed to create recovery wallet",
-                    e,
-                ))
-            })?;
+            .internal_error("Failed to create recovery wallet")?;
 
         // reveal the address for the wallet so we can sync it
         let address = recovery_wallet.reveal_next_address(KeychainKind::External);
         sync_wallet(&mut recovery_wallet, settings.signet_backend.clone())
             .await
-            .map_err(|e| {
-                RecoverError::new(DescriptorRecoveryError::from_debug(
-                    "Failed to sync recovery wallet",
-                    e,
-                ))
-            })?;
+            .internal_error("Failed to sync recovery wallet")?;
         let needs_recovery = recovery_wallet.balance().confirmed > Amount::ZERO;
 
         if !needs_recovery {
             assert!(key.len() > 4);
             let desc_height = u32::from_be_bytes(unsafe { *(key[..4].as_ptr() as *const [_; 4]) });
             if desc_height + RECOVERY_DESC_CLEANUP_DELAY > current_height {
-                descriptor_file.remove(key).map_err(|e| {
-                    RecoverError::new(DescriptorRecoveryError::new(
-                        "Failed to remove old descriptor",
-                        e,
-                    ))
-                })?;
+                descriptor_file
+                    .remove(key)
+                    .internal_error("Failed to remove old descriptor")?;
                 println!(
                     "removed old, already claimed descriptor due for recovery at {desc_height}"
                 );
@@ -158,33 +106,21 @@ async fn recover_inner(
             let mut builder = recovery_wallet.build_tx();
             builder.drain_to(recover_to.script_pubkey());
             builder.fee_rate(fee_rate);
-            builder.finish().map_err(|e| {
-                RecoverError::new(SignetTxError::new("Failed to build signet transaction", e))
-            })?
+            builder
+                .finish()
+                .internal_error("Failed to build signet transaction")?
         };
 
         recovery_wallet
             .sign(&mut psbt, Default::default())
-            .map_err(|e| {
-                RecoverError::new(SignetTxError::new("Failed to sign signet transaction", e))
-            })?;
+            .expect("tx should be signed");
 
-        let tx = psbt.extract_tx().map_err(|e| {
-            RecoverError::new(SignetTxError::new(
-                "Failed to finalize signet transaction",
-                e,
-            ))
-        })?;
+        let tx = psbt.extract_tx().expect("tx should be signed and ready");
         settings
             .signet_backend
             .broadcast_tx(&tx)
             .await
-            .map_err(|e| {
-                RecoverError::new(SignetTxError::from_debug(
-                    "Failed to broadcast signet transaction",
-                    e,
-                ))
-            })?
+            .internal_error("Failed to broadcast signet transaction")?
     }
 
     Ok(())

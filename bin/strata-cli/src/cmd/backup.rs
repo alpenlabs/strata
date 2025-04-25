@@ -1,8 +1,10 @@
 use argh::FromArgs;
 use bip39::Language;
-use terrors::OneOf;
 
-use crate::{errors::UnsupportedLanguage, handle_or_exit, seed::Seed};
+use crate::{
+    errors::{user_error, DisplayedError},
+    seed::Seed,
+};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "backup")]
@@ -16,30 +18,23 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
-/// Errors that can occur when printing the BIP39 mnemonic
-pub(crate) type BackupError = OneOf<(UnsupportedLanguage,)>;
+pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), DisplayedError> {
+    let language = match args.language.unwrap_or_else(|| "en".to_owned()).as_str() {
+        "en" => Ok(Language::English),
+        "cn" => Ok(Language::SimplifiedChinese),
+        "cn-trad" => Ok(Language::TraditionalChinese),
+        "cz" => Ok(Language::Czech),
+        "fr" => Ok(Language::French),
+        "it" => Ok(Language::Italian),
+        "jp" => Ok(Language::Japanese),
+        "kr" => Ok(Language::Korean),
+        "es" => Ok(Language::Spanish),
+        other => Err(user_error(format!(
+            "Unsupported language: '{}'. Use --help to list supported languages.",
+            other
+        ))),
+    }?;
 
-pub async fn backup(args: BackupArgs, seed: Seed) {
-    handle_or_exit!(backup_inner(args, seed).await);
-}
-
-async fn backup_inner(args: BackupArgs, seed: Seed) -> Result<(), BackupError> {
-    let language = match args.language {
-        Some(s) => s,
-        None => "en".to_owned(),
-    };
-    let language = match language.as_str() {
-        "en" => Language::English,
-        "cn" => Language::SimplifiedChinese,
-        "cn-trad" => Language::TraditionalChinese,
-        "cz" => Language::Czech,
-        "fr" => Language::French,
-        "it" => Language::Italian,
-        "jp" => Language::Japanese,
-        "kr" => Language::Korean,
-        "es" => Language::Spanish,
-        _ => return Err(OneOf::new(UnsupportedLanguage(language)))?,
-    };
     seed.print_mnemonic(language);
     Ok(())
 }

@@ -1,56 +1,31 @@
 use argh::FromArgs;
 use rand_core::OsRng;
-use terrors::OneOf;
 
 #[cfg(not(target_os = "linux"))]
-use crate::errors::{NoStorageAccess, PlatformFailure};
-use crate::{
-    handle_or_exit,
-    seed::{password::Password, EncryptedSeedPersister, Seed},
-};
+use crate::errors::{DisplayableError, DisplayedError};
+use crate::seed::{password::Password, EncryptedSeedPersister, Seed};
 
 /// Changes the seed's encryption password
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "change-password")]
 pub struct ChangePwdArgs {}
 
-/// Errors that can occur when changing seed encryption password
-#[cfg(target_os = "linux")]
-pub(crate) type ChangePasswordError = OneOf<(std::io::Error, dialoguer::Error, argon2::Error)>;
-
-#[cfg(not(target_os = "linux"))]
-pub(crate) type ChangePasswordError = OneOf<(
-    PlatformFailure,
-    NoStorageAccess,
-    dialoguer::Error,
-    argon2::Error,
-)>;
-
-pub async fn change_pwd(_args: ChangePwdArgs, seed: Seed, persister: impl EncryptedSeedPersister) {
-    handle_or_exit!(change_pwd_inner(_args, seed, persister).await);
-}
-
-async fn change_pwd_inner(
+pub async fn change_pwd(
     _args: ChangePwdArgs,
     seed: Seed,
     persister: impl EncryptedSeedPersister,
-) -> Result<(), ChangePasswordError> {
-    let mut new_pw = Password::read(true).map_err(OneOf::new)?;
+) -> Result<(), DisplayedError> {
+    let mut new_pw =
+        Password::read(true).internal_error("Failed to read the password entered by user.")?;
     if let Err(feedback) = new_pw.validate() {
         println!("Password is weak. {}", feedback);
     }
-    let encrypted_seed = match seed.encrypt(&mut new_pw, &mut OsRng) {
-        Ok(es) => es,
-        Err(e) => {
-            let narrowed = e.narrow::<aes_gcm_siv::Error, _>();
-            if let Ok(aes_error) = narrowed {
-                panic!("Failed to encrypt seed: {aes_error:?}");
-            }
-
-            return Err(narrowed.unwrap_err().broaden());
-        }
-    };
-    persister.save(&encrypted_seed).map_err(OneOf::broaden)?;
+    let encrypted_seed = seed
+        .encrypt(&mut new_pw, &mut OsRng)
+        .internal_error("Failed to encrypt seed")?;
+    persister
+        .save(&encrypted_seed)
+        .internal_error("Failed to save encrypted seed.")?;
 
     println!("Password changed successfully");
     Ok(())

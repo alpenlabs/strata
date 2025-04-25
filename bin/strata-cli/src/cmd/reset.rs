@@ -1,11 +1,10 @@
 use argh::FromArgs;
 use colored::Colorize;
 use dialoguer::Confirm;
-use terrors::OneOf;
 
 #[cfg(not(target_os = "linux"))]
-use crate::errors::{NoStorageAccess, PlatformFailure};
-use crate::{handle_or_exit, seed::EncryptedSeedPersister, settings::Settings};
+use crate::errors::{DisplayableError, DisplayedError};
+use crate::{seed::EncryptedSeedPersister, settings::Settings};
 
 /// DANGER: resets the CLI completely, destroying all keys and databases.
 /// Keeps config.
@@ -17,27 +16,11 @@ pub struct ResetArgs {
     assume_yes: bool,
 }
 
-/// Errors that can occur when resetting the CLI
-#[cfg(target_os = "linux")]
-pub(crate) type ResetError = OneOf<(std::io::Error, dialoguer::Error, argon2::Error)>;
-
-#[cfg(not(target_os = "linux"))]
-pub(crate) type ResetError = OneOf<(
-    PlatformFailure,
-    NoStorageAccess,
-    dialoguer::Error,
-    std::io::Error,
-)>;
-
-pub async fn reset(args: ResetArgs, persister: impl EncryptedSeedPersister, settings: Settings) {
-    handle_or_exit!(reset_inner(args, persister, settings).await);
-}
-
-async fn reset_inner(
+pub async fn reset(
     args: ResetArgs,
     persister: impl EncryptedSeedPersister,
     settings: Settings,
-) -> Result<(), ResetError> {
+) -> Result<(), DisplayedError> {
     let confirm = if args.assume_yes {
         true
     } else {
@@ -45,13 +28,16 @@ async fn reset_inner(
         Confirm::new()
             .with_prompt("Do you REALLY want to continue?")
             .interact()
-            .map_err(OneOf::new)?
+            .internal_error("Failed to read user confirmation")?
     };
 
     if confirm {
-        persister.delete().map_err(OneOf::broaden)?;
+        persister
+            .delete()
+            .internal_error("Failed to wipe out seed.")?;
         println!("Wiped seed");
-        std::fs::remove_dir_all(settings.data_dir.clone()).map_err(OneOf::new)?;
+        std::fs::remove_dir_all(settings.data_dir.clone())
+            .internal_error("Failed to delete data directory.")?;
         println!("Wiped data directory");
     }
 
