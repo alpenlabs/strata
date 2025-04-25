@@ -4293,8 +4293,8 @@ dependencies = [
  "serde",
  "serde_with",
  "strata-primitives",
- "strata-reth-evm",
- "strata-reth-primitives",
+ "alpen-reth-evm",
+ "alpen-reth-primitives",
  "strata-state",
  "thiserror 2.0.12",
  "zkaleido",
@@ -4302,7 +4302,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "strata-reth-evm"
+name = "alpen-reth-evm"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
@@ -4311,11 +4311,11 @@ dependencies = [
  "revm-primitives",
  "strata-crypto",
  "strata-primitives",
- "strata-reth-primitives",
+ "alpen-reth-primitives",
 ]
 
 [[package]]
-name = "strata-reth-primitives"
+name = "alpen-reth-primitives"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",

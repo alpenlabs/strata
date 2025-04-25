@@ -1,8 +1,8 @@
 use alloy_sol_types::SolEvent;
+use alpen_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
 use reth_primitives::{Receipt, TransactionSigned};
 use revm_primitives::U256;
 use strata_primitives::{bitcoin_bosd::Descriptor, buf::Buf32};
-use strata_reth_primitives::{WithdrawalIntent, WithdrawalIntentEvent};
 
 use crate::constants::BRIDGEOUT_ADDRESS;
 

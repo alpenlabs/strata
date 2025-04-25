@@ -3,18 +3,18 @@ use argh::FromArgs;
 use bdk_wallet::KeychainKind;
 
 use crate::{
+    alpen::AlpenWallet,
     net_type::{net_type_or_exit, NetworkType},
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::StrataWallet,
 };
 
 /// Prints a new address for the internal wallet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "receive")]
 pub struct ReceiveArgs {
-    /// either "signet" or "strata"
+    /// either "signet" or "alpen"
     #[argh(positional)]
     network_type: String,
 }
@@ -34,8 +34,8 @@ pub async fn receive(args: ReceiveArgs, seed: Seed, settings: Settings) {
             l1w.persist().unwrap();
             address_info.address.to_string()
         }
-        NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint).unwrap();
+        NetworkType::Alpen => {
+            let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint).unwrap();
             l2w.default_signer_address().to_string()
         }
     };

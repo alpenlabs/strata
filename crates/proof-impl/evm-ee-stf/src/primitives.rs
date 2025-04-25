@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use alloy_consensus::{serde_bincode_compat as serde_bincode_compat_header, Header};
 use alloy_eips::eip4895::Withdrawal;
+use alpen_reth_primitives::WithdrawalIntent;
 use reth_primitives::{
     transaction::serde_bincode_compat as serde_bincode_compat_tx, TransactionSigned,
 };
 use revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use strata_reth_primitives::WithdrawalIntent;
 use strata_state::block::ExecSegment;
 
 use crate::mpt::{MptNode, StorageEntry};

@@ -4,11 +4,11 @@ name = "strata-evmexec"
 version = "0.1.0"
 
 [dependencies]
+alpen-reth-evm.workspace = true
+alpen-reth-node.workspace = true
 strata-db.workspace = true
 strata-eectl.workspace = true
 strata-primitives.workspace = true
-strata-reth-evm.workspace = true
-strata-reth-node.workspace = true
 strata-state.workspace = true
 strata-storage.workspace = true
 

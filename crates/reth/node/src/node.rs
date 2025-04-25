@@ -1,3 +1,4 @@
+use alpen_reth_rpc::{SequencerClient, StrataEthApi};
 use reth_chainspec::{ChainSpec, EthereumHardforks};
 use reth_db::transaction::{DbTx, DbTxMut};
 use reth_node_api::{AddOnsContext, EngineValidator, FullNodeComponents, NodeAddOns};
@@ -19,7 +20,6 @@ use reth_provider::{
 };
 use reth_transaction_pool::{PoolTransaction, TransactionPool};
 use revm_primitives::alloy_primitives;
-use strata_reth_rpc::{SequencerClient, StrataEthApi};
 
 use crate::{
     args::StrataNodeArgs,

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use alpen_reth_db::WitnessProvider;
 use jsonrpsee::core::RpcResult;
 use revm_primitives::alloy_primitives::B256;
-use strata_reth_db::WitnessProvider;
 use strata_rpc_utils::to_jsonrpsee_error;
 
 use crate::{BlockWitness, StrataRpcApiServer};
