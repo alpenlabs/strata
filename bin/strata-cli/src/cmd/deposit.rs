@@ -97,7 +97,7 @@ pub async fn deposit(
     let current_block_height = l1w
         .local_chain()
         .get_chain_tip()
-        .expect("infallible")
+        .expect("valid chain tip")
         .height;
 
     let recover_at = current_block_height + RECOVER_AT_DELAY;

@@ -41,7 +41,7 @@ pub async fn recover(
     let current_height = l1w
         .local_chain()
         .get_chain_tip()
-        .expect("infallible")
+        .expect("valid chain tip")
         .height;
 
     println!("Current signet chain height: {current_height}");
