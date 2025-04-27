@@ -236,13 +236,15 @@ fn process_l1_checkpoint(
         warn!(%ckpt_epoch, "Empty proof posted");
         // If the proof is empty but empty proofs are not allowed, this will fail.
         if !params.proof_publish_mode.allow_empty() {
-            error!(%ckpt_epoch, "Invalid checkpoint: Empty proof");
+            error!(%ckpt_epoch, "Invalid checkpoint: Received empty proof while in strict proof mode. Check `proof_publish_mode` in rollup parameters; set it to a non-strict mode (e.g., `timeout`) to accept empty proofs.");
             return Err(OpError::InvalidProof);
         }
     } else {
         // Otherwise, verify the non-empty proof.
-        verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk)
-            .map_err(|e| OpError::InvalidProof)?;
+        verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk).map_err(|e| {
+            error!(%ckpt_epoch, error = %e, "Failed to verify non-empty proof for epoch");
+            OpError::InvalidProof
+        })?;
     }
 
     // Copy the epoch commitment and make it finalized.

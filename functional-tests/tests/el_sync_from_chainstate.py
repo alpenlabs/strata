@@ -1,7 +1,7 @@
 import flexitest
 from web3 import Web3
 
-from envs import testenv
+from envs import net_settings, testenv
 from utils import *
 
 
@@ -27,7 +27,9 @@ class ELSyncFromChainstateTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(
             testenv.BasicEnvConfig(
-                101, prover_client_settings=ProverClientSettings.new_with_proving()
+                101,
+                prover_client_settings=ProverClientSettings.new_with_proving(),
+                rollup_settings=net_settings.get_fast_batch_settings(),
             )
         )
 

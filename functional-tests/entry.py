@@ -120,6 +120,7 @@ def main(argv):
         "load_reth": reth_load_env,
         # separate env for running crash_* tests
         "crash": testenv.BasicEnvConfig(110),
+        "two_sequencers_with_different_proof_policy": testenv.IgnoreCheckpointWithInvalidProofEnvConfig(110),
     }
 
     setup_root_logger()

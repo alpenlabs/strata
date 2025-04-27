@@ -1,3 +1,4 @@
+import copy
 import json
 import time
 from typing import Optional
@@ -196,7 +197,7 @@ class BasicEnvConfig(flexitest.EnvConfig):
                 brpc.proxy.sendmany(
                     "",
                     {
-                        get_recovery_address(i, bridge_pk) if i < 10 else get_address(i - 10): 20
+                        (get_recovery_address(i, bridge_pk) if i < 10 else get_address(i - 10)): 20
                         for i in range(20)
                     },
                 )
@@ -381,6 +382,226 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         }
 
         return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)
+
+
+class IgnoreCheckpointWithInvalidProofEnvConfig(flexitest.EnvConfig):
+    def __init__(
+        self,
+        pre_generate_blocks: int = 0,
+        auto_generate_blocks: bool = True,
+        n_operators: int = 2,
+        fullnode_is_strict_follower: bool = True,
+    ):
+        self.pre_generate_blocks = pre_generate_blocks
+        self.auto_generate_blocks = auto_generate_blocks
+        self.n_operators = n_operators
+        self.fullnode_is_strict_follower = fullnode_is_strict_follower
+        super().__init__()
+
+    def init(self, ctx: flexitest.EnvContext) -> flexitest.LiveEnv:
+        btc_fac = ctx.get_factory("bitcoin")
+        seq_fac = ctx.get_factory("sequencer")
+        seq_signer_fac = ctx.get_factory("sequencer_signer")
+        reth_fac = ctx.get_factory("reth")
+        fn_fac = ctx.get_factory("fullnode")
+        prover_client_fac = ctx.get_factory("prover_client")
+
+        # set up network params
+        initdir = ctx.make_service_dir("_init")
+
+        # Define strict and fast settings
+        settings_fast = RollupParamsSettings.new_default().fast_batch()
+        _settings_strict = RollupParamsSettings.new_default().strict_mode()
+
+        # Generate base parameters using strict settings (defines keys)
+        params_gen_data = generate_simple_params(initdir, settings_fast, self.n_operators)
+        params_fast_json = params_gen_data["params"]
+
+        # Create fast params JSON by modifying the strict one to use fast settings
+        params_fast_dict = json.loads(params_fast_json)
+        params_strict_dict = copy.deepcopy(params_fast_dict)
+        params_strict_dict["proof_publish_mode"] = "strict"
+        params_strict_json = json.dumps(params_strict_dict)
+        print("params_strict_json: ", params_strict_json)
+
+        rollup_cfg_strict = RollupConfig.model_validate_json(params_strict_json)
+
+        # Shared bridge pubkey (derived from keys generated in params_gen_data)
+        bridge_pk = get_bridge_pubkey_from_cfg(rollup_cfg_strict)
+
+        # Setup shared infrastructure (Bitcoin, Reth)
+        secret_dir = ctx.make_service_dir("secret")
+        reth_secret_path = os.path.join(secret_dir, "jwt.hex")
+        with open(reth_secret_path, "w") as file:
+            file.write(generate_jwt_secret())
+
+        # Shared Reth for Sequencers
+        reth_fast = reth_fac.create_exec_client(0, reth_secret_path, None, name_suffix="fast")
+        reth_strict = reth_fac.create_exec_client(0, reth_secret_path, None, name_suffix="strict")
+        seq_reth_rpc_port_fast = reth_fast.get_prop("eth_rpc_http_port")
+        seq_reth_rpc_port_strict = reth_strict.get_prop("eth_rpc_http_port")
+        reth_authrpc_port_fast = reth_fast.get_prop("rpc_port")
+        reth_authrpc_port_strict = reth_strict.get_prop("rpc_port")
+
+        # Dedicated Reth for Fullnode
+        fullnode_reth = None
+        if self.fullnode_is_strict_follower:
+            fullnode_reth = reth_fac.create_exec_client(
+                1,
+                reth_secret_path,
+                f"http://localhost:{seq_reth_rpc_port_strict}",
+                name_suffix="fn",
+            )
+        else:
+            fullnode_reth = reth_fac.create_exec_client(
+                1,
+                reth_secret_path,
+                f"http://localhost:{seq_reth_rpc_port_fast}",
+                name_suffix="fn",
+            )
+
+        bitcoind = btc_fac.create_regtest_bitcoin()
+        time.sleep(BLOCK_GENERATION_INTERVAL_SECS)
+
+        brpc = bitcoind.create_rpc()
+        walletname = "sequencer_wallet"
+        brpc.proxy.createwallet(walletname)
+        seqaddr = brpc.proxy.getnewaddress()
+
+        if self.pre_generate_blocks > 0:
+            print(f"Pre generating {self.pre_generate_blocks} blocks to address {seqaddr}")
+            brpc.proxy.generatetoaddress(self.pre_generate_blocks, seqaddr)
+
+        if self.auto_generate_blocks:
+            generate_blocks(brpc, BLOCK_GENERATION_INTERVAL_SECS, seqaddr)
+
+        rpc_port = bitcoind.get_prop("rpc_port")
+        rpc_sock = f"localhost:{rpc_port}/wallet/{walletname}"
+        bitcoind_config = BitcoindConfig(
+            rpc_url=rpc_sock,
+            rpc_user=bitcoind.get_prop("rpc_user"),
+            rpc_password=bitcoind.get_prop("rpc_password"),
+        )
+
+        # Shared Reth config for sequencers
+        reth_config_fast = RethELConfig(
+            rpc_url=f"localhost:{reth_authrpc_port_fast}",
+            secret=reth_secret_path,
+        )
+        reth_config_strict = RethELConfig(
+            rpc_url=f"localhost:{reth_authrpc_port_strict}",
+            secret=reth_secret_path,
+        )
+
+        # Create Sequencer 1 (Fast Batch) - uses modified params_fast_json
+        sequencer_fast = seq_fac.create_sequencer_node(
+            bitcoind_config,
+            reth_config_fast,
+            seqaddr,
+            params_fast_json,
+            multi_instance_enabled=True,
+            instance_id=0,
+            name_suffix="fast",
+        )
+        seq_fast_host = sequencer_fast.get_prop("rpc_host")
+        seq_fast_port = sequencer_fast.get_prop("rpc_port")
+        sequencer_signer_fast = seq_signer_fac.create_sequencer_signer(
+            seq_fast_host,
+            seq_fast_port,
+            multi_instance_enabled=True,
+            instance_id=0,
+            name_suffix="fast",
+        )
+
+        # Create Sequencer 2 (Strict) - uses original params_strict_json
+        sequencer_strict = seq_fac.create_sequencer_node(
+            bitcoind_config,
+            reth_config_strict,
+            seqaddr,
+            params_strict_json,
+            multi_instance_enabled=True,
+            instance_id=1,
+            name_suffix="strict",
+        )
+        seq_strict_host = sequencer_strict.get_prop("rpc_host")
+        seq_strict_port = sequencer_strict.get_prop("rpc_port")
+        sequencer_signer_strict = seq_signer_fac.create_sequencer_signer(
+            seq_strict_host,
+            seq_strict_port,
+            multi_instance_enabled=True,
+            instance_id=1,
+            name_suffix="strict",
+        )
+
+        # Wait a bit more after starting sequencers if needed
+        if self.auto_generate_blocks:
+            time.sleep(BLOCK_GENERATION_INTERVAL_SECS * 10)
+
+        # Create Fullnode (Strict)
+        fullnode_reth_port = fullnode_reth.get_prop("rpc_port")
+        fullnode_reth_config = RethELConfig(
+            rpc_url=f"localhost:{fullnode_reth_port}",
+            secret=reth_secret_path,
+        )
+        # Point fullnode to the strict sequencer's RPC endpoint
+        sequencer_rpc_strict = f"ws://localhost:{seq_strict_port}"
+        sequencer_rpc_fast = f"ws://localhost:{seq_fast_port}"
+
+        # Fullnode
+        fullnode = None
+        if self.fullnode_is_strict_follower:
+            fullnode = fn_fac.create_fullnode(
+                bitcoind_config,
+                fullnode_reth_config,
+                sequencer_rpc_strict,
+                params_strict_json,
+                name_suffix="strictfollower",
+            )
+        else:
+            fullnode = fn_fac.create_fullnode(
+                bitcoind_config,
+                fullnode_reth_config,
+                sequencer_rpc_fast,
+                params_strict_json,
+                name_suffix="fastFollowerWithStrictPolicy",
+            )
+
+        # Create Prover Client (Strict)
+        prover_client_settings = ProverClientSettings.new_with_proving()
+        prover_client_strict = prover_client_fac.create_prover_client(
+            bitcoind_config,
+            f"http://localhost:{seq_strict_port}",
+            f"http://localhost:{seq_reth_rpc_port_strict}",
+            params_strict_json,
+            prover_client_settings,
+            name_suffix="strictprover",
+        )
+
+        # Create Prover Client (Fast)
+        prover_client_fast = prover_client_fac.create_prover_client(
+            bitcoind_config,
+            f"http://localhost:{seq_fast_port}",
+            f"http://localhost:{seq_reth_rpc_port_fast}",
+            params_fast_json,
+            prover_client_settings,
+            name_suffix="fastprover",
+        )
+
+        services = {
+            "bitcoin": bitcoind,
+            "fullnode_reth": fullnode_reth,
+            "fullnode": fullnode,
+            "seq_node_fast": sequencer_fast,
+            "seq_node_strict": sequencer_strict,
+            "seq_fast_reth": reth_fast,
+            "seq_strict_reth": reth_strict,
+            "sequencer_signer_fast": sequencer_signer_fast,
+            "sequencer_signer_strict": sequencer_signer_strict,
+            "prover_client_strict": prover_client_strict,
+            "prover_client_fast": prover_client_fast,
+        }
+
+        return BasicLiveEnv(services, bridge_pk, rollup_cfg_strict)
 
 
 # TODO: Maybe, we need to make it dynamic to enhance any EnvConfig with load testing capabilities.

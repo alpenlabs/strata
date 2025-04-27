@@ -89,7 +89,8 @@ pub fn verify_proof(
     // FIXME: we are accepting empty proofs for now (devnet) to reduce dependency on the prover
     // infra.
     let allow_empty = rollup_params.proof_publish_mode.allow_empty();
-    let accept_empty_proof = proof_receipt.proof().is_empty() && allow_empty;
+    let is_empty_proof = proof_receipt.proof().is_empty();
+    let accept_empty_proof = is_empty_proof && allow_empty;
     let skip_public_param_check = proof_receipt.public_values().is_empty() && allow_empty;
     let is_non_native_vk = !matches!(rollup_vk, RollupVerifyingKey::NativeVerifyingKey(_));
 
@@ -110,6 +111,13 @@ pub fn verify_proof(
     if accept_empty_proof && is_non_native_vk {
         warn!(%checkpoint_idx, "verifying empty proof as correct");
         return Ok(());
+    }
+
+    if !accept_empty_proof && is_empty_proof {
+        return Err(ZkVmError::ProofVerificationError(format!(
+            "Empty proof received for checkpoint {checkpoint_idx}, which is not allowed in strict proof mode. \
+            Check `proof_publish_mode` in rollup_params; set it to a non-strict mode (e.g., `timeout`) to accept empty proofs."
+        )));
     }
 
     verify_rollup_groth16_proof_receipt(proof_receipt, &rollup_vk)
