@@ -140,7 +140,7 @@ fn parse_tag_script<'a>(
         return Err(DepositParseError::TagOversized);
     }
 
-    parse_tag(data, config)
+    parse_tag(data, &config.magic_bytes, config.address_length)
 }
 
 /// Parses the script buffer which has the following structure:
@@ -148,10 +148,10 @@ fn parse_tag_script<'a>(
 /// sats_amt(8 bytes)]
 fn parse_tag<'b>(
     buf: &'b [u8],
-    config: &DepositTxParams,
+    magic_bytes: &[u8],
+    addr_len: u8,
 ) -> Result<DepositTag<'b>, DepositParseError> {
     // data has expected magic bytes
-    let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
 
     if buf.len() < magic_len + DEPOSIT_IDX_LEN + SATS_AMOUNT_LEN + TAKEBACK_HASH_LEN {
@@ -172,7 +172,7 @@ fn parse_tag<'b>(
         ee_takeback_amt.split_at(ee_takeback_amt.len() - SATS_AMOUNT_LEN - TAKEBACK_HASH_LEN);
 
     // Check dest_buf len
-    if dest_buf.len() != config.address_length as usize {
+    if dest_buf.len() != addr_len as usize {
         return Err(DepositParseError::InvalidDestLen(dest_buf.len() as u8));
     }
 
@@ -200,37 +200,174 @@ fn parse_tag<'b>(
 #[cfg(test)]
 mod tests {
 
-    use bitcoin::Amount;
-    use strata_test_utils::bitcoin::{
-        build_test_deposit_script, create_test_deposit_tx, test_taproot_addr,
+    use bitcoin::{
+        opcodes::all::OP_RETURN,
+        script::{Builder, PushBytesBuf},
+        Network,
     };
+    use strata_primitives::{l1::BitcoinAddress, params::DepositTxParams};
 
-    use crate::deposit::{deposit_tx::extract_deposit_info, test_utils::get_deposit_tx_config};
+    use crate::deposit::{
+        deposit_tx::{
+            parse_tag, parse_tag_script, DEPOSIT_IDX_LEN, SATS_AMOUNT_LEN, TAKEBACK_HASH_LEN,
+        },
+        error::DepositParseError,
+    };
+    const MAGIC_BYTES: &[u8] = &[1, 2, 3, 4, 5];
+    const ADDRESS: &str = "bcrt1p729l9680ht3zf7uhl6pgdrlhfp9r29cwajr5jk3k05fer62763fscz0w4s";
+
+    fn dummy_config() -> DepositTxParams {
+        DepositTxParams {
+            magic_bytes: MAGIC_BYTES.to_vec(),
+            address_length: 20,
+            deposit_amount: 10,
+            address: BitcoinAddress::parse(ADDRESS, Network::Regtest).unwrap(),
+        }
+    }
+
+    // Tests for parse_tag
 
     #[test]
-    fn check_deposit_parser() {
-        // values for testing
-        let config = get_deposit_tx_config();
-        let amt = Amount::from_sat(config.deposit_amount);
-        let idx = 0xdeadbeef;
-        let ee_addr = [1; 20];
+    fn parses_valid_buffer_correctly() {
+        let magic = [1, 2, 3, 4, 5];
+        const ADDR_LEN: usize = 20;
 
-        let deposit_request_script =
-            build_test_deposit_script(config.magic_bytes, idx, ee_addr.to_vec());
+        let deposit_idx: u32 = 42;
+        let dest_buf = vec![0xAB; ADDR_LEN];
+        let takeback_hash = vec![0xCD; 32];
+        let sats_amt: u64 = 1_000_000;
 
-        let test_transaction = create_test_deposit_tx(
-            Amount::from_sat(config.deposit_amount),
-            &test_taproot_addr().address().script_pubkey(),
-            &deposit_request_script,
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&magic);
+        buf.extend_from_slice(&deposit_idx.to_be_bytes());
+        buf.extend_from_slice(&dest_buf);
+        buf.extend_from_slice(&takeback_hash);
+        buf.extend_from_slice(&sats_amt.to_be_bytes());
+
+        let result = parse_tag(&buf, &magic, ADDR_LEN as u8).expect("should parse successfully");
+
+        assert_eq!(result.deposit_idx, 42);
+        assert_eq!(result.dest_buf, dest_buf.as_slice());
+        assert_eq!(result.amount, sats_amt);
+        assert_eq!(
+            result.tapscript_root,
+            takeback_hash
+                .as_slice()
+                .try_into()
+                .expect("takeback not 32 bytes")
         );
+    }
 
-        let out = extract_deposit_info(&test_transaction, &get_deposit_tx_config());
+    #[test]
+    fn fails_if_magic_mismatch() {
+        let magic = [1, 2, 3, 4, 5];
+        const ADDR_LEN: usize = 20;
 
-        assert!(out.is_some());
-        let out = out.unwrap();
+        let mut bad_buf = Vec::from(b"badmg"); // wrong magic, but correct length
+        bad_buf
+            .extend_from_slice(&[0u8; DEPOSIT_IDX_LEN + 20 + TAKEBACK_HASH_LEN + SATS_AMOUNT_LEN]);
 
-        assert_eq!(out.amt, amt.into());
-        assert_eq!(out.deposit_idx, idx);
-        assert_eq!(out.address, ee_addr);
+        let result = parse_tag(&bad_buf, &magic, ADDR_LEN as u8);
+
+        assert!(matches!(result, Err(DepositParseError::InvalidMagic)));
+    }
+
+    #[test]
+    fn fails_if_buffer_too_short() {
+        let magic = [1, 2, 3, 4, 5];
+        const ADDR_LEN: usize = 20;
+        let short_buf = Vec::from(magic); // only magic, missing everything else
+
+        let result = parse_tag(&short_buf, &magic, ADDR_LEN as u8);
+
+        assert!(matches!(result, Err(DepositParseError::InvalidData)));
+    }
+
+    #[test]
+    fn fails_if_address_length_mismatch() {
+        let magic = [1, 2, 3, 4, 5];
+        const ADDR_LEN: usize = 20;
+
+        let deposit_idx: u32 = 10;
+        let wrong_dest_buf = vec![0xFF; ADDR_LEN - 1]; // wrong address size
+        let takeback_hash = vec![0xCD; 32];
+        let sats_amt: u64 = 42;
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&magic);
+        buf.extend_from_slice(&deposit_idx.to_be_bytes());
+        buf.extend_from_slice(&wrong_dest_buf);
+        buf.extend_from_slice(&takeback_hash);
+        buf.extend_from_slice(&sats_amt.to_be_bytes());
+
+        let result = parse_tag(&buf, &magic, ADDR_LEN as u8);
+
+        if let Err(DepositParseError::InvalidDestLen(len)) = result {
+            assert_eq!(len, 19);
+        } else {
+            panic!("Expected InvalidDestLen error");
+        }
+    }
+
+    // Tets for parse_tag_script
+    #[test]
+    fn fails_if_missing_op_return() {
+        // Script without OP_RETURN
+        let script = Builder::new()
+            .push_slice(b"some data") // just pushes data, no OP_RETURN
+            .into_script();
+        let config = dummy_config();
+
+        let res = parse_tag_script(&script, &config);
+
+        assert!(matches!(res, Err(DepositParseError::MissingTag)));
+    }
+
+    #[test]
+    fn fails_if_no_data_after_op_return() {
+        // Script with OP_RETURN but no pushdata
+        let script = Builder::new().push_opcode(OP_RETURN).into_script();
+        let config = dummy_config();
+
+        let res = parse_tag_script(&script, &config);
+
+        assert!(matches!(res, Err(DepositParseError::NoData)));
+    }
+
+    #[test]
+    fn fails_if_tag_data_oversized() {
+        // Script with OP_RETURN and oversized pushdata (>80 bytes)
+        let oversized_payload = vec![0xAAu8; 81];
+        let script = Builder::new()
+            .push_opcode(OP_RETURN)
+            .push_slice(PushBytesBuf::try_from(oversized_payload).unwrap())
+            .into_script();
+        let config = dummy_config();
+
+        let res = parse_tag_script(&script, &config);
+
+        assert!(matches!(res, Err(DepositParseError::TagOversized)));
+    }
+
+    #[test]
+    fn succeeds_if_valid_op_return_and_data() {
+        // Script with OP_RETURN and valid size pushdata
+        let valid_payload = vec![0xAAu8; 50]; // size < 80 bytes
+        let script = Builder::new()
+            .push_opcode(OP_RETURN)
+            .push_slice(PushBytesBuf::try_from(valid_payload).unwrap())
+            .into_script();
+        let config = dummy_config();
+
+        // Might still fail inside parse_tag (e.g., InvalidMagic), but must NOT fail for
+        // MissingTag/NoData/TagOversized
+        let res = parse_tag_script(&script, &config);
+
+        assert!(!matches!(
+            res,
+            Err(DepositParseError::MissingTag)
+                | Err(DepositParseError::NoData)
+                | Err(DepositParseError::TagOversized)
+        ));
     }
 }
