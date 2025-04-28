@@ -2,7 +2,7 @@
 
 use bitcoin::{
     hashes::Hash,
-    key::{Secp256k1, TapTweak},
+    key::TapTweak,
     opcodes::all::OP_RETURN,
     sighash::{Prevouts, SighashCache},
     Amount, OutPoint, ScriptBuf, TapNodeHash, TapSighashType, Transaction, TxOut, XOnlyPublicKey,
@@ -19,6 +19,10 @@ use crate::{
     deposit::error::DepositParseError,
     utils::{next_bytes, next_op},
 };
+
+const TAKEBACK_HASH_LEN: usize = 32;
+const SATS_AMOUNT_LEN: usize = 8;
+const DEPOSIT_IDX_LEN: usize = 4;
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Option<DepositInfo> {
@@ -67,44 +71,41 @@ fn validate_deposit_signature(
     tag_data: &DepositTag<'_>,
     dep_config: &DepositTxParams,
 ) -> Option<()> {
-    // --- Initialize necessary variables and dependencies
-    let secp = Secp256k1::verification_only();
+    // Initialize necessary variables and dependencies
+    let secp = secp256k1::SECP256K1;
 
-    // --- Extract and validate input signature
+    // Extract and validate input signature
     let input = tx.input[0].clone();
     let sig_bytes = &input.witness[0];
-    let schnorr_sig = Signature::from_slice(&sig_bytes[..64]).unwrap(); // TODO: enforce length?
+    let schnorr_sig = Signature::from_slice(sig_bytes.get(..64)?).unwrap();
 
-    // --- Parse the internal pubkey and merkle root
+    // Parse the internal pubkey and merkle root
     let internal_pubkey = XOnlyPk::from_address(&dep_config.address).ok()?;
-    let mut hash_bytes = [0; 32];
-    hash_bytes.copy_from_slice(tag_data.tapscript_root.as_bytes());
-    let merkle_root: TapNodeHash = TapNodeHash::from_byte_array(hash_bytes);
+    let merkle_root: TapNodeHash = TapNodeHash::from_byte_array(*tag_data.tapscript_root.as_ref());
 
     let int_key = XOnlyPublicKey::from_slice(internal_pubkey.inner().as_bytes()).unwrap();
-    // --- Compute the tweaked output key
-    let (output_key, _) = int_key.tap_tweak(&secp, Some(merkle_root));
 
-    // --- Build the scriptPubKey for the UTXO
-    let script_pubkey = ScriptBuf::new_p2tr(&secp, int_key, Some(merkle_root));
+    // Build the scriptPubKey for the UTXO
+    let script_pubkey = ScriptBuf::new_p2tr(secp, int_key, Some(merkle_root));
 
-    let utxo = TxOut {
+    let utxos = [TxOut {
         value: Amount::from_sat(tag_data.amount),
         script_pubkey,
-    };
+    }];
 
-    // --- Compute the sighash
-    let prevout = Prevouts::One(0, utxo);
+    // Compute the sighash
+    let prevout = Prevouts::All(&utxos);
     let sighash = SighashCache::new(tx)
         .taproot_key_spend_signature_hash(0, &prevout, TapSighashType::Default)
         .unwrap();
 
-    // --- Prepare the message for signature verification
-    let mut digest = [0; 32];
-    digest.copy_from_slice(sighash.as_byte_array());
-    let msg = Message::from_digest(digest);
+    // Prepare the message for signature verification
+    let msg = Message::from_digest(*sighash.as_byte_array());
 
-    // --- Verify the Schnorr signature
+    // Compute the tweaked output key
+    let (output_key, _) = int_key.tap_tweak(secp, Some(merkle_root));
+
+    // Verify the Schnorr signature
     secp.verify_schnorr(&schnorr_sig, &msg, &output_key.to_inner())
         .ok()
 }
@@ -142,6 +143,9 @@ fn parse_tag_script<'a>(
     parse_tag(data, config)
 }
 
+/// Parses the script buffer which has the following structure:
+/// [magic_bytes(n bytes), stake_idx(4 bytes), ee_address(m bytes), takeback_hash(32 bytes),
+/// sats_amt(8 bytes)]
 fn parse_tag<'b>(
     buf: &'b [u8],
     config: &DepositTxParams,
@@ -150,36 +154,46 @@ fn parse_tag<'b>(
     let magic_bytes = &config.magic_bytes;
     let magic_len = magic_bytes.len();
 
-    // Do some math to make sure there is a magic.
-    let exp_min_len = magic_len + 4;
-    if buf.len() < exp_min_len {
-        return Err(DepositParseError::InvalidMagic);
+    if buf.len() < magic_len + DEPOSIT_IDX_LEN + SATS_AMOUNT_LEN + TAKEBACK_HASH_LEN {
+        return Err(DepositParseError::InvalidData);
     }
 
-    let magic_slice = &buf[..magic_len];
+    let (magic_slice, idx_ee_takeback_amt) = buf.split_at(magic_len);
     if magic_slice != magic_bytes {
         return Err(DepositParseError::InvalidMagic);
     }
 
-    // Extract the deposit idx.
-    let di_buf = &buf[magic_len..exp_min_len];
-    let deposit_idx = u32::from_be_bytes([di_buf[0], di_buf[1], di_buf[2], di_buf[3]]);
+    // Extract the deposit idx. Can use expect because of the above length check
+    let (didx_buf, ee_takeback_amt) = idx_ee_takeback_amt.split_at(DEPOSIT_IDX_LEN);
+    let deposit_idx =
+        u32::from_be_bytes(didx_buf.try_into().expect("Expect dep idx to be 4 bytes"));
 
-    // The rest of the buffer is the dest.
-    let dest_buf = &buf[exp_min_len..];
+    let (dest_buf, takeback_and_amt) =
+        ee_takeback_amt.split_at(ee_takeback_amt.len() - SATS_AMOUNT_LEN - TAKEBACK_HASH_LEN);
 
-    // TODO make this variable sized
+    // Check dest_buf len
     if dest_buf.len() != config.address_length as usize {
-        // casting is safe as address.len() < data.len() < 80
         return Err(DepositParseError::InvalidDestLen(dest_buf.len() as u8));
     }
+
+    // Extract takeback and amt
+    let (takeback_hash, amt) = takeback_and_amt.split_at(TAKEBACK_HASH_LEN);
+
+    // Extract sats, can use expect here because by the initial check on the buf len, we can ensure
+    // this.
+    let amt_bytes: [u8; 8] = amt
+        .try_into()
+        .expect("Expected to have 8 bytes as sats amount");
+
+    let sats_amt = u64::from_be_bytes(amt_bytes);
 
     Ok(DepositTag {
         deposit_idx,
         dest_buf,
-        // TODO
-        amount: 0,
-        tapscript_root: Buf32::zero(),
+        amount: sats_amt,
+        tapscript_root: takeback_hash
+            .try_into()
+            .expect("expected takeback hash length to match"),
     })
 }
 
