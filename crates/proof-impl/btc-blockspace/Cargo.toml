@@ -20,4 +20,5 @@ sha2.workspace = true
 hex.workspace = true
 rand.workspace = true
 strata-btcio.workspace = true
-strata-test-utils.workspace = true
+strata-l1tx = { workspace = true, features = ["test_utils"] }
+strata-test-utils = { workspace = true }

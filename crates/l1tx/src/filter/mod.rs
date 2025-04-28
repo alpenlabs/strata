@@ -7,11 +7,11 @@ pub mod types;
 mod withdrawal_fulfillment;
 
 use checkpoint::parse_valid_checkpoint_envelopes;
-pub use types::TxFilterConfig;
 use withdrawal_fulfillment::try_parse_tx_as_withdrawal_fulfillment;
 
-use crate::deposit::{
-    deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info,
+use crate::{
+    deposit::{deposit_request::extract_deposit_request_info, deposit_tx::extract_deposit_info},
+    filter::types::TxFilterConfig,
 };
 
 // TODO move all these functions to other modules

@@ -11,10 +11,10 @@ use bitcoin::{
     Address, Amount, Block, Network, ScriptBuf, Sequence, TapNodeHash, TapSighashType, Transaction,
     TxIn, TxOut, Witness,
 };
-use strata_l1tx::filter::TxFilterConfig;
+use strata_l1tx::TxFilterConfig;
 use strata_primitives::{
-    l1::{BitcoinAddress, L1HeaderRecord, OutputRef},
-    params::DepositTxParams,
+    l1::{BitcoinAddress, L1HeaderRecord, OutputRef, XOnlyPk},
+    params::{DepositTxParams, Params},
 };
 
 use crate::{l2::gen_params, ArbitraryGenerator};
@@ -52,20 +52,6 @@ pub fn get_btc_mainnet_block() -> Block {
 pub fn get_test_tx_filter_config() -> TxFilterConfig {
     let config = gen_params();
     TxFilterConfig::derive_from(config.rollup()).expect("can't derive filter config")
-}
-
-pub fn get_taproot_addr_and_keypair() -> (Address, Keypair) {
-    // Generate valid signature
-    let secp = Secp256k1::new();
-
-    // Step 1. Create a random internal key (you can use a fixed one in tests)
-    let secret_key = SecretKey::from_slice(&[42u8; 32]).unwrap();
-    let keypair = Keypair::from_secret_key(&secp, &secret_key);
-    let (internal_xonly, _parity) = keypair.x_only_public_key();
-
-    // Step 2. Create a Taproot address
-    let taproot_addr = Address::p2tr(&secp, internal_xonly, None, Network::Regtest);
-    (taproot_addr, keypair)
 }
 
 pub fn create_test_deposit_tx(

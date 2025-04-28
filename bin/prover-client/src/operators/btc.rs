@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use bitcoind_async_client::{traits::Reader, Client};
 use jsonrpsee::http_client::HttpClient;
-use strata_l1tx::filter::TxFilterConfig;
+use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
+use strata_l1tx::filter::types::TxFilterConfig;
 use strata_primitives::{
     l1::L1BlockCommitment,
     params::RollupParams,

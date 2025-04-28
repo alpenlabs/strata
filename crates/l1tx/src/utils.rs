@@ -96,22 +96,35 @@ pub fn get_operator_wallet_pks(params: &RollupParams) -> Vec<Buf32> {
     operator_table.iter().map(|op| *op.wallet_pk()).collect()
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils {
-    use bitcoin::Network;
-    use secp256k1::Keypair;
+    use bitcoin::{
+        secp256k1::{Keypair, Secp256k1, SecretKey},
+        Address, Network,
+    };
     use strata_primitives::{
         l1::{BitcoinAddress, XOnlyPk},
         params::Params,
     };
-    use strata_test_utils::bitcoin::get_taproot_addr_and_keypair;
 
-    use crate::filter::TxFilterConfig;
+    use crate::TxFilterConfig;
+
+    pub fn get_taproot_addr_and_keypair() -> (Address, Keypair) {
+        // Generate valid signature
+        let secp = Secp256k1::new();
+
+        // Step 1. Create a random internal key (you can use a fixed one in tests)
+        let secret_key = SecretKey::from_slice(&[42u8; 32]).unwrap();
+        let keypair = Keypair::from_secret_key(&secp, &secret_key);
+        let (internal_xonly, _parity) = keypair.x_only_public_key();
+
+        // Step 2. Create a Taproot address
+        let taproot_addr = Address::p2tr(&secp, internal_xonly, None, Network::Regtest);
+        (taproot_addr, keypair)
+    }
 
     /// Helper function to create filter config
     pub fn create_tx_filter_config(params: &Params) -> (TxFilterConfig, Keypair) {
-        use crate::filter::TxFilterConfig;
-
         let mut txconfig =
             TxFilterConfig::derive_from(params.rollup()).expect("can't get filter config");
 

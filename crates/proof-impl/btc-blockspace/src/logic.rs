@@ -5,7 +5,7 @@ use bitcoin::{
     Block,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
+use strata_l1tx::filter::{indexer::index_block, types::TxFilterConfig};
 use strata_primitives::l1::{L1TxProof, ProtocolOperation};
 use zkaleido::ZkVmEnv;
 

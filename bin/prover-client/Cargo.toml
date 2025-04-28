@@ -52,7 +52,7 @@ strata-test-utils.workspace = true
 
 [features]
 default = []
-sp1 = ["strata-zkvm-hosts/sp1"]
-sp1-builder = ["sp1", "strata-zkvm-hosts/sp1-builder"]
 risc0 = ["strata-zkvm-hosts/risc0"]
 risc0-builder = ["risc0", "strata-zkvm-hosts/risc0-builder"]
+sp1 = ["strata-zkvm-hosts/sp1"]
+sp1-builder = ["sp1", "strata-zkvm-hosts/sp1-builder"]
