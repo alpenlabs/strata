@@ -61,7 +61,7 @@ fn find_deposit_spends<'tx>(
 #[cfg(test)]
 mod test {
     use bitcoin::{Amount, ScriptBuf};
-    use strata_primitives::{l1::BitcoinAmount, params::Params};
+    use strata_primitives::l1::BitcoinAmount;
     use strata_test_utils::{
         bitcoin::{
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
@@ -70,28 +70,30 @@ mod test {
         l2::gen_params,
     };
 
-    use super::TxFilterConfig;
-    use crate::filter::{extract_deposit_requests, try_parse_tx_deposit};
-
-    /// Helper function to create filter config
-    fn create_tx_filter_config(params: &Params) -> TxFilterConfig {
-        TxFilterConfig::derive_from(params.rollup()).expect("can't get filter config")
-    }
+    use crate::{
+        filter::{extract_deposit_requests, try_parse_tx_deposit},
+        utils::test_utils::create_tx_filter_config,
+    };
 
     #[test]
     fn test_parse_deposit_txs() {
         let params = gen_params();
-        let filter_conf = create_tx_filter_config(&params);
+        let (filter_conf, keypair) = create_tx_filter_config(&params);
+
         let deposit_config = filter_conf.deposit_config.clone();
         let idx = 0xdeadbeef;
         let ee_addr = vec![1u8; 20]; // Example EVM address
+        let tapnode_hash = [0u8; 32]; // A dummy tapnode hash. Dummy works because we don't need to
+                                      // test takeback at this moment
         let deposit_script =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx, ee_addr.clone());
+            build_test_deposit_script(&deposit_config, idx, ee_addr.clone(), &tapnode_hash);
 
         let tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &deposit_config.address.address().script_pubkey(),
             &deposit_script,
+            &keypair,
+            &tapnode_hash,
         );
 
         let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
@@ -109,7 +111,7 @@ mod test {
     #[test]
     fn test_parse_deposit_request() {
         let params = gen_params();
-        let filter_conf = create_tx_filter_config(&params);
+        let (filter_conf, keypair) = create_tx_filter_config(&params);
         let mut deposit_conf = filter_conf.deposit_config.clone();
 
         let extra_amt = 10000;
@@ -122,10 +124,14 @@ mod test {
             dest_addr.clone(),
         );
 
+        let tapnode_hash = [0u8; 32];
+
         let tx = create_test_deposit_tx(
             Amount::from_sat(deposit_conf.deposit_amount), // Any amount
             &deposit_conf.address.address().script_pubkey(),
             &deposit_request_script,
+            &keypair,
+            &tapnode_hash,
         );
 
         let deposit_reqs: Vec<_> = extract_deposit_requests(&tx, &filter_conf).collect();
@@ -145,13 +151,18 @@ mod test {
     #[test]
     fn test_parse_invalid_deposit() {
         let params = gen_params();
-        let filter_conf = create_tx_filter_config(&params);
+        let (filter_conf, keypair) = create_tx_filter_config(&params);
+
         let deposit_conf = filter_conf.deposit_config.clone();
+        let tapnode_hash = [0u8; 32];
+
         // This won't have magic bytes in script so shouldn't get parsed.
         let tx = create_test_deposit_tx(
             Amount::from_sat(deposit_conf.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
             &ScriptBuf::new(),
+            &keypair,
+            &tapnode_hash,
         );
 
         let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();

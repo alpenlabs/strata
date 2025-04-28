@@ -2,7 +2,6 @@
 
 use bitcoin::{
     hashes::Hash,
-    key::TapTweak,
     opcodes::all::OP_RETURN,
     sighash::{Prevouts, SighashCache},
     Amount, OutPoint, ScriptBuf, TapNodeHash, TapSighashType, Transaction, TxOut, XOnlyPublicKey,
@@ -10,7 +9,7 @@ use bitcoin::{
 use secp256k1::{schnorr::Signature, Message};
 use strata_primitives::{
     buf::Buf32,
-    l1::{DepositInfo, OutputRef, XOnlyPk},
+    l1::{DepositInfo, OutputRef},
     prelude::DepositTxParams,
 };
 
@@ -80,7 +79,7 @@ fn validate_deposit_signature(
     let schnorr_sig = Signature::from_slice(sig_bytes.get(..64)?).unwrap();
 
     // Parse the internal pubkey and merkle root
-    let internal_pubkey = XOnlyPk::from_address(&dep_config.address).ok()?;
+    let internal_pubkey = dep_config.operators_pubkey;
     let merkle_root: TapNodeHash = TapNodeHash::from_byte_array(*tag_data.tapscript_root.as_ref());
 
     let int_key = XOnlyPublicKey::from_slice(internal_pubkey.inner().as_bytes()).unwrap();
@@ -102,12 +101,8 @@ fn validate_deposit_signature(
     // Prepare the message for signature verification
     let msg = Message::from_digest(*sighash.as_byte_array());
 
-    // Compute the tweaked output key
-    let (output_key, _) = int_key.tap_tweak(secp, Some(merkle_root));
-
     // Verify the Schnorr signature
-    secp.verify_schnorr(&schnorr_sig, &msg, &output_key.to_inner())
-        .ok()
+    secp.verify_schnorr(&schnorr_sig, &msg, &int_key).ok()
 }
 
 struct DepositTag<'buf> {
@@ -205,7 +200,10 @@ mod tests {
         script::{Builder, PushBytesBuf},
         Network,
     };
-    use strata_primitives::{l1::BitcoinAddress, params::DepositTxParams};
+    use strata_primitives::{
+        l1::{BitcoinAddress, XOnlyPk},
+        params::DepositTxParams,
+    };
 
     use crate::deposit::{
         deposit_tx::{
@@ -217,11 +215,13 @@ mod tests {
     const ADDRESS: &str = "bcrt1p729l9680ht3zf7uhl6pgdrlhfp9r29cwajr5jk3k05fer62763fscz0w4s";
 
     fn dummy_config() -> DepositTxParams {
+        let addr = BitcoinAddress::parse(ADDRESS, Network::Regtest).unwrap();
         DepositTxParams {
             magic_bytes: MAGIC_BYTES.to_vec(),
             address_length: 20,
             deposit_amount: 10,
-            address: BitcoinAddress::parse(ADDRESS, Network::Regtest).unwrap(),
+            address: addr.clone(),
+            operators_pubkey: XOnlyPk::from_address(&addr).unwrap(),
         }
     }
 

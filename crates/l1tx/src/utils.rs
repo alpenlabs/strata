@@ -58,10 +58,11 @@ pub fn next_u32(instructions: &mut Instructions<'_>) -> Option<u32> {
     }
 }
 
+/// Returns taproot address along with untweaked internal pubkey
 pub fn generate_taproot_address(
     operator_wallet_pks: &[Buf32],
     network: Network,
-) -> anyhow::Result<BitcoinAddress> {
+) -> anyhow::Result<(BitcoinAddress, XOnlyPublicKey)> {
     let keys = operator_wallet_pks.iter().map(|op| {
         PublicKey::from_x_only_public_key(
             XOnlyPublicKey::from_slice(op.as_ref()).expect("slice not an x-only public key"),
@@ -83,7 +84,7 @@ pub fn generate_taproot_address(
     let addr = Address::p2tr(SECP256K1, x_only_pub_key, merkle_root, network);
     let addr = BitcoinAddress::parse(&addr.to_string(), network)?;
 
-    Ok(addr)
+    Ok((addr, x_only_pub_key))
 }
 
 /// Reads the operator wallet public keys from Rollup params. Returns None if
@@ -93,4 +94,36 @@ pub fn get_operator_wallet_pks(params: &RollupParams) -> Vec<Buf32> {
     let OperatorConfig::Static(operator_table) = &params.operator_config;
 
     operator_table.iter().map(|op| *op.wallet_pk()).collect()
+}
+
+#[cfg(test)]
+pub mod test_utils {
+    use bitcoin::Network;
+    use secp256k1::Keypair;
+    use strata_primitives::{
+        l1::{BitcoinAddress, XOnlyPk},
+        params::Params,
+    };
+    use strata_test_utils::bitcoin::get_taproot_addr_and_keypair;
+
+    use crate::filter::TxFilterConfig;
+
+    /// Helper function to create filter config
+    pub fn create_tx_filter_config(params: &Params) -> (TxFilterConfig, Keypair) {
+        use crate::filter::TxFilterConfig;
+
+        let mut txconfig =
+            TxFilterConfig::derive_from(params.rollup()).expect("can't get filter config");
+
+        let mut deposit_config = txconfig.deposit_config.clone();
+        let (taproot_addr, keypair) = get_taproot_addr_and_keypair();
+        let (op_key, _) = keypair.x_only_public_key();
+        deposit_config.operators_pubkey = XOnlyPk::new(op_key.serialize().into()).unwrap();
+        deposit_config.address =
+            BitcoinAddress::from_bytes(taproot_addr.script_pubkey().as_bytes(), Network::Regtest)
+                .unwrap();
+
+        txconfig.deposit_config = deposit_config;
+        (txconfig, keypair)
+    }
 }

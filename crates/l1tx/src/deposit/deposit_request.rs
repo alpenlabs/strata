@@ -114,21 +114,29 @@ fn parse_tag_script(
 #[cfg(test)]
 mod tests {
     use bitcoin::{absolute::LockTime, Amount, Transaction};
-    use strata_test_utils::bitcoin::{
-        build_no_op_deposit_request_script, build_test_deposit_request_script,
-        create_test_deposit_tx, test_taproot_addr,
+    use strata_test_utils::{
+        bitcoin::{
+            build_no_op_deposit_request_script, build_test_deposit_request_script,
+            create_test_deposit_tx, test_taproot_addr,
+        },
+        l2::gen_params,
     };
 
     use super::extract_deposit_request_info;
-    use crate::deposit::{
-        deposit_request::parse_deposit_request_script, error::DepositParseError,
-        test_utils::get_deposit_tx_config,
+    use crate::{
+        deposit::{
+            deposit_request::parse_deposit_request_script, error::DepositParseError,
+            test_utils::get_deposit_tx_config,
+        },
+        utils::test_utils::create_tx_filter_config,
     };
 
     #[test]
     fn check_deposit_parser() {
         // values for testing
-        let mut config = get_deposit_tx_config();
+        let params = gen_params();
+        let (filter_conf, keypair) = create_tx_filter_config(&params);
+        let mut config = filter_conf.deposit_config.clone();
         let extra_amt = 100000;
         config.deposit_amount += extra_amt;
         let amt = Amount::from_sat(config.deposit_amount);
@@ -146,6 +154,8 @@ mod tests {
             Amount::from_sat(config.deposit_amount),
             &test_taproot_addr.address().script_pubkey(),
             &deposit_request_script,
+            &keypair,
+            &[0; 32],
         );
 
         let out = extract_deposit_request_info(&test_transaction, &config);

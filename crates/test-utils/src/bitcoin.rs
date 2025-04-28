@@ -3,12 +3,19 @@ use std::str::FromStr;
 use bitcoin::{
     absolute::LockTime,
     consensus::deserialize,
+    hashes::Hash,
     opcodes::all::OP_RETURN,
     script::{self, PushBytesBuf},
-    Address, Amount, Block, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
+    secp256k1::{Keypair, Message, Secp256k1, SecretKey},
+    sighash::{Prevouts, SighashCache},
+    Address, Amount, Block, Network, ScriptBuf, Sequence, TapNodeHash, TapSighashType, Transaction,
+    TxIn, TxOut, Witness,
 };
 use strata_l1tx::filter::TxFilterConfig;
-use strata_primitives::l1::{BitcoinAddress, L1HeaderRecord, OutputRef};
+use strata_primitives::{
+    l1::{BitcoinAddress, L1HeaderRecord, OutputRef},
+    params::DepositTxParams,
+};
 
 use crate::{l2::gen_params, ArbitraryGenerator};
 
@@ -47,12 +54,42 @@ pub fn get_test_tx_filter_config() -> TxFilterConfig {
     TxFilterConfig::derive_from(config.rollup()).expect("can't derive filter config")
 }
 
+pub fn get_taproot_addr_and_keypair() -> (Address, Keypair) {
+    // Generate valid signature
+    let secp = Secp256k1::new();
+
+    // Step 1. Create a random internal key (you can use a fixed one in tests)
+    let secret_key = SecretKey::from_slice(&[42u8; 32]).unwrap();
+    let keypair = Keypair::from_secret_key(&secp, &secret_key);
+    let (internal_xonly, _parity) = keypair.x_only_public_key();
+
+    // Step 2. Create a Taproot address
+    let taproot_addr = Address::p2tr(&secp, internal_xonly, None, Network::Regtest);
+    (taproot_addr, keypair)
+}
+
 pub fn create_test_deposit_tx(
     amt: Amount,
     addr_script: &ScriptBuf,
     opreturn_script: &ScriptBuf,
+    keypair: &Keypair,
+    tapnode_hash: &[u8; 32],
 ) -> Transaction {
-    let previous_output: OutputRef = ArbitraryGenerator::new().generate();
+    let mut previous_output: OutputRef = ArbitraryGenerator::new().generate();
+    previous_output.0.vout = 0;
+
+    let secp = Secp256k1::new();
+    let (xpk, _) = keypair.x_only_public_key();
+    let sbuf = ScriptBuf::new_p2tr(
+        &secp,
+        xpk,
+        Some(TapNodeHash::from_byte_array(*tapnode_hash)),
+    );
+
+    let prev_txout = TxOut {
+        value: amt,
+        script_pubkey: sbuf,
+    };
 
     let inputs = vec![TxIn {
         previous_output: *previous_output.outpoint(),
@@ -74,12 +111,27 @@ pub fn create_test_deposit_tx(
     ];
 
     // Create the transaction
-    Transaction {
+    let mut tx = Transaction {
         version: bitcoin::transaction::Version(2),
         lock_time: LockTime::ZERO,
         input: inputs,
         output: outputs,
-    }
+    };
+
+    let prevtxout = [prev_txout];
+    let prevouts = Prevouts::All(&prevtxout);
+    let sighash = SighashCache::new(&mut tx)
+        .taproot_key_spend_signature_hash(0, &prevouts, TapSighashType::Default)
+        .unwrap();
+
+    let msg = Message::from_digest(*sighash.as_ref());
+
+    // Sign the sighash
+    let sig = secp.sign_schnorr(&msg, keypair);
+
+    tx.input[0].witness.push(sig.as_ref());
+
+    tx
 }
 
 pub fn build_no_op_deposit_request_script(
@@ -110,10 +162,17 @@ pub fn build_test_deposit_request_script(
     builder.into_script()
 }
 
-pub fn build_test_deposit_script(magic: Vec<u8>, idx: u32, dest_addr: Vec<u8>) -> ScriptBuf {
-    let mut data = magic;
+pub fn build_test_deposit_script(
+    dep_config: &DepositTxParams,
+    idx: u32,
+    dest_addr: Vec<u8>,
+    tapnode_hash: &[u8; 32],
+) -> ScriptBuf {
+    let mut data = dep_config.magic_bytes.clone();
     data.extend(&idx.to_be_bytes()[..]);
     data.extend(dest_addr);
+    data.extend(tapnode_hash);
+    data.extend(&dep_config.deposit_amount.to_be_bytes());
 
     let builder = script::Builder::new()
         .push_opcode(OP_RETURN)
