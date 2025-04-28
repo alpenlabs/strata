@@ -1,7 +1,5 @@
 use std::{fmt, str::FromStr};
 
-use crate::errors::{user_error, DisplayedError};
-
 /// Represents a type of network, either Alpen's signet or Strata
 #[non_exhaustive]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -10,27 +8,26 @@ pub enum NetworkType {
     Strata,
 }
 
-impl FromStr for NetworkType {
-    type Err = DisplayedError;
+#[derive(Clone, Copy, Debug)]
+pub struct InvalidNetwork;
 
-    fn from_str(s: &str) -> Result<Self, DisplayedError> {
+impl FromStr for NetworkType {
+    type Err = InvalidNetwork;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "signet" => Ok(Self::Signet),
             "strata" => Ok(Self::Strata),
-            _ => Err(user_error(format!(
-                "Unsupported network: '{}'. Must be `signet` or `strata`.",
-                s
-            ))),
+            _ => Err(InvalidNetwork),
         }
     }
 }
 
 impl fmt::Display for NetworkType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let net_str = match self {
+        f.write_str(match self {
             NetworkType::Signet => "signet",
             NetworkType::Strata => "strata",
-        };
-        write!(f, "{}", net_str)
+        })
     }
 }

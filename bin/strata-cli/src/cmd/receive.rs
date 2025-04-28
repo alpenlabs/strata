@@ -25,7 +25,10 @@ pub async fn receive(
     seed: Seed,
     settings: Settings,
 ) -> Result<(), DisplayedError> {
-    let network_type = args.network_type.parse()?;
+    let network_type = args
+        .network_type
+        .parse()
+        .user_error("invalid network type")?;
 
     let address = match network_type {
         NetworkType::Signet => {

@@ -10,7 +10,7 @@ use colored::Colorize;
 
 use crate::{
     constants::SATS_TO_WEI,
-    errors::{user_error, DisplayableError, DisplayedError},
+    errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -36,6 +36,9 @@ pub struct DrainArgs {
     fee_rate: Option<u64>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct MissingTargetAddress;
+
 pub async fn drain(
     DrainArgs {
         signet_address,
@@ -46,8 +49,9 @@ pub async fn drain(
     settings: Settings,
 ) -> Result<(), DisplayedError> {
     if strata_address.is_none() && signet_address.is_none() {
-        return Err(user_error(
-            "Missing target address. Must provide a `signet` address or `strata` address.",
+        return Err(DisplayedError::UserError(
+            "Missing target address. Must provide a `signet` address or `strata` address.".into(),
+            Box::new(MissingTargetAddress),
         ));
     }
 

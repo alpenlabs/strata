@@ -13,7 +13,7 @@ use alloy::{
 };
 
 use crate::{
-    errors::{user_error, DisplayedError},
+    errors::{DisplayableError, DisplayedError},
     seed::Seed,
 };
 
@@ -54,9 +54,11 @@ impl StrataWallet {
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
-            .on_http(l2_http_endpoint.parse().map_err(|_| {
-                user_error(format!("Invalid strata endpoint: '{}'.", l2_http_endpoint))
-            })?);
+            .on_http(
+                l2_http_endpoint
+                    .parse()
+                    .user_error(format!("Invalid strata endpoint: '{}'.", l2_http_endpoint))?,
+            );
         Ok(Self(provider))
     }
 }

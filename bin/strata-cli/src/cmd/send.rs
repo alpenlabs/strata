@@ -42,7 +42,10 @@ pub struct SendArgs {
 }
 
 pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), DisplayedError> {
-    let network_type = args.network_type.parse()?;
+    let network_type = args
+        .network_type
+        .parse()
+        .user_error("invalid network type")?;
 
     match network_type {
         NetworkType::Signet => {

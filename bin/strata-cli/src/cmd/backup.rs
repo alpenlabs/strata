@@ -1,10 +1,7 @@
 use argh::FromArgs;
 use bip39::Language;
 
-use crate::{
-    errors::{user_error, DisplayedError},
-    seed::Seed,
-};
+use crate::{errors::DisplayedError, seed::Seed};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "backup")]
@@ -18,6 +15,9 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct UnsupportedMnemonicLanguage;
+
 pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), DisplayedError> {
     let language = match args.language.unwrap_or_else(|| "en".to_owned()).as_str() {
         "en" => Ok(Language::English),
@@ -29,10 +29,10 @@ pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), DisplayedError> 
         "jp" => Ok(Language::Japanese),
         "kr" => Ok(Language::Korean),
         "es" => Ok(Language::Spanish),
-        other => Err(user_error(format!(
-            "Unsupported language: '{}'. Use --help to list supported languages.",
-            other
-        ))),
+        _ => Err(DisplayedError::UserError(
+            "The mnemonic language you provided wasn't supported".to_string(),
+            Box::new(UnsupportedMnemonicLanguage),
+        )),
     }?;
 
     seed.print_mnemonic(language);
