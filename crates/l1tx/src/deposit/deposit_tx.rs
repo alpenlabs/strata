@@ -4,6 +4,7 @@ use bitcoin::{
     hashes::Hash,
     opcodes::all::OP_RETURN,
     sighash::{Prevouts, SighashCache},
+    taproot::TAPROOT_CONTROL_NODE_SIZE,
     Amount, OutPoint, ScriptBuf, TapNodeHash, TapSighashType, Transaction, TxOut, XOnlyPublicKey,
 };
 use secp256k1::{schnorr::Signature, Message};
@@ -19,9 +20,9 @@ use crate::{
     utils::{next_bytes, next_op},
 };
 
-const TAKEBACK_HASH_LEN: usize = 32;
-const SATS_AMOUNT_LEN: usize = 8;
-const DEPOSIT_IDX_LEN: usize = 4;
+const TAKEBACK_HASH_LEN: usize = TAPROOT_CONTROL_NODE_SIZE;
+const SATS_AMOUNT_LEN: usize = size_of::<u64>();
+const DEPOSIT_IDX_LEN: usize = size_of::<u32>();
 
 /// Extracts the DepositInfo from the Deposit Transaction
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Option<DepositInfo> {

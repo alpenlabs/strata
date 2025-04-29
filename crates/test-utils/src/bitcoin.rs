@@ -6,15 +6,15 @@ use bitcoin::{
     hashes::Hash,
     opcodes::all::OP_RETURN,
     script::{self, PushBytesBuf},
-    secp256k1::{Keypair, Message, Secp256k1, SecretKey},
+    secp256k1::{Keypair, Message, Secp256k1},
     sighash::{Prevouts, SighashCache},
-    Address, Amount, Block, Network, ScriptBuf, Sequence, TapNodeHash, TapSighashType, Transaction,
-    TxIn, TxOut, Witness,
+    Address, Amount, Block, ScriptBuf, Sequence, TapNodeHash, TapSighashType, Transaction, TxIn,
+    TxOut, Witness,
 };
 use strata_l1tx::TxFilterConfig;
 use strata_primitives::{
-    l1::{BitcoinAddress, L1HeaderRecord, OutputRef, XOnlyPk},
-    params::{DepositTxParams, Params},
+    l1::{BitcoinAddress, L1HeaderRecord, OutputRef},
+    params::DepositTxParams,
 };
 
 use crate::{l2::gen_params, ArbitraryGenerator};

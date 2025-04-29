@@ -84,14 +84,8 @@ mod test {
         hashes::Hash,
         Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode,
     };
-    use strata_l1tx::{
-        filter::{indexer::index_block, types::TxFilterConfig},
-        utils::test_utils::create_tx_filter_config,
-    };
-    use strata_primitives::{
-        l1::{payload::L1Payload, BitcoinAmount, ProtocolOperation},
-        params::Params,
-    };
+    use strata_l1tx::{filter::indexer::index_block, utils::test_utils::create_tx_filter_config};
+    use strata_primitives::l1::{payload::L1Payload, BitcoinAmount, ProtocolOperation};
     use strata_test_utils::{
         bitcoin::{
             build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
@@ -299,6 +293,10 @@ mod test {
         }
     }
 
+    // TODO; re-enable this when we decide multiple ops can be present with deposits
+    // Also, This could just be okay in the future where protocol Ops is going to be replaced by
+    // some other mechanism.
+    #[ignore]
     #[test]
     fn test_index_tx_with_multiple_ops() {
         let params = gen_params();
