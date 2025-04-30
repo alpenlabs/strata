@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
+use alpen_reth_statediff::BlockStateDiff;
 use revm_primitives::alloy_primitives::B256;
 use rockbound::{SchemaDBOperations, SchemaDBOperationsExt};
 use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 
-use super::schema::BlockWitnessSchema;
-use crate::{errors::DbError, DbResult, WitnessProvider, WitnessStore};
+use super::schema::{BlockStateDiffSchema, BlockWitnessSchema};
+use crate::{
+    errors::DbError, DbResult, StateDiffProvider, StateDiffStore, WitnessProvider, WitnessStore,
+};
 
 #[derive(Debug)]
 pub struct WitnessDB<DB> {
@@ -60,6 +63,33 @@ impl<DB: SchemaDBOperations> WitnessStore for WitnessDB<DB> {
 
     fn del_block_witness(&self, block_hash: B256) -> DbResult<()> {
         Ok(self.db.delete::<BlockWitnessSchema>(&block_hash)?)
+    }
+}
+
+impl<DB: SchemaDBOperations> StateDiffProvider for WitnessDB<DB> {
+    fn get_state_diff(&self, block_hash: B256) -> DbResult<Option<BlockStateDiff>> {
+        let raw = self.db.get::<BlockStateDiffSchema>(&block_hash)?;
+
+        let parsed: Option<BlockStateDiff> = raw
+            .map(|bytes| bincode::deserialize(&bytes))
+            .transpose()
+            .map_err(|err| DbError::CodecError(err.to_string()))?;
+
+        Ok(parsed)
+    }
+}
+
+impl<DB: SchemaDBOperations> StateDiffStore for WitnessDB<DB> {
+    fn put_state_diff(&self, block_hash: B256, witness: &BlockStateDiff) -> crate::DbResult<()> {
+        let serialized =
+            bincode::serialize(witness).map_err(|err| DbError::Other(err.to_string()))?;
+        Ok(self
+            .db
+            .put::<BlockStateDiffSchema>(&block_hash, &serialized)?)
+    }
+
+    fn del_state_diff(&self, block_hash: B256) -> DbResult<()> {
+        Ok(self.db.delete::<BlockStateDiffSchema>(&block_hash)?)
     }
 }
 
@@ -162,4 +192,6 @@ mod tests {
         let received_witness = db.get_block_witness(block_hash);
         assert!(matches!(received_witness, Ok(None)));
     }
+
+    // TODO add unit tests for state diff.
 }
