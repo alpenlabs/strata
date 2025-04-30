@@ -71,6 +71,7 @@ alpen-reth-exex = { path = "crates/reth/exex" }
 alpen-reth-node = { path = "crates/reth/node" }
 alpen-reth-primitives = { path = "crates/reth/primitives" }
 alpen-reth-rpc = { path = "crates/reth/rpc" }
+alpen-reth-statediff = { path = "crates/reth/statediff" }
 strata-btcio = { path = "crates/btcio" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }
