@@ -54,9 +54,29 @@ pub fn get_test_tx_filter_config() -> TxFilterConfig {
     TxFilterConfig::derive_from(config.rollup()).expect("can't derive filter config")
 }
 
+/// Creates a signed test Taproot deposit transaction.
+///
+/// Generates a dummy input referencing a random previous output, and constructs a
+/// transaction with two outputs:
+/// - A payment to `out_script_pubkey` with the specified amount.
+/// - An OP_RETURN output using `opreturn_script` with zero value.
+///
+/// The input is signed using Taproot key spend with `SIGHASH_DEFAULT`, and the address
+/// is derived from the provided `keypair` and `tapnode_hash`.
+///
+/// # Arguments
+/// - `amt`: Amount to deposit.
+/// - `out_script_pubkey`: Script to spend to.
+/// - `opreturn_script`: Script for the OP_RETURN output. This contains the metadata for the
+///   deposit.
+/// - `keypair`: Keypair used to sign the transaction.
+/// - `tapnode_hash`: Optional Taproot node hash for script path commitment.
+///
+/// # Returns
+/// A signed [`Transaction`] ready for testing or simulation.
 pub fn create_test_deposit_tx(
     amt: Amount,
-    addr_script: &ScriptBuf,
+    out_script_pubkey: &ScriptBuf,
     opreturn_script: &ScriptBuf,
     keypair: &Keypair,
     tapnode_hash: &[u8; 32],
@@ -87,8 +107,8 @@ pub fn create_test_deposit_tx(
     // Construct the outputs
     let outputs = vec![
         TxOut {
-            value: amt, // 10 BTC in satoshis
-            script_pubkey: addr_script.clone(),
+            value: amt,
+            script_pubkey: out_script_pubkey.clone(),
         },
         TxOut {
             value: Amount::ZERO, // Amount is zero for OP_RETURN

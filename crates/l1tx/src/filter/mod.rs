@@ -60,7 +60,10 @@ fn find_deposit_spends<'tx>(
 
 #[cfg(test)]
 mod test {
-    use bitcoin::{Amount, ScriptBuf};
+    use bitcoin::{
+        secp256k1::{Keypair, Secp256k1, SecretKey},
+        Amount, ScriptBuf,
+    };
     use strata_primitives::l1::BitcoinAmount;
     use strata_test_utils::{
         bitcoin::{
@@ -74,39 +77,6 @@ mod test {
         filter::{extract_deposit_requests, try_parse_tx_deposit},
         utils::test_utils::create_tx_filter_config,
     };
-
-    #[test]
-    fn test_parse_deposit_txs() {
-        let params = gen_params();
-        let (filter_conf, keypair) = create_tx_filter_config(&params);
-
-        let deposit_config = filter_conf.deposit_config.clone();
-        let idx = 0xdeadbeef;
-        let ee_addr = vec![1u8; 20]; // Example EVM address
-        let tapnode_hash = [0u8; 32]; // A dummy tapnode hash. Dummy works because we don't need to
-                                      // test takeback at this moment
-        let deposit_script =
-            build_test_deposit_script(&deposit_config, idx, ee_addr.clone(), &tapnode_hash);
-
-        let tx = create_test_deposit_tx(
-            Amount::from_sat(deposit_config.deposit_amount),
-            &deposit_config.address.address().script_pubkey(),
-            &deposit_script,
-            &keypair,
-            &tapnode_hash,
-        );
-
-        let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
-        assert_eq!(deposits.len(), 1, "Should find one deposit transaction");
-
-        assert_eq!(deposits[0].deposit_idx, idx, "deposit idx should match");
-        assert_eq!(deposits[0].address, ee_addr, "EE address should match");
-        assert_eq!(
-            deposits[0].amt,
-            BitcoinAmount::from_sat(deposit_config.deposit_amount),
-            "Deposit amount should match"
-        );
-    }
 
     #[test]
     fn test_parse_deposit_request() {
@@ -147,9 +117,41 @@ mod test {
         );
     }
 
-    /// Tests parsing deposits which are invalid, i.e won't parse.
     #[test]
-    fn test_parse_invalid_deposit() {
+    fn test_parse_deposit_txs() {
+        let params = gen_params();
+        let (filter_conf, keypair) = create_tx_filter_config(&params);
+
+        let deposit_config = filter_conf.deposit_config.clone();
+        let idx = 0xdeadbeef;
+        let ee_addr = vec![1u8; 20]; // Example EVM address
+        let tapnode_hash = [0u8; 32]; // A dummy tapnode hash. Dummy works because we don't need to
+                                      // test takeback at this moment
+        let deposit_script =
+            build_test_deposit_script(&deposit_config, idx, ee_addr.clone(), &tapnode_hash);
+
+        let tx = create_test_deposit_tx(
+            Amount::from_sat(deposit_config.deposit_amount),
+            &deposit_config.address.address().script_pubkey(),
+            &deposit_script,
+            &keypair,
+            &tapnode_hash,
+        );
+
+        let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
+        assert_eq!(deposits.len(), 1, "Should find one deposit transaction");
+
+        assert_eq!(deposits[0].deposit_idx, idx, "deposit idx should match");
+        assert_eq!(deposits[0].address, ee_addr, "EE address should match");
+        assert_eq!(
+            deposits[0].amt,
+            BitcoinAmount::from_sat(deposit_config.deposit_amount),
+            "Deposit amount should match"
+        );
+    }
+
+    #[test]
+    fn test_parse_invalid_deposit_empty_opreturn() {
         let params = gen_params();
         let (filter_conf, keypair) = create_tx_filter_config(&params);
 
@@ -162,6 +164,66 @@ mod test {
             &test_taproot_addr().address().script_pubkey(),
             &ScriptBuf::new(),
             &keypair,
+            &tapnode_hash,
+        );
+
+        let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
+        assert!(deposits.is_empty(), "Should find no deposit request");
+    }
+
+    #[test]
+    fn test_parse_invalid_deposit_invalid_tapnode_hash() {
+        let params = gen_params();
+        let (filter_conf, keypair) = create_tx_filter_config(&params);
+
+        let deposit_conf = filter_conf.deposit_config.clone();
+        let expected_tapnode_hash = [0u8; 32];
+        let ee_addr = vec![1u8; 20]; // Example EVM address
+        let idx = 0;
+
+        let mismatching_tapnode_hash = [1u8; 32];
+        let deposit_script = build_test_deposit_script(
+            &deposit_conf,
+            idx,
+            ee_addr.clone(),
+            &mismatching_tapnode_hash,
+        );
+
+        // This won't have magic bytes in script so shouldn't get parsed.
+        let tx = create_test_deposit_tx(
+            Amount::from_sat(deposit_conf.deposit_amount),
+            &test_taproot_addr().address().script_pubkey(),
+            &deposit_script,
+            &keypair,
+            &expected_tapnode_hash,
+        );
+
+        let deposits: Vec<_> = try_parse_tx_deposit(&tx, &filter_conf).collect();
+        assert!(deposits.is_empty(), "Should find no deposit request");
+    }
+
+    #[test]
+    fn test_parse_invalid_deposit_invalid_signature() {
+        let params = gen_params();
+        let (filter_conf, _keypair) = create_tx_filter_config(&params);
+
+        let deposit_config = filter_conf.deposit_config.clone();
+        let idx = 0xdeadbeef;
+        let ee_addr = vec![1u8; 20]; // Example EVM address
+        let tapnode_hash = [0u8; 32]; // A dummy tapnode hash. Dummy works because we don't need to
+                                      // test takeback at this moment
+        let deposit_script =
+            build_test_deposit_script(&deposit_config, idx, ee_addr.clone(), &tapnode_hash);
+
+        let secp = Secp256k1::new();
+        // Create a random secret key
+        let secret_key = SecretKey::from_slice(&[111u8; 32]).unwrap();
+        let invalid_keypair = Keypair::from_secret_key(&secp, &secret_key);
+        let tx = create_test_deposit_tx(
+            Amount::from_sat(deposit_config.deposit_amount),
+            &deposit_config.address.address().script_pubkey(),
+            &deposit_script,
+            &invalid_keypair,
             &tapnode_hash,
         );
 
