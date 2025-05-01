@@ -4,7 +4,7 @@ use strata_db::traits::ProofDatabase;
 use strata_primitives::proof::{ProofContext, ProofKey, ProofZkVm};
 use strata_rocksdb::prover::db::ProofDb;
 use tokio::{spawn, sync::Mutex, time::sleep};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::{
     checkpoint_runner::errors::CheckpointError, errors::ProvingTaskError, operators::ProofOperator,
@@ -72,7 +72,7 @@ impl ProverManager {
 
                 // Skip tasks if worker limit is reached
                 if in_progress_workers >= total_workers {
-                    info!(?task, "Worker limit reached, skipping task");
+                    warn!(?task, "Worker limit reached, skipping task");
                     continue;
                 }
                 *in_progress_tasks.entry(*task.host()).or_insert(0) += 1;

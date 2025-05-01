@@ -195,6 +195,9 @@ impl TaskTracker {
                     self.transient_failed_tasks.remove(&id);
                 }
                 ProvingTaskStatus::TransientFailure => {
+                    // Decrement value if key exists, or insert with a default value of 1
+                    *self.in_progress_tasks.entry(*id.host()).or_insert(0) -= 1;
+
                     // Check the retry counter against the max retry limit or just increment.
                     let retry_counter = self.transient_failed_tasks.entry(id);
                     match retry_counter {
