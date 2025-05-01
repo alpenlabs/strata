@@ -95,12 +95,23 @@ impl<DB: SchemaDBOperations> StateDiffStore for WitnessDB<DB> {
 
 #[cfg(test)]
 mod tests {
+
+    use revm::db::BundleAccount;
+    use revm_primitives::{
+        alloy_primitives::{address, map::HashMap},
+        fixed_bytes, AccountInfo, FixedBytes,
+    };
     use rockbound::SchemaDBOperations;
     use serde::Deserialize;
     use strata_proofimpl_evm_ee_stf::{EvmBlockStfInput, EvmBlockStfOutput};
     use tempfile::TempDir;
 
     use super::*;
+
+    pub const BLOCK_HASH_ONE: FixedBytes<32> =
+        fixed_bytes!("000000000000000000000000f529c70db0800449ebd81fbc6e4221523a989f05");
+    pub const BLOCK_HASH_TWO: FixedBytes<32> =
+        fixed_bytes!("0000000000000000000000000a743ba7304efcc9e384ece9be7631e2470e401e");
 
     fn get_rocksdb_tmp_instance() -> anyhow::Result<impl SchemaDBOperations> {
         let dbname = crate::rocksdb::ROCKSDB_NAME;
@@ -135,6 +146,25 @@ mod tests {
         .expect("Failed to read the blob data file");
 
         serde_json::from_str(&json_content).expect("Valid json")
+    }
+
+    fn test_state_diff() -> BlockStateDiff {
+        let mut test_diff = BlockStateDiff {
+            state: HashMap::default(),
+            contracts: HashMap::default(),
+        };
+
+        test_diff.state.insert(
+            address!("0xd8da6bf26964af9d7eed9e03e53415d37aa96045"),
+            BundleAccount::new(
+                None,
+                Some(AccountInfo::default()),
+                HashMap::default(),
+                revm::db::AccountStatus::Changed,
+            ),
+        );
+
+        test_diff
     }
 
     fn setup_db() -> WitnessDB<impl SchemaDBOperations> {
@@ -193,5 +223,54 @@ mod tests {
         assert!(matches!(received_witness, Ok(None)));
     }
 
-    // TODO add unit tests for state diff.
+    #[test]
+    fn set_and_get_state_diff_data() {
+        let db = setup_db();
+
+        let test_state_diff = test_state_diff();
+        let block_hash = BLOCK_HASH_ONE;
+
+        db.put_state_diff(block_hash, &test_state_diff)
+            .expect("failed to put witness data");
+
+        // assert block was stored
+        let received_state_diff = db
+            .get_state_diff(block_hash)
+            .expect("failed to retrieve witness data")
+            .unwrap();
+
+        assert_eq!(received_state_diff, test_state_diff);
+    }
+
+    #[test]
+    fn del_and_get_state_diff_data() {
+        let db = setup_db();
+        let test_state_diff = test_state_diff();
+        let block_hash = BLOCK_HASH_TWO;
+
+        // assert block is not present in the db
+        let received_state_diff = db.get_state_diff(block_hash);
+        assert!(matches!(received_state_diff, Ok(None)));
+
+        // deleting non existing block is ok
+        let res = db.del_block_witness(block_hash);
+        assert!(matches!(res, Ok(())));
+
+        db.put_state_diff(block_hash, &test_state_diff)
+            .expect("failed to put state diff data");
+        // assert block is present in the db
+        let received_state_diff = db.get_state_diff(block_hash);
+        assert!(matches!(
+            received_state_diff,
+            Ok(Some(BlockStateDiff { .. }))
+        ));
+
+        // deleting existing block is ok
+        let res = db.del_state_diff(block_hash);
+        assert!(matches!(res, Ok(())));
+
+        // assert block is deleted from the db
+        let received_state_diff = db.get_state_diff(block_hash);
+        assert!(matches!(received_state_diff, Ok(None)));
+    }
 }
