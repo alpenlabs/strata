@@ -3,6 +3,9 @@ edition = "2021"
 name = "strata-test-utils"
 version = "0.1.0"
 
+[lints]
+rust.unused_crate_dependencies = "deny"
+
 [dependencies]
 strata-btcio.workspace = true
 strata-chaintsn.workspace = true
