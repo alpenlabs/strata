@@ -1427,6 +1427,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "borsh",
+ "revm",
  "revm-primitives",
  "rockbound",
  "serde",

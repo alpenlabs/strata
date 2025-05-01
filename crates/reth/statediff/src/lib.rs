@@ -6,7 +6,7 @@ use revm_primitives::{AccountInfo, Address, Bytecode, HashMap, B256};
 use serde::{Deserialize, Serialize};
 
 /// Represents full state diff for the block together with original values.
-#[derive(Clone, Default, Debug, Deserialize, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct BlockStateDiff {
     /// Account state.
     pub state: HashMap<Address, BundleAccount>,
