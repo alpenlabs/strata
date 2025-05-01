@@ -1,23 +1,21 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use bitcoin::{hashes::Hash, Txid};
+use bitcoind_async_client::traits::{Broadcaster, Wallet};
 use strata_db::types::{L1TxEntry, L1TxStatus};
 use strata_primitives::params::Params;
 use strata_storage::{ops::l1tx_broadcast, BroadcastDbOps};
 use tokio::sync::mpsc::Receiver;
 use tracing::*;
 
-use crate::{
-    broadcaster::{
-        error::{BroadcasterError, BroadcasterResult},
-        state::BroadcasterState,
-    },
-    rpc::traits::{BroadcasterRpc, WalletRpc},
+use crate::broadcaster::{
+    error::{BroadcasterError, BroadcasterResult},
+    state::BroadcasterState,
 };
 
 /// Broadcasts the next blob to be sent
 pub async fn broadcaster_task(
-    rpc_client: Arc<impl BroadcasterRpc + WalletRpc>,
+    rpc_client: Arc<impl Broadcaster + Wallet>,
     ops: Arc<l1tx_broadcast::BroadcastDbOps>,
     mut entry_receiver: Receiver<(u64, L1TxEntry)>,
     params: Arc<Params>,
@@ -68,7 +66,7 @@ pub async fn broadcaster_task(
 async fn process_unfinalized_entries(
     unfinalized_entries: &BTreeMap<u64, L1TxEntry>,
     ops: Arc<BroadcastDbOps>,
-    rpc_client: &(impl BroadcasterRpc + WalletRpc),
+    rpc_client: &(impl Broadcaster + Wallet),
     params: &Params,
 ) -> BroadcasterResult<(BTreeMap<u64, L1TxEntry>, Vec<u64>)> {
     let mut to_remove = Vec::new();
@@ -105,7 +103,7 @@ async fn process_unfinalized_entries(
 /// Takes in `[L1TxEntry]`, checks status and then either publishes or checks for confirmations and
 /// returns its updated status. Returns None if status is not changed
 async fn handle_entry(
-    rpc_client: &(impl BroadcasterRpc + WalletRpc),
+    rpc_client: &(impl Broadcaster + Wallet),
     txentry: &L1TxEntry,
     idx: u64,
     ops: &BroadcastDbOps,

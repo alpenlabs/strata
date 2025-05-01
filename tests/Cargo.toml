@@ -20,7 +20,7 @@ rustdoc.all = "warn"
 
 #anyhow.workspace = true                                  # anyhow should be fine for tests
 #bitcoincore-rpc = "0.19.0"
-#corepc-node = { version = "0.4.0", features = ["28_0"] }
+#corepc-node = { version = "0.7.0", features = ["28_0", "download"] }
 #threadpool.workspace = true
 #tokio.workspace = true
 #tracing.workspace = true

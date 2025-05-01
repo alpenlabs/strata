@@ -1,6 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use bitcoin::Address;
+use bitcoind_async_client::{
+    traits::{Reader, Signer, Wallet},
+    Client,
+};
 use strata_config::btcio::WriterConfig;
 use strata_db::{
     traits::L1WriterDatabase,
@@ -19,7 +23,6 @@ use tracing::*;
 use super::bundler::{bundler_task, get_initial_unbundled_entries};
 use crate::{
     broadcaster::L1BroadcastHandle,
-    rpc::{traits::WriterRpc, BitcoinClient},
     status::{apply_status_updates, L1StatusUpdate},
     writer::{
         builder::EnvelopeError, context::WriterContext, signer::create_and_sign_payload_envelopes,
@@ -110,7 +113,7 @@ impl EnvelopeHandle {
 #[allow(clippy::too_many_arguments)]
 pub fn start_envelope_task<D: L1WriterDatabase + Send + Sync + 'static>(
     executor: &TaskExecutor,
-    bitcoin_client: Arc<BitcoinClient>,
+    bitcoin_client: Arc<Client>,
     config: Arc<WriterConfig>,
     params: Arc<Params>,
     sequencer_address: Address,
@@ -170,9 +173,9 @@ fn get_next_payloadidx_to_watch(insc_ops: &EnvelopeDataOps) -> anyhow::Result<u6
 ///
 /// The envelope will be monitored until it acquires the status of
 /// [`BlobL1Status::Finalized`]
-pub async fn watcher_task<W: WriterRpc>(
+pub async fn watcher_task<R: Reader + Signer + Wallet>(
     next_watch_payload_idx: u64,
-    context: Arc<WriterContext<W>>,
+    context: Arc<WriterContext<R>>,
     insc_ops: Arc<EnvelopeDataOps>,
     broadcast_handle: Arc<L1BroadcastHandle>,
 ) -> anyhow::Result<()> {
