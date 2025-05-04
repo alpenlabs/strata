@@ -122,3 +122,105 @@ pub fn verify_proof(
 
     verify_rollup_groth16_proof_receipt(proof_receipt, &rollup_vk)
 }
+
+#[cfg(test)]
+mod tests {
+    use strata_primitives::params::ProofPublishMode;
+    use strata_test_utils::l2::{gen_params_with_seed, get_test_signed_checkpoint};
+    use zkaleido::{Proof, ProofReceipt, PublicValues, ZkVmError};
+
+    use super::*;
+
+    fn get_test_input() -> (Checkpoint, RollupParams) {
+        let params = gen_params_with_seed(0);
+        let rollup_params = params.rollup;
+        let signed_checkpoint = get_test_signed_checkpoint();
+        let checkpoint = signed_checkpoint.checkpoint();
+
+        (checkpoint.clone(), rollup_params)
+    }
+
+    #[test]
+    fn test_empty_proof_and_empty_public_values_on_strict_mode() {
+        let (checkpoint, mut rollup_params) = get_test_input();
+
+        // Ensure the mode is Strict for this test
+        rollup_params.proof_publish_mode = ProofPublishMode::Strict;
+
+        // Explicitly create an empty proof receipt for this test case
+        let empty_receipt = ProofReceipt::new(Proof::new(vec![]), PublicValues::new(vec![]));
+
+        let result = verify_proof(&checkpoint, &empty_receipt, &rollup_params);
+
+        // Check that the result is an Err containing the OutputExtractionError variant.
+        assert!(matches!(
+            result,
+            Err(ZkVmError::OutputExtractionError { source: _ })
+        ));
+    }
+
+    #[test]
+    fn test_empty_proof_and_non_empty_public_values_on_strict_mode() {
+        let (checkpoint, mut rollup_params) = get_test_input();
+
+        // Ensure the mode is Strict for this test
+        rollup_params.proof_publish_mode = ProofPublishMode::Strict;
+
+        let public_values = checkpoint.batch_transition();
+        let encoded_public_values = borsh::to_vec(public_values).unwrap();
+
+        // Create a proof receipt with an empty proof and non-empty public values
+        let proof_receipt =
+            ProofReceipt::new(Proof::new(vec![]), PublicValues::new(encoded_public_values));
+
+        let result = verify_proof(&checkpoint, &proof_receipt, &rollup_params);
+
+        // Check that the result is an Err containing the ProofVerificationError variant
+        // and that the error message matches the expected format for empty proofs in strict mode.
+        assert!(
+            matches!(result, Err(ZkVmError::ProofVerificationError(msg)) if msg.contains("Empty proof received for checkpoint") && msg.contains("which is not allowed in strict proof mode"))
+        );
+    }
+
+    #[test]
+    fn test_empty_proof_on_timeout_mode_with_non_native_vk() {
+        let (checkpoint, mut rollup_params) = get_test_input();
+
+        // Ensure the mode is Timeout for this test
+        rollup_params.proof_publish_mode = ProofPublishMode::Timeout(1000);
+
+        // Ensure the VK is non-native for this test
+        rollup_params.rollup_vk = RollupVerifyingKey::SP1VerifyingKey(
+            "0x00b01ae596b4e51843484ff71ccbd0dd1a030af70b255e6b9aad50b81d81266f"
+                .parse()
+                .unwrap(),
+        );
+
+        let empty_receipt = ProofReceipt::new(Proof::new(vec![]), PublicValues::new(vec![]));
+
+        let result = verify_proof(&checkpoint, &empty_receipt, &rollup_params);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_empty_proof_on_timeout_mode_with_native_vk() {
+        let (checkpoint, mut rollup_params) = get_test_input();
+
+        // Ensure the mode is Timeout for this test
+        rollup_params.proof_publish_mode = ProofPublishMode::Timeout(1000);
+
+        // Ensure the VK is native for this test
+        rollup_params.rollup_vk = RollupVerifyingKey::NativeVerifyingKey(
+            "0000000000000000000000000000000000000000000000000000000000000000"
+                .parse()
+                .unwrap(),
+        );
+
+        let empty_receipt = ProofReceipt::new(Proof::new(vec![]), PublicValues::new(vec![]));
+
+        let result = verify_proof(&checkpoint, &empty_receipt, &rollup_params);
+
+        assert!(result.is_ok());
+    }
+}
