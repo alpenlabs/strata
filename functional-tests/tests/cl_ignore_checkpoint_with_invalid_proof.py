@@ -30,7 +30,7 @@ class IgnoreCheckpointWithInvalidProofTest(testenv.StrataTester):
             - Run 2 prover one for fastBatch and one for strict
             - Run 1 full node with a strict proof policy, requiring real proofs
               and rejecting empty/invalid ones.
-        
+
         Test Steps:
             - Stop the strict prover, strict sequencer, and full node services.
             - Sequencer 1 (fastBatch) creates epoch 4 with an empty proof and publishes it to L1.
