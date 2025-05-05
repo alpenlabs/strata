@@ -17,7 +17,7 @@ PROVER_CHECKPOINT_SETTINGS = {
 class FullnodeIgnoreCheckpointWithInvalidProofTest(testenv.StrataTester):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(
-            testenv.IgnoreCheckpointWithInvalidProofEnvConfig(
+            testenv.DualSequencerMixedPolicyEnvConfig(
                 pre_generate_blocks=110, fullnode_is_strict_follower=False
             )
         )
@@ -35,12 +35,11 @@ class FullnodeIgnoreCheckpointWithInvalidProofTest(testenv.StrataTester):
 
         seq_fast = ctx.get_service("seq_node_fast")
         prover_fast = ctx.get_service("prover_client_fast")
+        seq_strict = ctx.get_service("seq_node_strict")
+        prover_strict = ctx.get_service("prover_client_strict")
 
         # this fullnode has a strict proof policy but connected to the fast sequencer
         fullnode = ctx.get_service("fullnode")
-
-        seq_strict = ctx.get_service("seq_node_strict")
-        prover_strict = ctx.get_service("prover_client_strict")
 
         prover_fast.stop()
         seq_strict.stop()

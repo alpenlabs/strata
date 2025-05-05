@@ -241,8 +241,8 @@ fn process_l1_checkpoint(
         }
     } else {
         // Otherwise, verify the non-empty proof.
-        verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk).map_err(|e| {
-            error!(%ckpt_epoch, error = %e, "Failed to verify non-empty proof for epoch");
+        verify_rollup_groth16_proof_receipt(&receipt, &params.rollup_vk).map_err(|error| {
+            error!(%ckpt_epoch, %error, "Failed to verify non-empty proof for epoch");
             OpError::InvalidProof
         })?;
     }

@@ -113,7 +113,7 @@ pub fn verify_proof(
         return Ok(());
     }
 
-    if !accept_empty_proof && is_empty_proof {
+    if !allow_empty && is_empty_proof {
         return Err(ZkVmError::ProofVerificationError(format!(
             "Empty proof received for checkpoint {checkpoint_idx}, which is not allowed in strict proof mode. \
             Check `proof_publish_mode` in rollup_params; set it to a non-strict mode (e.g., `timeout`) to accept empty proofs."
@@ -126,13 +126,13 @@ pub fn verify_proof(
 #[cfg(test)]
 mod tests {
     use strata_primitives::params::ProofPublishMode;
-    use strata_test_utils::l2::{gen_params_with_seed, get_test_signed_checkpoint};
+    use strata_test_utils::l2::{gen_params, get_test_signed_checkpoint};
     use zkaleido::{Proof, ProofReceipt, PublicValues, ZkVmError};
 
     use super::*;
 
     fn get_test_input() -> (Checkpoint, RollupParams) {
-        let params = gen_params_with_seed(0);
+        let params = gen_params();
         let rollup_params = params.rollup;
         let signed_checkpoint = get_test_signed_checkpoint();
         let checkpoint = signed_checkpoint.checkpoint();
@@ -155,7 +155,7 @@ mod tests {
         // Check that the result is an Err containing the OutputExtractionError variant.
         assert!(matches!(
             result,
-            Err(ZkVmError::OutputExtractionError { source: _ })
+            Err(ZkVmError::OutputExtractionError { .. })
         ));
     }
 

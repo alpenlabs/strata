@@ -384,7 +384,7 @@ class HubNetworkEnvConfig(flexitest.EnvConfig):
         return BasicLiveEnv(svcs, bridge_pk, rollup_cfg)
 
 
-class IgnoreCheckpointWithInvalidProofEnvConfig(flexitest.EnvConfig):
+class DualSequencerMixedPolicyEnvConfig(flexitest.EnvConfig):
     def __init__(
         self,
         pre_generate_blocks: int = 0,
