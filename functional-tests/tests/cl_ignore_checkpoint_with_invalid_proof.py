@@ -30,6 +30,27 @@ class IgnoreCheckpointWithInvalidProofTest(testenv.StrataTester):
             - Run 2 prover one for fastBatch and one for strict
             - Run 1 full node with a strict proof policy, requiring real proofs
               and rejecting empty/invalid ones.
+        
+        Test Steps:
+            - Stop the strict prover, strict sequencer, and full node services.
+            - Sequencer 1 (fastBatch) creates epoch 4 with an empty proof and publishes it to L1.
+            - Stop sequencer 1.
+            - Capture the L1 checkpoint DA envelope data for epoch 4 created by sequencer 1.
+            - Stop the fast prover.
+            - Start the strict prover, strict sequencer, and full node services.
+            - Wait for sequencer 2 (strict) to process the initial epochs (up to 3).
+            - Stop the strict prover temporarily.
+            - Publish the captured L1 checkpoint DA envelope data (with the invalid proof)
+              for epoch 4 to L1 again.
+            - The full node and sequencer 2 should ignore the checkpoint with invalid proof,
+              not finalize epoch 4 based on it, and wait for a valid checkpoint.
+            - Start the strict prover again.
+            - Both the full node and sequencer 2 should continue working normally,
+              generate a valid proof, and finalize epoch 4 (and subsequently epoch 5)
+              with the valid checkpoint.
+            - After finalizing epoch 4 with the valid proof, resubmit the previous
+              invalid proof data for epoch 4.
+            - The full node and sequencer 2 should ignore this resubmission and continue
         """
 
         logging.warning(

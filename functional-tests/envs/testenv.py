@@ -422,7 +422,6 @@ class DualSequencerMixedPolicyEnvConfig(flexitest.EnvConfig):
         params_strict_dict = copy.deepcopy(params_fast_dict)
         params_strict_dict["proof_publish_mode"] = "strict"
         params_strict_json = json.dumps(params_strict_dict)
-        print("params_strict_json: ", params_strict_json)
 
         rollup_cfg_strict = RollupConfig.model_validate_json(params_strict_json)
 

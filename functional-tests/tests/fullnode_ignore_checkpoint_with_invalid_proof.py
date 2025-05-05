@@ -30,7 +30,7 @@ class FullnodeIgnoreCheckpointWithInvalidProofTest(testenv.StrataTester):
             - Run 1 sequencer with fastBatch proof policy
             - Run 1 full node with a strict proof policy, requiring real proofs
               and rejecting empty/invalid ones.
-            - Fullnode should not finalize the epoch 1
+            - Fullnode should not finalize the epochs with empty proofs
         """
 
         seq_fast = ctx.get_service("seq_node_fast")
@@ -86,10 +86,10 @@ class FullnodeIgnoreCheckpointWithInvalidProofTest(testenv.StrataTester):
 
         try:
             logging.info("Checking if epoch 3 is finalized in the fullnode")
-            wait_until_epoch_finalized(fullnode_rpc, 3, timeout=10)
+            wait_until_epoch_finalized(fullnode_rpc, 3, timeout=20)
             logging.warn("Fullnode incorrectly finalized epoch 3")
             return False
         except Exception:
-            logging.info("Fullnode correctly ignored epoch 1 because of the strict proof policy")
+            logging.info("Fullnode correctly ignored epochs because of the strict proof policy")
 
         return True
