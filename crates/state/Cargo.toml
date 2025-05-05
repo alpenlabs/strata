@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "strata-state"
-version = "0.1.0"
+version = "0.2.0-pre.1"
 
 # Note: Since we want to keep the core consensus logic generic, we shouldn't
 # reuse much of reth in this crate so that we can factor it all out eventually.
