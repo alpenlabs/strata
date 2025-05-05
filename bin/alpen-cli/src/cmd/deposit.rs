@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
+use alloy::{primitives::Address as AlpenAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{
     bitcoin::{taproot::LeafVersion, Address, ScriptBuf, TapNodeHash, XOnlyPublicKey},
@@ -16,6 +16,7 @@ use make_buf::make_buf;
 use strata_primitives::constants::RECOVER_DELAY;
 
 use crate::{
+    alpen::AlpenWallet,
     constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
     errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
@@ -23,20 +24,19 @@ use crate::{
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, SignetWallet},
-    strata::StrataWallet,
     taproot::{ExtractP2trPubkey, NotTaprootAddress},
 };
 
 /// Magic bytes to attach to the deposit request.
 pub const MAGIC_BYTES: &[u8] = r"alpen".as_bytes();
 
-/// Deposit 10 BTC from signet to Strata. If an address is not provided, the wallet's internal
-/// Strata address will be used.
+/// Deposit 10 BTC from signet to Alpen. If an address is not provided, the wallet's internal
+/// Alpen address will be used.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "deposit")]
 pub struct DepositArgs {
     #[argh(positional)]
-    strata_address: Option<String>,
+    alpen_address: Option<String>,
 
     /// override signet fee rate in sat/vbyte. must be >=1
     #[argh(option)]
@@ -45,18 +45,24 @@ pub struct DepositArgs {
 
 pub async fn deposit(
     DepositArgs {
-        strata_address,
+        alpen_address,
         fee_rate,
     }: DepositArgs,
     seed: Seed,
     settings: Settings,
 ) -> Result<(), DisplayedError> {
-    let requested_strata_address = strata_address
-        .map(|a| StrataAddress::from_str(&a).user_error("Provided strata address is invalid"))
+    let requested_alpen_address = alpen_address
+        .map(|a| {
+            AlpenAddress::from_str(&a).user_error(format!(
+                "Invalid Alpen address '{}'. Must be an EVM-compatible address.",
+                a
+            ))
+        })
         .transpose()?;
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
         .internal_error("Failed to load signet wallet")?;
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
+    let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+        .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
 
     l1w.sync()
         .await
@@ -68,11 +74,11 @@ pub async fn deposit(
     l1w.persist()
         .internal_error("Failed to persist signet wallet")?;
 
-    let strata_address = requested_strata_address.unwrap_or(l2w.default_signer_address());
+    let alpen_address = requested_alpen_address.unwrap_or(l2w.default_signer_address());
     println!(
-        "Bridging {} to Strata address {}",
+        "Bridging {} to Alpen address {}",
         BRIDGE_IN_AMOUNT.to_string().green(),
-        strata_address.to_string().cyan(),
+        alpen_address.to_string().cyan(),
     );
 
     println!(
@@ -117,14 +123,14 @@ pub async fn deposit(
     // Construct the DRT metadata OP_RETURN:
     // <magic_bytes>
     // <recovery_address_pk>
-    // <strata_address>
+    // <alpen_address>
     const MBL: usize = MAGIC_BYTES.len();
     const XONLYPK: usize = 32; // X-only PKs are 32-bytes in P2TR SegWit v1 addresses
-    const STRATA_ADDRESS_LEN: usize = 20; // EVM addresses are 20 bytes long
+    const ALPEN_ADDRESS_LEN: usize = 20; // EVM addresses are 20 bytes long
     let op_return_data = make_buf! {
         (MAGIC_BYTES, MBL),
         (&recovery_address_pk.serialize(), XONLYPK),
-        (strata_address.as_slice(), STRATA_ADDRESS_LEN)
+        (alpen_address.as_slice(), ALPEN_ADDRESS_LEN)
     };
 
     let mut psbt = {
@@ -169,8 +175,7 @@ pub async fn deposit(
             .with_maybe_explorer(settings.mempool_space_endpoint.as_deref())
             .pretty(),
     );
-
-    println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Strata.");
+    println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Alpen.");
     Ok(())
 }
 

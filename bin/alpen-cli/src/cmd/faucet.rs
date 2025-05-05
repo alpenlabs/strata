@@ -1,6 +1,6 @@
 use std::{fmt, str::FromStr};
 
-use alloy::{primitives::Address as StrataAddress, providers::WalletProvider};
+use alloy::{primitives::Address as AlpenAddress, providers::WalletProvider};
 use argh::FromArgs;
 use bdk_wallet::{bitcoin::Address, KeychainKind};
 use indicatif::ProgressBar;
@@ -10,19 +10,19 @@ use sha2::{Digest, Sha256};
 use shrex::{encode, Hex};
 
 use crate::{
+    alpen::AlpenWallet,
     errors::{DisplayableError, DisplayedError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::StrataWallet,
 };
 
 /// Request some bitcoin from the faucet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "faucet")]
 pub struct FaucetArgs {
-    /// either "signet" or "strata"
+    /// either "signet" or "alpen"
     #[argh(positional)]
     network_type: String,
     /// address that funds will be sent to. defaults to internal wallet
@@ -49,7 +49,7 @@ impl Chain {
     fn from_network_type(network_type: NetworkType) -> Result<Self, String> {
         match network_type {
             NetworkType::Signet => Ok(Chain::L1),
-            NetworkType::Strata => Ok(Chain::L2),
+            NetworkType::Alpen => Ok(Chain::L2),
         }
     }
 }
@@ -74,13 +74,45 @@ pub async fn faucet(
         .parse()
         .user_error("invalid network type")?;
 
-    let (address, claim): (String, &str) = match network_type {
+    let (address, claim) = match network_type {
         NetworkType::Signet => {
-            let addr = resolve_signet_address(&args, &seed, &settings)?;
+            let mut l1w =
+                SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+                    .internal_error("Failed to load signet wallet")?;
+
+            let addr = match &args.address {
+                None => {
+                    let address_info = l1w.reveal_next_address(KeychainKind::External);
+                    l1w.persist()
+                        .internal_error("Failed to persist signet wallet")?;
+                    address_info.address
+                }
+                Some(a) => {
+                    let unchecked = Address::from_str(a).user_error(format!(
+                        "Invalid signet address '{}'. Must be a valid Bitcoin address.",
+                        a
+                    ))?;
+
+                    unchecked
+                        .require_network(settings.network)
+                        .user_error(format!(
+                            "Provided address {} is not valid for network '{}'.",
+                            a, settings.network
+                        ))?
+                }
+            };
             (addr.to_string(), "claim_l1")
         }
-        NetworkType::Strata => {
-            let addr = resolve_strata_address(&args, &seed, &settings)?;
+        NetworkType::Alpen => {
+            let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+                .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
+            let addr = match &args.address {
+                Some(a) => AlpenAddress::from_str(a).user_error(format!(
+                    "Invalid Alpen address {}. Must be an EVM-compatible address.",
+                    a
+                ))?,
+                None => l2w.default_signer_address(),
+            };
             (addr.to_string(), "claim_l2")
         }
     };
@@ -93,7 +125,7 @@ pub async fn faucet(
         settings.faucet_endpoint.clone()
     ))?;
     let chain = Chain::from_network_type(network_type.clone()).user_error(format!(
-        "Unsupported network {}. Must be `signet` or `strata`.",
+        "Unsupported network {}. Must be `signet` or `alpen`.",
         network_type
     ))?;
     let endpoint = base
@@ -116,7 +148,7 @@ pub async fn faucet(
     let mut solution = 0u64;
     let prehash = {
         let mut hasher = Sha256::new();
-        hasher.update(b"strata faucet 2024");
+        hasher.update(b"alpen faucet 2024");
         hasher.update(challenge.nonce.0);
         hasher
     };
@@ -175,55 +207,4 @@ fn count_leading_zeros(data: &[u8]) -> u8 {
 fn pow_valid(mut hasher: Sha256, difficulty: u8, solution: Solution) -> bool {
     hasher.update(solution);
     count_leading_zeros(&hasher.finalize()) >= difficulty
-}
-
-fn resolve_signet_address(
-    args: &FaucetArgs,
-    seed: &Seed,
-    settings: &Settings,
-) -> Result<bdk_wallet::bitcoin::Address, DisplayedError> {
-    let mut l1w =
-        SignetWallet::new(seed, settings.network, settings.signet_backend.clone()).unwrap();
-
-    match &args.address {
-        None => {
-            let address_info = l1w.reveal_next_address(KeychainKind::External);
-            l1w.persist().unwrap();
-            Ok(address_info.address)
-        }
-        Some(a) => {
-            let unchecked = Address::from_str(a).user_error(format!(
-                "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
-                a
-            ))?;
-
-            let checked = unchecked
-                .require_network(settings.network)
-                .user_error(format!(
-                    "Address '{}' is not valid for network '{}'",
-                    a, settings.network
-                ))?;
-
-            Ok(checked)
-        }
-    }
-}
-
-fn resolve_strata_address(
-    args: &FaucetArgs,
-    seed: &Seed,
-    settings: &Settings,
-) -> Result<alloy::primitives::Address, DisplayedError> {
-    let l2w = StrataWallet::new(seed, &settings.strata_endpoint)?;
-
-    match &args.address {
-        Some(a) => {
-            let address = StrataAddress::from_str(a).user_error(format!(
-                "Invalid strata address '{}'. Must be an EVM-compatible address.",
-                a
-            ))?;
-            Ok(address)
-        }
-        None => Ok(l2w.default_signer_address()),
-    }
 }

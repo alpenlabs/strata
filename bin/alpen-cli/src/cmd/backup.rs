@@ -30,7 +30,7 @@ pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), DisplayedError> 
         "kr" => Ok(Language::Korean),
         "es" => Ok(Language::Spanish),
         _ => Err(DisplayedError::UserError(
-            "The mnemonic language you provided wasn't supported".to_string(),
+            "The mnemonic language provided is not supported".to_string(),
             Box::new(UnsupportedMnemonicLanguage),
         )),
     }?;

@@ -6,20 +6,20 @@ use argh::FromArgs;
 use bdk_wallet::bitcoin::Amount;
 
 use crate::{
+    alpen::AlpenWallet,
     constants::SATS_TO_WEI,
     errors::{DisplayableError, DisplayedError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::StrataWallet,
 };
 
 /// Prints the wallet's current balance(s)
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "balance")]
 pub struct BalanceArgs {
-    /// either "signet" or "strata"
+    /// either "signet" or "alpen"
     #[argh(positional)]
     network_type: String,
 }
@@ -32,7 +32,7 @@ pub async fn balance(
     let network_type = args
         .network_type
         .parse()
-        .user_error("invalid network type")?;
+        .user_error("Invalid network type")?;
 
     if let NetworkType::Signet = network_type {
         let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
@@ -50,13 +50,14 @@ pub async fn balance(
         println!("  Immature: {}", balance.immature);
     }
 
-    if let NetworkType::Strata = network_type {
-        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
+    if let NetworkType::Alpen = network_type {
+        let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+            .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
         println!("Getting balance...");
         let eth_balance = l2w
             .get_balance(l2w.default_signer_address())
             .await
-            .internal_error("Failed to fetch strata balance")?;
+            .internal_error("Failed to fetch Alpen balance")?;
         let sats = (eth_balance / U256::from(SATS_TO_WEI))
             .try_into()
             .expect("to fit into u64");

@@ -1,11 +1,11 @@
 use std::{fmt, str::FromStr};
 
-/// Represents a type of network, either Alpen's signet or Strata
+/// Represents a type of network, either Alpen's signet or Alpen
 #[non_exhaustive]
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum NetworkType {
     Signet,
-    Strata,
+    Alpen,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -17,7 +17,7 @@ impl FromStr for NetworkType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "signet" => Ok(Self::Signet),
-            "strata" => Ok(Self::Strata),
+            "alpen" => Ok(Self::Alpen),
             _ => Err(InvalidNetwork),
         }
     }
@@ -27,7 +27,7 @@ impl fmt::Display for NetworkType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             NetworkType::Signet => "signet",
-            NetworkType::Strata => "strata",
+            NetworkType::Alpen => "alpen",
         })
     }
 }

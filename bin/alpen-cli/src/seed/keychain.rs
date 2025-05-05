@@ -8,7 +8,7 @@ pub struct KeychainPersister;
 
 impl KeychainPersister {
     fn entry() -> Result<Entry, OneOf<(PlatformFailure, NoStorageAccess)>> {
-        Entry::new("strata", "default")
+        Entry::new("alpen", "default")
             .map_err(keyring_oneof)
             .map_err(|e| {
                 e.subset()

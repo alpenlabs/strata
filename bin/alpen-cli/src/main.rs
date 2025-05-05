@@ -1,3 +1,4 @@
+pub mod alpen;
 pub mod cmd;
 pub mod constants;
 #[macro_use]
@@ -8,7 +9,6 @@ pub mod recovery;
 pub mod seed;
 pub mod settings;
 pub mod signet;
-pub mod strata;
 pub mod taproot;
 
 use cmd::{

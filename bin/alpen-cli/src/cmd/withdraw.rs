@@ -10,16 +10,16 @@ use indicatif::ProgressBar;
 use strata_primitives::bitcoin_bosd::Descriptor;
 
 use crate::{
+    alpen::AlpenWallet,
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
     errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::StrataWallet,
 };
 
-/// Withdraw 10 BTC from Strata to signet
+/// Withdraw 10 BTC from Alpen to signet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "withdraw")]
 pub struct WithdrawArgs {
@@ -40,7 +40,6 @@ pub async fn withdraw(
                 "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
                 a
             ))?;
-
             let checked = unchecked
                 .require_network(settings.network)
                 .user_error(format!(
@@ -57,7 +56,8 @@ pub async fn withdraw(
     l1w.sync()
         .await
         .internal_error("Failed to sync signet wallet")?;
-    let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
+    let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+        .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
 
     let address = match address {
         Some(a) => a,
@@ -74,9 +74,9 @@ pub async fn withdraw(
 
     let tx = l2w
         .transaction_request()
-        .with_to(settings.bridge_strata_address)
+        .with_to(settings.bridge_alpen_address)
         .with_value(U256::from(BRIDGE_OUT_AMOUNT.to_sat() as u128 * SATS_TO_WEI))
-        // calldata for the Strata EVM-BOSD descriptor
+        // calldata for the Alpen EVM-BOSD descriptor
         .input(TransactionInput::new(bosd.to_bytes().into()));
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
@@ -84,7 +84,7 @@ pub async fn withdraw(
     let res = l2w
         .send_transaction(tx)
         .await
-        .internal_error("Failed to broadcast strata transaction")?;
+        .internal_error("Failed to broadcast Alpen transaction")?;
     pb.finish_with_message("Broadcast successful");
     println!(
         "{}",

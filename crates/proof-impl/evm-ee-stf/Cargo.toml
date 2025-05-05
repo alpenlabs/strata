@@ -4,9 +4,9 @@ name = "strata-proofimpl-evm-ee-stf"
 version = "0.1.0"
 
 [dependencies]
+alpen-reth-evm.workspace = true
+alpen-reth-primitives.workspace = true
 strata-primitives.workspace = true
-strata-reth-evm.workspace = true
-strata-reth-primitives.workspace = true
 strata-state.workspace = true
 zkaleido.workspace = true
 zkaleido-native-adapter.workspace = true

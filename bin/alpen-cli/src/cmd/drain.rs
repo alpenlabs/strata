@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use alloy::{
-    primitives::{Address as StrataAddress, U256},
+    primitives::{Address as AlpenAddress, U256},
     providers::{Provider, WalletProvider},
 };
 use argh::FromArgs;
@@ -9,17 +9,17 @@ use bdk_wallet::bitcoin::{Address, Amount};
 use colored::Colorize;
 
 use crate::{
+    alpen::AlpenWallet,
     constants::SATS_TO_WEI,
     errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, SignetWallet},
-    strata::StrataWallet,
 };
 
 /// Drains the internal wallet to the provided
-/// signet and Strata addresses
+/// signet and Alpen addresses
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "drain")]
 pub struct DrainArgs {
@@ -27,9 +27,9 @@ pub struct DrainArgs {
     #[argh(option, short = 's')]
     signet_address: Option<String>,
 
-    /// a Strata address for Strata funds to be drained to
+    /// an Alpen address for Alpen funds to be drained to
     #[argh(option, short = 'r')]
-    strata_address: Option<String>,
+    alpen_address: Option<String>,
 
     /// override signet fee rate in sat/vbyte. must be >=1
     #[argh(option)]
@@ -42,15 +42,15 @@ pub struct MissingTargetAddress;
 pub async fn drain(
     DrainArgs {
         signet_address,
-        strata_address,
+        alpen_address,
         fee_rate,
     }: DrainArgs,
     seed: Seed,
     settings: Settings,
 ) -> Result<(), DisplayedError> {
-    if strata_address.is_none() && signet_address.is_none() {
+    if alpen_address.is_none() && signet_address.is_none() {
         return Err(DisplayedError::UserError(
-            "Missing target address. Must provide a `signet` address or `strata` address.".into(),
+            "Missing target address. Must provide a `signet` address or `alpen` address.".into(),
             Box::new(MissingTargetAddress),
         ));
     }
@@ -61,22 +61,20 @@ pub async fn drain(
                 "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
                 a
             ))?;
-
             let checked = unchecked
                 .require_network(settings.network)
                 .user_error(format!(
                     "Address '{}' is not valid for network '{}'",
                     a, settings.network
                 ))?;
-
             Ok(checked)
         })
         .transpose()?;
 
-    let strata_address = strata_address
+    let alpen_address = alpen_address
         .map(|a| {
-            StrataAddress::from_str(&a).user_error(format!(
-                "Invalid strata address {}. Must be an EVM-compatible address.",
+            AlpenAddress::from_str(&a).user_error(format!(
+                "Invalid Alpen address '{}'. Must be an EVM-compatible address.",
                 a
             ))
         })
@@ -125,14 +123,15 @@ pub async fn drain(
         println!("Drained signet wallet to {}", address,);
     }
 
-    if let Some(address) = strata_address {
-        let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
+    if let Some(address) = alpen_address {
+        let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+            .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
         let balance = l2w
             .get_balance(l2w.default_signer_address())
             .await
             .internal_error("Failed to fetch strata balance")?;
         if balance == U256::ZERO {
-            println!("No Strata bitcoin to send");
+            println!("No Alpen bitcoin to send");
         }
 
         let estimate_tx = l2w
@@ -168,7 +167,7 @@ pub async fn drain(
         );
 
         println!(
-            "Drained {} from Strata wallet to {}",
+            "Drained {} from Alpen wallet to {}",
             Amount::from_sat((max_send_amount / U256::from(SATS_TO_WEI)).wrapping_to()),
             address,
         );

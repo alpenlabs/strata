@@ -3,7 +3,7 @@ services:
     build:
       context: ../
       dockerfile: ./docker/reth/Dockerfile
-    image: "strata_reth:v0.1.0"
+    image: "alpen_reth:v0.1.0"
     environment:
       CONFIG_FILE: ${CONFIG_FILE:-example_config.toml}
       BUILD_PROFILE: ${BUILD_PROFILE:-release}

@@ -3,19 +3,19 @@ use argh::FromArgs;
 use bdk_wallet::KeychainKind;
 
 use crate::{
+    alpen::AlpenWallet,
     errors::{DisplayableError, DisplayedError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
-    strata::StrataWallet,
 };
 
 /// Prints a new address for the internal wallet
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "receive")]
 pub struct ReceiveArgs {
-    /// either "signet" or "strata"
+    /// either "signet" or "alpen"
     #[argh(positional)]
     network_type: String,
 }
@@ -28,7 +28,7 @@ pub async fn receive(
     let network_type = args
         .network_type
         .parse()
-        .user_error("invalid network type")?;
+        .user_error("Invalid network type")?;
 
     let address = match network_type {
         NetworkType::Signet => {
@@ -49,8 +49,9 @@ pub async fn receive(
 
             address_info.address.to_string()
         }
-        NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
+        NetworkType::Alpen => {
+            let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+                .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
             l2w.default_signer_address().to_string()
         }
     };

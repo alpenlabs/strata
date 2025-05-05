@@ -12,10 +12,7 @@ use alloy::{
     transports::http::{Client, Http},
 };
 
-use crate::{
-    errors::{DisplayableError, DisplayedError},
-    seed::Seed,
-};
+use crate::seed::Seed;
 
 // alloy moment 💀
 type Provider = FillProvider<
@@ -31,15 +28,15 @@ type Provider = FillProvider<
     Ethereum,
 >;
 
-pub struct StrataWallet(Provider);
+pub struct AlpenWallet(Provider);
 
-impl DerefMut for StrataWallet {
+impl DerefMut for AlpenWallet {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl Deref for StrataWallet {
+impl Deref for AlpenWallet {
     type Target = Provider;
 
     fn deref(&self) -> &Self::Target {
@@ -47,9 +44,12 @@ impl Deref for StrataWallet {
     }
 }
 
-impl StrataWallet {
-    pub fn new(seed: &Seed, l2_http_endpoint: &str) -> Result<Self, DisplayedError> {
-        let wallet = seed.get_strata_wallet();
+#[derive(Debug)]
+pub struct AlpenEndpointParseError;
+
+impl AlpenWallet {
+    pub fn new(seed: &Seed, l2_http_endpoint: &str) -> Result<Self, AlpenEndpointParseError> {
+        let wallet = seed.get_alpen_wallet();
 
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
@@ -57,8 +57,9 @@ impl StrataWallet {
             .on_http(
                 l2_http_endpoint
                     .parse()
-                    .user_error(format!("Invalid strata endpoint: '{}'.", l2_http_endpoint))?,
+                    .map_err(|_| AlpenEndpointParseError)?,
             );
+
         Ok(Self(provider))
     }
 }

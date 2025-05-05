@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
+use alpen_reth_evm::set_evm_handles;
 use reth_chainspec::ChainSpec;
 use reth_evm::{env::EvmEnv, ConfigureEvm, ConfigureEvmEnv, NextBlockEnvAttributes};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{Header, TransactionSigned};
 use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
 use revm_primitives::{Address, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv};
-use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
 #[derive(Debug, Clone)]

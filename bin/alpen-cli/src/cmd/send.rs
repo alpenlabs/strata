@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use alloy::{
     network::TransactionBuilder,
-    primitives::{Address as StrataAddress, U256},
+    primitives::{Address as AlpenAddress, U256},
     providers::Provider,
     rpc::types::TransactionRequest,
 };
@@ -10,6 +10,7 @@ use argh::FromArgs;
 use bdk_wallet::bitcoin::{Address, Amount};
 
 use crate::{
+    alpen::AlpenWallet,
     constants::SATS_TO_WEI,
     errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
@@ -17,14 +18,13 @@ use crate::{
     seed::Seed,
     settings::Settings,
     signet::{get_fee_rate, log_fee_rate, SignetWallet},
-    strata::StrataWallet,
 };
 
 /// Send some bitcoin from the internal wallet.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "send")]
 pub struct SendArgs {
-    /// either "signet" or "strata"
+    /// either "signet" or "alpen"
     #[argh(positional)]
     network_type: String,
 
@@ -92,10 +92,11 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
                     .pretty(),
             );
         }
-        NetworkType::Strata => {
-            let l2w = StrataWallet::new(&seed, &settings.strata_endpoint)?;
-            let address = StrataAddress::from_str(&args.address).user_error(format!(
-                "Invalid strata address '{}'. Must be an EVM-compatible address.",
+        NetworkType::Alpen => {
+            let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+                .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
+            let address = AlpenAddress::from_str(&args.address).user_error(format!(
+                "Invalid Alpen address '{}'. Must be an EVM-compatible address.",
                 args.address
             ))?;
             let tx = TransactionRequest::default()
@@ -104,7 +105,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
             let res = l2w
                 .send_transaction(tx)
                 .await
-                .internal_error("Failed to broadcast strata transaction")?;
+                .internal_error("Failed to broadcast Alpen transaction")?;
             println!(
                 "{}",
                 OnchainObject::from(res.tx_hash())

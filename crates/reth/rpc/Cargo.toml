@@ -1,11 +1,11 @@
 [package]
 edition = "2021"
-name = "strata-reth-rpc"
+name = "alpen-reth-rpc"
 version = "0.1.0"
 
 [dependencies]
+alpen-reth-db.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
-strata-reth-db.workspace = true
 strata-rpc-utils.workspace = true
 
 alloy-consensus.workspace = true
