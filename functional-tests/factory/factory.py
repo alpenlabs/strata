@@ -288,6 +288,7 @@ class RethFactory(flexitest.Factory):
             "--http.port", str(ethrpc_http_port),
             "--color", "never",
             "--enable-witness-gen",
+            "--enable-state-diff-gen",
             "--custom-chain", custom_chain,
             "-vvvv"
         ]
