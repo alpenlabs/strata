@@ -54,7 +54,7 @@ pub async fn deposit(
     let requested_alpen_address = alpen_address
         .map(|a| {
             AlpenAddress::from_str(&a).user_error(format!(
-                "Invalid Alpen address '{}'. Must be an EVM-compatible address.",
+                "Invalid Alpen address '{}'. Must be an EVM-compatible address",
                 a
             ))
         })
@@ -62,7 +62,7 @@ pub async fn deposit(
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
         .internal_error("Failed to load signet wallet")?;
     let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
-        .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
+        .user_error("Invalid Alpen endpoint URL. Check the configuration")?;
 
     l1w.sync()
         .await

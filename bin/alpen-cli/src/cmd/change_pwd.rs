@@ -17,7 +17,7 @@ pub async fn change_pwd(
     persister: impl EncryptedSeedPersister,
 ) -> Result<(), DisplayedError> {
     let mut new_pw =
-        Password::read(true).internal_error("Failed to read the password entered by user.")?;
+        Password::read(true).internal_error("Failed to read the password entered by user")?;
     if let Err(feedback) = new_pw.validate() {
         println!("Password is weak. {}", feedback);
     }
@@ -26,7 +26,7 @@ pub async fn change_pwd(
         .internal_error("Failed to encrypt seed")?;
     persister
         .save(&encrypted_seed)
-        .internal_error("Failed to save encrypted seed.")?;
+        .internal_error("Failed to save encrypted seed")?;
 
     println!("Password changed successfully");
     Ok(())

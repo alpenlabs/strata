@@ -36,10 +36,10 @@ pub async fn reset(
     if confirm {
         persister
             .delete()
-            .internal_error("Failed to wipe out seed.")?;
+            .internal_error("Failed to wipe out seed")?;
         println!("Wiped seed");
         std::fs::remove_dir_all(settings.data_dir.clone())
-            .internal_error("Failed to delete data directory.")?;
+            .internal_error("Failed to delete data directory")?;
         println!("Wiped data directory");
     }
 

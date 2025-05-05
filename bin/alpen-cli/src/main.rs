@@ -32,7 +32,10 @@ async fn main() {
         return;
     }
 
-    let settings = Settings::load().unwrap();
+    let settings = Settings::load().unwrap_or_else(|e| {
+        eprintln!("Configuration error: {:?}", e);
+        std::process::exit(1);
+    });
 
     #[cfg(not(target_os = "linux"))]
     let persister = KeychainPersister;

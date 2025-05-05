@@ -32,7 +32,7 @@ pub async fn balance(
     let network_type = args
         .network_type
         .parse()
-        .user_error("Invalid network type")?;
+        .user_error(format!("Invalid network type '{}'", &args.network_type))?;
 
     if let NetworkType::Signet = network_type {
         let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
@@ -52,7 +52,7 @@ pub async fn balance(
 
     if let NetworkType::Alpen = network_type {
         let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
-            .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
+            .user_error("Invalid Alpen endpoint URL. Check the configuration")?;
         println!("Getting balance...");
         let eth_balance = l2w
             .get_balance(l2w.default_signer_address())

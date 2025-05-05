@@ -37,13 +37,13 @@ pub async fn withdraw(
         .address
         .map(|a| {
             let unchecked = Address::from_str(&a).user_error(format!(
-                "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
+                "Invalid signet address: '{}'. Must be a valid Bitcoin address",
                 a
             ))?;
             let checked = unchecked
                 .require_network(settings.network)
                 .user_error(format!(
-                    "Address '{}' is not valid for network '{}'",
+                    "Provided address {} is not valid for network '{}'",
                     a, settings.network
                 ))?;
 
@@ -57,7 +57,7 @@ pub async fn withdraw(
         .await
         .internal_error("Failed to sync signet wallet")?;
     let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
-        .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
+        .user_error("Invalid Alpen endpoint URL. Check the configuration")?;
 
     let address = match address {
         Some(a) => a,

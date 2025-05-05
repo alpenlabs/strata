@@ -52,12 +52,12 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
             let amount = Amount::from_sat(args.amount);
             let address = Address::from_str(&args.address)
                 .user_error(format!(
-                    "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
+                    "Invalid signet address: '{}'. Must be a valid Bitcoin address",
                     args.address
                 ))?
                 .require_network(settings.network)
                 .user_error(format!(
-                    "Wrong network '{}' for address: '{}'.",
+                    "Wrong network '{}' for address: '{}'",
                     settings.network, args.address
                 ))?;
             let mut l1w =
@@ -96,7 +96,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
             let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
                 .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
             let address = AlpenAddress::from_str(&args.address).user_error(format!(
-                "Invalid Alpen address '{}'. Must be an EVM-compatible address.",
+                "Invalid Alpen address '{}'. Must be an EVM-compatible address",
                 args.address
             ))?;
             let tx = TransactionRequest::default()

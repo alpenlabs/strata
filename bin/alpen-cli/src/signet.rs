@@ -21,7 +21,7 @@ use persist::Persister;
 use terrors::OneOf;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
-use crate::{errors::BoxedErr, seed::Seed};
+use crate::seed::Seed;
 
 pub fn log_fee_rate(fr: &FeeRate) {
     println!(
@@ -169,18 +169,18 @@ async fn apply_update_stream(
 ) -> Result<(), UpdateError> {
     while let Some(update) = rx.recv().await {
         match update {
-            WalletUpdate::SpkSync(update) => wallet
-                .apply_update(update)
-                .map_err(|e| UpdateError::from(Box::new(e) as BoxedErr))?,
-            WalletUpdate::SpkScan(update) => wallet
-                .apply_update(update)
-                .map_err(|e| UpdateError::from(Box::new(e) as BoxedErr))?,
+            WalletUpdate::SpkSync(update) => {
+                wallet.apply_update(update).map_err(UpdateError::from_err)?
+            }
+            WalletUpdate::SpkScan(update) => {
+                wallet.apply_update(update).map_err(UpdateError::from_err)?
+            }
             WalletUpdate::NewBlock(ev) => {
                 let height = ev.block_height();
                 let connected_to = ev.connected_to();
                 wallet
                     .apply_block_connected_to(&ev.block, height, connected_to)
-                    .map_err(|e| UpdateError::from(Box::new(e) as BoxedErr))?
+                    .map_err(UpdateError::from_err)?
             }
             WalletUpdate::MempoolTxs(txs) => wallet.apply_unconfirmed_txs(txs),
         }

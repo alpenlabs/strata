@@ -129,7 +129,7 @@ pub async fn drain(
         let balance = l2w
             .get_balance(l2w.default_signer_address())
             .await
-            .internal_error("Failed to fetch strata balance")?;
+            .internal_error("Failed to fetch Alpen balance")?;
         if balance == U256::ZERO {
             println!("No Alpen bitcoin to send");
         }
@@ -143,11 +143,11 @@ pub async fn drain(
         let gas_price = l2w
             .get_gas_price()
             .await
-            .internal_error("Failed to fetch strata gas price.")?;
+            .internal_error("Failed to fetch Alpen gas price.")?;
         let gas_estimate = l2w
             .estimate_gas(&estimate_tx)
             .await
-            .internal_error("Failed to estimate strata gas")?;
+            .internal_error("Failed to estimate Alpen gas")?;
 
         let total_fee = gas_estimate * gas_price;
         let max_send_amount = balance.saturating_sub(U256::from(total_fee));

@@ -29,12 +29,22 @@ use super::EsploraClient;
 #[macro_export]
 macro_rules! boxed_err {
     ($name:ident) => {
+        impl $name {
+            pub fn from_err<E>(err: E) -> Self
+            where
+                E: std::error::Error + Send + Sync + 'static,
+            {
+                Self::from(Box::new(err) as $crate::errors::BoxedErr)
+            }
+        }
+
         impl std::ops::Deref for $name {
             type Target = BoxedInner;
             fn deref(&self) -> &Self::Target {
                 self.0.as_ref()
             }
         }
+
         impl From<BoxedErr> for $name {
             fn from(err: BoxedErr) -> Self {
                 Self(err)
@@ -43,7 +53,7 @@ macro_rules! boxed_err {
 
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{:?}", self.0)
+                std::fmt::Display::fmt(&self.0, f)
             }
         }
 

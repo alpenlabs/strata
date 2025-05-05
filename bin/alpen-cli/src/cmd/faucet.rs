@@ -89,14 +89,14 @@ pub async fn faucet(
                 }
                 Some(a) => {
                     let unchecked = Address::from_str(a).user_error(format!(
-                        "Invalid signet address '{}'. Must be a valid Bitcoin address.",
+                        "Invalid signet address '{}'. Must be a valid Bitcoin address",
                         a
                     ))?;
 
                     unchecked
                         .require_network(settings.network)
                         .user_error(format!(
-                            "Provided address {} is not valid for network '{}'.",
+                            "Provided address {} is not valid for network '{}'",
                             a, settings.network
                         ))?
                 }
@@ -108,7 +108,7 @@ pub async fn faucet(
                 .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
             let addr = match &args.address {
                 Some(a) => AlpenAddress::from_str(a).user_error(format!(
-                    "Invalid Alpen address {}. Must be an EVM-compatible address.",
+                    "Invalid Alpen address {}. Must be an EVM-compatible address",
                     a
                 ))?,
                 None => l2w.default_signer_address(),
@@ -125,21 +125,31 @@ pub async fn faucet(
         settings.faucet_endpoint.clone()
     ))?;
     let chain = Chain::from_network_type(network_type.clone()).user_error(format!(
-        "Unsupported network {}. Must be `signet` or `alpen`.",
+        "Unsupported network {}. Must be `signet` or `alpen`",
         network_type
     ))?;
     let endpoint = base
         .join(&format!("/pow_challenge/{chain}"))
         .expect("a valid URL");
 
-    let challenge = client
+    let res = client
         .get(endpoint)
         .send()
         .await
-        .internal_error("Failed to fetch PoW challenge.")?
+        .internal_error("Failed to fetch PoW challenge")?;
+
+    if !res.status().is_success() {
+        let faucet_error = res.text().await.unwrap_or("Unknown error".to_string());
+        return Err(DisplayedError::InternalError(
+            "Faucet error".to_string(),
+            Box::new(faucet_error),
+        ));
+    }
+
+    let challenge = res
         .json::<PowChallenge>()
         .await
-        .internal_error("Failed to parse faucet response.")?;
+        .internal_error("Failed to parse faucet response")?;
     println!(
         "Received POW challenge with difficulty 2^{} from faucet: {:?}. Solving...",
         challenge.difficulty, challenge.nonce
@@ -172,7 +182,7 @@ pub async fn faucet(
     println!("Claiming to {} address {}", network_type, address);
 
     let url = format!(
-        "{base}{}/{}/{}",
+        "{base}/{}/{}/{}",
         claim,
         encode(&solution.to_le_bytes()),
         address
@@ -181,13 +191,13 @@ pub async fn faucet(
         .get(url)
         .send()
         .await
-        .internal_error("Failed to claim from faucet.")?;
+        .internal_error("Failed to claim from faucet")?;
 
     let status = res.status();
     let body = res
         .text()
         .await
-        .internal_error("Failed to parse faucet response.")?;
+        .internal_error("Failed to parse faucet response")?;
     if status == StatusCode::OK {
         println!("Faucet claim successfully queued. The funds should appear in your wallet soon.",);
     } else {
