@@ -40,7 +40,7 @@ pub async fn balance(
 
         l1w.sync()
             .await
-            .internal_error("Failed to load signet wallet")?;
+            .internal_error("Failed to sync signet wallet")?;
 
         let balance = l1w.balance();
         println!("Total: {}", balance.total());
@@ -52,7 +52,7 @@ pub async fn balance(
 
     if let NetworkType::Alpen = network_type {
         let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
-            .user_error("Invalid Alpen endpoint URL. Check the configuration")?;
+            .user_error("Invalid Alpen endpoint URL. Check the config file")?;
         println!("Getting balance...");
         let eth_balance = l2w
             .get_balance(l2w.default_signer_address())

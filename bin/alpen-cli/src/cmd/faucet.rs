@@ -11,7 +11,9 @@ use shrex::{encode, Hex};
 
 use crate::{
     alpen::AlpenWallet,
-    errors::{DisplayableError, DisplayedError},
+    errors::{
+        DisplayableError, DisplayedError, InvalidAlpenAddress, InvalidSignetAddress, WrongNetwork,
+    },
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -88,29 +90,41 @@ pub async fn faucet(
                     address_info.address
                 }
                 Some(a) => {
-                    let unchecked = Address::from_str(a).user_error(format!(
-                        "Invalid signet address '{}'. Must be a valid Bitcoin address",
-                        a
-                    ))?;
-
-                    unchecked
-                        .require_network(settings.network)
-                        .user_error(format!(
-                            "Provided address {} is not valid for network '{}'",
-                            a, settings.network
-                        ))?
+                    let unchecked = Address::from_str(a).map_err(|_| {
+                        DisplayedError::UserError(
+                            format!(
+                                "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
+                                a
+                            ),
+                            Box::new(InvalidSignetAddress),
+                        )
+                    })?;
+                    unchecked.require_network(settings.network).map_err(|_| {
+                        DisplayedError::UserError(
+                            format!(
+                                "Provided address '{}' is not valid for network '{}'",
+                                a, settings.network
+                            ),
+                            Box::new(WrongNetwork),
+                        )
+                    })?
                 }
             };
             (addr.to_string(), "claim_l1")
         }
         NetworkType::Alpen => {
             let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
-                .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
+                .user_error("Invalid Alpen endpoint URL. Check the config file")?;
             let addr = match &args.address {
-                Some(a) => AlpenAddress::from_str(a).user_error(format!(
-                    "Invalid Alpen address {}. Must be an EVM-compatible address",
-                    a
-                ))?,
+                Some(a) => AlpenAddress::from_str(a).map_err(|_| {
+                    DisplayedError::UserError(
+                        format!(
+                            "Invalid Alpen address {}. Must be an EVM-compatible address",
+                            a
+                        ),
+                        Box::new(InvalidAlpenAddress),
+                    )
+                })?,
                 None => l2w.default_signer_address(),
             };
             (addr.to_string(), "claim_l2")
@@ -120,10 +134,8 @@ pub async fn faucet(
     println!("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
-    let base = Url::from_str(&settings.faucet_endpoint).user_error(format!(
-        "Invalid faucet endopoint {}. Check the config file",
-        settings.faucet_endpoint.clone()
-    ))?;
+    let base = Url::from_str(&settings.faucet_endpoint)
+        .user_error("Invalid faucet endopoint. Check the config file")?;
     let chain = Chain::from_network_type(network_type.clone()).user_error(format!(
         "Unsupported network {}. Must be `signet` or `alpen`",
         network_type
@@ -139,9 +151,11 @@ pub async fn faucet(
         .internal_error("Failed to fetch PoW challenge")?;
 
     if !res.status().is_success() {
-        let faucet_error = res.text().await.unwrap_or("Unknown error".to_string());
+        let status = res.status();
+        let error_text = res.text().await.unwrap_or("unknown error".to_string());
+        let faucet_error = format!("{status}: {error_text}");
         return Err(DisplayedError::InternalError(
-            "Faucet error".to_string(),
+            "Faucet returned an error".to_string(),
             Box::new(faucet_error),
         ));
     }

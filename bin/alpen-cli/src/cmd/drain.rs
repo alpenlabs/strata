@@ -11,7 +11,9 @@ use colored::Colorize;
 use crate::{
     alpen::AlpenWallet,
     constants::SATS_TO_WEI,
-    errors::{DisplayableError, DisplayedError},
+    errors::{
+        DisplayableError, DisplayedError, InvalidAlpenAddress, InvalidSignetAddress, WrongNetwork,
+    },
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -36,6 +38,7 @@ pub struct DrainArgs {
     fee_rate: Option<u64>,
 }
 
+/// Target address not provided
 #[derive(Debug, Clone, Copy)]
 pub struct MissingTargetAddress;
 
@@ -57,26 +60,39 @@ pub async fn drain(
 
     let signet_address = signet_address
         .map(|a| {
-            let unchecked = Address::from_str(&a).user_error(format!(
-                "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
-                a
-            ))?;
-            let checked = unchecked
-                .require_network(settings.network)
-                .user_error(format!(
-                    "Address '{}' is not valid for network '{}'",
-                    a, settings.network
-                ))?;
+            let unchecked = Address::from_str(&a).map_err(|_| {
+                DisplayedError::UserError(
+                    format!(
+                        "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
+                        a
+                    ),
+                    Box::new(InvalidSignetAddress),
+                )
+            })?;
+            let checked = unchecked.require_network(settings.network).map_err(|_| {
+                DisplayedError::UserError(
+                    format!(
+                        "Provided address '{}' is not valid for network '{}'",
+                        a, settings.network
+                    ),
+                    Box::new(WrongNetwork),
+                )
+            })?;
             Ok(checked)
         })
         .transpose()?;
 
     let alpen_address = alpen_address
         .map(|a| {
-            AlpenAddress::from_str(&a).user_error(format!(
-                "Invalid Alpen address '{}'. Must be an EVM-compatible address.",
-                a
-            ))
+            AlpenAddress::from_str(&a).map_err(|_| {
+                DisplayedError::UserError(
+                    format!(
+                        "Invalid Alpen address '{}'. Must be an EVM-compatible address",
+                        a
+                    ),
+                    Box::new(InvalidAlpenAddress),
+                )
+            })
         })
         .transpose()?;
 
@@ -125,7 +141,7 @@ pub async fn drain(
 
     if let Some(address) = alpen_address {
         let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
-            .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
+            .user_error("Invalid Alpen endpoint URL. Check the config file")?;
         let balance = l2w
             .get_balance(l2w.default_signer_address())
             .await

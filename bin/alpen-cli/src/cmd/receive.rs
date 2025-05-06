@@ -51,7 +51,7 @@ pub async fn receive(
         }
         NetworkType::Alpen => {
             let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
-                .user_error("Invalid Alpen endpoint URL. Check the configuration")?;
+                .user_error("Invalid Alpen endpoint URL. Check the config file")?;
             l2w.default_signer_address().to_string()
         }
     };

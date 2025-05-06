@@ -15,6 +15,7 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
+/// Unsupported mnemonic language error
 #[derive(Clone, Copy, Debug)]
 pub struct UnsupportedMnemonicLanguage;
 

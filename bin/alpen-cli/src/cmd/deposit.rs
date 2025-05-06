@@ -18,7 +18,7 @@ use strata_primitives::constants::RECOVER_DELAY;
 use crate::{
     alpen::AlpenWallet,
     constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
-    errors::{DisplayableError, DisplayedError},
+    errors::{DisplayableError, DisplayedError, InvalidAlpenAddress},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
@@ -53,16 +53,21 @@ pub async fn deposit(
 ) -> Result<(), DisplayedError> {
     let requested_alpen_address = alpen_address
         .map(|a| {
-            AlpenAddress::from_str(&a).user_error(format!(
-                "Invalid Alpen address '{}'. Must be an EVM-compatible address",
-                a
-            ))
+            AlpenAddress::from_str(&a).map_err(|_| {
+                DisplayedError::UserError(
+                    format!(
+                        "Invalid Alpen address '{}'. Must be an EVM-compatible address",
+                        a
+                    ),
+                    Box::new(InvalidAlpenAddress),
+                )
+            })
         })
         .transpose()?;
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
         .internal_error("Failed to load signet wallet")?;
     let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
-        .user_error("Invalid Alpen endpoint URL. Check the configuration")?;
+        .user_error("Invalid Alpen endpoint URL. Check the config file")?;
 
     l1w.sync()
         .await
@@ -168,7 +173,7 @@ pub async fn deposit(
         .signet_backend
         .broadcast_tx(&tx)
         .await
-        .internal_error("Failed to broadcast transaction")?;
+        .internal_error("Failed to broadcast signet transaction")?;
     let txid = tx.compute_txid();
     pb.finish_with_message(
         OnchainObject::from(&txid)
