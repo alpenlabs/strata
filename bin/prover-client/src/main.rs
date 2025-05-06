@@ -4,13 +4,13 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use args::Args;
+use bitcoind_async_client::Client;
 use checkpoint_runner::runner::checkpoint_proof_runner;
 use db::open_rocksdb_database;
 use jsonrpsee::http_client::HttpClientBuilder;
 use operators::ProofOperator;
 use prover_manager::ProverManager;
 use rpc_server::ProverClientRpc;
-use strata_btcio::rpc::BitcoinClient;
 use strata_common::logging;
 use strata_rocksdb::{prover::db::ProofDb, DbOpsConfig};
 use task_tracker::TaskTracker;
@@ -59,7 +59,7 @@ async fn main_inner(args: Args) -> anyhow::Result<()> {
         .build(args.get_sequencer_rpc_url())
         .context("Failed to connect to the CL Sequencer client")?;
 
-    let btc_client = BitcoinClient::new(
+    let btc_client = Client::new(
         args.get_btc_rpc_url(),
         args.bitcoind_user.clone(),
         args.bitcoind_password.clone(),

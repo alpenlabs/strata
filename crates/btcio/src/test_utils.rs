@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use async_trait::async_trait;
 use bitcoin::{
     absolute::{Height, LockTime},
     bip32::Xpriv,
@@ -13,25 +12,23 @@ use bitcoin::{
     Address, Amount, Block, BlockHash, Network, ScriptBuf, SignedAmount, TapNodeHash, Transaction,
     TxOut, Txid, Work, XOnlyPublicKey,
 };
+use bitcoind_async_client::{
+    traits::{Broadcaster, Reader, Signer, Wallet},
+    types::{
+        CreateRawTransaction, GetBlockchainInfo, GetRawTransactionVerbosityOne,
+        GetRawTransactionVerbosityZero, GetTransaction, GetTxOut, ImportDescriptor,
+        ImportDescriptorResult, ListTransactions, ListUnspent, PreviousTransactionOutput,
+        ScriptPubkey, SignRawTransactionWithWallet, SubmitPackage, SubmitPackageTxResult,
+        TestMempoolAccept,
+    },
+    ClientResult,
+};
 use musig2::secp256k1::SECP256K1;
 use rand::{rngs::OsRng, RngCore};
 use strata_l1tx::envelope::builder::build_envelope_script;
 use strata_primitives::{l1::payload::L1Payload, params::Params};
 
-use crate::{
-    rpc::{
-        traits::{BroadcasterRpc, ReaderRpc, SignerRpc, WalletRpc},
-        types::{
-            CreateRawTransaction, GetBlockchainInfo, GetRawTransactionVerbosityOne,
-            GetRawTransactionVerbosityZero, GetTransaction, GetTxOut, ImportDescriptor,
-            ImportDescriptorResult, ListTransactions, ListUnspent, PreviousTransactionOutput,
-            ScriptPubkey, SignRawTransactionWithWallet, SubmitPackage, SubmitPackageTxResult,
-            TestMempoolAccept,
-        },
-        ClientResult,
-    },
-    writer::builder::{build_reveal_transaction, EnvelopeError},
-};
+use crate::writer::builder::{build_reveal_transaction, EnvelopeError};
 
 /// A test implementation of a Bitcoin client.
 #[derive(Debug, Clone)]
@@ -62,8 +59,7 @@ const TEST_BLOCKSTR: &str = "000000207d862a78fcb02ab24ebd154a20b9992af6d2f0c94d3
 /// [`rust-bitcoin` test](https://docs.rs/bitcoin/0.32.1/src/bitcoin/blockdata/transaction.rs.html#1638).
 pub const SOME_TX: &str = "0100000001a15d57094aa7a21a28cb20b59aab8fc7d1149a3bdbcddba9c622e4f5f6a99ece010000006c493046022100f93bb0e7d8db7bd46e40132d1f8242026e045f03a0efe71bbb8e3f475e970d790221009337cd7f1f929f00cc6ff01f03729b069a7c21b59b1736ddfee5db5946c5da8c0121033b9b137ee87d5a812d6f506efdd37f0affa7ffc310711c06c7f3e097c9447c52ffffffff0100e1f505000000001976a9140389035a9225b3839e2bbf32d826a1e222031fd888ac00000000";
 
-#[async_trait]
-impl ReaderRpc for TestBitcoinClient {
+impl Reader for TestBitcoinClient {
     async fn estimate_smart_fee(&self, _conf_target: u16) -> ClientResult<u64> {
         Ok(3)
     }
@@ -187,8 +183,7 @@ impl ReaderRpc for TestBitcoinClient {
     }
 }
 
-#[async_trait]
-impl BroadcasterRpc for TestBitcoinClient {
+impl Broadcaster for TestBitcoinClient {
     // send_raw_transaction sends a raw transaction to the network
     async fn send_raw_transaction(&self, _tx: &Transaction) -> ClientResult<Txid> {
         Ok(Txid::from_slice(&[1u8; 32]).unwrap())
@@ -223,8 +218,7 @@ impl BroadcasterRpc for TestBitcoinClient {
     }
 }
 
-#[async_trait]
-impl WalletRpc for TestBitcoinClient {
+impl Wallet for TestBitcoinClient {
     async fn get_new_address(&self) -> ClientResult<Address> {
         // taken from https://bitcoin.stackexchange.com/q/91222
         let addr = "bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw"
@@ -302,8 +296,7 @@ impl WalletRpc for TestBitcoinClient {
     }
 }
 
-#[async_trait]
-impl SignerRpc for TestBitcoinClient {
+impl Signer for TestBitcoinClient {
     async fn sign_raw_transaction_with_wallet(
         &self,
         tx: &Transaction,
@@ -362,12 +355,11 @@ pub mod corepc_node_helpers {
     use std::env;
 
     use bitcoin::{Address, BlockHash};
-    use corepc_node::BitcoinD;
-
-    use crate::rpc::BitcoinClient;
+    use bitcoind_async_client::Client;
+    use corepc_node::Node;
 
     /// Get the authentication credentials for a given `bitcoind` instance.
-    fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
+    fn get_auth(bitcoind: &Node) -> (String, String) {
         let params = &bitcoind.params;
         let cookie_values = params.get_cookie_values().unwrap().unwrap();
         (cookie_values.user, cookie_values.password)
@@ -376,7 +368,7 @@ pub mod corepc_node_helpers {
     /// Mine a number of blocks of a given size `count`, which may be specified to a given coinbase
     /// `address`.
     pub fn mine_blocks(
-        bitcoind: &BitcoinD,
+        bitcoind: &Node,
         count: usize,
         address: Option<Address>,
     ) -> anyhow::Result<Vec<BlockHash>> {
@@ -394,13 +386,13 @@ pub mod corepc_node_helpers {
         Ok(block_hashes)
     }
 
-    pub fn get_bitcoind_and_client() -> (BitcoinD, BitcoinClient) {
+    pub fn get_bitcoind_and_client() -> (Node, Client) {
         // setting the ENV variable `BITCOIN_XPRIV_RETRIEVABLE` to retrieve the xpriv
         env::set_var("BITCOIN_XPRIV_RETRIEVABLE", "true");
-        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let bitcoind = Node::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client = BitcoinClient::new(url, user, password, None, None).unwrap();
+        let client = Client::new(url, user, password, None, None).unwrap();
         (bitcoind, client)
     }
 }
