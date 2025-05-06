@@ -93,8 +93,7 @@ pub async fn faucet(
                     let unchecked = Address::from_str(a).map_err(|_| {
                         DisplayedError::UserError(
                             format!(
-                                "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
-                                a
+                                "Invalid signet address: '{a}'. Must be a valid Bitcoin address.",
                             ),
                             Box::new(InvalidSignetAddress),
                         )
@@ -102,8 +101,8 @@ pub async fn faucet(
                     unchecked.require_network(settings.network).map_err(|_| {
                         DisplayedError::UserError(
                             format!(
-                                "Provided address '{}' is not valid for network '{}'",
-                                a, settings.network
+                                "Provided address '{a}' is not valid for network '{}'",
+                                settings.network
                             ),
                             Box::new(WrongNetwork),
                         )
@@ -118,10 +117,7 @@ pub async fn faucet(
             let addr = match &args.address {
                 Some(a) => AlpenAddress::from_str(a).map_err(|_| {
                     DisplayedError::UserError(
-                        format!(
-                            "Invalid Alpen address {}. Must be an EVM-compatible address",
-                            a
-                        ),
+                        format!("Invalid Alpen address {a}. Must be an EVM-compatible address",),
                         Box::new(InvalidAlpenAddress),
                     )
                 })?,

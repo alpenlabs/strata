@@ -55,10 +55,7 @@ pub async fn deposit(
         .map(|a| {
             AlpenAddress::from_str(&a).map_err(|_| {
                 DisplayedError::UserError(
-                    format!(
-                        "Invalid Alpen address '{}'. Must be an EVM-compatible address",
-                        a
-                    ),
+                    format!("Invalid Alpen address '{a}'. Must be an EVM-compatible address",),
                     Box::new(InvalidAlpenAddress),
                 )
             })

@@ -62,18 +62,15 @@ pub async fn drain(
         .map(|a| {
             let unchecked = Address::from_str(&a).map_err(|_| {
                 DisplayedError::UserError(
-                    format!(
-                        "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
-                        a
-                    ),
+                    format!("Invalid signet address: '{a}'. Must be a valid Bitcoin address.",),
                     Box::new(InvalidSignetAddress),
                 )
             })?;
             let checked = unchecked.require_network(settings.network).map_err(|_| {
                 DisplayedError::UserError(
                     format!(
-                        "Provided address '{}' is not valid for network '{}'",
-                        a, settings.network
+                        "Provided address '{a}' is not valid for network '{}'",
+                        settings.network
                     ),
                     Box::new(WrongNetwork),
                 )
