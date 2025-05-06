@@ -57,21 +57,21 @@ where
 }
 
 pub(crate) trait DisplayableError {
-    type T;
-    fn user_error(self, msg: impl Into<String>) -> Result<Self::T, DisplayedError>;
-    fn internal_error(self, msg: impl Into<String>) -> Result<Self::T, DisplayedError>;
+    type Output;
+    fn user_error(self, msg: impl Into<String>) -> Result<Self::Output, DisplayedError>;
+    fn internal_error(self, msg: impl Into<String>) -> Result<Self::Output, DisplayedError>;
 }
 
 impl<T, E: std::fmt::Debug + 'static> DisplayableError for Result<T, E> {
-    type T = T;
+    type Output = T;
 
     #[inline]
-    fn user_error(self, msg: impl Into<String>) -> Result<Self::T, DisplayedError> {
+    fn user_error(self, msg: impl Into<String>) -> Result<Self::Output, DisplayedError> {
         self.map_err(user_error(msg))
     }
 
     #[inline]
-    fn internal_error(self, msg: impl Into<String>) -> Result<Self::T, DisplayedError> {
+    fn internal_error(self, msg: impl Into<String>) -> Result<Self::Output, DisplayedError> {
         self.map_err(internal_error(msg))
     }
 }
