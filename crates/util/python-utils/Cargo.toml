@@ -3,6 +3,9 @@ edition = "2021"
 name = "strata-python-utils"
 version = "0.6.0"
 
+[lints]
+rust.unused_crate_dependencies = "deny"
+
 [lib]
 name = "strata_utils"
 # "cdylib" is necessary to produce a shared library for Python to import from.
@@ -31,10 +34,10 @@ secp256k1.workspace = true
 pyo3-build-config = ">=0.24.1"
 
 [dev-dependencies]
-strata-btcio.workspace = true
 strata-common.workspace = true
 
 anyhow.workspace = true
-corepc-node = { version = "0.4.0", features = ["28_0"] }
+bitcoind-async-client.workspace = true
+corepc-node = { version = "0.7.0", features = ["28_0", "download"] }
 tokio.workspace = true
 tracing.workspace = true

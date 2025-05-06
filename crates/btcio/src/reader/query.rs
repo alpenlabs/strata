@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::bail;
 use bitcoin::{params::Params as BtcParams, Block, BlockHash, CompactTarget};
+use bitcoind_async_client::traits::Reader;
 use secp256k1::XOnlyPublicKey;
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
@@ -34,12 +35,11 @@ use crate::{
         tx_indexer::ReaderTxVisitorImpl,
         utils::{find_checkpoint_in_events, find_last_checkpoint_chainstate},
     },
-    rpc::traits::ReaderRpc,
     status::{apply_status_updates, L1StatusUpdate},
 };
 
 /// Context that encapsulates common items needed for L1 reader.
-pub(crate) struct ReaderContext<R: ReaderRpc> {
+pub(crate) struct ReaderContext<R: Reader> {
     /// Bitcoin reader client
     pub client: Arc<R>,
 
@@ -61,7 +61,7 @@ pub(crate) struct ReaderContext<R: ReaderRpc> {
 
 /// The main task that initializes the reader state and starts reading from bitcoin.
 pub async fn bitcoin_data_reader_task<E: EventSubmitter>(
-    client: Arc<impl ReaderRpc>,
+    client: Arc<impl Reader>,
     storage: Arc<NodeStorage>,
     config: Arc<ReaderConfig>,
     params: Arc<Params>,
@@ -105,7 +105,7 @@ fn calculate_target_next_block(
 }
 
 /// Inner function that actually does the reading task.
-async fn do_reader_task<R: ReaderRpc>(
+async fn do_reader_task<R: Reader>(
     ctx: ReaderContext<R>,
     target_next_block: u64,
     event_submitter: &impl EventSubmitter,
@@ -161,7 +161,7 @@ fn handle_poll_error(err: &anyhow::Error, status_updates: &mut Vec<L1StatusUpdat
 }
 
 /// Inits the reader state by trying to backfill blocks up to a target height.
-async fn init_reader_state<R: ReaderRpc>(
+async fn init_reader_state<R: Reader>(
     ctx: &ReaderContext<R>,
     target_next_block: u64,
 ) -> anyhow::Result<ReaderState> {
@@ -217,7 +217,7 @@ async fn init_reader_state<R: ReaderRpc>(
 /// Polls the chain to see if there's new blocks to look at, possibly reorging
 /// if there's a mixup and we have to go back. Returns events corresponding to block and
 /// transactions.
-async fn poll_for_new_blocks<R: ReaderRpc>(
+async fn poll_for_new_blocks<R: Reader>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
@@ -285,7 +285,7 @@ async fn poll_for_new_blocks<R: ReaderRpc>(
 /// Finds the highest block index where we do agree with the node.  If we never
 /// find one then we're really screwed.
 async fn find_pivot_block(
-    client: &impl ReaderRpc,
+    client: &impl Reader,
     state: &ReaderState,
 ) -> anyhow::Result<Option<(u64, BlockHash)>> {
     for (height, l1blkid) in state.iter_blocks_back() {
@@ -305,7 +305,7 @@ async fn find_pivot_block(
 }
 
 /// Fetches a block at given height, extracts relevant transactions and emits an `L1Event`.
-async fn fetch_and_process_block<R: ReaderRpc>(
+async fn fetch_and_process_block<R: Reader>(
     ctx: &ReaderContext<R>,
     height: u64,
     state: &mut ReaderState,
@@ -321,7 +321,7 @@ async fn fetch_and_process_block<R: ReaderRpc>(
 }
 
 /// Processes a bitcoin Block to return corresponding `L1Event` and `BlockHash`.
-async fn process_block<R: ReaderRpc>(
+async fn process_block<R: Reader>(
     ctx: &ReaderContext<R>,
     state: &mut ReaderState,
     status_updates: &mut Vec<L1StatusUpdate>,
@@ -370,7 +370,7 @@ async fn process_block<R: ReaderRpc>(
 /// placeholder value of 0. The resulting vector is then reversed so that timestamps are returned in
 /// ascending order (oldest first).
 async fn fetch_block_timestamps_ascending(
-    client: &impl ReaderRpc,
+    client: &impl Reader,
     height: u64,
     count: usize,
 ) -> anyhow::Result<Vec<u32>> {
@@ -402,7 +402,7 @@ async fn fetch_block_timestamps_ascending(
 /// timestamps (including a safe margin for potential reorg depth), and determines the next
 /// block's target.
 pub async fn fetch_verification_state(
-    client: &impl ReaderRpc,
+    client: &impl Reader,
     block_height: u64,
     l1_reorg_safe_depth: u32,
 ) -> anyhow::Result<HeaderVerificationState> {

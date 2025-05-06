@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use bitcoind_async_client::Client;
 use jsonrpsee::http_client::HttpClient;
-use strata_btcio::rpc::BitcoinClient;
 use strata_primitives::{params::RollupParams, proof::ProofContext};
 use strata_rocksdb::prover::db::ProofDb;
 use strata_rpc_types::ProofKey;
@@ -45,7 +45,7 @@ impl ProofOperator {
 
     /// Initializes a `ProofOperator` by creating and configuring the underlying proof operators.
     pub fn init(
-        btc_client: BitcoinClient,
+        btc_client: Client,
         evm_ee_client: HttpClient,
         cl_client: HttpClient,
         rollup_params: RollupParams,

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use bitcoin::{consensus, Transaction};
+use bitcoind_async_client::traits::{Reader, Signer, Wallet};
 use strata_db::types::{BundledPayloadEntry, L1TxEntry};
 use strata_primitives::buf::Buf32;
 use tracing::*;
@@ -9,7 +10,7 @@ use super::{
     builder::{build_envelope_txs, EnvelopeError},
     context::WriterContext,
 };
-use crate::{broadcaster::L1BroadcastHandle, rpc::traits::WriterRpc};
+use crate::broadcaster::L1BroadcastHandle;
 
 type BlobIdx = u64;
 
@@ -19,10 +20,10 @@ type BlobIdx = u64;
 /// 1. A new payload intent needs to be signed
 /// 2. A signed intent needs to be resigned because somehow its inputs were spent/missing
 /// 3. A confirmed block that includes the tx gets reorged
-pub async fn create_and_sign_payload_envelopes<W: WriterRpc>(
+pub async fn create_and_sign_payload_envelopes<R: Reader + Signer + Wallet>(
     payloadentry: &BundledPayloadEntry,
     broadcast_handle: &L1BroadcastHandle,
-    ctx: Arc<WriterContext<W>>,
+    ctx: Arc<WriterContext<R>>,
 ) -> Result<(Buf32, Buf32), EnvelopeError> {
     trace!("Creating and signing payload envelopes");
     let (commit, reveal) = build_envelope_txs(&payloadentry.payloads, ctx.as_ref()).await?;

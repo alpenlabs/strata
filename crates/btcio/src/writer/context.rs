@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
 use bitcoin::Address;
+use bitcoind_async_client::traits::{Reader, Signer, Wallet};
 use strata_config::btcio::WriterConfig;
 use strata_primitives::params::Params;
 use strata_status::StatusChannel;
 
-use crate::rpc::traits::WriterRpc;
-
 /// All the items that writer tasks need as context.
 #[derive(Clone)]
-pub struct WriterContext<W: WriterRpc> {
+pub struct WriterContext<R: Reader + Signer + Wallet> {
     /// Params for rollup.
     pub params: Arc<Params>,
 
@@ -20,18 +19,18 @@ pub struct WriterContext<W: WriterRpc> {
     pub sequencer_address: Address,
 
     /// Bitcoin client to sign and submit transactions.
-    pub client: Arc<W>,
+    pub client: Arc<R>,
 
     /// Channel for receiving latest states.
     pub status_channel: StatusChannel,
 }
 
-impl<W: WriterRpc> WriterContext<W> {
+impl<R: Reader + Signer + Wallet> WriterContext<R> {
     pub fn new(
         params: Arc<Params>,
         config: Arc<WriterConfig>,
         sequencer_address: Address,
-        client: Arc<W>,
+        client: Arc<R>,
         status_channel: StatusChannel,
     ) -> Self {
         Self {

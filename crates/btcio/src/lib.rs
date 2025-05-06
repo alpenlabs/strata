@@ -3,7 +3,6 @@
 
 pub mod broadcaster;
 pub mod reader;
-pub mod rpc;
 pub mod status;
 
 #[cfg(feature = "test_utils")]

@@ -463,8 +463,8 @@ mod tests {
     use std::sync::Once;
 
     use bdk_wallet::{bitcoin::Amount, KeychainKind, LocalOutput};
-    use corepc_node::BitcoinD;
-    use strata_btcio::rpc::{traits::BroadcasterRpc, BitcoinClient};
+    use bitcoind_async_client::{traits::Broadcaster, Client};
+    use corepc_node::Node;
     use strata_common::logging;
     use tokio::time::{sleep, Duration};
     use tracing::{debug, info, trace};
@@ -488,7 +488,7 @@ mod tests {
     }
 
     /// Get the authentication credentials for a given `bitcoind` instance.
-    fn get_auth(bitcoind: &BitcoinD) -> (String, String) {
+    fn get_auth(bitcoind: &Node) -> (String, String) {
         let params = &bitcoind.params;
         let cookie_values = params.get_cookie_values().unwrap().unwrap();
         (cookie_values.user, cookie_values.password)
@@ -496,11 +496,7 @@ mod tests {
 
     /// Mine a number of blocks of a given size `count`, which may be specified to a given coinbase
     /// `address`.
-    fn mine_blocks(
-        bitcoind: &BitcoinD,
-        count: usize,
-        address: Option<Address>,
-    ) -> anyhow::Result<()> {
+    fn mine_blocks(bitcoind: &Node, count: usize, address: Option<Address>) -> anyhow::Result<()> {
         let coinbase_address = match address {
             Some(address) => address,
             None => bitcoind.client.new_address()?,
@@ -515,11 +511,10 @@ mod tests {
     async fn drt_mempool_accept() {
         init_logging("drt-tests");
 
-        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let bitcoind = Node::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client =
-            BitcoinClient::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
+        let client = Client::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
 
         let mut wallet = taproot_wallet().unwrap();
         let address = wallet.reveal_next_address(KeychainKind::External).address;
@@ -544,11 +539,10 @@ mod tests {
     async fn recovery_path_mempool_accept() {
         init_logging("recovery-path-tests");
 
-        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let bitcoind = Node::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client =
-            BitcoinClient::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
+        let client = Client::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
         let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
             .expect("valid wallet client");
 
@@ -632,11 +626,10 @@ mod tests {
     async fn get_balance() {
         init_logging("balance-tests");
 
-        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let bitcoind = Node::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client =
-            BitcoinClient::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
+        let client = Client::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
         let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
             .expect("valid wallet client");
 
@@ -706,11 +699,10 @@ mod tests {
     async fn get_balance_recovery() {
         init_logging("recovery-balance-tests");
 
-        let bitcoind = BitcoinD::from_downloaded().unwrap();
+        let bitcoind = Node::from_downloaded().unwrap();
         let url = bitcoind.rpc_url();
         let (user, password) = get_auth(&bitcoind);
-        let client =
-            BitcoinClient::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
+        let client = Client::new(url.clone(), user.clone(), password.clone(), None, None).unwrap();
         let wallet_client = new_bitcoind_client(&url, None, Some(&user), Some(&password))
             .expect("valid wallet client");
 

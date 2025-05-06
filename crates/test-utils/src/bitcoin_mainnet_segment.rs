@@ -1,25 +1,21 @@
 use std::collections::HashMap;
 
 use anyhow::Error;
-use async_trait::async_trait;
 use bitcoin::{
     block::Header,
     consensus::{deserialize, serialize},
     hashes::Hash,
     Block, BlockHash, Network, Txid,
 };
-use strata_btcio::{
-    reader::query::fetch_verification_state,
-    rpc::{
-        error::ClientError,
-        traits::ReaderRpc,
-        types::{
-            GetBlockchainInfo, GetRawTransactionVerbosityOne, GetRawTransactionVerbosityZero,
-            GetTxOut,
-        },
-        ClientResult,
+use bitcoind_async_client::{
+    error::ClientError,
+    traits::Reader,
+    types::{
+        GetBlockchainInfo, GetRawTransactionVerbosityOne, GetRawTransactionVerbosityZero, GetTxOut,
     },
+    ClientResult,
 };
+use strata_btcio::reader::query::fetch_verification_state;
 use strata_primitives::{
     buf::Buf32,
     l1::{HeaderVerificationState, L1BlockManifest, L1HeaderRecord},
@@ -142,9 +138,8 @@ impl BtcChainSegment {
     }
 }
 
-/// Implement the ReaderRpc trait for our chain segment.
-#[async_trait]
-impl ReaderRpc for BtcChainSegment {
+/// Implement the [`Reader`] trait for our chain segment.
+impl Reader for BtcChainSegment {
     /// Return a default fee estimate.
     async fn estimate_smart_fee(&self, _conf_target: u16) -> ClientResult<u64> {
         // Return a default fee (e.g., 1000 satoshis per kB)

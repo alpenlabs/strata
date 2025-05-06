@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use bitcoin::{hashes::Hash, BlockHash};
+use bitcoind_async_client::{traits::Reader, Client};
 use el_sync::sync_chainstate_to_el;
 use errors::InitError;
 use jsonrpsee::Methods;
@@ -10,7 +11,6 @@ use rpc_client::sync_client;
 use strata_btcio::{
     broadcaster::{spawn_broadcaster_task, L1BroadcastHandle},
     reader::query::bitcoin_data_reader_task,
-    rpc::{traits::ReaderRpc, BitcoinClient},
     writer::start_envelope_task,
 };
 use strata_common::logging;
@@ -228,13 +228,13 @@ pub struct CoreContext {
     pub sync_manager: Arc<SyncManager>,
     pub status_channel: StatusChannel,
     pub engine: Arc<RpcExecEngineCtl<EngineRpcClient>>,
-    pub bitcoin_client: Arc<BitcoinClient>,
+    pub bitcoin_client: Arc<Client>,
 }
 
 fn do_startup_checks(
     storage: &NodeStorage,
     engine: &impl ExecEngineCtl,
-    bitcoin_client: &impl ReaderRpc,
+    bitcoin_client: &impl Reader,
     handle: &Handle,
 ) -> anyhow::Result<()> {
     let last_state_idx = match storage.chainstate().get_last_write_idx_blocking() {
@@ -303,7 +303,7 @@ fn start_core_tasks(
     database: Arc<CommonDb>,
     storage: Arc<NodeStorage>,
     _bridge_msg_ops: Arc<BridgeMsgOps>,
-    bitcoin_client: Arc<BitcoinClient>,
+    bitcoin_client: Arc<Client>,
 ) -> anyhow::Result<CoreContext> {
     let runtime = executor.handle().clone();
 
@@ -445,7 +445,7 @@ fn start_broadcaster_tasks(
     broadcast_database: Arc<BroadcastDb>,
     pool: threadpool::ThreadPool,
     executor: &TaskExecutor,
-    bitcoin_client: Arc<BitcoinClient>,
+    bitcoin_client: Arc<Client>,
     params: Arc<Params>,
     broadcast_poll_interval: u64,
 ) -> Arc<L1BroadcastHandle> {

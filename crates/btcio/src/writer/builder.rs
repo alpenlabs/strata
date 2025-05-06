@@ -19,6 +19,10 @@ use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
     Witness,
 };
+use bitcoind_async_client::{
+    traits::{Reader, Signer, Wallet},
+    types::ListUnspent,
+};
 use rand::{rngs::OsRng, RngCore};
 use strata_config::btcio::FeePolicy;
 use strata_l1tx::envelope::builder::build_envelope_script;
@@ -26,7 +30,6 @@ use strata_primitives::{l1::payload::L1Payload, params::Params};
 use thiserror::Error;
 
 use super::context::WriterContext;
-use crate::rpc::{traits::WriterRpc, types::ListUnspent};
 
 const BITCOIN_DUST_LIMIT: u64 = 546;
 
@@ -50,9 +53,9 @@ pub enum EnvelopeError {
 // Btcio depends on `tx-parser`. So this file is behind a feature flag 'test-utils' and on dev
 // dependencies on `tx-parser`, we include {btcio, feature="strata_test_utils"} , so cyclic
 // dependency doesn't happen
-pub(crate) async fn build_envelope_txs<W: WriterRpc>(
+pub(crate) async fn build_envelope_txs<R: Reader + Signer + Wallet>(
     payloads: &[L1Payload],
-    ctx: &WriterContext<W>,
+    ctx: &WriterContext<R>,
 ) -> anyhow::Result<(Transaction, Transaction)> {
     let network = ctx.client.network().await?;
     let utxos = ctx.client.get_utxos().await?;
@@ -66,8 +69,8 @@ pub(crate) async fn build_envelope_txs<W: WriterRpc>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn create_envelope_transactions<W: WriterRpc>(
-    ctx: &WriterContext<W>,
+pub fn create_envelope_transactions<R: Reader + Signer + Wallet>(
+    ctx: &WriterContext<R>,
     payloads: &[L1Payload],
     utxos: Vec<ListUnspent>,
     fee_rate: u64,
@@ -478,10 +481,10 @@ mod tests {
         taproot::ControlBlock, Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn,
         TxOut, Witness,
     };
+    use bitcoind_async_client::types::ListUnspent;
 
     use super::*;
     use crate::{
-        rpc::types::ListUnspent,
         test_utils::{test_context::get_writer_context, TestBitcoinClient},
         writer::builder::EnvelopeError,
     };
