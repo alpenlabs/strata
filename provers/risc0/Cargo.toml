@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "strata-risc0-guest-builder"
-version = "0.2.0-pre.1"
+version = "0.2.0-alpha.1"
 
 [dependencies]
 risc0-zkvm = "2.0.1"
