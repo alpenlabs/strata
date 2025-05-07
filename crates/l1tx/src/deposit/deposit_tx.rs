@@ -14,7 +14,6 @@ use strata_primitives::{
     prelude::DepositTxParams,
 };
 
-use super::constants::*;
 use crate::{
     deposit::error::DepositParseError,
     utils::{next_bytes, next_op},
@@ -32,9 +31,8 @@ pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Optio
     // Get the second output (index 1)
     let op_return_out = tx.output.get(1)?;
 
-    // Check if it is exact BRIDGE_DENOMINATION amount
-    // TODO make this not a const!
-    if send_addr_out.value.to_sat() != BRIDGE_DENOMINATION.to_sat() {
+    // Check if it is exact deposit denomination amount
+    if send_addr_out.value.to_sat() != config.deposit_amount {
         return None;
     }
 
@@ -150,7 +148,9 @@ fn parse_tag<'b>(
     // data has expected magic bytes
     let magic_len = magic_bytes.len();
 
-    if buf.len() < magic_len + DEPOSIT_IDX_LEN + SATS_AMOUNT_LEN + TAKEBACK_HASH_LEN {
+    if buf.len()
+        != magic_len + DEPOSIT_IDX_LEN + SATS_AMOUNT_LEN + TAKEBACK_HASH_LEN + addr_len as usize
+    {
         return Err(DepositParseError::InvalidData);
     }
 
@@ -164,8 +164,7 @@ fn parse_tag<'b>(
     let deposit_idx =
         u32::from_be_bytes(didx_buf.try_into().expect("Expect dep idx to be 4 bytes"));
 
-    let (dest_buf, takeback_and_amt) =
-        ee_takeback_amt.split_at(ee_takeback_amt.len() - SATS_AMOUNT_LEN - TAKEBACK_HASH_LEN);
+    let (dest_buf, takeback_and_amt) = ee_takeback_amt.split_at(addr_len as usize);
 
     // Check dest_buf len
     if dest_buf.len() != addr_len as usize {
@@ -303,11 +302,7 @@ mod tests {
 
         let result = parse_tag(&buf, &magic, ADDR_LEN as u8);
 
-        if let Err(DepositParseError::InvalidDestLen(len)) = result {
-            assert_eq!(len, 19);
-        } else {
-            panic!("Expected InvalidDestLen error");
-        }
+        assert!(matches!(result, Err(DepositParseError::InvalidData)));
     }
 
     // Tets for parse_tag_script

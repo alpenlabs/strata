@@ -148,8 +148,7 @@ pub struct DepositTxParams {
     // TODO rename to be `max_addr_len`
     pub address_length: u8,
 
-    /// Exact bitcoin amount in the at-rest deposit.
-    // TODO: rename this to deposit_denominations and set the type to be a vec(possibly sorted)
+    /// Exact bitcoin amount(sats) in the at-rest deposit.
     pub deposit_amount: u64,
 
     /// federation address derived from operator entries

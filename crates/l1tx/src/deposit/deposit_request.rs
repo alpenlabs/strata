@@ -6,7 +6,7 @@ use bitcoin::{opcodes::all::OP_RETURN, ScriptBuf, Transaction};
 use strata_primitives::{l1::DepositRequestInfo, params::DepositTxParams};
 use tracing::debug;
 
-use super::{common::DepositRequestScriptInfo, constants::*, error::DepositParseError};
+use super::{common::DepositRequestScriptInfo, error::DepositParseError};
 use crate::utils::{next_bytes, next_op};
 
 /// Extracts the DepositInfo from the Deposit Transaction
@@ -26,7 +26,7 @@ pub fn extract_deposit_request_info(
 
     // if sent value is less than equal to what we expect for bridge denomination. The extra amount
     // is used for fees to create deposit transaction
-    if addr_txn.value.to_sat() <= BRIDGE_DENOMINATION.to_sat() {
+    if addr_txn.value.to_sat() <= config.deposit_amount {
         return None;
     }
 
@@ -136,10 +136,9 @@ mod tests {
         // values for testing
         let params = gen_params();
         let (filter_conf, keypair) = create_tx_filter_config(&params);
-        let mut config = filter_conf.deposit_config.clone();
-        let extra_amt = 100000;
-        config.deposit_amount += extra_amt;
-        let amt = Amount::from_sat(config.deposit_amount);
+        let config = filter_conf.deposit_config.clone();
+        let extra_amount = 1000; // Just so that the deposit request has more than the deposit
+                                 // denomication to cover for fees
         let evm_addr = [1; 20];
         let dummy_control_block = [0xFF; 32];
         let test_taproot_addr = test_taproot_addr();
@@ -151,7 +150,7 @@ mod tests {
         );
 
         let test_transaction = create_test_deposit_tx(
-            Amount::from_sat(config.deposit_amount),
+            Amount::from_sat(config.deposit_amount + extra_amount),
             &test_taproot_addr.address().script_pubkey(),
             &deposit_request_script,
             &keypair,
@@ -163,7 +162,7 @@ mod tests {
         assert!(out.is_some());
         let out = out.unwrap();
 
-        assert_eq!(out.amt, amt.to_sat());
+        assert_eq!(out.amt, config.deposit_amount + extra_amount);
         assert_eq!(out.address, evm_addr);
         assert_eq!(out.take_back_leaf_hash, dummy_control_block);
     }
