@@ -1,4 +1,5 @@
 import logging
+import time
 
 import flexitest
 
@@ -48,6 +49,9 @@ class FullnodeIgnoreCheckpointWithInvalidProofTest(testenv.StrataTester):
         seq_fast_rpc = seq_fast.create_rpc()
         fullnode_rpc = fullnode.create_rpc()
 
+        # Sleep for 3 seconds to ensure that the sequencer has time to start
+        time.sleep(3)
+
         # Wait for seq_fast to start
         wait_until(
             lambda: seq_fast_rpc.strata_protocolVersion() is not None,
@@ -62,7 +66,13 @@ class FullnodeIgnoreCheckpointWithInvalidProofTest(testenv.StrataTester):
 
         empty_proof_receipt = {"proof": [], "public_values": []}
 
-        current_epoch = seq_fast_rpc.strata_getLatestCheckpointIndex(None)
+        current_epoch = 0
+
+        wait_until(
+            lambda: seq_fast_rpc.strata_getLatestCheckpointIndex(None) == current_epoch,
+            error_with="Checkpoint index did not increment",
+        )
+
         for _ in range(PROVER_CHECKPOINT_SETTINGS["CONSECUTIVE_PROOFS_REQUIRED"]):
             logging.info(f"Submitting proof for epoch {current_epoch}")
 

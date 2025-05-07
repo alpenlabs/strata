@@ -187,7 +187,7 @@ mod tests {
         let (checkpoint, mut rollup_params) = get_test_input();
 
         // Ensure the mode is Timeout for this test
-        rollup_params.proof_publish_mode = ProofPublishMode::Timeout(1000);
+        rollup_params.proof_publish_mode = ProofPublishMode::Timeout(1_000);
 
         // Ensure the VK is non-native for this test
         rollup_params.rollup_vk = RollupVerifyingKey::SP1VerifyingKey(
@@ -208,7 +208,7 @@ mod tests {
         let (checkpoint, mut rollup_params) = get_test_input();
 
         // Ensure the mode is Timeout for this test
-        rollup_params.proof_publish_mode = ProofPublishMode::Timeout(1000);
+        rollup_params.proof_publish_mode = ProofPublishMode::Timeout(1_000);
 
         // Ensure the VK is native for this test
         rollup_params.rollup_vk = RollupVerifyingKey::NativeVerifyingKey(
