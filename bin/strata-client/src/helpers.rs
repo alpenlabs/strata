@@ -2,8 +2,8 @@ use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use alloy_rpc_types::engine::JwtSecret;
 use bitcoin::{Address, Network};
+use bitcoind_async_client::{traits::Wallet, Client};
 use format_serde_error::SerdeError;
-use strata_btcio::rpc::{traits::WalletRpc, BitcoinClient};
 use strata_config::Config;
 use strata_evmexec::{engine::RpcExecEngineCtl, fetch_init_fork_choice_state, EngineRpcClient};
 use strata_primitives::{
@@ -120,10 +120,10 @@ fn load_rollup_params(path: &Path) -> Result<RollupParams, InitError> {
 }
 
 // TODO: remove this after builder is done
-pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<BitcoinClient>> {
+pub fn create_bitcoin_rpc_client(config: &Config) -> anyhow::Result<Arc<Client>> {
     // Set up Bitcoin client RPC.
     let bitcoind_url = format!("http://{}", config.bitcoind.rpc_url);
-    let btc_rpc = BitcoinClient::new(
+    let btc_rpc = Client::new(
         bitcoind_url,
         config.bitcoind.rpc_user.clone(),
         config.bitcoind.rpc_password.clone(),
@@ -189,7 +189,7 @@ pub fn init_engine_controller(
 
 /// Get an address controlled by sequencer's bitcoin wallet
 pub async fn generate_sequencer_address(
-    bitcoin_client: &BitcoinClient,
+    bitcoin_client: &Client,
     timeout: u64,
     poll_interval: u64,
 ) -> anyhow::Result<Address> {

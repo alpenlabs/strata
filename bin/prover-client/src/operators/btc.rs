@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use bitcoind_async_client::{traits::Reader, Client};
 use jsonrpsee::http_client::HttpClient;
-use strata_btcio::rpc::{traits::ReaderRpc, BitcoinClient};
 use strata_l1tx::filter::TxFilterConfig;
 use strata_primitives::{
     l1::L1BlockCommitment,
@@ -19,11 +19,11 @@ use crate::errors::ProvingTaskError;
 
 /// A struct that implements the [`ProvingOp`] trait for Bitcoin blockspace proof generation.
 ///
-/// It interfaces with the Bitcoin blockchain via a [`BitcoinClient`] to fetch the necessary data
+/// It interfaces with the Bitcoin blockchain via a [`Client`] to fetch the necessary data
 /// required by the [`BtcBlockspaceProgram`] for the proof generation.
 #[derive(Debug, Clone)]
 pub struct BtcBlockspaceOperator {
-    pub btc_client: Arc<BitcoinClient>,
+    pub btc_client: Arc<Client>,
     cl_client: HttpClient,
     rollup_params: Arc<RollupParams>,
 }
@@ -31,7 +31,7 @@ pub struct BtcBlockspaceOperator {
 impl BtcBlockspaceOperator {
     /// Creates a new BTC operations instance.
     pub fn new(
-        btc_client: Arc<BitcoinClient>,
+        btc_client: Arc<Client>,
         cl_client: HttpClient,
         rollup_params: Arc<RollupParams>,
     ) -> Self {
