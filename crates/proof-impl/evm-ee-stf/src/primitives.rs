@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use alloy_consensus::{serde_bincode_compat as serde_bincode_compat_header, Header};
+use alloy_consensus::{
+    serde_bincode_compat::{self as serde_bincode_compat_header},
+    transaction::serde_bincode_compat as serde_bincode_compat_tx,
+    EthereumTxEnvelope, Header, TxEip4844,
+};
 use alloy_eips::eip4895::Withdrawal;
 use alpen_reth_primitives::WithdrawalIntent;
-use reth_primitives::TransactionSigned;
 use revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -73,9 +76,8 @@ pub struct EvmBlockStfInput {
     pub ancestor_headers: Vec<Header>,
 
     /// A list of transactions to process.
-    // #[serde_as(as = "Vec<serde_bincode_compat::TransactionSigned>")]
-    // https://github.com/paradigmxyz/reth/issues/15751
-    pub transactions: Vec<TransactionSigned>,
+    #[serde_as(as = "Vec<serde_bincode_compat_tx::EthereumTxEnvelope<'_>>")]
+    pub transactions: Vec<EthereumTxEnvelope<TxEip4844>>,
 
     /// A list of withdrawals to process.
     pub withdrawals: Vec<Withdrawal>,

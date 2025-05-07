@@ -26,20 +26,18 @@ use alloy_primitives::map::DefaultHashBuilder;
 use alloy_rlp::BufMut;
 use alloy_rpc_types_eth::TransactionTrait;
 use alloy_trie::root::ordered_trie_root_with_encoder;
-use alpen_reth_evm::set_evm_handles;
 use anyhow::anyhow;
 use reth_primitives::{Header, Receipt, Transaction, TransactionSigned};
 use reth_primitives_traits::{constants::MINIMUM_GAS_LIMIT, SignedTransaction};
 use revm::{
-    db::{AccountState, InMemoryDB},
-    interpreter::Host,
-    primitives::{SpecId, TransactTo, TxEnv},
-    Database, DatabaseCommit, Evm,
+    context::{tx::TxEnv, Evm},
+    context_interface::TransactTo,
+    database::{AccountState, InMemoryDB},
+    primitives::hardfork::SpecId,
+    state::AccountInfo,
+    Database, DatabaseCommit,
 };
-use revm_primitives::{
-    alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
-    Account,
-};
+use revm_primitives::alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256};
 
 use crate::{
     mpt::{keccak, RlpBytes, StateAccount},
@@ -191,7 +189,7 @@ where
                 blk_env.gas_limit = U256::from(self.header.as_mut().unwrap().gas_limit);
             })
             .with_db(self.db.take().unwrap())
-            .append_handler_register(set_evm_handles)
+            //.append_handler_register(set_evm_handles)
             .build();
 
         let mut logs_bloom = Bloom::default();
@@ -282,7 +280,7 @@ impl EvmProcessor<InMemoryDB> {
         let db = self.db.take().expect("DB not initialized");
 
         let mut state_trie = mem::take(&mut self.input.pre_state_trie);
-        for (address, account) in &db.accounts {
+        for (address, account) in &db.cache.accounts {
             // Ignore untouched accounts.
             if account.account_state == AccountState::None {
                 continue;
@@ -357,7 +355,7 @@ fn fill_eth_tx_env(tx_env: &mut TxEnv, essence: &Transaction, caller: Address) {
             tx_env.value = tx.value;
             tx_env.data = tx.input.clone();
             tx_env.chain_id = tx.chain_id;
-            tx_env.nonce = Some(tx.nonce);
+            tx_env.nonce = tx.nonce;
             tx_env.access_list.clear();
         }
         Transaction::Eip2930(tx) => {
@@ -365,7 +363,7 @@ fn fill_eth_tx_env(tx_env: &mut TxEnv, essence: &Transaction, caller: Address) {
             tx_env.gas_limit = tx.gas_limit;
             tx_env.gas_price = U256::from(tx.gas_price);
             tx_env.gas_priority_fee = None;
-            tx_env.transact_to = if let TransactionKind::Call(to_addr) = tx.to {
+            tx_env.to = if let TransactionKind::Call(to_addr) = tx.to {
                 TransactTo::Call(to_addr)
             } else {
                 TransactTo::Create
@@ -407,7 +405,7 @@ where
     <D as Database>::Error: core::fmt::Debug,
 {
     // Read account from database
-    let mut account: Account = db
+    let mut account: AccountInfo = db
         .basic(address)
         .map_err(|db_err| {
             anyhow!(
@@ -419,7 +417,7 @@ where
         .unwrap_or_default()
         .into();
     // Credit withdrawal amount
-    account.info.balance = account.info.balance.checked_add(amount_wei).unwrap();
+    account.balance = account.balance.checked_add(amount_wei).unwrap();
     account.mark_touch();
     // Commit changes to database
 

@@ -5,7 +5,7 @@ use reth_db::transaction::{DbTx, DbTxMut};
 use reth_evm::ConfigureEvm;
 use reth_node_api::{AddOnsContext, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{
-    components::{ComponentsBuilder, ExecutorBuilder},
+    components::{BasicPayloadServiceBuilder, ComponentsBuilder, ExecutorBuilder},
     node::{FullNodeTypes, NodeTypes, NodeTypesWithEngine},
     rpc::{EngineValidatorAddOn, RethRpcAddOns, RpcAddOns, RpcHandle},
     BuilderContext, Node, NodeAdapter, NodeComponentsBuilder,
@@ -114,7 +114,7 @@ impl StrataEthereumNode {
     pub fn components<N>() -> ComponentsBuilder<
         N,
         EthereumPoolBuilder,
-        StrataPayloadServiceBuilder,
+        BasicPayloadServiceBuilder<StrataPayloadBuilderBuilder>,
         EthereumNetworkBuilder,
         StrataExecutorBuilder,
         EthereumConsensusBuilder,
@@ -131,7 +131,7 @@ impl StrataEthereumNode {
         ComponentsBuilder::default()
             .node_types::<N>()
             .pool(EthereumPoolBuilder::default())
-            .payload(StrataPayloadServiceBuilder::default())
+            .payload(BasicPayloadServiceBuilder<StrataPayloadBuilderBuilder>::default())
             .network(EthereumNetworkBuilder::default())
             .executor(StrataExecutorBuilder::default())
             .consensus(EthereumConsensusBuilder::default())
@@ -181,6 +181,7 @@ impl NodeTypes for StrataEthereumNode {
     type ChainSpec = ChainSpec;
     type StateCommitment = reth_trie_db::MerklePatriciaTrie;
     type Storage = StrataStorage;
+    type Payload = StrataEngineTypes;
 }
 
 /// Configure the node types with the custom engine types

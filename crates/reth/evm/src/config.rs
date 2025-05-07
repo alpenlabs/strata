@@ -1,25 +1,20 @@
 use std::sync::Arc;
 
 use revm::{
-    handler::register::EvmHandler,
-    primitives::{Address, EVMError, SpecId, U256},
-    Context, ContextPrecompile, Database,
+    context::result::EVMError,
+    precompile::{PrecompileWithAddress, Precompiles},
+    primitives::{Address, U256},
+    Context, Database,
 };
-use revm_primitives::Precompile;
 
-use crate::{
-    constants::{BASEFEE_ADDRESS, FIXED_WITHDRAWAL_WEI, SCHNORR_ADDRESS},
-    precompiles::{
-        bridge::{BridgeoutPrecompile, BRIDGEOUT_ADDRESS},
-        schnorr::verify_schnorr_precompile,
-    },
-};
+use crate::{constants::SCHNORR_ADDRESS, precompiles::schnorr::verify_schnorr_precompile};
 
 /// Add rollup specific customizations to EVM
-pub fn set_evm_handles<EXT, DB>(handler: &mut EvmHandler<EXT, DB>)
+pub fn set_evm_handles<EXT, DB>()
 where
     DB: Database,
 {
+    /*
     let spec_id = handler.cfg.spec_id;
 
     // install the precompiles
@@ -54,12 +49,13 @@ where
 
         prev_handle(context, gas)
     })
+    */
 }
 
 enum BalanceUpdate {
     Add(U256),
 }
-
+/*
 fn update_account_balance<EXT, DB: Database>(
     context: &mut Context<EXT, DB>,
     address: Address,
@@ -76,4 +72,15 @@ fn update_account_balance<EXT, DB: Database>(
     context.evm.journaled_state.touch(&address);
 
     Ok(())
+}
+*/
+
+pub fn get_precompiles() -> Precompiles {
+    let mut p = Precompiles::default();
+    p.extend([PrecompileWithAddress(
+        SCHNORR_ADDRESS,
+        verify_schnorr_precompile,
+    )]);
+
+    p
 }

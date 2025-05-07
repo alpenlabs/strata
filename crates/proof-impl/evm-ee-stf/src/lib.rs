@@ -26,7 +26,7 @@ use db::InMemoryDBHelper;
 use mpt::keccak;
 pub use primitives::{EvmBlockStfInput, EvmBlockStfOutput};
 use processor::{EvmConfig, EvmProcessor};
-use revm::{primitives::SpecId, InMemoryDB};
+use revm::{database::InMemoryDB, primitives::hardfork::SpecId};
 use revm_primitives::alloy_primitives::B256;
 use utils::generate_exec_update;
 use zkaleido::ZkVmEnv;
@@ -112,7 +112,7 @@ pub fn process_block_transaction_outer(zkvm: &impl ZkVmEnv) {
 
 #[cfg(test)]
 mod tests {
-    use revm::primitives::SpecId;
+    use revm::primitives::hardfork::SpecId;
     use serde::{Deserialize, Serialize};
 
     use super::*;

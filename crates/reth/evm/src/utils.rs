@@ -45,17 +45,15 @@ where
             }
 
             let txid = Buf32(tx.hash().as_slice().try_into().expect("32 bytes"));
-            WithdrawalIntentEvent::decode_log(log, true)
-                .ok()
-                .and_then(|evt| {
-                    Descriptor::from_bytes(&evt.destination)
-                        .ok()
-                        .map(|destination| WithdrawalIntent {
-                            amt: evt.amount,
-                            destination,
-                            withdrawal_txid: txid,
-                        })
-                })
+            WithdrawalIntentEvent::decode_log(log).ok().and_then(|evt| {
+                Descriptor::from_bytes(&evt.destination)
+                    .ok()
+                    .map(|destination| WithdrawalIntent {
+                        amt: evt.amount,
+                        destination,
+                        withdrawal_txid: txid,
+                    })
+            })
         })
     })
 }

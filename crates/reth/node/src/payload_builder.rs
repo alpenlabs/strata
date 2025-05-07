@@ -73,8 +73,10 @@ impl<Pool, Client> StrataPayloadBuilder<Pool, Client> {
             suggested_fee_recipient: attributes.suggested_fee_recipient(),
             prev_randao: attributes.prev_randao(),
             gas_limit: parent.gas_limit,
+            parent_beacon_block_root: attributes.parent_beacon_block_root(),
+            withdrawals: attributes.withdrawals(),
         };
-        self.evm_config.next_evm_env(parent, next_attributes)
+        self.evm_config.next_evm_env(parent, &next_attributes)
     }
 
     /// `StrataPayloadBuilder` constructor.
@@ -119,6 +121,17 @@ where
         )
     }
 
+    fn on_missing_payload(
+        &self,
+        _args: BuildArguments<Self::Attributes, Self::BuiltPayload>,
+    ) -> MissingPayloadBehaviour<Self::BuiltPayload> {
+        if self.builder_config.await_payload_on_missing {
+            MissingPayloadBehaviour::AwaitInProgress
+        } else {
+            MissingPayloadBehaviour::RaceEmptyPayload
+        }
+    }
+
     fn build_empty_payload(
         &self,
         config: PayloadConfig<Self::Attributes>,
@@ -148,6 +161,41 @@ where
     }
 }
 
+#[derive(Clone, Default, Debug)]
+#[non_exhaustive]
+struct StrataPayloadBuilderBuilder;
+
+impl StrataPayloadBuilderBuilder {
+    pub fn build<Types, Node, Evm, Pool>(
+        self,
+        evm_config: Evm,
+        ctx: &BuilderContext<Node>,
+        pool: Pool,
+    ) -> eyre::Result<StrataPayloadBuilder<Pool, Node::Provider>>
+    where
+        Types: NodeTypes<ChainSpec = ChainSpec, Primitives = EthPrimitives>,
+        Node: FullNodeTypes<Types = Types>,
+        Evm: ConfigureEvm<Primitives = PrimitivesTy<Types>>,
+        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<Node::Types>>>
+            + Unpin
+            + 'static,
+        Types::Payload: PayloadTypes<
+            BuiltPayload = EthBuiltPayload,
+            PayloadAttributes = EthPayloadAttributes,
+            PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+        >,
+    {
+        let conf = ctx.payload_builder_config();
+        Ok(StrataPayloadBuilder::new(
+            ctx.provider().clone(),
+            pool,
+            evm_config,
+            EthereumBuilderConfig::new().with_gas_limit(conf.gas_limit()),
+        ))
+    }
+}
+
+/*
 /// A custom payload service builder that supports the custom engine types
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
@@ -181,6 +229,7 @@ where
         ))
     }
 }
+*/
 
 /// Constructs an Ethereum transaction payload using the best transactions from the pool.
 ///
@@ -249,7 +298,7 @@ where
     let block_number = evm_env.block_env.number.to::<u64>();
     let beneficiary = evm_env.block_env.coinbase;
 
-    let mut sys_calls = SystemCaller::new(evm_config.clone(), chain_spec.clone());
+    let mut sys_calls = SystemCaller::new(evm_config.clone());
 
     // apply eip-4788 pre block contract call
     sys_calls
@@ -328,7 +377,7 @@ where
         }
 
         // Configure the environment for the tx.
-        let tx_env = evm_config.tx_env(tx.tx(), tx.signer());
+        let tx_env = evm_config.tx_env(tx.tx());
 
         let ResultAndState { result, state } = match evm.transact(tx_env) {
             Ok(res) => res,

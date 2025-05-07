@@ -1,6 +1,6 @@
 use alpen_reth_primitives::WithdrawalIntentEvent;
 use revm::{
-    primitives::{PrecompileError, PrecompileErrors, PrecompileOutput, PrecompileResult},
+    precompile::{PrecompileError, PrecompileOutput, PrecompileResult},
     ContextStatefulPrecompile, Database,
 };
 use revm_primitives::{Bytes, Log, LogData, U256};

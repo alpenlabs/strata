@@ -28,23 +28,9 @@ pub struct StrataEngineTypes<T: PayloadTypes = StrataPayloadTypes> {
 
 impl<T: PayloadTypes> PayloadTypes for StrataEngineTypes<T> {
     type BuiltPayload = T::BuiltPayload;
+    type ExecutionData = ExecutionData;
     type PayloadAttributes = T::PayloadAttributes;
     type PayloadBuilderAttributes = T::PayloadBuilderAttributes;
-}
-
-impl<T: PayloadTypes> EngineTypes for StrataEngineTypes<T>
-where
-    T::BuiltPayload: BuiltPayload<Primitives: NodePrimitives<Block = reth_primitives::Block>>
-        + TryInto<ExecutionPayloadV1>
-        + TryInto<StrataExecutionPayloadEnvelopeV2>
-        + TryInto<ExecutionPayloadEnvelopeV3>
-        + TryInto<ExecutionPayloadEnvelopeV4>,
-{
-    type ExecutionData = ExecutionData;
-    type ExecutionPayloadEnvelopeV1 = ExecutionPayloadV1;
-    type ExecutionPayloadEnvelopeV2 = StrataExecutionPayloadEnvelopeV2;
-    type ExecutionPayloadEnvelopeV3 = ExecutionPayloadEnvelopeV3;
-    type ExecutionPayloadEnvelopeV4 = ExecutionPayloadEnvelopeV4;
 
     fn block_to_payload(
         block: SealedBlock<
@@ -57,13 +43,36 @@ where
     }
 }
 
+impl<T: PayloadTypes<ExecutionData = ExecutionData>> EngineTypes for StrataEngineTypes<T>
+where
+    T::BuiltPayload: BuiltPayload<Primitives: NodePrimitives<Block = reth_primitives::Block>>
+        + TryInto<ExecutionPayloadV1>
+        + TryInto<StrataExecutionPayloadEnvelopeV2>
+        + TryInto<ExecutionPayloadEnvelopeV3>
+        + TryInto<ExecutionPayloadEnvelopeV4>,
+{
+    type ExecutionPayloadEnvelopeV1 = ExecutionPayloadV1;
+    type ExecutionPayloadEnvelopeV2 = StrataExecutionPayloadEnvelopeV2;
+    type ExecutionPayloadEnvelopeV3 = ExecutionPayloadEnvelopeV3;
+    type ExecutionPayloadEnvelopeV4 = ExecutionPayloadEnvelopeV4;
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct StrataPayloadTypes;
+pub struct StrataPayloadTypes<N: NodePrimitives = NodePrimitives>;
 
 impl PayloadTypes for StrataPayloadTypes {
+    type ExecutionData = ExecutionData;
     type BuiltPayload = StrataBuiltPayload;
     type PayloadAttributes = StrataPayloadAttributes;
     type PayloadBuilderAttributes = StrataPayloadBuilderAttributes;
+
+    fn block_to_payload(
+        block: SealedBlock<
+            <<Self::BuiltPayload as BuiltPayload>::Primitives as NodePrimitives>::Block,
+        >,
+    ) -> Self::ExecutionData {
+        Self::ExecutionData::from_block_unchecked(block.hash(), &block.into_block())
+    }
 }
 
 /// Strata engine validator
