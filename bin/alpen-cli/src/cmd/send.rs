@@ -72,9 +72,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
                 let mut builder = l1w.build_tx();
                 builder.add_recipient(address.script_pubkey(), amount);
                 builder.fee_rate(fee_rate);
-                builder
-                    .finish()
-                    .internal_error("Failed to create bridge transaction")?
+                builder.finish().internal_error("Failed to create PSBT")?
             };
             l1w.sign(&mut psbt, Default::default())
                 .expect("tx should be signed");

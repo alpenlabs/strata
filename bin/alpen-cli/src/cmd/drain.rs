@@ -100,9 +100,7 @@ pub async fn drain(
             builder.drain_wallet();
             builder.drain_to(address.script_pubkey());
             builder.fee_rate(fee_rate);
-            builder
-                .finish()
-                .internal_error("Failed to create bridge transaction")?
+            builder.finish().internal_error("Failed to create PSBT")?
         };
         l1w.sign(&mut psbt, Default::default())
             .expect("tx should be signed");
