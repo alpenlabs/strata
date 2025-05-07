@@ -11,9 +11,7 @@ use colored::Colorize;
 use crate::{
     alpen::AlpenWallet,
     constants::SATS_TO_WEI,
-    errors::{
-        DisplayableError, DisplayedError, InvalidAlpenAddress, InvalidSignetAddress, WrongNetwork,
-    },
+    errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -60,36 +58,24 @@ pub async fn drain(
 
     let signet_address = signet_address
         .map(|a| {
-            let unchecked = Address::from_str(&a).map_err(|_| {
-                DisplayedError::UserError(
-                    format!("Invalid signet address: '{a}'. Must be a valid Bitcoin address.",),
-                    Box::new(InvalidSignetAddress),
-                )
-            })?;
-            let checked = unchecked.require_network(settings.network).map_err(|_| {
-                DisplayedError::UserError(
-                    format!(
-                        "Provided address '{a}' is not valid for network '{}'",
-                        settings.network
-                    ),
-                    Box::new(WrongNetwork),
-                )
-            })?;
+            let unchecked = Address::from_str(&a).user_error(format!(
+                "Invalid signet address: '{a}'. Must be a valid Bitcoin address."
+            ))?;
+            let checked = unchecked
+                .require_network(settings.network)
+                .user_error(format!(
+                    "Provided address '{a}' is not valid for network '{}'",
+                    settings.network
+                ))?;
             Ok(checked)
         })
         .transpose()?;
 
     let alpen_address = alpen_address
         .map(|a| {
-            AlpenAddress::from_str(&a).map_err(|_| {
-                DisplayedError::UserError(
-                    format!(
-                        "Invalid Alpen address '{}'. Must be an EVM-compatible address",
-                        a
-                    ),
-                    Box::new(InvalidAlpenAddress),
-                )
-            })
+            AlpenAddress::from_str(&a).user_error(format!(
+                "Invalid Alpen address '{a}'. Must be an EVM-compatible address"
+            ))
         })
         .transpose()?;
 
@@ -116,7 +102,7 @@ pub async fn drain(
             builder.fee_rate(fee_rate);
             builder
                 .finish()
-                .internal_error("Failed to build signet transaction")?
+                .internal_error("Failed to create bridge transaction")?
         };
         l1w.sign(&mut psbt, Default::default())
             .expect("tx should be signed");

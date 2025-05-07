@@ -88,15 +88,3 @@ impl std::fmt::Display for DisplayedError {
         }
     }
 }
-
-/// Invalid signet address
-#[derive(Debug, Clone, Copy)]
-pub struct InvalidSignetAddress;
-
-/// Wrong network for provided address
-#[derive(Debug, Clone, Copy)]
-pub struct WrongNetwork;
-
-/// Invalid Alpen address
-#[derive(Debug, Clone, Copy)]
-pub struct InvalidAlpenAddress;

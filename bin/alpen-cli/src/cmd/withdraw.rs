@@ -12,7 +12,7 @@ use strata_primitives::bitcoin_bosd::Descriptor;
 use crate::{
     alpen::AlpenWallet,
     constants::{BRIDGE_OUT_AMOUNT, SATS_TO_WEI},
-    errors::{DisplayableError, DisplayedError, InvalidSignetAddress, WrongNetwork},
+    errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     seed::Seed,
     settings::Settings,
@@ -36,21 +36,15 @@ pub async fn withdraw(
     let address = args
         .address
         .map(|a| {
-            let unchecked = Address::from_str(&a).map_err(|_| {
-                DisplayedError::UserError(
-                    format!("Invalid signet address: '{a}'. Must be a valid Bitcoin address.",),
-                    Box::new(InvalidSignetAddress),
-                )
-            })?;
-            let checked = unchecked.require_network(settings.network).map_err(|_| {
-                DisplayedError::UserError(
-                    format!(
-                        "Provided address '{a}' is not valid for network '{}'",
-                        settings.network
-                    ),
-                    Box::new(WrongNetwork),
-                )
-            })?;
+            let unchecked = Address::from_str(&a).user_error(format!(
+                "Invalid signet address: '{a}'. Must be a valid Bitcoin address."
+            ))?;
+            let checked = unchecked
+                .require_network(settings.network)
+                .user_error(format!(
+                    "Provided address '{a}' is not valid for network '{}'",
+                    settings.network
+                ))?;
             Ok(checked)
         })
         .transpose()?;

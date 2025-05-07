@@ -12,9 +12,7 @@ use bdk_wallet::bitcoin::{Address, Amount};
 use crate::{
     alpen::AlpenWallet,
     constants::SATS_TO_WEI,
-    errors::{
-        DisplayableError, DisplayedError, InvalidAlpenAddress, InvalidSignetAddress, WrongNetwork,
-    },
+    errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     net_type::NetworkType,
     seed::Seed,
@@ -47,31 +45,21 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
     let network_type = args
         .network_type
         .parse()
-        .user_error("invalid network type")?;
+        .user_error(format!("invalid network type '{}'", args.network_type))?;
 
     match network_type {
         NetworkType::Signet => {
             let amount = Amount::from_sat(args.amount);
             let address = Address::from_str(&args.address)
-                .map_err(|_| {
-                    DisplayedError::UserError(
-                        format!(
-                            "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
-                            args.address
-                        ),
-                        Box::new(InvalidSignetAddress),
-                    )
-                })?
+                .user_error(format!(
+                    "Invalid signet address: '{}'. Must be a valid Bitcoin address.",
+                    args.address
+                ))?
                 .require_network(settings.network)
-                .map_err(|_| {
-                    DisplayedError::UserError(
-                        format!(
-                            "Provided address '{}' is not valid for network '{}'",
-                            args.address, settings.network
-                        ),
-                        Box::new(WrongNetwork),
-                    )
-                })?;
+                .user_error(format!(
+                    "Provided address '{}' is not valid for network '{}'",
+                    args.address, settings.network
+                ))?;
             let mut l1w =
                 SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
                     .internal_error("Failed to load signet wallet")?;
@@ -86,7 +74,7 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
                 builder.fee_rate(fee_rate);
                 builder
                     .finish()
-                    .internal_error("Failed to build signet transaction")?
+                    .internal_error("Failed to create bridge transaction")?
             };
             l1w.sign(&mut psbt, Default::default())
                 .expect("tx should be signed");
@@ -107,15 +95,10 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
         NetworkType::Alpen => {
             let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
                 .user_error("Invalid Alpen endpoint URL. Check the configuration.")?;
-            let address = AlpenAddress::from_str(&args.address).map_err(|_| {
-                DisplayedError::UserError(
-                    format!(
-                        "Invalid Alpen address {}. Must be an EVM-compatible address",
-                        args.address
-                    ),
-                    Box::new(InvalidAlpenAddress),
-                )
-            })?;
+            let address = AlpenAddress::from_str(&args.address).user_error(format!(
+                "Invalid Alpen address {}. Must be an EVM-compatible address",
+                args.address
+            ))?;
             let tx = TransactionRequest::default()
                 .with_to(address)
                 .with_value(U256::from(args.amount as u128 * SATS_TO_WEI));

@@ -11,9 +11,7 @@ use shrex::{encode, Hex};
 
 use crate::{
     alpen::AlpenWallet,
-    errors::{
-        DisplayableError, DisplayedError, InvalidAlpenAddress, InvalidSignetAddress, WrongNetwork,
-    },
+    errors::{DisplayableError, DisplayedError},
     net_type::NetworkType,
     seed::Seed,
     settings::Settings,
@@ -74,7 +72,7 @@ pub async fn faucet(
     let network_type = args
         .network_type
         .parse()
-        .user_error("invalid network type")?;
+        .user_error(format!("invalid network type '{}'", args.network_type))?;
 
     let (address, claim) = match network_type {
         NetworkType::Signet => {
@@ -90,23 +88,15 @@ pub async fn faucet(
                     address_info.address
                 }
                 Some(a) => {
-                    let unchecked = Address::from_str(a).map_err(|_| {
-                        DisplayedError::UserError(
-                            format!(
-                                "Invalid signet address: '{a}'. Must be a valid Bitcoin address.",
-                            ),
-                            Box::new(InvalidSignetAddress),
-                        )
-                    })?;
-                    unchecked.require_network(settings.network).map_err(|_| {
-                        DisplayedError::UserError(
-                            format!(
-                                "Provided address '{a}' is not valid for network '{}'",
-                                settings.network
-                            ),
-                            Box::new(WrongNetwork),
-                        )
-                    })?
+                    let unchecked = Address::from_str(a).user_error(format!(
+                        "Invalid signet address: '{a}'. Must be a valid Bitcoin address.",
+                    ))?;
+                    unchecked
+                        .require_network(settings.network)
+                        .user_error(format!(
+                            "Provided address '{a}' is not valid for network '{}'",
+                            settings.network
+                        ))?
                 }
             };
             (addr.to_string(), "claim_l1")
@@ -115,12 +105,9 @@ pub async fn faucet(
             let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
                 .user_error("Invalid Alpen endpoint URL. Check the config file")?;
             let addr = match &args.address {
-                Some(a) => AlpenAddress::from_str(a).map_err(|_| {
-                    DisplayedError::UserError(
-                        format!("Invalid Alpen address {a}. Must be an EVM-compatible address",),
-                        Box::new(InvalidAlpenAddress),
-                    )
-                })?,
+                Some(a) => AlpenAddress::from_str(a).user_error(format!(
+                    "Invalid Alpen address {a}. Must be an EVM-compatible address"
+                ))?,
                 None => l2w.default_signer_address(),
             };
             (addr.to_string(), "claim_l2")

@@ -28,7 +28,7 @@ pub async fn receive(
     let network_type = args
         .network_type
         .parse()
-        .user_error("Invalid network type")?;
+        .user_error(format!("invalid network type '{}'", args.network_type))?;
 
     let address = match network_type {
         NetworkType::Signet => {

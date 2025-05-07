@@ -18,7 +18,7 @@ use strata_primitives::constants::RECOVER_DELAY;
 use crate::{
     alpen::AlpenWallet,
     constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
-    errors::{DisplayableError, DisplayedError, InvalidAlpenAddress},
+    errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
@@ -53,12 +53,9 @@ pub async fn deposit(
 ) -> Result<(), DisplayedError> {
     let requested_alpen_address = alpen_address
         .map(|a| {
-            AlpenAddress::from_str(&a).map_err(|_| {
-                DisplayedError::UserError(
-                    format!("Invalid Alpen address '{a}'. Must be an EVM-compatible address",),
-                    Box::new(InvalidAlpenAddress),
-                )
-            })
+            AlpenAddress::from_str(&a).user_error(format!(
+                "Invalid Alpen address '{a}'. Must be an EVM-compatible address"
+            ))
         })
         .transpose()?;
     let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
@@ -90,12 +87,12 @@ pub async fn deposit(
 
     let (bridge_in_desc, _recovery_script, _recovery_script_hash) =
         bridge_in_descriptor(settings.bridge_musig2_pubkey, recovery_address)
-            .internal_error("Recovery address is not a P2TR address")?;
+            .expect("valid bridge in descriptor");
 
     let desc = bridge_in_desc
         .clone()
         .into_wallet_descriptor(l1w.secp_ctx(), settings.network)
-        .internal_error("Error creating bridge in descriptor")?;
+        .expect("valid descriptor");
 
     let mut temp_wallet = Wallet::create_single(desc.clone())
         .network(settings.network)
