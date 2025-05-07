@@ -36,7 +36,7 @@ strata-status.workspace = true
 strata-test-utils.workspace = true
 
 arbitrary.workspace = true
-corepc-node = { version = "0.7.0", features = ["28_0", "download"] }
+corepc-node = { version = "0.7.1", features = ["28_0", "download"] }
 mockall.workspace = true
 
 [features]
