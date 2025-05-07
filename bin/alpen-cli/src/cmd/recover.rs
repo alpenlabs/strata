@@ -106,9 +106,7 @@ pub async fn recover(
             let mut builder = recovery_wallet.build_tx();
             builder.drain_to(recover_to.script_pubkey());
             builder.fee_rate(fee_rate);
-            builder
-                .finish()
-                .internal_error("Failed to build signet transaction")?
+            builder.finish().internal_error("Failed to create PSBT")?
         };
 
         recovery_wallet
