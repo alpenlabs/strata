@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "strata-python-utils"
-version = "0.2.0-alpha.1"
+version = "0.2.0"
 
 [lints]
 rust.unused_crate_dependencies = "deny"
@@ -16,7 +16,7 @@ name = "strata_utils"
 crate-type = ["cdylib"]
 
 [dependencies]
-shrex = { version = "0.2.0-alpha.1", path = "../shrex", features = ["serde"] }
+shrex = { version = "0.2.0", path = "../shrex", features = ["serde"] }
 strata-crypto = { workspace = true, features = ["rand"] }
 strata-primitives.workspace = true
 
