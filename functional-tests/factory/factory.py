@@ -9,7 +9,13 @@ import web3.middleware
 from bitcoinlib.services.bitcoind import BitcoindClient
 
 from factory import seqrpc
-from factory.config import BitcoindConfig, ClientConfig, Config, ExecConfig, RethELConfig
+from factory.config import (
+    BitcoindConfig,
+    ClientConfig,
+    Config,
+    ExecConfig,
+    RethELConfig,
+)
 from load.cfg import LoadConfig
 from load.service import LoadGeneratorService
 from utils import *
@@ -76,8 +82,14 @@ class StrataFactory(flexitest.Factory):
         sequencer_address: str,  # TODO: remove this
         rollup_params: str,
         ctx: flexitest.EnvContext,
+        multi_instance_enabled: bool = False,
+        name_suffix: str = "",
+        instance_id: int = 0,
     ) -> flexitest.Service:
-        datadir = ctx.make_service_dir("sequencer")
+        if multi_instance_enabled:
+            datadir = ctx.make_service_dir(f"sequencer.{instance_id}.{name_suffix}")
+        else:
+            datadir = ctx.make_service_dir("sequencer")
         rpc_port = self.next_port()
         rpc_host = "127.0.0.1"
         logfile = os.path.join(datadir, "service.log")
@@ -136,8 +148,15 @@ class StrataSequencerFactory(flexitest.Factory):
         sequencer_rpc_port: str,
         ctx: flexitest.EnvContext,
         epoch_gas_limit: Optional[int] = None,
+        multi_instance_enabled: bool = False,
+        instance_id: int = 0,
+        name_suffix: str = "",
     ) -> flexitest.Service:
-        datadir = ctx.make_service_dir("sequencer_signer")
+        if multi_instance_enabled:
+            datadir = ctx.make_service_dir(f"sequencer_signer.{instance_id}.{name_suffix}")
+        else:
+            datadir = ctx.make_service_dir("sequencer_signer")
+
         seqkey_path = os.path.join(ctx.envdd_path, "_init", "seqkey.bin")
         logfile = os.path.join(datadir, "service.log")
 
@@ -181,9 +200,11 @@ class FullNodeFactory(flexitest.Factory):
         sequencer_rpc: str,
         rollup_params: str,
         ctx: flexitest.EnvContext,
+        name_suffix: str = "",
     ) -> flexitest.Service:
         idx = self.next_idx()
-        name = f"fullnode.{idx}"
+
+        name = f"fullnode.{idx}.{name_suffix}" if name_suffix != "" else f"fullnode.{idx}"
 
         datadir = ctx.make_service_dir(name)
         rpc_host = "127.0.0.1"
@@ -242,8 +263,9 @@ class RethFactory(flexitest.Factory):
         sequencer_reth_rpc: Optional[str],
         ctx: flexitest.EnvContext,
         custom_chain: str = "dev",
+        name_suffix: str = "",
     ) -> flexitest.Service:
-        name = f"reth.{id}"
+        name = f"reth.{id}.{name_suffix}"
         datadir = ctx.make_service_dir(name)
         authrpc_port = self.next_port()
         listener_port = self.next_port()
@@ -328,8 +350,11 @@ class ProverClientFactory(flexitest.Factory):
         rollup_params: str,
         settings: ProverClientSettings,
         ctx: flexitest.EnvContext,
+        name_suffix: str = "",
     ):
-        datadir = ctx.make_service_dir("prover_client")
+        name = f"prover_client.{name_suffix}" if name_suffix != "" else "prover_client"
+
+        datadir = ctx.make_service_dir(name)
         logfile = os.path.join(datadir, "service.log")
 
         rpc_port = self.next_port()

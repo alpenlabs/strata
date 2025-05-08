@@ -1,6 +1,6 @@
 import flexitest
 
-from envs import testenv
+from envs import net_settings, testenv
 from mixins import seq_crash_mixin
 from utils import ProverClientSettings, wait_until
 
@@ -10,7 +10,9 @@ class CrashSyncEventFinalizeEpochTest(seq_crash_mixin.SeqCrashMixin):
     def __init__(self, ctx: flexitest.InitContext):
         ctx.set_env(
             testenv.BasicEnvConfig(
-                101, prover_client_settings=ProverClientSettings.new_with_proving()
+                101,
+                prover_client_settings=ProverClientSettings.new_with_proving(),
+                rollup_settings=net_settings.get_fast_batch_settings(),
             )
         )
 
