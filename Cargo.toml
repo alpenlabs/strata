@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/btcio",
+  "crates/chainexec",
   "crates/chaintsn",
   "crates/common",
   "crates/config",
@@ -50,7 +51,7 @@ members = [
 
   # integration tests
   "tests",
-  "crates/util/python-utils",
+  "crates/util/python-utils", "crates/chainexec",
 ]
 
 default-members = [
@@ -72,6 +73,7 @@ alpen-reth-node = { path = "crates/reth/node" }
 alpen-reth-primitives = { path = "crates/reth/primitives" }
 alpen-reth-rpc = { path = "crates/reth/rpc" }
 strata-btcio = { path = "crates/btcio" }
+strata-chainexec = { path = "crates/chainexec" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }
 strata-config = { path = "crates/config" }
