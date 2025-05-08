@@ -5,7 +5,11 @@ use alloy::{
     providers::{Provider, WalletProvider},
 };
 use argh::FromArgs;
-use bdk_wallet::bitcoin::{Address, Amount};
+use bdk_wallet::{
+    bitcoin::{Address, Amount},
+    coin_selection::InsufficientFunds,
+    error::CreateTxError,
+};
 use colored::Colorize;
 
 use crate::{
@@ -100,7 +104,16 @@ pub async fn drain(
             builder.drain_wallet();
             builder.drain_to(address.script_pubkey());
             builder.fee_rate(fee_rate);
-            builder.finish().internal_error("Failed to create PSBT")?
+            match builder.finish() {
+                Ok(psbt) => psbt,
+                Err(CreateTxError::CoinSelection(e @ InsufficientFunds { .. })) => {
+                    return Err(DisplayedError::UserError(
+                        "Failed to create PSBT".to_string(),
+                        Box::new(e),
+                    ));
+                }
+                Err(e) => panic!("Unexpected error in creating PSBT: {e:?}"),
+            }
         };
         l1w.sign(&mut psbt, Default::default())
             .expect("tx should be signed");

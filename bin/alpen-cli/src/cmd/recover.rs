@@ -1,6 +1,7 @@
 use argh::FromArgs;
 use bdk_wallet::{
-    bitcoin::Amount, chain::ChainOracle, descriptor::IntoWalletDescriptor, KeychainKind, Wallet,
+    bitcoin::Amount, chain::ChainOracle, coin_selection::InsufficientFunds,
+    descriptor::IntoWalletDescriptor, error::CreateTxError, KeychainKind, Wallet,
 };
 use chrono::Utc;
 use colored::Colorize;
@@ -106,7 +107,16 @@ pub async fn recover(
             let mut builder = recovery_wallet.build_tx();
             builder.drain_to(recover_to.script_pubkey());
             builder.fee_rate(fee_rate);
-            builder.finish().internal_error("Failed to create PSBT")?
+            match builder.finish() {
+                Ok(psbt) => psbt,
+                Err(CreateTxError::CoinSelection(e @ InsufficientFunds { .. })) => {
+                    return Err(DisplayedError::UserError(
+                        "Failed to create PSBT".to_string(),
+                        Box::new(e),
+                    ));
+                }
+                Err(e) => panic!("Unexpected error in creating PSBT: {e:?}"),
+            }
         };
 
         recovery_wallet

@@ -7,7 +7,10 @@ use alloy::{
     rpc::types::TransactionRequest,
 };
 use argh::FromArgs;
-use bdk_wallet::bitcoin::{Address, Amount};
+use bdk_wallet::{
+    bitcoin::{Address, Amount},
+    error::CreateTxError,
+};
 
 use crate::{
     alpen::AlpenWallet,
@@ -72,7 +75,16 @@ pub async fn send(args: SendArgs, seed: Seed, settings: Settings) -> Result<(), 
                 let mut builder = l1w.build_tx();
                 builder.add_recipient(address.script_pubkey(), amount);
                 builder.fee_rate(fee_rate);
-                builder.finish().internal_error("Failed to create PSBT")?
+                match builder.finish() {
+                    Ok(psbt) => psbt,
+                    Err(e @ CreateTxError::OutputBelowDustLimit(_)) => {
+                        return Err(DisplayedError::UserError(
+                            "Failed to create PSBT".to_string(),
+                            Box::new(e),
+                        ));
+                    }
+                    Err(e) => panic!("Unexpected error in creating PSBT: {e:?}"),
+                }
             };
             l1w.sign(&mut psbt, Default::default())
                 .expect("tx should be signed");

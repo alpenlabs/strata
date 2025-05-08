@@ -5,7 +5,9 @@ use argh::FromArgs;
 use bdk_wallet::{
     bitcoin::{taproot::LeafVersion, Address, ScriptBuf, TapNodeHash, XOnlyPublicKey},
     chain::ChainOracle,
+    coin_selection::InsufficientFunds,
     descriptor::IntoWalletDescriptor,
+    error::CreateTxError,
     miniscript::{miniscript::Tap, Miniscript},
     template::DescriptorTemplateOut,
     KeychainKind, TxOrdering, Wallet,
@@ -139,9 +141,16 @@ pub async fn deposit(
         builder.add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT);
         builder.add_data(&op_return_data);
         builder.fee_rate(fee_rate);
-        builder
-            .finish()
-            .internal_error("Failed to create bridge transaction")?
+        match builder.finish() {
+            Ok(psbt) => psbt,
+            Err(CreateTxError::CoinSelection(e @ InsufficientFunds { .. })) => {
+                return Err(DisplayedError::UserError(
+                    "Failed to create bridge transaction".to_string(),
+                    Box::new(e),
+                ));
+            }
+            Err(e) => panic!("Unexpected error in creating PSBT: {e:?}"),
+        }
     };
     l1w.sign(&mut psbt, Default::default())
         .expect("tx should be signed");
