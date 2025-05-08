@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "strata-jmt"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 
 [dependencies]
 jmt = "0.10.0"
