@@ -40,6 +40,13 @@ where
                 .map(|maybe_witness| maybe_witness.map(BlockWitness::Raw))
         };
 
+        if res.is_ok() && res.as_ref().unwrap().is_none() {
+            println!(
+                "** No witness data found for block hash: {:?}**",
+                block_hash
+            );
+        }
+
         res.map_err(to_jsonrpsee_error("Failed fetching witness"))
     }
 }

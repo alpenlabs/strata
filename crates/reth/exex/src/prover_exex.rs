@@ -58,6 +58,10 @@ impl<
 
             let prover_input = extract_zkvm_input(block_hash, &self.ctx, &outcome)?;
 
+            println!("** Sleeping db write ***");
+            std::thread::sleep(std::time::Duration::from_secs(30));
+            println!("** Db write success ***");
+
             // TODO: maybe put db writes in another thread
             if let Err(err) = self.db.put_block_witness(block_hash, &prover_input) {
                 error!(?err, ?block_hash);
