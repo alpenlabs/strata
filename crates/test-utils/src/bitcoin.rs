@@ -4,6 +4,7 @@ use bitcoin::{
     absolute::LockTime,
     consensus::deserialize,
     hashes::Hash,
+    key::TapTweak,
     opcodes::all::OP_RETURN,
     script::{self, PushBytesBuf},
     secp256k1::{Keypair, Message, Secp256k1},
@@ -69,7 +70,7 @@ pub fn get_test_tx_filter_config() -> TxFilterConfig {
 /// - `out_script_pubkey`: Script to spend to.
 /// - `opreturn_script`: Script for the OP_RETURN output. This contains the metadata for the
 ///   deposit.
-/// - `keypair`: Keypair used to sign the transaction.
+/// - `keypair`: Keypair(untweaked) used to sign the transaction.
 /// - `tapnode_hash`: Optional Taproot node hash for script path commitment.
 ///
 /// # Returns
@@ -86,6 +87,8 @@ pub fn create_test_deposit_tx(
 
     let secp = Secp256k1::new();
     let (xpk, _) = keypair.x_only_public_key();
+    let tapscript_root = TapNodeHash::from_byte_array(*tapnode_hash); // since there is only one
+                                                                      // script node
     let sbuf = ScriptBuf::new_p2tr(
         &secp,
         xpk,
@@ -127,13 +130,15 @@ pub fn create_test_deposit_tx(
     let prevtxout = [prev_txout];
     let prevouts = Prevouts::All(&prevtxout);
     let sighash = SighashCache::new(&mut tx)
-        .taproot_key_spend_signature_hash(0, &prevouts, TapSighashType::Default)
+        .taproot_key_spend_signature_hash(0, &prevouts, TapSighashType::All)
         .unwrap();
 
     let msg = Message::from_digest(*sighash.as_ref());
 
+    let tweaked_pair = keypair.tap_tweak(&secp, Some(tapscript_root));
+
     // Sign the sighash
-    let sig = secp.sign_schnorr(&msg, keypair);
+    let sig = secp.sign_schnorr(&msg, &tweaked_pair.to_inner());
 
     tx.input[0].witness.push(sig.as_ref());
 

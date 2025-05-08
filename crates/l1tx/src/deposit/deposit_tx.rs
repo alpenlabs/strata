@@ -2,12 +2,13 @@
 
 use bitcoin::{
     hashes::Hash,
+    key::TapTweak,
     opcodes::all::OP_RETURN,
     sighash::{Prevouts, SighashCache},
     taproot::TAPROOT_CONTROL_NODE_SIZE,
     Amount, OutPoint, ScriptBuf, TapNodeHash, TapSighashType, Transaction, TxOut, XOnlyPublicKey,
 };
-use secp256k1::{schnorr::Signature, Message};
+use secp256k1::{constants::SCHNORR_SIGNATURE_SIZE, schnorr::Signature, Message};
 use strata_primitives::{
     buf::Buf32,
     l1::{DepositInfo, OutputRef},
@@ -23,7 +24,14 @@ const TAKEBACK_HASH_LEN: usize = TAPROOT_CONTROL_NODE_SIZE;
 const SATS_AMOUNT_LEN: usize = size_of::<u64>();
 const DEPOSIT_IDX_LEN: usize = size_of::<u32>();
 
-/// Extracts the DepositInfo from the Deposit Transaction
+/// Extracts [`DepositInfo`] from a [`Transaction`].
+///
+/// This function checks the first output of the transaction to see if it matches the expected
+/// deposit amount and address. It also checks the second output for the OP_RETURN script and parses
+/// it to extract the deposit index and destination address. Finally, it validates the deposit
+/// signature to ensure that the transaction was signed by the operators. If all checks pass, it
+/// returns a `DepositInfo` struct containing the deposit index, amount, destination address, and
+/// outpoint of the deposit transaction.
 pub fn extract_deposit_info(tx: &Transaction, config: &DepositTxParams) -> Option<DepositInfo> {
     // Get the first output (index 0)
     let send_addr_out = tx.output.first()?;
@@ -74,14 +82,24 @@ fn validate_deposit_signature(
 
     // Extract and validate input signature
     let input = tx.input[0].clone();
-    let sig_bytes = &input.witness[0];
-    let schnorr_sig = Signature::from_slice(sig_bytes.get(..64)?).unwrap();
+
+    // Check if witness is present.
+    if input.witness.is_empty() {
+        return None;
+    }
+    let sig_witness = &input.witness[0];
+    if sig_witness.len() < SCHNORR_SIGNATURE_SIZE {
+        return None;
+    }
+    let sig_bytes = &sig_witness[..SCHNORR_SIGNATURE_SIZE];
+    let schnorr_sig = Signature::from_slice(sig_bytes).ok()?;
 
     // Parse the internal pubkey and merkle root
     let internal_pubkey = dep_config.operators_pubkey;
     let merkle_root: TapNodeHash = TapNodeHash::from_byte_array(*tag_data.tapscript_root.as_ref());
 
     let int_key = XOnlyPublicKey::from_slice(internal_pubkey.inner().as_bytes()).unwrap();
+    let (tweaked_key, _) = int_key.tap_tweak(secp, Some(merkle_root));
 
     // Build the scriptPubKey for the UTXO
     let script_pubkey = ScriptBuf::new_p2tr(secp, int_key, Some(merkle_root));
@@ -94,14 +112,15 @@ fn validate_deposit_signature(
     // Compute the sighash
     let prevout = Prevouts::All(&utxos);
     let sighash = SighashCache::new(tx)
-        .taproot_key_spend_signature_hash(0, &prevout, TapSighashType::Default)
+        .taproot_key_spend_signature_hash(0, &prevout, TapSighashType::All)
         .unwrap();
 
     // Prepare the message for signature verification
     let msg = Message::from_digest(*sighash.as_byte_array());
 
     // Verify the Schnorr signature
-    secp.verify_schnorr(&schnorr_sig, &msg, &int_key).ok()
+    secp.verify_schnorr(&schnorr_sig, &msg, &tweaked_key.to_inner())
+        .ok()
 }
 
 struct DepositTag<'buf> {
