@@ -1,7 +1,7 @@
 use argh::FromArgs;
 use bip39::Language;
 
-use crate::seed::Seed;
+use crate::{errors::DisplayedError, seed::Seed};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "backup")]
@@ -15,25 +15,27 @@ pub struct BackupArgs {
     language: Option<String>,
 }
 
-pub async fn backup(args: BackupArgs, seed: Seed) {
-    let language = match args.language {
-        Some(s) => s,
-        None => "en".to_owned(),
-    };
-    let language = match language.as_str() {
-        "en" => Language::English,
-        "cn" => Language::SimplifiedChinese,
-        "cn-trad" => Language::TraditionalChinese,
-        "cz" => Language::Czech,
-        "fr" => Language::French,
-        "it" => Language::Italian,
-        "jp" => Language::Japanese,
-        "kr" => Language::Korean,
-        "es" => Language::Spanish,
-        _ => {
-            println!("invalid language. use --help to check available languages");
-            std::process::exit(1);
-        }
-    };
+/// Unsupported mnemonic language error
+#[derive(Clone, Copy, Debug)]
+pub struct UnsupportedMnemonicLanguage;
+
+pub async fn backup(args: BackupArgs, seed: Seed) -> Result<(), DisplayedError> {
+    let language = match args.language.unwrap_or_else(|| "en".to_owned()).as_str() {
+        "en" => Ok(Language::English),
+        "cn" => Ok(Language::SimplifiedChinese),
+        "cn-trad" => Ok(Language::TraditionalChinese),
+        "cz" => Ok(Language::Czech),
+        "fr" => Ok(Language::French),
+        "it" => Ok(Language::Italian),
+        "jp" => Ok(Language::Japanese),
+        "kr" => Ok(Language::Korean),
+        "es" => Ok(Language::Spanish),
+        other => Err(DisplayedError::UserError(
+            format!("The mnemonic language provided '{other}' is not supported"),
+            Box::new(UnsupportedMnemonicLanguage),
+        )),
+    }?;
+
     seed.print_mnemonic(language);
+    Ok(())
 }

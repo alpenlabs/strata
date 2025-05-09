@@ -21,8 +21,10 @@ use terrors::OneOf;
 use zeroize::Zeroizing;
 
 use crate::constants::{
-    AES_NONCE_LEN, AES_TAG_LEN, BIP44_STRATA_EVM_WALLET_PATH, PW_SALT_LEN, SEED_LEN,
+    AES_NONCE_LEN, AES_TAG_LEN, BIP44_ALPEN_EVM_WALLET_PATH, PW_SALT_LEN, SEED_LEN,
 };
+#[cfg(not(target_os = "linux"))]
+use crate::errors::{NoStorageAccess, PlatformFailure};
 
 pub struct BaseWallet(LoadParams, CreateParams);
 
@@ -99,7 +101,7 @@ impl Seed {
     }
 
     pub fn get_alpen_wallet(&self) -> EthereumWallet {
-        let derivation_path = DerivationPath::master().extend(BIP44_STRATA_EVM_WALLET_PATH);
+        let derivation_path = DerivationPath::master().extend(BIP44_ALPEN_EVM_WALLET_PATH);
 
         let mnemonic = Mnemonic::from_entropy(self.0.as_ref()).expect("valid entropy");
         // We do not use a passphrase.
@@ -233,6 +235,7 @@ pub fn load_or_create(
 
 #[cfg(not(target_os = "linux"))]
 type PersisterErr = OneOf<(PlatformFailure, NoStorageAccess)>;
+
 #[cfg(target_os = "linux")]
 type PersisterErr = OneOf<(io::Error,)>;
 

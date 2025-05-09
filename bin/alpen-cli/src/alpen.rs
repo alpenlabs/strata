@@ -45,16 +45,21 @@ impl Deref for AlpenWallet {
 }
 
 #[derive(Debug)]
-pub struct L2EndpointParseError;
+pub struct AlpenEndpointParseError;
 
 impl AlpenWallet {
-    pub fn new(seed: &Seed, l2_http_endpoint: &str) -> Result<Self, L2EndpointParseError> {
+    pub fn new(seed: &Seed, alpen_http_endpoint: &str) -> Result<Self, AlpenEndpointParseError> {
         let wallet = seed.get_alpen_wallet();
 
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
-            .on_http(l2_http_endpoint.parse().map_err(|_| L2EndpointParseError)?);
+            .on_http(
+                alpen_http_endpoint
+                    .parse()
+                    .map_err(|_| AlpenEndpointParseError)?,
+            );
+
         Ok(Self(provider))
     }
 }

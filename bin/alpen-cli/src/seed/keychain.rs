@@ -73,21 +73,10 @@ impl EncryptedSeedPersister for KeychainPersister {
     }
 }
 
+use crate::errors::{NoStorageAccess, PlatformFailure};
+
 // below is wrapper around [`keyring::Error`] so it can be used with OneOf to more precisely handle
 // errors
-
-/// This indicates runtime failure in the underlying platform storage system. The details of the
-/// failure can be retrieved from the attached platform error.
-#[derive(Debug)]
-#[allow(unused)]
-pub struct PlatformFailure(Box<dyn std::error::Error + Send + Sync>);
-
-/// This indicates that the underlying secure storage holding saved items could not be accessed.
-/// Typically this is because of access rules in the platform; for example, it might be that the
-/// credential store is locked. The underlying platform error will typically give the reason.
-#[derive(Debug)]
-#[allow(unused)]
-pub struct NoStorageAccess(Box<dyn std::error::Error + Send + Sync>);
 
 /// This indicates that there is no underlying credential entry in the platform for this entry.
 /// Either one was never set, or it was deleted.
@@ -138,8 +127,8 @@ type KeyRingErrors = (
 
 fn keyring_oneof(err: keyring::Error) -> OneOf<KeyRingErrors> {
     match err {
-        Error::PlatformFailure(error) => OneOf::new(PlatformFailure(error)),
-        Error::NoStorageAccess(error) => OneOf::new(NoStorageAccess(error)),
+        Error::PlatformFailure(error) => OneOf::new(PlatformFailure::new(error)),
+        Error::NoStorageAccess(error) => OneOf::new(NoStorageAccess::new(error)),
         Error::NoEntry => OneOf::new(NoEntry),
         Error::BadEncoding(vec) => OneOf::new(BadEncoding(vec)),
         Error::TooLong(name, limit) => OneOf::new(TooLong { name, limit }),

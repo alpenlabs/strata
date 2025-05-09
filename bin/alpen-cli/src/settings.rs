@@ -16,7 +16,7 @@ use shrex::Hex;
 use terrors::OneOf;
 
 use crate::{
-    constants::{BRIDGE_STRATA_ADDRESS, DEFAULT_NETWORK},
+    constants::{BRIDGE_ALPEN_ADDRESS, DEFAULT_NETWORK},
     signet::{backend::SignetBackend, EsploraClient},
 };
 
@@ -113,8 +113,8 @@ impl Settings {
             descriptor_db: descriptor_file,
             mempool_space_endpoint: from_file.mempool_endpoint,
             blockscout_endpoint: from_file.blockscout_endpoint,
-            bridge_alpen_address: AlpenAddress::from_str(BRIDGE_STRATA_ADDRESS)
-                .expect("valid alpen address"),
+            bridge_alpen_address: AlpenAddress::from_str(BRIDGE_ALPEN_ADDRESS)
+                .expect("valid Alpen address"),
             linux_seed_file,
             network: from_file.network.unwrap_or(DEFAULT_NETWORK),
             config_file: CONFIG_FILE.clone(),
