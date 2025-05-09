@@ -10,7 +10,7 @@ use bitcoind_async_client::traits::Reader;
 use secp256k1::XOnlyPublicKey;
 use strata_config::btcio::ReaderConfig;
 use strata_l1tx::{
-    filter::{indexer::index_block, TxFilterConfig},
+    filter::{indexer::index_block, types::TxFilterConfig},
     messages::RelevantTxEntry,
 };
 use strata_primitives::{

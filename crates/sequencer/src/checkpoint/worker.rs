@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use strata_db::{types::CheckpointEntry, DbError};
-use strata_l1tx::filter::TxFilterConfig;
+use strata_l1tx::filter::types::TxFilterConfig;
 use strata_primitives::{
     self,
     epoch::EpochCommitment,

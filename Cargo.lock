@@ -13935,6 +13935,7 @@ dependencies = [
  "bitcoin",
  "borsh",
  "musig2",
+ "secp256k1",
  "strata-btcio",
  "strata-primitives",
  "strata-state",
