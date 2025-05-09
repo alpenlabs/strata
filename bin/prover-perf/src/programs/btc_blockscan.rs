@@ -1,4 +1,4 @@
-use strata_l1tx::filter::TxFilterConfig;
+use strata_l1tx::filter::types::TxFilterConfig;
 use strata_proofimpl_btc_blockspace::{logic::BlockScanProofInput, program::BtcBlockspaceProgram};
 use strata_test_utils::{bitcoin_mainnet_segment::BtcChainSegment, l2::gen_params};
 use tracing::info;

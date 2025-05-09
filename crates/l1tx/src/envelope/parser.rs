@@ -8,7 +8,7 @@ use thiserror::Error;
 use tracing::*;
 
 use crate::{
-    filter::TxFilterConfig,
+    filter::types::TxFilterConfig,
     utils::{next_bytes, next_op},
 };
 

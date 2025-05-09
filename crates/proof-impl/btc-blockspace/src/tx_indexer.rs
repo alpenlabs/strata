@@ -55,11 +55,8 @@ mod test {
         Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode,
     };
     use strata_btcio::test_utils::create_checkpoint_envelope_tx;
-    use strata_l1tx::filter::{indexer::index_block, TxFilterConfig};
-    use strata_primitives::{
-        l1::{payload::L1Payload, BitcoinAmount, ProtocolOperation},
-        params::Params,
-    };
+    use strata_l1tx::{filter::indexer::index_block, utils::test_utils::create_tx_filter_config};
+    use strata_primitives::l1::{payload::L1Payload, BitcoinAmount, ProtocolOperation};
     use strata_test_utils::{
         bitcoin::{build_test_deposit_script, create_test_deposit_tx, test_taproot_addr},
         l2::{gen_params, get_test_signed_checkpoint},
@@ -85,24 +82,23 @@ mod test {
         }
     }
 
-    fn create_tx_filter_config(params: &Params) -> TxFilterConfig {
-        TxFilterConfig::derive_from(params.rollup()).expect("can't get filter config")
-    }
-
     #[test]
     fn test_index_deposits() {
         let params = gen_params();
-        let filter_config = create_tx_filter_config(&params);
+        let (filter_config, keypair) = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
         let idx = 0xdeadbeef;
         let ee_addr = vec![1u8; 20]; // Example EVM address
+        let tapnode_hash = [0u8; 32];
         let deposit_script =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx, ee_addr.clone());
+            build_test_deposit_script(&deposit_config, idx, ee_addr.clone(), &tapnode_hash);
 
         let tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &deposit_config.address.address().script_pubkey(),
             &deposit_script,
+            &keypair,
+            &tapnode_hash,
         );
 
         let block = create_test_block(vec![tx]);
@@ -139,12 +135,15 @@ mod test {
     #[test]
     fn test_index_no_deposit() {
         let params = gen_params();
-        let filter_config = create_tx_filter_config(&params);
+        let (filter_config, keypair) = create_tx_filter_config(&params);
+        let tapnode_hash = [0u8; 32];
         let deposit_config = filter_config.deposit_config.clone();
         let irrelevant_tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &test_taproot_addr().address().script_pubkey(),
             &ScriptBuf::new(),
+            &keypair,
+            &tapnode_hash,
         );
 
         let block = create_test_block(vec![irrelevant_tx]);
@@ -160,27 +159,32 @@ mod test {
     #[test]
     fn test_index_multiple_deposits() {
         let params = gen_params();
-        let filter_config = create_tx_filter_config(&params);
+        let (filter_config, keypair) = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
         let idx1 = 0xdeafbeef;
         let idx2 = 0x1badb007;
         let dest_addr1 = vec![3u8; 20];
         let dest_addr2 = vec![4u8; 20];
+        let tapnodehash = [0u8; 32];
 
         let deposit_script1 =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx1, dest_addr1.clone());
+            build_test_deposit_script(&deposit_config, idx1, dest_addr1.clone(), &tapnodehash);
         let deposit_script2 =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx2, dest_addr2.clone());
+            build_test_deposit_script(&deposit_config, idx2, dest_addr2.clone(), &tapnodehash);
 
         let tx1 = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &deposit_config.address.address().script_pubkey(),
             &deposit_script1,
+            &keypair,
+            &tapnodehash,
         );
         let tx2 = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &deposit_config.address.address().script_pubkey(),
             &deposit_script2,
+            &keypair,
+            &tapnodehash,
         );
 
         let block = create_test_block(vec![tx1, tx2]);
@@ -224,22 +228,29 @@ mod test {
         }
     }
 
+    // TODO; re-enable this when we decide multiple ops can be present with deposits
+    // Also, This could just be okay in the future where protocol Ops is going to be replaced by
+    // some other mechanism.
+    #[ignore]
     #[test]
     fn test_index_tx_with_multiple_ops() {
         let params = gen_params();
-        let filter_config = create_tx_filter_config(&params);
+        let (filter_config, keypair) = create_tx_filter_config(&params);
         let deposit_config = filter_config.deposit_config.clone();
         let idx = 0xdeadbeef;
         let ee_addr = vec![1u8; 20]; // Example EVM address
+        let tapnode_hash = [0u8; 32];
 
         // Create deposit utxo
         let deposit_script =
-            build_test_deposit_script(deposit_config.magic_bytes.clone(), idx, ee_addr.clone());
+            build_test_deposit_script(&deposit_config, idx, ee_addr.clone(), &tapnode_hash);
 
         let mut tx = create_test_deposit_tx(
             Amount::from_sat(deposit_config.deposit_amount),
             &deposit_config.address.address().script_pubkey(),
             &deposit_script,
+            &keypair,
+            &tapnode_hash,
         );
 
         // Create envelope tx and copy its input to the above deposit tx

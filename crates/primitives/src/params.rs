@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    block_credential::CredRule, l1::BitcoinAddress, operator::OperatorPubkeys, prelude::Buf32,
+    block_credential::CredRule,
+    l1::{BitcoinAddress, XOnlyPk},
+    operator::OperatorPubkeys,
+    prelude::Buf32,
     proof::RollupVerifyingKey,
 };
 
@@ -145,23 +148,14 @@ pub struct DepositTxParams {
     // TODO rename to be `max_addr_len`
     pub address_length: u8,
 
-    /// Exact bitcoin amount in the at-rest deposit.
-    // TODO: rename this to deposit_denominations and set the type to be a vec(possibly sorted)
+    /// Exact bitcoin amount(sats) in the at-rest deposit.
     pub deposit_amount: u64,
 
     /// federation address derived from operator entries
     pub address: BitcoinAddress,
-}
 
-impl RollupParams {
-    pub fn get_deposit_params(&self, address: BitcoinAddress) -> DepositTxParams {
-        DepositTxParams {
-            magic_bytes: self.rollup_name.clone().into_bytes().to_vec(),
-            address_length: self.address_length,
-            deposit_amount: self.deposit_amount,
-            address,
-        }
-    }
+    /// Operators' aggregated pubkey(untweaked internal pubkey)
+    pub operators_pubkey: XOnlyPk,
 }
 
 /// Describes how we decide to wait for proofs for checkpoints to generate.

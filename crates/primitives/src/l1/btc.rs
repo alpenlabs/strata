@@ -27,7 +27,7 @@ use crate::{buf::Buf32, constants::HASH_SIZE, errors::ParseError};
 
 /// L1 output reference.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct OutputRef(OutPoint);
+pub struct OutputRef(pub OutPoint);
 
 impl From<OutPoint> for OutputRef {
     fn from(value: OutPoint) -> Self {
