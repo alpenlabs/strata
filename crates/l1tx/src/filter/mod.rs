@@ -62,6 +62,7 @@ fn find_deposit_spends<'tx>(
 mod test {
     use bitcoin::{
         consensus::deserialize,
+        hex::FromHex,
         secp256k1::{Keypair, Secp256k1, SecretKey},
         Amount, ScriptBuf, Transaction, Witness,
     };
@@ -240,14 +241,14 @@ mod test {
     fn test_deposit_tx_with_test_vector() {
         // Set up test vector and decode transaction
         let txraw = "0200000000010186e7cee076c18d5d33a642ef689027265be442bce68294a335d8665e4eb81ab10000000000fdffffff0200e1f505000000002251209accbdba14ffa7ca9d636ec63beee4c00c9b9504e4fc4f71a779491907ff1ef10000000000000000486a467374726174610000000070997970c51812dc3a010c7d01b50e0d17dc79c8eb9ee3797b83d854f724f2ab625938deea929282a5330927a0e8ae994b9b2b240000000005f767a0014101a54bdc1dd43416bd0618969eb040735fbbfab1103a6c55a7a80f28e5aaa9c0f57d483dcc84d68d4add23515560c743d789b1a0dd596db40b3bd70407185da20100000000";
-        let txbytes = hex::decode(txraw).unwrap();
+        let txbytes = Vec::from_hex(txraw).unwrap();
         let tx: Transaction = deserialize(&txbytes).expect("failed to deserialize tx");
 
         // The operator pubkeys that has signed the above tx.
         let op_pubkeys: Vec<_> = vec![
-            hex::decode("b49092f76d06f8002e0b7f1c63b5058db23fd4465b4f6954b53e1f352a04754d"),
-            hex::decode("1e62d54af30569fd7269c14b6766f74d85ea00c911c4e1a423d4ba2ae4c34dc4"),
-            hex::decode("a4d869ccd09c470f8f86d3f1b0997fa2695933aaea001875b9db145ae9c1f4ba"),
+            Vec::from_hex("b49092f76d06f8002e0b7f1c63b5058db23fd4465b4f6954b53e1f352a04754d"),
+            Vec::from_hex("1e62d54af30569fd7269c14b6766f74d85ea00c911c4e1a423d4ba2ae4c34dc4"),
+            Vec::from_hex("a4d869ccd09c470f8f86d3f1b0997fa2695933aaea001875b9db145ae9c1f4ba"),
         ]
         .into_iter()
         .map(|x| Buf32::try_from_slice(&x.unwrap()).unwrap())

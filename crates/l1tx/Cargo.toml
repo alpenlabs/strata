@@ -16,7 +16,6 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-hex.workspace = true
 strata-btcio = { workspace = true, features = ["test_utils"] }
 strata-state = { workspace = true, features = ["test_utils"] }
 strata-test-utils.workspace = true

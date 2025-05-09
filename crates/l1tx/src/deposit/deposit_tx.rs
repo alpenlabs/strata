@@ -80,6 +80,10 @@ fn validate_deposit_signature(
     // Initialize necessary variables and dependencies
     let secp = secp256k1::SECP256K1;
 
+    // FIXME: Use latest version of `bitcoin` once released. The underlying
+    // `bitcoinconsensus==0.106` will have support for taproot validation. So here, we just need
+    // to create TxOut from operator pubkeys and tapnode hash and call `tx.verify()`.
+
     // Extract and validate input signature
     let input = tx.input[0].clone();
 
