@@ -42,7 +42,7 @@ use revm_primitives::{
 };
 use strata_reth_evm::{
     constants::{BRIDGEOUT_ADDRESS, SCHNORR_ADDRESS},
-    set_evm_handles,
+    // set_evm_handles,
 };
 
 use crate::{
@@ -195,7 +195,7 @@ where
                 blk_env.gas_limit = U256::from(self.header.as_mut().unwrap().gas_limit);
             })
             .with_db(self.db.take().unwrap())
-            .append_handler_register(set_evm_handles)
+            // .append_handler_register(set_evm_handles)
             .build();
 
         let mut logs_bloom = Bloom::default();

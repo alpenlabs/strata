@@ -7,7 +7,7 @@ use reth_evm_ethereum::{EthEvm, EthEvmConfig};
 use reth_primitives::{Header, TransactionSigned};
 use revm::{inspector_handle_register, EvmBuilder};
 use revm_primitives::{Address, CfgEnvWithHandlerCfg, HaltReason, HandlerCfg, TxEnv};
-use strata_reth_evm::set_evm_handles;
+// use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
 #[derive(Debug, Clone)]
@@ -71,7 +71,7 @@ impl ConfigureEvm for StrataEvmConfig {
             .with_db(db)
             .with_cfg_env_with_handler_cfg(cfg_env_with_handler_cfg)
             .with_block_env(evm_env.block_env)
-            .append_handler_register(set_evm_handles)
+            // .append_handler_register(set_evm_handles)
             .build()
             .into()
     }
@@ -96,7 +96,7 @@ impl ConfigureEvm for StrataEvmConfig {
             .with_external_context(inspector)
             .with_cfg_env_with_handler_cfg(cfg_env_with_handler_cfg)
             .with_block_env(evm_env.block_env)
-            .append_handler_register(set_evm_handles)
+            // .append_handler_register(set_evm_handles)
             .append_handler_register(inspector_handle_register)
             .build()
             .into()
