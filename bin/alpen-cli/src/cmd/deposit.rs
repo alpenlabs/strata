@@ -110,7 +110,7 @@ pub async fn deposit(
     // Construct the DRT metadata OP_RETURN:
     // <magic_bytes>
     // <recovery_address_pk>
-    // <strata_address>
+    // <alpen_address>
     const MBL: usize = MAGIC_BYTES.len();
     const XONLYPK: usize = 32; // X-only PKs are 32-bytes in P2TR SegWit v1 addresses
     const ALPEN_ADDRESS_LEN: usize = 20; // EVM addresses are 20 bytes long
