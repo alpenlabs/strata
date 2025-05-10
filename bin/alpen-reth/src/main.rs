@@ -4,7 +4,7 @@ use std::{fs, future::Future, path::PathBuf, sync::Arc};
 
 use alloy_genesis::Genesis;
 use alpen_reth_db::rocksdb::WitnessDB;
-use alpen_reth_exex::ProverWitnessGenerator;
+use alpen_reth_exex::{ProverWitnessGenerator, StateDiffGenerator};
 use alpen_reth_node::{args::StrataNodeArgs, StrataEthereumNode};
 use alpen_reth_rpc::{StrataRPC, StrataRpcApiServer};
 use clap::Parser;
@@ -48,17 +48,27 @@ fn main() {
 
         let mut extend_rpc = None;
 
-        // Install Prover Input ExEx, persist to DB, and add RPC for querying block witness.
-        if ext.enable_witness_gen {
+        if ext.enable_witness_gen || ext.enable_state_diff_gen {
             let rbdb = db::open_rocksdb_database(datadir.clone()).expect("open rocksdb");
             let db = Arc::new(WitnessDB::new(rbdb));
-            let rpc_db = db.clone();
+            // Add RPC for querying block witness and state diffs.
+            extend_rpc.replace(StrataRPC::new(db.clone()));
 
-            extend_rpc.replace(StrataRPC::new(rpc_db));
+            // Install Prover Input ExEx and persist to DB
+            if ext.enable_witness_gen {
+                let witness_db = db.clone();
+                node_builder = node_builder.install_exex("prover_input", |ctx| async {
+                    Ok(ProverWitnessGenerator::new(ctx, witness_db).start())
+                });
+            }
 
-            node_builder = node_builder.install_exex("prover_input", |ctx| async {
-                Ok(ProverWitnessGenerator::new(ctx, db).start())
-            });
+            // Install State Diff ExEx and persist to DB
+            if ext.enable_state_diff_gen {
+                let state_diff_db = db.clone();
+                node_builder = node_builder.install_exex("state_diffs", |ctx| async {
+                    Ok(StateDiffGenerator::new(ctx, state_diff_db).start())
+                });
+            }
         }
 
         // Note: can only add single hook
@@ -99,6 +109,9 @@ pub struct AdditionalConfig {
 
     #[arg(long, default_value_t = false)]
     pub enable_witness_gen: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub enable_state_diff_gen: bool,
 
     /// Rpc of sequener's reth node to forward transactions to.
     #[arg(long, required = false)]
