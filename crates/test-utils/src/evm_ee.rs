@@ -4,9 +4,8 @@ use strata_primitives::buf::{Buf32, Buf64};
 use strata_proofimpl_evm_ee_stf::{
     primitives::{EvmEeProofInput, EvmEeProofOutput},
     process_block_transaction,
-    processor::EvmConfig,
     utils::generate_exec_update,
-    EvmBlockStfInput,
+    EvmBlockStfInput, EvmConfig,
 };
 use strata_state::{
     block::{L1Segment, L2Block, L2BlockBody},
@@ -38,7 +37,7 @@ impl EvmSegment {
     ///
     /// Note: This assumes all the l1 segment is empty
     pub fn initialize_from_saved_ee_data(start_height: u64, end_height: u64) -> Self {
-        use revm::primitives::SpecId;
+        use revm::primitives::hardfork::SpecId;
 
         const EVM_CONFIG: EvmConfig = EvmConfig {
             chain_id: 2892,

@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 // mod config;
 pub mod constants;
+use strata_crypto as _;
 use strata_reth_primitives as _;
 // mod precompiles;
 mod utils;
