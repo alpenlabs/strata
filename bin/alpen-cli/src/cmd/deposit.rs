@@ -7,7 +7,9 @@ use bdk_wallet::{
         script::PushBytesBuf, taproot::LeafVersion, Address, ScriptBuf, TapNodeHash, XOnlyPublicKey,
     },
     chain::ChainOracle,
+    coin_selection::InsufficientFunds,
     descriptor::IntoWalletDescriptor,
+    error::CreateTxError,
     miniscript::{miniscript::Tap, Miniscript},
     template::DescriptorTemplateOut,
     KeychainKind, TxOrdering, Wallet,
@@ -19,6 +21,7 @@ use strata_primitives::constants::RECOVER_DELAY;
 use crate::{
     alpen::AlpenWallet,
     constants::{BRIDGE_IN_AMOUNT, RECOVER_AT_DELAY, SIGNET_BLOCK_TIME},
+    errors::{DisplayableError, DisplayedError},
     link::{OnchainObject, PrettyPrint},
     recovery::DescriptorRecovery,
     seed::Seed,
@@ -47,17 +50,28 @@ pub async fn deposit(
     }: DepositArgs,
     seed: Seed,
     settings: Settings,
-) {
-    let requested_alpen_address =
-        alpen_address.map(|a| AlpenAddress::from_str(&a).expect("bad alpen address"));
-    let mut l1w =
-        SignetWallet::new(&seed, settings.network, settings.signet_backend.clone()).unwrap();
-    let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint).unwrap();
+) -> Result<(), DisplayedError> {
+    let requested_alpen_address = alpen_address
+        .map(|a| {
+            AlpenAddress::from_str(&a).user_error(format!(
+                "Invalid Alpen address '{a}'. Must be an EVM-compatible address"
+            ))
+        })
+        .transpose()?;
+    let mut l1w = SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+        .internal_error("Failed to load signet wallet")?;
+    let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+        .user_error("Invalid Alpen endpoint URL. Check the config file")?;
 
-    l1w.sync().await.unwrap();
+    l1w.sync()
+        .await
+        .internal_error("Failed to sync signet wallet")?;
     let recovery_address = l1w.reveal_next_address(KeychainKind::External).address;
-    let recovery_address_pk = recovery_address.extract_p2tr_pubkey().unwrap();
-    l1w.persist().unwrap();
+    let recovery_address_pk = recovery_address
+        .extract_p2tr_pubkey()
+        .expect("internal keychain should be taproot");
+    l1w.persist()
+        .internal_error("Failed to persist signet wallet")?;
 
     let alpen_address = requested_alpen_address.unwrap_or(l2w.default_signer_address());
     println!(
@@ -83,7 +97,7 @@ pub async fn deposit(
     let mut temp_wallet = Wallet::create_single(desc.clone())
         .network(settings.network)
         .create_wallet_no_persist()
-        .expect("valid wallet");
+        .expect("valid descriptor");
 
     let current_block_height = l1w
         .local_chain()
@@ -131,23 +145,33 @@ pub async fn deposit(
         builder.add_recipient(bridge_in_address.script_pubkey(), BRIDGE_IN_AMOUNT);
         builder.add_data(&push_bytes);
         builder.fee_rate(fee_rate);
-        builder.finish().expect("valid psbt")
+        match builder.finish() {
+            Ok(psbt) => psbt,
+            Err(CreateTxError::CoinSelection(e @ InsufficientFunds { .. })) => {
+                return Err(DisplayedError::UserError(
+                    "Failed to create bridge transaction".to_string(),
+                    Box::new(e),
+                ));
+            }
+            Err(e) => panic!("Unexpected error in creating PSBT: {e:?}"),
+        }
     };
-    l1w.sign(&mut psbt, Default::default()).unwrap();
+    l1w.sign(&mut psbt, Default::default())
+        .expect("tx should be signed");
     println!("Built transaction");
 
-    let tx = psbt.extract_tx().expect("valid tx");
+    let tx = psbt.extract_tx().expect("tx should be signed and ready");
 
     let pb = ProgressBar::new_spinner().with_message("Saving output descriptor");
     pb.enable_steady_tick(Duration::from_millis(100));
 
     let mut desc_file = DescriptorRecovery::open(&seed, &settings.descriptor_db)
         .await
-        .unwrap();
+        .internal_error("Failed to open descriptor recovery file")?;
     desc_file
         .add_desc(recover_at, &bridge_in_desc)
         .await
-        .unwrap();
+        .internal_error("Failed to save recovery descriptor to recovery file")?;
     pb.finish_with_message("Saved output descriptor");
 
     let pb = ProgressBar::new_spinner().with_message("Broadcasting transaction");
@@ -156,7 +180,7 @@ pub async fn deposit(
         .signet_backend
         .broadcast_tx(&tx)
         .await
-        .expect("successful broadcast");
+        .internal_error("Failed to broadcast signet transaction")?;
     let txid = tx.compute_txid();
     pb.finish_with_message(
         OnchainObject::from(&txid)
@@ -164,6 +188,7 @@ pub async fn deposit(
             .pretty(),
     );
     println!("Expect transaction confirmation in ~{SIGNET_BLOCK_TIME:?}. Funds will take longer than this to be available on Alpen.");
+    Ok(())
 }
 
 /// Generates a bridge-in descriptor for a given bridge public key and recovery address.
