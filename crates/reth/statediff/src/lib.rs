@@ -24,19 +24,32 @@ impl From<BundleState> for BlockStateDiff {
 }
 
 /// A representation of several [`BlockStateDiff`] ready to be serialized and posted on DA.
-///
-/// N.B. "original" counterparts are needed to correctly construct the [`BatchStateDiff`]
-/// for the range of blocks and not include changes for the keys whose values
-/// were changed inside batch, but end up having the same value as before the batch.
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct BatchStateDiff {
     /// An account representation in the diff.
     /// [`Option::None`] indicates the account was destructed, but existed before the batch.
     pub accounts: HashMap<Address, Option<AccountInfo>>,
 
+    /// A collection of deployed smart contracts within the batch.
+    pub contracts: HashMap<B256, Bytecode>,
+
+    /// Storage slots.
+    pub storage_slots: HashMap<Address, HashMap<U256, U256>>,
+}
+
+/// A builder for the [`BatchStateDiff`].
+///
+/// N.B. "original" counterparts are needed to correctly construct the [`BatchStateDiff`]
+/// for the range of blocks and not include changes for the keys whose values
+/// were changed inside batch, but end up having the same value as before the batch.
+#[derive(Clone, Default, Debug)]
+pub struct BatchStateDiffBuilder {
+    /// An account representation in the diff.
+    /// [`Option::None`] indicates the account was destructed, but existed before the batch.
+    pub accounts: HashMap<Address, Option<AccountInfo>>,
+
     /// The *FIRST* original [`AccountInfo`] for the account in the batch.
     /// [`Option::None`] if the account was absent before the batch.
-    #[serde(skip)]
     pub original_accounts: HashMap<Address, Option<AccountInfo>>,
 
     /// A collection of deployed smart contracts within the batch.
@@ -44,12 +57,12 @@ pub struct BatchStateDiff {
 
     /// Storage slots.
     pub storage_slots: HashMap<Address, HashMap<U256, U256>>,
+
     /// The *FIRST* original value for the slot in the batch.
-    #[serde(skip)]
     pub original_storage_slots: HashMap<Address, HashMap<U256, U256>>,
 }
 
-impl BatchStateDiff {
+impl BatchStateDiffBuilder {
     pub fn new() -> Self {
         Default::default()
     }
@@ -104,6 +117,20 @@ impl BatchStateDiff {
             }
         }
     }
+
+    pub fn build(self) -> BatchStateDiff {
+        self.into()
+    }
+}
+
+impl From<BatchStateDiffBuilder> for BatchStateDiff {
+    fn from(value: BatchStateDiffBuilder) -> Self {
+        BatchStateDiff {
+            accounts: value.accounts,
+            contracts: value.contracts,
+            storage_slots: value.storage_slots,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -114,7 +141,7 @@ mod tests {
         KECCAK_EMPTY, U256,
     };
 
-    use crate::{BatchStateDiff, BlockStateDiff};
+    use crate::{BatchStateDiff, BatchStateDiffBuilder, BlockStateDiff};
 
     const fn account1() -> Address {
         Address::new([0x60; 20])
@@ -240,9 +267,10 @@ mod tests {
 
     #[test]
     fn basic_batch_state_diff() {
-        let mut batch_diff = BatchStateDiff::new();
+        let mut batch_diff = BatchStateDiffBuilder::new();
         batch_diff.apply(test_state_diff_acc1());
         batch_diff.apply(test_state_diff_acc2());
+        let batch_diff: BatchStateDiff = batch_diff.build();
 
         let acc1 = batch_diff
             .accounts
@@ -265,7 +293,7 @@ mod tests {
 
     #[test]
     fn multiple_slot_writes() {
-        let mut batch_diff = BatchStateDiff::new();
+        let mut batch_diff = BatchStateDiffBuilder::new();
         batch_diff.apply(test_state_diff_acc1());
         batch_diff.apply(test_state_diff_acc_old_slots1());
 
@@ -287,6 +315,8 @@ mod tests {
 
         // Apply slots again and check it was recorded.
         batch_diff.apply(test_state_diff_acc1());
+        let batch_diff: BatchStateDiff = batch_diff.build();
+
         assert!(
             batch_diff
                 .storage_slots
@@ -309,8 +339,10 @@ mod tests {
             revm_primitives::Bytecode::LegacyRaw(b"123".into()),
         );
 
-        let mut batch_diff = BatchStateDiff::new();
+        let mut batch_diff = BatchStateDiffBuilder::new();
         batch_diff.apply(test_diff);
+        let batch_diff: BatchStateDiff = batch_diff.build();
+
         assert!(!batch_diff.contracts.is_empty())
     }
 }
