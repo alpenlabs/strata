@@ -27,6 +27,9 @@ pub trait StrataRpcApi {
 
     #[method(name = "getBlockStateDiff")]
     fn get_block_state_diff(&self, block_hash: B256) -> RpcResult<Option<BlockStateDiff>>;
+
+    #[method(name = "getStateRootByDiffs")]
+    fn get_state_root_by_diffs(&self, block_number: u64) -> RpcResult<Option<B256>>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

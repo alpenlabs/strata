@@ -16,5 +16,5 @@ define_table_with_seek_key_codec!(
 
 define_table_with_seek_key_codec!(
     /// block number => hash mapping for easier testing.
-    (BlockNumberByHash) u64 => B256
+    (BlockNumberByHash) u64 => Vec<u8>
 );

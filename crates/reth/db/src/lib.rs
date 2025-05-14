@@ -25,5 +25,6 @@ pub trait StateDiffStore {
 }
 
 pub trait StateDiffProvider {
-    fn get_state_diff(&self, block_hash: B256) -> DbResult<Option<BlockStateDiff>>;
+    fn get_state_diff_by_hash(&self, block_hash: B256) -> DbResult<Option<BlockStateDiff>>;
+    fn get_state_diff_by_number(&self, block_number: u64) -> DbResult<Option<BlockStateDiff>>;
 }

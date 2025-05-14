@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use alpen_reth_db::{StateDiffProvider, WitnessProvider};
-use alpen_reth_statediff::BlockStateDiff;
+use alpen_reth_statediff::{state::StateReconstructed, BatchStateDiffBuilder, BlockStateDiff};
 use jsonrpsee::core::RpcResult;
 use revm_primitives::alloy_primitives::B256;
-use strata_rpc_utils::to_jsonrpsee_error;
+use strata_rpc_utils::{to_jsonrpsee_error, to_jsonrpsee_error_object};
 
 use crate::{BlockWitness, StrataRpcApiServer};
 
@@ -46,7 +46,35 @@ where
 
     fn get_block_state_diff(&self, block_hash: B256) -> RpcResult<Option<BlockStateDiff>> {
         self.db
-            .get_state_diff(block_hash)
+            .get_state_diff_by_hash(block_hash)
             .map_err(to_jsonrpsee_error("Failed fetching block state diff"))
+    }
+
+    fn get_state_root_by_diffs(&self, block_number: u64) -> RpcResult<Option<B256>> {
+        let mut builder = BatchStateDiffBuilder::new();
+
+        // First construct the batch state diff consisting of all the changes so far.
+        for i in 0..=block_number {
+            let block_diff = self
+                .db
+                .get_state_diff_by_number(i)
+                .map_err(to_jsonrpsee_error("Failed fetching block state diff"))?;
+
+            if block_diff.is_none() {
+                return RpcResult::Err(to_jsonrpsee_error_object(
+                    Some(""),
+                    "block diff is missing",
+                ));
+            }
+            builder.apply(block_diff.unwrap());
+        }
+
+        // Apply the batch state diff onto the empty State and return the resulting state root.
+        let mut state = StateReconstructed::new();
+        state
+            .apply(builder.build())
+            .map_err(to_jsonrpsee_error("Error while reconstructing the state"))?;
+
+        RpcResult::Ok(Some(state.state_root()))
     }
 }

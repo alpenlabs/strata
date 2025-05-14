@@ -67,7 +67,7 @@ impl<DB: SchemaDBOperations> WitnessStore for WitnessDB<DB> {
 }
 
 impl<DB: SchemaDBOperations> StateDiffProvider for WitnessDB<DB> {
-    fn get_state_diff(&self, block_hash: B256) -> DbResult<Option<BlockStateDiff>> {
+    fn get_state_diff_by_hash(&self, block_hash: B256) -> DbResult<Option<BlockStateDiff>> {
         let raw = self.db.get::<BlockStateDiffSchema>(&block_hash)?;
 
         let parsed: Option<BlockStateDiff> = raw
@@ -76,6 +76,15 @@ impl<DB: SchemaDBOperations> StateDiffProvider for WitnessDB<DB> {
             .map_err(|err| DbError::CodecError(err.to_string()))?;
 
         Ok(parsed)
+    }
+
+    fn get_state_diff_by_number(&self, block_number: u64) -> DbResult<Option<BlockStateDiff>> {
+        let block_hash = self.db.get::<BlockNumberByHash>(&block_number)?;
+        if block_hash.is_none() {
+            return DbResult::Ok(None);
+        }
+
+        self.get_state_diff_by_hash(B256::from_slice(&block_hash.unwrap()))
     }
 }
 
@@ -87,7 +96,7 @@ impl<DB: SchemaDBOperations> StateDiffStore for WitnessDB<DB> {
         witness: &BlockStateDiff,
     ) -> crate::DbResult<()> {
         self.db
-            .put::<BlockNumberByHash>(&block_number, &block_hash)?;
+            .put::<BlockNumberByHash>(&block_number, &block_hash.to_vec())?;
 
         let serialized =
             bincode::serialize(witness).map_err(|err| DbError::Other(err.to_string()))?;
@@ -243,7 +252,7 @@ mod tests {
 
         // assert block was stored
         let received_state_diff = db
-            .get_state_diff(block_hash)
+            .get_state_diff_by_hash(block_hash)
             .expect("failed to retrieve witness data")
             .unwrap();
 
@@ -257,7 +266,7 @@ mod tests {
         let block_hash = BLOCK_HASH_TWO;
 
         // assert block is not present in the db
-        let received_state_diff = db.get_state_diff(block_hash);
+        let received_state_diff = db.get_state_diff_by_hash(block_hash);
         assert!(matches!(received_state_diff, Ok(None)));
 
         // deleting non existing block is ok
@@ -267,7 +276,7 @@ mod tests {
         db.put_state_diff(block_hash, 7, &test_state_diff)
             .expect("failed to put state diff data");
         // assert block is present in the db
-        let received_state_diff = db.get_state_diff(block_hash);
+        let received_state_diff = db.get_state_diff_by_hash(block_hash);
         assert!(matches!(
             received_state_diff,
             Ok(Some(BlockStateDiff { .. }))
@@ -278,7 +287,7 @@ mod tests {
         assert!(matches!(res, Ok(())));
 
         // assert block is deleted from the db
-        let received_state_diff = db.get_state_diff(block_hash);
+        let received_state_diff = db.get_state_diff_by_hash(block_hash);
         assert!(matches!(received_state_diff, Ok(None)));
     }
 }
