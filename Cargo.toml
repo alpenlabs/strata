@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/asm",
   "crates/btcio",
   "crates/chaintsn",
   "crates/common",
