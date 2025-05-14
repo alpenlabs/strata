@@ -5,7 +5,7 @@ use revm_primitives::alloy_primitives::B256;
 use rockbound::{SchemaDBOperations, SchemaDBOperationsExt};
 use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 
-use super::schema::{BlockStateDiffSchema, BlockWitnessSchema};
+use super::schema::{BlockNumberByHash, BlockStateDiffSchema, BlockWitnessSchema};
 use crate::{
     errors::DbError, DbResult, StateDiffProvider, StateDiffStore, WitnessProvider, WitnessStore,
 };
@@ -80,7 +80,15 @@ impl<DB: SchemaDBOperations> StateDiffProvider for WitnessDB<DB> {
 }
 
 impl<DB: SchemaDBOperations> StateDiffStore for WitnessDB<DB> {
-    fn put_state_diff(&self, block_hash: B256, witness: &BlockStateDiff) -> crate::DbResult<()> {
+    fn put_state_diff(
+        &self,
+        block_hash: B256,
+        block_number: u64,
+        witness: &BlockStateDiff,
+    ) -> crate::DbResult<()> {
+        self.db
+            .put::<BlockNumberByHash>(&block_number, &block_hash)?;
+
         let serialized =
             bincode::serialize(witness).map_err(|err| DbError::Other(err.to_string()))?;
         Ok(self
@@ -230,7 +238,7 @@ mod tests {
         let test_state_diff = test_state_diff();
         let block_hash = BLOCK_HASH_ONE;
 
-        db.put_state_diff(block_hash, &test_state_diff)
+        db.put_state_diff(block_hash, 1, &test_state_diff)
             .expect("failed to put witness data");
 
         // assert block was stored
@@ -256,7 +264,7 @@ mod tests {
         let res = db.del_block_witness(block_hash);
         assert!(matches!(res, Ok(())));
 
-        db.put_state_diff(block_hash, &test_state_diff)
+        db.put_state_diff(block_hash, 7, &test_state_diff)
             .expect("failed to put state diff data");
         // assert block is present in the db
         let received_state_diff = db.get_state_diff(block_hash);

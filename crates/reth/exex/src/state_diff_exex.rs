@@ -43,7 +43,10 @@ impl<
             let state_diff = outcome.bundle.into();
 
             // TODO: maybe put db writes in another thread
-            if let Err(err) = self.db.put_state_diff(block_hash, &state_diff) {
+            if let Err(err) = self
+                .db
+                .put_state_diff(block_hash, block_number, &state_diff)
+            {
                 error!(?err, ?block_hash);
                 break;
             }
