@@ -4,6 +4,7 @@ pub mod eth;
 mod rpc;
 pub mod sequencer;
 
+use alpen_reth_statediff::BlockStateDiff;
 pub use eth::{StrataEthApi, StrataNodeCore};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use revm_primitives::alloy_primitives::B256;
@@ -23,6 +24,12 @@ pub trait StrataRpcApi {
         block_hash: B256,
         json: Option<bool>,
     ) -> RpcResult<Option<BlockWitness>>;
+
+    #[method(name = "getBlockStateDiff")]
+    fn get_block_state_diff(&self, block_hash: B256) -> RpcResult<Option<BlockStateDiff>>;
+
+    #[method(name = "getStateRootByDiffs")]
+    fn get_state_root_by_diffs(&self, block_number: u64) -> RpcResult<Option<B256>>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
