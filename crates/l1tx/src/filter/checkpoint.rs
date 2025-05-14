@@ -16,8 +16,8 @@ pub fn parse_valid_checkpoint_envelopes<'a>(
 ) -> impl Iterator<Item = SignedCheckpoint> + 'a {
     tx.input.iter().flat_map(move |inp| {
         inp.witness
-            .tapscript()
-            .and_then(|scr| parse_envelope_payloads(&scr.into(), filter_conf).ok())
+            .taproot_leaf_script()
+            .and_then(|scr| parse_envelope_payloads(&scr.script.into(), filter_conf).ok())
             .map(|items| {
                 items
                     .into_iter()

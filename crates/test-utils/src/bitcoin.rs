@@ -138,7 +138,7 @@ pub fn create_test_deposit_tx(
     let tweaked_pair = keypair.tap_tweak(&secp, Some(tapscript_root));
 
     // Sign the sighash
-    let sig = secp.sign_schnorr(&msg, &tweaked_pair.to_inner());
+    let sig = secp.sign_schnorr(&msg, &tweaked_pair.to_keypair());
 
     tx.input[0].witness.push(sig.as_ref());
 
