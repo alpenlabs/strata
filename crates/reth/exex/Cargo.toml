@@ -7,6 +7,7 @@ version = "0.3.0-alpha.1"
 alpen-reth-db.workspace = true
 alpen-reth-node.workspace = true
 alpen-reth-statediff.workspace = true
+strata-mpt.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
 
 alloy-consensus.workspace = true

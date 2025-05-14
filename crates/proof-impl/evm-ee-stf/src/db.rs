@@ -26,11 +26,9 @@ use revm::{
     primitives::{AccountInfo, Bytecode},
 };
 use revm_primitives::alloy_primitives::{Address, Bytes, B256, U256};
+use strata_mpt::{keccak, StateAccount, KECCAK_EMPTY};
 
-use crate::{
-    mpt::{keccak, StateAccount, KECCAK_EMPTY},
-    EvmBlockStfInput,
-};
+use crate::EvmBlockStfInput;
 
 /// A helper trait to extend [`InMemoryDB`] with additional functionality.
 pub trait InMemoryDBHelper {

@@ -1480,6 +1480,7 @@ dependencies = [
  "rockbound",
  "serde",
  "serde_json",
+ "strata-mpt",
  "strata-proofimpl-evm-ee-stf",
  "tempfile",
  "thiserror 2.0.12",
@@ -1584,7 +1585,7 @@ dependencies = [
  "revm",
  "revm-primitives",
  "serde",
- "strata-proofimpl-evm-ee-stf",
+ "strata-mpt",
 ]
 
 [[package]]
@@ -14095,6 +14096,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "strata-mpt",
  "strata-primitives",
  "strata-state",
  "thiserror 2.0.12",
