@@ -1586,6 +1586,7 @@ dependencies = [
  "revm-primitives",
  "serde",
  "strata-mpt",
+ "thiserror 2.0.11",
 ]
 
 [[package]]

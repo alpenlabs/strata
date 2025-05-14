@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 
+pub mod state;
 use alloy_primitives::U256;
 use revm::db::{BundleAccount, BundleState};
 use revm_primitives::{AccountInfo, Address, Bytecode, HashMap, B256};
