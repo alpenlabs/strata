@@ -3,7 +3,7 @@
 pub mod state;
 use alloy_primitives::U256;
 use revm::db::{BundleAccount, BundleState};
-use revm_primitives::{AccountInfo, Address, Bytecode, HashMap, B256};
+use revm_primitives::{AccountInfo, Address, Bytecode, HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 /// Represents full state diff for the block together with original values.
@@ -12,14 +12,14 @@ pub struct BlockStateDiff {
     /// Account state.
     pub state: HashMap<Address, BundleAccount>,
     /// All created contracts in this block.
-    pub contracts: HashMap<B256, Bytecode>,
+    pub contracts: HashSet<Bytecode>,
 }
 
 impl From<BundleState> for BlockStateDiff {
     fn from(value: BundleState) -> Self {
         Self {
             state: value.state,
-            contracts: value.contracts,
+            contracts: value.contracts.values().cloned().collect(),
         }
     }
 }
@@ -32,7 +32,7 @@ pub struct BatchStateDiff {
     pub accounts: HashMap<Address, Option<AccountInfo>>,
 
     /// A collection of deployed smart contracts within the batch.
-    pub contracts: HashMap<B256, Bytecode>,
+    pub contracts: HashSet<Bytecode>,
 
     /// Storage slots.
     pub storage_slots: HashMap<Address, HashMap<U256, U256>>,
@@ -54,7 +54,7 @@ pub struct BatchStateDiffBuilder {
     pub original_accounts: HashMap<Address, Option<AccountInfo>>,
 
     /// A collection of deployed smart contracts within the batch.
-    pub contracts: HashMap<B256, Bytecode>,
+    pub contracts: HashSet<Bytecode>,
 
     /// Storage slots.
     pub storage_slots: HashMap<Address, HashMap<U256, U256>>,
@@ -69,10 +69,7 @@ impl BatchStateDiffBuilder {
     }
 
     pub fn apply(&mut self, diff: BlockStateDiff) {
-        // Accumulate deployed contracts.
-        for (addr, bytecode) in diff.contracts.into_iter() {
-            self.contracts.insert(addr, bytecode);
-        }
+        self.contracts.extend(diff.contracts);
 
         for (addr, acc) in &diff.state {
             // Update original account if seen for the first time in the batch.
@@ -138,7 +135,7 @@ impl From<BatchStateDiffBuilder> for BatchStateDiff {
 mod tests {
     use revm::db::{states::StorageSlot, BundleAccount};
     use revm_primitives::{
-        alloy_primitives::map::HashMap, map::DefaultHashBuilder, AccountInfo, Address, FixedBytes,
+        alloy_primitives::map::HashMap, map::DefaultHashBuilder, AccountInfo, Address, HashSet,
         KECCAK_EMPTY, U256,
     };
 
@@ -207,7 +204,7 @@ mod tests {
     fn test_state_diff_acc1() -> BlockStateDiff {
         let mut test_diff = BlockStateDiff {
             state: HashMap::default(),
-            contracts: HashMap::default(),
+            contracts: HashSet::default(),
         };
 
         test_diff.state.insert(
@@ -226,7 +223,7 @@ mod tests {
     fn test_state_diff_acc_old_slots1() -> BlockStateDiff {
         let mut test_diff = BlockStateDiff {
             state: HashMap::default(),
-            contracts: HashMap::default(),
+            contracts: HashSet::default(),
         };
 
         test_diff.state.insert(
@@ -250,7 +247,7 @@ mod tests {
     fn test_state_diff_acc2() -> BlockStateDiff {
         let mut test_diff = BlockStateDiff {
             state: HashMap::default(),
-            contracts: HashMap::default(),
+            contracts: HashSet::default(),
         };
 
         test_diff.state.insert(
@@ -333,12 +330,11 @@ mod tests {
     fn smart_contract_diff() {
         let mut test_diff = BlockStateDiff {
             state: HashMap::default(),
-            contracts: HashMap::default(),
+            contracts: HashSet::default(),
         };
-        test_diff.contracts.insert(
-            FixedBytes::default(),
-            revm_primitives::Bytecode::LegacyRaw(b"123".into()),
-        );
+        test_diff
+            .contracts
+            .insert(revm_primitives::Bytecode::LegacyRaw(b"123".into()));
 
         let mut batch_diff = BatchStateDiffBuilder::new();
         batch_diff.apply(test_diff);

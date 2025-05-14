@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alpen_reth_db::{StateDiffProvider, WitnessProvider};
-use alpen_reth_statediff::{state::StateReconstructed, BatchStateDiffBuilder, BlockStateDiff};
+use alpen_reth_statediff::{state::ReconstructedState, BatchStateDiffBuilder, BlockStateDiff};
 use jsonrpsee::core::RpcResult;
 use revm_primitives::alloy_primitives::B256;
 use strata_rpc_utils::{to_jsonrpsee_error, to_jsonrpsee_error_object};
@@ -54,7 +54,7 @@ where
         let mut builder = BatchStateDiffBuilder::new();
 
         // First construct the batch state diff consisting of all the changes so far.
-        for i in 0..=block_number {
+        for i in 1..=block_number {
             let block_diff = self
                 .db
                 .get_state_diff_by_number(i)
@@ -70,7 +70,7 @@ where
         }
 
         // Apply the batch state diff onto the empty State and return the resulting state root.
-        let mut state = StateReconstructed::new();
+        let mut state = ReconstructedState::new();
         state
             .apply(builder.build())
             .map_err(to_jsonrpsee_error("Error while reconstructing the state"))?;

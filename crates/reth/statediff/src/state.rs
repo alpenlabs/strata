@@ -7,7 +7,7 @@ use crate::BatchStateDiff;
 
 /// An (in-memory) representation of the EVM state reconstructed only from [`BatchStateDiff`].
 #[derive(Clone, Default, Debug)]
-pub struct StateReconstructed {
+pub struct ReconstructedState {
     state_trie: MptNode,
     storage_trie: HashMap<Address, MptNode>,
 }
@@ -21,7 +21,7 @@ pub enum StateError {
     MptError(#[from] strata_mpt::Error),
 }
 
-impl StateReconstructed {
+impl ReconstructedState {
     pub fn new() -> Self {
         Default::default()
     }

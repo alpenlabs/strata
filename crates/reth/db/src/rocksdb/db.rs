@@ -5,7 +5,7 @@ use revm_primitives::alloy_primitives::B256;
 use rockbound::{SchemaDBOperations, SchemaDBOperationsExt};
 use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 
-use super::schema::{BlockNumberByHash, BlockStateDiffSchema, BlockWitnessSchema};
+use super::schema::{BlockHashByNumber, BlockStateDiffSchema, BlockWitnessSchema};
 use crate::{
     errors::DbError, DbResult, StateDiffProvider, StateDiffStore, WitnessProvider, WitnessStore,
 };
@@ -79,7 +79,7 @@ impl<DB: SchemaDBOperations> StateDiffProvider for WitnessDB<DB> {
     }
 
     fn get_state_diff_by_number(&self, block_number: u64) -> DbResult<Option<BlockStateDiff>> {
-        let block_hash = self.db.get::<BlockNumberByHash>(&block_number)?;
+        let block_hash = self.db.get::<BlockHashByNumber>(&block_number)?;
         if block_hash.is_none() {
             return DbResult::Ok(None);
         }
@@ -96,7 +96,7 @@ impl<DB: SchemaDBOperations> StateDiffStore for WitnessDB<DB> {
         witness: &BlockStateDiff,
     ) -> crate::DbResult<()> {
         self.db
-            .put::<BlockNumberByHash>(&block_number, &block_hash.to_vec())?;
+            .put::<BlockHashByNumber>(&block_number, &block_hash.to_vec())?;
 
         let serialized =
             bincode::serialize(witness).map_err(|err| DbError::Other(err.to_string()))?;
@@ -116,7 +116,7 @@ mod tests {
     use revm::db::BundleAccount;
     use revm_primitives::{
         alloy_primitives::{address, map::HashMap},
-        fixed_bytes, AccountInfo, FixedBytes,
+        fixed_bytes, AccountInfo, FixedBytes, HashSet,
     };
     use rockbound::SchemaDBOperations;
     use serde::Deserialize;
@@ -168,7 +168,7 @@ mod tests {
     fn test_state_diff() -> BlockStateDiff {
         let mut test_diff = BlockStateDiff {
             state: HashMap::default(),
-            contracts: HashMap::default(),
+            contracts: HashSet::default(),
         };
 
         test_diff.state.insert(

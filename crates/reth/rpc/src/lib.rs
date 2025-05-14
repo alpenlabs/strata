@@ -25,9 +25,11 @@ pub trait StrataRpcApi {
         json: Option<bool>,
     ) -> RpcResult<Option<BlockWitness>>;
 
+    /// Returns the state diff for the block.
     #[method(name = "getBlockStateDiff")]
     fn get_block_state_diff(&self, block_hash: B256) -> RpcResult<Option<BlockStateDiff>>;
 
+    /// Returns the state root for the block_number as reconstructured from the state diffs.
     #[method(name = "getStateRootByDiffs")]
     fn get_state_root_by_diffs(&self, block_number: u64) -> RpcResult<Option<B256>>;
 }
