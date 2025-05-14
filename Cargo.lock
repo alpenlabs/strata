@@ -1584,6 +1584,7 @@ dependencies = [
  "revm",
  "revm-primitives",
  "serde",
+ "strata-proofimpl-evm-ee-stf",
 ]
 
 [[package]]
@@ -13968,6 +13969,21 @@ dependencies = [
  "hex",
  "sha2 0.10.8",
  "thiserror 2.0.12",
+]
+
+[[package]]
+name = "strata-mpt"
+version = "0.1.0"
+dependencies = [
+ "alloy-rlp",
+ "alloy-rlp-derive",
+ "alloy-rpc-types-eth 0.9.2",
+ "anyhow",
+ "hex-literal",
+ "revm-primitives",
+ "rlp",
+ "serde",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
