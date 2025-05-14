@@ -82,6 +82,7 @@ mod test {
         test_index_deposit_request_with_visitor, test_index_deposit_with_visitor,
         test_index_multiple_deposits_with_visitor, test_index_no_deposit_with_visitor,
         test_index_tx_with_multiple_ops_with_visitor,
+        test_index_withdrawal_fulfillment_with_visitor,
     };
 
     use crate::reader::tx_indexer::ReaderTxVisitorImpl;
@@ -96,29 +97,38 @@ mod test {
     #[ignore = "Ignored because deposit request is not included as ops"]
     #[test]
     fn test_index_txs_deposit_request() {
-        let _ = test_index_deposit_request_with_visitor(ReaderTxVisitorImpl::new, |tx| {
-            tx.contents().protocol_ops().to_vec()
+        let _ = test_index_deposit_request_with_visitor(ReaderTxVisitorImpl::new, |ind_output| {
+            ind_output.contents().protocol_ops().to_vec()
         });
     }
 
     #[test]
     fn test_index_no_deposit() {
-        let _ = test_index_no_deposit_with_visitor(ReaderTxVisitorImpl::new, |tx| {
-            tx.contents().protocol_ops().to_vec()
+        let _ = test_index_no_deposit_with_visitor(ReaderTxVisitorImpl::new, |ind_output| {
+            ind_output.contents().protocol_ops().to_vec()
         });
     }
 
     #[test]
     fn test_index_multiple_deposits() {
-        let _ = test_index_multiple_deposits_with_visitor(ReaderTxVisitorImpl::new, |op_txs| {
-            op_txs.contents().protocol_ops().to_vec()
+        let _ = test_index_multiple_deposits_with_visitor(ReaderTxVisitorImpl::new, |ind_output| {
+            ind_output.contents().protocol_ops().to_vec()
         });
     }
 
     #[test]
     fn test_index_tx_with_multiple_ops() {
-        let _ = test_index_tx_with_multiple_ops_with_visitor(ReaderTxVisitorImpl::new, |tx| {
-            tx.contents().protocol_ops().to_vec()
-        });
+        let _ =
+            test_index_tx_with_multiple_ops_with_visitor(ReaderTxVisitorImpl::new, |ind_output| {
+                ind_output.contents().protocol_ops().to_vec()
+            });
+    }
+
+    #[test]
+    fn test_index_withdrawal_fulfillment() {
+        let _ = test_index_withdrawal_fulfillment_with_visitor(
+            ReaderTxVisitorImpl::new,
+            |ind_output| ind_output.contents().protocol_ops().to_vec(),
+        );
     }
 }

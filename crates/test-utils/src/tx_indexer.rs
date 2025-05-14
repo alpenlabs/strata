@@ -1,30 +1,38 @@
 use bitcoin::{
+    absolute::LockTime,
     block::{Header, Version},
     hashes::Hash,
-    Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode,
+    transaction::Version as TVersion,
+    Amount, Block, BlockHash, CompactTarget, ScriptBuf, Transaction, TxMerkleNode, TxOut,
 };
 use strata_l1tx::{
-    filter::indexer::{index_block, TxVisitor},
+    filter::{
+        indexer::{index_block, TxVisitor},
+        types::OPERATOR_FEE,
+    },
     messages::Indexed,
-    utils::test_utils::create_tx_filter_config,
+    utils::test_utils::{
+        create_opreturn_metadata_for_withdrawal_fulfillment, create_tx_filter_config,
+        get_filter_config_from_deposit_entries,
+    },
 };
-use strata_primitives::l1::{BitcoinAmount, ProtocolOperation};
+use strata_primitives::l1::{BitcoinAmount, ProtocolOperation, WithdrawalFulfillmentInfo};
 
 use crate::{
     bitcoin::{
         build_test_deposit_request_script, build_test_deposit_script, create_test_deposit_tx,
-        test_taproot_addr,
+        generate_withdrawal_fulfillment_data, test_taproot_addr,
     },
     l2::gen_params,
 };
 
 // TEST FUNCTIONS
 
-/// Runs a test deposit transaction with the given parameters and returns the indexer's output.
+/// Runs a test with multiple deposit transactions and returns the indexer's output.
 /// The caller can then perform further tests on the output.
 pub fn test_index_multiple_deposits_with_visitor<V>(
     visitor: impl Fn() -> V,
-    ops_extractor: fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
+    ops_extractor: impl Fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
 ) -> Vec<Indexed<V::Output>>
 where
     V: TxVisitor,
@@ -68,15 +76,11 @@ where
         "test: should find two relevant transactions"
     );
 
-    for (i, info) in tx_entries.iter().flat_map(|e| ops_extractor(e)).enumerate() {
+    for (i, info) in tx_entries.iter().flat_map(ops_extractor).enumerate() {
         if let ProtocolOperation::Deposit(deposit_info) = info {
             assert_eq!(
-                deposit_info.address,
-                if i == 0 {
-                    dest_addr1.clone()
-                } else {
-                    dest_addr2.clone()
-                },
+                &deposit_info.address,
+                if i == 0 { &dest_addr1 } else { &dest_addr2 },
                 "test: dest should match for transaction {i}",
             );
             assert_eq!(
@@ -97,9 +101,11 @@ where
     tx_entries
 }
 
+/// Runs a test with no deposit transaction and returns the indexer's output.
+/// The caller can then perform further tests on the output.
 pub fn test_index_no_deposit_with_visitor<V>(
     visitor: impl Fn() -> V,
-    _: fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
+    _: impl Fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
 ) -> Vec<Indexed<V::Output>>
 where
     V: TxVisitor,
@@ -127,9 +133,11 @@ where
     tx_entries
 }
 
+/// Runs a test with a deposit request transaction and returns the indexer's output.
+/// The caller can then perform further tests on the output.
 pub fn test_index_deposit_request_with_visitor<V>(
     visitor_fn: impl Fn() -> V,
-    extract_proto_ops: fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
+    extract_proto_ops: impl Fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
 ) -> Vec<Indexed<V::Output>>
 where
     V: TxVisitor,
@@ -184,9 +192,11 @@ where
     tx_entries
 }
 
+/// Runs a test with a deposit transaction and returns the indexer's output.
+/// The caller can then perform further tests on the output.
 pub fn test_index_deposit_with_visitor<V>(
     visitor_fn: impl Fn() -> V,
-    extract_ops: fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
+    extract_ops: impl Fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
 ) -> Vec<Indexed<V::Output>>
 where
     V: TxVisitor,
@@ -236,11 +246,76 @@ where
     tx_entries
 }
 
+/// Runs a test with a withdrawal fulfillment transaction and returns the indexer's output.
+/// The caller can then perform further tests on the output.
+pub fn test_index_withdrawal_fulfillment_with_visitor<V>(
+    visitor_fn: impl Fn() -> V,
+    extract_ops: impl Fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
+) -> Vec<Indexed<V::Output>>
+where
+    V: TxVisitor,
+{
+    let amt = Amount::from_int_btc(10);
+    let params = gen_params();
+    let (addresses, txids, deposit_entries) = generate_withdrawal_fulfillment_data(amt.into());
+    let filter_config = get_filter_config_from_deposit_entries(params, &deposit_entries);
+
+    let tx = Transaction {
+        version: TVersion(1),
+        lock_time: LockTime::from_height(0).unwrap(),
+        input: vec![], // dont care
+        output: vec![
+            // front payment
+            TxOut {
+                script_pubkey: addresses[0].to_script(),
+                value: amt - OPERATOR_FEE,
+            },
+            // metadata with operator index
+            TxOut {
+                script_pubkey: create_opreturn_metadata_for_withdrawal_fulfillment(1, 2, &txids[0]),
+                value: Amount::from_sat(0),
+            },
+            // change
+            TxOut {
+                script_pubkey: addresses[4].to_script(),
+                value: Amount::from_btc(0.12345).unwrap(),
+            },
+        ],
+    };
+
+    let block = create_test_block(vec![tx.clone()]);
+
+    let tx_entries = index_block(&block, visitor_fn, &filter_config);
+
+    assert_eq!(tx_entries.len(), 1, "Should find one relevant transaction");
+
+    let ops = extract_ops(&tx_entries[0]);
+
+    assert_eq!(ops.len(), 1, "Should find exactly one protocol operation");
+
+    match &ops[0] {
+        ProtocolOperation::WithdrawalFulfillment(withdrawal_info) => {
+            assert_eq!(
+                *withdrawal_info,
+                WithdrawalFulfillmentInfo {
+                    deposit_idx: 2,
+                    operator_idx: 1,
+                    amt: (amt - OPERATOR_FEE).into(),
+                    txid: tx.compute_txid().into()
+                }
+            );
+        }
+        _ => panic!("Expected WithdrawalFulfillment info"),
+    }
+
+    tx_entries
+}
+
 // TODO: implement this properly when we need to. For now, trying to support multiple ops is
 // creating more issues than helping us.
 pub fn test_index_tx_with_multiple_ops_with_visitor<V>(
     visitor: impl Fn() -> V,
-    _extract_ops: fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
+    _extract_ops: impl Fn(&Indexed<V::Output>) -> Vec<ProtocolOperation>,
 ) -> Vec<Indexed<V::Output>>
 where
     V: TxVisitor,
