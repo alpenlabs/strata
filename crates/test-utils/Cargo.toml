@@ -10,10 +10,10 @@ rust.unused_crate_dependencies = "deny"
 strata-btcio.workspace = true
 strata-chaintsn.workspace = true
 strata-consensus-logic.workspace = true
-strata-l1tx.workspace = true
+strata-l1tx = { workspace = true, features = ["test_utils"] }
 strata-primitives.workspace = true
 strata-proofimpl-evm-ee-stf.workspace = true
-strata-state.workspace = true
+strata-state = { workspace = true, features = ["test_utils"] }
 
 anyhow.workspace = true
 arbitrary.workspace = true
