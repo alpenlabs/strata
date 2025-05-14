@@ -84,7 +84,7 @@ strata-eectl = { path = "crates/eectl" }
 strata-evmexec = { path = "crates/evmexec" }
 strata-key-derivation = { path = "crates/key-derivation" }
 strata-l1tx = { path = "crates/l1tx" }
-strata-mpt = { path = "crate/mpt" }
+strata-mpt = { path = "crates/mpt" }
 strata-mmr = { path = "crates/util/mmr" }
 strata-primitives = { path = "crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }

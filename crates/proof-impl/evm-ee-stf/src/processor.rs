@@ -37,11 +37,9 @@ use revm_primitives::{
     alloy_primitives::{Address, Bloom, TxKind as TransactionKind, U256},
     Account,
 };
+use strata_mpt::{keccak, RlpBytes, StateAccount};
 
-use crate::{
-    mpt::{keccak, RlpBytes, StateAccount},
-    EvmBlockStfInput,
-};
+use crate::EvmBlockStfInput;
 
 /// The divisor for the gas limit bound.
 pub const GAS_LIMIT_DIVISOR: u64 = 1024;

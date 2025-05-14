@@ -16,18 +16,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 pub mod db;
-pub mod mpt;
 pub mod primitives;
 pub mod processor;
 pub mod program;
 pub mod utils;
 use alpen_reth_evm::collect_withdrawal_intents;
 use db::InMemoryDBHelper;
-use mpt::keccak;
 pub use primitives::{EvmBlockStfInput, EvmBlockStfOutput};
 use processor::{EvmConfig, EvmProcessor};
 use revm::{primitives::SpecId, InMemoryDB};
 use revm_primitives::alloy_primitives::B256;
+use strata_mpt::keccak;
 use utils::generate_exec_update;
 use zkaleido::ZkVmEnv;
 
