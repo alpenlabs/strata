@@ -15,7 +15,12 @@ pub trait WitnessProvider {
 }
 
 pub trait StateDiffStore {
-    fn put_state_diff(&self, block_hash: B256, state_diff: &BlockStateDiff) -> DbResult<()>;
+    fn put_state_diff(
+        &self,
+        block_hash: B256,
+        block_number: u64,
+        state_diff: &BlockStateDiff,
+    ) -> DbResult<()>;
     fn del_state_diff(&self, block_hash: B256) -> DbResult<()>;
 }
 
