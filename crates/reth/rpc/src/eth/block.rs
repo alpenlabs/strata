@@ -8,6 +8,7 @@ use reth_primitives::{Receipt, TransactionMeta, TransactionSigned};
 use reth_provider::{BlockReader, HeaderProvider};
 use reth_rpc_eth_api::{
     helpers::{EthBlocks, LoadBlock, LoadPendingBlock, LoadReceipt, SpawnBlocking},
+    types::RpcTypes,
     RpcNodeCore, RpcReceipt,
 };
 use reth_rpc_eth_types::{EthApiError, EthReceiptBuilder};
@@ -18,7 +19,7 @@ impl<N> EthBlocks for StrataEthApi<N>
 where
     Self: LoadBlock<
         Error = EthApiError,
-        NetworkTypes: alloy_network::Network<ReceiptResponse = TransactionReceipt>,
+        NetworkTypes: RpcTypes<Receipt = TransactionReceipt>,
         Provider: BlockReader<Receipt = Receipt, Transaction = TransactionSigned>,
     >,
     N: StrataNodeCore<Provider: ChainSpecProvider<ChainSpec = ChainSpec> + HeaderProvider>,
