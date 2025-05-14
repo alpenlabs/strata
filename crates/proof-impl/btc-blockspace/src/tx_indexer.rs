@@ -1,7 +1,9 @@
 use strata_l1tx::filter::indexer::TxVisitor;
 use strata_primitives::{
     batch::SignedCheckpoint,
-    l1::{DaCommitment, DepositInfo, ProtocolOperation},
+    l1::{
+        DaCommitment, DepositInfo, DepositSpendInfo, ProtocolOperation, WithdrawalFulfillmentInfo,
+    },
 };
 
 /// Ops indexer for use with the prover.
@@ -34,6 +36,15 @@ impl TxVisitor for ProverTxVisitorImpl {
 
     fn visit_checkpoint(&mut self, ckpt: SignedCheckpoint) {
         self.ops.push(ProtocolOperation::Checkpoint(ckpt));
+    }
+
+    fn visit_withdrawal_fulfillment(&mut self, info: WithdrawalFulfillmentInfo) {
+        self.ops
+            .push(ProtocolOperation::WithdrawalFulfillment(info));
+    }
+
+    fn visit_deposit_spend(&mut self, info: DepositSpendInfo) {
+        self.ops.push(ProtocolOperation::DepositSpent(info));
     }
 
     fn finalize(self) -> Option<Vec<ProtocolOperation>> {
