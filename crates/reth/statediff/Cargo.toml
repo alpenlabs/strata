@@ -8,3 +8,5 @@ alloy-primitives.workspace = true
 revm = { workspace = true, features = ["serde"] }
 revm-primitives.workspace = true
 serde.workspace = true
+strata-mpt.workspace = true
+thiserror.workspace = true
