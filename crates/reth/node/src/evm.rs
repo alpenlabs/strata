@@ -1,12 +1,16 @@
 use std::sync::Arc;
 
-use reth::revm::primitives::EVMError;
 use reth_chainspec::ChainSpec;
-use reth_evm::{env::EvmEnv, ConfigureEvm, ConfigureEvmEnv, Database, NextBlockEnvAttributes};
-use reth_evm_ethereum::{EthEvm, EthEvmConfig};
-use reth_primitives::{Header, TransactionSigned};
-use revm::{inspector_handle_register, EvmBuilder};
-use revm_primitives::{Address, CfgEnvWithHandlerCfg, HaltReason, HandlerCfg, TxEnv};
+use reth_evm::{
+    block::{BlockExecutorFactory, BlockExecutorFor},
+    env::EvmEnv,
+    eth::{EthBlockExecutionCtx, EthBlockExecutor},
+    ConfigureEvm, Database, EthEvmFactory, InspectorFor, NextBlockEnvAttributes,
+};
+use reth_evm_ethereum::{EthBlockAssembler, EthEvm, EthEvmConfig};
+use reth_primitives::{Header, Receipt, SealedBlock, SealedHeader, TransactionSigned};
+use revm::database::State;
+use revm_primitives::hardfork::SpecId;
 // use strata_reth_evm::set_evm_handles;
 
 /// Custom EVM configuration
@@ -17,7 +21,7 @@ pub struct StrataEvmConfig {
 }
 
 impl StrataEvmConfig {
-    pub const fn new(chain_spec: Arc<ChainSpec>) -> Self {
+    pub fn new(chain_spec: Arc<ChainSpec>) -> Self {
         Self {
             inner: EthEvmConfig::new(chain_spec),
         }
@@ -28,77 +32,70 @@ impl StrataEvmConfig {
     }
 }
 
-impl ConfigureEvmEnv for StrataEvmConfig {
-    type Header = Header;
+impl BlockExecutorFactory for StrataEvmConfig {
+    type EvmFactory = EthEvmFactory;
+    type ExecutionCtx<'a> = EthBlockExecutionCtx<'a>;
     type Transaction = TransactionSigned;
-    type Error = std::convert::Infallible;
-    type TxEnv = TxEnv;
-    type Spec = revm_primitives::SpecId;
+    type Receipt = Receipt;
 
-    fn tx_env(&self, transaction: &Self::Transaction, signer: Address) -> Self::TxEnv {
-        self.inner.tx_env(transaction, signer)
+    fn evm_factory(&self) -> &Self::EvmFactory {
+        self.inner.evm_factory()
     }
 
-    fn evm_env(&self, header: &Self::Header) -> EvmEnv<Self::Spec> {
+    fn create_executor<'a, DB, I>(
+        &'a self,
+        evm: EthEvm<&'a mut State<DB>, I>,
+        ctx: EthBlockExecutionCtx<'a>,
+    ) -> impl BlockExecutorFor<'a, Self, DB, I>
+    where
+        DB: Database + 'a,
+        I: InspectorFor<Self, &'a mut State<DB>> + 'a,
+    {
+        EthBlockExecutor::new(
+            evm,
+            ctx,
+            self.inner.chain_spec(),
+            self.inner.executor_factory.receipt_builder(),
+        )
+    }
+}
+
+impl ConfigureEvm for StrataEvmConfig {
+    type Primitives = <EthEvmConfig as ConfigureEvm>::Primitives;
+    type Error = <EthEvmConfig as ConfigureEvm>::Error;
+    type NextBlockEnvCtx = <EthEvmConfig as ConfigureEvm>::NextBlockEnvCtx;
+    type BlockExecutorFactory = Self;
+    type BlockAssembler = EthBlockAssembler<ChainSpec>;
+
+    fn block_executor_factory(&self) -> &Self::BlockExecutorFactory {
+        self
+    }
+
+    fn block_assembler(&self) -> &Self::BlockAssembler {
+        self.inner.block_assembler()
+    }
+
+    fn evm_env(&self, header: &Header) -> EvmEnv<SpecId> {
         self.inner.evm_env(header)
     }
 
     fn next_evm_env(
         &self,
-        parent: &Self::Header,
-        attributes: NextBlockEnvAttributes,
-    ) -> Result<EvmEnv<Self::Spec>, Self::Error> {
+        parent: &Header,
+        attributes: &NextBlockEnvAttributes,
+    ) -> Result<EvmEnv<SpecId>, Self::Error> {
         self.inner.next_evm_env(parent, attributes)
     }
-}
 
-impl ConfigureEvm for StrataEvmConfig {
-    type Evm<'a, DB: Database + 'a, I: 'a> = EthEvm<'a, I, DB>;
-    type EvmError<DBError: core::error::Error + Send + Sync + 'static> = EVMError<DBError>;
-    type HaltReason = HaltReason;
-
-    fn evm_with_env<DB: Database>(
-        &self,
-        db: DB,
-        evm_env: EvmEnv<Self::Spec>,
-    ) -> Self::Evm<'_, DB, ()> {
-        let cfg_env_with_handler_cfg = CfgEnvWithHandlerCfg {
-            cfg_env: evm_env.cfg_env,
-            handler_cfg: HandlerCfg::new(evm_env.spec),
-        };
-
-        EvmBuilder::default()
-            .with_db(db)
-            .with_cfg_env_with_handler_cfg(cfg_env_with_handler_cfg)
-            .with_block_env(evm_env.block_env)
-            // .append_handler_register(set_evm_handles)
-            .build()
-            .into()
+    fn context_for_block<'a>(&self, block: &'a SealedBlock) -> EthBlockExecutionCtx<'a> {
+        self.inner.context_for_block(block)
     }
 
-    fn evm_with_env_and_inspector<DB, I>(
+    fn context_for_next_block(
         &self,
-        db: DB,
-        evm_env: EvmEnv<Self::Spec>,
-        inspector: I,
-    ) -> Self::Evm<'_, DB, I>
-    where
-        DB: Database,
-        I: revm::GetInspector<DB>,
-    {
-        let cfg_env_with_handler_cfg = CfgEnvWithHandlerCfg {
-            cfg_env: evm_env.cfg_env,
-            handler_cfg: HandlerCfg::new(evm_env.spec),
-        };
-
-        EvmBuilder::default()
-            .with_db(db)
-            .with_external_context(inspector)
-            .with_cfg_env_with_handler_cfg(cfg_env_with_handler_cfg)
-            .with_block_env(evm_env.block_env)
-            // .append_handler_register(set_evm_handles)
-            .append_handler_register(inspector_handle_register)
-            .build()
-            .into()
+        parent: &SealedHeader,
+        attributes: Self::NextBlockEnvCtx,
+    ) -> EthBlockExecutionCtx<'_> {
+        self.inner.context_for_next_block(parent, attributes)
     }
 }

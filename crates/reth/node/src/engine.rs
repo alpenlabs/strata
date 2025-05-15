@@ -1,19 +1,18 @@
 use std::sync::Arc;
 
 use alloy_rpc_types::engine::{
-    ExecutionPayload, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadV1,
-    PayloadError,
+    payload::ExecutionData, ExecutionPayload, ExecutionPayloadEnvelopeV3,
+    ExecutionPayloadEnvelopeV4, ExecutionPayloadV1,
 };
-use reth::primitives::SealedBlock;
 use reth_chainspec::ChainSpec;
+use reth_ethereum_payload_builder::EthereumExecutionPayloadValidator;
 use reth_node_api::{
     payload::PayloadTypes, validate_version_specific_fields, AddOnsContext, BuiltPayload,
     EngineApiMessageVersion, EngineObjectValidationError, EngineTypes, EngineValidator,
-    ExecutionData, NodePrimitives, PayloadOrAttributes, PayloadValidator,
+    NewPayloadError, NodeTypes, PayloadOrAttributes, PayloadValidator,
 };
-use reth_node_builder::{rpc::EngineValidatorBuilder, FullNodeComponents, NodeTypesWithEngine};
-use reth_payload_validator::ExecutionPayloadValidator;
-use reth_primitives::Block;
+use reth_node_builder::{rpc::EngineValidatorBuilder, FullNodeComponents};
+use reth_primitives::{Block, NodePrimitives, RecoveredBlock};
 use serde::{Deserialize, Serialize};
 
 use super::payload::{StrataBuiltPayload, StrataPayloadBuilderAttributes};
@@ -27,9 +26,20 @@ pub struct StrataEngineTypes<T: PayloadTypes = StrataPayloadTypes> {
 }
 
 impl<T: PayloadTypes> PayloadTypes for StrataEngineTypes<T> {
+    type ExecutionData = ExecutionData;
     type BuiltPayload = T::BuiltPayload;
     type PayloadAttributes = T::PayloadAttributes;
     type PayloadBuilderAttributes = T::PayloadBuilderAttributes;
+
+    fn block_to_payload(
+        block: reth_primitives_traits::SealedBlock<
+            <<Self::BuiltPayload as BuiltPayload>::Primitives as NodePrimitives>::Block,
+        >,
+    ) -> Self::ExecutionData {
+        let (payload, sidecar) =
+            ExecutionPayload::from_block_unchecked(block.hash(), &block.into_block());
+        ExecutionData { payload, sidecar }
+    }
 }
 
 impl<T: PayloadTypes> EngineTypes for StrataEngineTypes<T>
@@ -40,43 +50,43 @@ where
         + TryInto<ExecutionPayloadEnvelopeV3>
         + TryInto<ExecutionPayloadEnvelopeV4>,
 {
-    type ExecutionData = ExecutionData;
     type ExecutionPayloadEnvelopeV1 = ExecutionPayloadV1;
     type ExecutionPayloadEnvelopeV2 = StrataExecutionPayloadEnvelopeV2;
     type ExecutionPayloadEnvelopeV3 = ExecutionPayloadEnvelopeV3;
     type ExecutionPayloadEnvelopeV4 = ExecutionPayloadEnvelopeV4;
-
-    fn block_to_payload(
-        block: SealedBlock<
-            <<Self::BuiltPayload as BuiltPayload>::Primitives as NodePrimitives>::Block,
-        >,
-    ) -> ExecutionData {
-        let (payload, sidecar) =
-            ExecutionPayload::from_block_unchecked(block.hash(), &block.into_block());
-        ExecutionData { payload, sidecar }
-    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct StrataPayloadTypes;
 
 impl PayloadTypes for StrataPayloadTypes {
+    type ExecutionData = ExecutionData;
     type BuiltPayload = StrataBuiltPayload;
     type PayloadAttributes = StrataPayloadAttributes;
     type PayloadBuilderAttributes = StrataPayloadBuilderAttributes;
+
+    fn block_to_payload(
+        block: reth_primitives_traits::SealedBlock<
+            <<Self::BuiltPayload as BuiltPayload>::Primitives as NodePrimitives>::Block,
+        >,
+    ) -> Self::ExecutionData {
+        let (payload, sidecar) =
+            ExecutionPayload::from_block_unchecked(block.hash(), &block.into_block());
+        ExecutionData { payload, sidecar }
+    }
 }
 
 /// Strata engine validator
 #[derive(Debug, Clone)]
 pub struct StrataEngineValidator {
-    inner: ExecutionPayloadValidator<ChainSpec>,
+    inner: EthereumExecutionPayloadValidator<ChainSpec>,
 }
 
 impl StrataEngineValidator {
     /// Instantiates a new validator.
     pub const fn new(chain_spec: Arc<ChainSpec>) -> Self {
         Self {
-            inner: ExecutionPayloadValidator::new(chain_spec),
+            inner: EthereumExecutionPayloadValidator::new(chain_spec),
         }
     }
 
@@ -94,8 +104,12 @@ impl PayloadValidator for StrataEngineValidator {
     fn ensure_well_formed_payload(
         &self,
         payload: ExecutionData,
-    ) -> Result<SealedBlock<Self::Block>, PayloadError> {
-        self.inner.ensure_well_formed_payload(payload)
+    ) -> Result<RecoveredBlock<Self::Block>, NewPayloadError> {
+        // let sealed_block = self.inner.ensure_well_formed_payload(payload)?;
+        let sealed_block = self.inner.ensure_well_formed_payload(payload)?;
+        sealed_block
+            .try_recover()
+            .map_err(|e| NewPayloadError::Other(e.into()))
     }
 }
 
@@ -106,19 +120,19 @@ where
     fn validate_version_specific_fields(
         &self,
         version: EngineApiMessageVersion,
-        payload_or_attrs: PayloadOrAttributes<'_, T::PayloadAttributes>,
+        payload_or_attrs: PayloadOrAttributes<'_, Self::ExecutionData, T::PayloadAttributes>,
     ) -> Result<(), EngineObjectValidationError> {
         validate_version_specific_fields(self.chain_spec(), version, payload_or_attrs)
     }
 
     fn ensure_well_formed_attributes(
         &self,
-        version: EngineApiMessageVersion,
-        attributes: &T::PayloadAttributes,
+        _version: EngineApiMessageVersion,
+        _attributes: &T::PayloadAttributes,
     ) -> Result<(), EngineObjectValidationError> {
-        validate_version_specific_fields(self.chain_spec(), version, attributes.into())?;
-
-        Ok(())
+        // validate_version_specific_fields(self.chain_spec(), version, attributes.into())?;
+        // Ok(())
+        todo!("validate version specific fields");
     }
 }
 
@@ -129,10 +143,10 @@ pub struct StrataEngineValidatorBuilder;
 
 impl<Node, Types> EngineValidatorBuilder<Node> for StrataEngineValidatorBuilder
 where
-    Types: NodeTypesWithEngine<
+    Types: NodeTypes<
         ChainSpec = ChainSpec,
+        Payload = StrataEngineTypes,
         Primitives = StrataPrimitives,
-        Engine = StrataEngineTypes,
     >,
     Node: FullNodeComponents<Types = Types>,
 {

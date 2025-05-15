@@ -1,17 +1,18 @@
 use alloy_consensus::Header;
+use reth::rpc::eth::FullEthApiServer;
 use reth_chainspec::{ChainSpec, EthereumHardforks};
 use reth_db::transaction::{DbTx, DbTxMut};
-use reth_evm::ConfigureEvm;
+use reth_evm::{ConfigureEvm, NextBlockEnvAttributes};
 use reth_node_api::{AddOnsContext, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{
     components::{ComponentsBuilder, ExecutorBuilder},
-    node::{FullNodeTypes, NodeTypes, NodeTypesWithEngine},
-    rpc::{EngineValidatorAddOn, RethRpcAddOns, RpcAddOns, RpcHandle},
+    node::{FullNodeTypes, NodeTypes},
+    rpc::{BasicEngineApiBuilder, EngineValidatorAddOn, RethRpcAddOns, RpcAddOns, RpcHandle},
     BuilderContext, Node, NodeAdapter, NodeComponentsBuilder,
 };
 use reth_node_ethereum::{
     node::{EthereumConsensusBuilder, EthereumNetworkBuilder, EthereumPoolBuilder},
-    BasicBlockExecutorProvider, EthExecutionStrategyFactory,
+    BasicBlockExecutorProvider,
 };
 use reth_primitives::BlockBody;
 use reth_provider::{
@@ -21,7 +22,7 @@ use reth_provider::{
     StorageLocation,
 };
 use reth_rpc_eth_types::{error::FromEvmError, EthApiError};
-use revm_primitives::{alloy_primitives, TxEnv};
+use revm_primitives::alloy_primitives;
 use strata_reth_rpc::{SequencerClient, StrataEthApi};
 
 use crate::{
@@ -121,10 +122,11 @@ impl StrataEthereumNode {
     >
     where
         N: FullNodeTypes<
-            Types: NodeTypesWithEngine<
-                Engine = StrataEngineTypes,
+            Types: NodeTypes<
+                Payload = StrataEngineTypes,
                 ChainSpec = ChainSpec,
                 Primitives = StrataPrimitives,
+                Storage = StrataStorage,
             >,
         >,
     {
@@ -144,11 +146,10 @@ impl StrataEthereumNode {
 impl<N> Node<N> for StrataEthereumNode
 where
     N: FullNodeTypes<
-        Types: NodeTypesWithEngine<
-            Engine = StrataEngineTypes,
+        Types: NodeTypes<
             ChainSpec = ChainSpec,
             Primitives = StrataPrimitives,
-            Storage = StrataStorage,
+            Payload = StrataEngineTypes,
         >,
     >,
 {
@@ -160,6 +161,7 @@ where
         StrataExecutorBuilder,
         EthereumConsensusBuilder,
     >;
+
     type AddOns = StrataAddOns<
         NodeAdapter<N, <Self::ComponentsBuilder as NodeComponentsBuilder<N>>::Components>,
     >;
@@ -181,18 +183,22 @@ impl NodeTypes for StrataEthereumNode {
     type ChainSpec = ChainSpec;
     type StateCommitment = reth_trie_db::MerklePatriciaTrie;
     type Storage = StrataStorage;
-}
-
-/// Configure the node types with the custom engine types
-impl NodeTypesWithEngine for StrataEthereumNode {
-    // use the custom engine types
-    type Engine = StrataEngineTypes;
+    type Payload = StrataEngineTypes;
 }
 
 /// Add-ons for Strata.
 #[derive(Debug)]
-pub struct StrataAddOns<N: FullNodeComponents> {
-    pub rpc_add_ons: RpcAddOns<N, StrataEthApi<N>, StrataEngineValidatorBuilder>,
+pub struct StrataAddOns<N: FullNodeComponents>
+where
+    StrataEthApi<N>: FullEthApiServer<Provider = N::Provider, Pool = N::Pool>,
+{
+    inner: RpcAddOns<N, StrataEthApi<N>, StrataEngineValidatorBuilder>, /* pub rpc_add_ons:
+                                                                         * RpcAddOns<
+                                                                         *     N,
+                                                                         *     StrataEthApi<N>,
+                                                                         *     StrataEngineValidatorBuilder,
+                                                                         *     BasicEngineApiBuilder<StrataEngineValidatorBuilder>,
+                                                                         * >, */
 }
 
 impl<N: FullNodeComponents<Types: NodeTypes<Primitives = StrataPrimitives>>> Default
@@ -213,13 +219,12 @@ impl<N: FullNodeComponents<Types: NodeTypes<Primitives = StrataPrimitives>>> Str
 impl<N> NodeAddOns<N> for StrataAddOns<N>
 where
     N: FullNodeComponents<
-        Types: NodeTypesWithEngine<
+        Types: NodeTypes<
             ChainSpec = ChainSpec,
             Primitives = StrataPrimitives,
-            Storage = StrataStorage,
-            Engine = StrataEngineTypes,
+            Payload = StrataEngineTypes,
         >,
-        Evm: ConfigureEvm<TxEnv = TxEnv>,
+        Evm: ConfigureEvm<NextBlockEnvCtx = NextBlockEnvAttributes>,
     >,
     EthApiError: FromEvmError<N::Evm>,
 {
@@ -240,13 +245,12 @@ where
 impl<N> RethRpcAddOns<N> for StrataAddOns<N>
 where
     N: FullNodeComponents<
-        Types: NodeTypesWithEngine<
+        Types: NodeTypes<
             ChainSpec = ChainSpec,
             Primitives = StrataPrimitives,
-            Storage = StrataStorage,
-            Engine = StrataEngineTypes,
+            Payload = StrataEngineTypes,
         >,
-        Evm: ConfigureEvm<TxEnv = TxEnv>,
+        Evm: ConfigureEvm<NextBlockEnvCtx = NextBlockEnvAttributes>,
     >,
     EthApiError: FromEvmError<N::Evm>,
 {
@@ -299,10 +303,10 @@ impl StrataAddOnsBuilder {
 impl<N> EngineValidatorAddOn<N> for StrataAddOns<N>
 where
     N: FullNodeComponents<
-        Types: NodeTypesWithEngine<
+        Types: NodeTypes<
             ChainSpec = ChainSpec,
             Primitives = StrataPrimitives,
-            Engine = StrataEngineTypes,
+            Payload = StrataEngineTypes,
         >,
     >,
 {
@@ -323,7 +327,7 @@ where
     Node: FullNodeTypes<Types: NodeTypes<ChainSpec = ChainSpec, Primitives = StrataPrimitives>>,
 {
     type EVM = StrataEvmConfig;
-    type Executor = BasicBlockExecutorProvider<EthExecutionStrategyFactory<Self::EVM>>;
+    type Executor = BasicBlockExecutorProvider<Self::EVM>;
 
     async fn build_evm(
         self,
@@ -333,10 +337,7 @@ where
 
         Ok((
             evm_config.clone(),
-            BasicBlockExecutorProvider::new(EthExecutionStrategyFactory::new(
-                ctx.chain_spec(),
-                evm_config,
-            )),
+            BasicBlockExecutorProvider::new(evm_config.clone()),
         ))
     }
 }
