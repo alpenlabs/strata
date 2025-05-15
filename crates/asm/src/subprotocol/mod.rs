@@ -5,13 +5,9 @@
 //! updating its internal state, and emitting cross-protocol messages and logs.
 
 use bitcoin::Block;
-use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::l1::ProtocolOperation;
+use strata_primitives::buf::Buf32;
 
-use crate::{
-    SectionState,
-    msg::{InterProtoMsg, ProtoEvent},
-};
+use crate::{SectionState, msg::InterProtoMsg};
 
 /// Interface for ASM subprotocol implementations.
 ///
@@ -23,21 +19,21 @@ pub trait Subprotocol {
     /// 1-byte subprotocol identifier / version tag (matches SPS-50).
     const VERSION: u8;
 
+    fn id(&self) -> u8 {
+        Self::VERSION
+    }
+
     /// Process the L1Block and extracts all the relevant information from L1 for the subprotocol
     ///
-    /// Update it's own output and as output this should give a list of InterProtoMsg addressed to
-    /// other subprotocol
+    /// Update it's own state and output a list of InterProtoMsg addressed to other subprotocols
     fn process_block(&mut self, _block: &Block) -> Vec<(u8, InterProtoMsg)> {
         vec![]
     }
 
-    /// Use the InterProtoMsg from other subprotocol to update it's state and generate the
-    /// ProtoEvent
-    fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> Vec<ProtoEvent> {
-        vec![]
-    }
-
-    fn to_section_state(&self) -> SectionState;
+    /// Use the InterProtoMsg from other subprotocol to update it's state. Also generate the event
+    /// logs that is later needed for introspection. Return the commitment of the events. The actual
+    /// event is defined by the subprotocol and is not visible to the ASM.
+    fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> (SectionState, Buf32);
 }
 
 pub mod bridge;
