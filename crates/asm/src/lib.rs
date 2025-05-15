@@ -4,41 +4,42 @@
 
 use std::collections::HashMap;
 
-use bitcoin::block::Block;
-use msg::ProtoEvent;
-use strata_primitives::l1::{HeaderVerificationState, L1BlockId};
+use bitcoin::{block::Block, params::Params};
+use strata_primitives::{
+    buf::Buf32,
+    l1::{HeaderVerificationState, L1BlockId},
+};
 use subprotocol::{Subprotocol, core::CoreASMState};
 use thiserror::Error;
 mod msg;
 mod subprotocol;
-mod tx_indexer;
 
 #[derive(Debug, Clone)]
 pub struct AnchorState {
     chain_view: ChainViewState,
 
+    /// This needs to be sorted by Subprotocol Version/ID
     sections: Vec<SectionState>,
 }
 
 impl AnchorState {
-    /// Constructs a map of all successfully deserialized subprotocol instances keyed by their ID.
-    // TODO: Experiment with using BTreeMap
-    pub fn subprotocols(&self) -> HashMap<u8, impl Subprotocol> {
-        let mut map = HashMap::with_capacity(self.sections.len());
+    /// Constructs a Vec of all successfully deserialized subprotocol instances
+    pub fn subprotocols(&self) -> Vec<impl Subprotocol> {
+        let mut protocols = Vec::with_capacity(self.sections.len());
         for section in &self.sections {
             // Ignore any sections that fail to deserialize
             if let Ok(proto) = section.subprotocol() {
-                map.insert(section.id(), proto);
+                protocols.push(proto);
             }
         }
-        map
+        protocols
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct ChainViewState {
-    pow_state: HeaderVerificationState,
-    headers: Vec<(L1BlockId, Vec<ProtoEvent>)>,
+    pub pow_state: HeaderVerificationState,
+    pub events: Vec<(L1BlockId, Vec<(u8, Buf32)>)>,
 }
 #[derive(Debug, Clone)]
 pub struct SectionState {
@@ -80,28 +81,38 @@ impl SectionState {
 }
 
 pub fn asm_stf(pre_state: AnchorState, block: Block) -> AnchorState {
-    let mut new_state = pre_state.clone();
     let mut protocols = pre_state.subprotocols();
+    let mut pow_state = pre_state.chain_view.pow_state.clone();
+    let mut events = pre_state.chain_view.events.clone();
+
+    pow_state
+        .check_and_update_continuity(&block.header, &Params::MAINNET)
+        .expect("header doesn't follow the consensus rules");
 
     let mut inter_msgs = HashMap::new();
-    for protocol in protocols.values_mut() {
+    for protocol in protocols.iter_mut() {
         let msgs = protocol.process_block(&block);
         for (id, msg) in msgs {
             inter_msgs.entry(id).or_insert_with(Vec::new).push(msg);
         }
     }
 
-    let mut protocol_events = Vec::new();
-    for (id, msgs) in inter_msgs {
-        let protocol = protocols.get_mut(&id).unwrap();
-        let events = protocol.finalize_state(&msgs);
-        protocol_events.push((id, events));
+    let mut mmr_events = Vec::new();
+    let mut sections = Vec::new();
+    for protocol in protocols.iter_mut() {
+        let id = protocol.id();
+        let msgs = inter_msgs.entry(id).or_default();
+        let (section, mmr_event_hash) = protocol.finalize_state(msgs);
+        sections.push(section);
+        mmr_events.push((id, mmr_event_hash));
     }
 
-    let mut sections: Vec<SectionState> = Vec::with_capacity(protocols.len());
-    for (id, protocol) in protocols {
-        sections.push(protocol.to_section_state());
-    }
+    events.push((*pow_state.last_verified_block.blkid(), mmr_events));
 
-    new_state
+    let chain_view = ChainViewState { pow_state, events };
+
+    AnchorState {
+        chain_view,
+        sections,
+    }
 }

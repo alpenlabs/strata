@@ -21,10 +21,3 @@ pub enum InterProtoMsg {
     /// Bridge Subprotocol
     Withdrawal(WithdrawalIntent),
 }
-
-/// Describes the events that needs to be introspected provably by the subprotocol at a later time
-/// and thus needs to be stored in the MMR so that it can be easily retrieved.
-///
-/// This includes information related to forced inclusion transaction, deposits.
-#[derive(Debug, Clone)]
-pub enum ProtoEvent {}

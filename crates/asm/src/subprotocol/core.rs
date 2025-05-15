@@ -26,15 +26,21 @@ pub struct CoreASMState {
     consensus_manager: Buf32,
 }
 
-impl Subprotocol for CoreASMState {
-    const VERSION: u8 = 1;
-
+impl CoreASMState {
     fn to_section_state(&self) -> SectionState {
         let data = borsh::to_vec(&self).expect("serialization of subprotocol failed");
         SectionState {
             subprotocol_id: 1, // FIXME:
             data,
         }
+    }
+}
+
+impl Subprotocol for CoreASMState {
+    const VERSION: u8 = 1;
+
+    fn finalize_state(&mut self, _msgs: &[crate::msg::InterProtoMsg]) -> (SectionState, Buf32) {
+        (self.to_section_state(), Buf32::zero())
     }
 }
 
