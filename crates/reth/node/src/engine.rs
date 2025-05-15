@@ -36,8 +36,8 @@ impl<T: PayloadTypes> PayloadTypes for StrataEngineTypes<T> {
             <<Self::BuiltPayload as BuiltPayload>::Primitives as NodePrimitives>::Block,
         >,
     ) -> Self::ExecutionData {
-        let (payload, sidecar) =
-            ExecutionPayload::from_block_unchecked(block.hash(), &block.into_block());
+        let (payload, sidecar) = todo!();
+        // ExecutionPayload::from_block_unchecked(block.hash(), &block.into_block());
         ExecutionData { payload, sidecar }
     }
 }

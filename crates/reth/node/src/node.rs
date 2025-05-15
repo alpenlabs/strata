@@ -1,18 +1,21 @@
 use alloy_consensus::Header;
-use reth::rpc::eth::FullEthApiServer;
+use reth::rpc::eth::{core::EthApiFor, FullEthApiServer};
 use reth_chainspec::{ChainSpec, EthereumHardforks};
 use reth_db::transaction::{DbTx, DbTxMut};
 use reth_evm::{ConfigureEvm, NextBlockEnvAttributes};
 use reth_node_api::{AddOnsContext, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{
-    components::{ComponentsBuilder, ExecutorBuilder},
+    components::{BasicPayloadServiceBuilder, ComponentsBuilder, ExecutorBuilder},
     node::{FullNodeTypes, NodeTypes},
-    rpc::{BasicEngineApiBuilder, EngineValidatorAddOn, RethRpcAddOns, RpcAddOns, RpcHandle},
+    rpc::{EngineValidatorAddOn, EthApiBuilder, RethRpcAddOns, RpcAddOns, RpcHandle},
     BuilderContext, Node, NodeAdapter, NodeComponentsBuilder,
 };
 use reth_node_ethereum::{
-    node::{EthereumConsensusBuilder, EthereumNetworkBuilder, EthereumPoolBuilder},
-    BasicBlockExecutorProvider,
+    node::{
+        EthereumConsensusBuilder, EthereumEngineValidatorBuilder, EthereumNetworkBuilder,
+        EthereumPoolBuilder,
+    },
+    BasicBlockExecutorProvider, EthereumEthApiBuilder,
 };
 use reth_primitives::BlockBody;
 use reth_provider::{
@@ -23,7 +26,7 @@ use reth_provider::{
 };
 use reth_rpc_eth_types::{error::FromEvmError, EthApiError};
 use revm_primitives::alloy_primitives;
-use strata_reth_rpc::{SequencerClient, StrataEthApi};
+use strata_reth_rpc::{eth::StrataEthApiBuilder, SequencerClient, StrataEthApi};
 
 use crate::{
     args::StrataNodeArgs,
@@ -104,240 +107,4 @@ impl ChainStorage<StrataPrimitives> for StrataStorage {
 pub struct StrataEthereumNode {
     // Strata node args.
     pub args: StrataNodeArgs,
-}
-
-impl StrataEthereumNode {
-    pub const fn new(args: StrataNodeArgs) -> Self {
-        Self { args }
-    }
-
-    /// Returns the components for the given [`StrataNodeArgs`].
-    pub fn components<N>() -> ComponentsBuilder<
-        N,
-        EthereumPoolBuilder,
-        StrataPayloadServiceBuilder,
-        EthereumNetworkBuilder,
-        StrataExecutorBuilder,
-        EthereumConsensusBuilder,
-    >
-    where
-        N: FullNodeTypes<
-            Types: NodeTypes<
-                Payload = StrataEngineTypes,
-                ChainSpec = ChainSpec,
-                Primitives = StrataPrimitives,
-                Storage = StrataStorage,
-            >,
-        >,
-    {
-        ComponentsBuilder::default()
-            .node_types::<N>()
-            .pool(EthereumPoolBuilder::default())
-            .payload(StrataPayloadServiceBuilder::default())
-            .network(EthereumNetworkBuilder::default())
-            .executor(StrataExecutorBuilder::default())
-            .consensus(EthereumConsensusBuilder::default())
-    }
-}
-
-/// Implement the Node trait for the custom node
-///
-/// This provides a preset configuration for the node
-impl<N> Node<N> for StrataEthereumNode
-where
-    N: FullNodeTypes<
-        Types: NodeTypes<
-            ChainSpec = ChainSpec,
-            Primitives = StrataPrimitives,
-            Payload = StrataEngineTypes,
-        >,
-    >,
-{
-    type ComponentsBuilder = ComponentsBuilder<
-        N,
-        EthereumPoolBuilder,
-        StrataPayloadServiceBuilder,
-        EthereumNetworkBuilder,
-        StrataExecutorBuilder,
-        EthereumConsensusBuilder,
-    >;
-
-    type AddOns = StrataAddOns<
-        NodeAdapter<N, <Self::ComponentsBuilder as NodeComponentsBuilder<N>>::Components>,
-    >;
-
-    fn components_builder(&self) -> Self::ComponentsBuilder {
-        Self::components()
-    }
-
-    fn add_ons(&self) -> Self::AddOns {
-        Self::AddOns::builder()
-            .with_sequencer(self.args.sequencer_http.clone())
-            .build()
-    }
-}
-
-/// Configure the node types
-impl NodeTypes for StrataEthereumNode {
-    type Primitives = StrataPrimitives;
-    type ChainSpec = ChainSpec;
-    type StateCommitment = reth_trie_db::MerklePatriciaTrie;
-    type Storage = StrataStorage;
-    type Payload = StrataEngineTypes;
-}
-
-/// Add-ons for Strata.
-#[derive(Debug)]
-pub struct StrataAddOns<N: FullNodeComponents>
-where
-    StrataEthApi<N>: FullEthApiServer<Provider = N::Provider, Pool = N::Pool>,
-{
-    inner: RpcAddOns<N, StrataEthApi<N>, StrataEngineValidatorBuilder>, /* pub rpc_add_ons:
-                                                                         * RpcAddOns<
-                                                                         *     N,
-                                                                         *     StrataEthApi<N>,
-                                                                         *     StrataEngineValidatorBuilder,
-                                                                         *     BasicEngineApiBuilder<StrataEngineValidatorBuilder>,
-                                                                         * >, */
-}
-
-impl<N: FullNodeComponents<Types: NodeTypes<Primitives = StrataPrimitives>>> Default
-    for StrataAddOns<N>
-{
-    fn default() -> Self {
-        Self::builder().build()
-    }
-}
-
-impl<N: FullNodeComponents<Types: NodeTypes<Primitives = StrataPrimitives>>> StrataAddOns<N> {
-    /// Build a [`StrataAddOns`] using [`StrataAddOnsBuilder`].
-    pub fn builder() -> StrataAddOnsBuilder {
-        StrataAddOnsBuilder::default()
-    }
-}
-
-impl<N> NodeAddOns<N> for StrataAddOns<N>
-where
-    N: FullNodeComponents<
-        Types: NodeTypes<
-            ChainSpec = ChainSpec,
-            Primitives = StrataPrimitives,
-            Payload = StrataEngineTypes,
-        >,
-        Evm: ConfigureEvm<NextBlockEnvCtx = NextBlockEnvAttributes>,
-    >,
-    EthApiError: FromEvmError<N::Evm>,
-{
-    type Handle = RpcHandle<N, StrataEthApi<N>>;
-
-    async fn launch_add_ons(
-        self,
-        ctx: reth_node_api::AddOnsContext<'_, N>,
-    ) -> eyre::Result<Self::Handle> {
-        let Self { rpc_add_ons } = self;
-
-        rpc_add_ons
-            .launch_add_ons_with(ctx, move |_, _| Ok(()))
-            .await
-    }
-}
-
-impl<N> RethRpcAddOns<N> for StrataAddOns<N>
-where
-    N: FullNodeComponents<
-        Types: NodeTypes<
-            ChainSpec = ChainSpec,
-            Primitives = StrataPrimitives,
-            Payload = StrataEngineTypes,
-        >,
-        Evm: ConfigureEvm<NextBlockEnvCtx = NextBlockEnvAttributes>,
-    >,
-    EthApiError: FromEvmError<N::Evm>,
-{
-    type EthApi = StrataEthApi<N>;
-
-    fn hooks_mut(&mut self) -> &mut reth_node_builder::rpc::RpcHooks<N, Self::EthApi> {
-        self.rpc_add_ons.hooks_mut()
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-#[non_exhaustive]
-pub struct StrataAddOnsBuilder {
-    /// Sequencer client, configured to forward submitted transactions to sequencer of given OP
-    /// network.
-    sequencer_client: Option<SequencerClient>,
-}
-
-impl StrataAddOnsBuilder {
-    /// With a [`SequencerClient`].
-    pub fn with_sequencer(mut self, sequencer_client: Option<String>) -> Self {
-        self.sequencer_client = sequencer_client.map(SequencerClient::new);
-        self
-    }
-}
-
-impl StrataAddOnsBuilder {
-    /// Builds an instance of [`StrataAddOns`].
-    pub fn build<N>(self) -> StrataAddOns<N>
-    where
-        N: FullNodeComponents<Types: NodeTypes<Primitives = StrataPrimitives>>,
-    {
-        let Self { sequencer_client } = self;
-
-        StrataAddOns {
-            rpc_add_ons: RpcAddOns::new(
-                move |ctx| {
-                    StrataEthApi::<N>::builder()
-                        .with_sequencer(sequencer_client)
-                        .build(ctx)
-                },
-                Default::default(),
-                Default::default(),
-            ),
-        }
-    }
-}
-
-/// Engine validator add-on for Strata.
-impl<N> EngineValidatorAddOn<N> for StrataAddOns<N>
-where
-    N: FullNodeComponents<
-        Types: NodeTypes<
-            ChainSpec = ChainSpec,
-            Primitives = StrataPrimitives,
-            Payload = StrataEngineTypes,
-        >,
-    >,
-{
-    type Validator = StrataEngineValidator;
-
-    async fn engine_validator(&self, ctx: &AddOnsContext<'_, N>) -> eyre::Result<Self::Validator> {
-        Ok(StrataEngineValidator::new(ctx.config.chain.clone()))
-    }
-}
-
-/// Builds a regular ethereum block executor that uses the custom EVM.
-#[derive(Debug, Default, Clone, Copy)]
-#[non_exhaustive]
-pub struct StrataExecutorBuilder;
-
-impl<Node> ExecutorBuilder<Node> for StrataExecutorBuilder
-where
-    Node: FullNodeTypes<Types: NodeTypes<ChainSpec = ChainSpec, Primitives = StrataPrimitives>>,
-{
-    type EVM = StrataEvmConfig;
-    type Executor = BasicBlockExecutorProvider<Self::EVM>;
-
-    async fn build_evm(
-        self,
-        ctx: &BuilderContext<Node>,
-    ) -> eyre::Result<(Self::EVM, Self::Executor)> {
-        let evm_config = StrataEvmConfig::new(ctx.chain_spec());
-
-        Ok((
-            evm_config.clone(),
-            BasicBlockExecutorProvider::new(evm_config.clone()),
-        ))
-    }
 }
