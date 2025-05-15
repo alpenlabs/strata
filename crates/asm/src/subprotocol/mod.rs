@@ -7,7 +7,7 @@
 use bitcoin::Block;
 use strata_primitives::buf::Buf32;
 
-use crate::{SectionState, msg::InterProtoMsg};
+use crate::{msg::InterProtoMsg, state::SectionState};
 
 /// Interface for ASM subprotocol implementations.
 ///
@@ -19,6 +19,10 @@ pub trait Subprotocol {
     /// 1-byte subprotocol identifier / version tag (matches SPS-50).
     const VERSION: u8;
 
+    /// Returns the identifier of the subprotocol for this section.
+    ///
+    /// This ID corresponds to the version or namespace of the subprotocol whose
+    /// state is serialized in this section.
     fn id(&self) -> u8 {
         Self::VERSION
     }
@@ -36,5 +40,8 @@ pub trait Subprotocol {
     fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> (SectionState, Buf32);
 }
 
+/// Bridge subprotocol implementation
 pub mod bridge;
+
+/// CoreASM subprotocol implementation
 pub mod core;
