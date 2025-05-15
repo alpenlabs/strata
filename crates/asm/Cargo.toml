@@ -4,3 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bitcoin.workspace = true
+bitcoin-bosd.workspace = true
+borsh.workspace = true
+serde.workspace = true
+strata-l1tx.workspace = true
+strata-primitives.workspace = true
+thiserror.workspace = true
+zkaleido.workspace = true

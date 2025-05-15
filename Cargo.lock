@@ -2109,6 +2109,16 @@ dependencies = [
 [[package]]
 name = "asm"
 version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "bitcoin-bosd",
+ "borsh",
+ "serde",
+ "strata-l1tx",
+ "strata-primitives",
+ "thiserror 2.0.12",
+ "zkaleido",
+]
 
 [[package]]
 name = "asn1_der"
