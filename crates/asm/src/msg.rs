@@ -17,7 +17,7 @@ pub struct WithdrawalIntent {
 /// needs to be consumed by other subprotocols
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub enum InterProtoMsg {
-    /// This messsage originates from the Core OL Subprotocol and is meant to be passed to the
+    /// This message originates from the Core OL Subprotocol and is meant to be passed to the
     /// Bridge Subprotocol
     Withdrawal(WithdrawalIntent),
 }
