@@ -2,13 +2,13 @@ services:
   reth:
     build:
       context: ../
-      dockerfile: ./docker/strata-reth/Dockerfile
+      dockerfile: ./docker/alpen-reth/Dockerfile
     platform: linux/amd64
-    image: public.ecr.aws/s6b4k6i9/strata_reth:v0.1.11
+    image: public.ecr.aws/r1l9t0r6/tn1/alpen-reth:latest
     environment:
       BUILD_PROFILE: ${BUILD_PROFILE:-release}
       RETH_AUTH_RPC_PORT: ${RETH_AUTH_RPC_PORT:-8551}
-      JWTSECRET: ${JWTSECRET}
+      JWTSECRET: ${JWTSECRET:-configs/jwt.hex}
     volumes:
       - ./data/reth:/app/reth
       - ./configs:/app/configs
