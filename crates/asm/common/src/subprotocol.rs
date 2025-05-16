@@ -4,7 +4,7 @@
 //! provide. Each subprotocol is responsible for parsing its transactions,
 //! updating its internal state, and emitting cross-protocol messages and logs.
 
-use bitcoin::Block;
+use bitcoin::Transaction;
 use strata_primitives::buf::Buf32;
 
 use crate::{error::ASMError, msg::InterProtoMsg, state::SectionState};
@@ -33,10 +33,11 @@ pub trait Subprotocol {
     /// Returns this subprotocol’s 1-byte (SPS-50) identifier.
     fn id(&self) -> u8;
 
-    /// Process the L1Block and extracts all the relevant information from L1 for the subprotocol
+    /// Process the transactions and extract all the relevant information from L1 for the
+    /// subprotocol
     ///
     /// Update it's own state and output a list of InterProtoMsg addressed to other subprotocols
-    fn process_block(&mut self, _block: &Block) -> Vec<(u8, InterProtoMsg)> {
+    fn process_txs(&mut self, _txs: &[Transaction]) -> Vec<(u8, InterProtoMsg)> {
         vec![]
     }
 

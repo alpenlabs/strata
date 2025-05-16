@@ -7,8 +7,10 @@ use std::collections::HashMap;
 use bitcoin::{block::Block, params::Params};
 use strata_asm_common::{AnchorState, ChainViewState};
 use subprotocols::parse_subprotocols;
+use tx_filter::group_txs_by_subprotocol;
 
 mod subprotocols;
+mod tx_filter;
 
 /// Computes the next AnchorState by applying the Anchor State Machine (ASM) state transition
 /// function (STF) to the given previous state and new L1 block.
@@ -23,10 +25,18 @@ pub fn asm_stf(pre_state: AnchorState, block: Block) -> AnchorState {
         .check_and_update_continuity(&block.header, &Params::MAINNET)
         .expect("header doesn't follow the consensus rules");
 
-    // 2. Process the block in each subprotocol, gathering any emitted intermediate messages
+    // 2. Filter the relevant transactions
+    let all_relevant_transactions = group_txs_by_subprotocol(block.txdata);
+
+    // 2. Process the relevant transaction of each subprotocol, gathering any emitted intermediate
+    //    messages
     let mut inter_msgs = HashMap::new();
     for protocol in protocols.iter_mut() {
-        let msgs = protocol.process_block(&block);
+        let relevant_transactions = all_relevant_transactions
+            .get(&protocol.id())
+            .map(|v| v.as_slice())
+            .unwrap_or_default();
+        let msgs = protocol.process_txs(relevant_transactions);
         for (id, msg) in msgs {
             inter_msgs.entry(id).or_insert_with(Vec::new).push(msg);
         }
