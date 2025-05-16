@@ -1,14 +1,20 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use strata_asm_common::{Subprotocol, msg::InterProtoMsg, state::SectionState};
+use strata_primitives::buf::Buf32;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub const BRIDGE_V1_SUBPROTOCOL_ID: u8 = 2;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+pub struct BridgeV1StateStub {}
+
+impl Subprotocol for BridgeV1StateStub {
+    const VERSION: u8 = BRIDGE_V1_SUBPROTOCOL_ID;
+
+    fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> (SectionState, Buf32) {
+        (
+            SectionState {
+                subprotocol_id: BRIDGE_V1_SUBPROTOCOL_ID,
+                data: Vec::new(),
+            },
+            Buf32::zero(),
+        )
     }
 }

@@ -1,7 +1,6 @@
 use strata_asm_common::{Subprotocol, error::ASMError, state::SectionState};
-use strata_asm_proto_core::CoreASMState;
-
-pub const CORE_SUBPROTOCOL_ID: u8 = 1;
+use strata_asm_proto_bridge_v1::{BRIDGE_V1_SUBPROTOCOL_ID, BridgeV1StateStub};
+use strata_asm_proto_core::{CORE_SUBPROTOCOL_ID, CoreASMState};
 
 pub fn parse_subprotocols(sections: &[SectionState]) -> Vec<impl Subprotocol> {
     let mut protocols = Vec::with_capacity(sections.len());
