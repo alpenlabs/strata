@@ -3,6 +3,7 @@ services:
     build:
       context: ../
       dockerfile: ./docker/strata-reth/Dockerfile
+    platform: linux/amd64
     image: public.ecr.aws/s6b4k6i9/strata_reth:v0.1.11
     environment:
       BUILD_PROFILE: ${BUILD_PROFILE:-release}
@@ -24,11 +25,12 @@ services:
     build:
       context: ../
       dockerfile: ./docker/strata-client/Dockerfile
-    image: strata_client:v0.2.0
+    platform: linux/amd64
+    image: public.ecr.aws/r1l9t0r6/testnet1/strata-client:latest
     environment:
       CONFIG_PATH: /app/configs/config.fn.toml
       PARAM_PATH: /app/configs/params.json
-      RUST_LOG: ${RUST_LOG:-debug}
+      RUST_LOG: ${RUST_LOG:-info}
     container_name: strata_client
     ports:
       - "8432:8432"
