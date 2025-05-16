@@ -32,16 +32,8 @@ pub struct CoreASMState {
     /// The L1 block ID up to which the `verified_checkpoint` covers.
     last_checkpoint_ref: L1BlockId,
 
-    /// Public key of the batch producer authorized to submit checkpoint proofs.
-    batch_producer_pubkey: Buf32,
-
-    /// Administrator public key. Holds the authority to update the
-    /// `batch_producer_pubkey` via a Bitcoin transaction.
-    administrator: Buf32,
-
-    /// Public key of the consensus manager, responsible for higher‐level
-    /// governance and protocol parameter updates.
-    consensus_manager: Buf32,
+    /// Public key of the sequencer authorized to submit checkpoint proofs.
+    sequencer_pubkey: Buf32,
 }
 
 impl Subprotocol for CoreASMState {
