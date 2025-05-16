@@ -16,7 +16,7 @@ use crate::{error::ASMError, msg::InterProtoMsg, state::SectionState};
 /// occurs in two phases: `process_block_txs` (initial pass) and
 /// `finalize_state` (after inter-protocol messaging).
 pub trait Subprotocol {
-    fn from_section(section: SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
+    fn from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
     where
         Self: Sized;
 

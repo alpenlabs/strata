@@ -6,8 +6,8 @@ pub fn parse_subprotocols(sections: &[SectionState]) -> Vec<Box<dyn Subprotocol>
     sections
         .iter()
         .filter_map(|sec| match sec.subprotocol_id {
-            CORE_SUBPROTOCOL_ID => CoreASMState::from_section(sec.clone()).ok(),
-            BRIDGE_V1_SUBPROTOCOL_ID => BridgeV1StateStub::from_section(sec.clone()).ok(),
+            CORE_SUBPROTOCOL_ID => CoreASMState::from_section(sec).ok(),
+            BRIDGE_V1_SUBPROTOCOL_ID => BridgeV1StateStub::from_section(sec).ok(),
             _ => None,
         })
         .collect()

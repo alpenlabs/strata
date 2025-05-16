@@ -46,7 +46,7 @@ impl Subprotocol for CoreASMState {
         CORE_SUBPROTOCOL_ID
     }
 
-    fn from_section(section: SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
+    fn from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
     where
         Self: Sized,
     {
@@ -70,11 +70,10 @@ impl From<CoreASMState> for SectionState {
     }
 }
 
-// 3) Parse the wire format back into your struct:
-impl TryFrom<SectionState> for CoreASMState {
+impl TryFrom<&SectionState> for CoreASMState {
     type Error = ASMError;
 
-    fn try_from(section: SectionState) -> Result<Self, Self::Error> {
+    fn try_from(section: &SectionState) -> Result<Self, Self::Error> {
         if section.subprotocol_id != CORE_SUBPROTOCOL_ID {
             return Err(ASMError::InvalidSubprotocol(section.subprotocol_id));
         }

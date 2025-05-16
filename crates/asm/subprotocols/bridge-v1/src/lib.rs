@@ -12,7 +12,7 @@ impl Subprotocol for BridgeV1StateStub {
         BRIDGE_V1_SUBPROTOCOL_ID
     }
 
-    fn from_section(section: SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
+    fn from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
     where
         Self: Sized,
     {
@@ -37,11 +37,10 @@ impl From<BridgeV1StateStub> for SectionState {
     }
 }
 
-// 3) Parse the wire format back into your struct:
-impl TryFrom<SectionState> for BridgeV1StateStub {
+impl TryFrom<&SectionState> for BridgeV1StateStub {
     type Error = ASMError;
 
-    fn try_from(section: SectionState) -> Result<Self, Self::Error> {
+    fn try_from(section: &SectionState) -> Result<Self, Self::Error> {
         if section.subprotocol_id != BRIDGE_V1_SUBPROTOCOL_ID {
             return Err(ASMError::InvalidSubprotocol(section.subprotocol_id));
         }
