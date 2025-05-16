@@ -114,7 +114,7 @@ impl StateCache {
         &self.new_state
     }
 
-    fn state_mut(&mut self) -> &mut Chainstate {
+    pub fn state_mut(&mut self) -> &mut Chainstate {
         &mut self.new_state
     }
 
