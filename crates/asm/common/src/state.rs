@@ -3,6 +3,8 @@ use strata_primitives::{
     l1::{HeaderVerificationState, L1BlockId},
 };
 
+use crate::SubprotocolId;
+
 /// Anchor state for the Anchor State Machine (ASM), the core of the Strata protocol.
 ///
 /// The ASM anchors the orchestration layer to L1, akin to a host smart contract
@@ -33,10 +35,10 @@ pub struct ChainViewState {
     /// - The outer Vec is ordered by block ID.
     /// - Each inner Vec contains tuples of `(subprotocol_id, event_hash)`.
     ///
-    /// `subprotocol_id` (u8) identifies which subprotocol emitted the event,
+    /// `subprotocol_id` identifies which subprotocol emitted the event,
     /// and `Buf32` is the protocol‐computed hash of the event payload.
     // TODO: Eventually this will use an MMR for minimal, non‐linear‐growing on‐chain state.
-    pub events: Vec<(L1BlockId, Vec<(u8, Buf32)>)>,
+    pub events: Vec<(L1BlockId, Vec<(SubprotocolId, Buf32)>)>,
 }
 
 /// Holds the off‐chain serialized state for a single subprotocol section within the ASM.
@@ -46,7 +48,7 @@ pub struct ChainViewState {
 #[derive(Debug, Clone)]
 pub struct SectionState {
     /// Identifier of the subprotocol
-    pub subprotocol_id: u8,
+    pub id: SubprotocolId,
 
     /// The serialized subprotocol state.
     ///

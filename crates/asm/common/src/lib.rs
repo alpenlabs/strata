@@ -10,3 +10,6 @@ pub use error::ASMError;
 pub use msg::*;
 pub use state::*;
 pub use subprotocol::Subprotocol;
+
+/// Identifier for the Subprotocol
+pub type SubprotocolId = u8;
