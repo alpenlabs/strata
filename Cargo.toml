@@ -6,6 +6,7 @@ members = [
   "crates/config",
   "crates/consensus-logic",
   "crates/crypto",
+  "crates/da-lib",
   "crates/db",
   "crates/eectl",
   "crates/evmexec",
