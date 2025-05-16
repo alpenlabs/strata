@@ -1,9 +1,15 @@
+//! BridgeV1 Subprotocol
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_asm_common::{Subprotocol, error::ASMError, msg::InterProtoMsg, state::SectionState};
+use strata_asm_common::{ASMError, InterProtoMsg, SectionState, Subprotocol};
 use strata_primitives::buf::Buf32;
 
+/// The unique identifier for the BridgeV1 subprotocol within the Anchor State Machine.
+///
+/// This constant is used to tag `SectionState` entries belonging to the CoreASM logic
+/// and must match the `subprotocol_id` checked in `SectionState::subprotocol()`.
 pub const BRIDGE_V1_SUBPROTOCOL_ID: u8 = 2;
 
+/// A minimal stub
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct BridgeV1StateStub {}
 
