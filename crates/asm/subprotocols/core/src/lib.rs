@@ -1,5 +1,8 @@
+//! This module implements the “CoreASM” subprotocol, responsible for
+//! on-chain verification and anchoring of zk-SNARK checkpoint proofs.
+
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_asm_common::{Subprotocol, error::ASMError, msg::InterProtoMsg, state::SectionState};
+use strata_asm_common::{ASMError, InterProtoMsg, SectionState, Subprotocol};
 use strata_primitives::{batch::EpochSummary, buf::Buf32, l1::L1BlockId};
 use zkaleido::VerifyingKey;
 

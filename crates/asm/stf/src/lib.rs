@@ -1,7 +1,11 @@
+//! The `asm_stf` crate implements the core Anchor State Machine state transition function (STF). It
+//! glues together block‐level validation, a set of pluggable subprotocols, and the global chain
+//! view into a single deterministic state transition.
+
 use std::collections::HashMap;
 
 use bitcoin::{block::Block, params::Params};
-use strata_asm_common::state::{AnchorState, ChainViewState};
+use strata_asm_common::{AnchorState, ChainViewState};
 use subprotocols::parse_subprotocols;
 
 mod subprotocols;

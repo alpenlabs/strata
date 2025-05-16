@@ -9,21 +9,28 @@ use strata_primitives::buf::Buf32;
 
 use crate::{error::ASMError, msg::InterProtoMsg, state::SectionState};
 
-/// Interface for ASM subprotocol implementations.
+/// ASM subprotocol interface.
 ///
-/// Each subprotocol must specify a unique `VERSION` and define the
-/// associated `State`, `Msg`, `TxTag`, and `AuxInput` types. Processing
-/// occurs in two phases: `process_block_txs` (initial pass) and
-/// `finalize_state` (after inter-protocol messaging).
+/// A Subprotocol encapsulates a self-contained piece of logic that
+///
+/// 1. processes each new L1 block to update its own state and emit outgoing inter-protocol
+///    messages, and then
+/// 2. receives incoming messages to finalize and serialize its state for inclusion in the global
+///    AnchorState.
+///
+/// Each implementor must provide:
+/// - A unique `VERSION: u8` constant (used as the `SectionState` tag).
+/// - A `from_section` constructor to rehydrate from the wire format.
+/// - The two core hooks: `process_block` and `finalize_state`.
 pub trait Subprotocol {
+    /// Reconstructs your subprotocol instance from its prior `SectionState`.
+    ///
+    /// Returns an error if the `subprotocol_id` or payload doesn’t match.
     fn from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
     where
         Self: Sized;
 
-    /// Returns the identifier of the subprotocol for this section.
-    ///
-    /// This ID corresponds to the version or namespace of the subprotocol whose
-    /// state is serialized in this section.
+    /// Returns this subprotocol’s 1-byte (SPS-50) identifier.
     fn id(&self) -> u8;
 
     /// Process the L1Block and extracts all the relevant information from L1 for the subprotocol
