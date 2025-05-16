@@ -41,9 +41,28 @@ pub struct CoreASMState {
     consensus_manager: Buf32,
 }
 
-impl CoreASMState {
-    fn to_section_state(&self) -> SectionState {
-        let data = borsh::to_vec(&self).expect("serialization of subprotocol failed");
+impl Subprotocol for CoreASMState {
+    fn id(&self) -> u8 {
+        CORE_SUBPROTOCOL_ID
+    }
+
+    fn from_section(section: SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
+    where
+        Self: Sized,
+    {
+        let state = CoreASMState::try_from(section)?;
+        Ok(Box::new(state))
+    }
+
+    fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> (SectionState, Buf32) {
+        let section: SectionState = self.clone().into();
+        (section, Buf32::zero())
+    }
+}
+
+impl From<CoreASMState> for SectionState {
+    fn from(state: CoreASMState) -> Self {
+        let data = borsh::to_vec(&state).expect("BorshSerialize on CoreASMState should never fail");
         SectionState {
             subprotocol_id: CORE_SUBPROTOCOL_ID,
             data,
@@ -51,19 +70,15 @@ impl CoreASMState {
     }
 }
 
-impl Subprotocol for CoreASMState {
-    const VERSION: u8 = CORE_SUBPROTOCOL_ID;
-
-    fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> (SectionState, Buf32) {
-        (self.to_section_state(), Buf32::zero())
-    }
-}
-
-impl TryFrom<&SectionState> for CoreASMState {
+// 3) Parse the wire format back into your struct:
+impl TryFrom<SectionState> for CoreASMState {
     type Error = ASMError;
 
-    fn try_from(section: &SectionState) -> Result<Self, Self::Error> {
+    fn try_from(section: SectionState) -> Result<Self, Self::Error> {
+        if section.subprotocol_id != CORE_SUBPROTOCOL_ID {
+            return Err(ASMError::InvalidSubprotocol(section.subprotocol_id));
+        }
         CoreASMState::try_from_slice(&section.data)
-            .map_err(|e| ASMError::Deserialization(CORE_SUBPROTOCOL_ID, e))
+            .map_err(|e| ASMError::Deserialization(section.subprotocol_id, e))
     }
 }
