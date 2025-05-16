@@ -113,10 +113,10 @@ impl<DB: SchemaDBOperations> StateDiffStore for WitnessDB<DB> {
 #[cfg(test)]
 mod tests {
 
-    use revm::db::BundleAccount;
+    use alpen_reth_statediff::account::{Account, AccountChanges};
     use revm_primitives::{
         alloy_primitives::{address, map::HashMap},
-        fixed_bytes, AccountInfo, FixedBytes, HashSet,
+        fixed_bytes, FixedBytes, HashSet,
     };
     use rockbound::SchemaDBOperations;
     use serde::Deserialize;
@@ -173,12 +173,7 @@ mod tests {
 
         test_diff.state.insert(
             address!("0xd8da6bf26964af9d7eed9e03e53415d37aa96045"),
-            BundleAccount::new(
-                None,
-                Some(AccountInfo::default()),
-                HashMap::default(),
-                revm::db::AccountStatus::Changed,
-            ),
+            AccountChanges::new(None, Some(Account::default()), HashMap::default()),
         );
 
         test_diff
