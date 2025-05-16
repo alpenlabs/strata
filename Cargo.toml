@@ -1,6 +1,10 @@
 [workspace]
 members = [
-  "crates/asm",
+  "crates/asm2",
+  "crates/asm/common",
+  "crates/asm/stf",
+  "crates/asm/subprotocols/core",
+  "crates/asm/subprotocols/bridge-v1",
   "crates/btcio",
   "crates/chaintsn",
   "crates/common",
@@ -76,6 +80,9 @@ alpen-reth-node = { path = "crates/reth/node" }
 alpen-reth-primitives = { path = "crates/reth/primitives" }
 alpen-reth-rpc = { path = "crates/reth/rpc" }
 alpen-reth-statediff = { path = "crates/reth/statediff" }
+strata-asm-common = { path = "crates/asm/common" }
+strata-asm-proto-core = { path = "crates/asm/subprotocols/core" }
+strata-asm-stf = { path = "crates/asm/stf" }
 strata-btcio = { path = "crates/btcio" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }
