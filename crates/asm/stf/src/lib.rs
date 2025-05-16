@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use bitcoin::{block::Block, params::Params};
-use strata_asm_common::{
-    Subprotocol,
-    state::{AnchorState, ChainViewState},
-};
+use strata_asm_common::state::{AnchorState, ChainViewState};
 use subprotocols::parse_subprotocols;
 
 mod subprotocols;

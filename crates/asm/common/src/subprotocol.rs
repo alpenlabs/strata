@@ -7,7 +7,7 @@
 use bitcoin::Block;
 use strata_primitives::buf::Buf32;
 
-use crate::{msg::InterProtoMsg, state::SectionState};
+use crate::{error::ASMError, msg::InterProtoMsg, state::SectionState};
 
 /// Interface for ASM subprotocol implementations.
 ///
@@ -16,16 +16,15 @@ use crate::{msg::InterProtoMsg, state::SectionState};
 /// occurs in two phases: `process_block_txs` (initial pass) and
 /// `finalize_state` (after inter-protocol messaging).
 pub trait Subprotocol {
-    /// 1-byte subprotocol identifier / version tag (matches SPS-50).
-    const VERSION: u8;
+    fn from_section(section: SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
+    where
+        Self: Sized;
 
     /// Returns the identifier of the subprotocol for this section.
     ///
     /// This ID corresponds to the version or namespace of the subprotocol whose
     /// state is serialized in this section.
-    fn id(&self) -> u8 {
-        Self::VERSION
-    }
+    fn id(&self) -> u8;
 
     /// Process the L1Block and extracts all the relevant information from L1 for the subprotocol
     ///
