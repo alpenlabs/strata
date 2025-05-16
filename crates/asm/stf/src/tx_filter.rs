@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use bitcoin::{Transaction, opcodes::all::OP_RETURN, script::Instruction};
+use strata_asm_common::SubprotocolId;
 
 /// Attempt to parse the SPS-50 L1 transaction header from the first output of a Bitcoin
 /// `Transaction`.
@@ -29,7 +30,7 @@ use bitcoin::{Transaction, opcodes::all::OP_RETURN, script::Instruction};
 /// assert_eq!(subp, 1);
 /// assert_eq!(tx_t, 7);
 /// ```
-fn parse_sps50_header(tx: &Transaction) -> Option<(u8, u8)> {
+fn parse_sps50_header(tx: &Transaction) -> Option<(SubprotocolId, u8)> {
     // 1) Ensure there's an output 0
     let first_out = tx.output.first()?;
     let script = &first_out.script_pubkey;
@@ -63,11 +64,13 @@ fn parse_sps50_header(tx: &Transaction) -> Option<(u8, u8)> {
 ///
 /// Transactions that lack a valid SPS-50 header (wrong magic, not OP_RETURN in output[0],
 /// or too-short payload) are filtered out.
-pub(crate) fn group_txs_by_subprotocol<T>(transactions: T) -> HashMap<u8, Vec<Transaction>>
+pub(crate) fn group_txs_by_subprotocol<T>(
+    transactions: T,
+) -> HashMap<SubprotocolId, Vec<Transaction>>
 where
     T: IntoIterator<Item = Transaction>,
 {
-    let mut map: HashMap<u8, Vec<Transaction>> = HashMap::new();
+    let mut map: HashMap<SubprotocolId, Vec<Transaction>> = HashMap::new();
 
     for tx in transactions {
         if let Some((subp, _tx_type)) = parse_sps50_header(&tx) {

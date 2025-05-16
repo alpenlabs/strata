@@ -2,7 +2,7 @@
 //! on-chain verification and anchoring of zk-SNARK checkpoint proofs.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_asm_common::{ASMError, InterProtoMsg, SectionState, Subprotocol};
+use strata_asm_common::{ASMError, InterProtoMsg, SectionState, Subprotocol, SubprotocolId};
 use strata_primitives::{batch::EpochSummary, buf::Buf32, l1::L1BlockId};
 use zkaleido::VerifyingKey;
 
@@ -10,7 +10,7 @@ use zkaleido::VerifyingKey;
 ///
 /// This constant is used to tag `SectionState` entries belonging to the CoreASM logic
 /// and must match the `subprotocol_id` checked in `SectionState::subprotocol()`.
-pub const CORE_SUBPROTOCOL_ID: u8 = 1;
+pub const CORE_SUBPROTOCOL_ID: SubprotocolId = 1;
 
 /// State for the CoreASM subprotocol, responsible for validating outgoing-layer (OL)
 /// checkpoints posted onto Bitcoin.
@@ -37,7 +37,7 @@ pub struct CoreASMState {
 }
 
 impl Subprotocol for CoreASMState {
-    fn id(&self) -> u8 {
+    fn id(&self) -> SubprotocolId {
         CORE_SUBPROTOCOL_ID
     }
 
@@ -59,7 +59,7 @@ impl From<CoreASMState> for SectionState {
     fn from(state: CoreASMState) -> Self {
         let data = borsh::to_vec(&state).expect("BorshSerialize on CoreASMState should never fail");
         SectionState {
-            subprotocol_id: CORE_SUBPROTOCOL_ID,
+            id: CORE_SUBPROTOCOL_ID,
             data,
         }
     }
@@ -69,10 +69,10 @@ impl TryFrom<&SectionState> for CoreASMState {
     type Error = ASMError;
 
     fn try_from(section: &SectionState) -> Result<Self, Self::Error> {
-        if section.subprotocol_id != CORE_SUBPROTOCOL_ID {
-            return Err(ASMError::InvalidSubprotocol(section.subprotocol_id));
+        if section.id != CORE_SUBPROTOCOL_ID {
+            return Err(ASMError::InvalidSubprotocol(section.id));
         }
         CoreASMState::try_from_slice(&section.data)
-            .map_err(|e| ASMError::Deserialization(section.subprotocol_id, e))
+            .map_err(|e| ASMError::Deserialization(section.id, e))
     }
 }

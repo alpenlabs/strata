@@ -7,7 +7,7 @@ use strata_asm_proto_core::{CORE_SUBPROTOCOL_ID, CoreASMState};
 pub(crate) fn parse_subprotocols(sections: &[SectionState]) -> Vec<Box<dyn Subprotocol>> {
     sections
         .iter()
-        .filter_map(|sec| match sec.subprotocol_id {
+        .filter_map(|sec| match sec.id {
             CORE_SUBPROTOCOL_ID => CoreASMState::from_section(sec).ok(),
             BRIDGE_V1_SUBPROTOCOL_ID => BridgeV1StateStub::from_section(sec).ok(),
             _ => None,

@@ -7,7 +7,7 @@
 use bitcoin::Transaction;
 use strata_primitives::buf::Buf32;
 
-use crate::{error::ASMError, msg::InterProtoMsg, state::SectionState};
+use crate::{SubprotocolId, error::ASMError, msg::InterProtoMsg, state::SectionState};
 
 /// ASM subprotocol interface.
 ///
@@ -19,19 +19,19 @@ use crate::{error::ASMError, msg::InterProtoMsg, state::SectionState};
 ///    AnchorState.
 ///
 /// Each implementor must provide:
-/// - A unique `VERSION: u8` constant (used as the `SectionState` tag).
+/// - A unique `id: SubprotocolId` constant (used as the `SectionState` tag).
 /// - A `from_section` constructor to rehydrate from the wire format.
-/// - The two core hooks: `process_block` and `finalize_state`.
+/// - The two core hooks: `process_txs` and `finalize_state`.
 pub trait Subprotocol {
+    /// Returns this subprotocol’s 1-byte (SPS-50) identifier.
+    fn id(&self) -> SubprotocolId;
+
     /// Reconstructs your subprotocol instance from its prior `SectionState`.
     ///
     /// Returns an error if the `subprotocol_id` or payload doesn’t match.
     fn from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
     where
         Self: Sized;
-
-    /// Returns this subprotocol’s 1-byte (SPS-50) identifier.
-    fn id(&self) -> u8;
 
     /// Process the transactions and extract all the relevant information from L1 for the
     /// subprotocol
