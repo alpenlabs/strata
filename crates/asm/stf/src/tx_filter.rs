@@ -13,23 +13,6 @@ use strata_asm_common::SubprotocolId;
 /// [5]      tx type (u8)
 /// [6..]    auxiliary data (ignored here)
 /// ```
-///
-/// # Parameters
-/// - `tx`: the Bitcoin `Transaction` to inspect.
-///
-/// # Returns
-/// - `Some((subprotocol_type, tx_type))` if:
-///   - there is an output at index 0;
-///   - its script is `OP_RETURN` with at least 6 bytes of payload;
-///   - the first four bytes of the payload equal `b"ALPN"`.
-/// - `None` otherwise.
-///
-/// # Examples
-/// ```
-/// let (subp, tx_t) = parse_sps50_header(&tx).unwrap();
-/// assert_eq!(subp, 1);
-/// assert_eq!(tx_t, 7);
-/// ```
 fn parse_sps50_header(tx: &Transaction) -> Option<(SubprotocolId, u8)> {
     // 1) Ensure there's an output 0
     let first_out = tx.output.first()?;

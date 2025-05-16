@@ -17,11 +17,6 @@ use crate::{SubprotocolId, error::ASMError, msg::InterProtoMsg, state::SectionSt
 ///    messages, and then
 /// 2. receives incoming messages to finalize and serialize its state for inclusion in the global
 ///    AnchorState.
-///
-/// Each implementor must provide:
-/// - A unique `id: SubprotocolId` constant (used as the `SectionState` tag).
-/// - A `from_section` constructor to rehydrate from the wire format.
-/// - The two core hooks: `process_txs` and `finalize_state`.
 pub trait Subprotocol {
     /// Returns this subprotocol’s 1-byte (SPS-50) identifier.
     fn id(&self) -> SubprotocolId;
