@@ -1,3 +1,4 @@
+// TODO: Move the logic with other libraries to do all the L1 transaction parsing logic.
 use std::collections::HashMap;
 
 use bitcoin::{Transaction, opcodes::all::OP_RETURN, script::Instruction};
