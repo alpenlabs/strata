@@ -5,6 +5,7 @@
 //! updating its internal state, and emitting cross-protocol messages and logs.
 
 use bitcoin::Transaction;
+use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::buf::Buf32;
 
 use crate::{SubprotocolId, error::ASMError, msg::InterProtoMsg, state::SectionState};
@@ -24,9 +25,31 @@ pub trait Subprotocol {
     /// Reconstructs your subprotocol instance from its prior `SectionState`.
     ///
     /// Returns an error if the `subprotocol_id` or payload doesn’t match.
-    fn from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
+    fn try_from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
     where
-        Self: Sized;
+        Self: Sized + BorshDeserialize + 'static,
+    {
+        let inner: Self = BorshDeserialize::try_from_slice(&section.data)
+            .map_err(|e| ASMError::Deserialization(section.id, e))?;
+        Ok(Box::new(inner))
+    }
+
+    /// Serializes this subprotocol’s current state into a `SectionState` for inclusion
+    /// in the global `AnchorState`.
+    /// # Panics
+    ///
+    /// This will panic if Borsh serialization fails, which should never occur
+    /// for a type that correctly derives `BorshSerialize`.
+    fn to_section(&self) -> SectionState
+    where
+        Self: BorshSerialize + Sized,
+    {
+        let data = borsh::to_vec(&self).expect("Borsh serialization of Subprotocol state failed");
+        SectionState {
+            id: self.id(),
+            data,
+        }
+    }
 
     /// Process the transactions and extract all the relevant information from L1 for the
     /// subprotocol

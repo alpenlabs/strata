@@ -2,7 +2,7 @@
 //! on-chain verification and anchoring of zk-SNARK checkpoint proofs.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_asm_common::{ASMError, InterProtoMsg, SectionState, Subprotocol, SubprotocolId};
+use strata_asm_common::{InterProtoMsg, SectionState, Subprotocol, SubprotocolId};
 use strata_primitives::{batch::EpochSummary, buf::Buf32, l1::L1BlockId};
 use zkaleido::VerifyingKey;
 
@@ -41,38 +41,8 @@ impl Subprotocol for CoreASMState {
         CORE_SUBPROTOCOL_ID
     }
 
-    fn from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
-    where
-        Self: Sized,
-    {
-        let state = CoreASMState::try_from(section)?;
-        Ok(Box::new(state))
-    }
-
     fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> (SectionState, Buf32) {
-        let section: SectionState = self.clone().into();
+        let section = self.to_section();
         (section, Buf32::zero())
-    }
-}
-
-impl From<CoreASMState> for SectionState {
-    fn from(state: CoreASMState) -> Self {
-        let data = borsh::to_vec(&state).expect("BorshSerialize on CoreASMState should never fail");
-        SectionState {
-            id: CORE_SUBPROTOCOL_ID,
-            data,
-        }
-    }
-}
-
-impl TryFrom<&SectionState> for CoreASMState {
-    type Error = ASMError;
-
-    fn try_from(section: &SectionState) -> Result<Self, Self::Error> {
-        if section.id != CORE_SUBPROTOCOL_ID {
-            return Err(ASMError::InvalidSubprotocol(section.id));
-        }
-        CoreASMState::try_from_slice(&section.data)
-            .map_err(|e| ASMError::Deserialization(section.id, e))
     }
 }
