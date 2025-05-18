@@ -14086,6 +14086,7 @@ dependencies = [
  "alloy-consensus",
  "alloy-eips",
  "alloy-rpc-types",
+ "alloy-rpc-types-engine",
  "eyre",
  "reth",
  "reth-basic-payload-builder",

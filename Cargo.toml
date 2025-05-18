@@ -131,6 +131,7 @@ alloy-rlp-derive = "0.3.11"
 alloy-rpc-types = { version = "0.14.0", features = [
   "eth",
 ], default-features = false }
+alloy-rpc-types-engine = { version = "0.14.0", default-features = false }
 alloy-rpc-types-eth = { version = "0.14.0", default-features = false, features = [
   "serde",
 ] }

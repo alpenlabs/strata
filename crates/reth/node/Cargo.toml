@@ -11,6 +11,7 @@ strata-reth-rpc.workspace = true
 alloy-consensus.workspace = true
 alloy-eips.workspace = true
 alloy-rpc-types.workspace = true
+alloy-rpc-types-engine.workspace = true
 eyre.workspace = true
 reth.workspace = true
 reth-basic-payload-builder.workspace = true

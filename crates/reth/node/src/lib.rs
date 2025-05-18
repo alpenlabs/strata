@@ -7,7 +7,7 @@ mod payload;
 mod payload_builder;
 
 pub mod args;
-pub use engine::{StrataEngineTypes, StrataEngineValidator, StrataPayloadTypes};
+pub use engine::{StrataEngineTypes, StrataEngineValidator};
 pub use node::StrataEthereumNode;
 pub use payload::{
     ExecutionPayloadEnvelopeV2, ExecutionPayloadFieldV2, StrataExecutionPayloadEnvelopeV2,
