@@ -1353,6 +1353,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpen-chainspec"
+version = "0.1.0"
+dependencies = [
+ "alloy-genesis 0.9.2",
+ "eyre",
+ "reth-chainspec",
+ "reth-cli",
+ "serde_json",
+ "shellexpand",
+]
+
+[[package]]
 name = "alpen-cli"
 version = "0.3.0-alpha.1"
 dependencies = [
@@ -1390,8 +1402,8 @@ dependencies = [
 name = "alpen-reth"
 version = "0.3.0-alpha.1"
 dependencies = [
- "alloy-genesis 0.9.2",
  "alloy-rpc-types 0.9.2",
+ "alpen-chainspec",
  "alpen-reth-db",
  "alpen-reth-exex",
  "alpen-reth-node",
@@ -1400,21 +1412,14 @@ dependencies = [
  "clap",
  "eyre",
  "hex",
- "jsonrpsee-types",
- "reqwest 0.12.15",
  "reth",
  "reth-chainspec",
- "reth-cli",
  "reth-cli-commands",
  "reth-cli-util",
  "reth-db",
  "reth-primitives",
- "reth-provider",
- "reth-rpc-eth-api",
- "reth-rpc-eth-types",
  "rockbound",
  "serde_json",
- "shellexpand",
  "thiserror 2.0.12",
  "tracing",
 ]
@@ -1582,6 +1587,8 @@ name = "alpen-reth-statediff"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "alpen-chainspec",
+ "eyre",
  "revm",
  "revm-primitives",
  "serde",
@@ -13838,6 +13845,7 @@ version = "0.3.0-alpha.1"
 dependencies = [
  "alloy-genesis 0.9.2",
  "alloy-primitives",
+ "alpen-chainspec",
  "anyhow",
  "argh",
  "bech32",

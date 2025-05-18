@@ -1,0 +1,12 @@
+[package]
+edition = "2021"
+name = "alpen-chainspec"
+version = "0.1.0"
+
+[dependencies]
+alloy-genesis.workspace = true
+eyre.workspace = true
+serde_json.workspace = true
+shellexpand = "3.0.0"
+reth-chainspec.workspace = true
+reth-cli.workspace = true

@@ -69,8 +69,10 @@ where
             builder.apply(block_diff.unwrap());
         }
 
-        // Apply the batch state diff onto the empty State and return the resulting state root.
-        let mut state = ReconstructedState::new();
+        // Apply the batch state diff onto the genesis State and return the resulting state root.
+        // P.S. currently, genesis is hardcoded to be taken from "dev" spec.
+        let mut state = ReconstructedState::new_from_spec("dev")
+            .map_err(to_jsonrpsee_error("Can't initialize reconstructured state"))?;
         state
             .apply(builder.build())
             .map_err(to_jsonrpsee_error("Error while reconstructing the state"))?;

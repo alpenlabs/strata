@@ -5,6 +5,8 @@ version = "0.1.0"
 
 [dependencies]
 alloy-primitives.workspace = true
+alpen-chainspec.workspace = true
+eyre.workspace = true
 revm = { workspace = true, features = ["serde"] }
 revm-primitives.workspace = true
 serde.workspace = true

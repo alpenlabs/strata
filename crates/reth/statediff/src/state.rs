@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use alpen_chainspec::chain_value_parser;
 use revm_primitives::{alloy_primitives::Address, B256, U256};
-use strata_mpt::{keccak, MptNode, StateAccount, EMPTY_ROOT};
+use strata_mpt::{keccak, MptNode, StateAccount, EMPTY_ROOT, KECCAK_EMPTY};
 
 use crate::BatchStateDiff;
 
@@ -26,22 +27,42 @@ impl ReconstructedState {
         Default::default()
     }
 
-    /// Applies a single [`BatchStateDiff`] atop of the current State.
-    pub fn apply(&mut self, batch_diff: BatchStateDiff) -> Result<(), StateError> {
-        // Insert smart contracts into the state trie.
-        for (address, code) in batch_diff.contracts {
-            // TODO: validate if it's correct all the time?
-            // Are changes to smart contract memory served separately by the slot diffs?
-            let contract_account = StateAccount {
-                nonce: 0,
-                balance: U256::ZERO,
+    pub fn new_from_spec(spec: &str) -> Result<Self, eyre::Error> {
+        let chain_spec = chain_value_parser(spec)?;
+
+        let mut new: Self = Default::default();
+        for (address, account) in chain_spec.genesis.alloc.iter() {
+            let mut state_account = StateAccount {
+                nonce: account.nonce.unwrap_or(0),
+                balance: account.balance,
                 storage_root: EMPTY_ROOT,
-                code_hash: code.hash_slow(),
+                code_hash: account
+                    .code
+                    .as_ref()
+                    .map(|bytes| keccak(bytes).into())
+                    .unwrap_or(KECCAK_EMPTY),
             };
-            self.state_trie
-                .insert_rlp(&keccak(address), contract_account)?;
+
+            if let Some(slots) = &account.storage {
+                if !slots.is_empty() {
+                    let acc_storage_trie = new.storage_trie.entry(*address).or_default();
+                    for (slot_key, slot_value) in slots.iter() {
+                        if slot_value != &B256::ZERO {
+                            acc_storage_trie.insert_rlp(&keccak(slot_key), *slot_value)?;
+                        }
+                    }
+                    state_account.storage_root = acc_storage_trie.hash();
+                }
+            }
+
+            new.state_trie.insert_rlp(&keccak(address), state_account)?;
         }
 
+        Ok(Self::new())
+    }
+
+    /// Applies a single [`BatchStateDiff`] atop of the current State.
+    pub fn apply(&mut self, batch_diff: BatchStateDiff) -> Result<(), StateError> {
         // Adjust accounts based on the accounts into and its slots.
         for (address, account_info) in batch_diff.accounts {
             let acc_info_trie_path = keccak(address);
@@ -86,7 +107,7 @@ impl ReconstructedState {
                 acc_storage_trie.hash()
             };
 
-            // Finally, insert the up-to-date account into the trie.
+            // Insert the up-to-date account into the trie.
             self.state_trie
                 .insert_rlp(&acc_info_trie_path, state_account)?;
         }

@@ -18,6 +18,7 @@ members = [
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
   "crates/zkvm/hosts",
+  "crates/reth/chainspec",
   "crates/reth/db",
   "crates/reth/evm",
   "crates/reth/exex",
@@ -66,6 +67,7 @@ default-members = [
 resolver = "2"
 
 [workspace.dependencies]
+alpen-chainspec = { path = "crates/reth/chainspec" }
 alpen-reth-db = { path = "crates/reth/db" }
 alpen-reth-evm = { path = "crates/reth/evm" }
 alpen-reth-exex = { path = "crates/reth/exex" }

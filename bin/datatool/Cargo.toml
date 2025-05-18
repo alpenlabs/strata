@@ -8,6 +8,7 @@ name = "strata-datatool"
 path = "src/main.rs"
 
 [dependencies]
+alpen-chainspec.workspace = true
 strata-key-derivation.workspace = true
 strata-primitives.workspace = true
 strata-risc0-guest-builder = { path = "../../provers/risc0", optional = true }
