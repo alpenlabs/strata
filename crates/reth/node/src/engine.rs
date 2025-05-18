@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use alloy_rpc_types::engine::{
     payload::ExecutionData, ExecutionPayload, ExecutionPayloadEnvelopeV3,
-    ExecutionPayloadEnvelopeV4, ExecutionPayloadV1, PayloadAttributes,
+    ExecutionPayloadEnvelopeV4, ExecutionPayloadV1,
 };
-use alloy_rpc_types_engine::ExecutionPayloadEnvelopeV2;
 use reth_chainspec::ChainSpec;
 use reth_ethereum_payload_builder::EthereumExecutionPayloadValidator;
 use reth_node_api::{
@@ -14,7 +13,6 @@ use reth_node_api::{
     PayloadOrAttributes, PayloadValidator,
 };
 use reth_node_builder::rpc::EngineValidatorBuilder;
-use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
 use reth_primitives::{Block, EthPrimitives, NodePrimitives, RecoveredBlock, SealedBlock};
 use serde::{Deserialize, Serialize};
 

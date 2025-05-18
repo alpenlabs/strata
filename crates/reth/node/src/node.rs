@@ -1,28 +1,21 @@
-use reth_chainspec::{ChainSpec, EthereumHardforks};
+use reth_chainspec::ChainSpec;
 use reth_node_builder::{
-    components::{BasicPayloadServiceBuilder, ComponentsBuilder, ExecutorBuilder},
+    components::{BasicPayloadServiceBuilder, ComponentsBuilder},
     node::{FullNodeTypes, NodeTypes},
-    rpc::{EngineValidatorAddOn, EthApiBuilder, RethRpcAddOns, RpcAddOns, RpcHandle},
-    BuilderContext, Node, NodeAdapter, NodeComponentsBuilder,
+    rpc::RpcAddOns, Node, NodeAdapter, NodeComponentsBuilder,
 };
 use reth_node_ethereum::{
     node::{
-        EthereumAddOns, EthereumConsensusBuilder, EthereumEngineValidatorBuilder,
-        EthereumExecutorBuilder, EthereumNetworkBuilder, EthereumPayloadBuilder,
+        EthereumConsensusBuilder,
+        EthereumExecutorBuilder, EthereumNetworkBuilder,
         EthereumPoolBuilder,
-    },
-    BasicBlockExecutorProvider, EthEngineTypes, EthereumEthApiBuilder,
+    }, EthereumEthApiBuilder,
 };
-use reth_primitives::{BlockBody, EthPrimitives};
-use reth_provider::{
-    providers::{ChainStorage, NodeTypesForProvider},
-    BlockBodyReader, BlockBodyWriter, ChainSpecProvider, ChainStorageReader, ChainStorageWriter,
-    DBProvider, DatabaseProvider, EthStorage, OmmersProvider, ProviderResult, ReadBodyInput,
-    StorageLocation,
-};
+use reth_primitives::EthPrimitives;
+use reth_provider::EthStorage;
 
 use crate::{
-    args::StrataNodeArgs, engine::StrataEngineValidatorBuilder, evm::StrataEvmConfig,
+    args::StrataNodeArgs, engine::StrataEngineValidatorBuilder,
     payload_builder::StrataPayloadBuilderBuilder, StrataEngineTypes,
 };
 
