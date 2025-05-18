@@ -39,7 +39,7 @@ class ElBlockStateDiffDataGenerationTest(testenv.StrataTester):
         state_diff_data = rethrpc.strataee_getBlockStateDiff(blockhash)
         assert state_diff_data is not None, "non empty state diff"
 
-        self.debug(state_diff_data)
+        self.info(state_diff_data)
 
 
 def get_contract():
