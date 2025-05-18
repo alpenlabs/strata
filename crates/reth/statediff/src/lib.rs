@@ -22,7 +22,7 @@ pub struct BatchStateDiffBuilder {
     /// [`Option::None`] indicates the account was destructed, but existed before the batch.
     pub accounts: HashMap<Address, Option<Account>>,
 
-    /// The *FIRST* original [`AccountInfo`] for the account in the batch.
+    /// The *FIRST* original [`Account`] for the account in the batch.
     /// [`Option::None`] if the account was absent before the batch.
     pub original_accounts: HashMap<Address, Option<Account>>,
 

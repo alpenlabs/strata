@@ -15,8 +15,8 @@ pub struct ReconstructedState {
 
 use thiserror::Error as ThisError;
 
-#[derive(ThisError, Debug)]
 /// A concrete error that may happen during state reconstruction.
+#[derive(Debug, ThisError)]
 pub enum StateError {
     #[error("Mpt Error: {0}")]
     MptError(#[from] strata_mpt::Error),
@@ -66,50 +66,49 @@ impl ReconstructedState {
         // Adjust accounts based on the accounts into and its slots.
         for (address, account_info) in batch_diff.accounts {
             let acc_info_trie_path = keccak(address);
-            if account_info.is_none() {
-                // Account was actually destructed.
-                self.state_trie.delete(&acc_info_trie_path)?;
-                continue;
-            }
-            let account_info = account_info.unwrap();
 
-            // Create a rlp-serializable StateAccount from the info.
-            // Storage root is yet to be calculated below.
-            let mut state_account = StateAccount {
-                nonce: account_info.nonce,
-                balance: account_info.balance,
-                storage_root: Default::default(),
-                code_hash: account_info.code_hash,
-            };
+            if let Some(account_info) = account_info {
+                // Create a rlp-serializable StateAccount from the info.
+                // Storage root is yet to be calculated below.
+                let mut state_account = StateAccount {
+                    nonce: account_info.nonce,
+                    balance: account_info.balance,
+                    storage_root: Default::default(),
+                    code_hash: account_info.code_hash,
+                };
 
-            // Do not put empty accounts into the state trie.
-            if state_account.is_account_empty() {
-                continue;
-            }
+                // Do not put empty accounts into the state trie.
+                if state_account.is_account_empty() {
+                    continue;
+                }
 
-            // Calculate the actual account storage root - take an existing storage trie
-            // for the account and apply changed slots atop.
-            state_account.storage_root = {
-                let acc_storage_trie = self.storage_trie.entry(address).or_default();
-                let changed_storage_slots = batch_diff.storage_slots.get(&address);
+                // Calculate the actual account storage root - take an existing storage trie
+                // for the account and apply changed slots atop.
+                state_account.storage_root = {
+                    let acc_storage_trie = self.storage_trie.entry(address).or_default();
+                    let changed_storage_slots = batch_diff.storage_slots.get(&address);
 
-                if let Some(changed_slots) = changed_storage_slots {
-                    for (slot_key, slot_value) in changed_slots {
-                        let slot_trie_path = keccak(slot_key.to_be_bytes::<32>());
+                    if let Some(changed_slots) = changed_storage_slots {
+                        for (slot_key, slot_value) in changed_slots {
+                            let slot_trie_path = keccak(slot_key.to_be_bytes::<32>());
 
-                        if slot_value == &U256::ZERO {
-                            acc_storage_trie.delete(&slot_trie_path)?;
-                        } else {
-                            acc_storage_trie.insert_rlp(&slot_trie_path, *slot_value)?;
+                            if slot_value == &U256::ZERO {
+                                acc_storage_trie.delete(&slot_trie_path)?;
+                            } else {
+                                acc_storage_trie.insert_rlp(&slot_trie_path, *slot_value)?;
+                            }
                         }
                     }
-                }
-                acc_storage_trie.hash()
-            };
+                    acc_storage_trie.hash()
+                };
 
-            // Insert the up-to-date account into the trie.
-            self.state_trie
-                .insert_rlp(&acc_info_trie_path, state_account)?;
+                // Insert the up-to-date account into the trie.
+                self.state_trie
+                    .insert_rlp(&acc_info_trie_path, state_account)?;
+            } else {
+                // Account was actually destructed.
+                self.state_trie.delete(&acc_info_trie_path)?;
+            }
         }
 
         Ok(())

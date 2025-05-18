@@ -50,7 +50,7 @@ where
             .map_err(to_jsonrpsee_error("Failed fetching block state diff"))
     }
 
-    fn get_state_root_by_diffs(&self, block_number: u64) -> RpcResult<Option<B256>> {
+    fn get_state_root_via_diffs(&self, block_number: u64) -> RpcResult<Option<B256>> {
         let mut builder = BatchStateDiffBuilder::new();
 
         // First construct the batch state diff consisting of all the changes so far.

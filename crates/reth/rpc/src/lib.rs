@@ -31,7 +31,7 @@ pub trait StrataRpcApi {
 
     /// Returns the state root for the block_number as reconstructured from the state diffs.
     #[method(name = "getStateRootByDiffs")]
-    fn get_state_root_by_diffs(&self, block_number: u64) -> RpcResult<Option<B256>>;
+    fn get_state_root_via_diffs(&self, block_number: u64) -> RpcResult<Option<B256>>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
