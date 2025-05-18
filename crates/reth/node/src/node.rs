@@ -2,20 +2,21 @@ use reth_chainspec::ChainSpec;
 use reth_node_builder::{
     components::{BasicPayloadServiceBuilder, ComponentsBuilder},
     node::{FullNodeTypes, NodeTypes},
-    rpc::RpcAddOns, Node, NodeAdapter, NodeComponentsBuilder,
+    rpc::RpcAddOns,
+    Node, NodeAdapter, NodeComponentsBuilder,
 };
 use reth_node_ethereum::{
     node::{
-        EthereumConsensusBuilder,
-        EthereumExecutorBuilder, EthereumNetworkBuilder,
+        EthereumConsensusBuilder, EthereumExecutorBuilder, EthereumNetworkBuilder,
         EthereumPoolBuilder,
-    }, EthereumEthApiBuilder,
+    },
+    EthereumEthApiBuilder,
 };
 use reth_primitives::EthPrimitives;
 use reth_provider::EthStorage;
 
 use crate::{
-    args::StrataNodeArgs, engine::StrataEngineValidatorBuilder,
+    args::StrataNodeArgs, engine::StrataEngineValidatorBuilder, evm::StrataExecutorBuilder,
     payload_builder::StrataPayloadBuilderBuilder, StrataEngineTypes,
 };
 
@@ -57,7 +58,7 @@ where
         EthereumPoolBuilder,
         BasicPayloadServiceBuilder<StrataPayloadBuilderBuilder>,
         EthereumNetworkBuilder,
-        EthereumExecutorBuilder,
+        StrataExecutorBuilder,
         EthereumConsensusBuilder,
     >;
 
@@ -71,7 +72,7 @@ where
             .pool(EthereumPoolBuilder::default())
             .payload(BasicPayloadServiceBuilder::default())
             .network(EthereumNetworkBuilder::default())
-            .executor(EthereumExecutorBuilder::default())
+            .executor(StrataExecutorBuilder::default())
             .consensus(EthereumConsensusBuilder::default())
     }
 

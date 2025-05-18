@@ -31,6 +31,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     engine::StrataEngineTypes,
+    evm::StrataEvmFactory,
     payload::{StrataBuiltPayload, StrataPayloadBuilderAttributes},
 };
 
@@ -78,7 +79,7 @@ pub struct StrataPayloadBuilder<Pool, Client> {
     /// Transaction pool.
     pool: Pool,
     /// The type responsible for creating the evm.
-    evm_config: EthEvmConfig,
+    evm_config: EthEvmConfig<StrataEvmFactory>,
     /// Payload builder configuration.
     builder_config: EthereumBuilderConfig,
 }
@@ -94,7 +95,7 @@ impl<Pool, Client> StrataPayloadBuilder<Pool, Client> {
         Self {
             client,
             pool,
-            evm_config: EthEvmConfig::new(chain_spec),
+            evm_config: EthEvmConfig::new_with_evm_factory(chain_spec, StrataEvmFactory::default()),
             builder_config,
         }
     }
