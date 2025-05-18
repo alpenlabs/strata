@@ -1,9 +1,4 @@
-use alloy_consensus::Header;
-use reth::rpc::eth::{core::EthApiFor, FullEthApiServer};
 use reth_chainspec::{ChainSpec, EthereumHardforks};
-use reth_db::transaction::{DbTx, DbTxMut};
-use reth_evm::{ConfigureEvm, NextBlockEnvAttributes};
-use reth_node_api::{AddOnsContext, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{
     components::{BasicPayloadServiceBuilder, ComponentsBuilder, ExecutorBuilder},
     node::{FullNodeTypes, NodeTypes},
@@ -25,12 +20,10 @@ use reth_provider::{
     DBProvider, DatabaseProvider, EthStorage, OmmersProvider, ProviderResult, ReadBodyInput,
     StorageLocation,
 };
-use reth_rpc_eth_types::{error::FromEvmError, EthApiError};
-use revm_primitives::alloy_primitives;
-use strata_reth_rpc::{eth::StrataEthApiBuilder, SequencerClient, StrataEthApi};
 
 use crate::{
-    args::StrataNodeArgs, evm::StrataEvmConfig, payload_builder::StrataPayloadBuilderBuilder,
+    args::StrataNodeArgs, engine::StrataEngineValidatorBuilder, evm::StrataEvmConfig,
+    payload_builder::StrataPayloadBuilderBuilder, StrataEngineTypes,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -52,14 +45,14 @@ impl NodeTypes for StrataEthereumNode {
     type ChainSpec = ChainSpec;
     type StateCommitment = reth_trie_db::MerklePatriciaTrie;
     type Storage = EthStorage;
-    type Payload = EthEngineTypes;
+    type Payload = StrataEngineTypes;
 }
 
 impl<N> Node<N> for StrataEthereumNode
 where
     N: FullNodeTypes<
         Types: NodeTypes<
-            Payload = EthEngineTypes,
+            Payload = StrataEngineTypes,
             ChainSpec = ChainSpec,
             Primitives = EthPrimitives,
             Storage = EthStorage,
@@ -69,13 +62,13 @@ where
     type ComponentsBuilder = ComponentsBuilder<
         N,
         EthereumPoolBuilder,
-        BasicPayloadServiceBuilder<EthereumPayloadBuilder>,
+        BasicPayloadServiceBuilder<StrataPayloadBuilderBuilder>,
         EthereumNetworkBuilder,
         EthereumExecutorBuilder,
         EthereumConsensusBuilder,
     >;
 
-    type AddOns = EthereumAddOns<
+    type AddOns = StrataNodeAddOns<
         NodeAdapter<N, <Self::ComponentsBuilder as NodeComponentsBuilder<N>>::Components>,
     >;
 
@@ -93,3 +86,6 @@ where
         Self::AddOns::default()
     }
 }
+
+/// Custom addons configuring RPC types
+pub type StrataNodeAddOns<N> = RpcAddOns<N, EthereumEthApiBuilder, StrataEngineValidatorBuilder>;

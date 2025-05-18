@@ -8,12 +8,14 @@ use alloy_rpc_types_engine::ExecutionPayloadEnvelopeV2;
 use reth_chainspec::ChainSpec;
 use reth_ethereum_payload_builder::EthereumExecutionPayloadValidator;
 use reth_node_api::{
-    payload::PayloadTypes, validate_version_specific_fields, BuiltPayload, EngineApiMessageVersion,
-    EngineObjectValidationError, EngineTypes, EngineValidator, InvalidPayloadAttributesError,
-    NewPayloadError, PayloadOrAttributes, PayloadValidator,
+    payload::PayloadTypes, validate_version_specific_fields, AddOnsContext, BuiltPayload,
+    EngineApiMessageVersion, EngineObjectValidationError, EngineTypes, EngineValidator,
+    FullNodeComponents, InvalidPayloadAttributesError, NewPayloadError, NodeTypes,
+    PayloadOrAttributes, PayloadValidator,
 };
+use reth_node_builder::rpc::EngineValidatorBuilder;
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
-use reth_primitives::{Block, NodePrimitives, RecoveredBlock, SealedBlock};
+use reth_primitives::{Block, EthPrimitives, NodePrimitives, RecoveredBlock, SealedBlock};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -124,5 +126,27 @@ where
     ) -> Result<(), InvalidPayloadAttributesError> {
         // skip default timestamp validation
         Ok(())
+    }
+}
+
+/// Custom engine validator builder
+#[derive(Debug, Default, Clone, Copy)]
+#[non_exhaustive]
+pub struct StrataEngineValidatorBuilder;
+
+impl<N> EngineValidatorBuilder<N> for StrataEngineValidatorBuilder
+where
+    N: FullNodeComponents<
+        Types: NodeTypes<
+            Payload = StrataEngineTypes,
+            ChainSpec = ChainSpec,
+            Primitives = EthPrimitives,
+        >,
+    >,
+{
+    type Validator = StrataEngineValidator;
+
+    async fn build(self, ctx: &AddOnsContext<'_, N>) -> eyre::Result<Self::Validator> {
+        Ok(StrataEngineValidator::new(ctx.config.chain.clone()))
     }
 }
