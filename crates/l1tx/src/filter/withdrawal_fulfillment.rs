@@ -126,7 +126,6 @@ mod test {
             generate_withdrawal_fulfillment_data(deposit_amt());
         let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
 
-
         let txn = Transaction {
             version: Version(1),
             lock_time: LockTime::from_height(0).unwrap(),
@@ -175,7 +174,6 @@ mod test {
             generate_withdrawal_fulfillment_data(deposit_amt());
         let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
 
-
         let txn = Transaction {
             version: Version(1),
             lock_time: LockTime::from_height(0).unwrap(),
@@ -213,7 +211,6 @@ mod test {
         let (addresses, txids, deposit_entries) =
             generate_withdrawal_fulfillment_data(deposit_amt());
         let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
-
 
         let txn = Transaction {
             version: Version(1),
@@ -253,7 +250,6 @@ mod test {
             generate_withdrawal_fulfillment_data(deposit_amt());
         let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
 
-
         let txn = Transaction {
             version: Version(1),
             lock_time: LockTime::from_height(0).unwrap(),
@@ -289,7 +285,6 @@ mod test {
         let params: Params = gen_params();
         let (addresses, _, deposit_entries) = generate_withdrawal_fulfillment_data(deposit_amt());
         let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
-
 
         let txn = Transaction {
             version: Version(1),
