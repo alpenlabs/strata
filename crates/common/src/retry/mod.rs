@@ -26,15 +26,19 @@ pub mod policies;
 /// # Example
 ///
 /// ```rust
+/// use strata_common::retry::{policies::ExponentialBackoff, retry_with_backoff};
+///
+/// // A dummy function for the example.
+/// fn try_something() -> Result<(), &'static str> {
+///     // In a real scenario, this would attempt an operation that might fail.
+///     Err("failed to do something")
+/// }
+///
 /// let result = retry_with_backoff(
 ///     "my_task",
-///     || try_something(),
 ///     3,
-///     ExponentialBackoff {
-///         base_delay_ms: 500,
-///         multiplier: 150,
-///         multiplier_base: 100,
-///     },
+///     &ExponentialBackoff::new(500, 150, 100),
+///     || try_something(),
 /// );
 /// ```
 pub fn retry_with_backoff<R, E, F>(
@@ -50,7 +54,7 @@ where
     retry_with_backoff_inner(name, max_retries, backoff, operation, sleep)
 }
 
-/// Inner method that acutally does the retry which is generic on the sleep function.
+/// Inner method that actually does the retry which is generic on the sleep function.
 fn retry_with_backoff_inner<R, E, F, S>(
     name: &str,
     max_retries: u16,
