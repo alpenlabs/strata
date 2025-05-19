@@ -5,7 +5,7 @@ use std::{collections::VecDeque, sync::Arc};
 use strata_chaintsn::transition::process_block;
 use strata_common::retry::{policies::ExponentialBackoff, retry_with_backoff};
 use strata_db::{errors::DbError, traits::BlockStatus, types::CheckpointConfStatus};
-use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
+use strata_eectl::{engine::ExecEngineCtl, errors::EngineError, messages::ExecPayloadData};
 use strata_primitives::{
     epoch::EpochCommitment, l1::L1BlockCommitment, l2::L2BlockCommitment, params::Params,
 };
@@ -514,6 +514,9 @@ fn process_fc_message(
             let ok = match handle_new_block(fcm_state, &blkid, &block_bundle, engine) {
                 Ok(v) => v,
                 Err(e) => {
+                    if let Some(EngineError::Other(_)) = e.downcast_ref() {
+                        return Err(e);
+                    }
                     // Really we shouldn't emit this error unless there's a
                     // problem checking the block in general and it could be
                     // valid or invalid, but we're kinda sloppy with errors
@@ -527,6 +530,9 @@ fn process_fc_message(
                 // check if any pending blocks can be finalized
                 if let Err(err) = handle_epoch_finalization(fcm_state, engine) {
                     error!(%err, "failed to finalize epoch");
+                    if let Some(EngineError::Other(_)) = err.downcast_ref() {
+                        return Err(err);
+                    }
                 }
 
                 // Update status.
@@ -990,6 +996,9 @@ fn handle_new_client_state(
     match handle_epoch_finalization(fcm_state, engine) {
         Err(err) => {
             error!(%err, "failed to finalize epoch");
+            if let Some(EngineError::Other(_)) = err.downcast_ref() {
+                return Err(err);
+            }
         }
         Ok(Some(finalized_epoch)) if finalized_epoch == new_fin_epoch => {
             debug!(?finalized_epoch, "finalized latest epoch");

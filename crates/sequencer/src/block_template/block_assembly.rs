@@ -311,6 +311,8 @@ fn prepare_exec_data<E: ExecEngineCtl>(
         remaining_gas_limit,
     );
 
+    // TODO: should we use retry with backoff in here too?
+    // IMO yes, but we don't need graceful shutdown for it
     let key = engine.prepare_payload(payload_env)?;
     trace!("submitted EL payload job, waiting for completion");
 
