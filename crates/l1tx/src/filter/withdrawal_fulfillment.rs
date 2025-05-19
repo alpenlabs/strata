@@ -5,7 +5,7 @@ use strata_primitives::{
 };
 use tracing::debug;
 
-use super::TxFilterConfig;
+use crate::filter::types::TxFilterConfig;
 
 /// Parse transaction and search for a Withdrawal Fulfillment transaction to an expected address.
 pub fn try_parse_tx_as_withdrawal_fulfillment(
@@ -96,19 +96,18 @@ fn parse_opreturn_metadata(script_buf: &ScriptBuf) -> Option<(u32, u32, [u8; 32]
 
 #[cfg(test)]
 mod test {
-    use bitcoin::{
-        absolute::LockTime, consensus, transaction::Version, Amount, OutPoint, Transaction, TxOut,
-    };
-    use strata_primitives::{
-        bitcoin_bosd::Descriptor, l1::OutputRef, params::Params, sorted_vec::FlatTable,
-    };
-    use strata_state::bridge_state::{
-        DepositEntry, DepositState, DispatchCommand, DispatchedState, WithdrawOutput,
-    };
-    use strata_test_utils::{l2::gen_params, ArbitraryGenerator};
+    use bitcoin::{absolute::LockTime, transaction::Version, Amount, Transaction, TxOut};
+    use strata_primitives::params::Params;
+    use strata_test_utils::{bitcoin::generate_withdrawal_fulfillment_data, l2::gen_params};
 
     use super::*;
-    use crate::filter::types::{conv_deposit_to_fulfillment, OPERATOR_FEE};
+    use crate::{
+        filter::types::OPERATOR_FEE,
+        utils::test_utils::{
+            create_opreturn_metadata_for_withdrawal_fulfillment,
+            get_filter_config_from_deposit_entries,
+        },
+    };
 
     const DEPOSIT_AMT: Amount = Amount::from_int_btc(10);
 
@@ -120,120 +119,13 @@ mod test {
         DEPOSIT_AMT - OPERATOR_FEE
     }
 
-    fn create_opreturn_metadata(
-        operator_idx: u32,
-        deposit_idx: u32,
-        deposit_txid: &[u8; 32],
-    ) -> ScriptBuf {
-        let mut metadata = [0u8; 40];
-        // first 4 bytes = operator idx
-        metadata[..4].copy_from_slice(&operator_idx.to_be_bytes());
-        // next 4 bytes = deposit idx
-        metadata[4..8].copy_from_slice(&deposit_idx.to_be_bytes());
-        metadata[8..40].copy_from_slice(deposit_txid);
-        Descriptor::new_op_return(&metadata).unwrap().to_script()
-    }
-
-    fn create_outputref(txid_bytes: &[u8; 32], vout: u32) -> OutputRef {
-        OutPoint::new(consensus::deserialize(txid_bytes).unwrap(), vout).into()
-    }
-
-    fn generate_data() -> (Vec<Descriptor>, Vec<[u8; 32]>, TxFilterConfig) {
-        let params: Params = gen_params();
-        let mut gen = ArbitraryGenerator::new();
-        let mut addresses = Vec::new();
-        let mut txids = Vec::<[u8; 32]>::new();
-        for _ in 0..10 {
-            addresses.push(Descriptor::new_p2wpkh(&gen.generate()));
-            txids.push(gen.generate());
-        }
-
-        let mut filterconfig = TxFilterConfig::derive_from(params.rollup()).unwrap();
-
-        let create_dispatched_deposit_entry =
-            |operator_idx: u32,
-             deposit_idx: u32,
-             addr: Descriptor,
-             deadline: u64,
-             deposit_txid: &[u8; 32],
-             withdrawal_request_txid: Option<Buf32>| {
-                DepositEntry::new(
-                    deposit_idx,
-                    create_outputref(deposit_txid, 0),
-                    vec![0, 1, 2],
-                    deposit_amt(),
-                    withdrawal_request_txid,
-                )
-                .with_state(DepositState::Dispatched(DispatchedState::new(
-                    DispatchCommand::new(vec![WithdrawOutput::new(
-                        addr,
-                        Amount::from_btc(10.0).unwrap().into(),
-                    )]),
-                    operator_idx,
-                    deadline,
-                )))
-            };
-
-        let deposits = vec![
-            // deposits with withdrawal assignments
-            create_dispatched_deposit_entry(
-                1,
-                2,
-                addresses[0].clone(),
-                100,
-                &txids[0],
-                gen.generate(),
-            ),
-            create_dispatched_deposit_entry(
-                2,
-                3,
-                addresses[1].clone(),
-                100,
-                &txids[1],
-                gen.generate(),
-            ),
-            create_dispatched_deposit_entry(
-                0,
-                4,
-                addresses[2].clone(),
-                100,
-                &txids[2],
-                gen.generate(),
-            ),
-            // deposits without withdrawal assignments
-            DepositEntry::new(
-                5,
-                create_outputref(&txids[3], 0),
-                vec![0, 1, 2],
-                deposit_amt(),
-                None,
-            )
-            .with_state(DepositState::Accepted),
-            DepositEntry::new(
-                6,
-                create_outputref(&txids[4], 0),
-                vec![0, 1, 2],
-                deposit_amt(),
-                None,
-            )
-            .with_state(DepositState::Accepted),
-        ];
-
-        // Watch all withdrawals that have been ordered.
-        let exp_fulfillments = deposits
-            .iter()
-            .flat_map(conv_deposit_to_fulfillment)
-            .collect::<Vec<_>>();
-
-        filterconfig.expected_withdrawal_fulfillments =
-            FlatTable::try_from_unsorted(exp_fulfillments).expect("types: malformed deposits");
-
-        (addresses, txids, filterconfig)
-    }
-
     #[test]
     fn test_parse_withdrawal_fulfillment_transactions_ok() {
-        let (addresses, txids, filterconfig) = generate_data();
+        let params: Params = gen_params();
+        let (addresses, txids, deposit_entries) =
+            generate_withdrawal_fulfillment_data(deposit_amt());
+        let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
+
         let txn = Transaction {
             version: Version(1),
             lock_time: LockTime::from_height(0).unwrap(),
@@ -246,7 +138,9 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    script_pubkey: create_opreturn_metadata(1, 2, &txids[0]),
+                    script_pubkey: create_opreturn_metadata_for_withdrawal_fulfillment(
+                        1, 2, &txids[0],
+                    ),
                     value: Amount::from_sat(0),
                 },
                 // change
@@ -275,7 +169,10 @@ mod test {
     #[test]
     fn test_parse_withdrawal_fulfillment_transactions_fail_wrong_order() {
         // TESTCASE: valid withdrawal, but different order of txout
-        let (addresses, txids, filterconfig) = generate_data();
+        let params: Params = gen_params();
+        let (addresses, txids, deposit_entries) =
+            generate_withdrawal_fulfillment_data(deposit_amt());
+        let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
 
         let txn = Transaction {
             version: Version(1),
@@ -289,7 +186,9 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    script_pubkey: create_opreturn_metadata(1, 2, &txids[0]),
+                    script_pubkey: create_opreturn_metadata_for_withdrawal_fulfillment(
+                        1, 2, &txids[0],
+                    ),
                     value: Amount::from_sat(0),
                 },
                 // front payment
@@ -308,7 +207,10 @@ mod test {
     #[test]
     fn test_parse_withdrawal_fulfillment_transactions_fail_wrong_operator() {
         // TESTCASE: correct amount but wrong operator idx for deposit
-        let (addresses, txids, filterconfig) = generate_data();
+        let params: Params = gen_params();
+        let (addresses, txids, deposit_entries) =
+            generate_withdrawal_fulfillment_data(deposit_amt());
+        let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
 
         let txn = Transaction {
             version: Version(1),
@@ -322,7 +224,9 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    script_pubkey: create_opreturn_metadata(2, 2, &txids[0]),
+                    script_pubkey: create_opreturn_metadata_for_withdrawal_fulfillment(
+                        2, 2, &txids[0],
+                    ),
                     value: Amount::from_sat(0),
                 },
                 // change
@@ -341,7 +245,10 @@ mod test {
     #[test]
     fn test_parse_withdrawal_fulfillment_transactions_fail_wrong_deposit_txid() {
         // TESTCASE: correct amount and operator idx for deposit, but wrong deposit txid
-        let (addresses, txids, filterconfig) = generate_data();
+        let params: Params = gen_params();
+        let (addresses, txids, deposit_entries) =
+            generate_withdrawal_fulfillment_data(deposit_amt());
+        let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
 
         let txn = Transaction {
             version: Version(1),
@@ -355,7 +262,9 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    script_pubkey: create_opreturn_metadata(1, 2, &txids[5]),
+                    script_pubkey: create_opreturn_metadata_for_withdrawal_fulfillment(
+                        1, 2, &txids[5],
+                    ),
                     value: Amount::from_sat(0),
                 },
                 // change
@@ -373,7 +282,9 @@ mod test {
 
     #[test]
     fn test_parse_withdrawal_fulfillment_transactions_fail_missing_op_return() {
-        let (addresses, _txids, filterconfig) = generate_data();
+        let params: Params = gen_params();
+        let (addresses, _, deposit_entries) = generate_withdrawal_fulfillment_data(deposit_amt());
+        let filterconfig = get_filter_config_from_deposit_entries(params, &deposit_entries);
 
         let txn = Transaction {
             version: Version(1),
