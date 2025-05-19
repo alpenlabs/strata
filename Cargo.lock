@@ -13806,6 +13806,7 @@ dependencies = [
  "rand 0.8.5",
  "secp256k1",
  "strata-btcio",
+ "strata-chain-worker",
  "strata-chaintsn",
  "strata-common",
  "strata-crypto",

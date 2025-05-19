@@ -154,10 +154,9 @@ impl ForkChoiceManager {
     fn finalize_epoch(&mut self, epoch: &EpochCommitment) -> anyhow::Result<()> {
         // Safety check.
         if epoch.epoch() < self.get_chainstate_finalized_epoch().epoch() {
-            return Err(Error::FinalizeOldEpoch(
-                *epoch,
-                self.get_chainstate_finalized_epoch(),
-            ));
+            return Err(
+                Error::FinalizeOldEpoch(*epoch, *self.get_chainstate_finalized_epoch()).into(),
+            );
         }
 
         // Do the leg work of applying the finalization.
@@ -224,15 +223,19 @@ impl ForkChoiceManager {
             .enumerate()
             .rev()
             .find(|(_, epoch)| epoch.epoch() <= prev_epoch)
-            .copied()
+            .map(|(a, b)| (a, *b))
     }
 
     fn clear_pending_epochs(&mut self, cur_fin_epoch: &EpochCommitment) {
         while self
             .epochs_pending_finalization
-            .pop_front_if(|e| e.epoch() <= cur_fin_epoch.epoch())
-            .is_some()
-        {}
+            .front()
+            .is_some_and(|e| e.epoch() <= cur_fin_epoch.epoch())
+        {
+            self.epochs_pending_finalization
+                .pop_front()
+                .expect("fcm: pop epochs_pending_finalization");
+        }
     }
 }
 
@@ -378,7 +381,7 @@ pub fn tracker_task(
 
     // Now that we have the database state in order, we can actually init the
     // FCM.
-    let mut fcm = match init_forkchoice_manager(&storage, &params, chain_worker, init_state) {
+    let mut fcm = match init_forkchoice_manager(&storage, &params, init_state, chain_worker) {
         Ok(fcm) => fcm,
         Err(e) => {
             error!(err = %e, "failed to init forkchoice manager!");
@@ -520,7 +523,7 @@ fn process_fc_message(
             let slot = block_bundle.header().slot();
             info!(%slot, %blkid, "processing new block");
 
-            let ok = match handle_new_block(fcm_state, &blkid, &block_bundle, engine) {
+            let ok = match handle_new_block(fcm_state, &blkid, &block_bundle) {
                 Ok(v) => v,
                 Err(e) => {
                     // Really we shouldn't emit this error unless there's a
@@ -534,7 +537,7 @@ fn process_fc_message(
 
             let status = if ok {
                 // check if any pending blocks can be finalized
-                if let Err(err) = handle_epoch_finalization(fcm_state, engine) {
+                if let Err(err) = handle_epoch_finalization(fcm_state) {
                     error!(%err, "failed to finalize epoch");
                 }
 
@@ -589,15 +592,15 @@ fn handle_new_block(
         let exec_hash = bundle.header().exec_payload_hash();
         let eng_payload = ExecPayloadData::from_l2_block_bundle(bundle);
         debug!(?blkid, ?exec_hash, "submitting execution payload");
-        let res = engine.submit_payload(eng_payload)?;
+        //let res = engine.submit_payload(eng_payload)?;
 
         // If the payload is invalid then we should write the full block as
         // being invalid and return too.
         // TODO verify this is reasonable behavior, especially with regard
         // to pre-sync
-        if res == strata_eectl::engine::BlockStatus::Invalid {
+        /*if res == strata_eectl::engine::BlockStatus::Invalid {
             return Ok(false);
-        }
+        }*/
     }
 
     // Insert block into pending block tracker and figure out if we
@@ -636,7 +639,7 @@ fn handle_new_block(
             // Also this is the point at which we update the engine head and
             // safe blocks.  We only have to actually call this one, it counts
             // for both.
-            engine.update_safe_block(tip_blkid)?;
+            //engine.update_safe_block(tip_blkid)?;
 
             Ok(true)
         }
@@ -741,7 +744,10 @@ fn pick_best_block<'t>(
 fn apply_tip_update(update: TipUpdate, fcm_state: &mut ForkChoiceManager) -> anyhow::Result<()> {
     match update {
         // Easy case.
-        TipUpdate::ExtendTip(_cur, new) => apply_blocks([new].into_iter(), fcm_state),
+        TipUpdate::ExtendTip(_cur, new) => {
+            /* apply_blocks([new].into_iter(), fcm_state) */
+            Ok(())
+        }
 
         // Weird case that shouldn't normally happen.
         TipUpdate::LongExtend(_cur, mut intermediate, new) => {
@@ -753,7 +759,8 @@ fn apply_tip_update(update: TipUpdate, fcm_state: &mut ForkChoiceManager) -> any
             // blocks we're applying.
             intermediate.push(new);
 
-            apply_blocks(intermediate.into_iter(), fcm_state)
+            //apply_blocks(intermediate.into_iter(), fcm_state)
+            Ok(())
         }
 
         TipUpdate::Reorg(reorg) => {
@@ -773,7 +780,7 @@ fn apply_tip_update(update: TipUpdate, fcm_state: &mut ForkChoiceManager) -> any
 
             // Now actually apply the new blocks in order.  This handles all of
             // the normal logic involves in extending the chain.
-            apply_blocks(reorg.apply_iter().copied(), fcm_state)?;
+            //apply_blocks(reorg.apply_iter().copied(), fcm_state)?;
 
             // TODO any cleanup?
 
@@ -815,6 +822,7 @@ fn revert_chainstate_to_block(
     Ok(())
 }
 
+/*
 /// Applies one or more blocks, updating the FCM state and persisting write
 /// batches to disk.  The block's parent must be the current tip in the FCM.
 ///
@@ -910,6 +918,7 @@ fn apply_blocks(
 
     Ok(())
 }
+*/
 
 /// Takes the block and post-state and inserts database entries to reflect the
 /// epoch being finished on-chain.
@@ -1032,7 +1041,7 @@ fn handle_epoch_finalization(
     fcm_state.finalize_epoch(&next_finalizable_epoch)?;
 
     info!(?next_finalizable_epoch, "updated finalized tip");
-    trace!(?fin_report, "finalization report");
+    //trace!(?fin_report, "finalization report");
     // TODO do something with the finalization report?
 
     Ok(Some(next_finalizable_epoch))
