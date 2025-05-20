@@ -16,7 +16,7 @@ pub trait InterprotoMsg: Any + 'static {
     /// impl.
     ///
     /// This can be removed by using trait upcasting in Rust 1.86.
-    fn to_box_any(&self) -> Box<dyn Any>;
+    fn as_dyn_any(&self) -> &dyn Any;
 }
 
 /// Empty impl that can't be constructed.
@@ -28,8 +28,8 @@ impl<const ID: SubprotocolId> InterprotoMsg for NullMsg<ID> {
         ID
     }
 
-    fn to_box_any(&self) -> Box<dyn Any> {
-        Box::new(*self)
+    fn as_dyn_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -84,8 +84,8 @@ mod tests {
             42
         }
 
-        fn to_box_any(&self) -> Box<dyn Any> {
-            Box::new(self.clone())
+        fn as_dyn_any(&self) -> &dyn Any {
+            self
         }
     }
 

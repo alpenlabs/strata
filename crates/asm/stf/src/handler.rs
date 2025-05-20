@@ -19,8 +19,8 @@ pub(crate) trait SubprotoHandler {
     ///
     /// # Panics
     ///
-    /// If an improper message type is provided.
-    fn accept_msg(&mut self, msg: Box<dyn InterprotoMsg>);
+    /// If an mismatched message type (behind the `dyn`) is provided.
+    fn accept_msg(&mut self, msg: &dyn InterprotoMsg);
 
     /// Processes the messages received.
     fn process_msgs(&mut self);
@@ -53,12 +53,12 @@ impl<S: Subprotocol + 'static, R: MsgRelayer + 'static> HandlerImpl<S, R> {
 }
 
 impl<S: Subprotocol, R: MsgRelayer> SubprotoHandler for HandlerImpl<S, R> {
-    fn accept_msg(&mut self, msg: Box<dyn InterprotoMsg>) {
+    fn accept_msg(&mut self, msg: &dyn InterprotoMsg) {
         let m = msg
-            .to_box_any()
-            .downcast::<S::Msg>()
+            .as_dyn_any()
+            .downcast_ref::<S::Msg>()
             .expect("asm: incorrect interproto msg type");
-        self.interproto_msg_buf.push(*m);
+        self.interproto_msg_buf.push(m.clone());
     }
 
     fn process_txs(&mut self, txs: &[TxInput<'_>], relayer: &mut dyn MsgRelayer) {
@@ -142,7 +142,7 @@ impl HandlerRelayer {
 }
 
 impl MsgRelayer for HandlerRelayer {
-    fn relay_msg(&mut self, m: Box<dyn InterprotoMsg>) {
+    fn relay_msg(&mut self, m: &dyn InterprotoMsg) {
         let h = self
             .get_handler_mut(m.id())
             .expect("asm: msg to unloaded subprotocol");

@@ -30,7 +30,7 @@ pub trait Subprotocol: 'static {
     type State: Any + BorshDeserialize + BorshSerialize;
 
     /// Message type that we receive messages from other subprotocols using.
-    type Msg: Any;
+    type Msg: Clone + Any;
 
     /// Constructs a new state to use if the ASM does not have an instance of it.
     fn init() -> Self::State;
@@ -50,7 +50,7 @@ pub trait Subprotocol: 'static {
 /// Generic message relayer interface.
 pub trait MsgRelayer: Any {
     /// Relays a message to the destination subprotocol.
-    fn relay_msg(&mut self, m: Box<dyn InterprotoMsg>);
+    fn relay_msg(&mut self, m: &dyn InterprotoMsg);
 
     /// Emits an output log message.
     fn emit_log(&mut self, log: Log);
