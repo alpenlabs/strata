@@ -10,6 +10,6 @@ mod state;
 mod subprotocol;
 
 pub use error::AsmError;
-pub use msg::{InterprotoMsg, NullMsg};
+pub use msg::{InterprotoMsg, Log, NullMsg};
 pub use state::{AnchorState, ChainViewState, SectionState};
 pub use subprotocol::{MsgRelayer, Subprotocol, SubprotocolId, TxInput};

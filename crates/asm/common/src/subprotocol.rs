@@ -10,7 +10,7 @@ use bitcoin::Transaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::buf::Buf32;
 
-use crate::{error::AsmError, msg::InterprotoMsg, state::SectionState};
+use crate::{Log, error::AsmError, msg::InterprotoMsg, state::SectionState};
 
 /// Identifier for a subprotocol.
 pub type SubprotocolId = u8;
@@ -52,6 +52,9 @@ pub trait Subprotocol: 'static {
 pub trait MsgRelayer: Any {
     /// Relays a message to the destination subprotocol.
     fn relay_msg(&mut self, m: Box<dyn InterprotoMsg>);
+
+    /// Emits an output log message.
+    fn emit_log(&mut self, log: Log);
 
     /// Gets this msg relayer as a `&dyn Any`.
     fn as_mut_any(&mut self) -> &mut dyn Any;

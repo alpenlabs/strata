@@ -1,7 +1,9 @@
 //! Loader infrastructure for setting up the context.
 // TODO maybe move (parts of) this module to common?
 
-use strata_asm_common::{AnchorState, Subprotocol};
+use std::collections::BTreeMap;
+
+use strata_asm_common::{AnchorState, Subprotocol, SubprotocolId, TxInput};
 
 use crate::handler::HandlerRelayer;
 
@@ -39,5 +41,33 @@ impl<'a> Stage for SubprotoLoaderStage<'a> {
         };
 
         self.handler.insert_subproto::<S>(state);
+    }
+}
+
+/// Stage to process txs pre-extracted from the block for each subprotocol.
+pub struct ProcessStage<'b> {
+    tx_bufs: BTreeMap<SubprotocolId, Vec<TxInput<'b>>>,
+    handler: HandlerRelayer,
+}
+
+impl<'b> Stage for ProcessStage<'b> {
+    fn process_subprotocol<S: Subprotocol>(&mut self) {
+        let txs = self
+            .tx_bufs
+            .get(&S::ID)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
+        self.handler.invoke_process_txs::<S>(txs);
+    }
+}
+
+/// Stage to handle messages exchanged between subprotocols in execution.
+pub struct FinishStage {
+    handler: HandlerRelayer,
+}
+
+impl Stage for FinishStage {
+    fn process_subprotocol<S: Subprotocol>(&mut self) {
+        self.handler.invoke_process_msgs::<S>();
     }
 }

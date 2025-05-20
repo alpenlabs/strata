@@ -3,7 +3,7 @@
 use std::{any::Any, collections::BTreeMap};
 
 use strata_asm_common::{
-    AsmError, InterprotoMsg, MsgRelayer, SectionState, Subprotocol, SubprotocolId, TxInput,
+    AsmError, InterprotoMsg, Log, MsgRelayer, SectionState, Subprotocol, SubprotocolId, TxInput,
 };
 
 /// Subprotocol handler trait for a loaded subprotocol.
@@ -99,12 +99,14 @@ impl<S: Subprotocol, R: MsgRelayer> SubprotoHandler for HandlerImpl<S, R> {
 /// Executor that manages a set of loaded subprotocols.
 pub struct HandlerRelayer {
     handlers: BTreeMap<SubprotocolId, Box<dyn SubprotoHandler>>,
+    logs: Vec<Log>,
 }
 
 impl HandlerRelayer {
     pub fn new() -> Self {
         Self {
             handlers: BTreeMap::new(),
+            logs: Vec::new(),
         }
     }
 
@@ -116,19 +118,38 @@ impl HandlerRelayer {
         }
     }
 
-    fn get_handler(&mut self, id: SubprotocolId) -> Result<&Box<dyn SubprotoHandler>, AsmError> {
+    pub fn get_handler(
+        &mut self,
+        id: SubprotocolId,
+    ) -> Result<&Box<dyn SubprotoHandler>, AsmError> {
         self.handlers
             .get(&id)
             .ok_or(AsmError::InvalidSubprotocol(id))
     }
 
-    fn get_handler_mut(
+    pub fn get_handler_mut(
         &mut self,
         id: SubprotocolId,
     ) -> Result<&mut Box<dyn SubprotoHandler>, AsmError> {
         self.handlers
             .get_mut(&id)
             .ok_or(AsmError::InvalidSubprotocol(id))
+    }
+
+    pub fn invoke_process_txs<'h, 'b, S: Subprotocol>(&'h mut self, txs: &[TxInput<'b>]) {
+        // FIXME annoying issue about multiple mut borrows, we can fix this with
+        // some refcell shenanigans
+        /*let h = self
+            .get_handler_mut(S::ID)
+            .expect("asm: unloaded subprotocol");
+        h.process_txs(txs, self)*/
+    }
+
+    pub fn invoke_process_msgs<S: Subprotocol>(&mut self) {
+        let h = self
+            .get_handler_mut(S::ID)
+            .expect("asm: unloaded subprotocol");
+        h.process_msgs()
     }
 }
 
@@ -138,6 +159,10 @@ impl MsgRelayer for HandlerRelayer {
             .get_handler_mut(m.id())
             .expect("asm: msg to unloaded subprotocol");
         h.accept_msg(m);
+    }
+
+    fn emit_log(&mut self, log: Log) {
+        self.logs.push(log);
     }
 
     fn as_mut_any(&mut self) -> &mut dyn Any {
