@@ -11,6 +11,8 @@ pub mod diff {
     };
 }
 
+pub use strata_diff_derive::DaDiff;
+
 pub trait Diff: Sized {
     type Target;
     fn none() -> Self; // Represents no diff
