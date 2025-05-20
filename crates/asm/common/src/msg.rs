@@ -9,11 +9,10 @@ pub trait InterprotoMsg: Any + 'static {
     /// Returns the ID of the subprotocol that produced this messages.
     fn id(&self) -> SubprotocolId;
 
-    /// Converts the message into a `Box<dyn Any>` for upcasting.
+    /// Converts the message ref into a `&dyn Any` for upcasting.
     ///
-    /// The impl of this function should always be `Box::new(self)`.  For
-    /// technical type system reasons, this cannot be provided as a default
-    /// impl.
+    /// The impl of this function should always be `self`.  For technical type
+    /// system reasons, this cannot be provided as a default impl.
     ///
     /// This can be removed by using trait upcasting in Rust 1.86.
     fn as_dyn_any(&self) -> &dyn Any;
