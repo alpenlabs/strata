@@ -3,7 +3,9 @@
 use std::{collections::VecDeque, sync::Arc};
 
 use strata_chaintsn::transition::process_block;
-use strata_common::retry::{policies::ExponentialBackoff, retry_with_backoff};
+use strata_common::retry::{
+    policies::ExponentialBackoff, retry_with_backoff, DEFAULT_ENGINE_CALL_MAX_RETRIES,
+};
 use strata_db::{errors::DbError, traits::BlockStatus, types::CheckpointConfStatus};
 use strata_eectl::{engine::ExecEngineCtl, errors::EngineError, messages::ExecPayloadData};
 use strata_primitives::{
@@ -33,8 +35,6 @@ use crate::{
     tip_update::{compute_tip_update, TipUpdate},
     unfinalized_tracker::{self, UnfinalizedBlockTracker},
 };
-
-const ENGINE_CALL_MAX_RETRIES: u16 = 4;
 
 /// Tracks the parts of the chain that haven't been finalized on-chain yet.
 pub struct ForkChoiceManager {
@@ -419,11 +419,6 @@ enum FcmEvent {
     Abort,
 }
 
-enum FcmError {
-    EngineError(String),
-    Other(String),
-}
-
 fn forkchoice_manager_task_inner<E: ExecEngineCtl>(
     shutdown: &ShutdownGuard,
     handle: Handle,
@@ -590,7 +585,7 @@ fn handle_new_block(
 
         let res = retry_with_backoff(
             "engine_submit_payload",
-            ENGINE_CALL_MAX_RETRIES,
+            DEFAULT_ENGINE_CALL_MAX_RETRIES,
             &ExponentialBackoff::default(),
             || engine.submit_payload(eng_payload.clone()),
         )?;
@@ -642,7 +637,7 @@ fn handle_new_block(
             // for both.
             retry_with_backoff(
                 "engine_update_safe_block",
-                ENGINE_CALL_MAX_RETRIES,
+                DEFAULT_ENGINE_CALL_MAX_RETRIES,
                 &ExponentialBackoff::default(),
                 || engine.update_safe_block(tip_blkid),
             )?;
@@ -1047,7 +1042,7 @@ fn handle_epoch_finalization(
     // Try calling engine with retries.
     retry_with_backoff(
         "engine_update_finalized",
-        ENGINE_CALL_MAX_RETRIES,
+        DEFAULT_ENGINE_CALL_MAX_RETRIES,
         &ExponentialBackoff::default(),
         || engine.update_finalized_block(*next_finalizable_epoch.last_blkid()),
     )?;

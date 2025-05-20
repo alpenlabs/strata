@@ -4,6 +4,9 @@ use tracing::{error, warn};
 
 pub mod policies;
 
+/// Default maximum number of retries for engine calls.
+pub const DEFAULT_ENGINE_CALL_MAX_RETRIES: u16 = 4;
+
 /// Runs a fallible operation with a backoff retry.
 ///
 /// Retries the given `operation` up to `max_retries` times with delays
