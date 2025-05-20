@@ -265,7 +265,7 @@ class RethFactory(flexitest.Factory):
         custom_chain: str = "dev",
         name_suffix: str = "",
     ) -> flexitest.Service:
-        name = f"reth.{id}.{name_suffix}"
+        name = f"reth.{id}{'.' + name_suffix if name_suffix else ''}"
         datadir = ctx.make_service_dir(name)
         authrpc_port = self.next_port()
         listener_port = self.next_port()
