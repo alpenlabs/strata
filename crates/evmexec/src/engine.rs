@@ -158,7 +158,6 @@ impl<T: EngineRpc> RpcExecEngineInner<T> {
         // TODO: correct error type
         let update_status = forkchoice_result.map_err(|err| EngineError::Other(err.to_string()))?;
 
-        // FIXME: IF Reth being in syncing state for any reason, it will return None for payload_id
         let payload_id: PayloadId = update_status
             .payload_id
             .ok_or(EngineError::Other("payload_id missing".into()))?; // should never happen
