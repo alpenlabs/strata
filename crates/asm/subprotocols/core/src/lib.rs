@@ -2,7 +2,7 @@
 //! on-chain verification and anchoring of zk-SNARK checkpoint proofs.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_asm_common::{InterProtoMsg, SectionState, Subprotocol, SubprotocolId};
+use strata_asm_common::{MsgRelayer, NullMsg, Subprotocol, SubprotocolId, TxInput};
 use strata_primitives::{batch::EpochSummary, buf::Buf32, l1::L1BlockId};
 use zkaleido::VerifyingKey;
 
@@ -12,13 +12,7 @@ use zkaleido::VerifyingKey;
 /// and must match the `subprotocol_id` checked in `SectionState::subprotocol()`.
 pub const CORE_SUBPROTOCOL_ID: SubprotocolId = 1;
 
-/// State for the CoreASM subprotocol, responsible for validating outgoing-layer (OL)
-/// checkpoints posted onto Bitcoin.
-///
-/// The CoreASM subprotocol ensures that each zk‐SNARK proof of a new checkpoint
-/// is correctly verified against the last known checkpoint state anchored on L1.
-/// It manages the verifying key, tracks the latest verified checkpoint, and
-/// enforces administrative controls over batch producer and consensus manager keys.
+/// OL Core state.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct CoreASMState {
     /// The zk‐SNARK verifying key used to verify each new checkpoint proof
@@ -36,13 +30,31 @@ pub struct CoreASMState {
     sequencer_pubkey: Buf32,
 }
 
-impl Subprotocol for CoreASMState {
-    fn id(&self) -> SubprotocolId {
-        CORE_SUBPROTOCOL_ID
+/// OL Core subprotocol.
+///
+/// The OL Core subprotocol ensures that each zk‐SNARK proof of a new checkpoint
+/// is correctly verified against the last known checkpoint state anchored on L1.
+/// It manages the verifying key, tracks the latest verified checkpoint, and
+/// enforces administrative controls over batch producer and consensus manager keys.
+#[derive(Copy, Clone, Debug)]
+pub struct OLCoreSubproto;
+
+impl Subprotocol for OLCoreSubproto {
+    const ID: SubprotocolId = CORE_SUBPROTOCOL_ID;
+
+    type State = CoreASMState;
+
+    type Msg = NullMsg<CORE_SUBPROTOCOL_ID>;
+
+    fn init() -> Self::State {
+        todo!()
     }
 
-    fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> (SectionState, Buf32) {
-        let section = self.to_section();
-        (section, Buf32::zero())
+    fn process_txs(state: &mut Self::State, txs: &[TxInput<'_>], relayer: &mut impl MsgRelayer) {
+        todo!()
+    }
+
+    fn finalize_state(state: &mut Self::State, msgs: &[Self::Msg]) {
+        todo!()
     }
 }

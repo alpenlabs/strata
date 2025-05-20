@@ -4,11 +4,16 @@
 //! provide. Each subprotocol is responsible for parsing its transactions,
 //! updating its internal state, and emitting cross-protocol messages and logs.
 
+use std::any::Any;
+
 use bitcoin::Transaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::buf::Buf32;
 
-use crate::{SubprotocolId, error::ASMError, msg::InterProtoMsg, state::SectionState};
+use crate::{error::AsmError, msg::InterprotoMsg, state::SectionState};
+
+/// Identifier for a subprotocol.
+pub type SubprotocolId = u8;
 
 /// ASM subprotocol interface.
 ///
@@ -18,49 +23,50 @@ use crate::{SubprotocolId, error::ASMError, msg::InterProtoMsg, state::SectionSt
 ///    messages, and then
 /// 2. receives incoming messages to finalize and serialize its state for inclusion in the global
 ///    AnchorState.
-pub trait Subprotocol {
-    /// Returns this subprotocol’s 1-byte (SPS-50) identifier.
-    fn id(&self) -> SubprotocolId;
+pub trait Subprotocol: 'static {
+    /// The subprotocol ID used when searching for relevant transactions.
+    const ID: SubprotocolId;
 
-    /// Reconstructs your subprotocol instance from its prior `SectionState`.
-    ///
-    /// Returns an error if the `subprotocol_id` or payload doesn’t match.
-    fn try_from_section(section: &SectionState) -> Result<Box<dyn Subprotocol>, ASMError>
-    where
-        Self: Sized + BorshDeserialize + 'static,
-    {
-        let inner: Self = BorshDeserialize::try_from_slice(&section.data)
-            .map_err(|e| ASMError::Deserialization(section.id, e))?;
-        Ok(Box::new(inner))
-    }
+    /// State type serialized into the ASM state structure.
+    type State: Any + BorshDeserialize + BorshSerialize;
 
-    /// Serializes this subprotocol’s current state into a `SectionState` for inclusion
-    /// in the global `AnchorState`.
-    /// # Panics
-    ///
-    /// This will panic if Borsh serialization fails, which should never occur
-    /// for a type that correctly derives `BorshSerialize`.
-    fn to_section(&self) -> SectionState
-    where
-        Self: BorshSerialize + Sized,
-    {
-        let data = borsh::to_vec(&self).expect("Borsh serialization of Subprotocol state failed");
-        SectionState {
-            id: self.id(),
-            data,
-        }
-    }
+    /// Message type that we receive messages from other subprotocols using.
+    type Msg: Any;
+
+    /// Constructs a new state to use if the ASM does not have an instance of it.
+    fn init() -> Self::State;
 
     /// Process the transactions and extract all the relevant information from L1 for the
     /// subprotocol
     ///
     /// Update it's own state and output a list of InterProtoMsg addressed to other subprotocols
-    fn process_txs(&mut self, _txs: &[Transaction]) -> Vec<(u8, InterProtoMsg)> {
-        vec![]
-    }
+    fn process_txs(state: &mut Self::State, txs: &[TxInput<'_>], relayer: &mut impl MsgRelayer);
 
-    /// Use the InterProtoMsg from other subprotocol to update it's state. Also generate the event
+    /// Use the msg other subprotocols to update its state. Also generate the event
     /// logs that is later needed for introspection. Return the commitment of the events. The actual
     /// event is defined by the subprotocol and is not visible to the ASM.
-    fn finalize_state(&mut self, _msgs: &[InterProtoMsg]) -> (SectionState, Buf32);
+    fn finalize_state(state: &mut Self::State, msgs: &[Self::Msg]);
+}
+
+/// Generic message relayer interface.
+pub trait MsgRelayer: Any {
+    /// Relays a message to the destination subprotocol.
+    fn relay_msg(&mut self, m: Box<dyn InterprotoMsg>);
+
+    /// Gets this msg relayer as a `&dyn Any`.
+    fn as_mut_any(&mut self) -> &mut dyn Any;
+}
+
+/// Transaction input data.
+#[derive(Debug)]
+pub struct TxInput<'t> {
+    // TODO add tag data somehow so we don't have to re-extract it
+    tx: &'t Transaction,
+}
+
+impl<'t> TxInput<'t> {
+    /// Gets the inner transaction.
+    pub fn tx(&self) -> &Transaction {
+        self.tx
+    }
 }

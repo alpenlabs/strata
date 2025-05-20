@@ -1,9 +1,10 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use strata_primitives::{
     buf::Buf32,
     l1::{HeaderVerificationState, L1BlockId},
 };
 
-use crate::SubprotocolId;
+use crate::{AsmError, Subprotocol, SubprotocolId};
 
 /// Anchor state for the Anchor State Machine (ASM), the core of the Strata protocol.
 ///
@@ -14,7 +15,7 @@ use crate::SubprotocolId;
 /// receiving protocol transactions at L1 and updating its storage. A zk-SNARK proof
 /// attests that the transition from the previous ASM state to the new state
 /// was performed correctly on the given L1 block.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct AnchorState {
     /// The current view of the L1 chain required for state transitions.
     pub chain_view: ChainViewState,
@@ -23,29 +24,28 @@ pub struct AnchorState {
     pub sections: Vec<SectionState>,
 }
 
+impl AnchorState {
+    /// Gets a section by protocol ID by doing a linear scan.
+    pub fn find_section(&self, id: SubprotocolId) -> Option<&SectionState> {
+        self.sections.iter().find(|s| s.id == id)
+    }
+}
+
 /// Represents the on‐chain view required by the Anchor State Machine (ASM) to process
 /// state transitions for each new L1 block.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct ChainViewState {
     /// All data needed to validate a Bitcoin block header, including past‐n timestamps,
     /// accumulated work, and difficulty adjustments.
     pub pow_state: HeaderVerificationState,
-
-    /// Events emitted by subprotocols, keyed by L1 block:
-    /// - The outer Vec is ordered by block ID.
-    /// - Each inner Vec contains tuples of `(subprotocol_id, event_hash)`.
-    ///
-    /// `subprotocol_id` identifies which subprotocol emitted the event,
-    /// and `Buf32` is the protocol‐computed hash of the event payload.
-    // TODO: Eventually this will use an MMR for minimal, non‐linear‐growing on‐chain state.
-    pub events: Vec<(L1BlockId, Vec<(SubprotocolId, Buf32)>)>,
+    // TODO header MMR
 }
 
 /// Holds the off‐chain serialized state for a single subprotocol section within the ASM.
 ///
 /// Each `SectionState` pairs the subprotocol’s unique ID with its current serialized state,
 /// allowing the ASM to apply the appropriate state transition logic for that subprotocol.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SectionState {
     /// Identifier of the subprotocol
     pub id: SubprotocolId,
@@ -54,4 +54,28 @@ pub struct SectionState {
     ///
     /// This is normally fairly small, but we are setting a comfortable max limit.
     pub data: Vec<u8>,
+}
+
+impl SectionState {
+    /// Constructs a new instance.
+    pub fn new(id: SubprotocolId, data: Vec<u8>) -> Self {
+        Self { id, data }
+    }
+
+    /// Constructs an instance by serializing a subprotocol state.
+    pub fn from_state<S: Subprotocol>(state: &S::State) -> Self {
+        let mut buf = Vec::new();
+        <S::State as BorshSerialize>::serialize(state, &mut buf).expect("asm: serialize");
+        Self::new(S::ID, buf)
+    }
+
+    /// Tries to deserialize the section data as a particular subprotocol's state.
+    pub fn try_to_state<S: Subprotocol>(&self) -> Result<S::State, AsmError> {
+        if S::ID != self.id {
+            return Err(AsmError::SubprotoIdMismatch(self.id, S::ID));
+        }
+
+        <S::State as BorshDeserialize>::try_from_slice(&self.data)
+            .map_err(|e| AsmError::Deserialization(self.id, e))
+    }
 }
