@@ -61,3 +61,42 @@ impl Backoff for ExponentialBackoff {
         curr_delay_ms * self.multiplier / self.multiplier_base
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn test_exponential_backoff_zero_multiplier_base() {
+        // This should panic because we can't have a zero denominator
+        let _ = ExponentialBackoff::new(1000, 20, 0);
+    }
+
+    #[test]
+    fn test_backoff_trait_implementation() {
+        let backoff = ExponentialBackoff::new(1000, 20, 10);
+
+        // Test base_delay_ms() method
+        assert_eq!(backoff.base_delay_ms(), 1000);
+
+        // Test next_delay_ms() method with initial value
+        let delay1 = backoff.next_delay_ms(1000);
+        assert_eq!(delay1, 2000); // 1000 * 20 / 10 = 2000
+
+        // Test next_delay_ms() method with subsequent value
+        let delay2 = backoff.next_delay_ms(delay1);
+        assert_eq!(delay2, 4000); // 2000 * 20 / 10 = 4000
+
+        // Test with default multipliers
+        let backoff2 = ExponentialBackoff::default();
+        let delay = backoff2.next_delay_ms(1000);
+        assert_eq!(delay, 1500); // 1000 * 15 / 10 = 1500
+
+        // test with new_with_default_multiplier
+        let backoff3 = ExponentialBackoff::new_with_default_multiplier(2000);
+        assert_eq!(backoff3.base_delay_ms, 2000);
+        let delay = backoff3.next_delay_ms(1000);
+        assert_eq!(delay, 1500); // 1000 * 15 / 10 = 1500
+    }
+}

@@ -158,4 +158,42 @@ mod tests {
         assert_eq!(sleep_log.lock().unwrap().len(), max_retries as usize);
         assert_eq!(sleep_log.lock().unwrap().to_vec(), vec![128, 64]);
     }
+
+    #[test]
+    fn succeeds_after_retries() {
+        let backoff = HalfBackoff;
+        let attempts_counter = Arc::new(Mutex::new(0));
+        let success_at_attempt = 2; // Succeeds on the 3rd attempt (0-indexed)
+        let sleep_log = Arc::new(Mutex::new(Vec::new()));
+        let max_retries = 3;
+
+        let result = retry_with_backoff_inner(
+            "mock_op_success",
+            max_retries,
+            &backoff,
+            {
+                let attempts_counter = Arc::clone(&attempts_counter);
+                move || -> Result<&str, &str> {
+                    let mut attempts = attempts_counter.lock().unwrap();
+                    *attempts += 1;
+                    if *attempts - 1 == success_at_attempt {
+                        Ok("success")
+                    } else {
+                        Err("fail")
+                    }
+                }
+            },
+            {
+                let sleep_log = Arc::clone(&sleep_log);
+                move |dur| {
+                    sleep_log.lock().unwrap().push(dur.as_millis() as u64);
+                }
+            },
+        );
+
+        assert_eq!(result, Ok("success"));
+        assert_eq!(*attempts_counter.lock().unwrap(), success_at_attempt + 1);
+        assert_eq!(sleep_log.lock().unwrap().len(), success_at_attempt);
+        assert_eq!(sleep_log.lock().unwrap().to_vec(), vec![128, 64]);
+    }
 }
