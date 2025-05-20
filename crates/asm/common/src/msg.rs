@@ -29,21 +29,35 @@ impl<const ID: SubprotocolId> InterprotoMsg for NullMsg<ID> {
     }
 
     fn to_box_any(&self) -> Box<dyn Any> {
-        Box::new(self.clone())
+        Box::new(*self)
     }
 }
 
 /// Stub type for SPS-msg-fmt log.
 ///
 /// This should be converted to be a wrapper from the strata-common repo.
+#[derive(Clone, Debug)]
 pub struct Log {
+    /// Type identifier
     ty: u16,
+    /// Body of the message
     body: Vec<u8>,
 }
 
 impl Log {
+    /// Constructor
     pub fn new(ty: u16, body: Vec<u8>) -> Self {
         Self { ty, body }
+    }
+
+    /// Returns type identifier
+    pub fn ty(&self) -> u16 {
+        self.ty
+    }
+
+    /// Returns slice of body
+    pub fn body(&self) -> &[u8] {
+        &self.body
     }
 }
 
@@ -59,6 +73,12 @@ mod tests {
         x: u32,
     }
 
+    impl Foo {
+        fn x(&self) -> u32 {
+            self.x
+        }
+    }
+
     impl InterprotoMsg for Foo {
         fn id(&self) -> SubprotocolId {
             42
@@ -69,10 +89,11 @@ mod tests {
         }
     }
 
+    #[test]
     fn test() {
         // TODO
         let inst = Foo { x: 5 };
-
-        let inst_box = Box::new(inst) as Box<dyn InterprotoMsg>;
+        inst.x();
+        let _inst_box = Box::new(inst) as Box<dyn InterprotoMsg>;
     }
 }

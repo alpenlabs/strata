@@ -1,8 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::{
-    buf::Buf32,
-    l1::{HeaderVerificationState, L1BlockId},
-};
+use strata_primitives::l1::HeaderVerificationState;
 
 use crate::{AsmError, Subprotocol, SubprotocolId};
 

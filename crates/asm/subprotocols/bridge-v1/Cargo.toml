@@ -15,4 +15,3 @@ rustdoc.all = "warn"
 [dependencies]
 borsh.workspace = true
 strata-asm-common.workspace = true
-strata-primitives.workspace = true

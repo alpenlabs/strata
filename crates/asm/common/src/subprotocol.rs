@@ -8,9 +8,8 @@ use std::any::Any;
 
 use bitcoin::Transaction;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_primitives::buf::Buf32;
 
-use crate::{Log, error::AsmError, msg::InterprotoMsg, state::SectionState};
+use crate::{Log, msg::InterprotoMsg};
 
 /// Identifier for a subprotocol.
 pub type SubprotocolId = u8;
@@ -68,6 +67,11 @@ pub struct TxInput<'t> {
 }
 
 impl<'t> TxInput<'t> {
+    /// Create a new `TxInput` referencing the given `Transaction`.
+    pub fn new(tx: &'t Transaction) -> Self {
+        TxInput { tx }
+    }
+
     /// Gets the inner transaction.
     pub fn tx(&self) -> &Transaction {
         self.tx

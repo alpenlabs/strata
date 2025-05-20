@@ -50,11 +50,11 @@ impl Subprotocol for OLCoreSubproto {
         todo!()
     }
 
-    fn process_txs(state: &mut Self::State, txs: &[TxInput<'_>], relayer: &mut impl MsgRelayer) {
+    fn process_txs(_state: &mut Self::State, _txs: &[TxInput<'_>], _relayer: &mut impl MsgRelayer) {
         todo!()
     }
 
-    fn finalize_state(state: &mut Self::State, msgs: &[Self::Msg]) {
+    fn finalize_state(_state: &mut Self::State, _msgs: &[Self::Msg]) {
         todo!()
     }
 }

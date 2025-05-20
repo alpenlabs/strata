@@ -5,6 +5,7 @@ use crate::SubprotocolId;
 /// Errors that can occur while working with ASM subprotocols.
 #[derive(Debug, Error)]
 pub enum AsmError {
+    /// Subprotocol ID of a decoded section did not match the expected subprotocol ID.
     #[error("tried to decode section of ID {0} as ID {1}")]
     SubprotoIdMismatch(SubprotocolId, SubprotocolId),
 

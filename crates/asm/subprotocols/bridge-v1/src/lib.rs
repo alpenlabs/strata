@@ -1,9 +1,6 @@
 //! BridgeV1 Subprotocol
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_asm_common::{
-    InterprotoMsg, MsgRelayer, NullMsg, SectionState, Subprotocol, SubprotocolId,
-};
-use strata_primitives::buf::Buf32;
+use strata_asm_common::{NullMsg, Subprotocol, SubprotocolId};
 
 /// The unique identifier for the BridgeV1 subprotocol within the Anchor State Machine.
 ///
@@ -33,14 +30,14 @@ impl Subprotocol for BridgeV1Subproto {
     }
 
     fn process_txs(
-        state: &mut Self::State,
-        txs: &[strata_asm_common::TxInput<'_>],
-        relayer: &mut impl strata_asm_common::MsgRelayer,
+        _state: &mut Self::State,
+        _txs: &[strata_asm_common::TxInput<'_>],
+        _relayer: &mut impl strata_asm_common::MsgRelayer,
     ) {
         todo!()
     }
 
-    fn finalize_state(state: &mut Self::State, msgs: &[Self::Msg]) {
+    fn finalize_state(_state: &mut Self::State, _msgs: &[Self::Msg]) {
         todo!()
     }
 }
