@@ -120,6 +120,7 @@ alloy = { version = "0.14.0", features = [
 ] }
 alloy-consensus = { version = "0.14.0", default-features = false }
 alloy-eips = { version = "0.14.0", default-features = false }
+alloy-evm = { version = "0.4.0", default-features = false }
 alloy-genesis = { version = "0.14.0", default-features = false }
 alloy-network = { version = "0.14.0", default-features = false }
 alloy-primitives = { version = "1.0.0", default-features = false, features = [

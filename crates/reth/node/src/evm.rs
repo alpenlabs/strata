@@ -24,6 +24,7 @@ use revm::{
     Context, Inspector, MainBuilder, MainContext,
 };
 use revm_primitives::{address, hardfork::SpecId, Address, Bytes};
+use strata_reth_evm::evm::MyEvm;
 
 /// A custom precompile that contains static precompiles.
 #[derive(Clone)]
@@ -102,6 +103,9 @@ pub struct StrataEvmFactory;
 
 impl EvmFactory for StrataEvmFactory {
     type Evm<DB: reth_evm::Database, I: revm::Inspector<Self::Context<DB>>> =
+        MyEvm<DB, I, EthPrecompiles>;
+
+    type Evm<DB: reth_evm::Database, I: revm::Inspector<Self::Context<DB>>> =
         EthEvm<DB, I, CustomPrecompiles>;
 
     type Context<DB: reth_evm::Database> = EthEvmContext<DB>;
@@ -118,14 +122,19 @@ impl EvmFactory for StrataEvmFactory {
         db: DB,
         input: EvmEnv,
     ) -> Self::Evm<DB, revm::inspector::NoOpInspector> {
-        let evm = Context::mainnet()
+        let ctx = Context::mainnet()
             .with_db(db)
             .with_cfg(input.cfg_env)
-            .with_block(input.block_env)
-            .build_mainnet_with_inspector(NoOpInspector {})
-            .with_precompiles(CustomPrecompiles::new());
+            .with_block(input.block_env);
+        // let evm = Context::mainnet()
+        //     .with_db(db)
+        //     .with_cfg(input.cfg_env)
+        //     .with_block(input.block_env)
+        //     .build_mainnet_with_inspector(NoOpInspector {})
+        //     .with_precompiles(CustomPrecompiles::new());
 
-        EthEvm::new(evm, false)
+        // MyEvm::new(ctx, false)
+        todo!()
     }
 
     fn create_evm_with_inspector<DB: reth_evm::Database, I: revm::Inspector<Self::Context<DB>>>(
@@ -134,12 +143,13 @@ impl EvmFactory for StrataEvmFactory {
         input: reth_evm::EvmEnv<Self::Spec>,
         inspector: I,
     ) -> Self::Evm<DB, I> {
-        EthEvm::new(
-            self.create_evm(db, input)
-                .into_inner()
-                .with_inspector(inspector),
-            true,
-        )
+        todo!()
+        // MyEvm::new(
+        //     self.create_evm(db, input)
+        //         .into_inner()
+        //         .with_inspector(inspector),
+        //     true,
+        // )
     }
 }
 

@@ -14035,6 +14035,7 @@ dependencies = [
 name = "strata-reth-evm"
 version = "0.1.0"
 dependencies = [
+ "alloy-evm",
  "alloy-sol-types",
  "reth-primitives",
  "revm",

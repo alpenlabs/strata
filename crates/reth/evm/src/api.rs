@@ -30,11 +30,11 @@ where
     type Block = <CTX as ContextTr>::Block;
 
     fn set_tx(&mut self, tx: Self::Tx) {
-        self.0.data.ctx.set_tx(tx);
+        self.inner.data.ctx.set_tx(tx);
     }
 
     fn set_block(&mut self, block: Self::Block) {
-        self.0.data.ctx.set_block(block);
+        self.inner.data.ctx.set_block(block);
     }
 
     fn replay(&mut self) -> Self::Output {
@@ -66,7 +66,7 @@ where
     type Inspector = INSP;
 
     fn set_inspector(&mut self, inspector: Self::Inspector) {
-        self.0.data.inspector = inspector;
+        self.inner.data.inspector = inspector;
     }
 
     fn inspect_replay(&mut self) -> Self::Output {
