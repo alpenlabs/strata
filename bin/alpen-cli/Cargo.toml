@@ -58,3 +58,6 @@ keyring = { version = "3.3.0", default-features = false, features = [
 keyring = { version = "3.3.0", default-features = false, features = [
   "windows-native",
 ] }
+
+[dev-dependencies]
+toml = "0.8.20"

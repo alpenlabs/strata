@@ -125,3 +125,47 @@ impl Settings {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use toml;
+
+    use super::*;
+
+    #[test]
+    fn test_settings_from_file_serde_roundtrip() {
+        let config = r#"
+            esplora = "https://esplora.testnet.alpenlabs.io"
+            bitcoind_rpc_user = "user"
+            bitcoind_rpc_pw = "pass"
+            bitcoind_rpc_endpoint = "http://127.0.0.1:38332"
+            alpen_endpoint = "https://rpc.testnet.alpenlabs.io"
+            faucet_endpoint = "https://faucet-api.testnet.alpenlabs.io"
+            mempool_endpoint = "https://bitcoin.testnet.alpenlabs.io"
+            blockscout_endpoint = "https://explorer.testnet.alpenlabs.io"
+            bridge_pubkey = "1d3e9c0417ba7d3551df5a1cc1dbe227aa4ce89161762454d92bfc2b1d5886f7"
+            magic_bytes = "alpenstrata"
+            network = "signet"
+        "#;
+
+        // Deserialize from TOML string
+        let parsed: SettingsFromFile =
+            toml::from_str(config).expect("failed to parse SettingsFromFile from TOML");
+
+        // Serialize back to TOML string
+        let serialized =
+            toml::to_string(&parsed).expect("failed to serialize SettingsFromFile to TOML");
+
+        // Deserialize again
+        let reparsed: SettingsFromFile =
+            toml::from_str(&serialized).expect("failed to deserialize serialized SettingsFromFile");
+
+        // Assert important fields survived round-trip
+        assert_eq!(parsed.esplora, reparsed.esplora);
+        assert_eq!(parsed.alpen_endpoint, reparsed.alpen_endpoint);
+        assert_eq!(parsed.faucet_endpoint, reparsed.faucet_endpoint);
+        assert_eq!(parsed.magic_bytes, reparsed.magic_bytes);
+        assert_eq!(parsed.network, reparsed.network);
+        assert_eq!(parsed.bridge_pubkey.0, reparsed.bridge_pubkey.0);
+    }
+}
