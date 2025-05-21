@@ -32,6 +32,7 @@ pub struct SettingsFromFile {
     pub mempool_endpoint: Option<String>,
     pub blockscout_endpoint: Option<String>,
     pub bridge_pubkey: Hex<[u8; 32]>,
+    pub magic_bytes: String,
     pub network: Option<Network>,
 }
 
@@ -48,6 +49,7 @@ pub struct Settings {
     pub mempool_space_endpoint: Option<String>,
     pub blockscout_endpoint: Option<String>,
     pub bridge_alpen_address: AlpenAddress,
+    pub magic_bytes: String,
     pub linux_seed_file: PathBuf,
     pub network: Network,
     pub config_file: PathBuf,
@@ -115,6 +117,7 @@ impl Settings {
             blockscout_endpoint: from_file.blockscout_endpoint,
             bridge_alpen_address: AlpenAddress::from_str(BRIDGE_ALPEN_ADDRESS)
                 .expect("valid Alpen address"),
+            magic_bytes: from_file.magic_bytes,
             linux_seed_file,
             network: from_file.network.unwrap_or(DEFAULT_NETWORK),
             config_file: CONFIG_FILE.clone(),
