@@ -21,7 +21,6 @@ pub mod header;
 pub mod id;
 pub mod l1;
 pub mod operation;
-pub mod state_diff;
 pub mod state_op;
 pub mod state_queue;
 pub mod sync_event;

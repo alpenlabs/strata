@@ -2,6 +2,7 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
+use strata_da_lib::{diff::*, DaDiff};
 use strata_primitives::{
     buf::Buf32, epoch::EpochCommitment, hash::compute_borsh_hash, l2::L2BlockCommitment,
 };
@@ -19,7 +20,7 @@ use crate::{
 /// pre-state and a block.
 ///
 /// This corresponds to the beacon chain state.
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize, DaDiff)]
 pub struct Chainstate {
     /// The slot that contained the block that produced this chainstate.
     pub(crate) cur_slot: u64,
@@ -49,19 +50,24 @@ pub struct Chainstate {
     pub(crate) finalized_epoch: EpochCommitment,
 
     /// Rollup's view of L1 state.
+    #[diff_override(l1::L1ViewStateDiff)]
     pub(crate) l1_state: l1::L1ViewState,
 
     /// Pending withdrawals that have been initiated but haven't been sent out.
+    #[diff_override(StateQueueDiff<bridge_ops::WithdrawalIntent>)]
     pub(crate) pending_withdraws: StateQueue<bridge_ops::WithdrawalIntent>,
 
     /// Execution environment state.  This is just for the single EE we support
     /// right now.
+    #[diff_override(exec_env::ExecEnvStateDiff)]
     pub(crate) exec_env_state: exec_env::ExecEnvState,
 
     /// Operator table we store registered operators for.
+    #[diff_override(StateQueueDiff<bridge_state::OperatorTable>)]
     pub(crate) operator_table: bridge_state::OperatorTable,
 
     /// Deposits table tracking each deposit's state.
+    #[diff_override(StateQueueDiff<bridge_state::DepositsTable>)]
     pub(crate) deposits_table: bridge_state::DepositsTable,
 }
 
