@@ -110,14 +110,15 @@ pub async fn deposit(
     // <recovery_address_pk>
     // <alpen_address>
     let magic_bytes = settings.magic_bytes.as_bytes();
-    let recovery_bytes = recovery_address_pk.serialize();
-    let alpen_bytes = alpen_address.as_slice();
-    let mut op_return_data =
-        Vec::with_capacity(magic_bytes.len() + recovery_bytes.len() + alpen_bytes.len());
+    let recovery_address_pk_bytes = recovery_address_pk.serialize();
+    let alpen_address_bytes = alpen_address.as_slice();
+    let mut op_return_data = Vec::with_capacity(
+        magic_bytes.len() + recovery_address_pk_bytes.len() + alpen_address_bytes.len(),
+    );
 
     op_return_data.extend_from_slice(magic_bytes);
-    op_return_data.extend_from_slice(&recovery_bytes);
-    op_return_data.extend_from_slice(alpen_bytes);
+    op_return_data.extend_from_slice(&recovery_address_pk_bytes);
+    op_return_data.extend_from_slice(alpen_address_bytes);
 
     // Convert to PushBytes (ensures length ≤ 80 bytes)
     let push_bytes = PushBytesBuf::try_from(op_return_data)
