@@ -200,6 +200,7 @@ fn resolve_strata_address(
     }
 }
 
+/// Ensures that the URL has a trailing slash.
 fn ensure_trailing_slash(mut url: Url) -> Url {
     if !url.path().ends_with('/') {
         let new_path = format!("{}/", url.path().trim_end_matches('/'));
