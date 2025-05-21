@@ -11,12 +11,14 @@ members = [
   "crates/evmexec",
   "crates/key-derivation",
   "crates/l1tx",
+  "crates/mpt",
   "crates/primitives",
   "crates/proof-impl/btc-blockspace",
   "crates/proof-impl/checkpoint",
   "crates/proof-impl/cl-stf",
   "crates/proof-impl/evm-ee-stf",
   "crates/zkvm/hosts",
+  "crates/reth/chainspec",
   "crates/reth/db",
   "crates/reth/evm",
   "crates/reth/exex",
@@ -65,12 +67,14 @@ default-members = [
 resolver = "2"
 
 [workspace.dependencies]
+alpen-chainspec = { path = "crates/reth/chainspec" }
 alpen-reth-db = { path = "crates/reth/db" }
 alpen-reth-evm = { path = "crates/reth/evm" }
 alpen-reth-exex = { path = "crates/reth/exex" }
 alpen-reth-node = { path = "crates/reth/node" }
 alpen-reth-primitives = { path = "crates/reth/primitives" }
 alpen-reth-rpc = { path = "crates/reth/rpc" }
+alpen-reth-statediff = { path = "crates/reth/statediff" }
 strata-btcio = { path = "crates/btcio" }
 strata-chaintsn = { path = "crates/chaintsn" }
 strata-common = { path = "crates/common" }
@@ -83,6 +87,7 @@ strata-evmexec = { path = "crates/evmexec" }
 strata-key-derivation = { path = "crates/key-derivation" }
 strata-l1tx = { path = "crates/l1tx" }
 strata-mmr = { path = "crates/util/mmr" }
+strata-mpt = { path = "crates/mpt" }
 strata-primitives = { path = "crates/primitives" }
 strata-proofimpl-btc-blockspace = { path = "crates/proof-impl/btc-blockspace" }
 strata-proofimpl-checkpoint = { path = "crates/proof-impl/checkpoint" }

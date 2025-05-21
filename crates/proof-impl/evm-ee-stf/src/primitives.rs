@@ -9,9 +9,8 @@ use reth_primitives::{
 use revm_primitives::alloy_primitives::{Address, Bytes, FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use strata_mpt::{MptNode, StorageEntry};
 use strata_state::block::ExecSegment;
-
-use crate::mpt::{MptNode, StorageEntry};
 
 /// Public Parameters that proof asserts
 pub type EvmEeProofOutput = Vec<ExecSegment>;

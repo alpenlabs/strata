@@ -17,7 +17,8 @@ use reth_revm::{db::CacheDB, primitives::FixedBytes};
 use reth_trie::{HashedPostState, TrieInput};
 use reth_trie_common::KeccakKeyHasher;
 use revm_primitives::alloy_primitives::{Address, B256};
-use strata_proofimpl_evm_ee_stf::{mpt::proofs_to_tries, EvmBlockStfInput};
+use strata_mpt::proofs_to_tries;
+use strata_proofimpl_evm_ee_stf::EvmBlockStfInput;
 use tracing::{debug, error};
 
 use crate::{
