@@ -4,6 +4,7 @@
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use strata_da_lib::DaDiff;
 use strata_primitives::{
     buf::Buf32, evm_exec::create_evm_extra_payload, prelude::payload::BlobSpec,
 };
@@ -43,22 +44,28 @@ impl ExecUpdate {
 
 /// Contains the explicit inputs to the STF.  Implicit inputs are determined
 /// from the CL's exec env state.
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize, DaDiff,
+)]
 pub struct UpdateInput {
     /// Update index.  This is incremented exactly 1.  This is to handle the
     /// future possible cases where we skip CL blocks and provide a monotonic
     /// ordering of EL states.
+    #[diff(u32)]
     update_idx: u64,
 
     /// Merkle tree root of the contents of the EL payload, in the order it was
     /// strataed in the block.
+    #[diff(u32)]
     entries_root: Buf32,
 
     /// Buffer of any other payload data.  This is used with the other fields
     /// here to construct the full EVM header payload.
+    #[diff(u32)]
     extra_payload: Vec<u8>,
 
     /// last applied Deposit Ops index
+    #[diff(u32)]
     applied_ops: Vec<Op>,
 }
 

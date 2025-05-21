@@ -9,7 +9,7 @@ use strata_primitives::{
 use crate::{
     bridge_ops::DepositIntent,
     bridge_state::{DepositEntry, OperatorEntry},
-    exec_update::Op,
+    exec_update::{Op, UpdateInputDiff},
     forced_inclusion::ForcedInclusion,
 };
 
@@ -42,13 +42,6 @@ pub struct ExecEnvStateDiff {
     waiting_da_blobs_diff: Vec<ListDiff<BlobSpec>>,
     pending_deposits_diff: StateQueueDiff<DepositIntent>,
     pending_forced_incls_diff: StateQueueDiff<ForcedInclusion>,
-}
-
-pub struct UpdateInputDiff {
-    update_idx_diff: Vec<RegisterDiff<u64>>,
-    entries_root_diff: Vec<RegisterDiff<Buf32>>,
-    extra_payload_diff: Vec<RegisterDiff<Vec<u8>>>,
-    applied_ops_diff: Vec<ListDiff<Op>>,
 }
 
 // Maybe put in another crate(da-lib) since this seems to be generic?

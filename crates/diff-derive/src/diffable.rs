@@ -31,20 +31,26 @@ pub fn generate_diffable(input: &DeriveInput) -> TokenStream {
 
     for field in fields {
         let fname = field.ident.as_ref().unwrap();
+        let field_ty = &field.ty;
         let diff_field_name = format_ident!("{}_diff", fname);
 
         match get_diff_override(&field.attrs) {
             Some(path) => {
                 diff_fields.push(quote! {
-                    #diff_field_name: Vec<#path>
+                    #diff_field_name: #path
                 });
             }
+            // If no diff override is found, use RegisterDiff(or error out making it mandatory?)
             None => {
-                let err = Error::new(
-                    field.ident.as_ref().unwrap().span(),
-                    format!("Missing #[diff(...)] attribute on field `{}`", fname),
-                );
-                return err.to_compile_error();
+                diff_fields.push(quote! {
+                    #diff_field_name: RegisterDiff<#field_ty>
+                });
+
+                // let err = Error::new(
+                //     field.ident.as_ref().unwrap().span(),
+                //     format!("Missing #[diff(...)] attribute on field `{}`", fname),
+                // );
+                // return err.to_compile_error();
             }
         }
     }
