@@ -218,6 +218,7 @@ fn pow_valid(mut hasher: Sha256, difficulty: u8, solution: Solution) -> bool {
     count_leading_zeros(&hasher.finalize()) >= difficulty
 }
 
+/// Ensures that the URL has a trailing slash.
 fn ensure_trailing_slash(mut url: Url) -> Url {
     if !url.path().ends_with('/') {
         let new_path = format!("{}/", url.path().trim_end_matches('/'));
