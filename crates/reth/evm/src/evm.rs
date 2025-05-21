@@ -1,8 +1,10 @@
-use alloy_evm::{eth::EthEvmContext, Database, Evm};
+use std::ops::{Deref, DerefMut};
+
+use alloy_evm::{eth::EthEvmContext, Database, Evm, EvmEnv};
 use revm::{
     context::{
-        result::{EVMError, HaltReason},
-        ContextSetters, ContextTr, Evm as RevmEvm, EvmData, TxEnv,
+        result::{EVMError, HaltReason, ResultAndState},
+        BlockEnv, ContextSetters, ContextTr, Evm as RevmEvm, EvmData, TxEnv,
     },
     handler::{
         instructions::{EthInstructions, InstructionProvider},
@@ -12,98 +14,77 @@ use revm::{
     interpreter::{
         interpreter::EthInterpreter, InputsImpl, Interpreter, InterpreterResult, InterpreterTypes,
     },
-    Context, Inspector, MainBuilder, MainContext,
+    Context, ExecuteEvm, InspectEvm, Inspector, MainBuilder, MainContext,
 };
 use revm_primitives::hardfork::SpecId;
 
-/// MyEvm variant of the EVM.
-pub struct MyEvm<CTX, INSP, PRECOMPILE = EthPrecompiles> {
-    pub inner: RevmEvm<CTX, INSP, EthInstructions<EthInterpreter, CTX>, PRECOMPILE>,
-    pub inspect: bool,
+pub struct MyEvm<DB: Database, I, PRECOMPILE = EthPrecompiles> {
+    inner: RevmEvm<
+        EthEvmContext<DB>,
+        I,
+        EthInstructions<EthInterpreter, EthEvmContext<DB>>,
+        PRECOMPILE,
+    >,
+    inspect: bool,
 }
 
-impl<CTX: ContextTr, INSP> MyEvm<CTX, INSP> {
-    pub fn new(ctx: CTX, inspector: INSP) -> Self {
-        let evm = RevmEvm {
-            data: EvmData { ctx, inspector },
-            instruction: EthInstructions::new_mainnet(),
-            precompiles: EthPrecompiles::default(),
-        };
-
+impl<DB: Database, I, PRECOMPILE> MyEvm<DB, I, PRECOMPILE> {
+    /// Creates a new Ethereum EVM instance.
+    ///
+    /// The `inspect` argument determines whether the configured [`Inspector`] of the given
+    /// [`RevmEvm`] should be invoked on [`Evm::transact`].
+    pub const fn new(
+        evm: RevmEvm<
+            EthEvmContext<DB>,
+            I,
+            EthInstructions<EthInterpreter, EthEvmContext<DB>>,
+            PRECOMPILE,
+        >,
+        inspect: bool,
+    ) -> Self {
         Self {
             inner: evm,
-            inspect: false,
+            inspect,
         }
     }
-}
 
-impl<CTX: ContextTr, INSP> EvmTr for MyEvm<CTX, INSP>
-where
-    CTX: ContextTr,
-{
-    type Context = CTX;
-    type Instructions = EthInstructions<EthInterpreter, CTX>;
-    type Precompiles = EthPrecompiles;
+    /// Consumes self and return the inner EVM instance.
+    pub fn into_inner(
+        self,
+    ) -> RevmEvm<EthEvmContext<DB>, I, EthInstructions<EthInterpreter, EthEvmContext<DB>>, PRECOMPILE>
+    {
+        self.inner
+    }
 
-    fn ctx(&mut self) -> &mut Self::Context {
+    /// Provides a reference to the EVM context.
+    pub const fn ctx(&self) -> &EthEvmContext<DB> {
+        &self.inner.data.ctx
+    }
+
+    /// Provides a mutable reference to the EVM context.
+    pub fn ctx_mut(&mut self) -> &mut EthEvmContext<DB> {
         &mut self.inner.data.ctx
     }
 
-    fn ctx_ref(&self) -> &Self::Context {
-        self.inner.ctx_ref()
-    }
-
-    fn ctx_instructions(&mut self) -> (&mut Self::Context, &mut Self::Instructions) {
-        self.inner.ctx_instructions()
-    }
-
-    fn run_interpreter(
-        &mut self,
-        interpreter: &mut Interpreter<
-            <Self::Instructions as InstructionProvider>::InterpreterTypes,
-        >,
-    ) -> <<Self::Instructions as InstructionProvider>::InterpreterTypes as InterpreterTypes>::Output
-    {
-        self.inner.run_interpreter(interpreter)
-    }
-
-    fn ctx_precompiles(&mut self) -> (&mut Self::Context, &mut Self::Precompiles) {
-        self.inner.ctx_precompiles()
+    /// Provides a mutable reference to the EVM inspector.
+    pub fn inspector_mut(&mut self) -> &mut I {
+        &mut self.inner.data.inspector
     }
 }
 
-impl<CTX: ContextTr, INSP> InspectorEvmTr for MyEvm<CTX, INSP>
-where
-    CTX: ContextSetters<Journal: JournalExt>,
-    INSP: Inspector<CTX, EthInterpreter>,
-{
-    type Inspector = INSP;
+impl<DB: Database, I, PRECOMPILE> Deref for MyEvm<DB, I, PRECOMPILE> {
+    type Target = EthEvmContext<DB>;
 
-    fn inspector(&mut self) -> &mut Self::Inspector {
-        self.inner.inspector()
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.ctx()
     }
+}
 
-    fn ctx_inspector(&mut self) -> (&mut Self::Context, &mut Self::Inspector) {
-        self.inner.ctx_inspector()
-    }
-
-    fn run_inspect_interpreter(
-        &mut self,
-        interpreter: &mut Interpreter<
-            <Self::Instructions as InstructionProvider>::InterpreterTypes,
-        >,
-    ) -> <<Self::Instructions as InstructionProvider>::InterpreterTypes as InterpreterTypes>::Output
-    {
-        let context = &mut self.inner.data.ctx;
-        let instructions = &mut self.inner.instruction;
-        let inspector = &mut self.inner.data.inspector;
-
-        inspect_instructions(
-            context,
-            interpreter,
-            inspector,
-            instructions.instruction_table(),
-        )
+impl<DB: Database, I, PRECOMPILE> DerefMut for MyEvm<DB, I, PRECOMPILE> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.ctx_mut()
     }
 }
 
@@ -123,15 +104,17 @@ where
 
     type Spec = SpecId;
 
-    fn block(&self) -> &revm::context::BlockEnv {
-        todo!()
+    fn block(&self) -> &BlockEnv {
+        &self.block
     }
 
-    fn transact_raw(
-        &mut self,
-        tx: Self::Tx,
-    ) -> Result<revm::context::result::ResultAndState<Self::HaltReason>, Self::Error> {
-        todo!()
+    fn transact_raw(&mut self, tx: Self::Tx) -> Result<ResultAndState, Self::Error> {
+        if self.inspect {
+            self.inner.set_tx(tx);
+            self.inner.inspect_replay()
+        } else {
+            self.inner.transact(tx)
+        }
     }
 
     fn transact_system_call(
@@ -144,17 +127,21 @@ where
     }
 
     fn db_mut(&mut self) -> &mut Self::DB {
-        todo!()
+        &mut self.journaled_state.database
     }
 
-    fn finish(self) -> (Self::DB, alloy_evm::EvmEnv<Self::Spec>)
-    where
-        Self: Sized,
-    {
-        todo!()
+    fn finish(self) -> (Self::DB, EvmEnv<Self::Spec>) {
+        let Context {
+            block: block_env,
+            cfg: cfg_env,
+            journaled_state,
+            ..
+        } = self.inner.data.ctx;
+
+        (journaled_state.database, EvmEnv { block_env, cfg_env })
     }
 
     fn set_inspector_enabled(&mut self, enabled: bool) {
-        todo!()
+        self.inspect = enabled;
     }
 }
