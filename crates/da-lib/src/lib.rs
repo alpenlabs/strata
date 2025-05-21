@@ -12,14 +12,13 @@ pub mod diff {
     };
 }
 
+/// Re-export the diffable derive macro.
 pub use strata_diff_derive::DaDiff;
 
-pub trait Diff: Sized {
+pub trait Diff: Sized + Default {
     type Target;
-    fn none() -> Self; // Represents no diff
 
-    /// Merge this diff with other diffs, potentially optimizing the resulting list.
-    fn merge_with(&self, other: &[Self]) -> Vec<Self>;
+    fn is_default(&self) -> bool;
 
     fn apply(&self, source: &mut Self::Target) -> Result<(), ApplyError>;
 }
