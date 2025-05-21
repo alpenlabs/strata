@@ -13645,6 +13645,7 @@ dependencies = [
  "bitcoind-async-client",
  "borsh",
  "corepc-node",
+ "futures",
  "hex",
  "mockall",
  "musig2",
