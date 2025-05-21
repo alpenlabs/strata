@@ -14,12 +14,14 @@ use revm::{
     interpreter::{
         interpreter::EthInterpreter, InputsImpl, Interpreter, InterpreterResult, InterpreterTypes,
     },
-    Context, ExecuteEvm, InspectEvm, Inspector, MainBuilder, MainContext,
+    precompile, Context, ExecuteEvm, InspectEvm, Inspector, MainBuilder, MainContext,
 };
 use revm_primitives::hardfork::SpecId;
 
+use crate::strata_evm::StrataEvm;
+
 pub struct MyEvm<DB: Database, I, PRECOMPILE = EthPrecompiles> {
-    inner: RevmEvm<
+    inner: StrataEvm<
         EthEvmContext<DB>,
         I,
         EthInstructions<EthInterpreter, EthEvmContext<DB>>,
@@ -34,7 +36,7 @@ impl<DB: Database, I, PRECOMPILE> MyEvm<DB, I, PRECOMPILE> {
     /// The `inspect` argument determines whether the configured [`Inspector`] of the given
     /// [`RevmEvm`] should be invoked on [`Evm::transact`].
     pub const fn new(
-        evm: RevmEvm<
+        evm: StrataEvm<
             EthEvmContext<DB>,
             I,
             EthInstructions<EthInterpreter, EthEvmContext<DB>>,
@@ -48,11 +50,33 @@ impl<DB: Database, I, PRECOMPILE> MyEvm<DB, I, PRECOMPILE> {
         }
     }
 
+    pub fn another_new(
+        ctx: EthEvmContext<DB>,
+        instruction: EthInstructions<EthInterpreter, EthEvmContext<DB>>,
+        precompiles: PRECOMPILE,
+    ) {
+        // let evm: StrataEvm<
+        //     EthEvmContext<DB>,
+        //     I,
+        //     EthInstructions<EthInterpreter, EthEvmContext<DB>>,
+        //     PRECOMPILE,
+        // > = StrataEvm::new(ctx, instruction, precompiles);
+        // let evm = Self {
+        //     inner: evm,
+        //     inspect: false,
+        // };
+        todo!()
+    }
+
     /// Consumes self and return the inner EVM instance.
     pub fn into_inner(
         self,
-    ) -> RevmEvm<EthEvmContext<DB>, I, EthInstructions<EthInterpreter, EthEvmContext<DB>>, PRECOMPILE>
-    {
+    ) -> StrataEvm<
+        EthEvmContext<DB>,
+        I,
+        EthInstructions<EthInterpreter, EthEvmContext<DB>>,
+        PRECOMPILE,
+    > {
         self.inner
     }
 
@@ -109,12 +133,13 @@ where
     }
 
     fn transact_raw(&mut self, tx: Self::Tx) -> Result<ResultAndState, Self::Error> {
-        if self.inspect {
-            self.inner.set_tx(tx);
-            self.inner.inspect_replay()
-        } else {
-            self.inner.transact(tx)
-        }
+        todo!()
+        // if self.inspect {
+        //     self.inner.set_tx(tx);
+        //     self.inner.inspect_replay()
+        // } else {
+        //     self.inner.transact(tx)
+        // }
     }
 
     fn transact_system_call(

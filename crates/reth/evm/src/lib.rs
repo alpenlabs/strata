@@ -14,3 +14,4 @@ pub use utils::collect_withdrawal_intents;
 // mod api;
 pub mod evm;
 mod handler;
+mod strata_evm;

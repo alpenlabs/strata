@@ -52,6 +52,10 @@ impl EvmFactory for StrataEvmFactory {
         db: DB,
         input: EvmEnv,
     ) -> Self::Evm<DB, revm::inspector::NoOpInspector> {
+        let context = Context::mainnet()
+            .with_db(db)
+            .with_cfg(input.cfg_env)
+            .with_block(input.block_env);
         let evm = Context::mainnet()
             .with_db(db)
             .with_cfg(input.cfg_env)
