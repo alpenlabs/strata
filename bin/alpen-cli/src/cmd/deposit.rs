@@ -27,7 +27,7 @@ use crate::{
 };
 
 /// Magic bytes to attach to the deposit request.
-pub const MAGIC_BYTES: &[u8] = r"alpen".as_bytes();
+pub const MAGIC_BYTES: &[u8] = r"alpenstrata".as_bytes();
 
 /// Deposit 10 BTC from signet to Alpen. If an address is not provided, the wallet's internal
 /// Alpen address will be used.
