@@ -14,7 +14,7 @@ pub const CORE_SUBPROTOCOL_ID: SubprotocolId = 1;
 
 /// OL Core state.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-pub struct CoreASMState {
+pub struct CoreOLState {
     /// The zk‐SNARK verifying key used to verify each new checkpoint proof
     /// that has been posted on Bitcoin.
     checkpoint_vk: VerifyingKey,
@@ -42,7 +42,7 @@ pub struct OLCoreSubproto;
 impl Subprotocol for OLCoreSubproto {
     const ID: SubprotocolId = CORE_SUBPROTOCOL_ID;
 
-    type State = CoreASMState;
+    type State = CoreOLState;
 
     type Msg = NullMsg<CORE_SUBPROTOCOL_ID>;
 

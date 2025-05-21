@@ -10,4 +10,4 @@ mod stage;
 mod transition;
 mod tx_filter;
 
-pub use transition::asm_stf;
+pub use transition::{StrataAsmSpec, asm_stf};

@@ -14,7 +14,7 @@ use crate::{
 
 /// ASM spec for the Strata protocol.
 #[derive(Debug)]
-pub(crate) struct StrataAsmSpec;
+pub struct StrataAsmSpec;
 
 impl AsmSpec for StrataAsmSpec {
     fn call_subprotocols(stage: &mut impl Stage) {
@@ -25,7 +25,7 @@ impl AsmSpec for StrataAsmSpec {
 
 /// Computes the next AnchorState by applying the Anchor State Machine (ASM) state transition
 /// function (STF) to the given previous state and new L1 block.
-pub fn asm_stf(pre_state: AnchorState, block: Block) -> AnchorState {
+pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: Block) -> AnchorState {
     let mut pow_state = pre_state.chain_view.pow_state.clone();
 
     // 1. Validate and update PoW header continuity for the new block
@@ -38,16 +38,16 @@ pub fn asm_stf(pre_state: AnchorState, block: Block) -> AnchorState {
 
     // 3. LOAD: bring each subprotocol into a HandlerRelayer
     let mut loader_stage = SubprotoLoaderStage::new(&pre_state);
-    StrataAsmSpec::call_subprotocols(&mut loader_stage);
+    S::call_subprotocols(&mut loader_stage);
 
     // 4. PROCESS: feed each subprotocol its slice of txs
     let mut process_stage =
         ProcessStage::new(all_relevant_transactions, loader_stage.into_handler());
-    StrataAsmSpec::call_subprotocols(&mut process_stage);
+    S::call_subprotocols(&mut process_stage);
 
     // 5. FINISH: let each subprotocol process its buffered interproto messages
     let mut finish_stage = FinishStage::new(process_stage.into_handler());
-    StrataAsmSpec::call_subprotocols(&mut finish_stage);
+    S::call_subprotocols(&mut finish_stage);
 
     let sections = finish_stage.into_sections();
     let chain_view = ChainViewState { pow_state };
