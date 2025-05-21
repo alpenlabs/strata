@@ -132,7 +132,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let url = format!(
         "{base}{}/{}/{}",
         claim,
-        encode(&solution.to_be_bytes()),
+        encode(&solution.to_le_bytes()),
         address
     );
     let res = client.get(url).send().await.unwrap();
