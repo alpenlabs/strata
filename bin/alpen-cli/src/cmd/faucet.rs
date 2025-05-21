@@ -80,11 +80,15 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     println!("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
-    let base = Url::from_str(&settings.faucet_endpoint).expect("valid url");
-    let endpoint = {
-        let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
-        base.join(&format!("/pow_challenge/{}", chain)).unwrap()
-    };
+    let base = Url::from_str(&settings.faucet_endpoint)
+        .user_error("Invalid faucet endopoint. Check the config file")?;
+    let chain = Chain::from_network_type(network_type.clone()).user_error(format!(
+        "Unsupported network {}. Must be `signet` or `alpen`",
+        network_type
+    ))?;
+    let endpoint = base
+        .join(&format!("pow_challenge/{chain}"))
+        .expect("a valid URL");
 
     let challenge = client
         .get(endpoint)
@@ -128,7 +132,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     let url = format!(
         "{base}{}/{}/{}",
         claim,
-        encode(&solution.to_le_bytes()),
+        encode(&solution.to_be_bytes()),
         address
     );
     let res = client.get(url).send().await.unwrap();
