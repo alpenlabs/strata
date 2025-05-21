@@ -64,12 +64,30 @@ pub struct Chainstate {
     pub(crate) exec_env_state: exec_env::ExecEnvState,
 
     /// Operator table we store registered operators for.
-    #[diff_override(StateQueueDiff<bridge_state::OperatorTable>)]
+    #[diff_override(StateQueueDiff<bridge_state::OperatorEntry>)]
     pub(crate) operator_table: bridge_state::OperatorTable,
 
     /// Deposits table tracking each deposit's state.
-    #[diff_override(StateQueueDiff<bridge_state::DepositsTable>)]
+    #[diff_override(StateQueueDiff<bridge_state::DepositEntry>)]
     pub(crate) deposits_table: bridge_state::DepositsTable,
+}
+
+impl Default for ChainstateDiff {
+    fn default() -> Self {
+        Self {
+            cur_slot_diff: Default::default(),
+            prev_block_diff: Default::default(),
+            cur_epoch_diff: Default::default(),
+            prev_epoch_diff: Default::default(),
+            finalized_epoch_diff: Default::default(),
+            is_epoch_finishing_diff: Default::default(),
+            l1_state_diff: Default::default(),
+            pending_withdraws_diff: Default::default(),
+            exec_env_state_diff: Default::default(),
+            operator_table_diff: Default::default(),
+            deposits_table_diff: Default::default(),
+        }
+    }
 }
 
 impl Chainstate {

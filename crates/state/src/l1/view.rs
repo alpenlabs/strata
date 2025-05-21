@@ -26,6 +26,18 @@ pub struct L1ViewState {
     pub(crate) header_vs: HeaderVerificationState,
 }
 
+impl Default for L1ViewStateDiff {
+    fn default() -> Self {
+        Self {
+            horizon_height_diff: Default::default(),
+            genesis_height_diff: Default::default(),
+            safe_block_height_diff: Default::default(),
+            safe_block_header_diff: Default::default(),
+            header_vs_diff: Default::default(),
+        }
+    }
+}
+
 impl L1ViewState {
     /// Creates a new instance with the genesis trigger L1 block already ingested.
     pub fn new_at_genesis(

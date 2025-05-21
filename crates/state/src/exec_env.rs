@@ -41,6 +41,21 @@ pub struct ExecEnvState {
     pending_forced_incls: StateQueue<forced_inclusion::ForcedInclusion>,
 }
 
+// TODO: needs to be auto generated but somehow I can't get it to work without deriving in the macro
+// itself. And that can't be done because that enforces everything contained to have Default
+// implemented.
+impl Default for ExecEnvStateDiff {
+    fn default() -> Self {
+        Self {
+            last_update_input_diff: Default::default(),
+            cur_state_diff: Default::default(),
+            waiting_da_blobs_diff: Default::default(),
+            pending_deposits_diff: Default::default(),
+            pending_forced_incls_diff: Default::default(),
+        }
+    }
+}
+
 impl ExecEnvState {
     /// Constructs an env state from a starting input and the a state root,
     /// without producing any blobs, deposits, forced inclusions, etc.

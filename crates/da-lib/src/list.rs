@@ -32,7 +32,7 @@ impl<T: Clone> Diff for ListDiff<T> {
                 if *index < source.len() {
                     source.remove(*index);
                 } else {
-                    return Err(crate::ApplyError);  // TODO: better error variant
+                    return Err(crate::ApplyError); // TODO: better error variant
                 }
                 Ok(())
             }
