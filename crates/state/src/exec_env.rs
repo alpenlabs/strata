@@ -5,7 +5,10 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use strata_da_lib::{diff::*, DaDiff};
 use strata_primitives::{buf::Buf32, l1::payload::BlobSpec};
 
-use crate::{bridge_ops, exec_update, forced_inclusion, state_queue::StateQueue};
+use crate::{
+    bridge_ops, exec_update, forced_inclusion,
+    state_queue::{StateQueue, StateQueueDiff},
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, BorshDeserialize, BorshSerialize, DaDiff)]
 pub struct ExecEnvState {

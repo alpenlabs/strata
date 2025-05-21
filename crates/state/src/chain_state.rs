@@ -2,7 +2,7 @@
 
 use arbitrary::Arbitrary;
 use borsh::{BorshDeserialize, BorshSerialize};
-use strata_da_lib::{diff::*, DaDiff};
+use strata_da_lib::DaDiff;
 use strata_primitives::{
     buf::Buf32, epoch::EpochCommitment, hash::compute_borsh_hash, l2::L2BlockCommitment,
 };
@@ -14,6 +14,7 @@ use crate::{
     genesis::GenesisStateData,
     l1::{self, L1ViewState},
     prelude::*,
+    state_queue::StateQueueDiff,
 };
 
 /// L2 blockchain state.  This is the state computed as a function of a
