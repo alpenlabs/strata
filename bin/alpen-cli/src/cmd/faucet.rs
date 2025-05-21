@@ -124,7 +124,7 @@ pub async fn faucet(
         network_type
     ))?;
     let endpoint = base
-        .join(&format!("/pow_challenge/{chain}"))
+        .join(&format!("pow_challenge/{chain}"))
         .expect("a valid URL");
 
     let res = client
@@ -179,9 +179,9 @@ pub async fn faucet(
     println!("Claiming to {} address {}", network_type, address);
 
     let url = format!(
-        "{base}/{}/{}/{}",
+        "{base}{}/{}/{}",
         claim,
-        encode(&solution.to_le_bytes()),
+        encode(&solution.to_be_bytes()),
         address
     );
     let res = client
