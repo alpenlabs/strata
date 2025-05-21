@@ -11,4 +11,4 @@ pub use error::AsmError;
 pub use msg::{InterprotoMsg, Log, NullMsg};
 pub use spec::{AsmSpec, Stage};
 pub use state::{AnchorState, ChainViewState, SectionState};
-pub use subprotocol::{MsgRelayer, Subprotocol, SubprotocolId, TxInput};
+pub use subprotocol::{MsgRelayer, Sps50TagPayload, Subprotocol, SubprotocolId, TxInput};

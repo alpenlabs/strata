@@ -2,7 +2,7 @@
 use std::collections::BTreeMap;
 
 use bitcoin::{Transaction, opcodes::all::OP_RETURN, script::Instruction};
-use strata_asm_common::{SubprotocolId, TxInput};
+use strata_asm_common::{Sps50TagPayload, SubprotocolId, TxInput};
 
 /// Attempt to parse the SPS-50 L1 transaction header from the first output of a Bitcoin
 /// `Transaction`.
@@ -14,7 +14,7 @@ use strata_asm_common::{SubprotocolId, TxInput};
 /// [5]      tx type (u8)
 /// [6..]    auxiliary data (ignored here)
 /// ```
-fn parse_sps50_header(tx: &Transaction) -> Option<(SubprotocolId, u8)> {
+fn parse_sps50_header(tx: &Transaction) -> Option<(SubprotocolId, Sps50TagPayload<'_>)> {
     // 1) Ensure there's an output 0
     let first_out = tx.output.first()?;
     let script = &first_out.script_pubkey;
@@ -39,8 +39,9 @@ fn parse_sps50_header(tx: &Transaction) -> Option<(SubprotocolId, u8)> {
 
     // 4) Extract subprotocol and tx type
     let subprotocol = data[4];
-    let tx_type = data[5];
-    Some((subprotocol, tx_type))
+
+    let sps_50_payload = Sps50TagPayload::new(data[5], data[5..].as_bytes());
+    Some((subprotocol, sps_50_payload))
 }
 
 /// Groups only those Bitcoin `Transaction`s tagged with an SPS-50 header,
@@ -58,8 +59,8 @@ where
     let mut map: BTreeMap<SubprotocolId, Vec<TxInput<'t>>> = BTreeMap::new();
 
     for tx in transactions {
-        if let Some((subp, _tx_type)) = parse_sps50_header(tx) {
-            map.entry(subp).or_default().push(TxInput::new(tx));
+        if let Some((subp, payload)) = parse_sps50_header(tx) {
+            map.entry(subp).or_default().push(TxInput::new(tx, payload));
         }
     }
 
