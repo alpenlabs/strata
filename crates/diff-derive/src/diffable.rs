@@ -19,6 +19,10 @@ pub fn generate_diffable(input: &DeriveInput) -> TokenStream {
     let vis = &input.vis;
     let diff_name = format_ident!("{}Diff", name);
 
+    // Copy generics and where clause
+    let generics = &input.generics;
+    let (_, ty_generics, where_clause) = generics.split_for_impl();
+
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(named) => &named.named,
@@ -57,7 +61,7 @@ pub fn generate_diffable(input: &DeriveInput) -> TokenStream {
 
     quote! {
         #[derive(Debug, Clone)]
-        #vis struct #diff_name {
+        #vis struct #diff_name #ty_generics #where_clause {
             #(pub #diff_fields),*
         }
     }
