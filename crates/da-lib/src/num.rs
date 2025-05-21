@@ -1,4 +1,5 @@
 /// Diffs for large numbers which will increment or decrement by small sizes
+#[derive(Debug, Clone)]
 pub enum NumDiff<N: Unsigned, Delta: Unsigned + SmallerThan<N>> {
     None,
     Increment(Delta),

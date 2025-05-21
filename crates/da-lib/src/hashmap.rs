@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub enum HashMapDiff<K, V> {
     None,
     Insert(K, V),

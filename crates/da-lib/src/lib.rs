@@ -3,11 +3,12 @@ mod hashmap;
 mod list;
 mod num;
 mod register;
+mod state_queue;
 
 pub mod diff {
     pub use super::{
         append_list::AppendOnlyListDiff, hashmap::HashMapDiff, list::ListDiff, num::NumDiff,
-        register::RegisterDiff,
+        register::RegisterDiff, state_queue::StateQueueDiff,
     };
 }
 

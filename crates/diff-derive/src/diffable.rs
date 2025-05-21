@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Attribute, Data, DeriveInput, Error, Fields, Path};
+use syn::{Attribute, Data, DeriveInput, Fields, Path};
 
 fn get_diff_override(attrs: &[Attribute]) -> Option<Path> {
     for attr in attrs {
-        if attr.path().is_ident("diff") {
+        if attr.path().is_ident("diff_override") {
             // Parse the attribute like #[diff(MyType)]
             if let Ok(path) = attr.parse_args::<syn::Path>() {
                 return Some(path);
@@ -43,7 +43,7 @@ pub fn generate_diffable(input: &DeriveInput) -> TokenStream {
             // If no diff override is found, use RegisterDiff(or error out making it mandatory?)
             None => {
                 diff_fields.push(quote! {
-                    #diff_field_name: RegisterDiff<#field_ty>
+                    #diff_field_name: ::strata_da_lib::diff::RegisterDiff<#field_ty>
                 });
 
                 // let err = Error::new(

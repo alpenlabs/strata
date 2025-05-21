@@ -9,16 +9,16 @@ pub struct VecDiff;
 
 #[derive(DaDiff, Debug, Clone)]
 pub struct TestStruct {
-    #[diff(Vec<IntDiff>)]
+    #[diff_override(Vec<IntDiff>)]
     pub a: u64,
 
-    #[diff(Vec<VecDiff>)]
+    #[diff_override(Vec<VecDiff>)]
     pub b: Vec<String>,
 }
 
 #[derive(DaDiff, Debug, Clone)]
 pub struct NestedStruct {
-    #[diff(TestStructDiff)]
+    #[diff_override(TestStructDiff)]
     pub test: TestStruct,
 
     pub reg: u32, // expect this to have auto derived RegisterDiff<u32>
