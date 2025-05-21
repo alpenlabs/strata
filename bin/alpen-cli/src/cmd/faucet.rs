@@ -202,10 +202,8 @@ fn resolve_strata_address(
 
 /// Ensures that the URL has a trailing slash.
 fn ensure_trailing_slash(mut url: Url) -> Url {
-    if !url.path().ends_with('/') {
-        let new_path = format!("{}/", url.path().trim_end_matches('/'));
-        url.set_path(&new_path);
-    }
+    let new_path = format!("{}/", url.path().trim_end_matches('/'));
+    url.set_path(&new_path);
     url
 }
 
@@ -225,6 +223,13 @@ mod tests {
     #[test]
     fn leaves_trailing_slash_when_present() {
         let url = Url::parse("https://example.com/").unwrap();
+        let fixed = ensure_trailing_slash(url);
+        assert_eq!(fixed.as_str(), "https://example.com/");
+    }
+
+    #[test]
+    fn handles_trailing_slashes_when_present() {
+        let url = Url::parse("https://example.com//").unwrap();
         let fixed = ensure_trailing_slash(url);
         assert_eq!(fixed.as_str(), "https://example.com/");
     }
