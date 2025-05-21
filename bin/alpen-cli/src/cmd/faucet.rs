@@ -80,15 +80,13 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     println!("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
-    let base = Url::from_str(&settings.faucet_endpoint)
-        .user_error("Invalid faucet endopoint. Check the config file")?;
-    let chain = Chain::from_network_type(network_type.clone()).user_error(format!(
-        "Unsupported network {}. Must be `signet` or `alpen`",
-        network_type
-    ))?;
-    let endpoint = base
-        .join(&format!("pow_challenge/{chain}"))
-        .expect("a valid URL");
+    let mut base_url = Url::from_str(&settings.faucet_endpoint).expect("valid url");
+    base_url = ensure_trailing_slash(base_url);
+
+    let endpoint = {
+        let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
+        base_url.join(&format!("pow_challenge/{}", chain)).unwrap()
+    };
 
     let challenge = client
         .get(endpoint)
@@ -130,7 +128,7 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
     println!("Claiming to {} address {}", network_type, address);
 
     let url = format!(
-        "{base}{}/{}/{}",
+        "{base_url}{}/{}/{}",
         claim,
         encode(&solution.to_le_bytes()),
         address
@@ -199,5 +197,34 @@ fn resolve_strata_address(
             std::process::exit(1);
         }),
         None => l2w.default_signer_address(),
+    }
+}
+
+fn ensure_trailing_slash(mut url: Url) -> Url {
+    if !url.path().ends_with('/') {
+        let new_path = format!("{}/", url.path().trim_end_matches('/'));
+        url.set_path(&new_path);
+    }
+    url
+}
+
+#[cfg(test)]
+mod tests {
+    use reqwest::Url;
+
+    use super::*;
+
+    #[test]
+    fn adds_trailing_slash_when_missing() {
+        let url = Url::parse("https://example.com").unwrap();
+        let fixed = ensure_trailing_slash(url);
+        assert_eq!(fixed.as_str(), "https://example.com/");
+    }
+
+    #[test]
+    fn leaves_trailing_slash_when_present() {
+        let url = Url::parse("https://example.com/").unwrap();
+        let fixed = ensure_trailing_slash(url);
+        assert_eq!(fixed.as_str(), "https://example.com/");
     }
 }
