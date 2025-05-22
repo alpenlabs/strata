@@ -20,9 +20,9 @@ use crate::{
 pub struct StrataAsmSpec;
 
 impl AsmSpec for StrataAsmSpec {
-    fn call_subprotocols(stage: &mut impl Stage, manager: &mut impl SubprotocolManager) {
-        stage.process_subprotocol::<OLCoreSubproto>(manager);
-        stage.process_subprotocol::<BridgeV1Subproto>(manager);
+    fn call_subprotocols(stage: &mut impl Stage) {
+        stage.process_subprotocol::<OLCoreSubproto>();
+        stage.process_subprotocol::<BridgeV1Subproto>();
     }
 }
 
@@ -42,16 +42,16 @@ pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: Block) -> Result<Ancho
     let mut manager = HandlerRelayer::new();
 
     // 3. LOAD: bring each subprotocol into a HandlerRelayer
-    let mut loader_stage = SubprotoLoaderStage::new(&pre_state);
-    S::call_subprotocols(&mut loader_stage, &mut manager);
+    let mut loader_stage = SubprotoLoaderStage::new(&pre_state, &mut manager);
+    S::call_subprotocols(&mut loader_stage);
 
     // 4. PROCESS: feed each subprotocol its slice of txs
-    let mut process_stage = ProcessStage::new(all_relevant_transactions);
-    S::call_subprotocols(&mut process_stage, &mut manager);
+    let mut process_stage = ProcessStage::new(all_relevant_transactions, &mut manager);
+    S::call_subprotocols(&mut process_stage);
 
     // 5. FINISH: let each subprotocol process its buffered interproto messages
-    let mut finish_stage = FinishStage::new();
-    S::call_subprotocols(&mut finish_stage, &mut manager);
+    let mut finish_stage = FinishStage::new(&mut manager);
+    S::call_subprotocols(&mut finish_stage);
 
     let sections = finish_stage.into_sorted_sections();
     let chain_view = ChainViewState { pow_state };
