@@ -10,7 +10,7 @@ use std::{
     sync::Arc,
 };
 
-use backend::{ScanError, SignetBackend, SyncError, WalletUpdate};
+use backend::{ScanError, SignetBackend, SyncError, UpdateError, WalletUpdate};
 use bdk_esplora::esplora_client::{self, AsyncClient};
 use bdk_wallet::{
     bitcoin::{FeeRate, Network},
@@ -106,13 +106,13 @@ impl SignetWallet {
         })
     }
 
-    pub async fn sync(&mut self) -> Result<(), OneOf<(SyncError, rusqlite::Error)>> {
+    pub async fn sync(&mut self) -> Result<(), OneOf<(UpdateError, SyncError, rusqlite::Error)>> {
         sync_wallet(&mut self.wallet, self.sync_backend.clone()).await?;
         self.persist().map_err(OneOf::new)?;
         Ok(())
     }
 
-    pub async fn scan(&mut self) -> Result<(), OneOf<(ScanError, rusqlite::Error)>> {
+    pub async fn scan(&mut self) -> Result<(), OneOf<(UpdateError, ScanError, rusqlite::Error)>> {
         scan_wallet(&mut self.wallet, self.sync_backend.clone()).await?;
         self.persist().map_err(OneOf::new)?;
         Ok(())
@@ -126,14 +126,14 @@ impl SignetWallet {
 pub async fn scan_wallet(
     wallet: &mut Wallet,
     sync_backend: Arc<dyn SignetBackend>,
-) -> Result<(), OneOf<(ScanError, rusqlite::Error)>> {
+) -> Result<(), OneOf<(UpdateError, ScanError, rusqlite::Error)>> {
     let req = wallet.start_full_scan();
     let last_cp = wallet.latest_checkpoint();
     let (tx, rx) = unbounded_channel();
 
     let handle = tokio::spawn(async move { sync_backend.scan_wallet(req, last_cp, tx).await });
 
-    apply_update_stream(wallet, rx).await;
+    apply_update_stream(wallet, rx).await.map_err(OneOf::new)?;
 
     handle
         .await
@@ -146,14 +146,14 @@ pub async fn scan_wallet(
 pub async fn sync_wallet(
     wallet: &mut Wallet,
     sync_backend: Arc<dyn SignetBackend>,
-) -> Result<(), OneOf<(SyncError, rusqlite::Error)>> {
+) -> Result<(), OneOf<(UpdateError, SyncError, rusqlite::Error)>> {
     let req = wallet.start_sync_with_revealed_spks();
     let last_cp = wallet.latest_checkpoint();
     let (tx, rx) = unbounded_channel();
 
     let handle = tokio::spawn(async move { sync_backend.sync_wallet(req, last_cp, tx).await });
 
-    apply_update_stream(wallet, rx).await;
+    apply_update_stream(wallet, rx).await.map_err(OneOf::new)?;
 
     handle
         .await
@@ -163,25 +163,30 @@ pub async fn sync_wallet(
     Ok(())
 }
 
-async fn apply_update_stream(wallet: &mut Wallet, mut rx: UnboundedReceiver<WalletUpdate>) {
+async fn apply_update_stream(
+    wallet: &mut Wallet,
+    mut rx: UnboundedReceiver<WalletUpdate>,
+) -> Result<(), UpdateError> {
     while let Some(update) = rx.recv().await {
         match update {
             WalletUpdate::SpkSync(update) => {
-                wallet.apply_update(update).expect("update to connect")
+                wallet.apply_update(update).map_err(UpdateError::from_err)?
             }
             WalletUpdate::SpkScan(update) => {
-                wallet.apply_update(update).expect("update to connect")
+                wallet.apply_update(update).map_err(UpdateError::from_err)?
             }
             WalletUpdate::NewBlock(ev) => {
                 let height = ev.block_height();
                 let connected_to = ev.connected_to();
                 wallet
                     .apply_block_connected_to(&ev.block, height, connected_to)
-                    .expect("block to be added")
+                    .map_err(UpdateError::from_err)?
             }
             WalletUpdate::MempoolTxs(txs) => wallet.apply_unconfirmed_txs(txs),
         }
     }
+
+    Ok(())
 }
 
 impl Deref for SignetWallet {

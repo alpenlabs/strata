@@ -11,7 +11,8 @@ use shrex::{encode, Hex};
 
 use crate::{
     alpen::AlpenWallet,
-    net_type::{net_type_or_exit, NetworkType},
+    errors::{DisplayableError, DisplayedError},
+    net_type::NetworkType,
     seed::Seed,
     settings::Settings,
     signet::SignetWallet,
@@ -63,39 +64,90 @@ impl fmt::Display for Chain {
     }
 }
 
-pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
-    let network_type = net_type_or_exit(&args.network_type);
+pub async fn faucet(
+    args: FaucetArgs,
+    seed: Seed,
+    settings: Settings,
+) -> Result<(), DisplayedError> {
+    let network_type = args
+        .network_type
+        .parse()
+        .user_error(format!("invalid network type '{}'", args.network_type))?;
 
     let (address, claim) = match network_type {
-        NetworkType::Signet => (
-            resolve_signet_address(&args, &seed, &settings).to_string(),
-            "claim_l1",
-        ),
-        NetworkType::Alpen => (
-            resolve_strata_address(&args, &seed, &settings).to_string(),
-            "claim_l2",
-        ),
+        NetworkType::Signet => {
+            let mut l1w =
+                SignetWallet::new(&seed, settings.network, settings.signet_backend.clone())
+                    .internal_error("Failed to load signet wallet")?;
+
+            let addr = match &args.address {
+                None => {
+                    let address_info = l1w.reveal_next_address(KeychainKind::External);
+                    l1w.persist()
+                        .internal_error("Failed to persist signet wallet")?;
+                    address_info.address
+                }
+                Some(a) => {
+                    let unchecked = Address::from_str(a).user_error(format!(
+                        "Invalid signet address: '{a}'. Must be a valid Bitcoin address.",
+                    ))?;
+                    unchecked
+                        .require_network(settings.network)
+                        .user_error(format!(
+                            "Provided address '{a}' is not valid for network '{}'",
+                            settings.network
+                        ))?
+                }
+            };
+            (addr.to_string(), "claim_l1")
+        }
+        NetworkType::Alpen => {
+            let l2w = AlpenWallet::new(&seed, &settings.alpen_endpoint)
+                .user_error("Invalid Alpen endpoint URL. Check the config file")?;
+            let addr = match &args.address {
+                Some(a) => AlpenAddress::from_str(a).user_error(format!(
+                    "Invalid Alpen address {a}. Must be an EVM-compatible address"
+                ))?,
+                None => l2w.default_signer_address(),
+            };
+            (addr.to_string(), "claim_l2")
+        }
     };
 
     println!("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
-    let mut base_url = Url::from_str(&settings.faucet_endpoint).expect("valid url");
+    let mut base_url = Url::from_str(&settings.faucet_endpoint)
+        .user_error("Invalid faucet endopoint. Check the config file")?;
     base_url = ensure_trailing_slash(base_url);
+    let chain = Chain::from_network_type(network_type.clone()).user_error(format!(
+        "Unsupported network {}. Must be `signet` or `alpen`",
+        network_type
+    ))?;
+    let endpoint = base_url
+        .join(&format!("pow_challenge/{chain}"))
+        .expect("a valid URL");
 
-    let endpoint = {
-        let chain = Chain::from_network_type(network_type.clone()).expect("conversion to succeed");
-        base_url.join(&format!("pow_challenge/{}", chain)).unwrap()
-    };
-
-    let challenge = client
+    let res = client
         .get(endpoint)
         .send()
         .await
-        .unwrap()
+        .internal_error("Failed to fetch PoW challenge")?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let error_text = res.text().await.unwrap_or("unknown error".to_string());
+        let faucet_error = format!("{status}: {error_text}");
+        return Err(DisplayedError::InternalError(
+            "Faucet returned an error".to_string(),
+            Box::new(faucet_error),
+        ));
+    }
+
+    let challenge = res
         .json::<PowChallenge>()
         .await
-        .expect("invalid response");
+        .internal_error("Failed to parse faucet response")?;
     println!(
         "Received POW challenge with difficulty 2^{} from faucet: {:?}. Solving...",
         challenge.difficulty, challenge.nonce
@@ -133,15 +185,24 @@ pub async fn faucet(args: FaucetArgs, seed: Seed, settings: Settings) {
         encode(&solution.to_le_bytes()),
         address
     );
-    let res = client.get(url).send().await.unwrap();
+    let res = client
+        .get(url)
+        .send()
+        .await
+        .internal_error("Failed to claim from faucet")?;
 
     let status = res.status();
-    let body = res.text().await.expect("invalid response");
+    let body = res
+        .text()
+        .await
+        .internal_error("Failed to parse faucet response")?;
     if status == StatusCode::OK {
         println!("Faucet claim successfully queued. The funds should appear in your wallet soon.",);
     } else {
         println!("Failed: faucet responded with {status}: {body}");
     }
+
+    Ok(())
 }
 
 fn count_leading_zeros(data: &[u8]) -> u8 {
@@ -154,50 +215,6 @@ fn count_leading_zeros(data: &[u8]) -> u8 {
 fn pow_valid(mut hasher: Sha256, difficulty: u8, solution: Solution) -> bool {
     hasher.update(solution);
     count_leading_zeros(&hasher.finalize()) >= difficulty
-}
-
-fn resolve_signet_address(
-    args: &FaucetArgs,
-    seed: &Seed,
-    settings: &Settings,
-) -> bdk_wallet::bitcoin::Address {
-    let mut l1w =
-        SignetWallet::new(seed, settings.network, settings.signet_backend.clone()).unwrap();
-
-    match &args.address {
-        None => {
-            let address_info = l1w.reveal_next_address(KeychainKind::External);
-            l1w.persist().unwrap();
-            address_info.address
-        }
-        Some(address) => {
-            let address = Address::from_str(address).unwrap_or_else(|_| {
-                eprintln!("Invalid signet address provided as argument.");
-                std::process::exit(1);
-            });
-            address
-                .require_network(settings.network)
-                .expect("wrong bitcoin network")
-        }
-    }
-}
-
-fn resolve_strata_address(
-    args: &FaucetArgs,
-    seed: &Seed,
-    settings: &Settings,
-) -> alloy::primitives::Address {
-    let l2w = AlpenWallet::new(seed, &settings.alpen_endpoint).unwrap();
-
-    match &args.address {
-        Some(address) => AlpenAddress::from_str(address).unwrap_or_else(|_| {
-            eprintln!(
-                "Invalid strata address provided as argument - must be an EVM-compatible address."
-            );
-            std::process::exit(1);
-        }),
-        None => l2w.default_signer_address(),
-    }
 }
 
 /// Ensures that the URL has a trailing slash.

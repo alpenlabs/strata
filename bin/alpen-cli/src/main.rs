@@ -1,6 +1,8 @@
 pub mod alpen;
 pub mod cmd;
 pub mod constants;
+#[macro_use]
+pub mod errors;
 mod link;
 pub mod net_type;
 pub mod recovery;
@@ -30,7 +32,10 @@ async fn main() {
         return;
     }
 
-    let settings = Settings::load().unwrap();
+    let settings = Settings::load().unwrap_or_else(|e| {
+        eprintln!("Configuration error: {:?}", e);
+        std::process::exit(1);
+    });
 
     #[cfg(not(target_os = "linux"))]
     let persister = KeychainPersister;
@@ -38,7 +43,10 @@ async fn main() {
     let persister = FilePersister::new(settings.linux_seed_file.clone());
 
     if let Commands::Reset(args) = cmd {
-        reset(args, persister, settings).await;
+        let result = reset(args, persister, settings).await;
+        if let Err(err) = result {
+            eprintln!("{err}");
+        }
         return;
     }
 
@@ -49,7 +57,7 @@ async fn main() {
         std::process::exit(1);
     });
 
-    match cmd {
+    let result = match cmd {
         Commands::Recover(args) => recover(args, seed, settings).await,
         Commands::Drain(args) => drain(args, seed, settings).await,
         Commands::Balance(args) => balance(args, seed, settings).await,
@@ -61,6 +69,10 @@ async fn main() {
         Commands::Receive(args) => receive(args, seed, settings).await,
         Commands::ChangePwd(args) => change_pwd(args, seed, persister).await,
         Commands::Scan(args) => scan(args, seed, settings).await,
-        _ => {}
+        _ => Ok(()),
+    };
+
+    if let Err(err) = result {
+        eprintln!("{err}");
     }
 }
