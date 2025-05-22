@@ -5,7 +5,7 @@
 //! registered subprotocols and finalising their execution.  The surrounding
 //! modules provide the handler and stage infrastructure used by the STF.
 
-mod handler;
+mod manager;
 mod stage;
 mod transition;
 mod tx_filter;

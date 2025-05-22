@@ -4,7 +4,7 @@ use std::{any::Any, collections::BTreeMap};
 
 use strata_asm_common::{
     AsmError, InterprotoMsg, Log, MsgRelayer, SectionState, SubprotoHandler, Subprotocol,
-    SubprotocolId, SubprotocolManager, TxInput,
+    SubprotocolId, TxInput,
 };
 
 /// Wrapper around the common subprotocol interface that handles the common
@@ -25,12 +25,17 @@ impl<S: Subprotocol + 'static, R: MsgRelayer + 'static> HandlerImpl<S, R> {
         }
     }
 
+    /// Constructs an instance by wrapping a subprotocol's state.
     pub(crate) fn from_state(state: S::State) -> Self {
         Self::new(state, Vec::new())
     }
 }
 
 impl<S: Subprotocol, R: MsgRelayer> SubprotoHandler for HandlerImpl<S, R> {
+    fn id(&self) -> SubprotocolId {
+        S::ID
+    }
+
     fn accept_msg(&mut self, msg: &dyn InterprotoMsg) {
         let m = msg
             .as_dyn_any()
@@ -56,23 +61,59 @@ impl<S: Subprotocol, R: MsgRelayer> SubprotoHandler for HandlerImpl<S, R> {
     }
 }
 
-/// Executor that manages a set of loaded subprotocols.
-pub(crate) struct HandlerRelayer {
+/// Manages subproto handlers and relays messages between them.
+pub(crate) struct SubprotoManager {
     handlers: BTreeMap<SubprotocolId, Box<dyn SubprotoHandler>>,
     logs: Vec<Log>,
 }
 
-impl SubprotocolManager for HandlerRelayer {
-    /// Inserts a subproto by creating a handler for it.
-    fn insert_subproto<S: Subprotocol>(&mut self, state: S::State) {
+/* SubprotocolManager for */
+impl SubprotoManager {
+    /// Inserts a subproto by creating a handler for it, wrapping a tstate.
+    pub(crate) fn insert_subproto<S: Subprotocol>(&mut self, state: S::State) {
         let handler = HandlerImpl::<S, Self>::from_state(state);
-        if self.handlers.insert(S::ID, Box::new(handler)).is_some() {
-            panic!("asm: loaded state twice");
-        }
+        assert_eq!(
+            handler.id(),
+            S::ID,
+            "asm: subproto handler impl ID doesn't match"
+        );
+        self.insert_handler(Box::new(handler));
     }
 
-    fn insert_handler<S: Subprotocol>(&mut self, handler: Box<dyn SubprotoHandler>) {
-        self.handlers.insert(S::ID, handler);
+    /// Dispatches transaction processing to the appropriate handler.
+    ///
+    /// This default implementation temporarily removes the handler to satisfy
+    /// borrow-checker constraints, invokes `process_txs` with `self` as the relayer,
+    /// and then reinserts the handler.
+    pub(crate) fn invoke_process_txs<S: Subprotocol>(&mut self, txs: &[TxInput<'_>]) {
+        // We temporarily take the handler out of the map so we can call
+        // `process_txs` with `self` as the relayer without violating the
+        // borrow checker.
+        let mut h = self
+            .remove_handler(S::ID)
+            .expect("asm: unloaded subprotocol");
+        h.process_txs(txs, self);
+        self.insert_handler(h);
+    }
+
+    /// Dispatches buffered inter-protocol message processing to the handler.
+    pub(crate) fn invoke_process_msgs<S: Subprotocol>(&mut self) {
+        let h = self
+            .get_handler_mut(S::ID)
+            .expect("asm: unloaded subprotocol");
+        h.process_msgs()
+    }
+
+    fn insert_handler(&mut self, handler: Box<dyn SubprotoHandler>) {
+        use std::collections::btree_map::Entry;
+
+        // We have to make sure we don't overwrite something there.
+        let ent = self.handlers.entry(handler.id());
+        if matches!(ent, Entry::Occupied(_)) {
+            panic!("asm: tried to overwrite subproto {} entry", handler.id());
+        }
+
+        ent.or_insert(handler);
     }
 
     fn remove_handler(&mut self, id: SubprotocolId) -> Result<Box<dyn SubprotoHandler>, AsmError> {
@@ -96,9 +137,15 @@ impl SubprotocolManager for HandlerRelayer {
             .get_mut(&id)
             .ok_or(AsmError::InvalidSubprotocol(id))
     }
+
+    /// Extracts the section state for a subprotocol.
+    pub(crate) fn to_section_state<S: Subprotocol>(&self) -> SectionState {
+        let h = self.get_handler(S::ID).expect("asm: unloaded subprotocol");
+        h.to_section()
+    }
 }
 
-impl HandlerRelayer {
+impl SubprotoManager {
     pub(crate) fn new() -> Self {
         Self {
             handlers: BTreeMap::new(),
@@ -107,7 +154,7 @@ impl HandlerRelayer {
     }
 }
 
-impl MsgRelayer for HandlerRelayer {
+impl MsgRelayer for SubprotoManager {
     fn relay_msg(&mut self, m: &dyn InterprotoMsg) {
         let h = self
             .get_handler_mut(m.id())

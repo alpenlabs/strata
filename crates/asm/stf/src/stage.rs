@@ -3,20 +3,18 @@
 
 use std::collections::BTreeMap;
 
-use strata_asm_common::{
-    AnchorState, SectionState, Stage, Subprotocol, SubprotocolId, SubprotocolManager, TxInput,
-};
+use strata_asm_common::{AnchorState, SectionState, Stage, Subprotocol, SubprotocolId, TxInput};
 
-use crate::handler::HandlerRelayer;
+use crate::manager::SubprotoManager;
 
 /// Stage that loads each subprotocol from the anchor state we're basing off of.
 pub(crate) struct SubprotoLoaderStage<'a> {
     anchor_state: &'a AnchorState,
-    manager: &'a mut HandlerRelayer,
+    manager: &'a mut SubprotoManager,
 }
 
 impl<'a> SubprotoLoaderStage<'a> {
-    pub(crate) fn new(anchor_state: &'a AnchorState, manager: &'a mut HandlerRelayer) -> Self {
+    pub(crate) fn new(anchor_state: &'a AnchorState, manager: &'a mut SubprotoManager) -> Self {
         Self {
             anchor_state,
             manager,
@@ -42,13 +40,13 @@ impl Stage for SubprotoLoaderStage<'_> {
 /// Stage to process txs pre-extracted from the block for each subprotocol.
 pub(crate) struct ProcessStage<'b, 'm> {
     tx_bufs: BTreeMap<SubprotocolId, Vec<TxInput<'b>>>,
-    manager: &'m mut HandlerRelayer,
+    manager: &'m mut SubprotoManager,
 }
 
 impl<'b, 'm> ProcessStage<'b, 'm> {
     pub(crate) fn new(
         tx_bufs: BTreeMap<SubprotocolId, Vec<TxInput<'b>>>,
-        manager: &'m mut HandlerRelayer,
+        manager: &'m mut SubprotoManager,
     ) -> Self {
         Self { tx_bufs, manager }
     }
@@ -68,11 +66,11 @@ impl Stage for ProcessStage<'_, '_> {
 /// Stage to handle messages exchanged between subprotocols in execution.
 pub(crate) struct FinishStage<'m> {
     sections: Vec<SectionState>,
-    manager: &'m mut HandlerRelayer,
+    manager: &'m mut SubprotoManager,
 }
 
 impl<'m> FinishStage<'m> {
-    pub(crate) fn new(manager: &'m mut HandlerRelayer) -> Self {
+    pub(crate) fn new(manager: &'m mut SubprotoManager) -> Self {
         let sections = Vec::new();
         Self { sections, manager }
     }

@@ -3,14 +3,12 @@
 //! view into a single deterministic state transition.
 
 use bitcoin::{block::Block, params::Params};
-use strata_asm_common::{
-    AnchorState, AsmError, AsmSpec, ChainViewState, Stage, SubprotocolManager,
-};
+use strata_asm_common::{AnchorState, AsmError, AsmSpec, ChainViewState, Stage};
 use strata_asm_proto_bridge_v1::BridgeV1Subproto;
 use strata_asm_proto_core::OLCoreSubproto;
 
 use crate::{
-    handler::HandlerRelayer,
+    manager::SubprotoManager,
     stage::{FinishStage, ProcessStage, SubprotoLoaderStage},
     tx_filter::group_txs_by_subprotocol,
 };
@@ -39,7 +37,7 @@ pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: Block) -> Result<Ancho
     // 2. Filter the relevant transactions
     let all_relevant_transactions = group_txs_by_subprotocol(&block.txdata);
 
-    let mut manager = HandlerRelayer::new();
+    let mut manager = SubprotoManager::new();
 
     // 3. LOAD: bring each subprotocol into a HandlerRelayer
     let mut loader_stage = SubprotoLoaderStage::new(&pre_state, &mut manager);

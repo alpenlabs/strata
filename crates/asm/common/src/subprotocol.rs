@@ -60,6 +60,10 @@ pub trait MsgRelayer: Any {
 
 /// Subprotocol handler trait for a loaded subprotocol.
 pub trait SubprotoHandler {
+    /// Gets the ID of the subprotocol.  This should just directly expose it
+    /// as-is.
+    fn id(&self) -> SubprotocolId;
+
     /// Processes transactions that were previously collected.
     fn process_txs(&mut self, txs: &[TxInput<'_>], relayer: &mut dyn MsgRelayer);
 
@@ -79,71 +83,4 @@ pub trait SubprotoHandler {
 
     /// Repacks the state into a [`SectionState`] instance.
     fn to_section(&self) -> SectionState;
-}
-
-/// Manages the lifecycle and execution of subprotocol handlers in the Anchor State Machine (ASM).
-///
-/// Implementers of this trait maintain a collection of subprotocol handlers and
-/// provide methods to insert, remove, lookup, and drive execution (transactions and messages),
-/// as well as extract the final `SectionState`.
-pub trait SubprotocolManager: MsgRelayer + Sized {
-    /// Inserts a new subprotocol by consuming its initial state and creating its handler.
-    fn insert_subproto<S: Subprotocol>(&mut self, state: S::State);
-
-    /// Inserts a boxed handler directly.
-    fn insert_handler<S: Subprotocol>(&mut self, handler: Box<dyn SubprotoHandler>);
-
-    /// Removes and returns the handler for the given `id`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `AsmError::InvalidSubprotocol(id)` if no handler with that ID is present.
-    fn remove_handler(&mut self, id: SubprotocolId) -> Result<Box<dyn SubprotoHandler>, AsmError>;
-
-    /// Retrieves an immutable reference to the handler for the given `id`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `AsmError::InvalidSubprotocol(id)` if no handler with that ID is present.
-    fn get_handler(&self, id: SubprotocolId) -> Result<&dyn SubprotoHandler, AsmError>;
-
-    /// Retrieves a mutable reference to the handler for the given `id`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `AsmError::InvalidSubprotocol(id)` if no handler with that ID is present.
-    fn get_handler_mut(
-        &mut self,
-        id: SubprotocolId,
-    ) -> Result<&mut Box<dyn SubprotoHandler>, AsmError>;
-
-    /// Dispatches transaction processing to the appropriate handler.
-    ///
-    /// This default implementation temporarily removes the handler to satisfy
-    /// borrow-checker constraints, invokes `process_txs` with `self` as the relayer,
-    /// and then reinserts the handler.
-    fn invoke_process_txs<S: Subprotocol>(&mut self, txs: &[TxInput<'_>]) {
-        // We temporarily take the handler out of the map so we can call
-        // `process_txs` with `self` as the relayer without violating the
-        // borrow checker.
-        let mut h = self
-            .remove_handler(S::ID)
-            .expect("asm: unloaded subprotocol");
-        h.process_txs(txs, self);
-        self.insert_handler::<S>(h);
-    }
-
-    /// Dispatches buffered inter-protocol message processing to the handler.
-    fn invoke_process_msgs<S: Subprotocol>(&mut self) {
-        let h = self
-            .get_handler_mut(S::ID)
-            .expect("asm: unloaded subprotocol");
-        h.process_msgs()
-    }
-
-    /// Extracts the finalized `SectionState` from the handler.
-    fn to_section_state<S: Subprotocol>(&self) -> SectionState {
-        let h = self.get_handler(S::ID).expect("asm: unloaded subprotocol");
-        h.to_section()
-    }
 }

@@ -1,4 +1,4 @@
-use crate::{Subprotocol, SubprotocolManager};
+use crate::Subprotocol;
 
 /// Specification for a concrete ASM instantiation describing the subprotocols we
 /// want to invoke and in what order.
