@@ -3,31 +3,9 @@
 use std::{any::Any, collections::BTreeMap};
 
 use strata_asm_common::{
-    AsmError, InterprotoMsg, Log, MsgRelayer, SectionState, Subprotocol, SubprotocolId, TxInput,
+    AsmError, InterprotoMsg, Log, MsgRelayer, SectionState, SubprotoHandler, Subprotocol,
+    SubprotocolId, SubprotocolManager, TxInput,
 };
-
-/// Subprotocol handler trait for a loaded subprotocol.
-pub(crate) trait SubprotoHandler {
-    /// Processes transactions that were previously collected.
-    fn process_txs(&mut self, txs: &[TxInput<'_>], relayer: &mut dyn MsgRelayer);
-
-    /// Accepts a message.  This is called while processing other subprotocols.
-    /// These should not be processed until we do the finalization.
-    ///
-    /// This MUST NOT act on any messages that were accepted before this was
-    /// called.
-    ///
-    /// # Panics
-    ///
-    /// If an mismatched message type (behind the `dyn`) is provided.
-    fn accept_msg(&mut self, msg: &dyn InterprotoMsg);
-
-    /// Processes the messages received.
-    fn process_msgs(&mut self);
-
-    /// Repacks the state into a [`SectionState`] instance.
-    fn to_section(&self) -> SectionState;
-}
 
 /// Wrapper around the common subprotocol interface that handles the common
 /// buffering logic for interproto messages.
@@ -84,30 +62,33 @@ pub(crate) struct HandlerRelayer {
     logs: Vec<Log>,
 }
 
-impl HandlerRelayer {
-    pub(crate) fn new() -> Self {
-        Self {
-            handlers: BTreeMap::new(),
-            logs: Vec::new(),
-        }
-    }
-
+impl SubprotocolManager for HandlerRelayer {
     /// Inserts a subproto by creating a handler for it.
-    pub(crate) fn insert_subproto<S: Subprotocol>(&mut self, state: S::State) {
+    fn insert_subproto<S: Subprotocol>(&mut self, state: S::State) {
         let handler = HandlerImpl::<S, Self>::from_state(state);
         if self.handlers.insert(S::ID, Box::new(handler)).is_some() {
             panic!("asm: loaded state twice");
         }
     }
 
-    pub(crate) fn get_handler(&self, id: SubprotocolId) -> Result<&dyn SubprotoHandler, AsmError> {
+    fn insert_handler<S: Subprotocol>(&mut self, handler: Box<dyn SubprotoHandler>) {
+        self.handlers.insert(S::ID, handler);
+    }
+
+    fn remove_handler(&mut self, id: SubprotocolId) -> Result<Box<dyn SubprotoHandler>, AsmError> {
+        self.handlers
+            .remove(&id)
+            .ok_or(AsmError::InvalidSubprotocol(id))
+    }
+
+    fn get_handler(&self, id: SubprotocolId) -> Result<&dyn SubprotoHandler, AsmError> {
         self.handlers
             .get(&id)
             .map(Box::as_ref)
             .ok_or(AsmError::InvalidSubprotocol(id))
     }
 
-    pub(crate) fn get_handler_mut(
+    fn get_handler_mut(
         &mut self,
         id: SubprotocolId,
     ) -> Result<&mut Box<dyn SubprotoHandler>, AsmError> {
@@ -115,29 +96,14 @@ impl HandlerRelayer {
             .get_mut(&id)
             .ok_or(AsmError::InvalidSubprotocol(id))
     }
+}
 
-    pub(crate) fn invoke_process_txs<S: Subprotocol>(&mut self, txs: &[TxInput<'_>]) {
-        // We temporarily take the handler out of the map so we can call
-        // `process_txs` with `self` as the relayer without violating the
-        // borrow checker.
-        let mut h = self
-            .handlers
-            .remove(&S::ID)
-            .expect("asm: unloaded subprotocol");
-        h.process_txs(txs, self);
-        self.handlers.insert(S::ID, h);
-    }
-
-    pub(crate) fn invoke_process_msgs<S: Subprotocol>(&mut self) {
-        let h = self
-            .get_handler_mut(S::ID)
-            .expect("asm: unloaded subprotocol");
-        h.process_msgs()
-    }
-
-    pub(crate) fn to_section_state<S: Subprotocol>(&self) -> SectionState {
-        let h = self.get_handler(S::ID).expect("asm: unloaded subprotocol");
-        h.to_section()
+impl HandlerRelayer {
+    pub(crate) fn new() -> Self {
+        Self {
+            handlers: BTreeMap::new(),
+            logs: Vec::new(),
+        }
     }
 }
 
