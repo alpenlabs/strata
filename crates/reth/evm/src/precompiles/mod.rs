@@ -1,2 +1,2 @@
-// pub mod bridge;
+pub mod bridge;
 pub mod schnorr;

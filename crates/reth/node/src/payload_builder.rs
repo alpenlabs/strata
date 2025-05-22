@@ -18,7 +18,7 @@ use reth_evm_ethereum::EthEvmConfig;
 use reth_node_api::{ConfigureEvm, FullNodeTypes, NodeTypes, PayloadBuilderAttributes};
 use reth_node_builder::{components::PayloadBuilderBuilder, PayloadBuilderConfig};
 use reth_payload_builder::{EthBuiltPayload, PayloadBuilderError};
-use reth_primitives::{EthPrimitives, InvalidTransactionError};
+use reth_primitives::{EthPrimitives, InvalidTransactionError, Receipt};
 use reth_primitives_traits::SignedTransaction;
 use reth_transaction_pool::{
     error::{Eip4844PoolTransactionError, InvalidPoolTransactionError},
@@ -27,6 +27,8 @@ use reth_transaction_pool::{
 };
 use revm::{context::Block, database::State};
 use revm_primitives::U256;
+use strata_reth_evm::collect_withdrawal_intents;
+use strata_reth_primitives::WithdrawalIntent;
 use tracing::{debug, trace, warn};
 
 use crate::{
@@ -316,6 +318,7 @@ where
         let miner_fee = tx
             .effective_tip_per_gas(base_fee)
             .expect("fee is always valid; execution succeeded");
+
         total_fees += U256::from(miner_fee) * U256::from(gas_used);
         cumulative_gas_used += gas_used;
     }
@@ -359,6 +362,14 @@ where
             .map_err(PayloadBuilderError::other)?;
     }
 
+    // collect recipts from the executed transactions
+    let receipts: Vec<Receipt> = execution_result.receipts;
+    let txns: Vec<TransactionSigned> = block.body().transactions().cloned().collect();
+    let tx_receipt_pairs = txns.iter().zip(receipts.iter());
+    let withdrawal_intents: Vec<WithdrawalIntent> =
+        collect_withdrawal_intents(tx_receipt_pairs).collect();
+    println!("withdrawal_intents: {:?}", withdrawal_intents);
+
     let sealed_block = Arc::new(block.sealed_block().clone());
     debug!(target: "payload_builder", id=%attributes.id, sealed_block_header = ?sealed_block.sealed_header(), "sealed built block");
 
@@ -366,7 +377,8 @@ where
     // extend the payload with the blob sidecars from the executed txs
     eth_payload.extend_sidecars(blob_sidecars.into_iter().map(Arc::unwrap_or_clone));
 
-    let strata_payload = StrataBuiltPayload::new(eth_payload, Vec::new());
+    let strata_payload = StrataBuiltPayload::new(eth_payload, withdrawal_intents);
+    // let strata_payload = StrataBuiltPayload::new(eth_payload, Default::default());
 
     Ok(BuildOutcome::Better {
         payload: strata_payload,

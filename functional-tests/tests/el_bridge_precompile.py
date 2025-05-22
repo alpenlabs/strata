@@ -12,12 +12,12 @@ withdrawal_intent_event_abi = {
     "anonymous": False,
     "inputs": [
         {"indexed": False, "internalType": "uint64", "name": "amount", "type": "uint64"},
-        {"indexed": False, "internalType": "bytes", "name": "dest_pk", "type": "bytes32"},
+        {"indexed": False, "internalType": "bytes", "name": "dest_pk", "type": "bytes"},
     ],
     "name": "WithdrawalIntentEvent",
     "type": "event",
 }
-event_signature_text = "WithdrawalIntentEvent(uint64,bytes32)"
+event_signature_text = "WithdrawalIntentEvent(uint64,bytes)"
 
 
 @flexitest.register
@@ -27,7 +27,6 @@ class ElBridgePrecompileTest(testenv.StrataTester):
 
     def main(self, ctx: flexitest.RunContext):
         self.warning("SKIPPING TEST fn_el_bridge_precompile")
-        return True
 
         reth = ctx.get_service("reth")
         web3: Web3 = reth.create_web3()
@@ -35,7 +34,7 @@ class ElBridgePrecompileTest(testenv.StrataTester):
         source = web3.address
         dest = web3.to_checksum_address(PRECOMPILE_BRIDGEOUT_ADDRESS)
         # 64 bytes
-        dest_pk = os.urandom(32).hex()
+        dest_pk = "00636861726c6579206c6f766573206865696469"
         self.debug(dest_pk)
 
         assert web3.is_connected(), "cannot connect to reth"

@@ -3,12 +3,18 @@ use std::sync::OnceLock;
 use revm::{
     context::{Cfg, ContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
-    interpreter::{InputsImpl, InterpreterResult},
-    precompile::{PrecompileFn, PrecompileOutput, PrecompileResult, Precompiles},
+    interpreter::{Gas, InputsImpl, InstructionResult, InterpreterResult},
+    precompile::{PrecompileError, PrecompileFn, PrecompileOutput, PrecompileResult, Precompiles},
 };
 use revm_primitives::{address, hardfork::SpecId, Address, Bytes};
 
-use crate::{constants::SCHNORR_ADDRESS, precompiles::schnorr::verify_schnorr_precompile};
+use crate::{
+    constants::{BRIDGEOUT_ADDRESS, SCHNORR_ADDRESS},
+    precompiles::{
+        bridge::{bridge_context_call, bridgeout_precompile},
+        schnorr::verify_schnorr_precompile,
+    },
+};
 
 /// A custom precompile that contains static precompiles.
 #[derive(Clone, Default)]
@@ -30,7 +36,10 @@ pub fn load_precompiles() -> &'static Precompiles {
     INSTANCE.get_or_init(|| {
         let mut precompiles = Precompiles::berlin().clone();
         // Custom precompile.
-        precompiles.extend([(SCHNORR_ADDRESS, verify_schnorr_precompile as PrecompileFn).into()]);
+        precompiles.extend([
+            (SCHNORR_ADDRESS, verify_schnorr_precompile as PrecompileFn).into(),
+            (BRIDGEOUT_ADDRESS, bridgeout_precompile as PrecompileFn).into(),
+        ]);
         precompiles
     })
 }
@@ -48,14 +57,61 @@ impl<CTX: ContextTr> PrecompileProvider<CTX> for StrataEvmPrecompiles {
 
     fn run(
         &mut self,
-        context: &mut CTX,
+        _context: &mut CTX,
         address: &Address,
         inputs: &InputsImpl,
-        is_static: bool,
+        _is_static: bool,
         gas_limit: u64,
     ) -> Result<Option<Self::Output>, String> {
-        self.precompiles
-            .run(context, address, inputs, is_static, gas_limit)
+        let Some(precompile) = self.precompiles.precompiles.get(address) else {
+            return Ok(None);
+        };
+
+        let mut result = InterpreterResult {
+            result: InstructionResult::Return,
+            gas: Gas::new(gas_limit),
+            output: Bytes::new(),
+        };
+
+        if *address == BRIDGEOUT_ADDRESS {
+            let res = bridge_context_call(&inputs.input, gas_limit, _context);
+            match res {
+                Ok(output) => {
+                    let underflow = result.gas.record_cost(output.gas_used);
+                    assert!(underflow, "Gas underflow is not possible");
+                    result.result = InstructionResult::Return;
+                    result.output = output.bytes;
+                }
+                Err(PrecompileError::Fatal(e)) => return Err(e),
+                Err(e) => {
+                    result.result = if e.is_oog() {
+                        InstructionResult::PrecompileOOG
+                    } else {
+                        InstructionResult::PrecompileError
+                    };
+                }
+            }
+            return Ok(Some(result));
+        }
+
+        match (*precompile)(&inputs.input, gas_limit) {
+            Ok(output) => {
+                let underflow = result.gas.record_cost(output.gas_used);
+                assert!(underflow, "Gas underflow is not possible");
+                result.result = InstructionResult::Return;
+                result.output = output.bytes;
+            }
+            Err(PrecompileError::Fatal(e)) => return Err(e),
+            Err(e) => {
+                result.result = if e.is_oog() {
+                    InstructionResult::PrecompileOOG
+                } else {
+                    InstructionResult::PrecompileError
+                };
+            }
+        }
+
+        Ok(Some(result))
     }
 
     fn warm_addresses(&self) -> Box<impl Iterator<Item = Address>> {
