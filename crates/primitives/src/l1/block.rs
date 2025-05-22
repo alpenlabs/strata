@@ -252,6 +252,10 @@ impl L1Block {
     pub fn height(&self) -> u64 {
         self.height
     }
+
+    pub fn inner(&self) -> &Block {
+        &self.inner
+    }
 }
 
 impl From<L1Block> for Block {
