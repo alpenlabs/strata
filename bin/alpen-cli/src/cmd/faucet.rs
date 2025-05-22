@@ -117,14 +117,15 @@ pub async fn faucet(
     println!("Fetching challenge from faucet");
 
     let client = reqwest::Client::new();
-    let base = Url::from_str(&settings.faucet_endpoint)
+    let mut base_url = Url::from_str(&settings.faucet_endpoint)
         .user_error("Invalid faucet endopoint. Check the config file")?;
+    base_url = ensure_trailing_slash(base_url);
     let chain = Chain::from_network_type(network_type.clone()).user_error(format!(
         "Unsupported network {}. Must be `signet` or `alpen`",
         network_type
     ))?;
-    let endpoint = base
-        .join(&format!("/pow_challenge/{chain}"))
+    let endpoint = base_url
+        .join(&format!("pow_challenge/{chain}"))
         .expect("a valid URL");
 
     let res = client
@@ -179,7 +180,7 @@ pub async fn faucet(
     println!("Claiming to {} address {}", network_type, address);
 
     let url = format!(
-        "{base}/{}/{}/{}",
+        "{base_url}{}/{}/{}",
         claim,
         encode(&solution.to_le_bytes()),
         address
@@ -214,4 +215,39 @@ fn count_leading_zeros(data: &[u8]) -> u8 {
 fn pow_valid(mut hasher: Sha256, difficulty: u8, solution: Solution) -> bool {
     hasher.update(solution);
     count_leading_zeros(&hasher.finalize()) >= difficulty
+}
+
+/// Ensures that the URL has a trailing slash.
+fn ensure_trailing_slash(mut url: Url) -> Url {
+    let new_path = format!("{}/", url.path().trim_end_matches('/'));
+    url.set_path(&new_path);
+    url
+}
+
+#[cfg(test)]
+mod tests {
+    use reqwest::Url;
+
+    use super::*;
+
+    #[test]
+    fn adds_trailing_slash_when_missing() {
+        let url = Url::parse("https://example.com").unwrap();
+        let fixed = ensure_trailing_slash(url);
+        assert_eq!(fixed.as_str(), "https://example.com/");
+    }
+
+    #[test]
+    fn leaves_trailing_slash_when_present() {
+        let url = Url::parse("https://example.com/").unwrap();
+        let fixed = ensure_trailing_slash(url);
+        assert_eq!(fixed.as_str(), "https://example.com/");
+    }
+
+    #[test]
+    fn handles_trailing_slashes_when_present() {
+        let url = Url::parse("https://example.com//").unwrap();
+        let fixed = ensure_trailing_slash(url);
+        assert_eq!(fixed.as_str(), "https://example.com/");
+    }
 }
