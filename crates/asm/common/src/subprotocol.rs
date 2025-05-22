@@ -8,7 +8,7 @@ use std::any::Any;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{AsmError, Log, SectionState, TxInput, msg::InterprotoMsg};
+use crate::{Log, SectionState, TxInput, msg::InterprotoMsg};
 
 /// Identifier for a subprotocol.
 pub type SubprotocolId = u8;
@@ -40,13 +40,17 @@ pub trait Subprotocol: 'static {
     /// Update it's own state and output a list of InterProtoMsg addressed to other subprotocols
     fn process_txs(state: &mut Self::State, txs: &[TxInput<'_>], relayer: &mut impl MsgRelayer);
 
-    /// Use the msg other subprotocols to update its state. Also generate the event
-    /// logs that is later needed for introspection. Return the commitment of the events. The actual
+    /// Use the msgs other subprotocols to update its state.
+    ///
+    /// TODO:
+    /// Also generate the event logs that is later needed for other components
+    /// to read ASM activity. Return the commitment of the events. The actual
     /// event is defined by the subprotocol and is not visible to the ASM.
-    fn finalize_state(state: &mut Self::State, msgs: &[Self::Msg]);
+    fn process_msgs(state: &mut Self::State, msgs: &[Self::Msg]);
 }
 
-/// Generic message relayer interface.
+/// Generic message relayer interface which subprotocols can use to interact
+/// with each other and the outside world.
 pub trait MsgRelayer: Any {
     /// Relays a message to the destination subprotocol.
     fn relay_msg(&mut self, m: &dyn InterprotoMsg);
@@ -78,8 +82,8 @@ pub trait SubprotoHandler {
     /// If an mismatched message type (behind the `dyn`) is provided.
     fn accept_msg(&mut self, msg: &dyn InterprotoMsg);
 
-    /// Processes the messages received.
-    fn process_msgs(&mut self);
+    /// Processes the buffered messages stored in the handler.
+    fn process_buffered_msgs(&mut self);
 
     /// Repacks the state into a [`SectionState`] instance.
     fn to_section(&self) -> SectionState;

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use strata_asm_common::{AnchorState, SectionState, Stage, Subprotocol, SubprotocolId, TxInput};
+use strata_asm_common::{AnchorState, Stage, Subprotocol, SubprotocolId, TxInput};
 
 use crate::manager::SubprotoManager;
 
@@ -65,26 +65,17 @@ impl Stage for ProcessStage<'_, '_> {
 
 /// Stage to handle messages exchanged between subprotocols in execution.
 pub(crate) struct FinishStage<'m> {
-    sections: Vec<SectionState>,
     manager: &'m mut SubprotoManager,
 }
 
 impl<'m> FinishStage<'m> {
     pub(crate) fn new(manager: &'m mut SubprotoManager) -> Self {
-        let sections = Vec::new();
-        Self { sections, manager }
-    }
-
-    pub(crate) fn into_sorted_sections(mut self) -> Vec<SectionState> {
-        self.sections.sort_by_key(|state| state.id);
-        self.sections
+        Self { manager }
     }
 }
 
 impl Stage for FinishStage<'_> {
     fn process_subprotocol<S: Subprotocol>(&mut self) {
         self.manager.invoke_process_msgs::<S>();
-        let section = self.manager.to_section_state::<S>();
-        self.sections.push(section);
     }
 }

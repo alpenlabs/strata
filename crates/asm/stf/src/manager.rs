@@ -67,7 +67,6 @@ pub(crate) struct SubprotoManager {
     logs: Vec<Log>,
 }
 
-/* SubprotocolManager for */
 impl SubprotoManager {
     /// Inserts a subproto by creating a handler for it, wrapping a tstate.
     pub(crate) fn insert_subproto<S: Subprotocol>(&mut self, state: S::State) {
@@ -122,6 +121,7 @@ impl SubprotoManager {
             .ok_or(AsmError::InvalidSubprotocol(id))
     }
 
+    #[allow(unused)]
     fn get_handler(&self, id: SubprotocolId) -> Result<&dyn SubprotoHandler, AsmError> {
         self.handlers
             .get(&id)
@@ -139,9 +139,28 @@ impl SubprotoManager {
     }
 
     /// Extracts the section state for a subprotocol.
+    #[allow(unused)]
     pub(crate) fn to_section_state<S: Subprotocol>(&self) -> SectionState {
         let h = self.get_handler(S::ID).expect("asm: unloaded subprotocol");
         h.to_section()
+    }
+
+    /// Exports each handler as a section we can use when constructing the final
+    /// `AnchorState`.  Consumes the manager.
+    pub(crate) fn export_sections(self) -> Vec<SectionState> {
+        let sections = self
+            .handlers
+            .into_values()
+            .map(|h| h.to_section())
+            .collect::<Vec<_>>();
+
+        // sanity check
+        assert!(
+            sections.is_sorted_by_key(|s| s.id),
+            "asm: sections not sorted on export"
+        );
+
+        sections
     }
 }
 

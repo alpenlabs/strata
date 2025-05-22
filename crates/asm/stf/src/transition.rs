@@ -26,10 +26,9 @@ impl AsmSpec for StrataAsmSpec {
 
 /// Computes the next AnchorState by applying the Anchor State Machine (ASM) state transition
 /// function (STF) to the given previous state and new L1 block.
-pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: Block) -> Result<AnchorState, AsmError> {
+pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: &Block) -> Result<AnchorState, AsmError> {
+    // 1. Validate and update PoW header continuity for the new block.
     let mut pow_state = pre_state.chain_view.pow_state.clone();
-
-    // 1. Validate and update PoW header continuity for the new block
     pow_state
         .check_and_update_continuity(&block.header, &Params::MAINNET)
         .map_err(AsmError::InvalidL1Header)?;
@@ -39,19 +38,20 @@ pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: Block) -> Result<Ancho
 
     let mut manager = SubprotoManager::new();
 
-    // 3. LOAD: bring each subprotocol into a HandlerRelayer
+    // 3. LOAD: Bring each subprotocol into the subproto manager.
     let mut loader_stage = SubprotoLoaderStage::new(&pre_state, &mut manager);
     S::call_subprotocols(&mut loader_stage);
 
-    // 4. PROCESS: feed each subprotocol its slice of txs
+    // 4. PROCESS: Feed each subprotocol its slice of txs.
     let mut process_stage = ProcessStage::new(all_relevant_transactions, &mut manager);
     S::call_subprotocols(&mut process_stage);
 
-    // 5. FINISH: let each subprotocol process its buffered interproto messages
+    // 5. FINISH: Let each subprotocol process its buffered interproto messages.
     let mut finish_stage = FinishStage::new(&mut manager);
     S::call_subprotocols(&mut finish_stage);
 
-    let sections = finish_stage.into_sorted_sections();
+    // 6. Construct the final `AnchorState` we return.
+    let sections = manager.export_sections();
     let chain_view = ChainViewState { pow_state };
     Ok(AnchorState {
         chain_view,
