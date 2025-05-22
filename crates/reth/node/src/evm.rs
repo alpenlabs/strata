@@ -24,76 +24,7 @@ use revm::{
     Context, Inspector, MainBuilder, MainContext,
 };
 use revm_primitives::{address, hardfork::SpecId, Address, Bytes};
-
-/// A custom precompile that contains static precompiles.
-#[derive(Clone)]
-pub struct CustomPrecompiles {
-    pub precompiles: EthPrecompiles,
-}
-
-impl CustomPrecompiles {
-    /// Given a [`PrecompileProvider`] and cache for a specific precompiles, create a
-    /// wrapper that can be used inside Evm.
-    fn new() -> Self {
-        Self {
-            precompiles: EthPrecompiles::default(),
-        }
-    }
-}
-
-/// Returns precompiles for Fjor spec.
-pub fn prague_custom() -> &'static Precompiles {
-    static INSTANCE: OnceLock<Precompiles> = OnceLock::new();
-    INSTANCE.get_or_init(|| {
-        let mut precompiles = Precompiles::prague().clone();
-        // Custom precompile.
-        precompiles.extend([(
-            address!("0x0000000000000000000000000000000000000999"),
-            |_, _| -> PrecompileResult {
-                PrecompileResult::Ok(PrecompileOutput::new(0, Bytes::new()))
-            } as PrecompileFn,
-        )
-            .into()]);
-        precompiles
-    })
-}
-
-impl<CTX: ContextTr> PrecompileProvider<CTX> for CustomPrecompiles {
-    type Output = InterpreterResult;
-
-    fn set_spec(&mut self, spec: <CTX::Cfg as Cfg>::Spec) -> bool {
-        let spec_id = spec.clone().into();
-        if spec_id == SpecId::PRAGUE {
-            self.precompiles = EthPrecompiles {
-                precompiles: prague_custom(),
-                spec: spec.into(),
-            }
-        } else {
-            PrecompileProvider::<CTX>::set_spec(&mut self.precompiles, spec);
-        }
-        true
-    }
-
-    fn run(
-        &mut self,
-        context: &mut CTX,
-        address: &Address,
-        inputs: &InputsImpl,
-        is_static: bool,
-        gas_limit: u64,
-    ) -> Result<Option<Self::Output>, String> {
-        self.precompiles
-            .run(context, address, inputs, is_static, gas_limit)
-    }
-
-    fn warm_addresses(&self) -> Box<impl Iterator<Item = Address>> {
-        self.precompiles.warm_addresses()
-    }
-
-    fn contains(&self, address: &Address) -> bool {
-        self.precompiles.contains(address)
-    }
-}
+use strata_reth_evm::evm::StrataEvmPrecompiles;
 
 /// Custom EVM configuration.
 #[derive(Debug, Clone, Default)]
@@ -102,7 +33,7 @@ pub struct StrataEvmFactory;
 
 impl EvmFactory for StrataEvmFactory {
     type Evm<DB: reth_evm::Database, I: revm::Inspector<Self::Context<DB>>> =
-        EthEvm<DB, I, CustomPrecompiles>;
+        EthEvm<DB, I, StrataEvmPrecompiles>;
 
     type Context<DB: reth_evm::Database> = EthEvmContext<DB>;
 
@@ -123,7 +54,7 @@ impl EvmFactory for StrataEvmFactory {
             .with_cfg(input.cfg_env)
             .with_block(input.block_env)
             .build_mainnet_with_inspector(NoOpInspector {})
-            .with_precompiles(CustomPrecompiles::new());
+            .with_precompiles(StrataEvmPrecompiles::new());
 
         EthEvm::new(evm, false)
     }
