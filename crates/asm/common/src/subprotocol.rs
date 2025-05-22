@@ -83,7 +83,7 @@ pub trait SubprotoHandler {
 
 /// Manages the lifecycle and execution of subprotocol handlers in the Anchor State Machine (ASM).
 ///
-/// Implementors of this trait maintain a collection of subprotocol handlers and
+/// Implementers of this trait maintain a collection of subprotocol handlers and
 /// provide methods to insert, remove, lookup, and drive execution (transactions and messages),
 /// as well as extract the final `SectionState`.
 pub trait SubprotocolManager: MsgRelayer + Sized {

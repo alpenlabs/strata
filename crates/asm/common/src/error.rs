@@ -1,3 +1,4 @@
+use strata_primitives::l1::L1VerificationError;
 use thiserror::Error;
 
 use crate::SubprotocolId;
@@ -24,4 +25,8 @@ pub enum AsmError {
     /// Failed to serialize the state of the given subprotocol.
     #[error("failed to serialize subprotocol {0} state: {1}")]
     Serialization(SubprotocolId, #[source] borsh::io::Error),
+
+    /// L1Header do not follow consensus rules.
+    #[error("L1Header do not follow consensus rules")]
+    InvalidL1Header(#[source] L1VerificationError),
 }

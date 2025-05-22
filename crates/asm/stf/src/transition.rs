@@ -3,7 +3,9 @@
 //! view into a single deterministic state transition.
 
 use bitcoin::{block::Block, params::Params};
-use strata_asm_common::{AnchorState, AsmSpec, ChainViewState, Stage, SubprotocolManager};
+use strata_asm_common::{
+    AnchorState, AsmError, AsmSpec, ChainViewState, Stage, SubprotocolManager,
+};
 use strata_asm_proto_bridge_v1::BridgeV1Subproto;
 use strata_asm_proto_core::OLCoreSubproto;
 
@@ -26,13 +28,13 @@ impl AsmSpec for StrataAsmSpec {
 
 /// Computes the next AnchorState by applying the Anchor State Machine (ASM) state transition
 /// function (STF) to the given previous state and new L1 block.
-pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: Block) -> AnchorState {
+pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: Block) -> Result<AnchorState, AsmError> {
     let mut pow_state = pre_state.chain_view.pow_state.clone();
 
     // 1. Validate and update PoW header continuity for the new block
     pow_state
         .check_and_update_continuity(&block.header, &Params::MAINNET)
-        .expect("header doesn't follow the consensus rules");
+        .map_err(AsmError::InvalidL1Header)?;
 
     // 2. Filter the relevant transactions
     let all_relevant_transactions = group_txs_by_subprotocol(&block.txdata);
@@ -51,10 +53,10 @@ pub fn asm_stf<S: AsmSpec>(pre_state: AnchorState, block: Block) -> AnchorState 
     let mut finish_stage = FinishStage::new();
     S::call_subprotocols(&mut finish_stage, &mut manager);
 
-    let sections = finish_stage.into_sections();
+    let sections = finish_stage.into_sorted_sections();
     let chain_view = ChainViewState { pow_state };
-    AnchorState {
+    Ok(AnchorState {
         chain_view,
         sections,
-    }
+    })
 }

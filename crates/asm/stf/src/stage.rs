@@ -66,7 +66,8 @@ impl FinishStage {
         Self { sections }
     }
 
-    pub(crate) fn into_sections(self) -> Vec<SectionState> {
+    pub(crate) fn into_sorted_sections(mut self) -> Vec<SectionState> {
+        self.sections.sort_by_key(|state| state.id);
         self.sections
     }
 }
