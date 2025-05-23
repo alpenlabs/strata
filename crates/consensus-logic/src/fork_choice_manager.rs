@@ -918,7 +918,6 @@ fn apply_blocks(
 
     Ok(())
 }
-*/
 
 /// Takes the block and post-state and inserts database entries to reflect the
 /// epoch being finished on-chain.
@@ -977,6 +976,7 @@ fn handle_finish_epoch(
 
     Ok(())
 }
+*/
 
 fn handle_new_client_state(
     fcm_state: &mut ForkChoiceManager,
