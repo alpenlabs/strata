@@ -1,9 +1,9 @@
-# Strata
+# Alpen
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache-blue.svg)](https://opensource.org/licenses/apache-2-0)
-[![codecov](https://codecov.io/gh/alpenlabs/strata/branch/main/graph/badge.svg?token=Q3ZYY44GN7)](https://codecov.io/gh/alpenlabs/strata)
-[![ci](https://github.com/alpenlabs/strata/actions/workflows/lint.yml/badge.svg?event=push)](https://github.com/alpenlabs/strata/actions)
+[![codecov](https://codecov.io/gh/alpenlabs/alpen/branch/main/graph/badge.svg?token=Q3ZYY44GN7)](https://codecov.io/gh/alpenlabs/strata)
+[![ci](https://github.com/alpenlabs/alpen/actions/workflows/lint.yml/badge.svg?event=push)](https://github.com/alpenlabs/alpen/actions)
 [![docs](https://img.shields.io/badge/docs-strata-orange)](https://docs.stratabtc.org)
 
 <p align="center">
