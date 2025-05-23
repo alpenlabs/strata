@@ -461,7 +461,7 @@ fn assert_correct_address(
     network: Network,
 ) {
     let recovery_key_pair = key_pair.tap_tweak(SECP256K1, taproot_spend_info.merkle_root());
-    let x_only_pub_key = recovery_key_pair.to_inner().x_only_public_key().0;
+    let x_only_pub_key = recovery_key_pair.to_keypair().x_only_public_key().0;
     assert_eq!(
         Address::p2tr_tweaked(
             TweakedPublicKey::dangerous_assume_tweaked(x_only_pub_key),

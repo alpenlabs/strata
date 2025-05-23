@@ -123,7 +123,7 @@ fn validate_deposit_signature(
     let msg = Message::from_digest(*sighash.as_byte_array());
 
     // Verify the Schnorr signature
-    secp.verify_schnorr(&schnorr_sig, &msg, &tweaked_key.to_inner())
+    secp.verify_schnorr(&schnorr_sig, &msg, &tweaked_key.to_x_only_public_key())
         .ok()
 }
 
