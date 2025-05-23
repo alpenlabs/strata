@@ -173,6 +173,17 @@ fn handle_task_error(task: ProofKey, e: ProvingTaskError) -> ProvingTaskStatus {
             error!(?task, ?e, "proving task failed transiently");
             ProvingTaskStatus::TransientFailure
         }
+        ProvingTaskError::ZkVmError(zkaleido::ZkVmError::ProofGenerationError(ref message)) => {
+            if message.to_lowercase().contains("unavailable") {
+                // This type of error with status:Unavailable indicates network error on SP1 side.
+                // See STR-1410 for details.
+                error!(?task, ?e, "proving task failed transiently");
+                ProvingTaskStatus::TransientFailure
+            } else {
+                error!(?task, ?e, "proving task failed");
+                ProvingTaskStatus::Failed
+            }
+        }
         _ => {
             // Other errors are treated as non-retryable, so the task is failed permanently.
             error!(?task, ?e, "proving task failed");
@@ -190,5 +201,56 @@ fn handle_checkpoint_error(chkpt_err: CheckpointError) -> ProvingTaskError {
         }
         CheckpointError::CheckpointNotFound(_) => ProvingTaskError::WitnessNotFound,
         CheckpointError::ProofErr(proving_task_error) => proving_task_error,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use strata_primitives::proof::ProofContext;
+    use strata_rpc_types::ProofKey;
+
+    use super::{handle_task_error, ProvingTaskError, ProvingTaskStatus};
+
+    #[test]
+    fn test_transient_retry_rpc_error() {
+        let mock_key = ProofKey::new(
+            ProofContext::Checkpoint(0),
+            strata_primitives::proof::ProofZkVm::SP1,
+        );
+        let err = ProvingTaskError::RpcError("rpc error".to_string());
+
+        assert_eq!(
+            handle_task_error(mock_key, err),
+            ProvingTaskStatus::TransientFailure
+        );
+    }
+
+    #[test]
+    fn test_transient_retry_zkvm_unavailable() {
+        let mock_key = ProofKey::new(
+            ProofContext::Checkpoint(0),
+            strata_primitives::proof::ProofZkVm::SP1,
+        );
+        let err = ProvingTaskError::ZkVmError(zkaleido::ZkVmError::ProofGenerationError(
+            "Unavailable".to_string(),
+        ));
+
+        assert_eq!(
+            handle_task_error(mock_key, err),
+            ProvingTaskStatus::TransientFailure
+        );
+    }
+
+    #[test]
+    fn test_failed_zkvm_panic() {
+        let mock_key = ProofKey::new(
+            ProofContext::Checkpoint(0),
+            strata_primitives::proof::ProofZkVm::SP1,
+        );
+        let err = ProvingTaskError::ZkVmError(zkaleido::ZkVmError::ProofGenerationError(
+            "panic during proof generation".to_string(),
+        ));
+
+        assert_eq!(handle_task_error(mock_key, err), ProvingTaskStatus::Failed);
     }
 }
