@@ -9,9 +9,9 @@ use strata_chainexec::{
     BlockExecutionOutput, ChainExecutor, ExecContext, ExecResult, MemStateAccessor,
 };
 use strata_chaintsn::context::L2HeaderAndParent;
-use strata_eectl::engine::ExecEngineCtl;
+use strata_eectl::{engine::ExecEngineCtl, messages::ExecPayloadData};
 use strata_primitives::{batch::EpochSummary, prelude::*};
-use strata_state::{chain_state::Chainstate, header::L2Header, prelude::*};
+use strata_state::{block::L2BlockBundle, chain_state::Chainstate, header::L2Header, prelude::*};
 use tracing::*;
 
 use crate::{
@@ -97,6 +97,9 @@ impl<W: WorkerContext, E: ExecEngineCtl> WorkerState<W, E> {
             .fetch_header(parent_blkid)?
             .ok_or(WorkerError::MissingL2Block(*parent_blkid))?;
 
+        // Try to execute the payload, seeing if *that's* valid.
+        self.try_exec_el_payload(block.blkid(), &bundle)?;
+
         let header_ctx = L2HeaderAndParent::new(
             bundle.header().header().clone(),
             *parent_blkid,
@@ -121,6 +124,31 @@ impl<W: WorkerContext, E: ExecEngineCtl> WorkerState<W, E> {
         self.update_cur_tip(*block)?;
 
         Ok(())
+    }
+
+    fn try_exec_el_payload(
+        &mut self,
+        blkid: &L2BlockId,
+        bundle: &L2BlockBundle,
+    ) -> WorkerResult<()> {
+        // We don't do this for the genesis block because that block doesn't
+        // actually have a well-formed accessory and it gets mad at us.
+        if bundle.header().slot() == 0 {
+            return Ok(());
+        }
+
+        // Construct the exec payload and just make the call.  This blocks until
+        // it gets back to us, which kinda sucks, but we're working on it!
+        let exec_hash = bundle.header().exec_payload_hash();
+        let eng_payload = ExecPayloadData::from_l2_block_bundle(bundle);
+        let res = self.engine.submit_payload(eng_payload)?;
+
+        if res == strata_eectl::engine::BlockStatus::Invalid {
+            let block = L2BlockCommitment::new(bundle.header().slot(), *blkid);
+            Err(WorkerError::InvalidExecPayload(block).into())
+        } else {
+            Ok(())
+        }
     }
 
     /// Takes the block and post-state and inserts database entries to reflect
