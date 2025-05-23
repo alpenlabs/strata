@@ -3,7 +3,7 @@ use strata_primitives::{
     buf::Buf32,
     l1::{BitcoinAmount, WithdrawalFulfillmentInfo},
 };
-use tracing::debug;
+use tracing::{debug, error};
 
 use super::TxFilterConfig;
 
@@ -20,8 +20,16 @@ pub fn try_parse_tx_as_withdrawal_fulfillment(
     metadata_txout.script_pubkey.is_op_return().then_some(())?;
 
     // 2. Ensure correct OP_RETURN data and check it has expected deposit index.
+
+    // FIXME this just takes the first 4 bytes of deposit config magic bytes
+    let magic_config = &filter_conf.deposit_config.magic_bytes;
+    let Ok(magic) = <[u8; 4]>::try_from(&magic_config[..4]) else {
+        error!("malformed magic bytes in deposit config");
+        return None;
+    };
+
     let (op_idx, dep_idx, deposit_txid_bytes) =
-        parse_opreturn_metadata(&metadata_txout.script_pubkey, filter_conf)?;
+        parse_opreturn_metadata(&metadata_txout.script_pubkey, &magic)?;
 
     let exp_ful = filter_conf.expected_withdrawal_fulfillments.get(&dep_idx)?;
     //eprintln!("exp ful {exp_ful:?}");
@@ -73,7 +81,7 @@ pub fn try_parse_tx_as_withdrawal_fulfillment(
 
 fn parse_opreturn_metadata(
     script_buf: &ScriptBuf,
-    config: &TxFilterConfig,
+    magic: &[u8; 4],
 ) -> Option<(u32, u32, [u8; 32])> {
     // FIXME this needs to ensure that it's actually an OP_RETURN
     let data = extract_op_return_data(script_buf)?;
@@ -86,14 +94,14 @@ fn parse_opreturn_metadata(
     // Check the magic bytes.
     let mut magic_bytes = [0u8; 4];
     magic_bytes.copy_from_slice(&data[..4]);
-    if magic_bytes != *config.deposit_config.magic_bytes {
+    if magic_bytes != *magic {
         return None;
     }
 
     // Then parse out each of the indexes we're referring to.
     let mut idx_bytes = [0u8; 4];
 
-    idx_bytes.copy_from_slice(&data[0..8]);
+    idx_bytes.copy_from_slice(&data[4..8]);
     let opidx: u32 = u32::from_be_bytes(idx_bytes);
 
     idx_bytes.copy_from_slice(&data[8..12]);
@@ -144,6 +152,9 @@ mod test {
     use super::*;
     use crate::filter::types::{conv_deposit_to_fulfillment, OPERATOR_FEE};
 
+    // First 4 bytes of "strata"?  I am not sure what this is supposed to be.
+    const MAGIC: [u8; 4] = [b's', b't', b'r', b'a'];
+
     const DEPOSIT_AMT: Amount = Amount::from_int_btc(10);
 
     fn deposit_amt() -> BitcoinAmount {
@@ -155,16 +166,18 @@ mod test {
     }
 
     fn create_opreturn_metadata(
+        magic: [u8; 4],
         operator_idx: u32,
         deposit_idx: u32,
         deposit_txid: &[u8; 32],
     ) -> ScriptBuf {
-        let mut metadata = [0u8; 40];
+        let mut metadata = [0u8; 44];
+        metadata[..4].copy_from_slice(&magic);
         // first 4 bytes = operator idx
-        metadata[..4].copy_from_slice(&operator_idx.to_be_bytes());
+        metadata[4..8].copy_from_slice(&operator_idx.to_be_bytes());
         // next 4 bytes = deposit idx
-        metadata[4..8].copy_from_slice(&deposit_idx.to_be_bytes());
-        metadata[8..40].copy_from_slice(deposit_txid);
+        metadata[8..12].copy_from_slice(&deposit_idx.to_be_bytes());
+        metadata[12..44].copy_from_slice(deposit_txid);
         Descriptor::new_op_return(&metadata).unwrap().to_script()
     }
 
@@ -280,7 +293,7 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    script_pubkey: create_opreturn_metadata(1, 2, &txids[0]),
+                    script_pubkey: create_opreturn_metadata(MAGIC, 1, 2, &txids[0]),
                     value: Amount::from_sat(0),
                 },
                 // change
@@ -323,7 +336,7 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    script_pubkey: create_opreturn_metadata(1, 2, &txids[0]),
+                    script_pubkey: create_opreturn_metadata(MAGIC, 1, 2, &txids[0]),
                     value: Amount::from_sat(0),
                 },
                 // front payment
@@ -356,7 +369,7 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    script_pubkey: create_opreturn_metadata(2, 2, &txids[0]),
+                    script_pubkey: create_opreturn_metadata(MAGIC, 2, 2, &txids[0]),
                     value: Amount::from_sat(0),
                 },
                 // change
@@ -389,7 +402,7 @@ mod test {
                 },
                 // metadata with operator index
                 TxOut {
-                    script_pubkey: create_opreturn_metadata(1, 2, &txids[5]),
+                    script_pubkey: create_opreturn_metadata(MAGIC, 1, 2, &txids[5]),
                     value: Amount::from_sat(0),
                 },
                 // change
