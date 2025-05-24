@@ -90,7 +90,7 @@ mod test {
     #[test]
     fn test_index_deposits() {
         let _ = test_index_deposit_with_visitor(ReaderTxVisitorImpl::new, |tx| {
-            tx.contents().protocol_ops().to_vec()
+            tx.item().protocol_ops().to_vec()
         });
     }
 
@@ -98,21 +98,21 @@ mod test {
     #[test]
     fn test_index_txs_deposit_request() {
         let _ = test_index_deposit_request_with_visitor(ReaderTxVisitorImpl::new, |ind_output| {
-            ind_output.contents().protocol_ops().to_vec()
+            ind_output.item().protocol_ops().to_vec()
         });
     }
 
     #[test]
     fn test_index_no_deposit() {
         let _ = test_index_no_deposit_with_visitor(ReaderTxVisitorImpl::new, |ind_output| {
-            ind_output.contents().protocol_ops().to_vec()
+            ind_output.item().protocol_ops().to_vec()
         });
     }
 
     #[test]
     fn test_index_multiple_deposits() {
         let _ = test_index_multiple_deposits_with_visitor(ReaderTxVisitorImpl::new, |ind_output| {
-            ind_output.contents().protocol_ops().to_vec()
+            ind_output.item().protocol_ops().to_vec()
         });
     }
 
@@ -120,7 +120,7 @@ mod test {
     fn test_index_tx_with_multiple_ops() {
         let _ =
             test_index_tx_with_multiple_ops_with_visitor(ReaderTxVisitorImpl::new, |ind_output| {
-                ind_output.contents().protocol_ops().to_vec()
+                ind_output.item().protocol_ops().to_vec()
             });
     }
 
@@ -128,7 +128,7 @@ mod test {
     fn test_index_withdrawal_fulfillment() {
         let _ = test_index_withdrawal_fulfillment_with_visitor(
             ReaderTxVisitorImpl::new,
-            |ind_output| ind_output.contents().protocol_ops().to_vec(),
+            |ind_output| ind_output.item().protocol_ops().to_vec(),
         );
     }
 }
