@@ -167,7 +167,7 @@ impl<S: GChainSpec> StageRunner<S> {
                 continue;
             }
 
-            let coverage = self.link_coverage(lref, path);
+            let coverage = self.get_link_coverage(lref, path);
             self.pipeline.schedule().check_ready(proc_id, &coverage)?;
 
             let artifact = stage
@@ -192,6 +192,7 @@ impl<S: GChainSpec> StageRunner<S> {
             self.cache.insert_artifact(lref.clone(), proc_id, artifact);
             self.outdated.remove_artifact(lref, proc_id);
         }
+
         Ok(StageRun {
             outcome: LinkOutcome::Accepted,
             produced,
@@ -243,7 +244,7 @@ impl<S: GChainSpec> StageRunner<S> {
         proc_id: ProcId,
         path: &LinkPath<S>,
     ) -> Result<(), GExecError> {
-        let artifacts = self.cached_artifacts(proc_id, path.links())?;
+        let artifacts = self.get_cached_artifacts(proc_id, path.links())?;
         self.get_proc_stage(proc_id)
             .chain_proc()
             .commit_outputs(path, &artifacts)
@@ -255,7 +256,7 @@ impl<S: GChainSpec> StageRunner<S> {
     /// link was committed has none for it.
     pub(crate) fn check_undoable(&self, path: &LinkPath<S>) -> Result<(), GExecError> {
         for proc_id in self.pipeline.proc_ids() {
-            self.committed_artifacts(proc_id, path.links())?;
+            self.get_committed_artifacts(proc_id, path.links())?;
         }
         Ok(())
     }
@@ -267,7 +268,7 @@ impl<S: GChainSpec> StageRunner<S> {
         proc_id: ProcId,
         path: &LinkPath<S>,
     ) -> Result<(), GExecError> {
-        let artifacts = self.committed_artifacts(proc_id, path.links())?;
+        let artifacts = self.get_committed_artifacts(proc_id, path.links())?;
         self.get_proc_stage(proc_id)
             .chain_proc()
             .uncommit_outputs(path, &artifacts)
@@ -293,7 +294,7 @@ impl<S: GChainSpec> StageRunner<S> {
     }
 
     /// Collects a stage's cached artifacts for a run of links, in order.
-    fn cached_artifacts(
+    fn get_cached_artifacts(
         &self,
         proc_id: ProcId,
         links: &[LinkRef<S>],
@@ -311,7 +312,7 @@ impl<S: GChainSpec> StageRunner<S> {
 
     /// Collects the artifacts a stage committed a run of links with, in
     /// order, which are the outdated ones where there are any.
-    fn committed_artifacts(
+    fn get_committed_artifacts(
         &self,
         proc_id: ProcId,
         links: &[LinkRef<S>],
@@ -330,7 +331,7 @@ impl<S: GChainSpec> StageRunner<S> {
 
     /// Works out which stages have covered a link and the path to its origin
     /// from what's in the cache.
-    fn link_coverage(&self, lref: &LinkRef<S>, path: &LinkPath<S>) -> LinkCoverage {
+    fn get_link_coverage(&self, lref: &LinkRef<S>, path: &LinkPath<S>) -> LinkCoverage {
         let mut coverage = LinkCoverage::new();
         for stage in self.pipeline.iter_stages() {
             let proc_id = stage.proc_id();
