@@ -4,8 +4,8 @@ use strata_gchain_types::*;
 
 use crate::core::*;
 use crate::errors::GExecError;
-use crate::linear_executor::LinearExecutor;
 use crate::reprocess::{RejectedCommit, ReprocExecutor, ReprocLog, StagePlan};
+use crate::serial_executor::SerialExecutor;
 use crate::store::ExecutorStore;
 
 /// What opening an executor did to bring the stored state in line with the
@@ -42,13 +42,13 @@ impl<S: GChainSpec> OpenReport<S> {
     }
 }
 
-/// A [`LinearExecutor`] and the output produced from readying it.
-pub(crate) type LinearExecutorReadyOutput<S, P, X> = (LinearExecutor<S, P, X>, OpenReport<S>);
+/// A [`SerialExecutor`] and the output produced from readying it.
+pub(crate) type SerialExecutorReadyOutput<S, P, X> = (SerialExecutor<S, P, X>, OpenReport<S>);
 
 /// What opening an executor over a store came to.
 pub enum OpenResult<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> {
     /// The stages stand behind everything that's committed.
-    Ready(LinearExecutor<S, P, X>, OpenReport<S>),
+    Ready(SerialExecutor<S, P, X>, OpenReport<S>),
 
     /// Some stages have to reprocessed because some links due to a client
     /// upgrade or crash.
@@ -58,7 +58,7 @@ pub enum OpenResult<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<
 impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> OpenResult<S, P, X> {
     /// Does whatever reprocessing is needed right away and hands over the
     /// executor.
-    pub fn finish(self) -> Result<LinearExecutorReadyOutput<S, P, X>, GExecError> {
+    pub fn finish(self) -> Result<SerialExecutorReadyOutput<S, P, X>, GExecError> {
         match self {
             Self::Ready(exec, report) => Ok((exec, report)),
             Self::NeedsReprocess(pending) => pending.finish(),
@@ -71,7 +71,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Open
     /// # Panics
     ///
     /// If not ready, meaning there's reprocessing needed.
-    pub fn expect_ready(self) -> LinearExecutorReadyOutput<S, P, X> {
+    pub fn expect_ready(self) -> SerialExecutorReadyOutput<S, P, X> {
         match self {
             OpenResult::Ready(exec, report) => (exec, report),
             OpenResult::NeedsReprocess(_) => panic!("gchain/open: not ready"),
@@ -85,14 +85,14 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Open
 pub(crate) fn finish_open<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>(
     mut core: ExecutorCore<S, P, X>,
     reproc: ReprocLog<S>,
-) -> Result<LinearExecutorReadyOutput<S, P, X>, GExecError> {
+) -> Result<SerialExecutorReadyOutput<S, P, X>, GExecError> {
     let leveled = level_stages(&mut core)?;
     let report = OpenReport {
         initialized: leveled.initialized,
         recommitted: leveled.recommitted,
         reproc,
     };
-    Ok((LinearExecutor::from_clean_core(core), report))
+    Ok((SerialExecutor::from_clean_core(core), report))
 }
 
 /// The stages that had to be brought level with the committed node.

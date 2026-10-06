@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use strata_gchain_types::*;
 
-use crate::config::{ExecutorBuilder, PipelineBuilder, StagePipeline};
+use crate::config::{PipelineBuilder, SerialExecutorBuilder, StagePipeline};
 use crate::mem_store::MemExecutorStore;
 use crate::store::ExecutorStore;
 use crate::tracking::CommitIndex;
@@ -224,7 +224,8 @@ pub(crate) fn pipeline_of(procs: Vec<TestProc>) -> StagePipeline<TestSpec> {
     builder.build()
 }
 
-pub(crate) type TestBuilder = ExecutorBuilder<TestSpec, TestProvider, MemExecutorStore<TestSpec>>;
+pub(crate) type TestBuilder =
+    SerialExecutorBuilder<TestSpec, TestProvider, MemExecutorStore<TestSpec>>;
 
 /// A builder at genesis node 1 with the given stages under the IDs "a", "b",
 /// ... in order, with no deps between them.
@@ -233,7 +234,7 @@ pub(crate) fn builder_of(
     store: &Arc<MemExecutorStore<TestSpec>>,
     procs: Vec<TestProc>,
 ) -> TestBuilder {
-    let mut builder = ExecutorBuilder::new(provider.clone(), store.clone(), TestRef(1));
+    let mut builder = SerialExecutorBuilder::new(provider.clone(), store.clone(), TestRef(1));
     for (idx, proc) in procs.into_iter().enumerate() {
         let name = char::from(b'a' + idx as u8).to_string();
         let proc_id = ProcId::from_str(&name).expect("test: parse ProcId");

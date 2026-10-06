@@ -21,6 +21,9 @@ use crate::store::{ArtifactRecord, ExecutorStore};
 use crate::tracking::{CommitIndex, TrackingState};
 use crate::traverse::{find_path, find_reachable_links};
 
+/// Lower-level internal executor that contains all of the data involved in
+/// running an executor but does not make high-level decisions about managing
+/// it.
 pub(crate) struct ExecutorCore<
     S: GChainSpec,
     P: ChainProvider<Spec = S>,

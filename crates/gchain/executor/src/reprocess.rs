@@ -24,7 +24,7 @@ use crate::core::ExecutorCore;
 use crate::errors::GExecError;
 use crate::history::{CommitWalker, CommittedStep, ResumeSearch, StepJudge, find_resume_path};
 use crate::open::*;
-use crate::stage_runner::{LinkOutcome, StageRunner};
+use crate::stage_runner::StageRunner;
 use crate::store::ExecutorStore;
 
 use crate::ArtifactRecord;
@@ -208,7 +208,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     }
 
     /// Applies the plans that are left and hands over the executor.
-    pub fn finish(mut self) -> Result<LinearExecutorReadyOutput<S, P, X>, GExecError> {
+    pub fn finish(mut self) -> Result<SerialExecutorReadyOutput<S, P, X>, GExecError> {
         while self.apply_next_stage()?.is_some() {
             // TODO(trey): add logging about what we're doing here
         }

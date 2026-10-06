@@ -32,21 +32,21 @@ use crate::errors::GExecError;
 use crate::stage_runner::LinkOutcome;
 use crate::store::ExecutorStore;
 
-/// Linear processor pipeline executor.
+/// Single-threaded serial chaingraph executor.
 ///
-/// This is still a "low initiative" data structure, it must be driven by some
-/// external sync engine that decides which links to process and which paths to
-/// commit.  The executor only reports when a request doesn't make sense
-/// against what it has.
+/// This is still a "moderate initiative" data structure, it must be driven by
+/// some external sync engine that decides which links to process and which
+/// paths to commit.  The executor only reports when a request doesn't make
+/// sense against what it has.
 ///
-/// One only exists while every stage sits at the committed node and stands
-/// behind the committed links since it was initialized.
-pub struct LinearExecutor<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> {
+/// Having this means that the database was opened successfully and all
+/// processor stage execution is matching what we expect it to match.
+pub struct SerialExecutor<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> {
     core: ExecutorCore<S, P, X>,
 }
 
 impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
-    LinearExecutor<S, P, X>
+    SerialExecutor<S, P, X>
 {
     /// Wraps a core opened on a clean database.
     ///
@@ -179,14 +179,14 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
-    use crate::config::ExecutorBuilder;
+    use crate::config::SerialExecutorBuilder;
     use crate::mem_store::MemExecutorStore;
     use crate::open::{OpenReport, OpenResult};
     use crate::reprocess::ReprocExecutor;
     use crate::test_support::*;
     use crate::tracking::{CommitIndex, TrackingState};
 
-    type Exec = LinearExecutor<TestSpec, TestProvider, MemExecutorStore<TestSpec>>;
+    type Exec = SerialExecutor<TestSpec, TestProvider, MemExecutorStore<TestSpec>>;
     type Reproc = ReprocExecutor<TestSpec, TestProvider, MemExecutorStore<TestSpec>>;
 
     fn id(s: &str) -> ProcId {
@@ -909,7 +909,7 @@ mod tests {
         let second_events = second.events();
         let no_deps = ProcDeps::new(Vec::new(), Vec::new());
         let on_first = ProcDeps::new(vec![id("a")], Vec::new());
-        let builder = ExecutorBuilder::new(provider.clone(), store.clone(), TestRef(1))
+        let builder = SerialExecutorBuilder::new(provider.clone(), store.clone(), TestRef(1))
             .add_stage(id("a"), first, no_deps)
             .expect("test: add stage")
             .add_stage(id("b"), second, on_first)

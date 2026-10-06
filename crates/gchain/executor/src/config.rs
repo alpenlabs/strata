@@ -82,9 +82,13 @@ impl<S: GChainSpec> PipelineBuilder<S> {
     }
 }
 
-/// Assembles an executor over a provider and a store, one processor stage at
+/// Assembles a [`crate::SerialExecutor`] over a provider and a store, one processor stage at
 /// a time in canonical order.
-pub struct ExecutorBuilder<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> {
+pub struct SerialExecutorBuilder<
+    S: GChainSpec,
+    P: ChainProvider<Spec = S>,
+    X: ExecutorStore<Spec = S>,
+> {
     pipeline: PipelineBuilder<S>,
     provider: Arc<P>,
     store: Arc<X>,
@@ -92,7 +96,7 @@ pub struct ExecutorBuilder<S: GChainSpec, P: ChainProvider<Spec = S>, X: Executo
 }
 
 impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
-    ExecutorBuilder<S, P, X>
+    SerialExecutorBuilder<S, P, X>
 {
     /// Starts an executor with no stages.
     ///
