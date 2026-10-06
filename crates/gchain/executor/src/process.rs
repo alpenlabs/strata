@@ -93,8 +93,8 @@ pub(crate) struct ProcShim<P: GChainProc> {
 impl<P: GChainProc> ProcShim<P> {
     /// Wraps a processor stage under the ID the executor registers it as.
     ///
-    /// [`PipelineBuilder`](crate::PipelineBuilder) is what pairs the two in
-    /// practice, so the registered key and the shim's ID can't drift apart.
+    /// The pipeline builder is what pairs the two in practice, so the
+    /// registered key and the shim's ID can't drift apart.
     pub(crate) fn new(proc_id: ProcId, proc: P) -> Self {
         Self { proc_id, proc }
     }
@@ -151,7 +151,7 @@ impl<S: GChainSpec, P: GChainProc<Spec = S>> GChainProcDyn<S> for ProcShim<P> {
         path: &LinkPath<S>,
         outputs: &[Arc<dyn DynProcArtifact>],
     ) -> Result<(), ProcError> {
-        let outputs = downcast_artifacts::<P>(self.proc_id, outputs)?;
+        let outputs = downcast_artifacts_arc::<P>(self.proc_id, outputs)?;
         self.proc.commit_outputs(path, &outputs)
     }
 
@@ -160,7 +160,7 @@ impl<S: GChainSpec, P: GChainProc<Spec = S>> GChainProcDyn<S> for ProcShim<P> {
         path: &LinkPath<S>,
         outputs: &[Arc<dyn DynProcArtifact>],
     ) -> Result<(), ProcError> {
-        let outputs = downcast_artifacts::<P>(self.proc_id, outputs)?;
+        let outputs = downcast_artifacts_arc::<P>(self.proc_id, outputs)?;
         self.proc.uncommit_outputs(path, &outputs)
     }
 
@@ -172,7 +172,7 @@ impl<S: GChainSpec, P: GChainProc<Spec = S>> GChainProcDyn<S> for ProcShim<P> {
         let artifact = artifact
             .as_any()
             .downcast_ref::<P::Artifact>()
-            .ok_or_else(|| artifact_type_mismatch(self.proc_id))?;
+            .ok_or_else(|| make_artifact_type_mismatch_err(self.proc_id))?;
         self.proc.preprune_artifact(lref, artifact)
     }
 
@@ -181,34 +181,34 @@ impl<S: GChainSpec, P: GChainProc<Spec = S>> GChainProcDyn<S> for ProcShim<P> {
     }
 }
 
-/// Reports artifacts having gotten crossed between stages inside the executor.
-///
-/// This is an executor bug rather than anything the stage did, but it surfaces
-/// at the shim boundary where only a [`ProcError`] can be returned, so the
-/// typed executor error is preserved as its source.
-fn artifact_type_mismatch(proc_id: ProcId) -> ProcError {
-    ProcError::custom(GExecError::ArtifactTypeMismatch(proc_id))
-}
-
-/// Recovers a stage's own artifact type from a type-erased artifact.
-fn downcast_artifact<P: GChainProc>(
-    proc_id: ProcId,
-    artifact: &Arc<dyn DynProcArtifact>,
-) -> Result<Arc<P::Artifact>, ProcError> {
-    Arc::clone(artifact)
-        .into_any_arc()
-        .downcast::<P::Artifact>()
-        .map_err(|_| artifact_type_mismatch(proc_id))
-}
-
 /// Recovers a stage's own artifact type across a run of type-erased artifacts,
 /// preserving their order.
-fn downcast_artifacts<P: GChainProc>(
+fn downcast_artifacts_arc<P: GChainProc>(
     proc_id: ProcId,
     artifacts: &[Arc<dyn DynProcArtifact>],
 ) -> Result<Vec<Arc<P::Artifact>>, ProcError> {
     artifacts
         .iter()
-        .map(|a| downcast_artifact::<P>(proc_id, a))
+        .map(|a| downcast_artifact_arc::<P>(proc_id, a.clone()))
         .collect()
+}
+
+/// Recovers a stage's own artifact type from a type-erased artifact.
+fn downcast_artifact_arc<P: GChainProc>(
+    proc_id: ProcId,
+    artifact: Arc<dyn DynProcArtifact>,
+) -> Result<Arc<P::Artifact>, ProcError> {
+    artifact
+        .into_any_arc()
+        .downcast::<P::Artifact>()
+        .map_err(|_| make_artifact_type_mismatch_err(proc_id))
+}
+
+/// Reports artifacts having gotten crossed between stages inside the executor.
+///
+/// This is an executor bug rather than anything the stage did, but it surfaces
+/// at the shim boundary where only a [`ProcError`] can be returned, so the
+/// typed executor error is preserved as its source.
+fn make_artifact_type_mismatch_err(proc_id: ProcId) -> ProcError {
+    ProcError::custom(GExecError::ArtifactTypeMismatch(proc_id))
 }

@@ -55,7 +55,7 @@ impl<S: GChainSpec> ArtifactCache<S> {
         proc_id: ProcId,
     ) -> Option<Arc<A>> {
         let artifact = self.get_artifact_dyn(lref, proc_id)?;
-        Arc::clone(artifact).into_any_arc().downcast::<A>().ok()
+        artifact.clone().into_any_arc().downcast::<A>().ok()
     }
 
     /// Discards the artifact one stage stored for a link.

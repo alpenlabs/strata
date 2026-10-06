@@ -117,7 +117,6 @@ pub struct CheckpointData {
     /// This describes both ends of the link, since it commits to the terminal
     /// blocks of this epoch and the previous one.
     summary: EpochSummary,
-    // TODO(trey): figure out what other structure to put here, why is this spread out so awkwardly?
 }
 
 impl CheckpointData {

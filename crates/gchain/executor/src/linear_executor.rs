@@ -48,30 +48,6 @@ pub struct LinearExecutor<S: GChainSpec, P: ChainProvider<Spec = S>, X: Executor
 impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     LinearExecutor<S, P, X>
 {
-    /*
-        /// Opens an executor over a store, reconciling what it holds with the
-        /// pipeline.
-        ///
-        /// A store that has never been used starts every stage at `base_node`,
-        /// which is then the oldest node the pipeline can roll back to until it's
-        /// pruned past.  Otherwise the committed path's artifacts are loaded.  If
-        /// the stages accept them all, stages that have no committed state or lag
-        /// the committed node are brought level and the executor is ready.  If
-        /// not, what's handed back is the means to reprocess the links in
-        /// question, which gives the executor once that's done.
-        ///
-        /// Uncommitted links are left where they are; one whose artifacts turn
-        /// out to be missing or no longer accepted has those stages re-run when
-        /// it's next processed.
-        pub fn open(
-            pipeline: StagePipeline<S>,
-            provider: Arc<P>,
-            store: Arc<X>,
-            base_node: NodeRef<S>,
-        ) -> Result<Opened<S, P, X>, GExecError> {
-    }
-        */
-
     /// Wraps a core opened on a clean database.
     ///
     /// This means all processor stage data is "level" with the committed node
@@ -118,12 +94,13 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
         let path = self.core.path_to_origin(lref, endpoints.origin())?;
 
         let outcome = self.core.run_stages(lref, &path, &missing)?;
-        if matches!(outcome, LinkOutcome::Rejected { .. }) {
+        if outcome.is_rejected() {
             // Whatever an earlier run had stored for it goes too, along with
             // anything that was built on it.
             self.core.forget_link(lref)?;
             self.core.sweep_from(endpoints.target())?;
         }
+
         Ok(outcome)
     }
 
@@ -202,7 +179,7 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
-    use crate::config::{ExecutorBuilder, PipelineBuilder, StagePipeline};
+    use crate::config::ExecutorBuilder;
     use crate::mem_store::MemExecutorStore;
     use crate::open::{OpenReport, OpenResult};
     use crate::reprocess::ReprocExecutor;
@@ -232,22 +209,6 @@ mod tests {
         Arc::new(p)
     }
 
-    /// Opens an executor at genesis node 1 over a pipeline.
-    fn open_pipeline(
-        provider: &Arc<TestProvider>,
-        store: &Arc<MemExecutorStore<TestSpec>>,
-        pipeline: StagePipeline<TestSpec>,
-    ) -> OpenResult<TestSpec, TestProvider, MemExecutorStore<TestSpec>> {
-        ExecutorBuilder::new(
-            pipeline,
-            Arc::clone(provider),
-            Arc::clone(store),
-            TestRef(1),
-        )
-        .open()
-        .expect("test: open executor")
-    }
-
     /// Opens an executor at genesis node 1 with the given stages under the
     /// IDs "a", "b", ... in order, which has to need no reprocessing.
     fn open(
@@ -255,16 +216,16 @@ mod tests {
         store: &Arc<MemExecutorStore<TestSpec>>,
         procs: Vec<TestProc>,
     ) -> (Exec, OpenReport<TestSpec>) {
-        open_pipeline(provider, store, pipeline_of(procs)).expect_ready()
+        builder_of(provider, store, procs)
+            .open()
+            .expect("test: open executor")
+            .expect_ready()
     }
 
-    /// Opens an executor like [`open`], which has to need reprocessing.
-    fn open_reproc(
-        provider: &Arc<TestProvider>,
-        store: &Arc<MemExecutorStore<TestSpec>>,
-        pipeline: StagePipeline<TestSpec>,
-    ) -> Reproc {
-        match open_pipeline(provider, store, pipeline) {
+    /// Opens the executor a builder describes, which has to need
+    /// reprocessing.
+    fn open_reproc(builder: TestBuilder) -> Reproc {
+        match builder.open().expect("test: open executor") {
             OpenResult::Ready(..) => panic!("test: expected links to reprocess"),
             OpenResult::NeedsReprocess(pending) => pending,
         }
@@ -288,7 +249,8 @@ mod tests {
     /// The links of each plan that's left, by stage.
     fn planned(pending: &Reproc) -> Vec<(ProcId, TestRef, Vec<TestRef>)> {
         pending
-            .plans()
+            .log()
+            .pending()
             .map(|p| {
                 (
                     p.proc_id(),
@@ -827,7 +789,7 @@ mod tests {
         let first = TestProc::new().with_version(2).accepting_old([10]);
         let second = TestProc::new();
         let (first_events, second_events) = (first.events(), second.events());
-        let mut pending = open_reproc(&provider, &store, pipeline_of(vec![first, second]));
+        let mut pending = open_reproc(builder_of(&provider, &store, vec![first, second]));
 
         assert_eq!(
             planned(&pending),
@@ -884,7 +846,7 @@ mod tests {
             .accepting_old([10, 11])
             .not_resuming_at([3, 2]);
         let events = first.events();
-        let pending = open_reproc(&provider, &store, pipeline_of(vec![first, TestProc::new()]));
+        let pending = open_reproc(builder_of(&provider, &store, vec![first, TestProc::new()]));
 
         assert_eq!(
             planned(&pending),
@@ -906,13 +868,31 @@ mod tests {
         );
     }
 
+    /// Rolling a stage back takes the artifact it committed with, which only
+    /// the store has once the stage doesn't stand behind it.
+    #[test]
+    fn test_reprocessing_needs_the_artifacts_a_stage_committed_with() {
+        let (provider, store) = committed_store();
+        store
+            .discard_link_artifacts(&TestRef(12))
+            .expect("test: discard artifacts");
+
+        let first = TestProc::new().with_version(2);
+        let pending = open_reproc(builder_of(&provider, &store, vec![first, TestProc::new()]));
+
+        let err = expect_err(pending.finish(), "reprocessing to fail");
+        assert!(matches!(
+            err,
+            GExecError::StaleArtifact { proc_id, .. } if proc_id == id("a")
+        ));
+    }
+
     #[test]
     fn test_stage_with_nowhere_to_resume_fails_to_open() {
         let (provider, store) = committed_store();
         let first = TestProc::new().with_version(2).not_resuming_at([1, 2, 3]);
 
-        let pipeline = pipeline_of(vec![first, TestProc::new()]);
-        let res = ExecutorBuilder::new(pipeline, provider, store, TestRef(1)).open();
+        let res = builder_of(&provider, &store, vec![first, TestProc::new()]).open();
 
         let err = expect_err(res, "open to fail");
         assert!(matches!(err, GExecError::NoResumePoint(proc_id) if proc_id == id("a")));
@@ -929,13 +909,12 @@ mod tests {
         let second_events = second.events();
         let no_deps = ProcDeps::new(Vec::new(), Vec::new());
         let on_first = ProcDeps::new(vec![id("a")], Vec::new());
-        let pipeline = PipelineBuilder::new()
+        let builder = ExecutorBuilder::new(provider.clone(), store.clone(), TestRef(1))
             .add_stage(id("a"), first, no_deps)
             .expect("test: add stage")
             .add_stage(id("b"), second, on_first)
-            .expect("test: add stage")
-            .build();
-        let pending = open_reproc(&provider, &store, pipeline);
+            .expect("test: add stage");
+        let pending = open_reproc(builder);
 
         assert_eq!(
             planned(&pending),
@@ -966,7 +945,7 @@ mod tests {
             .rejecting([12]);
         let second = TestProc::new();
         let (first_events, second_events) = (first.events(), second.events());
-        let pending = open_reproc(&provider, &store, pipeline_of(vec![first, second]));
+        let pending = open_reproc(builder_of(&provider, &store, vec![first, second]));
 
         let (mut exec, report) = pending.finish().expect("test: finish");
 

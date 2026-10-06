@@ -10,8 +10,7 @@ use strata_asm_checkpoint_types::{
 use strata_asm_common::AsmManifest;
 use strata_checkpoint_types::EpochSummary;
 use strata_gchain_executor::{
-    ArtifactCache, ExecutorBuilder, GExecError, LinkOutcome, MemExecutorStore, PipelineBuilder,
-    ProcContextImpl,
+    ArtifactCache, ExecutorBuilder, GExecError, LinkOutcome, MemExecutorStore, ProcContextImpl,
 };
 use strata_gchain_types::*;
 use strata_identifiers::{
@@ -39,7 +38,6 @@ const SLOTS_PER_EPOCH: u64 = 2;
 #[derive(Default)]
 struct MemStateStore {
     states: Mutex<BTreeMap<OLStateNode, OLStateV1>>,
-    terminal_headers: Mutex<Vec<OLBlockHeaderV1>>,
 }
 
 impl OLStateStore for MemStateStore {
@@ -79,11 +77,6 @@ impl OLStateStore for MemStateStore {
 
     fn prune_states_before(&self, node: &OLStateNode) -> Result<(), ProcError> {
         self.states.lock().unwrap().retain(|n, _| n >= node);
-        Ok(())
-    }
-
-    fn store_terminal_header(&self, header: &OLBlockHeaderV1) -> Result<(), ProcError> {
-        self.terminal_headers.lock().unwrap().push(header.clone());
         Ok(())
     }
 }
@@ -512,11 +505,6 @@ fn test_exec_checkpoint_reaches_block_path_state() {
         h.stored_root(&h.chain.node(2)),
         Some(*h.chain.header(2).state_root())
     );
-    assert_eq!(
-        h.state_store.terminal_headers.lock().unwrap().as_slice(),
-        &[h.chain.header(2).clone()],
-        "checkpoint commit must persist the reconstructed header"
-    );
 }
 
 #[test]
@@ -638,23 +626,19 @@ fn test_linear_executor_drives_ol_stages() {
         MemIndexStore::default(),
     );
     let index_deps = index_proc.deps();
-    let pipeline = PipelineBuilder::new()
-        .add_stage(
-            proc_id("exec"),
-            exec_proc,
-            ProcDeps::new(Vec::new(), vec![proc_id("exec")]),
-        )
-        .expect("add exec")
-        .add_stage(proc_id("index"), index_proc, index_deps)
-        .expect("add index")
-        .build();
-
     let (mut exec, report) = ExecutorBuilder::new(
-        pipeline,
         Arc::new(OLChainProvider::new(chain_store)),
         Arc::new(MemExecutorStore::new()),
         chain.node(0),
     )
+    .add_stage(
+        proc_id("exec"),
+        exec_proc,
+        ProcDeps::new(Vec::new(), vec![proc_id("exec")]),
+    )
+    .expect("add exec")
+    .add_stage(proc_id("index"), index_proc, index_deps)
+    .expect("add index")
     .open()
     .expect("open")
     .finish()
@@ -695,11 +679,6 @@ fn test_linear_executor_drives_ol_stages() {
     exec.commit_through(&ckpt_refs[1])
         .expect("commit checkpoint");
     assert_eq!(exec.committed_node(), &chain.node(4));
-    assert_eq!(
-        state_store.terminal_headers.lock().unwrap().as_slice(),
-        &[chain.header(4).clone()],
-        "checkpoint commit must persist the reconstructed header"
-    );
 
     exec.uncommit_to(&chain.node(2)).expect("uncommit");
     assert_eq!(exec.committed_node(), &chain.node(2));

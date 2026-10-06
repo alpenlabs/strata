@@ -7,11 +7,16 @@
 //! just that stage back with the artifacts it committed with, runs it over
 //! the links again, and commits what that produced.
 //!
+//! This is the only place a stage is handed artifacts it doesn't stand
+//! behind any more, and only to undo what they committed.  They're read back
+//! from the store for that and kept nowhere.
+//!
 //! Until every plan is applied there's no executor to drive, only a
-//! [`PendingExecutor`] that knows what's left to do.
+//! [`ReprocExecutor`] that knows what's left to do.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::mem;
+use std::sync::Arc;
 
 use strata_gchain_types::*;
 
@@ -21,6 +26,8 @@ use crate::history::{CommitWalker, CommittedStep, ResumeSearch, StepJudge, find_
 use crate::open::*;
 use crate::stage_runner::{LinkOutcome, StageRunner};
 use crate::store::ExecutorStore;
+
+use crate::ArtifactRecord;
 
 /// The committed links a stage has to process again.
 pub struct StagePlan<S: GChainSpec> {
@@ -66,99 +73,55 @@ impl<S: GChainSpec> RejectedCommit<S> {
     }
 }
 
-/// Executor over a store with committed links that have to be reprocessed
-/// before it can be driven.
-///
-/// The plans are applied a stage at a time in canonical order, since a stage
-/// builds on what the ones it depends on produce.  When to do that is up to
-/// the caller; [`Self::finish`] applies whatever is left and hands over the
-/// executor.
-pub struct ReprocExecutor<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> {
-    core: ExecutorCore<S, P, X>,
-    plans: VecDeque<StagePlan<S>>,
-
-    // TODO(trey): move these to a reproc log structure, maybe also plans
-    reprocessed: Vec<StagePlan<S>>,
+/// What reprocessing has done so far and what it has left to do.
+pub struct ReprocLog<S: GChainSpec> {
+    pending: VecDeque<StagePlan<S>>,
+    applied: Vec<StagePlan<S>>,
     rejected: Vec<RejectedCommit<S>>,
 }
 
-impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
-    ReprocExecutor<S, P, X>
-{
-    pub(crate) fn new(core: ExecutorCore<S, P, X>, plans: Vec<StagePlan<S>>) -> Self {
+impl<S: GChainSpec> ReprocLog<S> {
+    pub(crate) fn new(plans: Vec<StagePlan<S>>) -> Self {
         Self {
-            core,
-            plans: plans.into(),
-            reprocessed: Vec::new(),
+            pending: plans.into(),
+            applied: Vec::new(),
             rejected: Vec::new(),
         }
     }
 
-    /// The node the pipeline is committed up to.
-    pub fn committed_node(&self) -> &NodeRef<S> {
-        self.core.committed_node()
-    }
-
-    /// The committed links that can still be rolled back, from the oldest.
-    pub fn committed_path(&self) -> &LinkPath<S> {
-        self.core.committed_path()
-    }
-
     /// The plans still to be applied, in the order they will be.
-    pub fn plans(&self) -> impl Iterator<Item = &StagePlan<S>> {
-        self.plans.iter()
+    pub fn pending(&self) -> impl Iterator<Item = &StagePlan<S>> {
+        self.pending.iter()
     }
 
-    /// Committed links that were rejected so far.
+    /// The links each stage processed again, in the order the stages did.
+    pub fn applied(&self) -> &[StagePlan<S>] {
+        &self.applied
+    }
+
+    /// Committed links that were rejected when processed again, which the
+    /// pipeline was rolled back to before.
     pub fn rejected(&self) -> &[RejectedCommit<S>] {
         &self.rejected
     }
 
-    /// Applies the next stage's plan, returning the stage if there was one
-    /// left.
-    ///
-    /// If the stage rejects a link, the whole pipeline is rolled back to the
-    /// link's origin and the plans left are cut short to match.
-    pub fn apply_next_stage(&mut self) -> Result<Option<ProcId>, GExecError> {
-        let Some(plan) = self.plans.pop_front() else {
-            return Ok(None);
-        };
-        let proc_id = plan.proc_id;
-
-        match reprocess_stage(&mut self.core, &plan)? {
-            None => self.reprocessed.push(plan),
-            Some(rejection) => {
-                let dropped = roll_back_rejected(&mut self.core, proc_id, &rejection)?;
-                self.reprocessed.push(StagePlan {
-                    proc_id,
-                    path: plan.path.slice(0, rejection.plan_pos),
-                });
-                self.rejected.push(RejectedCommit {
-                    lref: rejection.lref,
-                    proc_id,
-                    dropped,
-                });
-                self.cut_plans_to_committed();
-            }
-        }
-
-        Ok(Some(proc_id))
+    fn take_next(&mut self) -> Option<StagePlan<S>> {
+        self.pending.pop_front()
     }
 
-    /// Applies the plans that are left and hands over the executor.
-    pub fn finish(mut self) -> Result<LinearExecutorReadyOutput<S, P, X>, GExecError> {
-        while self.apply_next_stage()?.is_some() {
-            // TODO(trey): add logging about what we're doing here
-        }
-        finish_open(self.core, self.reprocessed, self.rejected)
+    fn record_applied(&mut self, plan: StagePlan<S>) {
+        self.applied.push(plan);
+    }
+
+    fn record_rejected(&mut self, rejected: RejectedCommit<S>) {
+        self.rejected.push(rejected);
     }
 
     /// Cuts the plans that are left down to the links still committed after
     /// a rollback.
-    fn cut_plans_to_committed(&mut self) {
-        let committed = self.core.committed_path();
-        let plans = mem::take(&mut self.plans);
-        self.plans = plans
+    fn cut_pending_to(&mut self, committed: &LinkPath<S>) {
+        let pending = mem::take(&mut self.pending);
+        self.pending = pending
             .into_iter()
             .filter_map(|plan| cut_plan_to(plan, committed))
             .collect();
@@ -176,27 +139,126 @@ fn cut_plan_to<S: GChainSpec>(plan: StagePlan<S>, committed: &LinkPath<S>) -> Op
     })
 }
 
-/// Judges committed links for one stage by the artifacts loaded for them.
-// FIXME(trey): this type feels convoluted and context-specific, maybe we should
-// a type that represents the precomputed dep graph
+/// Executor over a store with committed links that have to be reprocessed
+/// before it can be driven.
+///
+/// The plans are applied a stage at a time in canonical order, since a stage
+/// builds on what the ones it depends on produce.  When to do that is up to
+/// the caller; [`Self::finish`] applies whatever is left and hands over the
+/// executor.
+pub struct ReprocExecutor<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> {
+    core: ExecutorCore<S, P, X>,
+    log: ReprocLog<S>,
+}
+
+impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
+    ReprocExecutor<S, P, X>
+{
+    pub(crate) fn new(core: ExecutorCore<S, P, X>, plans: Vec<StagePlan<S>>) -> Self {
+        Self {
+            core,
+            log: ReprocLog::new(plans),
+        }
+    }
+
+    /// The node the pipeline is committed up to.
+    pub fn committed_node(&self) -> &NodeRef<S> {
+        self.core.committed_node()
+    }
+
+    /// The committed links that can still be rolled back, from the oldest.
+    pub fn committed_path(&self) -> &LinkPath<S> {
+        self.core.committed_path()
+    }
+
+    /// What has been reprocessed so far and what's left.
+    pub fn log(&self) -> &ReprocLog<S> {
+        &self.log
+    }
+
+    /// Applies the next stage's plan, returning the stage if there was one
+    /// left.
+    ///
+    /// If the stage rejects a link, the whole pipeline is rolled back to the
+    /// link's origin and the plans left are cut short to match.
+    pub fn apply_next_stage(&mut self) -> Result<Option<ProcId>, GExecError> {
+        let Some(plan) = self.log.take_next() else {
+            return Ok(None);
+        };
+        let proc_id = plan.proc_id;
+
+        match reprocess_stage(&mut self.core, &plan)? {
+            None => self.log.record_applied(plan),
+            Some(rejection) => {
+                let dropped = roll_back_rejected(&mut self.core, proc_id, &rejection)?;
+                self.log.record_applied(StagePlan {
+                    proc_id,
+                    path: plan.path.slice(0, rejection.plan_pos),
+                });
+                self.log.record_rejected(RejectedCommit {
+                    lref: rejection.lref,
+                    proc_id,
+                    dropped,
+                });
+                self.log.cut_pending_to(self.core.committed_path());
+            }
+        }
+
+        Ok(Some(proc_id))
+    }
+
+    /// Applies the plans that are left and hands over the executor.
+    pub fn finish(mut self) -> Result<LinearExecutorReadyOutput<S, P, X>, GExecError> {
+        while self.apply_next_stage()?.is_some() {
+            // TODO(trey): add logging about what we're doing here
+        }
+        finish_open(self.core, self.log)
+    }
+}
+
+/// Judges committed links for one stage by the artifacts loaded for them and
+/// by what the stages it depends on are reprocessing.
 struct StageJudge<'c, S: GChainSpec> {
     stages: &'c StageRunner<S>,
     proc_id: ProcId,
 
-    /// Links the stages this one depends on are reprocessing, which makes
-    /// what it built on their artifacts out of date.
-    forced: HashSet<LinkRef<S>>,
+    /// The plans of the stages before this one.
+    plans: &'c [StagePlan<S>],
+}
+
+impl<S: GChainSpec> StageJudge<'_, S> {
+    /// Whether a stage this one depends on is reprocessing a link, which
+    /// makes what this one built on its artifact out of date.
+    fn check_dep_reprocesses(&self, lref: &LinkRef<S>) -> bool {
+        let schedule = self.stages.pipeline().schedule();
+        schedule
+            .iter_deps(self.proc_id)
+            .any(|dep| check_planned(self.plans, dep, lref))
+    }
 }
 
 impl<S: GChainSpec> StepJudge<S> for StageJudge<'_, S> {
     fn check_step_acceptable(&mut self, step: &CommittedStep<S>) -> Result<bool, GExecError> {
         let lref = step.lref();
-        Ok(!self.forced.contains(lref) && self.stages.has_current(lref, self.proc_id))
+        Ok(self.stages.has_current(lref, self.proc_id) && !self.check_dep_reprocesses(lref))
     }
 
     fn check_can_resume_at(&mut self, node: &NodeRef<S>) -> Result<bool, GExecError> {
-        self.stages.check_can_resume_at(self.proc_id, node)
+        self.stages
+            .get_stage(self.proc_id)
+            .check_can_resume_at(node)
     }
+}
+
+/// Whether a stage's plan, if it has one, covers a link.
+fn check_planned<S: GChainSpec>(
+    plans: &[StagePlan<S>],
+    proc_id: ProcId,
+    lref: &LinkRef<S>,
+) -> bool {
+    plans
+        .iter()
+        .any(|plan| plan.proc_id == proc_id && plan.path.links().contains(lref))
 }
 
 /// Works out which committed links each stage has to process again, in
@@ -222,11 +284,12 @@ pub(crate) fn plan_reprocessing<
         let mut judge = StageJudge {
             stages: core.stages(),
             proc_id,
-            forced: collect_dep_links(core.stages(), proc_id, &plans),
+            plans: &plans,
         };
 
         let walker = CommitWalker::from_tracking(core.store(), tracking);
-        match find_resume_path(walker, tracking.committed_node(), floor, &mut judge)? {
+        let found = find_resume_path(walker, tracking.committed_node(), floor, &mut judge)?;
+        match found {
             ResumeSearch::UpToDate => {}
             ResumeSearch::ResumeAt(path) => plans.push(StagePlan { proc_id, path }),
             ResumeSearch::NoResumePoint => return Err(GExecError::NoResumePoint(proc_id)),
@@ -234,28 +297,6 @@ pub(crate) fn plan_reprocessing<
     }
 
     Ok(plans)
-}
-
-/// The links being reprocessed by the stages a stage depends on.
-fn collect_dep_links<S: GChainSpec>(
-    stages: &StageRunner<S>,
-    proc_id: ProcId,
-    plans: &[StagePlan<S>],
-) -> HashSet<LinkRef<S>> {
-    let deps = stages
-        .pipeline()
-        .schedule()
-        .get_deps(proc_id)
-        .expect("gchain: stage is in the schedule");
-
-    plans
-        .iter()
-        .filter(|plan| plan.proc_id != proc_id)
-        .filter(|plan| {
-            deps.cur_node().contains(&plan.proc_id) || deps.prev_node().contains(&plan.proc_id)
-        })
-        .flat_map(|plan| plan.path.links().iter().cloned())
-        .collect()
 }
 
 /// A committed link a stage rejected while reprocessing.
@@ -297,14 +338,14 @@ fn reprocess_stage<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<S
     // and has what's in between committed along with the rest.
     let rewind_pos = resume_pos.min(stage_pos);
     let rewind_node = &committed.nodes()[rewind_pos];
-    core.uncommit_stage_between(proc_id, rewind_node, &stage_node)?;
+    rewind_stage(core, proc_id, rewind_node, &stage_node)?;
 
     for (plan_pos, lref) in plan.path.links().iter().enumerate() {
         let origin_pos = resume_pos + plan_pos;
         let pre_path = committed.slice(rewind_pos, origin_pos);
         let outcome = core.run_stages(lref, &pre_path, &[proc_id])?;
 
-        if matches!(outcome, LinkOutcome::Rejected { .. }) {
+        if outcome.is_rejected() {
             let origin = &committed.nodes()[origin_pos];
             core.commit_stage_between(proc_id, rewind_node, origin)?;
             return Ok(Some(Rejection {
@@ -349,7 +390,7 @@ fn roll_back_rejected<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStor
             .get_node_index(&node)
             .ok_or_else(|| GExecError::stage_diverged(proc_id, &node))?;
         if pos > origin_pos {
-            core.uncommit_stage_between(proc_id, origin, &node)?;
+            rewind_stage(core, proc_id, origin, &node)?;
         }
     }
 
@@ -360,4 +401,66 @@ fn roll_back_rejected<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStor
     core.evict_to_committed();
 
     Ok(dropped)
+}
+
+/// Rolls one stage back over the committed links between two nodes, a
+/// commit at a time from the newest, with the artifacts it committed them
+/// with, leaving the stage at the earlier node.
+///
+/// A stage is always rolled back over a link before it processes the link
+/// again, so where it no longer stands behind an artifact, the store still
+/// has the one it committed with.
+fn rewind_stage<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>(
+    core: &mut ExecutorCore<S, P, X>,
+    proc_id: ProcId,
+    from: &NodeRef<S>,
+    to: &NodeRef<S>,
+) -> Result<(), GExecError> {
+    let segments = core.find_committed_segments_between(from, to)?;
+    for segment in segments.iter().rev() {
+        let artifacts = load_committed_with(core, proc_id, segment.links())?;
+        core.get_stage(proc_id).uncommit(segment, &artifacts)?;
+        core.set_stage_node(proc_id, segment.base_node().clone())?;
+    }
+
+    Ok(())
+}
+
+/// Collects the artifacts a stage committed a run of links with, in order:
+/// the ones it still stands behind, and otherwise what the store has from
+/// it, whichever version of the stage that came from.
+fn load_committed_with<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>(
+    core: &ExecutorCore<S, P, X>,
+    proc_id: ProcId,
+    links: &[LinkRef<S>],
+) -> Result<Vec<Arc<dyn DynProcArtifact>>, GExecError> {
+    let mut artifacts = Vec::with_capacity(links.len());
+    for lref in links {
+        if let Some(artifact) = core.stages().cache().get_artifact_dyn(lref, proc_id) {
+            artifacts.push(artifact.clone());
+            continue;
+        }
+
+        let record = load_proc_link_artifact_rec(core.store(), lref, proc_id)?
+            .ok_or_else(|| GExecError::stale_artifact(lref, proc_id))?;
+        artifacts.push(core.get_stage(proc_id).decode(record.data())?);
+    }
+
+    Ok(artifacts)
+}
+
+/// Finds a specific processor's artifact record for a link.
+fn load_proc_link_artifact_rec<S: GChainSpec, X: ExecutorStore<Spec = S>>(
+    store: &X,
+    lref: &LinkRef<S>,
+    proc_id: ProcId,
+) -> Result<Option<ArtifactRecord<S>>, GExecError> {
+    // TODO(trey): add fn to just load a single artifact instead of loading all
+    // artifacts for a link and then dropping the ones we don't want
+    let records = store
+        .load_link_artifacts(lref)
+        .map_err(GExecError::Storage)?;
+    Ok(records
+        .into_iter()
+        .find(|record| record.proc_id() == proc_id))
 }

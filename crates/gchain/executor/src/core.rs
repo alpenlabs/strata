@@ -14,26 +14,12 @@ use strata_gchain_types::*;
 
 use crate::config::StagePipeline;
 use crate::errors::GExecError;
-use crate::history::CommitWalker;
+use crate::history::{CommitWalker, LogCut, find_log_cut, find_segments_between};
+use crate::stage::Stage;
 use crate::stage_runner::{LinkOutcome, StageRunner};
 use crate::store::{ArtifactRecord, ExecutorStore};
 use crate::tracking::{CommitIndex, TrackingState};
 use crate::traverse::{find_path, find_reachable_links};
-
-/// Where a node sits in the commit log.
-struct LogCut<S: GChainSpec> {
-    idx: CommitIndex,
-    segment: LinkPath<S>,
-
-    /// The node's position in the segment.
-    pos: usize,
-}
-
-/// The stages that had to be brought level with the committed node.
-pub(crate) struct LeveledStages {
-    pub(crate) initialized: Vec<ProcId>,
-    pub(crate) recommitted: Vec<ProcId>,
-}
 
 pub(crate) struct ExecutorCore<
     S: GChainSpec,
@@ -109,6 +95,15 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         self.stages.pipeline().proc_ids().collect()
     }
 
+    /// Looks up a stage by the ID it's registered under.
+    ///
+    /// # Panics
+    ///
+    /// If no stage is registered under the ID.
+    pub(crate) fn get_stage(&self, proc_id: ProcId) -> &Stage<S> {
+        self.stages.get_stage(proc_id)
+    }
+
     #[cfg(test)]
     pub(crate) fn check_loaded(&self, lref: &LinkRef<S>) -> bool {
         self.loaded.contains_key(lref)
@@ -172,7 +167,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         lref: &LinkRef<S>,
         origin: &NodeRef<S>,
     ) -> Result<LinkPath<S>, GExecError> {
-        let provider = Arc::clone(&self.provider);
+        let provider = self.provider.clone();
         let committed = self.committed_node().clone();
         find_path(provider.as_ref(), &committed, origin, |l| {
             self.check_usable(l)
@@ -192,17 +187,21 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
     ) -> Result<LinkOutcome, GExecError> {
         let link = self.fetch_link(lref)?;
         let run = self.stages.run(lref, &link, path, stages)?;
-        if run.outcome() == LinkOutcome::Accepted {
-            self.store_artifacts(run.produced())?;
+
+        if run.outcome().is_accepted() {
+            for record in run.produced() {
+                self.store_artifact(record)?;
+            }
             self.loaded.insert(lref.clone(), true);
         }
+
         Ok(run.outcome())
     }
 
     /// Forgets every link that's reachable from a node but no longer from the
     /// committed path's base, returning them.
     pub(crate) fn sweep_from(&mut self, node: &NodeRef<S>) -> Result<Vec<LinkRef<S>>, GExecError> {
-        let provider = Arc::clone(&self.provider);
+        let provider = self.provider.clone();
         let base = self.committed_path().base_node().clone();
         let keep = find_reachable_links(provider.as_ref(), &base, |l| self.check_present(l))?;
         let candidates = find_reachable_links(provider.as_ref(), node, |l| self.check_present(l))?;
@@ -214,6 +213,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         for lref in &doomed {
             self.forget_link(lref)?;
         }
+
         Ok(doomed)
     }
 
@@ -299,6 +299,18 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         Ok(())
     }
 
+    /// The commits covering the committed links between two nodes on the
+    /// committed path, oldest first, with the ones at either end cut down to
+    /// the part in between.
+    pub(crate) fn find_committed_segments_between(
+        &self,
+        from: &NodeRef<S>,
+        to: &NodeRef<S>,
+    ) -> Result<Vec<LinkPath<S>>, GExecError> {
+        let walker = CommitWalker::from_tracking(self.store(), &self.tracking);
+        find_segments_between(walker, from, to)
+    }
+
     /// Cuts the committed path and the commit log back to a node on the
     /// path.  The stages have to have been rolled back to it already.
     pub(crate) fn truncate_committed_to(&mut self, node: &NodeRef<S>) -> Result<(), GExecError> {
@@ -306,18 +318,18 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         let cut = self.find_log_cut(node)?;
         let next_commit = match &cut {
             None => self.tracking.next_commit(),
-            Some(cut) if cut.pos == 0 => cut.idx,
-            Some(cut) => cut.idx.next(),
+            Some(cut) if cut.is_at_start() => cut.idx(),
+            Some(cut) => cut.idx().next(),
         };
 
         self.update_tracking(|tracking| tracking.truncate_committed_to(node, next_commit))?;
 
         if let Some(cut) = cut
-            && cut.pos > 0
-            && cut.pos < cut.segment.len()
+            && !cut.is_at_start()
+            && !cut.is_at_end()
         {
             self.store
-                .store_commit_segment(cut.idx, &cut.segment.slice(0, cut.pos))
+                .store_commit_segment(cut.idx(), &cut.get_part_before())
                 .map_err(GExecError::Storage)?;
         }
         self.store
@@ -336,8 +348,8 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         let cut = self.find_log_cut(node)?;
         let first_commit = match &cut {
             None => self.tracking.first_commit(),
-            Some(cut) if cut.pos == cut.segment.len() => cut.idx.next(),
-            Some(cut) => cut.idx,
+            Some(cut) if cut.is_at_end() => cut.idx().next(),
+            Some(cut) => cut.idx(),
         };
 
         // The base moves first: if discarding is cut short, what's left
@@ -346,12 +358,11 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         self.update_tracking(|tracking| tracking.advance_base_to(node, first_commit))?;
 
         if let Some(cut) = cut
-            && cut.pos > 0
-            && cut.pos < cut.segment.len()
+            && !cut.is_at_start()
+            && !cut.is_at_end()
         {
-            let kept = cut.segment.slice(cut.pos, cut.segment.len());
             self.store
-                .store_commit_segment(cut.idx, &kept)
+                .store_commit_segment(cut.idx(), &cut.get_part_after())
                 .map_err(GExecError::Storage)?;
         }
         self.store
@@ -369,99 +380,14 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         Ok(())
     }
 
-    /// Brings every stage's committed state level with the committed node:
-    /// a stage that has never been initialized is initialized there, and one
-    /// that lags has the rest of the committed path committed.
-    // TODO(trey): should this be moved to the ReprocExecutor?
-    pub(crate) fn level_stages(&mut self) -> Result<LeveledStages, GExecError> {
-        let mut leveled = LeveledStages {
-            initialized: Vec::new(),
-            recommitted: Vec::new(),
-        };
-
-        let committed = self.committed_node().clone();
-        for proc_id in self.get_proc_ids() {
-            match self.tracking.get_stage_node(proc_id).cloned() {
-                None => {
-                    self.stages.init_stage(proc_id, &committed)?;
-                    self.set_stage_node(proc_id, committed.clone())?;
-                    leveled.initialized.push(proc_id);
-                }
-                Some(node) if node == committed => {}
-                Some(node) => {
-                    if self.committed_path().get_node_index(&node).is_none() {
-                        return Err(GExecError::stage_diverged(proc_id, &node));
-                    }
-                    self.commit_stage_between(proc_id, &node, &committed)?;
-                    leveled.recommitted.push(proc_id);
-                }
-            }
-        }
-
-        Ok(leveled)
-    }
-
-    /// The commits covering the committed links between two nodes on the
-    /// committed path, oldest first, with the ones at either end cut down to
-    /// the part in between.
-    // TODO(trey): should this be moved to the ReprocExecutor?
-    fn find_committed_segments_between(
-        &self,
-        from: &NodeRef<S>,
-        to: &NodeRef<S>,
-    ) -> Result<Vec<LinkPath<S>>, GExecError> {
-        if from == to {
-            return Ok(Vec::new());
-        }
-
-        let mut segments = Vec::new();
-        let mut reached_to = false;
-        let mut walker = CommitWalker::from_tracking(self.store(), &self.tracking);
-        while let Some(commit) = walker.next_segment()? {
-            let mut segment = commit.into_path();
-            if !reached_to {
-                let Some(pos) = segment.get_node_index(to) else {
-                    continue;
-                };
-                segment = segment.slice(0, pos);
-                reached_to = true;
-            }
-
-            let from_pos = segment.get_node_index(from);
-            if let Some(pos) = from_pos {
-                segment = segment.slice(pos, segment.len());
-            }
-            if !segment.is_empty() {
-                segments.push(segment);
-            }
-            if from_pos.is_some() {
-                segments.reverse();
-                return Ok(segments);
-            }
-        }
-
-        Err(GExecError::corrupt_commit_log(from))
-    }
-
     /// Finds the newest commit a node on the committed path is part of, if
     /// anything is committed.
-    // TODO(trey): should this be moved to the ReprocExecutor?
     fn find_log_cut(&self, node: &NodeRef<S>) -> Result<Option<LogCut<S>>, GExecError> {
-        let mut walker = CommitWalker::from_tracking(self.store(), &self.tracking);
-        while let Some(commit) = walker.next_segment()? {
-            if let Some(pos) = commit.path().get_node_index(node) {
-                return Ok(Some(LogCut {
-                    idx: commit.idx(),
-                    segment: commit.into_path(),
-                    pos,
-                }));
-            }
-        }
-
-        if self.committed_path().is_empty() {
-            Ok(None)
-        } else {
-            Err(GExecError::corrupt_commit_log(node))
+        let walker = CommitWalker::from_tracking(self.store(), &self.tracking);
+        match find_log_cut(walker, node)? {
+            Some(cut) => Ok(Some(cut)),
+            None if self.committed_path().is_empty() => Ok(None),
+            None => Err(GExecError::corrupt_commit_log(node)),
         }
     }
 
@@ -497,18 +423,18 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         Ok(present)
     }
 
-    // FIXME(trey): this fn is dumb, make it take the record directly instead of
-    // as a slice, do the loop on the outside
-    fn store_artifacts(&self, produced: &[ArtifactRecord<S>]) -> Result<(), GExecError> {
-        for record in produced {
-            self.store
-                .store_artifact(record)
-                .map_err(GExecError::Storage)?;
-        }
-        Ok(())
+    fn store_artifact(&self, record: &ArtifactRecord<S>) -> Result<(), GExecError> {
+        self.store
+            .store_artifact(record)
+            .map_err(GExecError::Storage)
     }
 
-    fn set_stage_node(&mut self, proc_id: ProcId, node: NodeRef<S>) -> Result<(), GExecError> {
+    /// Records the node a stage has committed up to.
+    pub(crate) fn set_stage_node(
+        &mut self,
+        proc_id: ProcId,
+        node: NodeRef<S>,
+    ) -> Result<(), GExecError> {
         self.update_tracking(|tracking| {
             tracking.set_stage_node(proc_id, node);
             Ok(())
@@ -526,9 +452,6 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
     ) -> Result<(), GExecError> {
         // For safety, clone the tracking state and apply the changes to that,
         // only overwrite the field if the store is successful.
-        //
-        // TODO(trey): long term, improve the interface here so that this is
-        // harder to fuck up
         let mut tracking = self.tracking.clone();
         update(&mut tracking)?;
         self.store

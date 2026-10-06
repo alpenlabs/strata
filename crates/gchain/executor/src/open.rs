@@ -5,7 +5,7 @@ use strata_gchain_types::*;
 use crate::core::*;
 use crate::errors::GExecError;
 use crate::linear_executor::LinearExecutor;
-use crate::reprocess::{RejectedCommit, ReprocExecutor, StagePlan};
+use crate::reprocess::{RejectedCommit, ReprocExecutor, ReprocLog, StagePlan};
 use crate::store::ExecutorStore;
 
 /// What opening an executor did to bring the stored state in line with the
@@ -13,8 +13,7 @@ use crate::store::ExecutorStore;
 pub struct OpenReport<S: GChainSpec> {
     initialized: Vec<ProcId>,
     recommitted: Vec<ProcId>,
-    reprocessed: Vec<StagePlan<S>>,
-    rejected: Vec<RejectedCommit<S>>,
+    reproc: ReprocLog<S>,
 }
 
 impl<S: GChainSpec> OpenReport<S> {
@@ -33,13 +32,13 @@ impl<S: GChainSpec> OpenReport<S> {
     /// The committed links each stage processed again, because it no longer
     /// accepted the artifacts stored for them.
     pub fn reprocessed(&self) -> &[StagePlan<S>] {
-        &self.reprocessed
+        self.reproc.applied()
     }
 
     /// Committed links a stage rejected when processing them again, which
     /// the pipeline was rolled back to before.
     pub fn rejected(&self) -> &[RejectedCommit<S>] {
-        &self.rejected
+        self.reproc.rejected()
     }
 }
 
@@ -85,15 +84,52 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Open
 /// executor with the account of what opening it took.
 pub(crate) fn finish_open<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>(
     mut core: ExecutorCore<S, P, X>,
-    reprocessed: Vec<StagePlan<S>>,
-    rejected: Vec<RejectedCommit<S>>,
+    reproc: ReprocLog<S>,
 ) -> Result<LinearExecutorReadyOutput<S, P, X>, GExecError> {
-    let leveled = core.level_stages()?;
+    let leveled = level_stages(&mut core)?;
     let report = OpenReport {
         initialized: leveled.initialized,
         recommitted: leveled.recommitted,
-        reprocessed,
-        rejected,
+        reproc,
     };
     Ok((LinearExecutor::from_clean_core(core), report))
+}
+
+/// The stages that had to be brought level with the committed node.
+struct LeveledStages {
+    initialized: Vec<ProcId>,
+    recommitted: Vec<ProcId>,
+}
+
+/// Brings every stage's committed state level with the committed node: a
+/// stage that has never been initialized is initialized there, and one that
+/// lags has the rest of the committed path committed.
+fn level_stages<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>(
+    core: &mut ExecutorCore<S, P, X>,
+) -> Result<LeveledStages, GExecError> {
+    let mut leveled = LeveledStages {
+        initialized: Vec::new(),
+        recommitted: Vec::new(),
+    };
+
+    let committed = core.committed_node().clone();
+    for proc_id in core.get_proc_ids() {
+        match core.tracking().get_stage_node(proc_id).cloned() {
+            None => {
+                core.get_stage(proc_id).init_at(&committed)?;
+                core.set_stage_node(proc_id, committed.clone())?;
+                leveled.initialized.push(proc_id);
+            }
+            Some(node) if node == committed => {}
+            Some(node) => {
+                if core.committed_path().get_node_index(&node).is_none() {
+                    return Err(GExecError::stage_diverged(proc_id, &node));
+                }
+                core.commit_stage_between(proc_id, &node, &committed)?;
+                leveled.recommitted.push(proc_id);
+            }
+        }
+    }
+
+    Ok(leveled)
 }

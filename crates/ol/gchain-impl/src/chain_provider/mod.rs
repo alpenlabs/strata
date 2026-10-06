@@ -21,6 +21,10 @@ pub trait OLChainStore: Send + Sync + 'static {
 
     /// Fetches a block's header, including terminal headers reconstructed from
     /// checkpoints, which have no block.
+    ///
+    /// Whatever ingests a checkpoint is what makes its terminal header
+    /// available here.  The provider relies on that to describe the block
+    /// links that build on a checkpoint; the stages don't store headers.
     fn fetch_header(&self, blkid: &OLBlockId) -> Result<Option<OLBlockHeaderV1>, ProviderError>;
 
     fn fetch_blocks_at_slot(&self, slot: Slot) -> Result<Vec<OLBlockId>, ProviderError>;

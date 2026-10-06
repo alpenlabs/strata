@@ -32,24 +32,14 @@ impl<S: GChainSpec> CommitSegment<S> {
     }
 }
 
-/// A committed link with where it sits in the graph and in the commit log.
+/// A committed link with where it sits in the graph.
+// TODO(trey): convert this into LinkInfo structure in the types crate and reuse in various places
 pub(crate) struct CommittedStep<S: GChainSpec> {
-    commit_idx: CommitIndex,
     lref: LinkRef<S>,
     endpoints: LinkEndpoints<S>,
 }
 
 impl<S: GChainSpec> CommittedStep<S> {
-    /// The commit the link was committed by.
-    // FIXME(trey): maybe this can just be `#[cfg(test)]`
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "only judges in tests care so far")
-    )]
-    pub(crate) fn commit_idx(&self) -> CommitIndex {
-        self.commit_idx
-    }
-
     pub(crate) fn lref(&self) -> &LinkRef<S> {
         &self.lref
     }
@@ -122,17 +112,109 @@ impl<'s, X: ExecutorStore> CommitWalker<'s, X> {
     }
 }
 
+// TODO(trey): make this into a fn on LinkPath that returns an
+// `impl Iterator` that we can just .collect in `next_step`
 fn segment_steps<S: GChainSpec>(segment: &CommitSegment<S>) -> Vec<CommittedStep<S>> {
     let path = segment.path();
     path.nodes()
         .iter()
         .zip(path.steps())
         .map(|(origin, (lref, target))| CommittedStep {
-            commit_idx: segment.idx(),
             lref: lref.clone(),
             endpoints: LinkEndpoints::new(origin.clone(), target.clone()),
         })
         .collect()
+}
+
+/// Where a node sits in the commit log.
+pub(crate) struct LogCut<S: GChainSpec> {
+    idx: CommitIndex,
+    segment: LinkPath<S>,
+    pos: usize,
+}
+
+impl<S: GChainSpec> LogCut<S> {
+    /// The commit the node is part of.
+    pub(crate) fn idx(&self) -> CommitIndex {
+        self.idx
+    }
+
+    /// Whether the node is the one the commit started from.
+    pub(crate) fn is_at_start(&self) -> bool {
+        self.pos == 0
+    }
+
+    /// Whether the node is the one the commit ended at.
+    pub(crate) fn is_at_end(&self) -> bool {
+        self.pos == self.segment.len()
+    }
+
+    /// The part of the commit up to the node.
+    pub(crate) fn get_part_before(&self) -> LinkPath<S> {
+        self.segment.slice(0, self.pos)
+    }
+
+    /// The part of the commit from the node on.
+    pub(crate) fn get_part_after(&self) -> LinkPath<S> {
+        self.segment.slice(self.pos, self.segment.len())
+    }
+}
+
+/// Finds the newest commit a node is part of, if the log has it.
+pub(crate) fn find_log_cut<X: ExecutorStore>(
+    mut walker: CommitWalker<'_, X>,
+    node: &NodeRef<X::Spec>,
+) -> Result<Option<LogCut<X::Spec>>, GExecError> {
+    while let Some(commit) = walker.next_segment()? {
+        if let Some(pos) = commit.path().get_node_index(node) {
+            return Ok(Some(LogCut {
+                idx: commit.idx(),
+                segment: commit.into_path(),
+                pos,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+/// The commits covering the links between two nodes in the log, oldest
+/// first, with the ones at either end cut down to the part in between.
+pub(crate) fn find_segments_between<X: ExecutorStore>(
+    mut walker: CommitWalker<'_, X>,
+    from: &NodeRef<X::Spec>,
+    to: &NodeRef<X::Spec>,
+) -> Result<Vec<LinkPath<X::Spec>>, GExecError> {
+    if from == to {
+        return Ok(Vec::new());
+    }
+
+    let mut segments = Vec::new();
+    let mut reached_to = false;
+    while let Some(commit) = walker.next_segment()? {
+        let mut segment = commit.into_path();
+        if !reached_to {
+            let Some(pos) = segment.get_node_index(to) else {
+                continue;
+            };
+            segment = segment.slice(0, pos);
+            reached_to = true;
+        }
+
+        let from_pos = segment.get_node_index(from);
+        if let Some(pos) = from_pos {
+            segment = segment.slice(pos, segment.len());
+        }
+        if !segment.is_empty() {
+            segments.push(segment);
+        }
+        if from_pos.is_some() {
+            segments.reverse();
+            return Ok(segments);
+        }
+    }
+
+    Err(GExecError::corrupt_commit_log(from))
 }
 
 /// Verdicts on committed links and the nodes between them, from whoever wants
@@ -277,20 +359,63 @@ mod tests {
 
         let mut seen = Vec::new();
         while let Some(step) = walker.next_step().expect("test: next step") {
-            let idx = u64::from(step.commit_idx());
-            seen.push((idx, step.lref().0, step.origin().0, step.target().0));
+            seen.push((step.lref().0, step.origin().0, step.target().0));
         }
 
         assert_eq!(
             seen,
+            vec![(14, 5, 6), (13, 4, 5), (12, 3, 4), (11, 2, 3), (10, 1, 2),]
+        );
+    }
+
+    #[test]
+    fn test_find_segments_between_cuts_the_ends() {
+        let store = store();
+
+        let found = find_segments_between(walker(&store), &TestRef(2), &TestRef(5))
+            .expect("test: find segments");
+        assert_eq!(
+            found,
             vec![
-                (5, 14, 5, 6),
-                (5, 13, 4, 5),
-                (4, 12, 3, 4),
-                (3, 11, 2, 3),
-                (3, 10, 1, 2),
+                path(2, &[(11, 3)]),
+                path(3, &[(12, 4)]),
+                path(4, &[(13, 5)]),
             ]
         );
+
+        // Ends on commit boundaries leave nothing empty behind.
+        let found = find_segments_between(walker(&store), &TestRef(3), &TestRef(4))
+            .expect("test: find segments");
+        assert_eq!(found, vec![path(3, &[(12, 4)])]);
+
+        let found = find_segments_between(walker(&store), &TestRef(4), &TestRef(4))
+            .expect("test: find segments");
+        assert!(found.is_empty());
+
+        let err = find_segments_between(walker(&store), &TestRef(9), &TestRef(5)).unwrap_err();
+        assert!(matches!(err, GExecError::CorruptCommitLog(_)));
+    }
+
+    #[test]
+    fn test_find_log_cut_takes_the_newest_commit_with_the_node() {
+        let store = store();
+        let cut = |node| find_log_cut(walker(&store), &TestRef(node)).expect("test: find cut");
+
+        let inside = cut(5).expect("test: node in log");
+        assert_eq!(inside.idx(), CommitIndex::from(5));
+        assert!(!inside.is_at_start() && !inside.is_at_end());
+        assert_eq!(inside.get_part_before(), path(4, &[(13, 5)]));
+        assert_eq!(inside.get_part_after(), path(5, &[(14, 6)]));
+
+        // A node two commits meet at belongs to the newer one.
+        let boundary = cut(4).expect("test: node in log");
+        assert_eq!(boundary.idx(), CommitIndex::from(5));
+        assert!(boundary.is_at_start());
+
+        let tip = cut(6).expect("test: node in log");
+        assert!(tip.is_at_end());
+
+        assert!(cut(9).is_none());
     }
 
     #[test]

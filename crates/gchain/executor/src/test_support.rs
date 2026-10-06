@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use strata_gchain_types::*;
 
-use crate::config::{PipelineBuilder, StagePipeline};
+use crate::config::{ExecutorBuilder, PipelineBuilder, StagePipeline};
 use crate::mem_store::MemExecutorStore;
 use crate::store::ExecutorStore;
 use crate::tracking::CommitIndex;
@@ -202,7 +202,7 @@ impl TestProc {
     /// A handle onto the event log that outlives handing the stage to a
     /// pipeline.
     pub(crate) fn events(&self) -> EventLog {
-        Arc::clone(&self.events)
+        self.events.clone()
     }
 
     fn record(&self, event: ProcEvent) {
@@ -222,6 +222,26 @@ pub(crate) fn pipeline_of(procs: Vec<TestProc>) -> StagePipeline<TestSpec> {
             .expect("test: add stage");
     }
     builder.build()
+}
+
+pub(crate) type TestBuilder = ExecutorBuilder<TestSpec, TestProvider, MemExecutorStore<TestSpec>>;
+
+/// A builder at genesis node 1 with the given stages under the IDs "a", "b",
+/// ... in order, with no deps between them.
+pub(crate) fn builder_of(
+    provider: &Arc<TestProvider>,
+    store: &Arc<MemExecutorStore<TestSpec>>,
+    procs: Vec<TestProc>,
+) -> TestBuilder {
+    let mut builder = ExecutorBuilder::new(provider.clone(), store.clone(), TestRef(1));
+    for (idx, proc) in procs.into_iter().enumerate() {
+        let name = char::from(b'a' + idx as u8).to_string();
+        let proc_id = ProcId::from_str(&name).expect("test: parse ProcId");
+        builder = builder
+            .add_stage(proc_id, proc, ProcDeps::new(Vec::new(), Vec::new()))
+            .expect("test: add stage");
+    }
+    builder
 }
 
 /// The artifact a stage has stored for a link.

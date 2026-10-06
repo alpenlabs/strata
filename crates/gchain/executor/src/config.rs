@@ -7,32 +7,17 @@ use strata_gchain_types::*;
 use crate::core::*;
 use crate::errors::GExecError;
 use crate::open::*;
-use crate::process::{GChainProcDyn, ProcShim};
 use crate::reprocess::*;
 use crate::schedule::{StageSchedule, StageScheduleBuilder};
+use crate::stage::Stage;
 use crate::store::ExecutorStore;
-
-/// A processor stage as registered in a pipeline.
-pub(crate) struct Stage<S: GChainSpec> {
-    chain_proc: Arc<dyn GChainProcDyn<S>>,
-}
-
-impl<S: GChainSpec> Stage<S> {
-    pub(crate) fn proc_id(&self) -> ProcId {
-        self.chain_proc.proc_id()
-    }
-
-    pub(crate) fn chain_proc(&self) -> &dyn GChainProcDyn<S> {
-        self.chain_proc.as_ref()
-    }
-}
 
 /// Pipeline of processor stages in canonical order with their schedule.
 ///
 /// The stages are held in canonical order and the schedule only indexes into
 /// them, so there's no second copy of the ordering that could disagree with
 /// the first.  Built with [`PipelineBuilder`].
-pub struct StagePipeline<S: GChainSpec> {
+pub(crate) struct StagePipeline<S: GChainSpec> {
     stages: Vec<Stage<S>>,
     schedule: StageSchedule,
 }
@@ -44,7 +29,7 @@ impl<S: GChainSpec> StagePipeline<S> {
     }
 
     /// The stages' IDs in canonical order.
-    pub fn proc_ids(&self) -> impl DoubleEndedIterator<Item = ProcId> {
+    pub(crate) fn proc_ids(&self) -> impl DoubleEndedIterator<Item = ProcId> {
         self.stages.iter().map(Stage::proc_id)
     }
 
@@ -64,13 +49,13 @@ impl<S: GChainSpec> StagePipeline<S> {
 /// can't drift apart.  Deps are validated as each stage is added: IDs must be
 /// unique, and a dep must name a stage already added (or, for a path dep, the
 /// stage itself).
-pub struct PipelineBuilder<S: GChainSpec> {
+pub(crate) struct PipelineBuilder<S: GChainSpec> {
     stages: Vec<Stage<S>>,
     schedule: StageScheduleBuilder,
 }
 
 impl<S: GChainSpec> PipelineBuilder<S> {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             stages: Vec::new(),
             schedule: StageScheduleBuilder::new(),
@@ -78,20 +63,18 @@ impl<S: GChainSpec> PipelineBuilder<S> {
     }
 
     /// Appends a stage under an ID, after every stage added so far.
-    pub fn add_stage(
+    pub(crate) fn add_stage(
         mut self,
         proc_id: ProcId,
         proc: impl GChainProc<Spec = S>,
         deps: ProcDeps,
     ) -> Result<Self, GExecError> {
         self.schedule.add_stage(proc_id, deps)?;
-        self.stages.push(Stage {
-            chain_proc: Arc::new(ProcShim::new(proc_id, proc)),
-        });
+        self.stages.push(Stage::new(proc_id, proc));
         Ok(self)
     }
 
-    pub fn build(self) -> StagePipeline<S> {
+    pub(crate) fn build(self) -> StagePipeline<S> {
         StagePipeline {
             stages: self.stages,
             schedule: self.schedule.build(),
@@ -99,14 +82,10 @@ impl<S: GChainSpec> PipelineBuilder<S> {
     }
 }
 
-impl<S: GChainSpec> Default for PipelineBuilder<S> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
+/// Assembles an executor over a provider and a store, one processor stage at
+/// a time in canonical order.
 pub struct ExecutorBuilder<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> {
-    pipeline: StagePipeline<S>,
+    pipeline: PipelineBuilder<S>,
     provider: Arc<P>,
     store: Arc<X>,
     base_node: NodeRef<S>,
@@ -115,32 +94,56 @@ pub struct ExecutorBuilder<S: GChainSpec, P: ChainProvider<Spec = S>, X: Executo
 impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     ExecutorBuilder<S, P, X>
 {
-    pub fn new(
-        pipeline: StagePipeline<S>,
-        provider: Arc<P>,
-        store: Arc<X>,
-        base_node: NodeRef<S>,
-    ) -> Self {
+    /// Starts an executor with no stages.
+    ///
+    /// A store that has never been used starts every stage at `base_node`,
+    /// which is then the oldest node the pipeline can roll back to until it's
+    /// pruned past.
+    pub fn new(provider: Arc<P>, store: Arc<X>, base_node: NodeRef<S>) -> Self {
         Self {
-            pipeline,
+            pipeline: PipelineBuilder::new(),
             provider,
             store,
             base_node,
         }
     }
 
-    // TODO(trey): rework this to behave more like a builder
+    /// Appends a stage under an ID, after every stage added so far.
+    ///
+    /// IDs must be unique, and a dep must name a stage already added (or, for
+    /// a path dep, the stage itself).
+    pub fn add_stage(
+        mut self,
+        proc_id: ProcId,
+        proc: impl GChainProc<Spec = S>,
+        deps: ProcDeps,
+    ) -> Result<Self, GExecError> {
+        self.pipeline = self.pipeline.add_stage(proc_id, proc, deps)?;
+        Ok(self)
+    }
 
-    /// Opens the executor on top of the database.
+    /// Opens the executor over the store, reconciling what it holds with the
+    /// stages.
+    ///
+    /// The committed path's artifacts are loaded.  If the stages accept them
+    /// all, stages that have no committed state or lag the committed node are
+    /// brought level and the executor is ready.  If not, what's handed back
+    /// is the means to reprocess the links in question, which gives the
+    /// executor once that's done.
+    ///
+    /// Uncommitted links are left where they are; one whose artifacts turn
+    /// out to be missing or no longer accepted has those stages re-run when
+    /// it's next processed.
     pub fn open(self) -> Result<OpenResult<S, P, X>, GExecError> {
-        let core = ExecutorCore::open(self.pipeline, self.provider, self.store, self.base_node)?;
+        let pipeline = self.pipeline.build();
+        let core = ExecutorCore::open(pipeline, self.provider, self.store, self.base_node)?;
         let plans = plan_reprocessing(&core)?;
         if !plans.is_empty() {
             let pending = ReprocExecutor::new(core, plans);
             return Ok(OpenResult::NeedsReprocess(pending));
         }
 
-        let (exec, report) = finish_open(core, Vec::new(), Vec::new())?;
+        let (exec, report) = finish_open(core, ReprocLog::new(Vec::new()))?;
         Ok(OpenResult::Ready(exec, report))
     }
 }

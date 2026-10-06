@@ -66,9 +66,7 @@ pub trait GChainSpec: 'static {
 pub trait GNodeRef: Clone + Debug + Eq + PartialEq + Ord + PartialOrd + Hash {}
 
 /// A link between two nodes.
-pub trait GLinkRef: Clone + Debug + Eq + PartialEq + Ord + PartialOrd + Hash {
-    // TODO
-}
+pub trait GLinkRef: Clone + Debug + Eq + PartialEq + Ord + PartialOrd + Hash {}
 
 /// A header for a link in the chain.
 ///

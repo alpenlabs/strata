@@ -22,6 +22,7 @@ mod open;
 mod process;
 mod reprocess;
 mod schedule;
+mod stage;
 mod stage_runner;
 mod store;
 #[cfg(test)]
@@ -30,12 +31,13 @@ mod tracking;
 mod traverse;
 
 pub use artifact_cache::*;
-pub use config::*;
+pub use config::ExecutorBuilder;
 pub use context::*;
 pub use errors::*;
 pub use linear_executor::*;
 pub use mem_store::*;
-pub use reprocess::{RejectedCommit, ReprocExecutor, StagePlan};
+pub use open::{OpenReport, OpenResult};
+pub use reprocess::{RejectedCommit, ReprocExecutor, ReprocLog, StagePlan};
 pub use stage_runner::LinkOutcome;
 pub use store::*;
 pub use tracking::*;

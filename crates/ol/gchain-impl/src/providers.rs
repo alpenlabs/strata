@@ -7,7 +7,6 @@
 use strata_asm_common::AsmManifest;
 use strata_gchain_types::ProcError;
 use strata_identifiers::L1Height;
-use strata_ol_chain_types_v1::OLBlockHeaderV1;
 use strata_ol_state_support_types::{IComputeStateRootWithWrites, IndexerWrites};
 use strata_ol_state_types::IStateAccessor;
 use strata_ol_state_types_v1::{OLAccountStateV1, WriteBatch};
@@ -47,13 +46,6 @@ pub trait OLStateStore: Send + Sync + 'static {
     /// Discards every committed state older than the node, which is becoming
     /// the oldest one anything can roll back to.
     fn prune_states_before(&self, node: &OLStateNode) -> Result<(), ProcError>;
-
-    /// Stores a terminal header reconstructed from a checkpoint.
-    ///
-    /// These are only produced for checkpoint steps, since there's no block to
-    /// take the header from, and later block steps need them as parent headers.
-    // TODO(trey): rework this so that we assume it already exists from the persisted checkpoint data from the ASM runs
-    fn store_terminal_header(&self, header: &OLBlockHeaderV1) -> Result<(), ProcError>;
 }
 
 /// Source of the ASM manifests a checkpoint's epoch covers.

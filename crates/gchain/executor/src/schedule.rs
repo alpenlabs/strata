@@ -32,8 +32,17 @@ impl StageSchedule {
     }
 
     /// The deps a stage was registered with.
-    pub(crate) fn get_deps(&self, proc_id: ProcId) -> Option<&ProcDeps> {
+    fn get_deps(&self, proc_id: ProcId) -> Option<&ProcDeps> {
         self.index_of(proc_id).map(|idx| &self.stages[idx].1)
+    }
+
+    /// Every stage a stage depends on, whether for the link being processed
+    /// or the path to it.  A stage named for both comes up twice.
+    pub(crate) fn iter_deps(&self, proc_id: ProcId) -> impl Iterator<Item = ProcId> {
+        self.get_deps(proc_id)
+            .into_iter()
+            .flat_map(|deps| deps.cur_node().iter().chain(deps.prev_node()))
+            .copied()
     }
 
     /// Checks that every dep of a stage is covered for a link.

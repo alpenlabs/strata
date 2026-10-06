@@ -111,10 +111,6 @@ impl<S: OLStateStore, M: L1ManifestProvider> GChainProc for OLExecProc<S, M> {
                 .output()
                 .ok_or(OLProcError::InvalidLinkOnPath(*lref))?;
             diffs.push(output.write_batch());
-
-            if matches!(lref, OLLinkRef::Checkpoint(_)) {
-                self.state_store.store_terminal_header(output.header())?;
-            }
         }
 
         // The node names the root it expects; a mismatch means the artifacts
