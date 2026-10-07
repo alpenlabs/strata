@@ -10,7 +10,8 @@ use strata_asm_checkpoint_types::{
 use strata_asm_common::AsmManifest;
 use strata_checkpoint_types::EpochSummary;
 use strata_gchain_executor::{
-    ArtifactCache, ExecutorBuilder, GExecError, LinkOutcome, MemExecutorStore, ProcContextImpl,
+    ArtifactCache, ArtifactView, GExecError, LinkOutcome, MemExecutorStore, ProcContextImpl,
+    SerialExecutorBuilder,
 };
 use strata_gchain_types::*;
 use strata_identifiers::{
@@ -388,7 +389,7 @@ impl Harness {
         lref: &OLLinkRef,
         link: &OLLink,
     ) -> Result<Arc<P::Artifact>, ProcError> {
-        let ctx = ProcContextImpl::<P>::new(&self.cache, &self.path, *lref, proc_id(id));
+        let ctx = ProcContextImpl::<P, _>::new(&self.cache, &self.path, *lref, proc_id(id));
         let artifact = Arc::new(proc.process_link(lref, link, &ctx)?);
         let erased = Arc::clone(&artifact) as Arc<dyn DynProcArtifact>;
         self.cache.insert_artifact(*lref, proc_id(id), erased);
@@ -626,7 +627,7 @@ fn test_linear_executor_drives_ol_stages() {
         MemIndexStore::default(),
     );
     let index_deps = index_proc.deps();
-    let (mut exec, report) = ExecutorBuilder::new(
+    let (mut exec, report) = SerialExecutorBuilder::new(
         Arc::new(OLChainProvider::new(chain_store)),
         Arc::new(MemExecutorStore::new()),
         chain.node(0),

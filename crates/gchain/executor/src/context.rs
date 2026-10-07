@@ -4,14 +4,15 @@ use std::sync::Arc;
 
 use strata_gchain_types::*;
 
-use crate::artifact_cache::ArtifactCache;
+use crate::artifact_cache::ArtifactView;
 
 /// Context handed to a processor stage while it processes a link.
 ///
-/// Borrows the executor's artifact cache and resolves dep fetches against the
-/// link being processed and the uncommitted path leading to its origin node.
-pub struct ProcContextImpl<'c, P: GChainProc> {
-    cache: &'c ArtifactCache<P::Spec>,
+/// Borrows a view of the executor's artifacts and resolves dep fetches against
+/// the link being processed and the uncommitted path leading to its origin
+/// node.
+pub struct ProcContextImpl<'c, P: GChainProc, V: ArtifactView<P::Spec>> {
+    artifacts: V,
 
     /// A path from the committed node to the origin of the link being
     /// processed, so its terminal node is that origin.  Which path it is when
@@ -22,15 +23,15 @@ pub struct ProcContextImpl<'c, P: GChainProc> {
     proc_id: ProcId,
 }
 
-impl<'c, P: GChainProc> ProcContextImpl<'c, P> {
+impl<'c, P: GChainProc, V: ArtifactView<P::Spec>> ProcContextImpl<'c, P, V> {
     pub fn new(
-        cache: &'c ArtifactCache<P::Spec>,
+        artifacts: V,
         path: &'c LinkPath<P::Spec>,
         cur_lref: LinkRef<P::Spec>,
         proc_id: ProcId,
     ) -> Self {
         Self {
-            cache,
+            artifacts,
             path,
             cur_lref,
             proc_id,
@@ -38,13 +39,13 @@ impl<'c, P: GChainProc> ProcContextImpl<'c, P> {
     }
 }
 
-impl<P: GChainProc> ProcContext<P> for ProcContextImpl<'_, P> {
+impl<P: GChainProc, V: ArtifactView<P::Spec>> ProcContext<P> for ProcContextImpl<'_, P, V> {
     fn proc_id(&self) -> ProcId {
         self.proc_id
     }
 
     fn get_cur_artifact<A: ProcArtifact>(&self, proc_id: ProcId) -> Option<Arc<A>> {
-        self.cache.get_artifact(&self.cur_lref, proc_id)
+        self.artifacts.get_artifact(&self.cur_lref, proc_id)
     }
 
     fn get_path_artifacts<A: ProcArtifact>(
@@ -55,7 +56,10 @@ impl<P: GChainProc> ProcContext<P> for ProcContextImpl<'_, P> {
             .path
             .links()
             .iter()
-            .map(|lref| Some((lref.clone(), self.cache.get_artifact::<A>(lref, proc_id)?)))
+            .map(|lref| {
+                let artifact = self.artifacts.get_artifact::<A>(lref, proc_id)?;
+                Some((lref.clone(), artifact))
+            })
             .collect::<Option<Vec<_>>>()?;
         Some(PathArtifacts::new(self.path.base_node().clone(), steps))
     }

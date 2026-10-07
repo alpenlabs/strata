@@ -8,7 +8,8 @@ use std::sync::{Arc, Mutex};
 
 use strata_gchain_types::*;
 
-use crate::config::{PipelineBuilder, SerialExecutorBuilder, StagePipeline};
+use crate::config::SerialExecutorBuilder;
+use crate::core::{PipelineBuilder, StagePipeline};
 use crate::mem_store::MemExecutorStore;
 use crate::store::ExecutorStore;
 use crate::tracking::CommitIndex;
@@ -163,6 +164,7 @@ pub(crate) struct TestProc {
     reject: HashSet<TestRef>,
     accept_old: HashSet<TestRef>,
     no_resume: HashSet<TestRef>,
+    fail_commit: HashSet<TestRef>,
     events: EventLog,
 }
 
@@ -173,8 +175,16 @@ impl TestProc {
             reject: HashSet::new(),
             accept_old: HashSet::new(),
             no_resume: HashSet::new(),
+            fail_commit: HashSet::new(),
             events: EventLog::default(),
         }
+    }
+
+    /// Fails to commit any path that includes one of some links, which is
+    /// as close as a test gets to the stage crashing mid-commit.
+    pub(crate) fn failing_commit_of(mut self, lrefs: impl IntoIterator<Item = u8>) -> Self {
+        self.fail_commit = lrefs.into_iter().map(TestRef).collect();
+        self
     }
 
     /// Accepts artifacts from older versions for some links.
@@ -328,6 +338,9 @@ impl GChainProc for TestProc {
         path: &LinkPath<TestSpec>,
         _outputs: &[Arc<FlagArtifact>],
     ) -> Result<(), ProcError> {
+        if path.links().iter().any(|l| self.fail_commit.contains(l)) {
+            return Err(ProcError::custom("test: commit failed"));
+        }
         self.record(ProcEvent::Commit(path.links().to_vec()));
         Ok(())
     }

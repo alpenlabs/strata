@@ -8,7 +8,7 @@
 
 use strata_gchain_types::*;
 
-use crate::errors::GExecError;
+use crate::errors::{GExecError, GExecResult};
 use crate::store::ExecutorStore;
 use crate::tracking::{CommitIndex, TrackingState};
 
@@ -85,7 +85,7 @@ impl<'s, X: ExecutorStore> CommitWalker<'s, X> {
     /// The next commit back with the path it covered.
     ///
     /// Drops whatever was left of the segment being stepped through.
-    pub(crate) fn next_segment(&mut self) -> Result<Option<CommitSegment<X::Spec>>, GExecError> {
+    pub(crate) fn next_segment(&mut self) -> GExecResult<Option<CommitSegment<X::Spec>>> {
         self.steps.clear();
         let Some(idx) = self.next_idx else {
             return Ok(None);
@@ -101,7 +101,7 @@ impl<'s, X: ExecutorStore> CommitWalker<'s, X> {
     }
 
     /// The next committed link back.
-    pub(crate) fn next_step(&mut self) -> Result<Option<CommittedStep<X::Spec>>, GExecError> {
+    pub(crate) fn next_step(&mut self) -> GExecResult<Option<CommittedStep<X::Spec>>> {
         while self.steps.is_empty() {
             let Some(segment) = self.next_segment()? else {
                 return Ok(None);
@@ -164,7 +164,7 @@ impl<S: GChainSpec> LogCut<S> {
 pub(crate) fn find_log_cut<X: ExecutorStore>(
     mut walker: CommitWalker<'_, X>,
     node: &NodeRef<X::Spec>,
-) -> Result<Option<LogCut<X::Spec>>, GExecError> {
+) -> GExecResult<Option<LogCut<X::Spec>>> {
     while let Some(commit) = walker.next_segment()? {
         if let Some(pos) = commit.path().get_node_index(node) {
             return Ok(Some(LogCut {
@@ -184,7 +184,7 @@ pub(crate) fn find_segments_between<X: ExecutorStore>(
     mut walker: CommitWalker<'_, X>,
     from: &NodeRef<X::Spec>,
     to: &NodeRef<X::Spec>,
-) -> Result<Vec<LinkPath<X::Spec>>, GExecError> {
+) -> GExecResult<Vec<LinkPath<X::Spec>>> {
     if from == to {
         return Ok(Vec::new());
     }
@@ -221,10 +221,10 @@ pub(crate) fn find_segments_between<X: ExecutorStore>(
 /// part of the history redone.
 pub(crate) trait StepJudge<S: GChainSpec> {
     /// Whether what's there for a committed link can stay as it is.
-    fn check_step_acceptable(&mut self, step: &CommittedStep<S>) -> Result<bool, GExecError>;
+    fn check_step_acceptable(&mut self, step: &CommittedStep<S>) -> GExecResult<bool>;
 
     /// Whether redoing links can start from a node.
-    fn check_can_resume_at(&mut self, node: &NodeRef<S>) -> Result<bool, GExecError>;
+    fn check_can_resume_at(&mut self, node: &NodeRef<S>) -> GExecResult<bool>;
 }
 
 /// Where redoing committed links has to start from.
@@ -254,7 +254,7 @@ pub(crate) fn find_resume_path<S: GChainSpec, X: ExecutorStore<Spec = S>>(
     newest: &NodeRef<S>,
     floor: &NodeRef<S>,
     judge: &mut impl StepJudge<S>,
-) -> Result<ResumeSearch<S>, GExecError> {
+) -> GExecResult<ResumeSearch<S>> {
     // Newest first, with the node we've walked back to so far.
     let mut redo: Vec<(LinkRef<S>, NodeRef<S>)> = Vec::new();
     let mut node = newest.clone();
@@ -340,14 +340,11 @@ mod tests {
     }
 
     impl StepJudge<TestSpec> for SetJudge {
-        fn check_step_acceptable(
-            &mut self,
-            step: &CommittedStep<TestSpec>,
-        ) -> Result<bool, GExecError> {
+        fn check_step_acceptable(&mut self, step: &CommittedStep<TestSpec>) -> GExecResult<bool> {
             Ok(self.acceptable.contains(&step.lref().0))
         }
 
-        fn check_can_resume_at(&mut self, node: &TestRef) -> Result<bool, GExecError> {
+        fn check_can_resume_at(&mut self, node: &TestRef) -> GExecResult<bool> {
             Ok(self.resumable.contains(&node.0))
         }
     }

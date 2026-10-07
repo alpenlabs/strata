@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use strata_gchain_types::*;
 
-use crate::errors::GExecError;
+use crate::errors::{GExecError, GExecResult};
 
 /// Finds a path of usable links from one node to another with the fewest
 /// links, if the second is reachable from the first.
@@ -21,8 +21,8 @@ pub(crate) fn find_path<S: GChainSpec>(
     provider: &impl ChainProvider<Spec = S>,
     from: &NodeRef<S>,
     to: &NodeRef<S>,
-    mut usable: impl FnMut(&LinkRef<S>) -> Result<bool, GExecError>,
-) -> Result<Option<LinkPath<S>>, GExecError> {
+    mut usable: impl FnMut(&LinkRef<S>) -> GExecResult<bool>,
+) -> GExecResult<Option<LinkPath<S>>> {
     // BFS from `from`, remembering the link and origin each node was first
     // reached by.
     let mut arrived_by: HashMap<NodeRef<S>, (LinkRef<S>, NodeRef<S>)> = HashMap::new();
@@ -64,8 +64,8 @@ pub(crate) fn find_path<S: GChainSpec>(
 pub(crate) fn find_reachable_links<S: GChainSpec>(
     provider: &impl ChainProvider<Spec = S>,
     from: &NodeRef<S>,
-    mut usable: impl FnMut(&LinkRef<S>) -> Result<bool, GExecError>,
-) -> Result<HashSet<LinkRef<S>>, GExecError> {
+    mut usable: impl FnMut(&LinkRef<S>) -> GExecResult<bool>,
+) -> GExecResult<HashSet<LinkRef<S>>> {
     let mut seen_nodes = HashSet::from([from.clone()]);
     let mut seen_links = HashSet::new();
     let mut queue = VecDeque::from([from.clone()]);
@@ -87,7 +87,7 @@ pub(crate) fn find_reachable_links<S: GChainSpec>(
 fn fetch_endpoints<S: GChainSpec>(
     provider: &impl ChainProvider<Spec = S>,
     lref: &LinkRef<S>,
-) -> Result<LinkEndpoints<S>, GExecError> {
+) -> GExecResult<LinkEndpoints<S>> {
     provider
         .fetch_link_endpoints(lref)?
         .ok_or_else(|| GExecError::missing_link_endpoints(lref))
@@ -114,7 +114,7 @@ mod tests {
         p
     }
 
-    fn usable(ids: &[u8]) -> impl FnMut(&TestRef) -> Result<bool, GExecError> {
+    fn usable(ids: &[u8]) -> impl FnMut(&TestRef) -> GExecResult<bool> {
         let set: HashSet<_> = refs(ids).into_iter().collect();
         move |lref| Ok(set.contains(lref))
     }

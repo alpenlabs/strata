@@ -5,7 +5,7 @@ use std::fmt::{self, Debug, Display};
 
 use strata_gchain_types::*;
 
-use crate::errors::GExecError;
+use crate::errors::{GExecError, GExecResult};
 
 /// Position of a commit segment in the store's commit log.
 ///
@@ -64,8 +64,10 @@ struct StagePosition<S: GChainSpec> {
 /// This is everything an executor needs to pick up where it left off apart
 /// from the artifacts themselves.  It's small (a handful of stages), so it's
 /// persisted whole whenever any part of it changes and its parts can never be
-/// seen to disagree.  The stages' nodes only differ from the path's terminal
-/// while a commit is in progress; the executor brings them level on open.
+/// seen to disagree.  The stages' nodes only lag the path's terminal, and
+/// only while a commit is in progress: the path is extended before the
+/// stages commit it, so a commit cut short is finished by bringing them
+/// level on open.
 pub struct TrackingState<S: GChainSpec> {
     /// The committed path, from the oldest node still rolled back to up to
     /// the committed node.
@@ -151,7 +153,7 @@ impl<S: GChainSpec> TrackingState<S> {
 
     /// The committed links from a node on the committed path up to the
     /// committed node.
-    pub fn committed_path_from(&self, node: &NodeRef<S>) -> Result<LinkPath<S>, GExecError> {
+    pub fn committed_path_from(&self, node: &NodeRef<S>) -> GExecResult<LinkPath<S>> {
         let idx = self.get_committed_index_of(node)?;
         Ok(self.committed.slice(idx, self.committed.len()))
     }
@@ -173,7 +175,7 @@ impl<S: GChainSpec> TrackingState<S> {
         &mut self,
         node: &NodeRef<S>,
         next_commit: CommitIndex,
-    ) -> Result<(), GExecError> {
+    ) -> GExecResult<()> {
         let idx = self.get_committed_index_of(node)?;
         self.committed = self.committed.slice(0, idx);
         self.next_commit = next_commit;
@@ -187,14 +189,14 @@ impl<S: GChainSpec> TrackingState<S> {
         &mut self,
         node: &NodeRef<S>,
         first_commit: CommitIndex,
-    ) -> Result<(), GExecError> {
+    ) -> GExecResult<()> {
         let idx = self.get_committed_index_of(node)?;
         self.committed = self.committed.slice(idx, self.committed.len());
         self.first_commit = first_commit;
         Ok(())
     }
 
-    fn get_committed_index_of(&self, node: &NodeRef<S>) -> Result<usize, GExecError> {
+    fn get_committed_index_of(&self, node: &NodeRef<S>) -> GExecResult<usize> {
         self.committed
             .get_node_index(node)
             .ok_or_else(|| GExecError::node_not_on_committed_path(node))

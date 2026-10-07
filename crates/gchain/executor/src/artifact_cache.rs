@@ -3,6 +3,45 @@ use std::sync::Arc;
 
 use strata_gchain_types::*;
 
+/// Read access to the artifacts stages have for links, which is what a stage
+/// draws its deps from while it's run.
+///
+/// Running a stage only ever reads artifacts, so it takes this rather than
+/// any one way of holding them.
+pub trait ArtifactView<S: GChainSpec> {
+    /// Gets the type-erased artifact some processor stage has for a link.
+    fn get_artifact_dyn(
+        &self,
+        lref: &LinkRef<S>,
+        proc_id: ProcId,
+    ) -> Option<&Arc<dyn DynProcArtifact>>;
+
+    /// Gets the artifact some processor stage has for a link, downcast to its
+    /// concrete type.
+    ///
+    /// Returns `None` if the stage has no artifact for the link, or if the
+    /// artifact it has isn't of type `A`.
+    fn get_artifact<A: ProcArtifact>(&self, lref: &LinkRef<S>, proc_id: ProcId) -> Option<Arc<A>>
+    where
+        Self: Sized,
+    {
+        let artifact = self.get_artifact_dyn(lref, proc_id)?;
+        artifact.clone().into_any_arc().downcast::<A>().ok()
+    }
+}
+
+/// A borrowed view is a view, which is also what lets a type-erased one be
+/// handed to code that's generic over the view.
+impl<S: GChainSpec, V: ArtifactView<S> + ?Sized> ArtifactView<S> for &V {
+    fn get_artifact_dyn(
+        &self,
+        lref: &LinkRef<S>,
+        proc_id: ProcId,
+    ) -> Option<&Arc<dyn DynProcArtifact>> {
+        (**self).get_artifact_dyn(lref, proc_id)
+    }
+}
+
 /// Cached artifacts from links that we've extracted and determined might be
 /// useful for later proc stages.
 ///
@@ -35,29 +74,6 @@ impl<S: GChainSpec> ArtifactCache<S> {
             .insert(proc_id, artifact);
     }
 
-    /// Gets the type-erased artifact some processor stage stored for a link.
-    pub fn get_artifact_dyn(
-        &self,
-        lref: &LinkRef<S>,
-        proc_id: ProcId,
-    ) -> Option<&Arc<dyn DynProcArtifact>> {
-        self.links.get(lref).and_then(|atbl| atbl.get(&proc_id))
-    }
-
-    /// Gets the artifact some processor stage stored for a link, downcast to its
-    /// concrete type.
-    ///
-    /// Returns `None` if the stage stored no artifact for the link, or if the
-    /// artifact it stored isn't of type `A`.
-    pub fn get_artifact<A: ProcArtifact>(
-        &self,
-        lref: &LinkRef<S>,
-        proc_id: ProcId,
-    ) -> Option<Arc<A>> {
-        let artifact = self.get_artifact_dyn(lref, proc_id)?;
-        artifact.clone().into_any_arc().downcast::<A>().ok()
-    }
-
     /// Discards the artifact one stage stored for a link.
     pub fn remove_artifact(&mut self, lref: &LinkRef<S>, proc_id: ProcId) {
         if let Some(atbl) = self.links.get_mut(lref) {
@@ -86,6 +102,16 @@ impl<S: GChainSpec> Default for ArtifactCache<S> {
     }
 }
 
+impl<S: GChainSpec> ArtifactView<S> for ArtifactCache<S> {
+    fn get_artifact_dyn(
+        &self,
+        lref: &LinkRef<S>,
+        proc_id: ProcId,
+    ) -> Option<&Arc<dyn DynProcArtifact>> {
+        self.links.get(lref).and_then(|atbl| atbl.get(&proc_id))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -97,7 +123,7 @@ mod tests {
         ProcId::from_str(s).expect("test: parse ProcId")
     }
 
-    fn count(cache: &ArtifactCache<TestSpec>, lref: u8, id: &str) -> Option<u32> {
+    fn count(cache: &impl ArtifactView<TestSpec>, lref: u8, id: &str) -> Option<u32> {
         cache
             .get_artifact::<CountArtifact>(&TestRef(lref), proc_id(id))
             .map(|a| a.0)
@@ -145,5 +171,16 @@ mod tests {
         cache.retain_links(&HashSet::from([TestRef(1)]));
         assert_eq!(count(&cache, 1, "a"), Some(1));
         assert_eq!(count(&cache, 3, "a"), None);
+    }
+
+    /// A stage sees the artifacts through a type-erased borrow.
+    #[test]
+    fn test_view_reads_through_a_type_erased_borrow() {
+        let mut cache = ArtifactCache::<TestSpec>::new();
+        cache.insert_artifact(TestRef(1), proc_id("a"), Arc::new(CountArtifact(1)));
+
+        let view: &dyn ArtifactView<TestSpec> = &cache;
+        assert_eq!(count(&view, 1, "a"), Some(1));
+        assert_eq!(count(&view, 2, "a"), None);
     }
 }

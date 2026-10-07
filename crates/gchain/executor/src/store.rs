@@ -3,10 +3,12 @@
 //! The executor is the only thing that talks to the store, and it keeps
 //! little in memory beyond what's here: the tracking state is mirrored whole,
 //! and artifacts are loaded per link as they're needed.  The tracking state is
-//! written as one unit so its parts can never disagree; artifacts are written
-//! only once every stage has accepted their link.  The commit log is written
-//! around the tracking state such that a crash leaves at worst segments the
-//! tracking state doesn't cover, which are trimmed off on open.
+//! written as one unit so its parts can never disagree; an artifact is
+//! written once its stage has accepted the link, and a link some stages have
+//! yet to accept just has those stages run when it's next processed.  The
+//! commit log is written around the tracking state such that a crash leaves
+//! at worst segments the tracking state doesn't cover, which are trimmed off
+//! on open.
 //!
 //! A store should only be used by one executor at a time.
 

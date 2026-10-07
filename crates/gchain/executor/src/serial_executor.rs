@@ -18,18 +18,22 @@
 //! uses: only the committed path's artifacts are kept in memory (a commit
 //! can't be undone without them), and anything else is loaded when a path
 //! runs through it.  The pipeline's position is a small [`TrackingState`]
-//! mirrored whole in the store.  A [`StageRunner`] does the running and holds
-//! the loaded artifacts; the executor is where every fetch and every store
-//! write happens, in order.
+//! mirrored whole in the store.  All of that is the [`ExecutorCore`]'s to
+//! keep; the executor's own part is deciding which stage does what and in
+//! what order, which here is always one at a time in canonical order.
+//!
+//! An operation that fails partway leaves the core with stages lagging the
+//! committed node, which reopening the store brings level.
 
 use std::sync::Arc;
 
 use strata_gchain_types::*;
 
 use crate::core::ExecutorCore;
-use crate::errors::GExecError;
-
-use crate::stage_runner::LinkOutcome;
+use crate::errors::{GExecError, GExecResult};
+use crate::serial_ops::{
+    LinkOutcome, level_stage, rewind_stage, run_job_and_apply_receipt, run_link,
+};
 use crate::store::ExecutorStore;
 
 /// Single-threaded serial chaingraph executor.
@@ -72,7 +76,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
         &mut self,
         lref: &LinkRef<S>,
         proc_id: ProcId,
-    ) -> Result<Option<Arc<A>>, GExecError> {
+    ) -> GExecResult<Option<Arc<A>>> {
         self.core.get_artifact(lref, proc_id)
     }
 
@@ -84,7 +88,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     /// a version of the stage it no longer accepts) has just those stages
     /// run.  A rejected link leaves nothing behind, so it can be asked about
     /// again.
-    pub fn process_link(&mut self, lref: &LinkRef<S>) -> Result<LinkOutcome, GExecError> {
+    pub fn process_link(&mut self, lref: &LinkRef<S>) -> GExecResult<LinkOutcome> {
         let missing = self.core.get_missing_stages(lref)?;
         if missing.is_empty() {
             return Ok(LinkOutcome::Accepted);
@@ -93,7 +97,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
         let endpoints = self.core.fetch_link_endpoints(lref)?;
         let path = self.core.path_to_origin(lref, endpoints.origin())?;
 
-        let outcome = self.core.run_stages(lref, &path, &missing)?;
+        let outcome = run_link(&mut self.core, lref, &path, &missing)?;
         if outcome.is_rejected() {
             // Whatever an earlier run had stored for it goes too, along with
             // anything that was built on it.
@@ -109,7 +113,10 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     ///
     /// The path is the one with the fewest links to the link's origin.  The
     /// links stay recorded afterwards so the commit can be undone.
-    pub fn commit_through(&mut self, lref: &LinkRef<S>) -> Result<(), GExecError> {
+    ///
+    /// The path is committed before any stage commits it, so a commit cut
+    /// short is finished on the next open rather than undone.
+    pub fn commit_through(&mut self, lref: &LinkRef<S>) -> GExecResult<()> {
         if self.core.tracking().is_committed(lref) {
             return Err(GExecError::link_on_committed_path(lref));
         }
@@ -122,7 +129,11 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
         let pushed = path.try_push_link(lref.clone(), &endpoints);
         debug_assert!(pushed, "gchain: path found to the link's own origin");
 
-        self.core.commit_path(&path)
+        self.core.append_commit(&path)?;
+        for proc_id in self.proc_ids() {
+            level_stage(&mut self.core, proc_id, path.terminal_node())?;
+        }
+        Ok(())
     }
 
     /// Rolls every stage back to a node on the committed path, undoing the
@@ -131,23 +142,21 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     ///
     /// The undone links stay recorded as uncommitted, so they can be committed
     /// again or built on.
-    pub fn uncommit_to(&mut self, node: &NodeRef<S>) -> Result<(), GExecError> {
-        let undone = self.core.check_undoable_from(node)?;
+    pub fn uncommit_to(&mut self, node: &NodeRef<S>) -> GExecResult<()> {
+        let undone = self.core.check_undoable_to(node)?;
         if undone.is_empty() {
             return Ok(());
         }
 
-        let committed = self.committed_node().clone();
-        for proc_id in self.core.get_proc_ids().into_iter().rev() {
-            self.core
-                .uncommit_stage_between(proc_id, node, &committed)?;
+        for proc_id in self.proc_ids().into_iter().rev() {
+            rewind_stage(&mut self.core, proc_id, node)?;
         }
         self.core.truncate_committed_to(node)
     }
 
     /// Forgets an uncommitted link along with every link that was only
     /// reachable through it, returning everything forgotten.
-    pub fn discard_link(&mut self, lref: &LinkRef<S>) -> Result<Vec<LinkRef<S>>, GExecError> {
+    pub fn discard_link(&mut self, lref: &LinkRef<S>) -> GExecResult<Vec<LinkRef<S>>> {
         if self.core.tracking().is_committed(lref) {
             return Err(GExecError::link_on_committed_path(lref));
         }
@@ -167,10 +176,19 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     /// and lets the stages discard what they kept for that.
     ///
     /// Returns every link forgotten.
-    pub fn prune_upto(&mut self, node: &NodeRef<S>) -> Result<Vec<LinkRef<S>>, GExecError> {
+    pub fn prune_upto(&mut self, node: &NodeRef<S>) -> GExecResult<Vec<LinkRef<S>>> {
         let dropped = self.core.advance_committed_base_to(node)?;
-        self.core.prune_stages_upto(node)?;
+        let jobs: Vec<_> = self.core.create_prune_jobs(node).collect();
+        for job in jobs {
+            run_job_and_apply_receipt(&mut self.core, job)?;
+        }
+        self.core.evict_to_committed();
         Ok(dropped)
+    }
+
+    /// The stages' IDs in canonical order.
+    fn proc_ids(&self) -> Vec<ProcId> {
+        self.core.proc_ids().collect()
     }
 }
 
@@ -181,8 +199,7 @@ mod tests {
     use super::*;
     use crate::config::SerialExecutorBuilder;
     use crate::mem_store::MemExecutorStore;
-    use crate::open::{OpenReport, OpenResult};
-    use crate::reprocess::ReprocExecutor;
+    use crate::open::{OpenReport, OpenResult, ReprocExecutor};
     use crate::test_support::*;
     use crate::tracking::{CommitIndex, TrackingState};
 
@@ -350,9 +367,14 @@ mod tests {
         let outcome = exec.process_link(&TestRef(10)).expect("test: process link");
 
         assert_eq!(outcome, LinkOutcome::Rejected { proc_id: id("a") });
+        // The stage's finding was on record until the link was forgotten,
+        // so the stage got to clean up after it.
         assert_eq!(
             take_events(&first_events),
-            vec![ProcEvent::Process(TestRef(10))]
+            vec![
+                ProcEvent::Process(TestRef(10)),
+                ProcEvent::Preprune(TestRef(10)),
+            ]
         );
         assert!(take_events(&second_events).is_empty());
         assert!(!has_artifact(&mut exec, 10));
@@ -552,6 +574,49 @@ mod tests {
                 ProcEvent::Commit(refs(&[11, 12])),
             ]
         );
+    }
+
+    /// The path is committed before the stages commit it, so a commit that
+    /// a stage fails partway through is finished when the store is reopened
+    /// rather than lost.
+    #[test]
+    fn test_commit_cut_short_is_finished_on_reopen() {
+        let provider = provider();
+        let store = Arc::new(MemExecutorStore::new());
+        {
+            let first = TestProc::new();
+            let second = TestProc::new().failing_commit_of([11]);
+            let first_events = first.events();
+            let (mut exec, _) = open(&provider, &store, vec![first, second]);
+            accept(&mut exec, 10);
+            accept(&mut exec, 11);
+            take_events(&first_events);
+
+            let err = exec.commit_through(&TestRef(11)).unwrap_err();
+            assert!(matches!(err, GExecError::Proc(proc_id, _) if proc_id == id("b")));
+            assert_eq!(
+                take_events(&first_events),
+                vec![ProcEvent::Commit(refs(&[10, 11]))]
+            );
+            let stored = tracking(&store);
+            assert_eq!(stored.committed_node(), &TestRef(3));
+            assert_eq!(stored.get_stage_node(id("a")), Some(&TestRef(3)));
+            assert_eq!(stored.get_stage_node(id("b")), Some(&TestRef(1)));
+        }
+
+        let first = TestProc::new();
+        let second = TestProc::new();
+        let (first_events, second_events) = (first.events(), second.events());
+        let (exec, report) = open(&provider, &store, vec![first, second]);
+
+        assert_eq!(report.recommitted(), &[id("b")]);
+        assert!(take_events(&first_events).is_empty());
+        assert_eq!(
+            take_events(&second_events),
+            vec![ProcEvent::Commit(refs(&[10, 11]))]
+        );
+        assert_eq!(exec.committed_node(), &TestRef(3));
+        assert_eq!(tracking(&store).get_stage_node(id("b")), Some(&TestRef(3)));
     }
 
     #[test]
@@ -956,6 +1021,7 @@ mod tests {
                 ProcEvent::Process(TestRef(11)),
                 ProcEvent::Process(TestRef(12)),
                 ProcEvent::Commit(refs(&[11])),
+                ProcEvent::Preprune(TestRef(12)),
             ]
         );
         assert_eq!(

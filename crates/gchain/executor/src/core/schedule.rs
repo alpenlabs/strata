@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use strata_gchain_types::*;
 
-use crate::errors::GExecError;
+use crate::errors::{GExecError, GExecResult};
 
 /// The stages of a pipeline in canonical order with their validated deps.
 ///
@@ -54,11 +54,7 @@ impl StageSchedule {
     ///
     /// If the stage isn't in the schedule, since an executor only asks about
     /// stages it registered.
-    pub(crate) fn check_ready(
-        &self,
-        proc_id: ProcId,
-        coverage: &LinkCoverage,
-    ) -> Result<(), GExecError> {
+    pub(crate) fn check_ready(&self, proc_id: ProcId, coverage: &LinkCoverage) -> GExecResult<()> {
         let deps = self
             .get_deps(proc_id)
             .expect("gchain: readiness check for unregistered stage");
@@ -104,11 +100,7 @@ impl StageScheduleBuilder {
     /// in canonical order.  A path dep may also name the stage itself, which
     /// is the normal case for a validating stage building on its own earlier
     /// output.
-    pub(crate) fn add_stage(
-        &mut self,
-        proc_id: ProcId,
-        deps: ProcDeps,
-    ) -> Result<&mut Self, GExecError> {
+    pub(crate) fn add_stage(&mut self, proc_id: ProcId, deps: ProcDeps) -> GExecResult<&mut Self> {
         if self.by_id.contains_key(&proc_id) {
             return Err(GExecError::DuplicateProc(proc_id));
         }
@@ -201,7 +193,7 @@ mod tests {
         )
     }
 
-    fn schedule(stages: &[(&str, ProcDeps)]) -> Result<StageSchedule, GExecError> {
+    fn schedule(stages: &[(&str, ProcDeps)]) -> GExecResult<StageSchedule> {
         let mut builder = StageScheduleBuilder::new();
         for (name, deps) in stages {
             builder.add_stage(id(name), deps.clone())?;

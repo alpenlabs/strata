@@ -5,6 +5,9 @@ use thiserror::Error;
 
 use crate::tracking::CommitIndex;
 
+/// What the executor's fallible operations come to.
+pub type GExecResult<T> = Result<T, GExecError>;
+
 /// Failures the executor reports while driving a processor pipeline.
 ///
 /// The provider and processor failures keep their own error types rather than

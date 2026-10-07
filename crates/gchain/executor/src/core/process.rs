@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use strata_gchain_types::*;
 
-use crate::artifact_cache::ArtifactCache;
+use crate::artifact_cache::ArtifactView;
 use crate::context::ProcContextImpl;
 use crate::errors::GExecError;
 
@@ -37,16 +37,17 @@ pub(crate) trait GChainProcDyn<S: GChainSpec>: 'static {
 
     /// Processes a link and returns the type-erased artifact.
     ///
-    /// The cache supplies the stage's declared deps, resolved against the link
-    /// being processed and `path`, the uncommitted path from the committed node
-    /// to the link's origin node.
+    /// The artifacts supply the stage's declared deps, resolved against the
+    /// link being processed and `path`, the uncommitted path from the
+    /// committed node to the link's origin node.  The stage's type is erased
+    /// here, so the view of them has to be too.
     ///
     /// See [`GChainProc::process_link`].
     fn process_link(
         &self,
         lref: &LinkRef<S>,
         link: &Link<S>,
-        cache: &ArtifactCache<S>,
+        artifacts: &dyn ArtifactView<S>,
         path: &LinkPath<S>,
     ) -> Result<Arc<dyn DynProcArtifact>, ProcError>;
 
@@ -130,10 +131,10 @@ impl<S: GChainSpec, P: GChainProc<Spec = S>> GChainProcDyn<S> for ProcShim<P> {
         &self,
         lref: &LinkRef<S>,
         link: &Link<S>,
-        cache: &ArtifactCache<S>,
+        artifacts: &dyn ArtifactView<S>,
         path: &LinkPath<S>,
     ) -> Result<Arc<dyn DynProcArtifact>, ProcError> {
-        let ctx = ProcContextImpl::<P>::new(cache, path, lref.clone(), self.proc_id);
+        let ctx = ProcContextImpl::<P, _>::new(artifacts, path, lref.clone(), self.proc_id);
         let artifact = self.proc.process_link(lref, link, &ctx)?;
         Ok(Arc::new(artifact))
     }
