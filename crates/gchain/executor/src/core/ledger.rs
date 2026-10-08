@@ -140,40 +140,51 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     }
 
     /// Whether a stage covers a loaded link.  See [`StageArtifacts::covers`].
+    ///
+    /// # Panics
+    ///
+    /// If the link's artifacts aren't loaded.
     pub(super) fn covers(&self, lref: &LinkRef<S>, proc_id: ProcId) -> bool {
+        self.assert_loaded(lref);
         self.artifacts.covers(lref, proc_id)
     }
 
     /// The stages that don't cover a loaded link, in canonical order.
+    ///
+    /// # Panics
+    ///
+    /// If the link's artifacts aren't loaded.
     pub(super) fn missing_stages(&self, lref: &LinkRef<S>) -> Vec<ProcId> {
+        self.assert_loaded(lref);
         self.artifacts.missing_stages(lref)
     }
 
-    /// Loads what the store has for a link.  The records are handed back
-    /// rather than taken in, since taking in an older version's artifact
-    /// needs the link's header, which is the provider's to fetch.
-    pub(super) fn load_stored(&self, lref: &LinkRef<S>) -> GExecResult<Vec<ArtifactRecord<S>>> {
-        self.store
-            .load_link_artifacts(lref)
-            .map_err(GExecError::Storage)
-    }
-
-    /// Whether taking in a stored artifact needs its link's header.
-    pub(super) fn check_needs_header(&self, record: &ArtifactRecord<S>) -> bool {
-        self.artifacts.check_needs_header(record)
-    }
-
-    /// Takes in the stored artifacts of a link, which counts as loaded from
-    /// then on.
-    pub(super) fn take_in_stored(
+    /// Loads a link's stored artifacts if they aren't loaded already, after
+    /// which the link counts as loaded whether or not the store had any.
+    ///
+    /// The link's header is only fetched from the provider if some artifact
+    /// came from an older version of its stage, which the stage judges by it.
+    pub(super) fn hydrate_link(
         &mut self,
+        provider: &impl ChainProvider<Spec = S>,
         lref: &LinkRef<S>,
-        records: Vec<ArtifactRecord<S>>,
-        header: Option<&LinkHeader<S>>,
     ) -> GExecResult<()> {
+        if self.check_loaded(lref).is_some() {
+            return Ok(());
+        }
+
+        let records = self.load_stored(lref)?;
+        let needs_header = records
+            .iter()
+            .any(|record| self.artifacts.check_needs_header(record));
+        let header = match needs_header {
+            true => provider.fetch_link_header(lref)?,
+            false => None,
+        };
+
         let present = !records.is_empty();
         for record in records {
-            self.artifacts.insert_stored(record, header)?;
+            self.artifacts.insert_stored(record, header.as_ref())?;
         }
         self.loaded.insert(lref.clone(), present);
         Ok(())
@@ -181,7 +192,13 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
 
     /// Forgets a loaded link everywhere it's tracked, letting each stage
     /// clean up after its artifact before the artifacts go.
+    ///
+    /// # Panics
+    ///
+    /// If the link's artifacts aren't loaded, since the stages couldn't
+    /// clean up after them.
     pub(super) fn forget_link(&mut self, lref: &LinkRef<S>) -> GExecResult<()> {
+        self.assert_loaded(lref);
         self.artifacts.discard(lref)?;
         self.store
             .discard_link_artifacts(lref)
@@ -239,10 +256,7 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
         link: &'r Link<S>,
         path: &'r LinkPath<S>,
     ) -> GExecResult<ProcessJob<'r, S, ArtifactCache<S>>> {
-        assert!(
-            self.check_loaded(lref).is_some(),
-            "gchain: processing a link that isn't loaded"
-        );
+        self.assert_loaded(lref);
         let coverage = self.artifacts.get_link_coverage(lref, path);
         self.artifacts
             .pipeline()
@@ -465,6 +479,15 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
 
     // ---- internals ---------------------------------------------------------
 
+    /// Anything that reads or discards a link's artifacts has to have them
+    /// loaded first, or it would silently act on none.
+    fn assert_loaded(&self, lref: &LinkRef<S>) {
+        assert!(
+            self.check_loaded(lref).is_some(),
+            "gchain: acting on a link that isn't loaded ({lref:?})"
+        );
+    }
+
     fn get_committed_index(&self, node: &NodeRef<S>) -> GExecResult<usize> {
         self.log
             .get_committed_index(node)
@@ -492,6 +515,13 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
             .get_stage_index(proc_id)
             .expect("gchain: moving a stage that isn't initialized");
         (stage_node, stage_pos)
+    }
+
+    /// Loads what the store has for a link.
+    fn load_stored(&self, lref: &LinkRef<S>) -> GExecResult<Vec<ArtifactRecord<S>>> {
+        self.store
+            .load_link_artifacts(lref)
+            .map_err(GExecError::Storage)
     }
 
     /// Collects the artifacts a stage committed a run of links with, in
@@ -548,7 +578,7 @@ mod tests {
         let store = Arc::new(MemExecutorStore::new());
         let mut ledger = Ledger::open(pipeline, store, TestRef(1)).expect("test: open ledger");
         ledger
-            .take_in_stored(&TestRef(10), Vec::new(), None)
+            .hydrate_link(&TestProvider::new(), &TestRef(10))
             .expect("test: load link");
         ledger
     }

@@ -287,22 +287,8 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
 
     // ---- internals ---------------------------------------------------------
 
-    /// Loads a link's stored artifacts into the ledger if they aren't there
-    /// already.
-    ///
-    /// The link's header is only fetched if some artifact came from an older
-    /// version of its stage, which the stage judges by it.
+    /// See [`Ledger::hydrate_link`].
     fn hydrate_link(&mut self, lref: &LinkRef<S>) -> GExecResult<()> {
-        if self.ledger.check_loaded(lref).is_some() {
-            return Ok(());
-        }
-
-        let records = self.ledger.load_stored(lref)?;
-        let needs_header = records.iter().any(|r| self.ledger.check_needs_header(r));
-        let header = match needs_header {
-            true => self.provider.fetch_link_header(lref)?,
-            false => None,
-        };
-        self.ledger.take_in_stored(lref, records, header.as_ref())
+        self.ledger.hydrate_link(self.provider.as_ref(), lref)
     }
 }
