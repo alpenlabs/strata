@@ -9,10 +9,9 @@ use std::sync::{Arc, Mutex};
 use strata_gchain_types::*;
 
 use crate::config::SerialExecutorBuilder;
-use crate::core::{PipelineBuilder, StagePipeline};
+use crate::core::{CommitIndex, PipelineBuilder, StagePipeline};
 use crate::mem_store::MemExecutorStore;
 use crate::store::ExecutorStore;
-use crate::tracking::CommitIndex;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct TestRef(pub u8);

@@ -17,8 +17,10 @@
 //! iff its artifacts are in the store, which is also where they live between
 //! uses: only the committed path's artifacts are kept in memory (a commit
 //! can't be undone without them), and anything else is loaded when a path
-//! runs through it.  The pipeline's position is a small [`TrackingState`]
-//! mirrored whole in the store.  All of that is the [`ExecutorCore`]'s to
+//! runs through it.  The pipeline's position is a pair of small records
+//! ([`CommitTrackingState`](crate::CommitTrackingState) and
+//! [`StageTrackingState`](crate::StageTrackingState)) each mirrored whole in the store.
+//! All of that is the [`ExecutorCore`]'s to
 //! keep; the executor's own part is deciding which stage does what and in
 //! what order, which here is always one at a time in canonical order.
 //!
@@ -117,7 +119,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     /// The path is committed before any stage commits it, so a commit cut
     /// short is finished on the next open rather than undone.
     pub fn commit_through(&mut self, lref: &LinkRef<S>) -> GExecResult<()> {
-        if self.core.tracking().is_committed(lref) {
+        if self.core.is_committed(lref) {
             return Err(GExecError::link_on_committed_path(lref));
         }
         if !self.core.check_usable(lref)? {
@@ -157,7 +159,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>>
     /// Forgets an uncommitted link along with every link that was only
     /// reachable through it, returning everything forgotten.
     pub fn discard_link(&mut self, lref: &LinkRef<S>) -> GExecResult<Vec<LinkRef<S>>> {
-        if self.core.tracking().is_committed(lref) {
+        if self.core.is_committed(lref) {
             return Err(GExecError::link_on_committed_path(lref));
         }
         if !self.core.check_present(lref)? {
@@ -198,10 +200,10 @@ mod tests {
 
     use super::*;
     use crate::config::SerialExecutorBuilder;
+    use crate::core::{CommitIndex, CommitTrackingState, StageTrackingState};
     use crate::mem_store::MemExecutorStore;
     use crate::open::{OpenReport, OpenResult, ReprocExecutor};
     use crate::test_support::*;
-    use crate::tracking::{CommitIndex, TrackingState};
 
     type Exec = SerialExecutor<TestSpec, TestProvider, MemExecutorStore<TestSpec>>;
     type Reproc = ReprocExecutor<TestSpec, TestProvider, MemExecutorStore<TestSpec>>;
@@ -300,11 +302,18 @@ mod tests {
             .is_some()
     }
 
-    fn tracking(store: &MemExecutorStore<TestSpec>) -> TrackingState<TestSpec> {
+    fn commit_tracking(store: &MemExecutorStore<TestSpec>) -> CommitTrackingState<TestSpec> {
         store
-            .load_tracking()
-            .expect("test: load tracking")
-            .expect("test: tracking stored")
+            .load_commit_tracking()
+            .expect("test: load commit tracking")
+            .expect("test: commit tracking stored")
+    }
+
+    fn stage_tracking(store: &MemExecutorStore<TestSpec>) -> StageTrackingState<TestSpec> {
+        store
+            .load_stage_tracking()
+            .expect("test: load stage tracking")
+            .expect("test: stage tracking stored")
     }
 
     #[test]
@@ -316,10 +325,13 @@ mod tests {
         assert_eq!(take_events(&events), vec![ProcEvent::Init(TestRef(1))]);
         assert_eq!(exec.committed_node(), &TestRef(1));
         assert!(exec.committed_path().is_empty());
-        let stored = tracking(&store);
-        assert!(stored.committed_path().is_empty());
-        assert_eq!(stored.committed_node(), &TestRef(1));
-        assert_eq!(stored.get_stage_node(id("a")), Some(&TestRef(1)));
+        let commits = commit_tracking(&store);
+        assert!(commits.committed_path().is_empty());
+        assert_eq!(commits.committed_node(), &TestRef(1));
+        assert_eq!(
+            stage_tracking(&store).get_stage_node(id("a")),
+            Some(&TestRef(1))
+        );
     }
 
     #[test]
@@ -348,9 +360,14 @@ mod tests {
         );
         assert_eq!(exec.committed_node(), &TestRef(3));
         assert_eq!(exec.committed_path().links(), &refs(&[10, 11]));
-        let stored = tracking(&store);
-        assert_eq!(stored.get_stage_node(id("a")), Some(&TestRef(3)));
-        assert_eq!(stored.committed_path().links(), &refs(&[10, 11]));
+        assert_eq!(
+            stage_tracking(&store).get_stage_node(id("a")),
+            Some(&TestRef(3))
+        );
+        assert_eq!(
+            commit_tracking(&store).committed_path().links(),
+            &refs(&[10, 11])
+        );
         // Committed links keep their artifacts so the commit can be undone.
         assert!(has_artifact(&mut exec, 10));
     }
@@ -453,7 +470,10 @@ mod tests {
         );
         assert_eq!(exec.committed_node(), &TestRef(2));
         assert_eq!(exec.committed_path().links(), &refs(&[10]));
-        assert_eq!(tracking(&store).get_stage_node(id("b")), Some(&TestRef(2)));
+        assert_eq!(
+            stage_tracking(&store).get_stage_node(id("b")),
+            Some(&TestRef(2))
+        );
 
         // The undone link is uncommitted again, so it can be built on and
         // committed again.
@@ -531,9 +551,9 @@ mod tests {
         assert!(exec.committed_path().is_empty());
         assert!(has_artifact(&mut exec, 12));
         assert!(!has_stored(&store, 10));
-        let stored = tracking(&store);
-        assert_eq!(stored.committed_path().base_node(), &TestRef(3));
-        assert!(stored.committed_path().is_empty());
+        let commits = commit_tracking(&store);
+        assert_eq!(commits.committed_path().base_node(), &TestRef(3));
+        assert!(commits.committed_path().is_empty());
 
         // Nothing before the new base can be rolled back to any more.
         let err = exec.uncommit_to(&TestRef(1)).unwrap_err();
@@ -598,8 +618,8 @@ mod tests {
                 take_events(&first_events),
                 vec![ProcEvent::Commit(refs(&[10, 11]))]
             );
-            let stored = tracking(&store);
-            assert_eq!(stored.committed_node(), &TestRef(3));
+            assert_eq!(commit_tracking(&store).committed_node(), &TestRef(3));
+            let stored = stage_tracking(&store);
             assert_eq!(stored.get_stage_node(id("a")), Some(&TestRef(3)));
             assert_eq!(stored.get_stage_node(id("b")), Some(&TestRef(1)));
         }
@@ -616,7 +636,10 @@ mod tests {
             vec![ProcEvent::Commit(refs(&[10, 11]))]
         );
         assert_eq!(exec.committed_node(), &TestRef(3));
-        assert_eq!(tracking(&store).get_stage_node(id("b")), Some(&TestRef(3)));
+        assert_eq!(
+            stage_tracking(&store).get_stage_node(id("b")),
+            Some(&TestRef(3))
+        );
     }
 
     #[test]
@@ -630,11 +653,11 @@ mod tests {
             exec.commit_through(&TestRef(11)).expect("test: commit");
         }
         // Pretend stage "a" crashed after committing only the first link.
-        let mut lagging = tracking(&store);
+        let mut lagging = stage_tracking(&store);
         lagging.set_stage_node(id("a"), TestRef(2));
         store
-            .store_tracking(&lagging)
-            .expect("test: store tracking");
+            .store_stage_tracking(&lagging)
+            .expect("test: store stage tracking");
 
         let first = TestProc::new();
         let second = TestProc::new();
@@ -652,7 +675,7 @@ mod tests {
             vec![ProcEvent::Init(TestRef(3))]
         );
         assert_eq!(exec.committed_node(), &TestRef(3));
-        let stored = tracking(&store);
+        let stored = stage_tracking(&store);
         assert_eq!(stored.get_stage_node(id("a")), Some(&TestRef(3)));
         assert_eq!(stored.get_stage_node(id("b")), Some(&TestRef(3)));
     }
@@ -822,9 +845,9 @@ mod tests {
         exec.prune_upto(&TestRef(3)).expect("test: prune");
         assert_eq!(stored_segment(&store, 0), None);
         assert_eq!(stored_segment(&store, 1), Some(refs(&[12])));
-        let stored = tracking(&store);
-        assert_eq!(stored.first_commit(), CommitIndex::from(1));
-        assert_eq!(stored.last_commit(), Some(CommitIndex::from(1)));
+        let commits = commit_tracking(&store);
+        assert_eq!(commits.first_commit(), CommitIndex::from(1));
+        assert_eq!(commits.last_commit(), Some(CommitIndex::from(1)));
     }
 
     #[test]
@@ -1042,7 +1065,7 @@ mod tests {
         assert_eq!(exec.committed_path().links(), &refs(&[10, 11]));
         assert_eq!(stored_segment(&store, 1), Some(refs(&[11])));
         assert!(!has_stored(&store, 12));
-        let stored = tracking(&store);
+        let stored = stage_tracking(&store);
         assert_eq!(stored.get_stage_node(id("a")), Some(&TestRef(3)));
         assert_eq!(stored.get_stage_node(id("b")), Some(&TestRef(3)));
 

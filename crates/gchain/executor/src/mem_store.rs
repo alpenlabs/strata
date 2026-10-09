@@ -5,8 +5,8 @@ use std::sync::Mutex;
 
 use strata_gchain_types::*;
 
+use crate::core::{CommitIndex, CommitTrackingState, StageTrackingState};
 use crate::store::{ArtifactRecord, ExecutorStore};
-use crate::tracking::{CommitIndex, TrackingState};
 
 /// In-memory [`ExecutorStore`], for tests and executors that don't need to
 /// survive a restart.
@@ -16,7 +16,8 @@ pub struct MemExecutorStore<S: GChainSpec> {
 
 struct MemStoreInner<S: GChainSpec> {
     artifacts: BTreeMap<(LinkRef<S>, ProcId), ProcessorArtifactData>,
-    tracking: Option<TrackingState<S>>,
+    commits: Option<CommitTrackingState<S>>,
+    stages: Option<StageTrackingState<S>>,
     segments: BTreeMap<CommitIndex, LinkPath<S>>,
 }
 
@@ -25,7 +26,8 @@ impl<S: GChainSpec> MemExecutorStore<S> {
         Self {
             inner: Mutex::new(MemStoreInner {
                 artifacts: BTreeMap::new(),
-                tracking: None,
+                commits: None,
+                stages: None,
                 segments: BTreeMap::new(),
             }),
         }
@@ -49,12 +51,20 @@ impl<S: GChainSpec> Default for MemExecutorStore<S> {
 impl<S: GChainSpec> ExecutorStore for MemExecutorStore<S> {
     type Spec = S;
 
-    fn store_tracking(&self, state: &TrackingState<S>) -> Result<(), BoxedError> {
-        self.with_inner(|inner| inner.tracking = Some(state.clone()))
+    fn store_commit_tracking(&self, tracking: &CommitTrackingState<S>) -> Result<(), BoxedError> {
+        self.with_inner(|inner| inner.commits = Some(tracking.clone()))
     }
 
-    fn load_tracking(&self) -> Result<Option<TrackingState<S>>, BoxedError> {
-        self.with_inner(|inner| inner.tracking.clone())
+    fn load_commit_tracking(&self) -> Result<Option<CommitTrackingState<S>>, BoxedError> {
+        self.with_inner(|inner| inner.commits.clone())
+    }
+
+    fn store_stage_tracking(&self, tracking: &StageTrackingState<S>) -> Result<(), BoxedError> {
+        self.with_inner(|inner| inner.stages = Some(tracking.clone()))
+    }
+
+    fn load_stage_tracking(&self) -> Result<Option<StageTrackingState<S>>, BoxedError> {
+        self.with_inner(|inner| inner.stages.clone())
     }
 
     fn store_commit_segment(&self, idx: CommitIndex, path: &LinkPath<S>) -> Result<(), BoxedError> {

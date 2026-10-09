@@ -8,9 +8,10 @@
 
 use strata_gchain_types::*;
 
+use super::commit_tracker::CommitTrackingState;
+use super::tracking::CommitIndex;
 use crate::errors::{GExecError, GExecResult};
 use crate::store::ExecutorStore;
-use crate::tracking::{CommitIndex, TrackingState};
 
 /// A commit out of the log with the path it covered.
 pub(crate) struct CommitSegment<S: GChainSpec> {
@@ -77,8 +78,8 @@ impl<'s, X: ExecutorStore> CommitWalker<'s, X> {
         }
     }
 
-    /// Constructs a new instance from the committed indexes of a [`TrackingState`].
-    pub(crate) fn from_tracking(store: &'s X, tracking: &TrackingState<X::Spec>) -> Self {
+    /// Constructs a new instance from the committed indexes of a [`CommitTrackingState`].
+    pub(crate) fn from_tracking(store: &'s X, tracking: &CommitTrackingState<X::Spec>) -> Self {
         Self::new(store, tracking.first_commit(), tracking.last_commit())
     }
 

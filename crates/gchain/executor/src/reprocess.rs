@@ -231,11 +231,10 @@ pub(crate) fn plan_reprocessing<
 >(
     core: &ExecutorCore<S, P, X>,
 ) -> GExecResult<Vec<StagePlan<S>>> {
-    let tracking = core.tracking();
     let mut plans: Vec<StagePlan<S>> = Vec::new();
 
     for proc_id in core.proc_ids() {
-        let Some(floor) = tracking.get_stage_floor(proc_id) else {
+        let Some(floor) = core.get_stage_floor(proc_id) else {
             continue;
         };
 
@@ -282,7 +281,6 @@ fn reprocess_stage<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<S
         .get_node_index(resume_node)
         .ok_or_else(|| GExecError::node_not_on_committed_path(resume_node))?;
     let stage_node = core
-        .tracking()
         .get_stage_node(proc_id)
         .cloned()
         .expect("gchain: planned stage not initialized");
@@ -339,7 +337,7 @@ fn roll_back_rejected<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStor
         if proc_id == rejecting {
             continue;
         }
-        let Some(node) = core.tracking().get_stage_node(proc_id).cloned() else {
+        let Some(node) = core.get_stage_node(proc_id).cloned() else {
             continue;
         };
 

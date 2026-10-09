@@ -194,7 +194,7 @@ fn level_stages<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec
     let committed = core.committed_node().clone();
     let proc_ids: Vec<_> = core.proc_ids().collect();
     for proc_id in proc_ids {
-        match core.tracking().get_stage_node(proc_id).cloned() {
+        match core.get_stage_node(proc_id).cloned() {
             None => {
                 let job = core
                     .create_init_job(proc_id)

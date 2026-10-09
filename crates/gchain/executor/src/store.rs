@@ -14,7 +14,7 @@
 
 use strata_gchain_types::*;
 
-use crate::tracking::{CommitIndex, TrackingState};
+use crate::core::{CommitIndex, CommitTrackingState, StageTrackingState};
 
 /// An artifact with the link and stage it belongs to, as the store keeps it.
 pub struct ArtifactRecord<S: GChainSpec> {
@@ -69,11 +69,30 @@ pub trait ExecutorStore {
     /// The chain spec this store tracks.
     type Spec: GChainSpec;
 
-    /// Records where the pipeline stands, replacing what was there.
-    fn store_tracking(&self, state: &TrackingState<Self::Spec>) -> Result<(), BoxedError>;
+    /// Records the committed path and the bounds of the commit log,
+    /// replacing what was there.
+    fn store_commit_tracking(
+        &self,
+        tracking: &CommitTrackingState<Self::Spec>,
+    ) -> Result<(), BoxedError>;
 
-    /// Loads where the pipeline stands, if it has ever been initialized.
-    fn load_tracking(&self) -> Result<Option<TrackingState<Self::Spec>>, BoxedError>;
+    /// Loads the committed path and the bounds of the commit log, if the
+    /// store has ever been initialized.
+    fn load_commit_tracking(&self) -> Result<Option<CommitTrackingState<Self::Spec>>, BoxedError>;
+
+    /// Records where each stage stands, replacing what was there.
+    ///
+    /// This is kept apart from the commit tracking because the two are
+    /// written at different times, in the order that keeps a stage's node on
+    /// the committed path whenever a write is cut short (see
+    /// [`StageTrackingState`]).
+    fn store_stage_tracking(
+        &self,
+        tracking: &StageTrackingState<Self::Spec>,
+    ) -> Result<(), BoxedError>;
+
+    /// Loads where each stage stands, if any stage has ever been recorded.
+    fn load_stage_tracking(&self) -> Result<Option<StageTrackingState<Self::Spec>>, BoxedError>;
 
     /// Records the path a commit covered under its index, replacing what was
     /// there.

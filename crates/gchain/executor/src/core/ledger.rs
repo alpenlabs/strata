@@ -1,11 +1,22 @@
 //! The record of what's been processed and committed, and the rules for
 //! changing it.
 //!
-//! This is everything the core keeps apart from the graph: the artifacts
-//! the stages stand behind ([`StageArtifacts`]), where the pipeline stands
-//! ([`CommitLog`]), which links have been loaded from the store, and the
-//! store itself.  It never touches the provider, so it can't find links or
-//! paths; it's told about them.
+//! This is everything the core keeps apart from the graph: the pipeline's
+//! stages, the artifacts on hand for them ([`ArtifactTable`]), what's
+//! committed ([`CommitTracker`]), and how far each stage has committed it
+//! ([`StageTracker`]), each of the last three backed by its own part of the
+//! store.  None of them knows about the others; the ledger is where they're
+//! related.  Pairing the artifacts with the pipeline is what decides which
+//! stages a link is missing, which stages' deps a job can draw on, and what
+//! can be committed or undone; pairing the stages' positions with the
+//! committed path is what keeps every stage's node on it.  The ledger never
+//! touches the provider, so it can't find links or paths; it's told about
+//! them.
+//!
+//! An artifact that says its link is invalid is kept like any other: it's
+//! the stage's finding.  But it never *covers* the link, so a stage that
+//! depends on it can't run on the link, no path can run through the link,
+//! and the link can't be committed.
 //!
 //! The ledger is what jobs are issued from and what receipts are applied
 //! to, and it's where every out-of-order ask is refused: a process job for
@@ -14,31 +25,32 @@
 //! a cut to the committed path past a stage.  What it lets through keeps
 //! the store consistent with what's in memory.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use strata_gchain_types::*;
 
-use crate::artifact_cache::{ArtifactCache, ArtifactView};
+use crate::artifact_cache::ArtifactCache;
 use crate::errors::{GExecError, GExecResult};
-use crate::store::{ArtifactRecord, ExecutorStore};
-use crate::tracking::TrackingState;
+use crate::store::ExecutorStore;
 
-use super::artifacts::StageArtifacts;
-use super::commit_log::CommitLog;
+use super::artifacts::ArtifactTable;
+use super::commit_tracker::CommitTracker;
 use super::history::{ResumeSearch, StepJudge, find_resume_path};
 use super::jobs::{CommitJob, InitJob, ProcessJob, PruneJob, Receipt, UncommitJob};
 use super::pipeline::StagePipeline;
-use super::stage::ProducedArtifact;
+use super::schedule::LinkCoverage;
+use super::stage::{ProducedArtifact, Stage};
+use super::stage_tracker::StageTracker;
 
 pub(crate) struct Ledger<S: GChainSpec, X: ExecutorStore<Spec = S>> {
-    artifacts: StageArtifacts<S>,
-    log: CommitLog<X>,
+    pipeline: StagePipeline<S>,
+    artifacts: ArtifactTable<S>,
+    commits: CommitTracker<S>,
+    stages: StageTracker<S>,
 
-    /// Links whose stored artifacts have been loaded, and whether the store
-    /// had any.
-    loaded: HashMap<LinkRef<S>, bool>,
-
+    /// What the rest was loaded from and is written back to.  Only the
+    /// ledger holds it, so the rest is never handed any other.
     store: Arc<X>,
 }
 
@@ -50,11 +62,13 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
         store: Arc<X>,
         base_node: NodeRef<S>,
     ) -> GExecResult<Self> {
-        let log = CommitLog::open(store.clone(), base_node)?;
+        let commits = CommitTracker::open(store.as_ref(), base_node)?;
+        let stages = StageTracker::open(store.as_ref())?;
         Ok(Self {
-            artifacts: StageArtifacts::new(pipeline),
-            log,
-            loaded: HashMap::new(),
+            pipeline,
+            artifacts: ArtifactTable::new(),
+            commits,
+            stages,
             store,
         })
     }
@@ -62,26 +76,39 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     // ---- where things stand ------------------------------------------------
 
     pub(super) fn committed_node(&self) -> &NodeRef<S> {
-        self.log.committed_node()
+        self.commits.committed_node()
     }
 
     pub(super) fn committed_path(&self) -> &LinkPath<S> {
-        self.log.committed_path()
+        self.commits.committed_path()
     }
 
-    pub(super) fn tracking(&self) -> &TrackingState<S> {
-        self.log.tracking()
+    /// Whether a link is on the committed path.
+    pub(super) fn is_committed(&self, lref: &LinkRef<S>) -> bool {
+        self.commits.is_committed(lref)
+    }
+
+    /// The node a stage has committed up to, if it has ever been
+    /// initialized.
+    pub(super) fn get_stage_node(&self, proc_id: ProcId) -> Option<&NodeRef<S>> {
+        self.stages.get_stage_node(proc_id)
+    }
+
+    /// The node a stage was initialized at, if it ever has been.  It has
+    /// nothing for the links committed before it.
+    pub(super) fn get_stage_floor(&self, proc_id: ProcId) -> Option<&NodeRef<S>> {
+        self.stages.get_stage_floor(proc_id)
     }
 
     /// The stages' IDs in canonical order.
     pub(super) fn proc_ids(&self) -> impl DoubleEndedIterator<Item = ProcId> {
-        self.artifacts.pipeline().proc_ids()
+        self.pipeline.proc_ids()
     }
 
     /// Every stage a stage depends on.  See
     /// [`StageSchedule::iter_deps`](super::schedule::StageSchedule::iter_deps).
     pub(super) fn iter_deps(&self, proc_id: ProcId) -> impl Iterator<Item = ProcId> {
-        self.artifacts.pipeline().schedule().iter_deps(proc_id)
+        self.pipeline.schedule().iter_deps(proc_id)
     }
 
     /// Asks a stage whether it can pick up processing from a node.
@@ -90,14 +117,14 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
         proc_id: ProcId,
         node: &NodeRef<S>,
     ) -> GExecResult<bool> {
-        self.artifacts.get_stage(proc_id).check_can_resume_at(node)
+        self.get_stage(proc_id).check_can_resume_at(node)
     }
 
     /// Whether every stage stands at the committed node, which is what it
     /// takes to drive an executor over the ledger.
     pub(super) fn check_clean(&self) -> bool {
         self.proc_ids()
-            .all(|id| self.tracking().get_stage_node(id) == Some(self.committed_node()))
+            .all(|id| self.get_stage_node(id) == Some(self.committed_node()))
     }
 
     /// Walks the commit history back from the committed node to find the
@@ -108,29 +135,28 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
         floor: &NodeRef<S>,
         judge: &mut impl StepJudge<S>,
     ) -> GExecResult<ResumeSearch<S>> {
-        find_resume_path(self.log.walker(), self.committed_node(), floor, judge)
+        find_resume_path(
+            self.commits.start_walker(self.store.as_ref()),
+            self.committed_node(),
+            floor,
+            judge,
+        )
     }
 
     // ---- artifacts ---------------------------------------------------------
 
-    /// Whether a link's stored artifacts have been loaded, and if so whether
-    /// the store had any.
-    pub(super) fn check_loaded(&self, lref: &LinkRef<S>) -> Option<bool> {
-        self.loaded.get(lref).copied()
+    /// See [`ArtifactTable::check_loaded`].
+    #[cfg(test)]
+    pub(super) fn check_loaded(&self, lref: &LinkRef<S>) -> bool {
+        self.artifacts.check_loaded(lref)
     }
 
-    /// Whether the store has anything at all for a link, without loading it.
+    /// See [`ArtifactTable::check_present`].
     pub(super) fn check_present(&self, lref: &LinkRef<S>) -> GExecResult<bool> {
-        match self.check_loaded(lref) {
-            Some(present) => Ok(present),
-            None => self
-                .store
-                .has_link_artifacts(lref)
-                .map_err(GExecError::Storage),
-        }
+        self.artifacts.check_present(self.store.as_ref(), lref)
     }
 
-    /// The artifact a stage has for a loaded link.
+    /// See [`ArtifactTable::get_artifact`].
     pub(super) fn get_artifact<A: ProcArtifact>(
         &self,
         lref: &LinkRef<S>,
@@ -139,13 +165,8 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
         self.artifacts.get_artifact(lref, proc_id)
     }
 
-    /// Whether a stage covers a loaded link.  See [`StageArtifacts::covers`].
-    ///
-    /// # Panics
-    ///
-    /// If the link's artifacts aren't loaded.
+    /// See [`ArtifactTable::covers`].
     pub(super) fn covers(&self, lref: &LinkRef<S>, proc_id: ProcId) -> bool {
-        self.assert_loaded(lref);
         self.artifacts.covers(lref, proc_id)
     }
 
@@ -155,39 +176,20 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     ///
     /// If the link's artifacts aren't loaded.
     pub(super) fn missing_stages(&self, lref: &LinkRef<S>) -> Vec<ProcId> {
-        self.assert_loaded(lref);
-        self.artifacts.missing_stages(lref)
+        self.proc_ids()
+            .filter(|proc_id| !self.covers(lref, *proc_id))
+            .collect()
     }
 
-    /// Loads a link's stored artifacts if they aren't loaded already, after
-    /// which the link counts as loaded whether or not the store had any.
-    ///
-    /// The link's header is only fetched from the provider if some artifact
-    /// came from an older version of its stage, which the stage judges by it.
+    /// Loads a link's stored artifacts if they aren't loaded already, as the
+    /// stages judge them.  See [`ArtifactTable::hydrate_link`].
     pub(super) fn hydrate_link(
         &mut self,
         provider: &impl ChainProvider<Spec = S>,
         lref: &LinkRef<S>,
     ) -> GExecResult<()> {
-        if self.check_loaded(lref).is_some() {
-            return Ok(());
-        }
-
-        let records = self.load_stored(lref)?;
-        let needs_header = records
-            .iter()
-            .any(|record| self.artifacts.check_needs_header(record));
-        let header = match needs_header {
-            true => provider.fetch_link_header(lref)?,
-            false => None,
-        };
-
-        let present = !records.is_empty();
-        for record in records {
-            self.artifacts.insert_stored(record, header.as_ref())?;
-        }
-        self.loaded.insert(lref.clone(), present);
-        Ok(())
+        self.artifacts
+            .hydrate_link(self.store.as_ref(), provider, &self.pipeline, lref)
     }
 
     /// Forgets a loaded link everywhere it's tracked, letting each stage
@@ -198,20 +200,18 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     /// If the link's artifacts aren't loaded, since the stages couldn't
     /// clean up after them.
     pub(super) fn forget_link(&mut self, lref: &LinkRef<S>) -> GExecResult<()> {
-        self.assert_loaded(lref);
-        self.artifacts.discard(lref)?;
-        self.store
-            .discard_link_artifacts(lref)
-            .map_err(GExecError::Storage)?;
-        self.loaded.remove(lref);
-        Ok(())
+        for stage in self.pipeline.iter_stages() {
+            if let Some(artifact) = self.artifacts.get_artifact_dyn(lref, stage.proc_id()) {
+                stage.preprune(lref, artifact.as_ref())?;
+            }
+        }
+        self.artifacts.forget(self.store.as_ref(), lref)
     }
 
     /// Drops every loaded artifact except the committed path's.
     pub(super) fn evict_to_committed(&mut self) {
         let keep: HashSet<_> = self.committed_path().links().iter().cloned().collect();
-        self.artifacts.retain_links(&keep);
-        self.loaded.retain(|lref, _| keep.contains(lref));
+        self.artifacts.evict_to(&keep);
     }
 
     // ---- jobs and receipts -------------------------------------------------
@@ -229,10 +229,10 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     /// Initializing a stage at the committed node, if it has never been
     /// initialized.
     pub(super) fn create_init_job(&self, proc_id: ProcId) -> Option<InitJob<S>> {
-        match self.tracking().get_stage_node(proc_id) {
+        match self.get_stage_node(proc_id) {
             Some(_) => None,
             None => Some(InitJob::new(
-                self.artifacts.get_stage(proc_id).clone(),
+                self.get_stage(proc_id).clone(),
                 self.committed_node().clone(),
             )),
         }
@@ -256,15 +256,11 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
         link: &'r Link<S>,
         path: &'r LinkPath<S>,
     ) -> GExecResult<ProcessJob<'r, S, ArtifactCache<S>>> {
-        self.assert_loaded(lref);
-        let coverage = self.artifacts.get_link_coverage(lref, path);
-        self.artifacts
-            .pipeline()
-            .schedule()
-            .check_ready(proc_id, &coverage)?;
+        let coverage = self.get_link_coverage(lref, path);
+        self.pipeline.schedule().check_ready(proc_id, &coverage)?;
 
         Ok(ProcessJob::new(
-            self.artifacts.get_stage(proc_id),
+            self.get_stage(proc_id),
             lref,
             link,
             path,
@@ -293,10 +289,12 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
             "gchain: committing a stage back past where it stands"
         );
 
-        let stage = self.artifacts.get_stage(proc_id);
-        let segments = self.log.find_segments_between(stage_node, upto)?;
+        let stage = self.get_stage(proc_id);
+        let segments = self
+            .commits
+            .find_segments_between(self.store.as_ref(), stage_node, upto)?;
         Ok(segments.into_iter().map(move |segment| {
-            let artifacts = self.load_committed_with(proc_id, segment.links())?;
+            let artifacts = self.get_committed_with(proc_id, segment.links())?;
             Ok(CommitJob::new(stage.clone(), segment, artifacts))
         }))
     }
@@ -323,14 +321,17 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
             "gchain: undoing a stage forward past where it stands"
         );
 
-        let Some(segment) = self.log.find_segments_between(downto, stage_node)?.pop() else {
+        let Some(segment) = self
+            .commits
+            .find_segments_between(self.store.as_ref(), downto, stage_node)?
+            .pop()
+        else {
             return Ok(None);
         };
 
-        let artifacts = self.load_committed_with(proc_id, segment.links())?;
-        self.log
-            .set_stage_node(proc_id, segment.base_node().clone())?;
-        let stage = self.artifacts.get_stage(proc_id).clone();
+        let artifacts = self.get_committed_with(proc_id, segment.links())?;
+        self.set_stage_node(proc_id, segment.base_node().clone())?;
+        let stage = self.get_stage(proc_id).clone();
         Ok(Some(UncommitJob::new(stage, segment, artifacts)))
     }
 
@@ -340,8 +341,7 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
         &'c self,
         node: &'c NodeRef<S>,
     ) -> impl Iterator<Item = PruneJob<S>> + 'c {
-        self.artifacts
-            .pipeline()
+        self.pipeline
             .iter_stages()
             .map(|stage| PruneJob::new(stage.clone(), node.clone()))
     }
@@ -360,8 +360,10 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     /// If some stage isn't at the committed node to begin with.
     pub(super) fn append_commit(&mut self, path: &LinkPath<S>) -> GExecResult<()> {
         assert!(self.check_clean(), "gchain: commit over lagging stages");
-        self.artifacts.check_committable(path)?;
-        self.log.append(path)?;
+        if let Some((lref, proc_id)) = self.find_uncovered(path) {
+            return Err(GExecError::missing_artifact(lref, proc_id));
+        }
+        self.commits.append(self.store.as_ref(), path)?;
         self.evict_to_committed();
         Ok(())
     }
@@ -373,8 +375,10 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     /// committed has none for it, and nothing else is missing one once the
     /// stages stand behind everything committed.
     pub(super) fn check_undoable_to(&self, node: &NodeRef<S>) -> GExecResult<LinkPath<S>> {
-        let undone = self.tracking().committed_path_from(node)?;
-        self.artifacts.check_undoable(&undone)?;
+        let undone = self.commits.committed_path_from(node)?;
+        if let Some((lref, proc_id)) = self.find_uncovered(&undone) {
+            return Err(GExecError::stale_artifact(lref, proc_id));
+        }
         Ok(undone)
     }
 
@@ -390,7 +394,7 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
             self.stage_indexes().all(|idx| idx <= pos),
             "gchain: committed path cut back past a stage"
         );
-        self.log.truncate_to(node)
+        self.commits.truncate_to(self.store.as_ref(), node)
     }
 
     /// Moves the base of the committed path and the start of the commit log
@@ -406,30 +410,15 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
             self.stage_indexes().all(|idx| idx >= pos),
             "gchain: committed path's base moved past a stage"
         );
-        self.log.advance_base_to(node)
+        self.commits.advance_base_to(self.store.as_ref(), node)
     }
 
     // ---- what receipts do ---------------------------------------------------
 
-    /// Records an artifact a stage produced for a loaded link, persisted
-    /// before it's kept on hand.
-    ///
-    /// # Panics
-    ///
-    /// If the link's artifacts aren't loaded, since no process job is issued
-    /// for such a link.
+    /// Records an artifact a stage produced for a link.  See
+    /// [`ArtifactTable::record`].
     pub(super) fn record_artifact(&mut self, produced: ProducedArtifact<S>) -> GExecResult<()> {
-        let lref = produced.lref();
-        assert!(
-            self.check_loaded(lref).is_some(),
-            "gchain: artifact for a link that isn't loaded"
-        );
-        self.store
-            .store_artifact(produced.record())
-            .map_err(GExecError::Storage)?;
-        self.loaded.insert(lref.clone(), true);
-        self.artifacts.insert_produced(produced);
-        Ok(())
+        self.artifacts.record(self.store.as_ref(), produced)
     }
 
     /// Records a stage as initialized at a node, which has to be the
@@ -445,10 +434,10 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
             "gchain: stage initialized away from the committed node"
         );
         assert!(
-            self.tracking().get_stage_node(proc_id).is_none(),
+            self.get_stage_node(proc_id).is_none(),
             "gchain: stage initialized twice"
         );
-        self.log.set_stage_node(proc_id, node)
+        self.set_stage_node(proc_id, node)
     }
 
     /// Records a stage as having made a commit, which has to continue from
@@ -460,18 +449,18 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
         to: NodeRef<S>,
     ) -> GExecResult<()> {
         assert_eq!(
-            self.tracking().get_stage_node(proc_id),
+            self.get_stage_node(proc_id),
             Some(from),
             "gchain: stage committed from somewhere it wasn't"
         );
-        self.log.set_stage_node(proc_id, to)
+        self.set_stage_node(proc_id, to)
     }
 
     /// Confirms a stage has undone a commit down to where it was recorded
     /// before the job went out.
     pub(super) fn record_stage_uncommitted(&self, proc_id: ProcId, node: &NodeRef<S>) {
         assert_eq!(
-            self.tracking().get_stage_node(proc_id),
+            self.get_stage_node(proc_id),
             Some(node),
             "gchain: stage undid a commit it wasn't recorded for"
         );
@@ -479,25 +468,52 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
 
     // ---- internals ---------------------------------------------------------
 
-    /// Anything that reads or discards a link's artifacts has to have them
-    /// loaded first, or it would silently act on none.
-    fn assert_loaded(&self, lref: &LinkRef<S>) {
-        assert!(
-            self.check_loaded(lref).is_some(),
-            "gchain: acting on a link that isn't loaded ({lref:?})"
-        );
+    /// Looks up a stage by the ID it's registered under.
+    ///
+    /// # Panics
+    ///
+    /// If no stage is registered under the ID, since an executor only asks
+    /// about stages it registered.
+    fn get_stage(&self, proc_id: ProcId) -> &Stage<S> {
+        self.pipeline
+            .get_stage(proc_id)
+            .expect("gchain: proc ID doesn't point to stage")
     }
 
     fn get_committed_index(&self, node: &NodeRef<S>) -> GExecResult<usize> {
-        self.log
+        self.commits
             .get_committed_index(node)
             .ok_or_else(|| GExecError::node_not_on_committed_path(node))
+    }
+
+    /// Records the node a stage stands at, which has to be on the committed
+    /// path.  See [`StageTracker::set_stage_node`] for when it's recorded.
+    fn set_stage_node(&mut self, proc_id: ProcId, node: NodeRef<S>) -> GExecResult<()> {
+        self.get_committed_index(&node)?;
+        self.stages
+            .set_stage_node(self.store.as_ref(), proc_id, node)
+    }
+
+    /// Where a stage stands on the committed path, if it has been
+    /// initialized.
+    ///
+    /// A stage that's been initialized always stands somewhere on the path:
+    /// a stage is only ever recorded at a node on it, the path is only ever
+    /// cut back to where every stage is at or before, and its base only ever
+    /// moved up to where every stage is at or past.
+    fn get_stage_index(&self, proc_id: ProcId) -> Option<usize> {
+        let node = self.get_stage_node(proc_id)?;
+        let idx = self
+            .commits
+            .get_committed_index(node)
+            .expect("gchain: stage node on committed path");
+        Some(idx)
     }
 
     /// Where every initialized stage stands on the committed path.
     fn stage_indexes(&self) -> impl Iterator<Item = usize> {
         self.proc_ids()
-            .filter_map(|proc_id| self.log.get_stage_index(proc_id))
+            .filter_map(|proc_id| self.get_stage_index(proc_id))
     }
 
     /// The node a stage stands at and where that is on the committed path.
@@ -507,21 +523,38 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     /// If the stage isn't initialized.
     fn get_stage_pos(&self, proc_id: ProcId) -> (&NodeRef<S>, usize) {
         let stage_node = self
-            .tracking()
             .get_stage_node(proc_id)
             .expect("gchain: moving a stage that isn't initialized");
         let stage_pos = self
-            .log
             .get_stage_index(proc_id)
             .expect("gchain: moving a stage that isn't initialized");
         (stage_node, stage_pos)
     }
 
-    /// Loads what the store has for a link.
-    fn load_stored(&self, lref: &LinkRef<S>) -> GExecResult<Vec<ArtifactRecord<S>>> {
-        self.store
-            .load_link_artifacts(lref)
-            .map_err(GExecError::Storage)
+    /// Works out which stages cover a loaded link and the path to its
+    /// origin.
+    fn get_link_coverage(&self, lref: &LinkRef<S>, path: &LinkPath<S>) -> LinkCoverage {
+        let mut coverage = LinkCoverage::new();
+        for proc_id in self.proc_ids() {
+            if self.covers(lref, proc_id) {
+                coverage.mark_cur(proc_id);
+            }
+            if path.links().iter().all(|l| self.covers(l, proc_id)) {
+                coverage.mark_path(proc_id);
+            }
+        }
+        coverage
+    }
+
+    /// The first link on a path some stage doesn't cover, with the stage,
+    /// taking the stages in canonical order.
+    fn find_uncovered<'p>(&self, path: &'p LinkPath<S>) -> Option<(&'p LinkRef<S>, ProcId)> {
+        self.proc_ids().find_map(|proc_id| {
+            path.links()
+                .iter()
+                .find(|lref| !self.covers(lref, proc_id))
+                .map(|lref| (lref, proc_id))
+        })
     }
 
     /// Collects the artifacts a stage committed a run of links with, in
@@ -532,24 +565,26 @@ impl<S: GChainSpec, X: ExecutorStore<Spec = S>> Ledger<S, X> {
     /// hand, and it only ever rolls a stage back over a link before having
     /// it process the link again, so the store still has what the stage
     /// committed with.
-    fn load_committed_with(
+    fn get_committed_with(
         &self,
         proc_id: ProcId,
         links: &[LinkRef<S>],
     ) -> GExecResult<Vec<Arc<dyn DynProcArtifact>>> {
         let mut artifacts = Vec::with_capacity(links.len());
         for lref in links {
-            if let Some(artifact) = self.artifacts.cache().get_artifact_dyn(lref, proc_id) {
+            if let Some(artifact) = self.artifacts.get_artifact_dyn(lref, proc_id) {
                 artifacts.push(artifact.clone());
                 continue;
             }
 
             let record = self
-                .load_stored(lref)?
+                .store
+                .load_link_artifacts(lref)
+                .map_err(GExecError::Storage)?
                 .into_iter()
                 .find(|record| record.proc_id() == proc_id)
                 .ok_or_else(|| GExecError::stale_artifact(lref, proc_id))?;
-            artifacts.push(self.artifacts.get_stage(proc_id).decode(record.data())?);
+            artifacts.push(self.get_stage(proc_id).decode(record.data())?);
         }
 
         Ok(artifacts)

@@ -1,10 +1,14 @@
 //! The processor stages an executor drives, in canonical order.
 
+use std::sync::Arc;
+
 use strata_gchain_types::*;
 
+use super::artifacts::RecordIntake;
 use super::schedule::{StageSchedule, StageScheduleBuilder};
 use super::stage::Stage;
-use crate::errors::GExecResult;
+use crate::errors::{GExecError, GExecResult};
+use crate::store::ArtifactRecord;
 
 /// Pipeline of processor stages in canonical order with their schedule.
 ///
@@ -34,6 +38,41 @@ impl<S: GChainSpec> StagePipeline<S> {
 
     pub(crate) fn schedule(&self) -> &StageSchedule {
         &self.schedule
+    }
+}
+
+/// A stored record counts as its stage's artifact for the link if it came
+/// from the stage's current version or an older one the stage still accepts
+/// for the link, which the stage judges by the link's header.  Records from
+/// stages no longer in the pipeline are passed over.
+impl<S: GChainSpec> RecordIntake<S> for StagePipeline<S> {
+    fn check_needs_header(&self, record: &ArtifactRecord<S>) -> bool {
+        self.get_stage(record.proc_id())
+            .is_some_and(|stage| record.data().exec_version() < stage.proc_version())
+    }
+
+    fn take_in(
+        &self,
+        record: &ArtifactRecord<S>,
+        header: Option<&LinkHeader<S>>,
+    ) -> GExecResult<Option<Arc<dyn DynProcArtifact>>> {
+        let (lref, proc_id) = (record.lref(), record.proc_id());
+        let Some(stage) = self.get_stage(proc_id) else {
+            return Ok(None);
+        };
+
+        let stored = record.data().exec_version();
+        let current = stage.proc_version();
+        if stored > current {
+            return Err(GExecError::artifact_from_newer_version(lref, proc_id));
+        }
+
+        let acceptable = stored == current
+            || header.is_some_and(|h| stage.check_artifact_acceptable(stored, lref, h));
+        match acceptable {
+            true => stage.decode(record.data()).map(Some),
+            false => Ok(None),
+        }
     }
 }
 

@@ -42,15 +42,24 @@ impl<S: GChainSpec, V: ArtifactView<S> + ?Sized> ArtifactView<S> for &V {
     }
 }
 
-/// Cached artifacts from links that we've extracted and determined might be
-/// useful for later proc stages.
+/// The artifacts on hand for the links that have been taken in.
 ///
 /// Artifacts are keyed by the processor stage that produced them, since that's
 /// how processor stages name their dependencies (see [`ProcDeps`]).  Multiple
 /// stages may produce artifacts of the same concrete type.
+///
+/// A link is in the cache once it's been taken in, whether or not anything
+/// was found for it, and each stage that had something for it gets a slot,
+/// holding the artifact if what the stage had still counts as one.  So the
+/// cache can say which links it speaks for and which of those some stage
+/// has something for, without that being kept anywhere else.
 pub struct ArtifactCache<S: GChainSpec> {
-    links: HashMap<LinkRef<S>, BTreeMap<ProcId, Arc<dyn DynProcArtifact>>>,
+    links: HashMap<LinkRef<S>, LinkSlots>,
 }
+
+/// A slot per stage that has something for a link, holding its artifact if
+/// what it has counts as one.
+type LinkSlots = BTreeMap<ProcId, Option<Arc<dyn DynProcArtifact>>>;
 
 impl<S: GChainSpec> ArtifactCache<S> {
     /// Creates a new empty cache.
@@ -60,13 +69,41 @@ impl<S: GChainSpec> ArtifactCache<S> {
         }
     }
 
-    /// Stores the artifact a processor stage produced for a link, replacing any
-    /// artifact that stage had already stored for it.
+    /// Whether a link has been taken in.
+    pub fn contains_link(&self, lref: &LinkRef<S>) -> bool {
+        self.links.contains_key(lref)
+    }
+
+    /// Whether some stage has something for a link that's been taken in,
+    /// counting slots that hold no artifact.
+    pub fn has_entries(&self, lref: &LinkRef<S>) -> bool {
+        self.links.get(lref).is_some_and(|atbl| !atbl.is_empty())
+    }
+
+    /// Takes in a link, with no artifacts for it yet.
+    pub fn insert_link(&mut self, lref: LinkRef<S>) {
+        self.links.entry(lref).or_default();
+    }
+
+    /// Stores the artifact a processor stage produced for a link, replacing
+    /// anything that stage had stored for it.
     pub fn insert_artifact(
         &mut self,
         lref: LinkRef<S>,
         proc_id: ProcId,
         artifact: Arc<dyn DynProcArtifact>,
+    ) {
+        self.insert_entry(lref, proc_id, Some(artifact));
+    }
+
+    /// Takes note of what a processor stage has for a link, which is an
+    /// artifact or just that there was something that no longer counts as
+    /// one.  Replaces anything that stage had stored for the link.
+    pub fn insert_entry(
+        &mut self,
+        lref: LinkRef<S>,
+        proc_id: ProcId,
+        artifact: Option<Arc<dyn DynProcArtifact>>,
     ) {
         self.links
             .entry(lref)
@@ -74,23 +111,13 @@ impl<S: GChainSpec> ArtifactCache<S> {
             .insert(proc_id, artifact);
     }
 
-    /// Discards the artifact one stage stored for a link.
-    pub fn remove_artifact(&mut self, lref: &LinkRef<S>, proc_id: ProcId) {
-        if let Some(atbl) = self.links.get_mut(lref) {
-            atbl.remove(&proc_id);
-            if atbl.is_empty() {
-                self.links.remove(lref);
-            }
-        }
-    }
-
-    /// Discards every artifact stored for a link.
+    /// Drops a link along with everything stored for it.
     pub fn remove_link(&mut self, lref: &LinkRef<S>) {
         self.links.remove(lref);
     }
 
-    /// Discards the artifacts for every link outside the provided set, such as
-    /// after committing or abandoning a path.
+    /// Drops every link outside the provided set, such as after committing
+    /// or abandoning a path.
     pub fn retain_links(&mut self, keep: &HashSet<LinkRef<S>>) {
         self.links.retain(|lref, _| keep.contains(lref));
     }
@@ -108,7 +135,10 @@ impl<S: GChainSpec> ArtifactView<S> for ArtifactCache<S> {
         lref: &LinkRef<S>,
         proc_id: ProcId,
     ) -> Option<&Arc<dyn DynProcArtifact>> {
-        self.links.get(lref).and_then(|atbl| atbl.get(&proc_id))
+        self.links
+            .get(lref)
+            .and_then(|atbl| atbl.get(&proc_id))
+            .and_then(Option::as_ref)
     }
 }
 
@@ -161,16 +191,34 @@ mod tests {
             );
         }
 
-        cache.remove_artifact(&TestRef(1), proc_id("b"));
-        assert_eq!(count(&cache, 1, "a"), Some(1));
-        assert_eq!(count(&cache, 1, "b"), None);
-
         cache.remove_link(&TestRef(2));
         assert_eq!(count(&cache, 2, "a"), None);
+        assert!(!cache.contains_link(&TestRef(2)));
 
         cache.retain_links(&HashSet::from([TestRef(1)]));
         assert_eq!(count(&cache, 1, "a"), Some(1));
         assert_eq!(count(&cache, 3, "a"), None);
+        assert!(!cache.contains_link(&TestRef(3)));
+    }
+
+    /// A link taken in is known even with nothing for it, and a slot
+    /// without an artifact counts as something for the link without being
+    /// something a stage can read.
+    #[test]
+    fn test_links_and_empty_slots_are_known_but_not_readable() {
+        let mut cache = ArtifactCache::<TestSpec>::new();
+        cache.insert_link(TestRef(1));
+        cache.insert_entry(TestRef(2), proc_id("a"), None);
+
+        assert!(cache.contains_link(&TestRef(1)));
+        assert!(!cache.has_entries(&TestRef(1)));
+        assert!(cache.contains_link(&TestRef(2)));
+        assert!(cache.has_entries(&TestRef(2)));
+        assert!(!cache.contains_link(&TestRef(3)));
+        assert_eq!(count(&cache, 2, "a"), None);
+
+        cache.insert_artifact(TestRef(2), proc_id("a"), Arc::new(CountArtifact(5)));
+        assert_eq!(count(&cache, 2, "a"), Some(5));
     }
 
     /// A stage sees the artifacts through a type-erased borrow.

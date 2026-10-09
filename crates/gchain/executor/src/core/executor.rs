@@ -9,7 +9,6 @@ use strata_gchain_types::*;
 use crate::artifact_cache::ArtifactCache;
 use crate::errors::{GExecError, GExecResult};
 use crate::store::ExecutorStore;
-use crate::tracking::TrackingState;
 
 use super::history::{ResumeSearch, StepJudge};
 use super::jobs::{CommitJob, InitJob, ProcessJob, PruneJob, Receipt, UncommitJob};
@@ -57,8 +56,19 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
         self.ledger.committed_path()
     }
 
-    pub(crate) fn tracking(&self) -> &TrackingState<S> {
-        self.ledger.tracking()
+    /// Whether a link is on the committed path.
+    pub(crate) fn is_committed(&self, lref: &LinkRef<S>) -> bool {
+        self.ledger.is_committed(lref)
+    }
+
+    /// See [`Ledger::get_stage_node`].
+    pub(crate) fn get_stage_node(&self, proc_id: ProcId) -> Option<&NodeRef<S>> {
+        self.ledger.get_stage_node(proc_id)
+    }
+
+    /// See [`Ledger::get_stage_floor`].
+    pub(crate) fn get_stage_floor(&self, proc_id: ProcId) -> Option<&NodeRef<S>> {
+        self.ledger.get_stage_floor(proc_id)
     }
 
     /// The stages' IDs in canonical order.
@@ -88,7 +98,7 @@ impl<S: GChainSpec, P: ChainProvider<Spec = S>, X: ExecutorStore<Spec = S>> Exec
 
     #[cfg(test)]
     pub(crate) fn check_loaded(&self, lref: &LinkRef<S>) -> bool {
-        self.ledger.check_loaded(lref).is_some()
+        self.ledger.check_loaded(lref)
     }
 
     /// See [`Ledger::find_resume_path`].

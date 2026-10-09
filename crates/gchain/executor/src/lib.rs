@@ -23,11 +23,11 @@ mod serial_ops;
 mod store;
 #[cfg(test)]
 mod test_support;
-mod tracking;
 
 pub use artifact_cache::*;
 pub use config::SerialExecutorBuilder;
 pub use context::*;
+pub use core::{CommitIndex, CommitTrackingState, StageTrackingState};
 pub use errors::*;
 pub use mem_store::*;
 pub use open::{OpenReport, OpenResult, ReprocExecutor};
@@ -35,4 +35,3 @@ pub use reprocess::{RejectedCommit, ReprocLog, StagePlan};
 pub use serial_executor::*;
 pub use serial_ops::LinkOutcome;
 pub use store::*;
-pub use tracking::*;

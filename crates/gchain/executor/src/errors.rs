@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use strata_gchain_types::{BoxedError, GLinkRef, GNodeRef, ProcError, ProcId, ProviderError};
 use thiserror::Error;
 
-use crate::tracking::CommitIndex;
+use crate::core::CommitIndex;
 
 /// What the executor's fallible operations come to.
 pub type GExecResult<T> = Result<T, GExecError>;
