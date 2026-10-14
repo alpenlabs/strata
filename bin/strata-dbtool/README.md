@@ -429,9 +429,13 @@ strata-dbtool delete-prover-task <key_hex> --force
 
 ### `backfill-checkpoint-proof-task`
 Queue a fresh `Pending` checkpoint-proof task for an epoch. Resolves the
-canonical commitment at the epoch and prefixes its task key with V1 through
-`VersionedTaskStore`, so the running node will pick the task up on its next
-startup-recovery pass. Backfill for other specs is not yet supported.
+canonical commitment at the epoch and reads its terminal OL state's current
+spec to prefix the task key through `VersionedTaskStore`. A prover service for
+that spec can recover the task on startup. Missing or unreadable terminal state
+causes an error without inserting a task, including during a dry run. Without
+`--force`, the command only previews the task; existing task records are never
+overwritten. This command does not add proving support for a spec or migrate
+existing tasks.
 
 ```bash
 strata-dbtool backfill-checkpoint-proof-task <epoch> --force

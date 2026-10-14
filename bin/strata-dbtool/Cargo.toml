@@ -30,7 +30,6 @@ strata-ol-chain-types-v1.workspace = true
 strata-ol-mmr-index.workspace = true
 strata-ol-state-container.workspace = true
 strata-ol-state-support-types.workspace = true
-strata-ol-state-types.workspace = true
 strata-paas.workspace = true
 strata-primitives.workspace = true
 strata-storage.workspace = true
@@ -39,7 +38,11 @@ tracing-subscriber.workspace = true
 zkaleido.workspace = true
 
 [dev-dependencies]
+ciborium.workspace = true
+sled.workspace = true
 strata-merkle.workspace = true
 strata-ol-params = { workspace = true, features = ["test-defaults"] }
 strata-ol-state-container = { workspace = true, features = ["test-utils"] }
+strata-ol-state-types.workspace = true
 strata-ol-state-types-v1.workspace = true
+typed-sled.workspace = true
