@@ -1,2 +1,12 @@
 [advisories]
-ignore = []
+ignore = [
+  # ruzstd 0.8.3 decompression bomb, fixed in ruzstd 0.9.1. ruzstd comes in only
+  # through object 0.37.3, which sp1-core-executor 6.8.1 depends on with default
+  # features, turning on object's `compression` feature. No SP1 release has moved
+  # to object 0.40, the first version on ruzstd 0.9, so the lockfile cannot pick
+  # up the fix. No code in the dependency graph decompresses zstd data:
+  # sp1-core-executor uses object only to write ELF files, and backtrace leaves
+  # its own `ruzstd` feature off. Remove this entry once SP1 depends on
+  # object >= 0.40 or turns off object's default features.
+  "RUSTSEC-2026-0344",
+]
