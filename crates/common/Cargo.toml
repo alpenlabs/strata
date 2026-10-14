@@ -21,5 +21,4 @@ tracing.workspace = true
 tokio.workspace = true
 
 [features]
-async = ["dep:tokio"]
 debug-utils = ["dep:tokio"]
