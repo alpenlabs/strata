@@ -154,11 +154,24 @@ to repair them by clearing checkpoints. A task whose epoch commitment no longer
 matches the canonical summary is rejected by input resolution before proving.
 
 There is no automatic checkpoint deletion on restart, including when artifact
-validation fails. Offline repair remains an explicit operator action. If repair
-removes a proof that must be regenerated, its completed task and any dependent
-local payload/signing state must also be reconciled; deleting only the receipt
-does not reset the prover's completed status. L1 writer-intent cancellation is a
-separate concern tracked by STR-4290.
+validation fails. Offline repair remains an explicit operator action. Stop the
+node before using these `strata-dbtool` commands:
+
+- `delete-checkpoint-proof <epoch> --force` removes the canonical epoch's proof
+  receipt, but leaves its prover task unchanged.
+- `reset-prover-task <key_hex> --force` makes the task pending and clears its
+  retry-after timestamp. It retains metadata, including any saved remote request ID.
+- `delete-prover-task <key_hex> --force` removes the task record and its metadata,
+  allowing a later submission to create a fresh task.
+
+Deleting a receipt alone leaves a completed task completed and does not trigger
+reproving. These commands also leave existing checkpoint payloads, signing
+records, and the checkpoint runner's epoch cursor unchanged. There is no dedicated
+dbtool command to remove only payload/signing records. Reverting checkpointed
+history with `revert-ol-state` also removes epoch summaries and rewinds OL state;
+it is not a targeted payload/signing repair. See the
+[dbtool command reference](../../../bin/strata-dbtool/README.md) for command details.
+L1 writer-intent cancellation is a separate concern tracked by STR-4290.
 
 ## Checks
 
