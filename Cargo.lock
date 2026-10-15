@@ -9364,9 +9364,11 @@ name = "strata-dbtool"
 version = "0.3.0-alpha.1"
 dependencies = [
  "argh",
+ "ciborium",
  "hex",
  "serde",
  "serde_json",
+ "sled",
  "ssz",
  "strata-acct-types",
  "strata-asm-checkpoint-types",
@@ -9391,6 +9393,7 @@ dependencies = [
  "strata-storage",
  "tokio",
  "tracing-subscriber",
+ "typed-sled",
  "zkaleido",
 ]
 

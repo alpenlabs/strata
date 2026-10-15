@@ -12,9 +12,10 @@
 use argh::FromArgs;
 use strata_checkpoint_types::CheckpointProofTask;
 use strata_cli_common::errors::{DisplayableError, DisplayedError};
-use strata_db_types::{backend::DatabaseBackend, prover_task::ProverTaskDatabase};
+use strata_db_types::{
+    backend::DatabaseBackend, ol_state::OLStateDatabase, prover_task::ProverTaskDatabase,
+};
 use strata_identifiers::Epoch;
-use strata_ol_state_types::OLSpecId;
 use strata_paas::{TaskRecordData, TaskStatus};
 use strata_storage::VersionedTaskStore;
 
@@ -360,9 +361,9 @@ pub(crate) fn delete_prover_task(
 
 /// Queue a fresh `Pending` checkpoint-proof task for an epoch.
 ///
-/// Resolves the canonical commitment at the epoch and constructs the
-/// V1 task key via [`VersionedTaskStore`] so the running node picks it up
-/// on next startup recovery. Dry-run unless `--force` is passed.
+/// Resolves the canonical commitment and uses its terminal OL state's current
+/// spec to construct the task key via [`VersionedTaskStore`]. A prover service
+/// for that spec can recover the task on startup. Dry-run unless `--force` is passed.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "backfill-checkpoint-proof-task")]
 pub(crate) struct BackfillCheckpointProofTaskArgs {
@@ -404,11 +405,23 @@ pub(crate) fn backfill_checkpoint_proof_task(
             Box::new(args.epoch),
         )
     })?;
-    // TODO(STR-4561): Select the epoch's proving spec when backfilling a task.
-    // This command currently assigns V1 to every task. Read cur_spec from the epoch's
-    // terminal OL state and use it as the stored task's spec.
-    // If that state or spec cannot be resolved, report an error without inserting a task.
-    let key = VersionedTaskStore::encode_key(OLSpecId::V1, CheckpointProofTask(commitment));
+    let terminal = commitment.to_block_commitment();
+    // The current spec identifies the completed epoch; the staged spec is for the next one.
+    let spec = db
+        .ol_state_db()
+        .get_toplevel_ol_state(terminal)
+        .internal_error(format!(
+            "Failed to read terminal OL state at {terminal:?} for epoch {}",
+            args.epoch
+        ))?
+        .ok_or_else(|| {
+            DisplayedError::UserError(
+                format!("No terminal OL state for epoch {}", args.epoch),
+                Box::new(terminal),
+            )
+        })?
+        .cur_spec();
+    let key = VersionedTaskStore::encode_key(spec, CheckpointProofTask(commitment));
     let key_hex = hex::encode(&key);
 
     if !args.force {
@@ -452,4 +465,182 @@ pub(crate) fn backfill_prover_task_raw(
 
     println!("backfilled prover task: {}", args.key_hex);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use ciborium::{from_reader, into_writer, value::Value};
+    use sled::Config as SledConfig;
+    use strata_checkpoint_types::EpochSummary;
+    use strata_db_store_sled::{test_utils::get_test_sled_backend, SledBackend, SledDbConfig};
+    use strata_db_types::ol_checkpoint::OLCheckpointDatabase;
+    use strata_identifiers::{Buf32, EpochCommitment, L1BlockCommitment, OLBlockCommitment};
+    use strata_ol_state_container::{
+        test_utils::{
+            create_test_container_with_staged, create_test_genesis_container, v0_container,
+        },
+        OLStateContainer,
+    };
+    use strata_ol_state_types::OLSpecId;
+    use strata_ol_state_types_v1::test_utils::create_test_genesis_state;
+    use typed_sled::SledDb;
+
+    use super::*;
+
+    fn seed_epoch(db: &impl DatabaseBackend, state: OLStateContainer) -> EpochCommitment {
+        let terminal = OLBlockCommitment::new(10, Buf32::from([1; 32]).into());
+        let summary = EpochSummary::new(
+            1,
+            terminal,
+            OLBlockCommitment::new(9, Buf32::from([2; 32]).into()),
+            L1BlockCommitment::new(100, Buf32::from([3; 32]).into()),
+            state.compute_state_root(),
+        );
+        db.ol_state_db()
+            .put_toplevel_ol_state(terminal, state)
+            .unwrap();
+        db.ol_checkpoint_db().insert_epoch_summary(summary).unwrap();
+        summary.get_epoch_commitment()
+    }
+
+    fn backfill(db: &impl DatabaseBackend, force: bool) -> Result<(), DisplayedError> {
+        backfill_checkpoint_proof_task(db, BackfillCheckpointProofTaskArgs { epoch: 1, force })
+    }
+
+    #[test]
+    fn backfill_uses_terminal_current_spec() {
+        for (state, expected_spec) in [
+            (v0_container(create_test_genesis_state()), OLSpecId::V0),
+            (create_test_genesis_container(), OLSpecId::V1),
+            (create_test_container_with_staged(0), OLSpecId::V1),
+            (create_test_container_with_staged(2), OLSpecId::V1),
+        ] {
+            let db = get_test_sled_backend();
+            let commitment = seed_epoch(db.as_ref(), state);
+            // A newer snapshot must not determine this epoch's spec.
+            db.ol_state_db()
+                .put_toplevel_ol_state(
+                    OLBlockCommitment::new(11, Buf32::from([4; 32]).into()),
+                    create_test_genesis_container(),
+                )
+                .unwrap();
+
+            backfill(db.as_ref(), true).unwrap();
+
+            let tasks = db.prover_task_db().list_all_tasks().unwrap();
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(
+                VersionedTaskStore::decode_key(&tasks[0].0),
+                Some((expected_spec, CheckpointProofTask(commitment)))
+            );
+            assert_eq!(tasks[0].1.status(), &TaskStatus::Pending);
+        }
+    }
+
+    #[test]
+    fn backfill_missing_terminal_state_does_not_use_another_snapshot() {
+        for force in [false, true] {
+            let db = get_test_sled_backend();
+            let commitment = seed_epoch(db.as_ref(), create_test_genesis_container());
+            db.ol_state_db()
+                .del_toplevel_ol_state(commitment.to_block_commitment())
+                .unwrap();
+            for (slot, block_id) in [(9, [2; 32]), (10, [4; 32]), (11, [5; 32])] {
+                db.ol_state_db()
+                    .put_toplevel_ol_state(
+                        OLBlockCommitment::new(slot, Buf32::from(block_id).into()),
+                        create_test_genesis_container(),
+                    )
+                    .unwrap();
+            }
+
+            let error = backfill(db.as_ref(), force).unwrap_err();
+
+            assert!(matches!(error, DisplayedError::UserError(_, _)));
+            assert!(error.to_string().contains("terminal OL state"));
+            assert_eq!(db.prover_task_db().list_all_tasks().unwrap().len(), 0);
+        }
+    }
+
+    #[test]
+    fn backfill_unreadable_terminal_spec_does_not_insert_a_task() {
+        let raw_db = SledConfig::new().temporary(true).open().unwrap();
+        let db = SledBackend::new(
+            Arc::new(SledDb::new(raw_db.clone()).unwrap()),
+            SledDbConfig::test(),
+        )
+        .unwrap();
+        seed_epoch(&db, create_test_genesis_container());
+
+        // Inject an unsupported current spec into the actual stored CBOR snapshot.
+        // Typed state constructors cannot produce this invalid state.
+        let tree = raw_db.open_tree("OLStateSchema").unwrap();
+        let (key, encoded) = tree.first().unwrap().unwrap();
+        let mut value: Value = from_reader(encoded.as_ref()).unwrap();
+        let (_, current_spec) = value
+            .as_map_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|(field, _)| field.as_text() == Some("cur_spec_version"))
+            .unwrap();
+        *current_spec = Value::Integer(99.into());
+        let mut invalid = Vec::new();
+        into_writer(&value, &mut invalid).unwrap();
+        tree.insert(key, invalid).unwrap();
+
+        for force in [false, true] {
+            let error = backfill(&db, force).unwrap_err();
+            assert!(matches!(error, DisplayedError::InternalError(_, _)));
+            assert!(error.to_string().contains("terminal OL state"));
+            assert_eq!(db.prover_task_db().list_all_tasks().unwrap().len(), 0);
+        }
+    }
+
+    #[test]
+    fn backfill_without_canonical_epoch_does_not_insert_a_task() {
+        let db = get_test_sled_backend();
+        for force in [false, true] {
+            let error = backfill(db.as_ref(), force).unwrap_err();
+            assert!(error
+                .to_string()
+                .contains("No canonical checkpoint commitment"));
+            assert_eq!(db.prover_task_db().list_all_tasks().unwrap().len(), 0);
+        }
+    }
+
+    #[test]
+    fn backfill_dry_run_does_not_insert_a_task() {
+        let db = get_test_sled_backend();
+        seed_epoch(db.as_ref(), create_test_genesis_container());
+
+        backfill(db.as_ref(), false).unwrap();
+
+        assert_eq!(db.prover_task_db().list_all_tasks().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn backfill_preserves_existing_task_even_with_force() {
+        let db = get_test_sled_backend();
+        let commitment = seed_epoch(db.as_ref(), create_test_genesis_container());
+        let key = VersionedTaskStore::encode_key(OLSpecId::V1, CheckpointProofTask(commitment));
+        let mut record = TaskRecordData::new(TaskStatus::Completed);
+        record.set_metadata(Some(vec![1, 2, 3]));
+        db.prover_task_db()
+            .insert_task(key.clone(), record.clone())
+            .unwrap();
+
+        backfill(db.as_ref(), false).unwrap();
+        let error = backfill(db.as_ref(), true).unwrap_err();
+
+        assert!(error.to_string().contains("EntryAlreadyExists"));
+        let tasks = db.prover_task_db().list_all_tasks().unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].0, key);
+        assert_eq!(tasks[0].1.status(), record.status());
+        assert_eq!(tasks[0].1.metadata(), record.metadata());
+        assert_eq!(tasks[0].1.updated_at_secs(), record.updated_at_secs());
+        assert_eq!(tasks[0].1.retry_after_secs(), record.retry_after_secs());
+    }
 }
