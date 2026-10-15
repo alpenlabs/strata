@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 use strata_db_types::errors::DbError;
 use strata_db_types::prover_task::ProverTaskDatabase;
-use strata_db_types::DbResult;
 use strata_paas::{ProverError, ProverResult, TaskRecord, TaskRecordData, TaskStatus};
 use tokio::runtime::Handle;
 
@@ -69,11 +68,6 @@ impl ProverTaskDbManager {
             .into_iter()
             .map(|(key, data)| TaskRecord::from_parts(key, data))
             .collect())
-    }
-
-    /// Deletes a task record by key.
-    pub fn delete_task(&self, key: &[u8]) -> DbResult<bool> {
-        self.ops.delete_task_blocking(key.to_vec())
     }
 }
 

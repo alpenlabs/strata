@@ -34,7 +34,7 @@ pub trait ProverTaskDatabase: Send + Sync + 'static {
     /// call, `false` otherwise.
     ///
     /// Deletes by key without decoding the stored record, including malformed values.
-    /// Used by startup reconciliation and offline admin tooling.
+    /// Used by offline admin tooling.
     fn delete_task(&self, key: Vec<u8>) -> DbResult<bool>;
 
     /// All records where `status` is retriable and `retry_after_secs <= now_secs`.
