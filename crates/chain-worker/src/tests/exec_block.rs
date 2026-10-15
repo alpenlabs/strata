@@ -109,6 +109,17 @@ impl ChainWorkerContext for OrderEnforcingContext {
             .or_else(|| self.states.get(&commitment).cloned()))
     }
 
+    fn fetch_summary(&self, epoch: EpochCommitment) -> WorkerResult<Option<EpochSummary>> {
+        Ok(self
+            .stored_summaries
+            .lock()
+            .unwrap()
+            .iter()
+            .chain(self.canonical_summaries.values())
+            .find(|summary| summary.get_epoch_commitment() == epoch)
+            .copied())
+    }
+
     fn fetch_canonical_epoch_summary_at(&self, epoch: Epoch) -> WorkerResult<Option<EpochSummary>> {
         Ok(self.canonical_summaries.get(&epoch).cloned())
     }
@@ -453,5 +464,51 @@ fn test_rejected_terminal_deletes_only_its_summary() {
     assert_eq!(
         *ctx.deleted_summaries.lock().unwrap(),
         vec![original.get_epoch_commitment(); 2]
+    );
+}
+
+/// Repeated acceptance needs no state reconstruction once the exact summary exists.
+#[test]
+fn test_accepted_terminal_with_summary_skips_epoch_work() {
+    let (mut ctx, header) = exec_single_block_epoch(false);
+    let block = header.compute_block_commitment();
+    handle_accepted_block(&ctx, block).expect("create missing summary from stored execution");
+    let summary = ctx.stored_summaries.lock().unwrap()[0];
+    ctx.states.clear();
+    ctx.stored_states.lock().unwrap().clear();
+    ctx.write_batches.lock().unwrap().clear();
+
+    handle_accepted_block(&ctx, block).expect("existing summary needs no state or write batches");
+    assert_eq!(*ctx.stored_summaries.lock().unwrap(), vec![summary]);
+    assert_eq!(
+        *ctx.merged_epochs.lock().unwrap(),
+        vec![summary.get_epoch_commitment()]
+    );
+    assert!(ctx.stored_states.lock().unwrap().is_empty());
+}
+
+/// A summary for another terminal in the same epoch must not suppress recovery.
+#[test]
+fn test_accepted_terminal_recovers_despite_other_summary_at_same_epoch() {
+    let (ctx, header) = exec_single_block_epoch(false);
+    let block = header.compute_block_commitment();
+    let other = EpochSummary::new(
+        header.epoch(),
+        OLBlockCommitment::new(block.slot(), OLBlockId::from(Buf32::from([0xab; 32]))),
+        *ctx.canonical_summaries[&0].terminal(),
+        *ctx.canonical_summaries[&0].new_l1(),
+        *header.state_root(),
+    );
+    ctx.stored_summaries.lock().unwrap().push(other);
+
+    handle_accepted_block(&ctx, block).expect("recover this terminal's missing summary");
+    let summaries = ctx.stored_summaries.lock().unwrap();
+    assert_eq!(summaries.len(), 2);
+    assert_eq!(summaries[0], other);
+    assert_eq!(*summaries[1].terminal(), block);
+    assert_eq!(
+        ctx.indexed_epochs.lock().unwrap().len(),
+        1,
+        "block was executed only once"
     );
 }

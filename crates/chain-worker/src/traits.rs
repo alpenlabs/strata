@@ -91,6 +91,9 @@ pub trait ChainWorkerContext: Send + Sync + 'static {
     /// Deletes the summary for exactly this epoch commitment, returning whether it existed.
     fn delete_summary(&self, epoch: EpochCommitment) -> WorkerResult<bool>;
 
+    /// Fetches the summary for exactly this epoch commitment.
+    fn fetch_summary(&self, epoch: EpochCommitment) -> WorkerResult<Option<EpochSummary>>;
+
     /// Fetches canonical epoch summary for an epoch index.
     fn fetch_canonical_epoch_summary_at(&self, epoch: Epoch) -> WorkerResult<Option<EpochSummary>>;
 

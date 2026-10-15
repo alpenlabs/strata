@@ -258,6 +258,10 @@ impl ChainWorkerContext for ChainWorkerContextImpl {
         Ok(self.ol_checkpoint_mgr.del_epoch_summary_blocking(epoch)?)
     }
 
+    fn fetch_summary(&self, epoch: EpochCommitment) -> WorkerResult<Option<EpochSummary>> {
+        Ok(self.ol_checkpoint_mgr.get_epoch_summary_blocking(epoch)?)
+    }
+
     fn fetch_canonical_epoch_summary_at(&self, epoch: u32) -> WorkerResult<Option<EpochSummary>> {
         let commitment = self
             .ol_checkpoint_mgr

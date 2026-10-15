@@ -95,6 +95,19 @@ impl<C: FcmContext> Service for FcmService<C> {
 
 impl<C: FcmContext> AsyncService for FcmService<C> {
     async fn on_launch(state: &mut Self::State) -> anyhow::Result<()> {
+        // A crash after marking a terminal block valid can leave its epoch summary
+        // missing. Repeat BlockAccepted in chain order so the worker creates missing
+        // summaries before unchecked-block replay; it skips summaries already stored.
+        for block in state.collect_unfinalized_blocks()? {
+            state
+                .ctx()
+                .handle_accepted_block(block)
+                .await
+                .with_context(|| {
+                    format!("failed to complete startup acceptance for OL block {block}")
+                })?;
+        }
+
         let startup_replay_candidates = state.take_startup_replay_candidates();
         if startup_replay_candidates.is_empty() {
             return Ok(());
@@ -1941,7 +1954,14 @@ mod tests {
             .replace_canonical_suffix_from(1, vec![canonical_1.blkid(), canonical_2.blkid()])
             .await?;
 
-        let fcm_state = init_fcm_service_state(PredicateKey::always_accept(), fixture.ctx).await?;
+        let mut fcm_state =
+            init_fcm_service_state(PredicateKey::always_accept(), fixture.ctx).await?;
+        <FcmService<StubFcmContext> as AsyncService>::on_launch(&mut fcm_state).await?;
+        assert_eq!(
+            *fcm_state.ctx().accepted_blocks.lock().unwrap(),
+            vec![canonical_1.commitment(), canonical_2.commitment()]
+        );
+        assert!(fcm_state.ctx().executed_blocks().is_empty());
 
         assert_eq!(fcm_state.cur_best_block(), canonical_2.commitment());
         let reconcile_targets = fcm_state.ctx().startup_mmr_reconcile_targets();
@@ -2211,6 +2231,75 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn on_launch_completes_valid_blocks_before_replaying_unchecked_blocks(
+    ) -> anyhow::Result<()> {
+        let genesis = make_storage_block(0, OLBlockId::from(Buf32::zero()));
+        let genesis_blkid = genesis.header().compute_blkid();
+        let genesis_commitment = OLBlockCommitment::new(genesis.header().slot(), genesis_blkid);
+        let genesis_epoch = EpochCommitment::new(0, genesis_commitment.slot(), genesis_blkid);
+        let ctx = Arc::new(
+            StubFcmContext::new()
+                .with_last_finalized_epoch(Some(genesis_epoch))
+                .with_last_confirmed_epoch(Some(genesis_epoch)),
+        );
+
+        let block1 = make_storage_block(1, genesis_blkid);
+        let blkid1 = block1.header().compute_blkid();
+        let commitment1 = OLBlockCommitment::new(block1.header().slot(), blkid1);
+        let block2 = make_storage_block(2, blkid1);
+        let blkid2 = block2.header().compute_blkid();
+        let commitment2 = OLBlockCommitment::new(block2.header().slot(), blkid2);
+
+        ctx.storage().put_executed_block(
+            genesis,
+            make_genesis_state().into_container(),
+            BlockStatus::Valid,
+        );
+        for (block, commitment) in [(block1, commitment1), (block2, commitment2)] {
+            let blkid = block.header().compute_blkid();
+            ctx.storage().put_ol_block(block);
+            ctx.storage()
+                .set_block_status(
+                    blkid,
+                    if commitment == commitment1 {
+                        BlockStatus::Valid
+                    } else {
+                        BlockStatus::Unchecked
+                    },
+                )
+                .await?;
+            ctx.storage()
+                .put_toplevel_ol_state(commitment, make_genesis_state().into_container());
+        }
+        ctx.storage().put_canonical_epoch_commitment(genesis_epoch);
+        ctx.storage().seed_canonical_genesis(genesis_blkid);
+
+        let mut fcm_state =
+            init_fcm_service_state(PredicateKey::always_accept(), ctx.clone()).await?;
+
+        <FcmService<StubFcmContext> as AsyncService>::on_launch(&mut fcm_state).await?;
+
+        assert_eq!(ctx.executed_blocks(), vec![commitment2]);
+        assert_eq!(
+            *ctx.accepted_blocks.lock().unwrap(),
+            vec![commitment1, commitment2]
+        );
+        assert_eq!(ctx.safe_tip_updates(), vec![commitment2]);
+        assert_eq!(fcm_state.cur_best_block(), commitment2);
+        assert_eq!(fcm_state.take_startup_replay_candidates(), Vec::new());
+        assert_eq!(
+            ctx.storage().get_block_status(blkid1).await?,
+            Some(BlockStatus::Valid)
+        );
+        assert_eq!(
+            ctx.storage().get_block_status(blkid2).await?,
+            Some(BlockStatus::Valid)
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn stub_storage_round_trips_blocks_and_statuses() {
         let storage = StubFcmStorage::new();
         let block = make_storage_block(1, OLBlockId::from(Buf32::zero()));
@@ -2439,6 +2528,36 @@ mod tests {
         assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![terminal]);
         assert!(ctx.rejected_blocks.lock().unwrap().is_empty());
         assert!(ctx.published_statuses().is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn startup_acceptance_failure_stops_before_unchecked_replay() -> anyhow::Result<()> {
+        let (ctx, _, terminal) = terminal_summary_test_context(true, true).await?;
+        ctx.storage()
+            .set_block_status(*terminal.blkid(), BlockStatus::Valid)
+            .await?;
+        let child = make_storage_block(terminal.slot() + 1, *terminal.blkid());
+        let child_commitment = ctx.storage().put_ol_block(child);
+        ctx.storage()
+            .set_block_status(*child_commitment.blkid(), BlockStatus::Unchecked)
+            .await?;
+        let mut state = init_fcm_service_state(PredicateKey::always_accept(), ctx.clone()).await?;
+
+        let err = <FcmService<StubFcmContext> as AsyncService>::on_launch(&mut state)
+            .await
+            .expect_err("recovery must succeed before replay starts");
+        assert!(format!("{err:#}").contains("injected summary creation failure"));
+        assert!(ctx.executed_blocks().is_empty());
+        assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![terminal]);
+        assert_eq!(
+            ctx.storage().get_block_status(*terminal.blkid()).await?,
+            Some(BlockStatus::Valid)
+        );
+        assert_eq!(
+            state.take_startup_replay_candidates(),
+            vec![*child_commitment.blkid()]
+        );
         Ok(())
     }
 

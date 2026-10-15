@@ -453,6 +453,12 @@ pub(crate) fn handle_accepted_block(
     if !header.is_terminal() {
         return Ok(());
     }
+    // Startup repeats acceptance notifications. A stored summary means the
+    // preceding state and indexing writes already succeeded.
+    let epoch = EpochCommitment::new(header.epoch(), block.slot(), *block.blkid());
+    if ctx.fetch_summary(epoch)?.is_some() {
+        return Ok(());
+    }
     let new_state = ctx
         .fetch_ol_state(block)?
         .ok_or(WorkerError::MissingPreState(block))?;
