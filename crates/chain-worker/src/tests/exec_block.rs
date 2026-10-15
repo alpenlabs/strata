@@ -18,7 +18,7 @@ use strata_db_types::errors::DbError;
 use strata_identifiers::{
     Buf32, Epoch, EpochCommitment, L1BlockCommitment, OLBlockCommitment, OLBlockId, SubjectId,
 };
-use strata_ol_chain_types_v1::{OLBlockHeaderV1, OLBlockV1};
+use strata_ol_chain_types_v1::{BlockFlagsV1, OLBlockHeaderV1, OLBlockV1};
 use strata_ol_params::OLRuntimeParams;
 use strata_ol_state_container::OLStateContainer;
 use strata_ol_state_types::{IStateAccessor, IStateAccessorMut, OLSpecId, OLSpecVersions};
@@ -33,7 +33,7 @@ use super::fixture::make_marked_genesis_state;
 use crate::{
     WorkerError, WorkerResult,
     output::OLBlockExecutionOutput,
-    state::{exec_block, merge_epoch_state},
+    state::{exec_block, handle_accepted_block, merge_epoch_state},
     traits::ChainWorkerContext,
 };
 
@@ -96,7 +96,15 @@ impl ChainWorkerContext for OrderEnforcingContext {
         &self,
         commitment: OLBlockCommitment,
     ) -> WorkerResult<Option<OLStateContainer>> {
-        Ok(self.states.get(&commitment).cloned())
+        Ok(self
+            .stored_states
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find(|(stored, _)| *stored == commitment)
+            .map(|(_, state)| state.clone())
+            .or_else(|| self.states.get(&commitment).cloned()))
     }
 
     fn fetch_canonical_epoch_summary_at(&self, epoch: Epoch) -> WorkerResult<Option<EpochSummary>> {
@@ -144,8 +152,7 @@ impl ChainWorkerContext for OrderEnforcingContext {
         }
         // Pins the intended ordering rather than a DB contract: the summary
         // must be the last durable step, after the epoch data merge, so a
-        // merge failure can never leave a summary behind for a block that
-        // then gets rejected.
+        // merge failure can never announce an incomplete epoch.
         if !self.merged_epochs.lock().unwrap().contains(&commitment) {
             return Err(WorkerError::Database(DbError::Other(format!(
                 "summary stored before epoch data merge for epoch {epoch}"
@@ -286,6 +293,12 @@ fn test_exec_single_block_epoch_persists_before_summary() {
     let terminal_commitment =
         OLBlockCommitment::new(terminal_header.slot(), terminal_header.compute_blkid());
 
+    assert!(ctx.stored_summaries.lock().unwrap().is_empty());
+    assert!(ctx.merged_epochs.lock().unwrap().is_empty());
+    assert!(ctx.fetch_ol_state(terminal_commitment).unwrap().is_some());
+
+    handle_accepted_block(&ctx, terminal_commitment)
+        .expect("FCM requests summary after acceptance");
     let summaries = ctx.stored_summaries.lock().unwrap();
     assert_eq!(summaries.len(), 1, "exactly one epoch summary stored");
     let epoch = summaries[0].get_epoch_commitment();
@@ -306,6 +319,7 @@ fn test_exec_first_v1_block_on_v0_terminal_persists_wrapped_state() {
     let (ctx, terminal_header) = exec_single_block_epoch(true);
     let terminal_commitment =
         OLBlockCommitment::new(terminal_header.slot(), terminal_header.compute_blkid());
+    handle_accepted_block(&ctx, terminal_commitment).expect("create accepted epoch summary");
 
     let stored_states = ctx.stored_states.lock().unwrap();
     let terminal_states: Vec<_> = stored_states
@@ -356,7 +370,8 @@ fn test_exec_block_rejects_noncanonical_manifest() {
 /// fails instead of producing a terminal state to store.
 #[test]
 fn test_merge_epoch_state_rejects_root_mismatch() {
-    let (ctx, _) = exec_single_block_epoch(false);
+    let (ctx, header) = exec_single_block_epoch(false);
+    handle_accepted_block(&ctx, header.compute_block_commitment()).expect("create summary");
     let summary = ctx.stored_summaries.lock().unwrap()[0];
     let wrong = EpochSummary::new(
         summary.epoch(),
@@ -371,4 +386,29 @@ fn test_merge_epoch_state_rejects_root_mismatch() {
         err,
         WorkerError::MergedStateRootMismatch { merged, .. } if merged == *summary.final_state()
     ));
+}
+
+/// Ordinary accepted blocks must not create summaries or merge epoch data.
+#[test]
+fn test_handle_accepted_non_terminal_block_does_not_complete_epoch() {
+    let (mut ctx, terminal_header) = exec_single_block_epoch(false);
+    let header = OLBlockHeaderV1::new(
+        0,
+        BlockFlagsV1::zero(),
+        terminal_header.slot() + 1,
+        terminal_header.epoch() + 1,
+        terminal_header.compute_blkid(),
+        Buf32::zero(),
+        Buf32::zero(),
+        Buf32::zero(),
+    );
+    let block = header.compute_block_commitment();
+    ctx.headers.insert(*block.blkid(), header);
+    let stored_state_count = ctx.stored_states.lock().unwrap().len();
+
+    handle_accepted_block(&ctx, block).expect("ordinary accepted block needs no epoch completion");
+
+    assert!(ctx.stored_summaries.lock().unwrap().is_empty());
+    assert!(ctx.merged_epochs.lock().unwrap().is_empty());
+    assert_eq!(ctx.stored_states.lock().unwrap().len(), stored_state_count);
 }

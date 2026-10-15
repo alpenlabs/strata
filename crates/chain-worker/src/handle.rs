@@ -54,6 +54,16 @@ impl ChainWorkerHandle {
             .map_err(convert_service_error)?
     }
 
+    /// Handles a block accepted by FCM, completing its epoch if it is terminal.
+    ///
+    /// FCM must finish processing the block and mark it valid before calling this.
+    pub async fn handle_accepted_block(&self, block: OLBlockCommitment) -> WorkerResult<()> {
+        self.command_handle
+            .send_and_wait(|completion| ChainWorkerMessage::BlockAccepted(block, completion))
+            .await
+            .map_err(convert_service_error)?
+    }
+
     /// Finalize an epoch, making whatever database changes necessary (async).
     pub async fn finalize_epoch(&self, epoch: EpochCommitment) -> WorkerResult<()> {
         self.command_handle

@@ -13,6 +13,9 @@ pub enum ChainWorkerMessage {
     /// Try to execute a block at the given commitment.
     TryExecBlock(OLBlockCommitment, CommandCompletionSender<WorkerResult<()>>),
 
+    /// Notifies the chain worker that FCM accepted a block.
+    BlockAccepted(OLBlockCommitment, CommandCompletionSender<WorkerResult<()>>),
+
     /// Finalize an epoch, updating database state accordingly.
     FinalizeEpoch(EpochCommitment, CommandCompletionSender<WorkerResult<()>>),
 

@@ -16,6 +16,8 @@ use crate::{
 #[async_trait]
 pub trait ChainController: Send + Sync {
     async fn try_exec_block(&self, block: OLBlockCommitment) -> anyhow::Result<()>;
+    /// Notifies the chain worker after FCM finishes processing and marks a block valid.
+    async fn handle_accepted_block(&self, block: OLBlockCommitment) -> anyhow::Result<()>;
     async fn update_safe_tip(&self, safe_tip: OLBlockCommitment) -> anyhow::Result<()>;
     async fn finalize_epoch(&self, epoch: EpochCommitment) -> anyhow::Result<()>;
 }

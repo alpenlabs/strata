@@ -170,13 +170,6 @@ async fn process_fc_message<C: FcmContext>(
             };
 
             let status = if ok {
-                // check if any pending blocks can be finalized
-                if let Err(err) = handle_epoch_finalization(fcm_state).await {
-                    error!(%err, "failed to finalize epoch");
-                }
-
-                publish_sync_status(fcm_state).await?;
-
                 BlockStatus::Valid
             } else {
                 // Emit invalid block warning.
@@ -193,6 +186,15 @@ async fn process_fc_message<C: FcmContext>(
             )
             .await?;
             if ok {
+                // Summary consumers must only start after FCM finishes processing
+                // the block and durably marks it valid. A failure here must not
+                // turn an accepted block into an invalid block.
+                fcm_state.ctx().handle_accepted_block(block).await?;
+
+                if let Err(err) = handle_epoch_finalization(fcm_state).await {
+                    error!(%err, "failed to finalize epoch");
+                }
+                publish_sync_status(fcm_state).await?;
                 counter!("strata_fcm_blocks_accepted_total").increment(1);
             } else {
                 counter!("strata_fcm_blocks_rejected_total").increment(1);
@@ -219,10 +221,9 @@ async fn set_block_status_and_clear_invalid_high_watermark<C: FcmContext>(
         // Revisit high-watermark clearing once FCM distinguishes consensus-invalid blocks
         // from transient execution failures.
 
-        // A rejected terminal block may have stored its epoch summary before
-        // failing (the summary is the last exec step, but post-exec failures
-        // can still invalidate the block afterwards). Drop it so it cannot
-        // shadow the replacement terminal's summary in canonical lookups.
+        // Older node versions could store a terminal block's summary before
+        // FCM rejected it. Clean up that exact summary when reprocessing such
+        // a block so it cannot shadow the replacement terminal's summary.
         // Keyed exactly by the rejected block's own commitment, this can
         // never touch another block's summary, so it runs regardless of the
         // high-watermark gate below.
@@ -957,6 +958,8 @@ mod tests {
         last_finalized_epoch: Option<EpochCommitment>,
         last_confirmed_epoch: Option<EpochCommitment>,
         executed_blocks: Mutex<Vec<OLBlockCommitment>>,
+        accepted_blocks: Mutex<Vec<OLBlockCommitment>>,
+        fail_summary_creation: bool,
         safe_tip_updates: Mutex<Vec<OLBlockCommitment>>,
         finalized_epochs: Mutex<Vec<EpochCommitment>>,
         published_statuses: Mutex<Vec<OLSyncStatus>>,
@@ -1144,6 +1147,19 @@ mod tests {
     impl ChainController for StubFcmContext {
         async fn try_exec_block(&self, block: OLBlockCommitment) -> anyhow::Result<()> {
             self.executed_blocks.lock().unwrap().push(block);
+            Ok(())
+        }
+
+        async fn handle_accepted_block(&self, block: OLBlockCommitment) -> anyhow::Result<()> {
+            assert_eq!(
+                self.storage.get_block_status(*block.blkid()).await?,
+                Some(BlockStatus::Valid),
+                "FCM must persist Valid before signalling the worker"
+            );
+            self.accepted_blocks.lock().unwrap().push(block);
+            if self.fail_summary_creation {
+                return Err(anyhow!("injected summary creation failure"));
+            }
             Ok(())
         }
 
@@ -2351,6 +2367,7 @@ mod tests {
         assert_eq!(ctx.executed_blocks(), vec![block_commitment]);
         assert_eq!(ctx.safe_tip_updates(), vec![block_commitment]);
         assert_eq!(ctx.finalized_epochs(), Vec::new());
+        assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![block_commitment]);
         assert_eq!(
             ctx.storage().get_block_status(blkid).await.unwrap(),
             Some(BlockStatus::Valid)
@@ -2362,6 +2379,84 @@ mod tests {
         assert_eq!(statuses[0].recently_complete_epoch(), genesis_epoch);
         assert_eq!(statuses[0].confirmed_epoch(), genesis_epoch);
         assert_eq!(statuses[0].finalized_epoch(), genesis_epoch);
+    }
+
+    async fn terminal_summary_test_context(
+        fail_summary_creation: bool,
+        persist_terminal_state: bool,
+    ) -> anyhow::Result<(
+        Arc<StubFcmContext>,
+        FcmServiceState<StubFcmContext>,
+        OLBlockCommitment,
+    )> {
+        let genesis = make_storage_block(0, OLBlockId::from(Buf32::zero()));
+        let genesis_commitment = genesis.header().compute_block_commitment();
+        let genesis_epoch = EpochCommitment::new(0, 0, *genesis_commitment.blkid());
+        let mut ctx = StubFcmContext::new()
+            .with_last_finalized_epoch(Some(genesis_epoch))
+            .with_last_confirmed_epoch(Some(genesis_epoch));
+        ctx.fail_summary_creation = fail_summary_creation;
+        let ctx = Arc::new(ctx);
+        ctx.storage().put_executed_block(
+            genesis,
+            make_genesis_state().into_container(),
+            BlockStatus::Valid,
+        );
+        ctx.storage().put_canonical_epoch_commitment(genesis_epoch);
+        ctx.storage()
+            .seed_canonical_genesis(*genesis_commitment.blkid());
+        let block = make_terminal_storage_block(1, *genesis_commitment.blkid());
+        let terminal = ctx.storage().put_ol_block(block);
+        if persist_terminal_state {
+            ctx.storage()
+                .put_toplevel_ol_state(terminal, make_genesis_state().into_container());
+        }
+        let state = init_fcm_service_state(PredicateKey::always_accept(), ctx.clone()).await?;
+        Ok((ctx, state, terminal))
+    }
+
+    #[tokio::test]
+    async fn process_fc_message_signals_worker_after_terminal_is_valid() -> anyhow::Result<()> {
+        let (ctx, mut state, terminal) = terminal_summary_test_context(false, true).await?;
+        process_fc_message(&ForkChoiceMessage::NewBlock(*terminal.blkid()), &mut state).await?;
+        assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![terminal]);
+        assert_eq!(state.cur_best_block(), terminal);
+        assert_eq!(ctx.published_statuses().len(), 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn process_fc_message_skips_acceptance_signal_after_post_execution_failure(
+    ) -> anyhow::Result<()> {
+        let (ctx, mut state, terminal) = terminal_summary_test_context(false, false).await?;
+        // Execution succeeds in the stub, but applying the tip fails because its state is missing.
+        process_fc_message(&ForkChoiceMessage::NewBlock(*terminal.blkid()), &mut state).await?;
+        assert_eq!(ctx.executed_blocks(), vec![terminal]);
+        assert_eq!(
+            ctx.storage().get_block_status(*terminal.blkid()).await?,
+            Some(BlockStatus::Invalid)
+        );
+        assert!(ctx.accepted_blocks.lock().unwrap().is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn process_fc_message_summary_failure_preserves_valid_status() -> anyhow::Result<()> {
+        let (ctx, mut state, terminal) = terminal_summary_test_context(true, true).await?;
+        let err = process_fc_message(&ForkChoiceMessage::NewBlock(*terminal.blkid()), &mut state)
+            .await
+            .expect_err("summary failure is propagated");
+        assert!(err
+            .to_string()
+            .contains("injected summary creation failure"));
+        assert_eq!(
+            ctx.storage().get_block_status(*terminal.blkid()).await?,
+            Some(BlockStatus::Valid)
+        );
+        assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![terminal]);
+        assert!(ctx.storage().epoch_summary_deletes().is_empty());
+        assert!(ctx.published_statuses().is_empty());
+        Ok(())
     }
 
     #[tokio::test]
