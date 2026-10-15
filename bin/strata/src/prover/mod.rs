@@ -139,6 +139,9 @@ pub(crate) fn start_prover_service(
     .context("checkpoint artifact check failed at startup")?;
     info!(%block, "checkpoint artifacts checked at startup");
 
+    // TODO(STR-4610): Handle persisted permanently failed checkpoint tasks before
+    // launching prover services; otherwise they can keep an epoch blocked across restarts.
+
     // Each scanner receives a spec-scoped store, including startup recovery.
     let mut handles = BTreeMap::new();
     for (spec, prover) in provers {
