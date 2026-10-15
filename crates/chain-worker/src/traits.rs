@@ -85,11 +85,11 @@ pub trait ChainWorkerContext: Send + Sync + 'static {
     // Epoch management
     // =========================================================================
 
-    /// Stores an epoch summary in the database.
-    ///
-    /// Called as the last durable step of terminal block execution: a stored
-    /// summary indicates the whole epoch finalization persisted.
+    /// Stores the summary after the epoch's state and indexing writes succeed.
     fn store_summary(&self, summary: EpochSummary) -> WorkerResult<()>;
+
+    /// Deletes the summary for exactly this epoch commitment, returning whether it existed.
+    fn delete_summary(&self, epoch: EpochCommitment) -> WorkerResult<bool>;
 
     /// Fetches canonical epoch summary for an epoch index.
     fn fetch_canonical_epoch_summary_at(&self, epoch: Epoch) -> WorkerResult<Option<EpochSummary>>;

@@ -204,6 +204,12 @@ impl ChainWorkerServiceState {
         handle_accepted_block(&self.ctx, block)
     }
 
+    /// Handles a block rejected by FCM.
+    pub(crate) fn handle_rejected_block(&self, block: OLBlockCommitment) -> WorkerResult<()> {
+        self.check_initialized()?;
+        handle_rejected_block(&self.ctx, block)
+    }
+
     /// Updates the current tip as managed by the worker.
     pub(crate) fn update_cur_tip(&mut self, tip: OLBlockCommitment) -> WorkerResult<()> {
         self.state.cur_tip = tip;
@@ -457,6 +463,26 @@ pub(crate) fn handle_accepted_block(
     debug!(?summary, "completed chain epoch");
     ctx.store_summary(summary)?;
 
+    Ok(())
+}
+
+/// Removes only the rejected terminal block's epoch summary, if one exists.
+///
+/// Older node versions could persist summaries before FCM accepted the block.
+/// The exact commitment keeps another terminal block's summary at the same epoch intact.
+pub(crate) fn handle_rejected_block(
+    ctx: &impl ChainWorkerContext,
+    block: OLBlockCommitment,
+) -> WorkerResult<()> {
+    let header = ctx
+        .fetch_header(block.blkid())?
+        .ok_or(WorkerError::MissingOLBlock(*block.blkid()))?;
+    if header.is_terminal() {
+        let epoch = EpochCommitment::new(header.epoch(), block.slot(), *block.blkid());
+        if ctx.delete_summary(epoch)? {
+            info!(%block, "deleted epoch summary of rejected OL terminal block");
+        }
+    }
     Ok(())
 }
 

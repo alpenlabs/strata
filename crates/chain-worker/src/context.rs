@@ -223,7 +223,7 @@ impl ChainWorkerContext for ChainWorkerContextImpl {
         self.ol_state_indexing_mgr
             .set_epoch_commitment_blocking(commitment.epoch(), commitment)?;
 
-        // Insert the epoch summary last which indicates that the whole finalization persisted
+        // Store the summary after the epoch's state and indexing writes succeed.
         match self
             .ol_checkpoint_mgr
             .insert_epoch_summary_blocking(summary)
@@ -252,6 +252,10 @@ impl ChainWorkerContext for ChainWorkerContextImpl {
 
         let _ = self.epoch_summary_tx.send(Some(commitment));
         Ok(())
+    }
+
+    fn delete_summary(&self, epoch: EpochCommitment) -> WorkerResult<bool> {
+        Ok(self.ol_checkpoint_mgr.del_epoch_summary_blocking(epoch)?)
     }
 
     fn fetch_canonical_epoch_summary_at(&self, epoch: u32) -> WorkerResult<Option<EpochSummary>> {

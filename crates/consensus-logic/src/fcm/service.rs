@@ -221,31 +221,13 @@ async fn set_block_status_and_clear_invalid_high_watermark<C: FcmContext>(
         // Revisit high-watermark clearing once FCM distinguishes consensus-invalid blocks
         // from transient execution failures.
 
-        // Older node versions could store a terminal block's summary before
-        // FCM rejected it. Clean up that exact summary when reprocessing such
-        // a block so it cannot shadow the replacement terminal's summary.
-        // Keyed exactly by the rejected block's own commitment, this can
-        // never touch another block's summary, so it runs regardless of the
-        // high-watermark gate below.
-        if bundle.header().is_terminal() {
-            let summary_commitment =
-                EpochCommitment::new(bundle.header().epoch(), block.slot(), *block.blkid());
-            let deleted = fcm_state
-                .ctx()
-                .del_epoch_summary(summary_commitment)
-                .await
-                .inspect_err(|err| {
-                    error!(
-                        %block,
-                        %err,
-                        "failed to delete epoch summary of invalid OL terminal block"
-                    );
-                })
-                .context("failed to delete epoch summary of invalid OL terminal block")?;
-            if deleted {
-                info!(%block, "deleted epoch summary of invalid OL terminal block");
-            }
-        }
+        // Let chain worker clean up before replacement generation can resume.
+        // Signal every rejected block; it owns any epoch-summary work.
+        fcm_state
+            .ctx()
+            .handle_rejected_block(block)
+            .await
+            .context("failed to handle rejected OL block")?;
 
         // The cleanup below only applies to the block the sequencer is
         // currently stuck on. An invalid block that is not the high-watermark
@@ -848,7 +830,6 @@ mod tests {
         states: HashMap<OLBlockCommitment, Arc<OLStateContainer>>,
         canonical_epochs: HashMap<Epoch, EpochCommitment>,
         indexing_rollbacks: Vec<(Epoch, OLBlockCommitment)>,
-        epoch_summary_deletes: Vec<EpochCommitment>,
     }
 
     impl StubFcmStorage {
@@ -946,10 +927,6 @@ mod tests {
         fn indexing_rollbacks(&self) -> Vec<(Epoch, OLBlockCommitment)> {
             self.inner.lock().unwrap().indexing_rollbacks.clone()
         }
-
-        fn epoch_summary_deletes(&self) -> Vec<EpochCommitment> {
-            self.inner.lock().unwrap().epoch_summary_deletes.clone()
-        }
     }
 
     #[derive(Default)]
@@ -959,6 +936,8 @@ mod tests {
         last_confirmed_epoch: Option<EpochCommitment>,
         executed_blocks: Mutex<Vec<OLBlockCommitment>>,
         accepted_blocks: Mutex<Vec<OLBlockCommitment>>,
+        rejected_blocks: Mutex<Vec<OLBlockCommitment>>,
+        fail_rejection_cleanup: Mutex<bool>,
         fail_summary_creation: bool,
         safe_tip_updates: Mutex<Vec<OLBlockCommitment>>,
         finalized_epochs: Mutex<Vec<EpochCommitment>>,
@@ -1079,11 +1058,6 @@ mod tests {
             Ok(())
         }
 
-        async fn del_epoch_summary(&self, epoch: EpochCommitment) -> DbResult<bool> {
-            self.inner.lock().unwrap().epoch_summary_deletes.push(epoch);
-            Ok(false)
-        }
-
         async fn get_toplevel_ol_state(
             &self,
             commitment: OLBlockCommitment,
@@ -1163,6 +1137,19 @@ mod tests {
             Ok(())
         }
 
+        async fn handle_rejected_block(&self, block: OLBlockCommitment) -> anyhow::Result<()> {
+            assert_eq!(
+                self.storage.get_block_status(*block.blkid()).await?,
+                Some(BlockStatus::Invalid),
+                "FCM must persist Invalid before signalling rejection"
+            );
+            self.rejected_blocks.lock().unwrap().push(block);
+            if *self.fail_rejection_cleanup.lock().unwrap() {
+                return Err(anyhow!("injected rejection cleanup failure"));
+            }
+            Ok(())
+        }
+
         async fn update_safe_tip(&self, safe_tip: OLBlockCommitment) -> anyhow::Result<()> {
             self.safe_tip_updates.lock().unwrap().push(safe_tip);
             Ok(())
@@ -1229,10 +1216,6 @@ mod tests {
             self.storage
                 .rollback_block_state_indexing(epoch, cutoff)
                 .await
-        }
-
-        async fn del_epoch_summary(&self, epoch: EpochCommitment) -> DbResult<bool> {
-            self.storage.del_epoch_summary(epoch).await
         }
 
         async fn get_toplevel_ol_state(
@@ -2454,8 +2437,40 @@ mod tests {
             Some(BlockStatus::Valid)
         );
         assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![terminal]);
-        assert!(ctx.storage().epoch_summary_deletes().is_empty());
+        assert!(ctx.rejected_blocks.lock().unwrap().is_empty());
         assert!(ctx.published_statuses().is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rejection_cleanup_failure_preserves_high_watermark() -> anyhow::Result<()> {
+        let (ctx, state, block) = terminal_summary_test_context(false, false).await?;
+        ctx.storage().set_block_high_watermark(block);
+        *ctx.fail_rejection_cleanup.lock().unwrap() = true;
+        let bundle = ctx.storage().get_ol_block(*block.blkid()).await?.unwrap();
+
+        let err = set_block_status_and_clear_invalid_high_watermark(
+            &state,
+            &bundle,
+            block,
+            BlockStatus::Invalid,
+        )
+        .await
+        .expect_err("rejection cleanup failure must propagate");
+        assert!(format!("{err:#}").contains("injected rejection cleanup failure"));
+        assert_eq!(ctx.storage().block_high_watermark(), Some(block));
+        assert!(ctx.storage().indexing_rollbacks().is_empty());
+
+        *ctx.fail_rejection_cleanup.lock().unwrap() = false;
+        set_block_status_and_clear_invalid_high_watermark(
+            &state,
+            &bundle,
+            block,
+            BlockStatus::Invalid,
+        )
+        .await?;
+        assert_eq!(ctx.storage().block_high_watermark(), None);
+        assert_eq!(*ctx.rejected_blocks.lock().unwrap(), vec![block, block]);
         Ok(())
     }
 
@@ -2505,14 +2520,14 @@ mod tests {
             ctx.storage().indexing_rollbacks(),
             vec![(0, genesis_commitment)]
         );
-        // Non-terminal blocks never store a summary, so none is deleted.
-        assert!(ctx.storage().epoch_summary_deletes().is_empty());
+        // Chain worker decides whether a rejected block needs summary cleanup.
+        assert_eq!(*ctx.rejected_blocks.lock().unwrap(), vec![block_commitment]);
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn process_fc_message_deletes_summary_for_invalid_terminal_block() -> anyhow::Result<()> {
+    async fn process_fc_message_signals_rejected_terminal_block() -> anyhow::Result<()> {
         let (_, pk) = test_schnorr_keypair();
         let genesis = make_storage_block(0, OLBlockId::from(Buf32::zero()));
         let genesis_blkid = genesis.header().compute_blkid();
@@ -2551,12 +2566,7 @@ mod tests {
             ctx.storage().indexing_rollbacks(),
             vec![(0, genesis_commitment)]
         );
-        // A rejected terminal block's epoch summary is dropped so it cannot
-        // shadow the replacement terminal's summary in canonical lookups.
-        assert_eq!(
-            ctx.storage().epoch_summary_deletes(),
-            vec![EpochCommitment::new(0, 1, blkid)]
-        );
+        assert_eq!(*ctx.rejected_blocks.lock().unwrap(), vec![block_commitment]);
 
         Ok(())
     }
@@ -2617,14 +2627,16 @@ mod tests {
             ctx.storage().block_high_watermark(),
             Some(canonical_commitment)
         );
-        // Non-terminal blocks never store a summary, so none is deleted.
-        assert!(ctx.storage().epoch_summary_deletes().is_empty());
+        assert_eq!(
+            *ctx.rejected_blocks.lock().unwrap(),
+            vec![OLBlockCommitment::new(1, fork_blkid)]
+        );
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn process_fc_message_deletes_summary_for_invalid_non_high_watermark_terminal_block(
+    async fn process_fc_message_signals_rejected_non_high_watermark_terminal_block(
     ) -> anyhow::Result<()> {
         let (_, pk) = test_schnorr_keypair();
         let genesis = make_storage_block(0, OLBlockId::from(Buf32::zero()));
@@ -2671,12 +2683,10 @@ mod tests {
             ctx.storage().get_block_status(fork_blkid).await?,
             Some(BlockStatus::Invalid)
         );
-        // The exact-keyed summary delete runs even though the fork is not the
-        // high-watermark: a stale summary keyed by the rejected terminal must
-        // not shadow canonical epoch lookups.
+        // Signal rejection even when the block does not hold the high-watermark.
         assert_eq!(
-            ctx.storage().epoch_summary_deletes(),
-            vec![EpochCommitment::new(0, 1, fork_blkid)]
+            *ctx.rejected_blocks.lock().unwrap(),
+            vec![OLBlockCommitment::new(1, fork_blkid)]
         );
         // The suffix-shaped cleanup stays gated: no indexing rollback and the
         // canonical high-watermark is kept.

@@ -48,6 +48,11 @@ impl SyncService for ChainWorkerService {
                 completion.send_blocking(res);
             }
 
+            ChainWorkerMessage::BlockRejected(block, completion) => {
+                let res = state.handle_rejected_block(block);
+                completion.send_blocking(res);
+            }
+
             ChainWorkerMessage::UpdateSafeTip(olbc, completion) => {
                 let res = state.update_cur_tip(olbc);
                 completion.send_blocking(res);

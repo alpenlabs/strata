@@ -18,6 +18,8 @@ pub trait ChainController: Send + Sync {
     async fn try_exec_block(&self, block: OLBlockCommitment) -> anyhow::Result<()>;
     /// Notifies the chain worker after FCM finishes processing and marks a block valid.
     async fn handle_accepted_block(&self, block: OLBlockCommitment) -> anyhow::Result<()>;
+    /// Notifies the chain worker after FCM marks a block invalid.
+    async fn handle_rejected_block(&self, block: OLBlockCommitment) -> anyhow::Result<()>;
     async fn update_safe_tip(&self, safe_tip: OLBlockCommitment) -> anyhow::Result<()>;
     async fn finalize_epoch(&self, epoch: EpochCommitment) -> anyhow::Result<()>;
 }
@@ -51,14 +53,6 @@ pub trait FcmStorage: UnfinalizedOLBlockSource {
         epoch: Epoch,
         cutoff: OLBlockCommitment,
     ) -> DbResult<()>;
-
-    /// Deletes the epoch summary keyed by exactly this epoch commitment.
-    ///
-    /// Called when a terminal block is marked invalid to drop the summary it
-    /// may have stored before failing, so a stale summary cannot shadow the
-    /// replacement terminal's summary in canonical epoch lookups. Returns
-    /// `true` when a summary existed and was deleted.
-    async fn del_epoch_summary(&self, epoch: EpochCommitment) -> DbResult<bool>;
 
     async fn get_toplevel_ol_state(
         &self,
