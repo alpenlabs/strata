@@ -122,6 +122,14 @@ writes V1-prefixed keys; backfill for other specs and decoded task details are d
 Remote jobs store an opaque request ID in task metadata. The remote strategy can
 resume that request through the same spec's service while its metadata remains available.
 
+The remote strategy fetches the receipt and decodes its public output without
+adding local cryptographic proof verification. Each service
+checks the task's terminal-state spec before proving. Missing terminal state
+is retried without a version fallback. The witness still starts from the previous
+epoch's terminal state; if that state is missing, witness resolution waits.
+Node routing checks artifact availability before submitting work. The
+shared prover-core needs no changes for this routing. ASM checks run only at startup.
+
 ### Checkpoint work across restarts
 
 Startup preserves local checkpoint payloads, signing records, proofs, and prover
@@ -151,14 +159,6 @@ removes a proof that must be regenerated, its completed task and any dependent
 local payload/signing state must also be reconciled; deleting only the receipt
 does not reset the prover's completed status. L1 writer-intent cancellation is a
 separate concern tracked by STR-4290.
-
-The remote strategy fetches the receipt and decodes its public output without
-adding local cryptographic proof verification. Each service
-checks the task's terminal-state spec before proving. Missing terminal state
-is retried without a version fallback. The witness still starts from the previous
-epoch's terminal state; if that state is missing, witness resolution waits.
-Node routing checks artifact availability before submitting work. The
-shared prover-core needs no changes for this routing. ASM checks run only at startup.
 
 ## Checks
 
