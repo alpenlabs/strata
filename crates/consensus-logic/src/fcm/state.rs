@@ -111,6 +111,22 @@ impl<C: FcmContext> FcmServiceState<C> {
         self.inner_state.cur_best_block
     }
 
+    /// Collects ancestors of the current tip, including the tip, oldest first.
+    ///
+    /// Excludes the finalized anchor.
+    ///
+    /// Startup repeats their acceptance notifications because a crash can leave a
+    /// valid terminal block without its epoch summary. Earlier epochs must complete first.
+    pub(crate) fn collect_unfinalized_blocks(&self) -> Result<Vec<OLBlockCommitment>, Error> {
+        let tracker = self.chain_tracker();
+        construct_validated_parent_chain(tracker, self.cur_best_block())?
+            .into_iter()
+            .rev()
+            .filter(|blkid| blkid != tracker.finalized_tip())
+            .map(|blkid| Ok(OLBlockCommitment::new(tracker_slot(tracker, blkid)?, blkid)))
+            .collect()
+    }
+
     pub(crate) fn take_startup_replay_candidates(&mut self) -> Vec<OLBlockId> {
         mem::take(&mut self.inner_state.startup_replay_candidates)
     }

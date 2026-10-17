@@ -97,6 +97,18 @@ impl ChainWorkerContext for MockChainWorkerContext {
         Ok(self.checkpoint_payloads.get(epoch).cloned())
     }
 
+    fn fetch_summary(&self, epoch: EpochCommitment) -> WorkerResult<Option<EpochSummary>> {
+        Ok(self
+            .epoch_summaries
+            .get(&epoch.epoch())
+            .and_then(|summaries| {
+                summaries
+                    .iter()
+                    .find(|summary| summary.get_epoch_commitment() == epoch)
+                    .copied()
+            }))
+    }
+
     fn fetch_canonical_epoch_summary_at(&self, epoch: Epoch) -> WorkerResult<Option<EpochSummary>> {
         Ok(self
             .epoch_summaries
@@ -176,6 +188,10 @@ impl ChainWorkerContext for MockChainWorkerContext {
     }
 
     fn store_summary(&self, _summary: EpochSummary) -> WorkerResult<()> {
+        unimplemented!("not used by apply_checkpoint_epoch")
+    }
+
+    fn delete_summary(&self, _epoch: EpochCommitment) -> WorkerResult<bool> {
         unimplemented!("not used by apply_checkpoint_epoch")
     }
 

@@ -198,6 +198,18 @@ impl ChainWorkerServiceState {
         exec_block(&self.ctx, self.ctx.runtime_params(), block_commitment)
     }
 
+    /// Handles a block accepted by FCM, completing its epoch if it is terminal.
+    pub(crate) fn handle_accepted_block(&self, block: OLBlockCommitment) -> WorkerResult<()> {
+        self.check_initialized()?;
+        handle_accepted_block(&self.ctx, block)
+    }
+
+    /// Handles a block rejected by FCM.
+    pub(crate) fn handle_rejected_block(&self, block: OLBlockCommitment) -> WorkerResult<()> {
+        self.check_initialized()?;
+        handle_rejected_block(&self.ctx, block)
+    }
+
     /// Updates the current tip as managed by the worker.
     pub(crate) fn update_cur_tip(&mut self, tip: OLBlockCommitment) -> WorkerResult<()> {
         self.state.cur_tip = tip;
@@ -207,7 +219,7 @@ impl ChainWorkerServiceState {
     /// Marks an epoch as finalized(buried).
     ///
     /// By the time this runs the epoch's terminal state has already been merged
-    /// and stored — by [`handle_terminal_block_exec_post_ops`] for full
+    /// and stored — by [`handle_accepted_block`] for full
     /// sync, or by `apply_checkpoint` for checkpoint sync. This verifies that
     /// state is present, then records the epoch as finalized.
     pub(crate) fn finalize_epoch(&mut self, epoch: EpochCommitment) -> WorkerResult<()> {
@@ -246,12 +258,7 @@ impl ChainWorkerServiceState {
 
 /// Executes a block via the OL STF and persists its outputs.
 ///
-/// For terminal blocks the execution output is persisted *before* the epoch
-/// post-ops run: [`handle_terminal_block_exec_post_ops`] stamps the epoch
-/// commitment onto the indexing row that persisting a block of the epoch
-/// creates. In a single-block epoch (e.g. one sealed immediately by the
-/// checkpoint size policy) this block's persist is the only thing that
-/// creates that row, so stamping first fails with a missing-row error.
+/// Epoch summaries are created separately, after FCM marks the block valid.
 pub(crate) fn exec_block(
     ctx: &impl ChainWorkerContext,
     runtime_params: OLRuntimeParams,
@@ -277,23 +284,7 @@ pub(crate) fn exec_block(
         parent_commitment,
     )?;
 
-    let is_terminal = block.header().is_terminal();
-    debug!(slot=%block.header().slot(), is_terminal, "Checking if block is terminal");
-
-    if is_terminal {
-        // Persist results (including the full state) before the terminal
-        // post-ops; see the doc comment above.
-        persist_execution_output(ctx, &block, *block_commitment, &output, new_state.clone())?;
-
-        // Handle epoch terminal
-        // TODO(STR-3673): the epoch commitment seems to be sent to the
-        // receiver for each block at the moment. Ideally we would do it just
-        // here.
-        handle_terminal_block_exec_post_ops(ctx, &block, &output, &new_state)?;
-    } else {
-        // Persist results (including the full state)
-        persist_execution_output(ctx, &block, *block_commitment, &output, new_state)?;
-    }
+    persist_execution_output(ctx, &block, *block_commitment, &output, new_state)?;
 
     Ok(())
 }
@@ -447,34 +438,57 @@ fn persist_execution_output(
     Ok(())
 }
 
-/// Takes the block and post-state and inserts database entries to reflect
-/// the epoch being finished on-chain.
+/// Completes epoch processing for an accepted terminal block; other blocks need no work.
 ///
-/// Expects the terminal block's own output to be persisted already: the merge
-/// reads every block's write batch including the terminal block's, and epoch
-/// finalization stamps the epoch commitment onto an existing indexing row.
-///
-/// The summary is stored last, after the epoch data merge: a stored summary
-/// (and the notification it emits) indicates the whole epoch finalization
-/// persisted. A failure anywhere earlier leaves no summary behind for a
-/// block that may then be rejected.
-fn handle_terminal_block_exec_post_ops(
+/// Execution has already stored the header, full post-state, and write batches.
+/// The epoch merge remains before summary storage, so consumers only see a
+/// summary after all epoch completion writes succeed.
+pub(crate) fn handle_accepted_block(
     ctx: &impl ChainWorkerContext,
-    block: &OLBlockV1,
-    last_block_output: &OLBlockExecutionOutput,
-    new_state: &OLStateContainer,
+    block: OLBlockCommitment,
 ) -> WorkerResult<()> {
-    let completed_epoch = block.header().epoch();
+    let header = ctx
+        .fetch_header(block.blkid())?
+        .ok_or(WorkerError::MissingOLBlock(*block.blkid()))?;
+    if !header.is_terminal() {
+        return Ok(());
+    }
+    // Startup repeats acceptance notifications. A stored summary means the
+    // preceding state and indexing writes already succeeded.
+    let epoch = EpochCommitment::new(header.epoch(), block.slot(), *block.blkid());
+    if ctx.fetch_summary(epoch)?.is_some() {
+        return Ok(());
+    }
+    let new_state = ctx
+        .fetch_ol_state(block)?
+        .ok_or(WorkerError::MissingPreState(block))?;
+    let prev_terminal = get_prev_terminal(ctx, header.epoch())?;
+    let summary = build_epoch_summary(&header, &new_state, prev_terminal);
 
-    let prev_terminal = get_prev_terminal(ctx, completed_epoch)?;
-    let summary = build_epoch_summary(block.header(), last_block_output, new_state, prev_terminal);
-
-    // Merge the epoch's write batches into the terminal state.
     ctx.merge_epoch_data(&summary)?;
-
     debug!(?summary, "completed chain epoch");
     ctx.store_summary(summary)?;
 
+    Ok(())
+}
+
+/// Removes only the rejected terminal block's epoch summary, if one exists.
+///
+/// Older node versions could persist summaries before FCM accepted the block.
+/// The exact commitment keeps another terminal block's summary at the same epoch intact.
+pub(crate) fn handle_rejected_block(
+    ctx: &impl ChainWorkerContext,
+    block: OLBlockCommitment,
+) -> WorkerResult<()> {
+    let header = ctx
+        .fetch_header(block.blkid())?
+        .ok_or(WorkerError::MissingOLBlock(*block.blkid()))?;
+    if header.is_terminal() {
+        let epoch = EpochCommitment::new(header.epoch(), block.slot(), *block.blkid());
+        if ctx.delete_summary(epoch)? {
+            info!(%block, "deleted epoch summary of rejected OL terminal block");
+        }
+    }
     Ok(())
 }
 
@@ -1078,15 +1092,13 @@ fn run_stf_verification(
     Ok((write_batch, indexer_writes, logs))
 }
 
-/// Builds the [`EpochSummary`] for a completed epoch from the terminal block,
-/// its execution output, and the post-state.
+/// Builds the [`EpochSummary`] from the terminal header and its persisted post-state.
 ///
 /// L1 info is sourced from the post-state's epochal state rather than the
 /// write batch, since the batch only carries diffs and may not contain a
 /// `last_l1_*` update if the terminal block introduced no new manifests.
 fn build_epoch_summary(
     block_header: &OLBlockHeaderV1,
-    last_block_output: &OLBlockExecutionOutput,
     new_state: &OLStateContainer,
     prev_terminal: OLBlockCommitment,
 ) -> EpochSummary {
@@ -1097,7 +1109,7 @@ fn build_epoch_summary(
     // may not contain a last_l1_* update if the terminal block had no new manifests.
     let new_l1_block = new_state.chainstate().last_l1_block();
 
-    let epoch_final_state = *last_block_output.computed_state_root();
+    let epoch_final_state = *block_header.state_root();
 
     EpochSummary::new(
         completed_epoch,
@@ -1114,12 +1126,10 @@ mod tests {
     use strata_identifiers::{Buf32, L1BlockCommitment, L1BlockId, L1Height, OLBlockId};
     use strata_ol_chain_types_v1::{BlockFlagsV1, OLBlockHeaderV1};
     use strata_ol_state_container::test_utils::genesis_container;
-    use strata_ol_state_support_types::IndexerWrites;
     use strata_ol_state_types_v1::{WriteBatch, test_utils::create_test_genesis_state};
     use strata_ol_stf_v1::test_utils::make_genesis_state;
 
     use super::*;
-    use crate::OLBlockExecutionOutput;
 
     /// Regression test for the panic
     /// `terminal block must have L1 height in write batch`.
@@ -1149,9 +1159,6 @@ mod tests {
         assert!(terminal_batch.epochal_writes().last_l1_blkid.is_none());
 
         let state_root = Buf32::from([9u8; 32]);
-        let output =
-            OLBlockExecutionOutput::new(state_root, terminal_batch, IndexerWrites::new(), vec![]);
-
         let mut flags = BlockFlagsV1::zero();
         flags.set_is_terminal(true);
         let header = OLBlockHeaderV1::new(
@@ -1166,7 +1173,7 @@ mod tests {
         );
 
         let new_state = genesis_container(new_state);
-        let summary = build_epoch_summary(&header, &output, &new_state, OLBlockCommitment::null());
+        let summary = build_epoch_summary(&header, &new_state, OLBlockCommitment::null());
 
         assert_eq!(
             summary.new_l1(),

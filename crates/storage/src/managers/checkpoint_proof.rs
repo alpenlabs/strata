@@ -55,8 +55,4 @@ impl CheckpointProofDbManager {
             .map(decode_receipt)
             .transpose()
     }
-
-    pub fn del_proof(&self, epoch: EpochCommitment) -> DbResult<bool> {
-        self.ops.del_proof_blocking(epoch)
-    }
 }

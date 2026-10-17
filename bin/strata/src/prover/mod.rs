@@ -139,6 +139,9 @@ pub(crate) fn start_prover_service(
     .context("checkpoint artifact check failed at startup")?;
     info!(%block, "checkpoint artifacts checked at startup");
 
+    // TODO(STR-4610): Handle persisted permanently failed checkpoint tasks before
+    // launching prover services; otherwise they can keep an epoch blocked across restarts.
+
     // Each scanner receives a spec-scoped store, including startup recovery.
     let mut handles = BTreeMap::new();
     for (spec, prover) in provers {
@@ -237,8 +240,8 @@ fn spawn_checkpoint_runner(
             derive_next_epoch_to_prove(last_payload_epoch, history_base_epoch);
         // The epoch-summary watch channel resets to `None` on restart, so fall
         // back to the last summarized epoch from storage. Otherwise the catch-up
-        // loop below would idle at 0 and never re-prove epochs whose proofs were
-        // cleared by startup reconciliation until a new terminal epoch arrives.
+        // loop below would idle at 0 and never submit summarized epochs that
+        // still need a proof until a new terminal epoch arrives.
         let mut latest_epoch = epoch_rx
             .borrow()
             .map(|commitment| commitment.epoch())

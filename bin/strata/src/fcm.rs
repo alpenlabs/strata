@@ -62,6 +62,16 @@ impl ChainController for StrataFcmContext {
         Ok(())
     }
 
+    async fn handle_accepted_block(&self, block: OLBlockCommitment) -> anyhow::Result<()> {
+        self.chain_worker.handle_accepted_block(block).await?;
+        Ok(())
+    }
+
+    async fn handle_rejected_block(&self, block: OLBlockCommitment) -> anyhow::Result<()> {
+        self.chain_worker.handle_rejected_block(block).await?;
+        Ok(())
+    }
+
     async fn update_safe_tip(&self, safe_tip: OLBlockCommitment) -> anyhow::Result<()> {
         self.chain_worker.update_safe_tip(safe_tip).await?;
         Ok(())
@@ -140,13 +150,6 @@ impl FcmStorage for StrataFcmContext {
         self.storage
             .ol_state_indexing()
             .rollback_to_block_async(epoch, cutoff)
-            .await
-    }
-
-    async fn del_epoch_summary(&self, epoch: EpochCommitment) -> DbResult<bool> {
-        self.storage
-            .ol_checkpoint()
-            .del_epoch_summary_async(epoch)
             .await
     }
 

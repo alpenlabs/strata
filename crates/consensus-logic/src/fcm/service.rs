@@ -95,6 +95,19 @@ impl<C: FcmContext> Service for FcmService<C> {
 
 impl<C: FcmContext> AsyncService for FcmService<C> {
     async fn on_launch(state: &mut Self::State) -> anyhow::Result<()> {
+        // A crash after marking a terminal block valid can leave its epoch summary
+        // missing. Repeat BlockAccepted in chain order so the worker creates missing
+        // summaries before unchecked-block replay; it skips summaries already stored.
+        for block in state.collect_unfinalized_blocks()? {
+            state
+                .ctx()
+                .handle_accepted_block(block)
+                .await
+                .with_context(|| {
+                    format!("failed to complete startup acceptance for OL block {block}")
+                })?;
+        }
+
         let startup_replay_candidates = state.take_startup_replay_candidates();
         if startup_replay_candidates.is_empty() {
             return Ok(());
@@ -170,13 +183,6 @@ async fn process_fc_message<C: FcmContext>(
             };
 
             let status = if ok {
-                // check if any pending blocks can be finalized
-                if let Err(err) = handle_epoch_finalization(fcm_state).await {
-                    error!(%err, "failed to finalize epoch");
-                }
-
-                publish_sync_status(fcm_state).await?;
-
                 BlockStatus::Valid
             } else {
                 // Emit invalid block warning.
@@ -193,6 +199,15 @@ async fn process_fc_message<C: FcmContext>(
             )
             .await?;
             if ok {
+                // Summary consumers must only start after FCM finishes processing
+                // the block and durably marks it valid. A failure here must not
+                // turn an accepted block into an invalid block.
+                fcm_state.ctx().handle_accepted_block(block).await?;
+
+                if let Err(err) = handle_epoch_finalization(fcm_state).await {
+                    error!(%err, "failed to finalize epoch");
+                }
+                publish_sync_status(fcm_state).await?;
                 counter!("strata_fcm_blocks_accepted_total").increment(1);
             } else {
                 counter!("strata_fcm_blocks_rejected_total").increment(1);
@@ -219,32 +234,13 @@ async fn set_block_status_and_clear_invalid_high_watermark<C: FcmContext>(
         // Revisit high-watermark clearing once FCM distinguishes consensus-invalid blocks
         // from transient execution failures.
 
-        // A rejected terminal block may have stored its epoch summary before
-        // failing (the summary is the last exec step, but post-exec failures
-        // can still invalidate the block afterwards). Drop it so it cannot
-        // shadow the replacement terminal's summary in canonical lookups.
-        // Keyed exactly by the rejected block's own commitment, this can
-        // never touch another block's summary, so it runs regardless of the
-        // high-watermark gate below.
-        if bundle.header().is_terminal() {
-            let summary_commitment =
-                EpochCommitment::new(bundle.header().epoch(), block.slot(), *block.blkid());
-            let deleted = fcm_state
-                .ctx()
-                .del_epoch_summary(summary_commitment)
-                .await
-                .inspect_err(|err| {
-                    error!(
-                        %block,
-                        %err,
-                        "failed to delete epoch summary of invalid OL terminal block"
-                    );
-                })
-                .context("failed to delete epoch summary of invalid OL terminal block")?;
-            if deleted {
-                info!(%block, "deleted epoch summary of invalid OL terminal block");
-            }
-        }
+        // Let chain worker clean up before replacement generation can resume.
+        // Signal every rejected block; it owns any epoch-summary work.
+        fcm_state
+            .ctx()
+            .handle_rejected_block(block)
+            .await
+            .context("failed to handle rejected OL block")?;
 
         // The cleanup below only applies to the block the sequencer is
         // currently stuck on. An invalid block that is not the high-watermark
@@ -847,7 +843,6 @@ mod tests {
         states: HashMap<OLBlockCommitment, Arc<OLStateContainer>>,
         canonical_epochs: HashMap<Epoch, EpochCommitment>,
         indexing_rollbacks: Vec<(Epoch, OLBlockCommitment)>,
-        epoch_summary_deletes: Vec<EpochCommitment>,
     }
 
     impl StubFcmStorage {
@@ -945,10 +940,6 @@ mod tests {
         fn indexing_rollbacks(&self) -> Vec<(Epoch, OLBlockCommitment)> {
             self.inner.lock().unwrap().indexing_rollbacks.clone()
         }
-
-        fn epoch_summary_deletes(&self) -> Vec<EpochCommitment> {
-            self.inner.lock().unwrap().epoch_summary_deletes.clone()
-        }
     }
 
     #[derive(Default)]
@@ -957,6 +948,10 @@ mod tests {
         last_finalized_epoch: Option<EpochCommitment>,
         last_confirmed_epoch: Option<EpochCommitment>,
         executed_blocks: Mutex<Vec<OLBlockCommitment>>,
+        accepted_blocks: Mutex<Vec<OLBlockCommitment>>,
+        rejected_blocks: Mutex<Vec<OLBlockCommitment>>,
+        fail_rejection_cleanup: Mutex<bool>,
+        fail_summary_creation: bool,
         safe_tip_updates: Mutex<Vec<OLBlockCommitment>>,
         finalized_epochs: Mutex<Vec<EpochCommitment>>,
         published_statuses: Mutex<Vec<OLSyncStatus>>,
@@ -1076,11 +1071,6 @@ mod tests {
             Ok(())
         }
 
-        async fn del_epoch_summary(&self, epoch: EpochCommitment) -> DbResult<bool> {
-            self.inner.lock().unwrap().epoch_summary_deletes.push(epoch);
-            Ok(false)
-        }
-
         async fn get_toplevel_ol_state(
             &self,
             commitment: OLBlockCommitment,
@@ -1144,6 +1134,32 @@ mod tests {
     impl ChainController for StubFcmContext {
         async fn try_exec_block(&self, block: OLBlockCommitment) -> anyhow::Result<()> {
             self.executed_blocks.lock().unwrap().push(block);
+            Ok(())
+        }
+
+        async fn handle_accepted_block(&self, block: OLBlockCommitment) -> anyhow::Result<()> {
+            assert_eq!(
+                self.storage.get_block_status(*block.blkid()).await?,
+                Some(BlockStatus::Valid),
+                "FCM must persist Valid before signalling the worker"
+            );
+            self.accepted_blocks.lock().unwrap().push(block);
+            if self.fail_summary_creation {
+                return Err(anyhow!("injected summary creation failure"));
+            }
+            Ok(())
+        }
+
+        async fn handle_rejected_block(&self, block: OLBlockCommitment) -> anyhow::Result<()> {
+            assert_eq!(
+                self.storage.get_block_status(*block.blkid()).await?,
+                Some(BlockStatus::Invalid),
+                "FCM must persist Invalid before signalling rejection"
+            );
+            self.rejected_blocks.lock().unwrap().push(block);
+            if *self.fail_rejection_cleanup.lock().unwrap() {
+                return Err(anyhow!("injected rejection cleanup failure"));
+            }
             Ok(())
         }
 
@@ -1213,10 +1229,6 @@ mod tests {
             self.storage
                 .rollback_block_state_indexing(epoch, cutoff)
                 .await
-        }
-
-        async fn del_epoch_summary(&self, epoch: EpochCommitment) -> DbResult<bool> {
-            self.storage.del_epoch_summary(epoch).await
         }
 
         async fn get_toplevel_ol_state(
@@ -1942,7 +1954,14 @@ mod tests {
             .replace_canonical_suffix_from(1, vec![canonical_1.blkid(), canonical_2.blkid()])
             .await?;
 
-        let fcm_state = init_fcm_service_state(PredicateKey::always_accept(), fixture.ctx).await?;
+        let mut fcm_state =
+            init_fcm_service_state(PredicateKey::always_accept(), fixture.ctx).await?;
+        <FcmService<StubFcmContext> as AsyncService>::on_launch(&mut fcm_state).await?;
+        assert_eq!(
+            *fcm_state.ctx().accepted_blocks.lock().unwrap(),
+            vec![canonical_1.commitment(), canonical_2.commitment()]
+        );
+        assert!(fcm_state.ctx().executed_blocks().is_empty());
 
         assert_eq!(fcm_state.cur_best_block(), canonical_2.commitment());
         let reconcile_targets = fcm_state.ctx().startup_mmr_reconcile_targets();
@@ -2212,6 +2231,75 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn on_launch_completes_valid_blocks_before_replaying_unchecked_blocks(
+    ) -> anyhow::Result<()> {
+        let genesis = make_storage_block(0, OLBlockId::from(Buf32::zero()));
+        let genesis_blkid = genesis.header().compute_blkid();
+        let genesis_commitment = OLBlockCommitment::new(genesis.header().slot(), genesis_blkid);
+        let genesis_epoch = EpochCommitment::new(0, genesis_commitment.slot(), genesis_blkid);
+        let ctx = Arc::new(
+            StubFcmContext::new()
+                .with_last_finalized_epoch(Some(genesis_epoch))
+                .with_last_confirmed_epoch(Some(genesis_epoch)),
+        );
+
+        let block1 = make_storage_block(1, genesis_blkid);
+        let blkid1 = block1.header().compute_blkid();
+        let commitment1 = OLBlockCommitment::new(block1.header().slot(), blkid1);
+        let block2 = make_storage_block(2, blkid1);
+        let blkid2 = block2.header().compute_blkid();
+        let commitment2 = OLBlockCommitment::new(block2.header().slot(), blkid2);
+
+        ctx.storage().put_executed_block(
+            genesis,
+            make_genesis_state().into_container(),
+            BlockStatus::Valid,
+        );
+        for (block, commitment) in [(block1, commitment1), (block2, commitment2)] {
+            let blkid = block.header().compute_blkid();
+            ctx.storage().put_ol_block(block);
+            ctx.storage()
+                .set_block_status(
+                    blkid,
+                    if commitment == commitment1 {
+                        BlockStatus::Valid
+                    } else {
+                        BlockStatus::Unchecked
+                    },
+                )
+                .await?;
+            ctx.storage()
+                .put_toplevel_ol_state(commitment, make_genesis_state().into_container());
+        }
+        ctx.storage().put_canonical_epoch_commitment(genesis_epoch);
+        ctx.storage().seed_canonical_genesis(genesis_blkid);
+
+        let mut fcm_state =
+            init_fcm_service_state(PredicateKey::always_accept(), ctx.clone()).await?;
+
+        <FcmService<StubFcmContext> as AsyncService>::on_launch(&mut fcm_state).await?;
+
+        assert_eq!(ctx.executed_blocks(), vec![commitment2]);
+        assert_eq!(
+            *ctx.accepted_blocks.lock().unwrap(),
+            vec![commitment1, commitment2]
+        );
+        assert_eq!(ctx.safe_tip_updates(), vec![commitment2]);
+        assert_eq!(fcm_state.cur_best_block(), commitment2);
+        assert_eq!(fcm_state.take_startup_replay_candidates(), Vec::new());
+        assert_eq!(
+            ctx.storage().get_block_status(blkid1).await?,
+            Some(BlockStatus::Valid)
+        );
+        assert_eq!(
+            ctx.storage().get_block_status(blkid2).await?,
+            Some(BlockStatus::Valid)
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn stub_storage_round_trips_blocks_and_statuses() {
         let storage = StubFcmStorage::new();
         let block = make_storage_block(1, OLBlockId::from(Buf32::zero()));
@@ -2351,6 +2439,7 @@ mod tests {
         assert_eq!(ctx.executed_blocks(), vec![block_commitment]);
         assert_eq!(ctx.safe_tip_updates(), vec![block_commitment]);
         assert_eq!(ctx.finalized_epochs(), Vec::new());
+        assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![block_commitment]);
         assert_eq!(
             ctx.storage().get_block_status(blkid).await.unwrap(),
             Some(BlockStatus::Valid)
@@ -2362,6 +2451,146 @@ mod tests {
         assert_eq!(statuses[0].recently_complete_epoch(), genesis_epoch);
         assert_eq!(statuses[0].confirmed_epoch(), genesis_epoch);
         assert_eq!(statuses[0].finalized_epoch(), genesis_epoch);
+    }
+
+    async fn terminal_summary_test_context(
+        fail_summary_creation: bool,
+        persist_terminal_state: bool,
+    ) -> anyhow::Result<(
+        Arc<StubFcmContext>,
+        FcmServiceState<StubFcmContext>,
+        OLBlockCommitment,
+    )> {
+        let genesis = make_storage_block(0, OLBlockId::from(Buf32::zero()));
+        let genesis_commitment = genesis.header().compute_block_commitment();
+        let genesis_epoch = EpochCommitment::new(0, 0, *genesis_commitment.blkid());
+        let mut ctx = StubFcmContext::new()
+            .with_last_finalized_epoch(Some(genesis_epoch))
+            .with_last_confirmed_epoch(Some(genesis_epoch));
+        ctx.fail_summary_creation = fail_summary_creation;
+        let ctx = Arc::new(ctx);
+        ctx.storage().put_executed_block(
+            genesis,
+            make_genesis_state().into_container(),
+            BlockStatus::Valid,
+        );
+        ctx.storage().put_canonical_epoch_commitment(genesis_epoch);
+        ctx.storage()
+            .seed_canonical_genesis(*genesis_commitment.blkid());
+        let block = make_terminal_storage_block(1, *genesis_commitment.blkid());
+        let terminal = ctx.storage().put_ol_block(block);
+        if persist_terminal_state {
+            ctx.storage()
+                .put_toplevel_ol_state(terminal, make_genesis_state().into_container());
+        }
+        let state = init_fcm_service_state(PredicateKey::always_accept(), ctx.clone()).await?;
+        Ok((ctx, state, terminal))
+    }
+
+    #[tokio::test]
+    async fn process_fc_message_signals_worker_after_terminal_is_valid() -> anyhow::Result<()> {
+        let (ctx, mut state, terminal) = terminal_summary_test_context(false, true).await?;
+        process_fc_message(&ForkChoiceMessage::NewBlock(*terminal.blkid()), &mut state).await?;
+        assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![terminal]);
+        assert_eq!(state.cur_best_block(), terminal);
+        assert_eq!(ctx.published_statuses().len(), 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn process_fc_message_skips_acceptance_signal_after_post_execution_failure(
+    ) -> anyhow::Result<()> {
+        let (ctx, mut state, terminal) = terminal_summary_test_context(false, false).await?;
+        // Execution succeeds in the stub, but applying the tip fails because its state is missing.
+        process_fc_message(&ForkChoiceMessage::NewBlock(*terminal.blkid()), &mut state).await?;
+        assert_eq!(ctx.executed_blocks(), vec![terminal]);
+        assert_eq!(
+            ctx.storage().get_block_status(*terminal.blkid()).await?,
+            Some(BlockStatus::Invalid)
+        );
+        assert!(ctx.accepted_blocks.lock().unwrap().is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn process_fc_message_summary_failure_preserves_valid_status() -> anyhow::Result<()> {
+        let (ctx, mut state, terminal) = terminal_summary_test_context(true, true).await?;
+        let err = process_fc_message(&ForkChoiceMessage::NewBlock(*terminal.blkid()), &mut state)
+            .await
+            .expect_err("summary failure is propagated");
+        assert!(err
+            .to_string()
+            .contains("injected summary creation failure"));
+        assert_eq!(
+            ctx.storage().get_block_status(*terminal.blkid()).await?,
+            Some(BlockStatus::Valid)
+        );
+        assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![terminal]);
+        assert!(ctx.rejected_blocks.lock().unwrap().is_empty());
+        assert!(ctx.published_statuses().is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn startup_acceptance_failure_stops_before_unchecked_replay() -> anyhow::Result<()> {
+        let (ctx, _, terminal) = terminal_summary_test_context(true, true).await?;
+        ctx.storage()
+            .set_block_status(*terminal.blkid(), BlockStatus::Valid)
+            .await?;
+        let child = make_storage_block(terminal.slot() + 1, *terminal.blkid());
+        let child_commitment = ctx.storage().put_ol_block(child);
+        ctx.storage()
+            .set_block_status(*child_commitment.blkid(), BlockStatus::Unchecked)
+            .await?;
+        let mut state = init_fcm_service_state(PredicateKey::always_accept(), ctx.clone()).await?;
+
+        let err = <FcmService<StubFcmContext> as AsyncService>::on_launch(&mut state)
+            .await
+            .expect_err("recovery must succeed before replay starts");
+        assert!(format!("{err:#}").contains("injected summary creation failure"));
+        assert!(ctx.executed_blocks().is_empty());
+        assert_eq!(*ctx.accepted_blocks.lock().unwrap(), vec![terminal]);
+        assert_eq!(
+            ctx.storage().get_block_status(*terminal.blkid()).await?,
+            Some(BlockStatus::Valid)
+        );
+        assert_eq!(
+            state.take_startup_replay_candidates(),
+            vec![*child_commitment.blkid()]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rejection_cleanup_failure_preserves_high_watermark() -> anyhow::Result<()> {
+        let (ctx, state, block) = terminal_summary_test_context(false, false).await?;
+        ctx.storage().set_block_high_watermark(block);
+        *ctx.fail_rejection_cleanup.lock().unwrap() = true;
+        let bundle = ctx.storage().get_ol_block(*block.blkid()).await?.unwrap();
+
+        let err = set_block_status_and_clear_invalid_high_watermark(
+            &state,
+            &bundle,
+            block,
+            BlockStatus::Invalid,
+        )
+        .await
+        .expect_err("rejection cleanup failure must propagate");
+        assert!(format!("{err:#}").contains("injected rejection cleanup failure"));
+        assert_eq!(ctx.storage().block_high_watermark(), Some(block));
+        assert!(ctx.storage().indexing_rollbacks().is_empty());
+
+        *ctx.fail_rejection_cleanup.lock().unwrap() = false;
+        set_block_status_and_clear_invalid_high_watermark(
+            &state,
+            &bundle,
+            block,
+            BlockStatus::Invalid,
+        )
+        .await?;
+        assert_eq!(ctx.storage().block_high_watermark(), None);
+        assert_eq!(*ctx.rejected_blocks.lock().unwrap(), vec![block, block]);
+        Ok(())
     }
 
     #[tokio::test]
@@ -2410,14 +2639,14 @@ mod tests {
             ctx.storage().indexing_rollbacks(),
             vec![(0, genesis_commitment)]
         );
-        // Non-terminal blocks never store a summary, so none is deleted.
-        assert!(ctx.storage().epoch_summary_deletes().is_empty());
+        // Chain worker decides whether a rejected block needs summary cleanup.
+        assert_eq!(*ctx.rejected_blocks.lock().unwrap(), vec![block_commitment]);
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn process_fc_message_deletes_summary_for_invalid_terminal_block() -> anyhow::Result<()> {
+    async fn process_fc_message_signals_rejected_terminal_block() -> anyhow::Result<()> {
         let (_, pk) = test_schnorr_keypair();
         let genesis = make_storage_block(0, OLBlockId::from(Buf32::zero()));
         let genesis_blkid = genesis.header().compute_blkid();
@@ -2456,12 +2685,7 @@ mod tests {
             ctx.storage().indexing_rollbacks(),
             vec![(0, genesis_commitment)]
         );
-        // A rejected terminal block's epoch summary is dropped so it cannot
-        // shadow the replacement terminal's summary in canonical lookups.
-        assert_eq!(
-            ctx.storage().epoch_summary_deletes(),
-            vec![EpochCommitment::new(0, 1, blkid)]
-        );
+        assert_eq!(*ctx.rejected_blocks.lock().unwrap(), vec![block_commitment]);
 
         Ok(())
     }
@@ -2522,14 +2746,16 @@ mod tests {
             ctx.storage().block_high_watermark(),
             Some(canonical_commitment)
         );
-        // Non-terminal blocks never store a summary, so none is deleted.
-        assert!(ctx.storage().epoch_summary_deletes().is_empty());
+        assert_eq!(
+            *ctx.rejected_blocks.lock().unwrap(),
+            vec![OLBlockCommitment::new(1, fork_blkid)]
+        );
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn process_fc_message_deletes_summary_for_invalid_non_high_watermark_terminal_block(
+    async fn process_fc_message_signals_rejected_non_high_watermark_terminal_block(
     ) -> anyhow::Result<()> {
         let (_, pk) = test_schnorr_keypair();
         let genesis = make_storage_block(0, OLBlockId::from(Buf32::zero()));
@@ -2576,12 +2802,10 @@ mod tests {
             ctx.storage().get_block_status(fork_blkid).await?,
             Some(BlockStatus::Invalid)
         );
-        // The exact-keyed summary delete runs even though the fork is not the
-        // high-watermark: a stale summary keyed by the rejected terminal must
-        // not shadow canonical epoch lookups.
+        // Signal rejection even when the block does not hold the high-watermark.
         assert_eq!(
-            ctx.storage().epoch_summary_deletes(),
-            vec![EpochCommitment::new(0, 1, fork_blkid)]
+            *ctx.rejected_blocks.lock().unwrap(),
+            vec![OLBlockCommitment::new(1, fork_blkid)]
         );
         // The suffix-shaped cleanup stays gated: no indexing rollback and the
         // canonical high-watermark is kept.

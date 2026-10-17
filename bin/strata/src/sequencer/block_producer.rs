@@ -3,9 +3,10 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, anyhow, bail};
+use strata_chain_worker::ChainWorkerHandle;
 use strata_consensus_logic::{FcmServiceHandle, message::ForkChoiceMessage};
 use strata_db_types::ol_block::BlockStatus;
-use strata_identifiers::{EpochCommitment, OLBlockCommitment, OLBlockId};
+use strata_identifiers::{OLBlockCommitment, OLBlockId};
 use strata_ol_chain_types_v1::OLBlockV1;
 use strata_ol_sequencer::{SequencerBuilder, SequencerServiceStatus};
 use strata_service::ServiceMonitor;
@@ -39,6 +40,7 @@ pub(crate) fn start_block_producer(
         .block_on(process_startup_high_watermark_block(
             runctx.storage().as_ref(),
             fcm_handle.as_ref(),
+            runctx.chain_worker_handle().as_ref(),
         ))?;
 
     let context = Arc::new(NodeSequencerContext::new(
@@ -62,6 +64,7 @@ pub(crate) fn start_block_producer(
 async fn process_startup_high_watermark_block(
     storage: &NodeStorage,
     fcm_handle: &FcmServiceHandle,
+    chain_worker: &ChainWorkerHandle,
 ) -> Result<()> {
     let high_watermark = storage
         .ol_block()
@@ -119,26 +122,10 @@ async fn process_startup_high_watermark_block(
                 })
                 .context("failed to roll back state indexing for invalid high-watermark OL block on startup")?;
 
-            // An invalid terminal block may have stored its epoch summary
-            // before being rejected. Drop it so it cannot shadow the
-            // replacement terminal's summary in canonical lookups.
-            if block.header().is_terminal() {
-                let summary_commitment =
-                    EpochCommitment::new(block.header().epoch(), high_watermark.slot(), block_id);
-                storage
-                    .ol_checkpoint()
-                    .del_epoch_summary_async(summary_commitment)
-                    .await
-                    .inspect_err(|err| {
-                        error!(
-                            block_id = %block_id,
-                            slot = high_watermark.slot(),
-                            %err,
-                            "failed to delete epoch summary of invalid high-watermark OL terminal block on startup; replacement generation for this slot remains blocked"
-                        );
-                    })
-                    .context("failed to delete epoch summary of invalid high-watermark OL terminal block on startup")?;
-            }
+            chain_worker
+                .handle_rejected_block(high_watermark)
+                .await
+                .context("failed to handle rejected high-watermark OL block on startup")?;
 
             let cleared = storage
                 .ol_block()

@@ -414,14 +414,18 @@ strata-dbtool abandon-prover-tasks --all-unfinished --force
 ```
 
 ### `reset-prover-task`
-Flip a task back to `Pending` and clear its retry-after timestamp.
+Flip a task back to `Pending` and clear its retry-after timestamp. Retains task
+metadata, including any saved remote request ID, so this can resume the same
+remote job rather than create a new one.
 
 ```bash
 strata-dbtool reset-prover-task <key_hex> --force
 ```
 
 ### `delete-prover-task`
-Hard-delete a task row.
+Delete a task row and its metadata, including any saved remote request ID.
+A later submission for the same key can create a fresh task. This does not delete
+its proof receipt or checkpoint payload/signing records.
 
 ```bash
 strata-dbtool delete-prover-task <key_hex> --force
@@ -457,9 +461,17 @@ strata-dbtool get-checkpoint-proof <epoch> [OPTIONS]
 ```
 
 ### `delete-checkpoint-proof`
-Delete the stored proof receipt for an epoch. Operates on the canonical
-commitment at that epoch. Use case: force a re-prove after a guest-program
-upgrade.
+Delete the stored proof receipt for an epoch's canonical commitment. This leaves
+the prover task and checkpoint payload/signing records unchanged. Deleting the
+receipt alone does not force reproving: a completed task still needs to be reset
+with `reset-prover-task` or removed with `delete-prover-task`. Those commands do
+not make the checkpoint runner revisit an epoch it has already passed.
+
+There is no dedicated command to remove only checkpoint payload/signing records.
+Reverting checkpointed history with `revert-ol-state` also removes epoch summaries
+and rewinds OL state. Replacing a guest artifact under the same spec is not a
+supported protocol upgrade; see
+[checkpoint work across restarts](../../crates/ol/checkpoint-artifacts/README.md#checkpoint-work-across-restarts).
 
 ```bash
 strata-dbtool delete-checkpoint-proof <epoch> --force

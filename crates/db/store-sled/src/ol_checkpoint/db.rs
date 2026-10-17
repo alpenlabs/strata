@@ -273,45 +273,6 @@ impl OLCheckpointDatabase for OLCheckpointDBSled {
         Ok(deleted_epochs)
     }
 
-    fn del_local_checkpoint_payload_entries_from_epoch(
-        &self,
-        start_epoch: Epoch,
-    ) -> DbResult<Vec<EpochCommitment>> {
-        let keys: Vec<EpochCommitment> = self
-            .payload_tree
-            .range(epoch_lower_bound(start_epoch)..)
-            .map_err(conv_sled_err)?
-            .map(|item| {
-                item.map(|(epoch_comm, _entry)| epoch_comm)
-                    .map_err(conv_sled_err)
-            })
-            .collect::<DbResult<_>>()?;
-
-        if keys.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let deleted_epochs = self.config.with_retry(
-            (&self.payload_tree, &self.signing_tree, &self.unsigned_tree),
-            |(pt, st, ut)| {
-                let mut deleted_epochs = Vec::new();
-                for epoch_comm in &keys {
-                    if pt.contains_key(epoch_comm)? {
-                        let had_signing = st.contains_key(epoch_comm)?;
-                        pt.remove(epoch_comm)?;
-                        st.remove(epoch_comm)?;
-                        if !had_signing {
-                            ut.remove(&epoch_comm.epoch())?;
-                        }
-                        deleted_epochs.push(*epoch_comm);
-                    }
-                }
-                Ok(deleted_epochs)
-            },
-        )?;
-        Ok(deleted_epochs)
-    }
-
     fn put_checkpoint_signing_entry(
         &self,
         epoch: EpochCommitment,

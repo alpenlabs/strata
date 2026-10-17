@@ -18,7 +18,7 @@ use strata_db_types::errors::DbError;
 use strata_identifiers::{
     Buf32, Epoch, EpochCommitment, L1BlockCommitment, OLBlockCommitment, OLBlockId, SubjectId,
 };
-use strata_ol_chain_types_v1::{OLBlockHeaderV1, OLBlockV1};
+use strata_ol_chain_types_v1::{BlockFlagsV1, OLBlockHeaderV1, OLBlockV1};
 use strata_ol_params::OLRuntimeParams;
 use strata_ol_state_container::OLStateContainer;
 use strata_ol_state_types::{IStateAccessor, IStateAccessorMut, OLSpecId, OLSpecVersions};
@@ -33,7 +33,7 @@ use super::fixture::make_marked_genesis_state;
 use crate::{
     WorkerError, WorkerResult,
     output::OLBlockExecutionOutput,
-    state::{exec_block, merge_epoch_state},
+    state::{exec_block, handle_accepted_block, handle_rejected_block, merge_epoch_state},
     traits::ChainWorkerContext,
 };
 
@@ -57,6 +57,8 @@ struct OrderEnforcingContext {
     indexed_epochs: Mutex<Vec<Epoch>>,
     /// Summaries accepted by [`ChainWorkerContext::store_summary`].
     stored_summaries: Mutex<Vec<EpochSummary>>,
+    /// Exact commitments passed to summary deletion.
+    deleted_summaries: Mutex<Vec<EpochCommitment>>,
     /// Epochs passed to [`ChainWorkerContext::merge_epoch_data`].
     merged_epochs: Mutex<Vec<EpochCommitment>>,
     /// States accepted by [`ChainWorkerContext::store_toplevel_state`] and
@@ -96,7 +98,26 @@ impl ChainWorkerContext for OrderEnforcingContext {
         &self,
         commitment: OLBlockCommitment,
     ) -> WorkerResult<Option<OLStateContainer>> {
-        Ok(self.states.get(&commitment).cloned())
+        Ok(self
+            .stored_states
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find(|(stored, _)| *stored == commitment)
+            .map(|(_, state)| state.clone())
+            .or_else(|| self.states.get(&commitment).cloned()))
+    }
+
+    fn fetch_summary(&self, epoch: EpochCommitment) -> WorkerResult<Option<EpochSummary>> {
+        Ok(self
+            .stored_summaries
+            .lock()
+            .unwrap()
+            .iter()
+            .chain(self.canonical_summaries.values())
+            .find(|summary| summary.get_epoch_commitment() == epoch)
+            .copied())
     }
 
     fn fetch_canonical_epoch_summary_at(&self, epoch: Epoch) -> WorkerResult<Option<EpochSummary>> {
@@ -144,8 +165,7 @@ impl ChainWorkerContext for OrderEnforcingContext {
         }
         // Pins the intended ordering rather than a DB contract: the summary
         // must be the last durable step, after the epoch data merge, so a
-        // merge failure can never leave a summary behind for a block that
-        // then gets rejected.
+        // merge failure can never announce an incomplete epoch.
         if !self.merged_epochs.lock().unwrap().contains(&commitment) {
             return Err(WorkerError::Database(DbError::Other(format!(
                 "summary stored before epoch data merge for epoch {epoch}"
@@ -153,6 +173,14 @@ impl ChainWorkerContext for OrderEnforcingContext {
         }
         self.stored_summaries.lock().unwrap().push(summary);
         Ok(())
+    }
+
+    fn delete_summary(&self, epoch: EpochCommitment) -> WorkerResult<bool> {
+        self.deleted_summaries.lock().unwrap().push(epoch);
+        let mut summaries = self.stored_summaries.lock().unwrap();
+        let old_len = summaries.len();
+        summaries.retain(|summary| summary.get_epoch_commitment() != epoch);
+        Ok(summaries.len() != old_len)
     }
 
     fn merge_epoch_data(&self, summary: &EpochSummary) -> WorkerResult<()> {
@@ -267,6 +295,7 @@ fn exec_single_block_epoch(v0_parent: bool) -> (OrderEnforcingContext, OLBlockHe
         canonical_summaries: HashMap::from([(0, genesis_summary)]),
         indexed_epochs: Mutex::new(Vec::new()),
         stored_summaries: Mutex::new(Vec::new()),
+        deleted_summaries: Mutex::new(Vec::new()),
         merged_epochs: Mutex::new(Vec::new()),
         stored_states: Mutex::new(Vec::new()),
         write_batches: Mutex::new(HashMap::new()),
@@ -286,6 +315,12 @@ fn test_exec_single_block_epoch_persists_before_summary() {
     let terminal_commitment =
         OLBlockCommitment::new(terminal_header.slot(), terminal_header.compute_blkid());
 
+    assert!(ctx.stored_summaries.lock().unwrap().is_empty());
+    assert!(ctx.merged_epochs.lock().unwrap().is_empty());
+    assert!(ctx.fetch_ol_state(terminal_commitment).unwrap().is_some());
+
+    handle_accepted_block(&ctx, terminal_commitment)
+        .expect("FCM requests summary after acceptance");
     let summaries = ctx.stored_summaries.lock().unwrap();
     assert_eq!(summaries.len(), 1, "exactly one epoch summary stored");
     let epoch = summaries[0].get_epoch_commitment();
@@ -306,6 +341,7 @@ fn test_exec_first_v1_block_on_v0_terminal_persists_wrapped_state() {
     let (ctx, terminal_header) = exec_single_block_epoch(true);
     let terminal_commitment =
         OLBlockCommitment::new(terminal_header.slot(), terminal_header.compute_blkid());
+    handle_accepted_block(&ctx, terminal_commitment).expect("create accepted epoch summary");
 
     let stored_states = ctx.stored_states.lock().unwrap();
     let terminal_states: Vec<_> = stored_states
@@ -356,7 +392,8 @@ fn test_exec_block_rejects_noncanonical_manifest() {
 /// fails instead of producing a terminal state to store.
 #[test]
 fn test_merge_epoch_state_rejects_root_mismatch() {
-    let (ctx, _) = exec_single_block_epoch(false);
+    let (ctx, header) = exec_single_block_epoch(false);
+    handle_accepted_block(&ctx, header.compute_block_commitment()).expect("create summary");
     let summary = ctx.stored_summaries.lock().unwrap()[0];
     let wrong = EpochSummary::new(
         summary.epoch(),
@@ -371,4 +408,107 @@ fn test_merge_epoch_state_rejects_root_mismatch() {
         err,
         WorkerError::MergedStateRootMismatch { merged, .. } if merged == *summary.final_state()
     ));
+}
+
+/// Ordinary blocks must not create or delete summaries, or merge epoch data.
+#[test]
+fn test_handle_non_terminal_block_does_not_change_epoch_summaries() {
+    let (mut ctx, terminal_header) = exec_single_block_epoch(false);
+    let header = OLBlockHeaderV1::new(
+        0,
+        BlockFlagsV1::zero(),
+        terminal_header.slot() + 1,
+        terminal_header.epoch() + 1,
+        terminal_header.compute_blkid(),
+        Buf32::zero(),
+        Buf32::zero(),
+        Buf32::zero(),
+    );
+    let block = header.compute_block_commitment();
+    ctx.headers.insert(*block.blkid(), header);
+    let stored_state_count = ctx.stored_states.lock().unwrap().len();
+
+    handle_accepted_block(&ctx, block).expect("ordinary accepted block needs no epoch completion");
+    handle_rejected_block(&ctx, block).expect("ordinary rejected block needs no summary deletion");
+
+    assert!(ctx.deleted_summaries.lock().unwrap().is_empty());
+    assert!(ctx.stored_summaries.lock().unwrap().is_empty());
+    assert!(ctx.merged_epochs.lock().unwrap().is_empty());
+    assert_eq!(ctx.stored_states.lock().unwrap().len(), stored_state_count);
+}
+
+/// Rejection deletes only the exact terminal's summary and tolerates repeated signals.
+#[test]
+fn test_rejected_terminal_deletes_only_its_summary() {
+    let (ctx, header) = exec_single_block_epoch(false);
+    let rejected_block = header.compute_block_commitment();
+    handle_accepted_block(&ctx, rejected_block)
+        .expect("seed summary from the old eager-write flow");
+    let original = ctx.stored_summaries.lock().unwrap()[0];
+    let replacement = EpochSummary::new(
+        original.epoch(),
+        OLBlockCommitment::new(
+            rejected_block.slot(),
+            OLBlockId::from(Buf32::from([0xab; 32])),
+        ),
+        *original.prev_terminal(),
+        *original.new_l1(),
+        *original.final_state(),
+    );
+    ctx.stored_summaries.lock().unwrap().push(replacement);
+
+    handle_rejected_block(&ctx, rejected_block).expect("remove obsolete summary");
+    assert_eq!(*ctx.stored_summaries.lock().unwrap(), vec![replacement]);
+    handle_rejected_block(&ctx, rejected_block).expect("missing summary is already cleaned up");
+    assert_eq!(*ctx.stored_summaries.lock().unwrap(), vec![replacement]);
+    assert_eq!(
+        *ctx.deleted_summaries.lock().unwrap(),
+        vec![original.get_epoch_commitment(); 2]
+    );
+}
+
+/// Repeated acceptance needs no state reconstruction once the exact summary exists.
+#[test]
+fn test_accepted_terminal_with_summary_skips_epoch_work() {
+    let (mut ctx, header) = exec_single_block_epoch(false);
+    let block = header.compute_block_commitment();
+    handle_accepted_block(&ctx, block).expect("create missing summary from stored execution");
+    let summary = ctx.stored_summaries.lock().unwrap()[0];
+    ctx.states.clear();
+    ctx.stored_states.lock().unwrap().clear();
+    ctx.write_batches.lock().unwrap().clear();
+
+    handle_accepted_block(&ctx, block).expect("existing summary needs no state or write batches");
+    assert_eq!(*ctx.stored_summaries.lock().unwrap(), vec![summary]);
+    assert_eq!(
+        *ctx.merged_epochs.lock().unwrap(),
+        vec![summary.get_epoch_commitment()]
+    );
+    assert!(ctx.stored_states.lock().unwrap().is_empty());
+}
+
+/// A summary for another terminal in the same epoch must not suppress recovery.
+#[test]
+fn test_accepted_terminal_recovers_despite_other_summary_at_same_epoch() {
+    let (ctx, header) = exec_single_block_epoch(false);
+    let block = header.compute_block_commitment();
+    let other = EpochSummary::new(
+        header.epoch(),
+        OLBlockCommitment::new(block.slot(), OLBlockId::from(Buf32::from([0xab; 32]))),
+        *ctx.canonical_summaries[&0].terminal(),
+        *ctx.canonical_summaries[&0].new_l1(),
+        *header.state_root(),
+    );
+    ctx.stored_summaries.lock().unwrap().push(other);
+
+    handle_accepted_block(&ctx, block).expect("recover this terminal's missing summary");
+    let summaries = ctx.stored_summaries.lock().unwrap();
+    assert_eq!(summaries.len(), 2);
+    assert_eq!(summaries[0], other);
+    assert_eq!(*summaries[1].terminal(), block);
+    assert_eq!(
+        ctx.indexed_epochs.lock().unwrap().len(),
+        1,
+        "block was executed only once"
+    );
 }

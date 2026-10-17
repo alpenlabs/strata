@@ -106,7 +106,7 @@ impl RunContext {
     }
 
     /// Returns the chain worker handle.
-    #[cfg(feature = "prover")]
+    #[cfg(any(feature = "sequencer", feature = "prover"))]
     pub(crate) fn chain_worker_handle(&self) -> &Arc<ChainWorkerHandle> {
         &self.service_handles.chain_worker_handle
     }
