@@ -2,7 +2,9 @@ version: 2
 updates:
   # GitHub Actions dependencies
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "monthly"
       time: "00:00"
