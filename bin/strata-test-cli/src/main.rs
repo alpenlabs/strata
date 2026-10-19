@@ -26,7 +26,8 @@ use cmd::{
     convert_to_xonly_pk::convert_to_xonly_pk,
     create_deposit_tx::create_deposit_tx,
     create_ee_predicate_update::{
-        create_checkpoint_predicate_update, create_ee_predicate_update, print_signing_message,
+        create_admin_cancel, create_asm_predicate_update, create_checkpoint_predicate_update,
+        create_ee_predicate_update, print_signing_message,
     },
     create_withdrawal_fulfillment::create_withdrawal_fulfillment,
     extract_p2tr_pubkey::extract_p2tr_pubkey,
@@ -46,6 +47,8 @@ fn main() {
         Commands::CreateWithdrawalFulfillment(args) => create_withdrawal_fulfillment(args),
         Commands::CreateEePredicateUpdate(args) => create_ee_predicate_update(args),
         Commands::CreateCheckpointPredicateUpdate(args) => create_checkpoint_predicate_update(args),
+        Commands::CreateAsmPredicateUpdate(args) => create_asm_predicate_update(args),
+        Commands::CreateAdminCancel(args) => create_admin_cancel(args),
         Commands::PrintSigningMessage(args) => print_signing_message(args),
         Commands::ComputeDrtOutput(args) => compute_drt_output(args),
         Commands::BuildSnarkWithdrawal(args) => build_snark_withdrawal(args),
