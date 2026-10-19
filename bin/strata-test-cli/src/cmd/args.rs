@@ -6,7 +6,8 @@ use super::{
     convert_to_xonly_pk::ConvertToXonlyPkArgs,
     create_deposit_tx::CreateDepositTxArgs,
     create_ee_predicate_update::{
-        CreateCheckpointPredicateUpdateArgs, CreateEePredicateUpdateArgs, PrintSigningMessageArgs,
+        CreateAdminCancelArgs, CreateAsmPredicateUpdateArgs, CreateCheckpointPredicateUpdateArgs,
+        CreateEePredicateUpdateArgs, PrintSigningMessageArgs,
     },
     create_withdrawal_fulfillment::CreateWithdrawalFulfillmentArgs,
     extract_p2tr_pubkey::ExtractP2trPubkeyArgs,
@@ -41,6 +42,12 @@ pub enum Commands {
 
     /// Queue an admin update that changes the OL checkpoint predicate key
     CreateCheckpointPredicateUpdate(CreateCheckpointPredicateUpdateArgs),
+
+    /// Queue an admin update that changes the ASM STF predicate key (switches the ASM spec)
+    CreateAsmPredicateUpdate(CreateAsmPredicateUpdateArgs),
+
+    /// Cancel a queued admin predicate update before it activates
+    CreateAdminCancel(CreateAdminCancelArgs),
 
     /// Print the admin signing message for offline (hardware wallet) signing
     PrintSigningMessage(PrintSigningMessageArgs),

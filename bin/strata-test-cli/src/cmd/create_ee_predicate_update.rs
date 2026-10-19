@@ -29,8 +29,8 @@ use serde_json::{json, Value};
 use strata_asm_admin_threshold_sig::{SignatureSet, ThresholdConfig};
 use strata_asm_proto_admin_txs::{
     actions::{
-        updates::{EeStfVkUpdate, OlStfVkUpdate},
-        MultisigAction, UpdateAction,
+        updates::{AsmStfVkUpdate, EeStfVkUpdate, OlStfVkUpdate},
+        CancelAction, MultisigAction, UpdateAction, UpdateId,
     },
     parser::SignedPayload,
 };
@@ -195,6 +195,166 @@ pub struct CreateCheckpointPredicateUpdateArgs {
     pub commit_output_sats: u64,
 }
 
+/// Broadcast an ASM STF predicate update (role: StrataAdministrator).
+///
+/// Every ASM executor must already list the new predicate in its execution targets: one
+/// that does not halts at the first block after the update activates.
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "create-asm-predicate-update")]
+pub struct CreateAsmPredicateUpdateArgs {
+    /// update sequence number; must be > the role's last accepted seqno (max gap per params)
+    #[argh(option)]
+    pub seq_no: u64,
+
+    /// target predicate (e.g. `Sp1Groth16:<hex>`)
+    #[argh(option, from_str_fn(parse_predicate_key))]
+    pub predicate: PredicateKey,
+
+    /// admin xpriv used to sign as signer index 0 (alias for `--admin-key 0:<xpriv>`)
+    #[argh(option)]
+    pub admin_xpriv: Option<String>,
+
+    /// signing key as `<signer_index>:<xpriv|32-byte hex>` (repeatable)
+    #[argh(option)]
+    pub admin_key: Vec<String>,
+
+    /// external BIP-137 signature as `<signer_index>:<base64>` (repeatable)
+    #[argh(option)]
+    pub signature: Vec<String>,
+
+    /// asm params JSON (the deployed `asmParams`) whose Admin role config verifies signatures
+    #[argh(option)]
+    pub signers_config: Option<PathBuf>,
+
+    /// signer threshold (with `--signer-address`; alternative to `--signers-config`)
+    #[argh(option)]
+    pub threshold: Option<u8>,
+
+    /// P2WPKH signer address in signer-index order (repeatable, with `--threshold`)
+    #[argh(option)]
+    pub signer_address: Vec<String>,
+
+    /// bitcoin network: regtest (default), signet, testnet or bitcoin
+    #[argh(option, default = "NETWORK", from_str_fn(parse_network))]
+    pub network: Network,
+
+    /// SPS-50 magic bytes, 4 ASCII chars (default ALPN)
+    #[argh(option, default = "MAGIC_BYTES", from_str_fn(parse_magic))]
+    pub magic: MagicBytes,
+
+    /// fund the commit tx from this bitcoind wallet (required unless network is regtest)
+    #[argh(option)]
+    pub btc_wallet: Option<String>,
+
+    /// build, verify and print the txs without broadcasting
+    #[argh(switch)]
+    pub dry_run: bool,
+
+    /// bitcoin RPC URL
+    #[argh(option)]
+    pub btc_url: String,
+
+    /// bitcoin RPC username
+    #[argh(option)]
+    pub btc_user: String,
+
+    /// bitcoin RPC password
+    #[argh(option)]
+    pub btc_password: String,
+
+    /// fee rate in sat/vB for commit/reveal txs (default 2)
+    #[argh(option, default = "2")]
+    pub fee_rate: u64,
+
+    /// commit output value in sats (default 20000)
+    #[argh(option, default = "20_000")]
+    pub commit_output_sats: u64,
+}
+
+/// Broadcast a cancel of a queued predicate update (role: that of the cancelled update).
+///
+/// The chain accepts the cancel only if `--update` and `--predicate` match the queued
+/// update exactly and it lands before the update activates.
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "create-admin-cancel")]
+pub struct CreateAdminCancelArgs {
+    /// ID of the queued update to cancel (the admin state's `next_update_id` when it queued)
+    #[argh(option)]
+    pub target_id: UpdateId,
+
+    /// kind of the queued update: `ee-stf-vk`, `ol-stf-vk` or `asm-stf-vk`
+    #[argh(option, from_str_fn(parse_target))]
+    pub update: PredicateUpdateTarget,
+
+    /// predicate of the queued update
+    #[argh(option, from_str_fn(parse_predicate_key))]
+    pub predicate: PredicateKey,
+
+    /// cancel sequence number; must be > the role's last accepted seqno (max gap per params)
+    #[argh(option)]
+    pub seq_no: u64,
+
+    /// admin xpriv used to sign as signer index 0 (alias for `--admin-key 0:<xpriv>`)
+    #[argh(option)]
+    pub admin_xpriv: Option<String>,
+
+    /// signing key as `<signer_index>:<xpriv|32-byte hex>` (repeatable)
+    #[argh(option)]
+    pub admin_key: Vec<String>,
+
+    /// external BIP-137 signature as `<signer_index>:<base64>` (repeatable)
+    #[argh(option)]
+    pub signature: Vec<String>,
+
+    /// asm params JSON (the deployed `asmParams`) whose Admin role config verifies signatures
+    #[argh(option)]
+    pub signers_config: Option<PathBuf>,
+
+    /// signer threshold (with `--signer-address`; alternative to `--signers-config`)
+    #[argh(option)]
+    pub threshold: Option<u8>,
+
+    /// P2WPKH signer address in signer-index order (repeatable, with `--threshold`)
+    #[argh(option)]
+    pub signer_address: Vec<String>,
+
+    /// bitcoin network: regtest (default), signet, testnet or bitcoin
+    #[argh(option, default = "NETWORK", from_str_fn(parse_network))]
+    pub network: Network,
+
+    /// SPS-50 magic bytes, 4 ASCII chars (default ALPN)
+    #[argh(option, default = "MAGIC_BYTES", from_str_fn(parse_magic))]
+    pub magic: MagicBytes,
+
+    /// fund the commit tx from this bitcoind wallet (required unless network is regtest)
+    #[argh(option)]
+    pub btc_wallet: Option<String>,
+
+    /// build, verify and print the txs without broadcasting
+    #[argh(switch)]
+    pub dry_run: bool,
+
+    /// bitcoin RPC URL
+    #[argh(option)]
+    pub btc_url: String,
+
+    /// bitcoin RPC username
+    #[argh(option)]
+    pub btc_user: String,
+
+    /// bitcoin RPC password
+    #[argh(option)]
+    pub btc_password: String,
+
+    /// fee rate in sat/vB for commit/reveal txs (default 2)
+    #[argh(option, default = "2")]
+    pub fee_rate: u64,
+
+    /// commit output value in sats (default 20000)
+    #[argh(option, default = "20_000")]
+    pub commit_output_sats: u64,
+}
+
 /// Print the exact text admin signers must sign with Bitcoin `signmessage` (BIP-137).
 ///
 /// The message goes to stdout byte-for-byte (no trailing newline); role and digest go to
@@ -202,7 +362,8 @@ pub struct CreateCheckpointPredicateUpdateArgs {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "print-signing-message")]
 pub struct PrintSigningMessageArgs {
-    /// update kind: `ee-stf-vk` (AlpenAdministrator) or `ol-stf-vk` (StrataAdministrator)
+    /// update kind: `ee-stf-vk` (AlpenAdministrator), `ol-stf-vk` or `asm-stf-vk`
+    /// (StrataAdministrator)
     #[argh(option, from_str_fn(parse_target))]
     pub update: PredicateUpdateTarget,
 
@@ -217,6 +378,10 @@ pub struct PrintSigningMessageArgs {
     /// bitcoin network the chain is anchored to (default regtest)
     #[argh(option, default = "NETWORK", from_str_fn(parse_network))]
     pub network: Network,
+
+    /// print the message for cancelling queued update `<id>` instead of the update itself
+    #[argh(option)]
+    pub cancel_target_id: Option<UpdateId>,
 }
 
 fn parse_predicate_key(value: &str) -> Result<PredicateKey, String> {
@@ -238,8 +403,9 @@ fn parse_target(value: &str) -> Result<PredicateUpdateTarget, String> {
     match value {
         "ee-stf-vk" => Ok(PredicateUpdateTarget::EeStfVk),
         "ol-stf-vk" => Ok(PredicateUpdateTarget::OlStfVk),
+        "asm-stf-vk" => Ok(PredicateUpdateTarget::AsmStfVk),
         other => Err(format!(
-            "unknown update `{other}` (expected ee-stf-vk|ol-stf-vk)"
+            "unknown update `{other}` (expected ee-stf-vk|ol-stf-vk|asm-stf-vk)"
         )),
     }
 }
@@ -256,6 +422,8 @@ pub enum PredicateUpdateTarget {
     EeStfVk,
     /// OL STF / checkpoint verifying key (StrataAdministrator).
     OlStfVk,
+    /// ASM STF verifying key, which selects the ASM spec (StrataAdministrator).
+    AsmStfVk,
 }
 
 #[derive(Debug)]
@@ -278,6 +446,8 @@ struct PredicateUpdateRequest {
     fee_rate: u64,
     commit_output_sats: u64,
     target: PredicateUpdateTarget,
+    /// Cancel the queued update with this ID instead of submitting the update.
+    cancel_target_id: Option<UpdateId>,
 }
 
 pub(crate) fn create_ee_predicate_update(
@@ -302,6 +472,7 @@ pub(crate) fn create_ee_predicate_update(
         fee_rate: args.fee_rate,
         commit_output_sats: args.commit_output_sats,
         target: PredicateUpdateTarget::EeStfVk,
+        cancel_target_id: None,
     })
 }
 
@@ -327,11 +498,62 @@ pub(crate) fn create_checkpoint_predicate_update(
         fee_rate: args.fee_rate,
         commit_output_sats: args.commit_output_sats,
         target: PredicateUpdateTarget::OlStfVk,
+        cancel_target_id: None,
+    })
+}
+
+pub(crate) fn create_asm_predicate_update(
+    args: CreateAsmPredicateUpdateArgs,
+) -> Result<(), DisplayedError> {
+    create_predicate_update(PredicateUpdateRequest {
+        seq_no: args.seq_no,
+        predicate: args.predicate,
+        admin_xpriv: args.admin_xpriv,
+        admin_key: args.admin_key,
+        signature: args.signature,
+        signers_config: args.signers_config,
+        threshold: args.threshold,
+        signer_address: args.signer_address,
+        network: args.network,
+        magic: args.magic,
+        btc_wallet: args.btc_wallet,
+        dry_run: args.dry_run,
+        btc_url: args.btc_url,
+        btc_user: args.btc_user,
+        btc_password: args.btc_password,
+        fee_rate: args.fee_rate,
+        commit_output_sats: args.commit_output_sats,
+        target: PredicateUpdateTarget::AsmStfVk,
+        cancel_target_id: None,
+    })
+}
+
+pub(crate) fn create_admin_cancel(args: CreateAdminCancelArgs) -> Result<(), DisplayedError> {
+    create_predicate_update(PredicateUpdateRequest {
+        seq_no: args.seq_no,
+        predicate: args.predicate,
+        admin_xpriv: args.admin_xpriv,
+        admin_key: args.admin_key,
+        signature: args.signature,
+        signers_config: args.signers_config,
+        threshold: args.threshold,
+        signer_address: args.signer_address,
+        network: args.network,
+        magic: args.magic,
+        btc_wallet: args.btc_wallet,
+        dry_run: args.dry_run,
+        btc_url: args.btc_url,
+        btc_user: args.btc_user,
+        btc_password: args.btc_password,
+        fee_rate: args.fee_rate,
+        commit_output_sats: args.commit_output_sats,
+        target: args.update,
+        cancel_target_id: Some(args.target_id),
     })
 }
 
 pub(crate) fn print_signing_message(args: PrintSigningMessageArgs) -> Result<(), DisplayedError> {
-    let action = build_predicate_update_action(args.predicate, args.update);
+    let action = build_admin_action(args.predicate, args.update, args.cancel_target_id);
     let (message, digest) = signing_message(&action, args.seq_no, args.network);
     print!("{}", message.as_str());
     eprintln!();
@@ -416,7 +638,7 @@ struct SignedAdminPayload {
 /// Builds the action, collects signatures and, when a signer config is given, runs the
 /// on-chain threshold check. Touches no RPC, so it fails fast before any funding.
 fn sign_and_verify(args: &PredicateUpdateRequest) -> anyhow::Result<SignedAdminPayload> {
-    let action = build_predicate_update_action(args.predicate.clone(), args.target);
+    let action = build_admin_action(args.predicate.clone(), args.target, args.cancel_target_id);
     let (message, digest) = signing_message(&action, args.seq_no, args.network);
 
     let mut keys = Vec::new();
@@ -703,15 +925,26 @@ fn random_secret_key() -> anyhow::Result<SecretKey> {
     SecretKey::from_slice(&bytes).context("failed to generate envelope key")
 }
 
-fn build_predicate_update_action(
-    key: PredicateKey,
-    target: PredicateUpdateTarget,
-) -> MultisigAction {
-    let update = match target {
+fn build_update_action(key: PredicateKey, target: PredicateUpdateTarget) -> UpdateAction {
+    match target {
         PredicateUpdateTarget::EeStfVk => UpdateAction::EeStfVk(EeStfVkUpdate::new(key)),
         PredicateUpdateTarget::OlStfVk => UpdateAction::OlStfVk(OlStfVkUpdate::new(key)),
-    };
-    MultisigAction::Update(update)
+        PredicateUpdateTarget::AsmStfVk => UpdateAction::AsmStfVk(AsmStfVkUpdate::new(key)),
+    }
+}
+
+/// Builds the predicate update, or a cancel of it when `cancel_target_id` names the queued
+/// update. A cancel embeds the update so its role and signing message match the update's.
+fn build_admin_action(
+    key: PredicateKey,
+    target: PredicateUpdateTarget,
+    cancel_target_id: Option<UpdateId>,
+) -> MultisigAction {
+    let update = build_update_action(key, target);
+    match cancel_target_id {
+        Some(target_id) => MultisigAction::Cancel(CancelAction::new(target_id, update)),
+        None => MultisigAction::Update(update),
+    }
 }
 
 fn generate_keypair(secret_key: SecretKey) -> anyhow::Result<(UntweakedKeypair, XOnlyPublicKey)> {
@@ -868,6 +1101,7 @@ mod tests {
     use strata_asm_admin_threshold_sig::{
         verify_threshold_signatures, IndexedSignature, P2wpkhAddress,
     };
+    use strata_asm_admin_types::Role;
     use strata_asm_proto_admin_txs::test_utils::sign_ecdsa_bip137;
 
     use super::*;
@@ -886,11 +1120,16 @@ mod tests {
             .collect();
         let config = ThresholdConfig::try_new(signers, NonZero::new(2).expect("nz")).expect("cfg");
 
-        for target in [
+        let targets = [
             PredicateUpdateTarget::EeStfVk,
             PredicateUpdateTarget::OlStfVk,
-        ] {
-            let action = build_predicate_update_action(PredicateKey::always_accept(), target);
+            PredicateUpdateTarget::AsmStfVk,
+        ];
+        for (target, cancel_target_id) in
+            targets.into_iter().flat_map(|t| [(t, None), (t, Some(2))])
+        {
+            let action =
+                build_admin_action(PredicateKey::always_accept(), target, cancel_target_id);
             let (_, digest) = signing_message(&action, 5, network);
             let sigs = vec![
                 IndexedSignature::new(0, sign_ecdsa_bip137(&digest, &keys[0])),
@@ -921,5 +1160,34 @@ mod tests {
             // wrong magic must not decode
             assert!(decode_reveal_tx(&reveal_tx, MagicBytes::new(*b"XXXX"), &payload).is_err());
         }
+    }
+
+    /// The ASM STF update and its cancel are Strata Administrator actions, and the cancel
+    /// message names the queued update it targets.
+    #[test]
+    fn asm_stf_vk_update_and_cancel_messages() {
+        let target = parse_target("asm-stf-vk").expect("known target");
+        let key = PredicateKey::always_accept();
+
+        let update = build_admin_action(key.clone(), target, None);
+        assert_eq!(update.required_role(), Role::StrataAdministrator);
+        let (message, _) = signing_message(&update, 2, Network::Signet);
+        let text = message.as_str();
+        assert!(text.contains("Network: signet"), "{text}");
+        assert!(text.contains("Action: ASM STF VK Update"), "{text}");
+        assert!(
+            text.contains("Authorized By: Strata Administrator"),
+            "{text}"
+        );
+        assert!(text.contains("Sequence: 2"), "{text}");
+
+        let cancel = build_admin_action(key, target, Some(2));
+        assert_eq!(cancel.required_role(), Role::StrataAdministrator);
+        let (message, _) = signing_message(&cancel, 3, Network::Signet);
+        let text = message.as_str();
+        assert!(text.contains("Action: Cancel"), "{text}");
+        assert!(text.contains("Sequence: 3"), "{text}");
+        assert!(text.contains("Target Id: 2"), "{text}");
+        assert!(text.contains("Target Update: ASM STF VK Update"), "{text}");
     }
 }
