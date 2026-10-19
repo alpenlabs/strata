@@ -166,7 +166,9 @@ jobs:
   build-and-push:
     name: "Build ${{ matrix.program }}"
     needs: [prepare]
-    if: needs.prepare.result == 'success'
+    # check-new-commits is skipped on push and dispatch. Without a status
+    # function, the implicit success() sees that skip and skips this job too.
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
     environment: prod
     permissions:
